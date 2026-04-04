@@ -1,0 +1,7 @@
+# Default owner for everything
+* @lagarcess
+
+# Critical infrastructure files require extra attention
+.github/workflows/ @lagarcess
+Dockerfile @lagarcess
+pyproject.toml @lagarcess

@@ -1,0 +1,18 @@
+displayName: "Crypto Signals Job Failure Alert"
+documentation:
+  content: |
+    Cloud Run job `crypto-signals-job` has failed with a non-zero exit code.
+
+    **Action Required:**
+    1. Check Cloud Logging for error details
+    2. Review recent code changes
+    3. Verify secrets and environment variables
+  mimeType: text/markdown
+conditions:
+  - displayName: "Job execution failed"
+    conditionMatchedLog:
+      filter: 'resource.type="cloud_run_job" AND resource.labels.job_name="crypto-signals-job" AND severity>=ERROR'
+combiner: OR
+alertStrategy:
+  notificationRateLimit:
+    period: 300s

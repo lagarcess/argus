@@ -1,0 +1,21 @@
+displayName: "Crypto Signals Execution Time Alert"
+documentation:
+  content: |
+    Cloud Run job `crypto-signals-job` execution time has exceeded 5 minutes.
+
+    **Action Required:**
+    1. Check for slow API calls or network issues
+    2. Review job logs for processing bottlenecks
+    3. Consider optimizing data processing logic
+  mimeType: text/markdown
+conditions:
+  - displayName: "Execution time exceeds 5 minutes"
+    conditionThreshold:
+      filter: 'resource.type="cloud_run_job" AND resource.labels.job_name="crypto-signals-job" AND metric.type="run.googleapis.com/job/running_task_attempt_count"'
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_COUNT
+combiner: OR

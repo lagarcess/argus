@@ -1,0 +1,60 @@
+# Git files
+.git
+.gitignore
+.pre-commit-config.yaml
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (secrets should come from Secret Manager)
+.env
+.env.*
+
+# Documentation
+*.md
+docs/
+
+# Tests
+tests/
+test_*.py
+
+# CI/CD
+.github/
+
+# Temporary files
+*.log
+*.tmp
+tmp/
+temp/
+
+# OS files
+.DS_Store
+Thumbs.db

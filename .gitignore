@@ -1,0 +1,42 @@
+# Environment files with secrets
+.env
+.env.*
+!.env.example
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+.flake8
+
+# Logs
+*.log
+logs/
+
+# Secrets directory (for local development)
+secrets/
+*.json
+!pyproject.json
+valid_assets.txt
+
+# Temporary files
+
+# Ignore everything in the temp folder...
+temp/*
+# ...but don't ignore the .gitkeep file itself
+!temp/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db

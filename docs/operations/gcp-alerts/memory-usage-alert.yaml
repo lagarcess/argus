@@ -1,0 +1,21 @@
+displayName: "Crypto Signals High Memory Usage"
+documentation:
+  content: |
+    Cloud Run job `crypto-signals-job` memory utilization has exceeded 80% for over 5 minutes.
+
+    **Action Required:**
+    1. Review job execution logs for memory-intensive operations
+    2. Consider increasing memory allocation in Cloud Run job settings
+    3. Check for memory leaks in recent code changes
+  mimeType: text/markdown
+conditions:
+  - displayName: "Memory utilization above 80%"
+    conditionThreshold:
+      filter: 'resource.type="cloud_run_job" AND resource.labels.job_name="crypto-signals-job" AND metric.type="run.googleapis.com/container/memory/utilization"'
+      comparison: COMPARISON_GT
+      thresholdValue: 0.8
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_MEAN
+combiner: OR
