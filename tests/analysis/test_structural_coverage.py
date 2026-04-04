@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from crypto_signals.analysis.structural import (
+from argus.analysis.structural import (
     _fast_pip_core,
     _perpendicular_distance,
     _zigzag_core,

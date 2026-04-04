@@ -1,7 +1,7 @@
 """Unit tests for the indicators module."""
 
 import pandas as pd
-from crypto_signals.analysis.indicators import TechnicalIndicators
+from argus.analysis.indicators import TechnicalIndicators
 
 
 def test_add_all_indicators():

@@ -2,8 +2,8 @@
 
 import pandas as pd
 import pytest
-from crypto_signals.analysis.indicators import TechnicalIndicators
-from crypto_signals.analysis.patterns import PatternAnalyzer
+from argus.analysis.indicators import TechnicalIndicators
+from argus.analysis.patterns import PatternAnalyzer
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ import time
 import numpy as np
 import pandas as pd
 import pytest
-from crypto_signals.analysis.structural import (
+from argus.analysis.structural import (
     Pivot,
     _zigzag_core,
     fast_pip,
