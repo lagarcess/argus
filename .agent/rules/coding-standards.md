@@ -5,7 +5,7 @@ globs: ["src/**/*.py"]
 
 # Coding Standards Rule
 
-1. Use `loguru` for all logging. Never use `print()` or `logging`.
+1. Use `loguru` for all logging. Prohibit standard `logging` module and `print()` calls.
 2. 100% type hint coverage on all function signatures.
 3. 90 character line limit (ruff enforced).
 4. Use Pydantic `BaseModel` for data crossing boundaries.

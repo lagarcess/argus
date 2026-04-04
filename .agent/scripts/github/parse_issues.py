@@ -19,11 +19,7 @@ def format_issue_for_agent(issue_data: dict) -> str:
     labels = issue_data.get("labels", [])
 
     # Extract label names
-    label_names = [
-        label.get("name", "")
-        for label in labels
-        if isinstance(label, dict)
-    ]
+    label_names = [label.get("name", "") for label in labels if isinstance(label, dict)]
 
     # Determine issue type from labels
     issue_type = "feature"
@@ -67,27 +63,19 @@ def format_issue_for_agent(issue_data: dict) -> str:
     output.append("  - Run pre-commit hooks if available")
     output.append("")
     output.append("STEP 5: CREATE PR")
-    output.append(
-        f"  - Branch: {issue_type}/issue-{number}-[short-desc]"
-    )
-    output.append(
-        f"  - Commit: {issue_type}: [concise description] (#{number})"
-    )
+    output.append(f"  - Branch: {issue_type}/issue-{number}-[short-desc]")
+    output.append(f"  - Commit: {issue_type}: [concise description] (#{number})")
     output.append("  - Reference this issue in PR description")
     output.append("  - Ensure all CI checks pass")
     output.append("")
     output.append("=" * 80)
     output.append("IMPORTANT REMINDERS")
     output.append("=" * 80)
-    output.append(
-        "  - DO NOT modify files outside the scope of this issue"
-    )
+    output.append("  - DO NOT modify files outside the scope of this issue")
     output.append("  - DO NOT skip writing tests")
     output.append("  - DO keep changes minimal and focused")
     output.append("  - DO follow the existing code style")
-    output.append(
-        "  - DO check for similar patterns in the codebase"
-    )
+    output.append("  - DO check for similar patterns in the codebase")
     output.append("")
 
     return "\n".join(output)
@@ -95,10 +83,7 @@ def format_issue_for_agent(issue_data: dict) -> str:
 
 def main() -> None:
     if len(sys.argv) != 2:
-        print(
-            "Usage: python .agent/scripts/github/"
-            "parse_issues.py <JSON_FILE>"
-        )
+        print("Usage: python .agent/scripts/github/" "parse_issues.py <JSON_FILE>")
         sys.exit(1)
 
     json_path = Path(sys.argv[1])

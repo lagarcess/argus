@@ -34,8 +34,7 @@ def parse_pr_comments(
     if not isinstance(comments, list):
         comments = [comments]
 
-    print(f"🔵 Parsing {len(comments)} comments from "
-          f"{input_file.name}...")
+    print(f"🔵 Parsing {len(comments)} comments from " f"{input_file.name}...")
 
     report_lines: list[str] = []
     report_lines.append(f"PR Comments: {input_file.name}")
@@ -47,16 +46,8 @@ def parse_pr_comments(
         url = c.get("html_url", "N/A")
 
         # Line range
-        end_line = (
-            c.get("line")
-            or c.get("original_line")
-            or "N/A"
-        )
-        start_line = (
-            c.get("start_line")
-            or c.get("original_start_line")
-            or end_line
-        )
+        end_line = c.get("line") or c.get("original_line") or "N/A"
+        start_line = c.get("start_line") or c.get("original_start_line") or end_line
         if start_line == end_line or start_line == "N/A":
             line_str = f"{end_line}"
         else:
@@ -80,9 +71,7 @@ def parse_pr_comments(
                 priority = "MED"
             elif "low" in prio_slug:
                 priority = "LOW"
-            clean_body = raw_body.replace(
-                prio_match.group(0), ""
-            ).strip()
+            clean_body = raw_body.replace(prio_match.group(0), "").strip()
 
         report_lines.append("-" * 80)
         report_lines.append(f"Comment #{i + 1} [{priority}]")
@@ -100,9 +89,7 @@ def parse_pr_comments(
         f.write("\n".join(report_lines))
 
     print(f"✅ Report saved to: {output_file}")
-    print(
-        f"\n📋 Agents: Check {output_file} for full details."
-    )
+    print(f"\n📋 Agents: Check {output_file} for full details.")
     print("   Address HIGH priority items immediately.")
 
 

@@ -6,7 +6,7 @@ globs: ["src/argus/analysis/**/*.py"]
 # Performance Rule
 
 1. **JIT Warmup**: Any change to `src/argus/analysis/` requires `warmup_jit()` in test setup.
-2. **Pure math only** inside `@njit` functions — no pandas, logger, or Python objects.
+2. **Pure math only** inside `@njit` functions — no pandas, logger, I/O operations, or Python objects.
 3. **Performance targets** (after warmup):
    - ZigZag 1M points: <50ms
    - FastPIP 100K points: <100ms
