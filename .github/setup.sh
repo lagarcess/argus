@@ -26,7 +26,7 @@ poetry config virtualenvs.in-project true
 
 # 5. Install Dependencies (Non-interactive)
 echo "🔵 [Setup] Installing dependencies via Poetry..."
-poetry install --no-interaction --no-root
+poetry install --no-interaction
 
 # 6. Validate Package Import
 echo "🔵 [Setup] Validating argus package..."
