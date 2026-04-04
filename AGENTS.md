@@ -1,109 +1,79 @@
-# Project Agents & Tools: Crypto Sentinel
+# Project Agents & Tools: Argus
 
-This file serves as the **AI Team Registry**. It dictates how AI agents (like Jules or the Antigravity assistant) must behave, what skills they possess, and what workflows they can execute.
-
-If you are an AI reading this, you are part of a strict, production-grade engineering team. You must adhere to the Global Rules and activate the appropriate Expert Skills when working in specific domains.
+AI agent configuration registry for the Argus backtesting engine.
 
 ---
 
-## 🛡️ 1. Global & Workspace Rules (`.agent/rules/`)
+## 🛡️ Rules (`.agent/rules/`) — Always-Follow Guidelines
 
-These rules are machine-enforceable constraints. You must follow them implicitly.
-
-| Rule | Trigger | Purpose |
+| Rule | Scope | Purpose |
 | :--- | :--- | :--- |
-| `architecture.md` | Model Decision | Enforces strict boundaries (Zero IO in Domain, Market parses to Domain, Engine orchestrates). |
-| `data-integrity.md` | Model Decision | Enforces **Two-Phase Commit** (Firestore before Discord). Prevents overriding `ENVIRONMENT=PROD`. |
-| `coding-standards.md` | Model Decision | Enforces `loguru` (never `print`), 100% type hinting, 90 char limits, and Pydantic validation. |
-| `numba-jit.md` | Glob (`analysis/**/*.py`) | Enforces pure math inside JIT, requires `warmup_jit()` calls. |
-| `testing-tdd.md` | Glob (`tests/**/*.py`) | Enforces creating *new* test files for refactored classes. Mandates `polyfactory` mock generation. |
+| `coding-standards.md` | `src/**/*.py` | loguru logging, type hints, 90 char limit, Pydantic |
+| `testing.md` | `tests/**/*.py` | TDD-first, 63% coverage target, pytest conventions |
+| `git-workflow.md` | All | Conventional commits, branch naming, PR process |
+| `performance.md` | `src/argus/analysis/**` | Numba JIT warmup, pure math, perf targets |
+| `workspace.md` | All | temp/ for scratch, Poetry, file organization |
 
 ---
 
-## 🧠 2. AI Expert Skills (`.agent/skills/`)
+## 🧠 Skills (`.agent/skills/`) — Domain Knowledge
 
-Skills are specialized instruction sets. If your current task touches one of these domains, you **must** read the corresponding `SKILL.md` file before generating code.
-
-| Skill | Expert Persona | When to Use |
-| :--- | :--- | :--- |
-| `signal-state-machine` | Trading Execution Specialist | Modifying `engine/signal_generator.py` or editing signal state lifecycles. Prevents Phantom TP3 jumps. |
-| `alpaca-integration` | Brokerage Infra Engineer | Modifying `market/` wrappers or execution API calls. Teaches 404 defensive parsing and rate limit handling. |
-| `math-io-separation` | Quant Systems Architect | Refactoring monoliths. Teaches how to decouple Pandas/NumPy from external I/O for easy testing. |
-| `firestore-mutations` | Database Reliability Engineer | Modifying `repository/`. Teaches atomic batches, composite indexes, and preventing zombie positions. |
-| `schema-migration` | Data Platform Engineer | Editing Pydantic schemas in `domain/`. Teaches backwards compat and BQ pipeline sync requirements. |
-
----
-
-## ⚙️ 3. Standard Workflows (Slash Commands)
-
-Workflows are automated scripts outlining step-by-step processes. Execute them via `/workflow-name` or by reading the `.agent/workflows/` directory.
-
-### Orchestration & Design (The Master Hand-offs)
-- `/kickoff`: The Product Owner gathers business requirements and outputs `docs/designs/requirements.md`.
-- `/design`: The Backend Architect and DRE draft a system architecture `docs/designs/rfc-design.md` for your approval.
-- `/proto-sync`: Translates Google Stitch UI/UX JSON exports into functional frontend components aligned with Pydantic schemas.
-
-### Core Development Loop
-- `/plan`: Generates `temp/plan/implementation-plan.md`. Always start here.
-- `/implement`: Enters the Red-Green-Refactor loop, creates branch, writes test.
-- `/fix`: The universal TDD inner-loop. Reads a failing test, fixes code, loops 3 times.
-
-### Validation & CI/CD
-- `/verify`: Runs the full suite, coverage regression check, type checking, and pre-commit hooks.
-- /preflight: Local Docker + GCP check (FLAGGED AS BROKEN - run manually for now).
-- `/architect`: Analyzes massive monoliths (e.g. `main.py`) to draft an extraction plan without touching code.
-- `/perf`: Benchmarks Numba JIT logic and backtest paths to catch latency spikes.
-
-### Data & Architecture
-- `/migrate`: Validates Firestore schemas and BigQuery parity, then commits changes.
-- `/diagnose`: Infrastructure health check (GCP, Firestore, Alpaca) and Book Balancing Audit (Reverse Orphans/Zombies).
-
-### Review & Learning
-- `/sync`: Resolve upstream conflicts, rebase, and verify infrastructure integrity before PR review.
-- `/sync-docs`: Audits the repository and synchronizes all documentation (.md files, docstrings) with the current codebase state.
-- `/pr`: Creates a comprehensive Pull Request from current changes, formatting, and checking for secrets.
-- `/review`: AI Code Review (Staff Engineer Persona) + Automated Code Hygiene pass.
-- `/review-jules`: Manager-level review for delegations to the Jules Agent.
-- `/learn`: **Critical**. Extracts engineering lessons for future reference and commits to knowledge base. Run after every major change.
-- `/cleanup_branch`: Post-merge cleanup workflow. Delete local branches, prune remote, and refresh dependencies.
+| Skill | When to Use |
+| :--- | :--- |
+| `coding-standards/` | Python code style, logging, validation patterns |
+| `numba-patterns/` | JIT compilation, warmup, pure-math constraints |
+| `backend-patterns/` | Data provider, caching, config, error handling |
+| `testing-patterns/` | pytest, TDD workflow, coverage strategy |
+| `frontend-patterns/` | React/Next.js components, design system, API integration |
+| `security-review/` | Secrets, .env safety, API boundaries, auth |
 
 ---
 
-## 🤝 4. Team Delegation Strategy
+## ⚙️ Workflows (`.agent/workflows/`) — Slash Commands
 
-As the solo Staff Engineer, you orchestrate this AI Agency using three primary tools: **Antigravity**, **GitHub**, and **Jules**.
+### Core Development
+| Command | Description |
+| :--- | :--- |
+| `/plan` | Generate implementation plan before making changes |
+| `/implement` | TDD loop: write test → implement → verify |
+| `/fix` | Fix a failing test (max 3 iterations) |
 
-**Note on MCP**: GitHub's native integrations are extremely powerful for asynchronous agentic tracking. For a solo project, GitHub Issues is sufficient to manage the AI Agency. You only need to scale to Linear if sprint planning and cross-functional ticketing become overwhelming.
+### Quality & Release
+| Command | Description |
+| :--- | :--- |
+| `/review` | Code review with security and quality checks |
+| `/verify` | Run full test suite + lint |
+| `/pr` | Create a comprehensive pull request |
+| `/perf` | Benchmark Numba JIT performance paths |
 
-### Antigravity (The Staff Copilot)
-*Role*: High-level reasoning, system architecture, complex refactoring, and orchestration.
-- Use for `/kickoff`, `/design`, and `/architect` workflows.
-- Use for deep systemic bugs requiring `/diagnose`.
-- Use to maintain `agency_blueprint.md` and `AGENTS.md`.
+### Discovery & Ops
+| Command | Description |
+| :--- | :--- |
+| `/issue` | Diagnose, validate, create GitHub issues |
+| `/learn` | Extract engineering lessons from completed work |
 
-### GitHub Issues (The Workflow Contract)
-*Role*: The central source of truth for work tracking.
-- **When to Create an Issue (`/issue`)**:
-  - Any task exceeding 1 hour of work or touching >2 modules.
-  - Epics that emerge from a `/kickoff` session.
-  - Vague bugs that require isolated investigation before coding.
-- *Why*: It forces you to define strict **acceptance criteria** before an AI writes code, preventing hallucinations and scope creep.
+---
 
-### Jules (The Execution Engine)
-*Role*: The junior-to-mid level engineer executing well-defined tickets.
-- **When to Delegate (Add `jules` tag to a GitHub Issue)**:
-  - Repetitive, isolated tasks (e.g., "Add a new endpoint for X that matches schema Y").
-  - Test coverage expansion (e.g., "Write unit tests for `analysis/indicators.py`").
-  - Boilerplate generation based on an approved `docs/designs/rfc-design.md` from Antigravity.
-- **VM Setup (`scripts/jules-setup.sh`)**: Jules should run this script to correctly initialize its workspace (dependencies, safe environment variables, JIT warmup) before executing tasks.
-- *Why*: Jules excels at asynchronous, scoped task execution. Jules writes the PR, and you (with Antigravity's help) review it via the `/review-jules` workflow.
+## 🔧 Scripts (`.agent/scripts/github/`) — GitHub Context
+
+| Script | Purpose |
+| :--- | :--- |
+| `batch_get_issues.sh` | Fetch multiple issues in one go |
+| `get_issue_details.sh` | Fetch + format a single issue |
+| `parse_issues.py` | Parse issue JSON → readable agent context |
+| `parse_pr_comments.py` | Parse PR review comments → prioritized report |
+
+Usage:
+```bash
+& "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/batch_get_issues.sh 42 43 44
+```
 
 ---
 
 ## 🛑 Never-Violate Standards
 
-1. **Environment Isolation**: Never override `ENVIRONMENT=PROD` in automated scripts. Use `DEV` for fixes.
-2. **Two-Phase Commit**: Always persist a signal or state to Firestore *before* sending a Discord notification.
-3. **Structured Logging**: Use `loguru` with context (`signal_id`, `symbol`). No standard `print` statements.
-4. **TDD First**: Generate a failing unit test for bugs before writing the fix.
-5. **JIT Warmup**: Any changes to `src/crypto_signals/analysis/` require a `warmup_jit()` call to prevent latency spikes in production.
+1. **Structured Logging**: Use `loguru` with context. No `print()`.
+2. **TDD First**: Write a failing test before fixing any bug.
+3. **JIT Warmup**: Changes to `src/argus/analysis/` require `warmup_jit()`.
+4. **Use `temp/`**: Never dump scratch files in the project root.
+5. **Secrets in `.env`**: Never commit credentials to source control.

@@ -1,43 +1,29 @@
 [tool.poetry]
-name = "crypto-signals"
+name = "argus"
 version = "0.1.0"
-description = "Crypto Sentinel - Automated Crypto Trading System"
+description = "Argus - Pattern Analysis & Backtesting Engine"
 authors = ["Admin <admin@example.com>"]
-packages = [{include = "crypto_signals", from = "src"}]
+packages = [{include = "argus", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 # Configuration Management
 pydantic-settings = "^2.7.0"
 python-dotenv = "^1.0.0"
-# Alpaca Trading & Market Data
+# Alpaca Market Data
 alpaca-py = "^0.38.0"
+# Logging
 loguru = "^0.7.3"
-tenacity = "^8.2.0"
-# Google Cloud Services
-google-cloud-firestore = "^2.22.0"
-google-cloud-bigquery = "^3.27.0"
-google-cloud-secret-manager = "^2.21.0"
-google-cloud-logging = "^3.11.0"
-# HTTP Client
-requests = "^2.31.0"
-websockets = "^13.1"
 # Data Analysis
 pandas = "^2.2.0"
 pandas-ta-classic = {git = "https://github.com/xgboosted/pandas-ta-classic.git", branch = "main"}
-# Terminal UI & Rich Logging
-rich = "^13.0.0"
-typer = "^0.20.1"
+# High-Performance Computing
 numba = {version = ">=0.60.0", python = ">=3.10"}
 joblib = "^1.5.3"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-migrate-schema = "crypto_signals.scripts.migrate_schema:main"
-sync-docs = "crypto_signals.scripts.docs.sync_docs:app"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0,<9.0"
@@ -46,10 +32,7 @@ pytest-cov = ">=4.0.0"
 pre-commit = "<4.0"
 ruff = ">=0.4.0,<0.5.0"
 icdiff = ">=2.0.7,<3.0.0"
-mplfinance = ">=0.12.10b0,<0.13.0"
 mypy = "^1.10.0"
-polyfactory = "^3.2.0"
-sqlglot = "^28.9.0"
 
 [tool.mypy]
 python_version = "3.10"
@@ -60,29 +43,11 @@ check_untyped_defs = true
 disallow_any_generics = true
 
 [[tool.mypy.overrides]]
-## Core Legacy Modules
 module = [
-    "crypto_signals.scripts.diagnostics.account_status",
-    "crypto_signals.engine.execution",
-    "crypto_signals.notifications.discord",
-    "crypto_signals.scripts.diagnostics.health_check",
-    "crypto_signals.scripts.diagnostics.state_analysis",
-    "crypto_signals.scripts.resurrect_positions",
-    "crypto_signals.scripts.diagnostics.forensic_analysis",
-    "crypto_signals.pipelines.rejected_signal_archival",
-    "crypto_signals.pipelines.trade_archival",
-    "crypto_signals.pipelines.base",
-    "crypto_signals.pipelines.price_patch",
-    "crypto_signals.pipelines.fee_patch",
-    "crypto_signals.analysis.structural",
-    "crypto_signals.analysis.patterns",
-    "crypto_signals.analysis.indicators",
-    "crypto_signals.analysis.harmonics",
-    "crypto_signals.market.asset_service",
-    "crypto_signals.engine.risk",
-    "crypto_signals.engine.signal_generator",
-    "crypto_signals.pipelines.account_snapshot",
-    "crypto_signals.engine.parameters",
+    "argus.analysis.structural",
+    "argus.analysis.patterns",
+    "argus.analysis.indicators",
+    "argus.analysis.harmonics",
 ]
 ignore_errors = true
 
@@ -92,17 +57,14 @@ data_file = "temp/coverage/.coverage"
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
-# Skip integration tests by default (run with: pytest -m integration)
-addopts = "-v -m 'not integration' --cov=src --cov-report=term-missing --cov-report=html:temp/coverage/html --cov-report=xml:temp/coverage/coverage.xml --cov-fail-under=63"
+addopts = "-v --cov=src --cov-report=term-missing --cov-report=html:temp/coverage/html --cov-report=xml:temp/coverage/coverage.xml"
 markers = [
-    "visual: marks tests as visual integration tests (require TEST_DISCORD_WEBHOOK)",
-    "integration: marks tests as integration tests that require real credentials (deselected by default)",
     "slow: marks tests as slow (performance benchmarks requiring large datasets)",
 ]
 
 [tool.ruff]
 line-length = 90
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [

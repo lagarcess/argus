@@ -1,24 +1,27 @@
 ---
-description: Benchmarks Numba JIT logic and backtest paths to catch latency spikes
+description: Benchmark Numba JIT logic and backtest performance paths.
 ---
 
-1. **JIT Warmup Verification**
-   // turbo
-   - Ensure `warmup_jit()` is called successfully without crashing.
-   - Run python command: `poetry run python -c "from crypto_signals.analysis.structural import warmup_jit; warmup_jit()"`
+# /perf — Performance Benchmarking
 
-2. **Slow Test Execution**
-   // turbo
-   - Run tests marked with `@pytest.mark.slow`. These are typically performance benchmarks on historical datasets.
-   - Execute: `poetry run pytest -m slow -v`
+1. **Warm up JIT**:
+   ```python
+   from argus.analysis.structural import warmup_jit
+   warmup_jit()
+   ```
 
-3. **Profiling**
-   // turbo
-   - If the user provides a specific entry point script or symbol, run a cProfile trace.
-   - Execute: `poetry run python -m cProfile -s tottime -m crypto_signals.main --smoke-test > temp/perf/profile_results.txt` (ensure `temp/perf` exists).
+2. **Run performance tests**:
+   ```
+   poetry run pytest tests/analysis/test_structural.py -v -k "Performance" --no-header
+   ```
 
-4. **Analysis & Report**
-   - Read `temp/perf/profile_results.txt`.
-   - Identify the top 5 most expensive function calls.
-   - If any domain or I/O boundary functions appear higher than the math/analysis functions, raise a warning.
-   - Present a concise performance report to the user.
+3. **Targets** (after warmup):
+   | Operation | Dataset | Target |
+   |-----------|---------|--------|
+   | ZigZag | 1M points | <50ms |
+   | FastPIP | 100K points | <100ms |
+   | Harmonic scan | 15 pivots | <2ms |
+
+4. **Report** any regressions vs targets.
+
+> References: `numba-patterns` skill

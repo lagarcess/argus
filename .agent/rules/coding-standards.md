@@ -1,25 +1,15 @@
 ---
-description: Coding standards and stylistic constraints (Model Decision - Trigger anytime code is written or reviewed)
+description: Python coding standards — loguru, type hints, 90 char limit, pydantic.
+globs: ["src/**/*.py"]
 ---
 
-# Coding Standards
+# Coding Standards Rule
 
-Enforce these standards strictly across the entire Python codebase.
+1. Use `loguru` for all logging. Prohibit standard `logging` module and `print()` calls.
+2. 100% type hint coverage on all function signatures.
+3. 90 character line limit (ruff enforced).
+4. Use Pydantic `BaseModel` for data crossing boundaries.
+5. Use `pydantic-settings` for configuration (never raw `os.environ`).
+6. Modern Python: `str | None` not `Optional[str]`, `list[str]` not `List[str]`.
 
-## 1. Logging
-- **Rule**: Standard `print()` is prohibited in production source code.
-- **Implementation**: You must use `loguru` (`from loguru import logger`).
-- **Context**: Always bind context to logs when dealing with entities.
-  - `logger.info(f"Processing symbol {symbol}")`
-  - Even better: `logger.bind(symbol=symbol).info("Processing")`
-
-## 2. Types and Parsing
-- **Rule**: 100% type hint coverage is required (enforced by `mypy`).
-- **Data Validation**: Avoid raw `dict` passing between boundaries. Use Pydantic schemas (`crypto_signals.domain.schemas`) to validate shapes and types.
-
-## 3. Formatting
-- **Rule**: Maximum line length is 90 characters.
-- **Exceptions**: Long URLs in comments or strings that cannot be broken.
-
-## 4. Defensive Programming
-- **Rule**: Always handle `None`. If a dictionary lookup (`.get()`) or a database fetch could return `None`, you must explicitly handle that branch before accessing properties.
+See: `.agent/skills/coding-standards/SKILL.md` for full details.

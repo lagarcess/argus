@@ -9,33 +9,39 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
+# Linting / Type checking
+.ruff_cache/
+.mypy_cache/
+
 # IDE
 .vscode/
 .idea/
-.flake8
+.cursor/
 
 # Logs
 *.log
 logs/
 
-# Secrets directory (for local development)
-secrets/
-*.json
-!pyproject.json
-valid_assets.txt
-
 # Temporary files
-
 # Ignore everything in the temp folder...
 temp/*
 # ...but don't ignore the .gitkeep file itself
 !temp/.gitkeep
+
+# Joblib cache (market data)
+.gemini/cache/
 
 # OS files
 .DS_Store

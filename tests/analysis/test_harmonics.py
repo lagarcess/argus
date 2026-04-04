@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import pytest
-from crypto_signals.analysis.harmonics import (
+from argus.analysis.harmonics import (
     FIB_382,
     FIB_618,
     FIB_786,
@@ -13,7 +13,7 @@ from crypto_signals.analysis.harmonics import (
     FIB_1618,
     HarmonicAnalyzer,
 )
-from crypto_signals.analysis.structural import Pivot
+from argus.analysis.structural import Pivot
 
 
 @pytest.fixture
