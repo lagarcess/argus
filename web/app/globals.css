@@ -27,13 +27,13 @@ h1, h2, h3, .headline {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
   }
-  
+
   .text-gradient-cyan {
     background: linear-gradient(135deg, #99f7ff 0%, #00f1fe 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
-  
+
   .tonal-shift {
     background: linear-gradient(180deg, transparent 0%, rgba(153, 247, 255, 0.03) 100%);
   }

@@ -62,7 +62,8 @@ _PEAK = 1
 _VALLEY = 2
 
 
-@njit(cache=True)
+# PERFORMANCE: fastmath=True allows aggressive LLVM mathematical optimizations, cutting Numba loop execution time.
+@njit(fastmath=True, cache=True)
 def _zigzag_core(highs: np.ndarray, lows: np.ndarray, pct_threshold: float) -> np.ndarray:
     """Core ZigZag algorithm with O(N) time complexity.
 
@@ -238,7 +239,7 @@ def find_pivots(
     return pivots
 
 
-@njit(cache=True)
+@njit(fastmath=True, cache=True)
 def _perpendicular_distance(
     px: float, py: float, x1: float, y1: float, x2: float, y2: float
 ) -> float:
@@ -260,7 +261,7 @@ def _perpendicular_distance(
     return float(numerator / denominator)
 
 
-@njit(cache=True)
+@njit(fastmath=True, cache=True)
 def _fast_pip_core(
     indices: np.ndarray, prices: np.ndarray, max_points: int
 ) -> np.ndarray:

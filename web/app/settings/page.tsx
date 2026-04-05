@@ -9,7 +9,7 @@ export default function SettingsPage() {
       <TopNav />
       <div className="flex pt-20">
         <Sidebar />
-        
+
         <main className="flex-1 md:ml-64 p-8 min-h-[calc(100vh-80px)]">
           {/* Reality Gap Banner */}
           <div className="relative w-full h-32 rounded-xl overflow-hidden mb-12 flex items-center px-12 group bg-surface-container-high border border-outline-variant/20">
@@ -120,7 +120,7 @@ export default function SettingsPage() {
                 </div>
               </section>
             </div>
-            
+
             <div className="pt-8 border-t border-outline-variant/10 flex justify-between items-center pb-12">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-secondary-fixed animate-pulse"></span>
@@ -130,7 +130,7 @@ export default function SettingsPage() {
           </div>
         </main>
       </div>
-      
+
       {/* Mobile nav */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full h-16 bg-[#0e0e10]/80 backdrop-blur-xl border-t border-neutral-800/20 flex justify-around items-center z-50">
         <span className="material-symbols-outlined text-neutral-500">grid_view</span>

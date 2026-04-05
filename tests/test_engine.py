@@ -98,7 +98,12 @@ def test_engine_run_with_data(mock_data):
     assert hasattr(result.equity_curve[0], "timestamp")
     assert hasattr(result.equity_curve[0], "value")
     # Verify timestamp format (ISO 8601 string)
-    assert "T" in result.equity_curve[0].timestamp or "+" in result.equity_curve[0].timestamp or result.equity_curve[0].timestamp.endswith("Z") or " " in result.equity_curve[0].timestamp
+    assert (
+        "T" in result.equity_curve[0].timestamp
+        or "+" in result.equity_curve[0].timestamp
+        or result.equity_curve[0].timestamp.endswith("Z")
+        or " " in result.equity_curve[0].timestamp
+    )
 
     # Assert trades
     for trade in result.trades:
