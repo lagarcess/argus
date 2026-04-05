@@ -68,8 +68,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Right Column: Auth Panel */}
-        <div className="relative group perspective-1000">
+        <div id="auth-panel" className="relative group perspective-1000">
           <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full group-hover:bg-primary/30 transition-colors duration-700 pointer-events-none"></div>
 
           <div className="glass-panel relative z-10 rounded-2xl border border-outline-variant/30 p-8 shadow-2xl transform transition-transform duration-500">
@@ -124,7 +123,7 @@ export default function LandingPage() {
                     href="#"
                     className="text-[10px] text-primary hover:text-primary-dim uppercase tracking-widest font-bold"
                   >
-                    Forgot Key?
+                    Forgot Password?
                   </a>
                 </div>
               )}
@@ -140,7 +139,7 @@ export default function LandingPage() {
             <div className="my-6 flex items-center gap-4">
               <div className="flex-1 h-px bg-outline-variant/20"></div>
               <span className="text-[10px] lowercase tracking-widest text-on-surface-variant">
-                sign up with
+                {authMode === "signup" ? "sign up with" : "log in with"}
               </span>
               <div className="flex-1 h-px bg-outline-variant/20"></div>
             </div>
@@ -168,10 +167,11 @@ export default function LandingPage() {
 
             <div className="mt-8 text-center">
               <button
-                onClick={() => setAuthMode("login")}
+                onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
                 className="text-[10px] text-on-surface-variant hover:text-primary uppercase tracking-[0.2em] font-bold transition-colors"
+                type="button"
               >
-                Already have an account? Log in
+                {authMode === "login" ? "Don't have an account? Sign up" : "Already have an account? Log in"}
               </button>
             </div>
 

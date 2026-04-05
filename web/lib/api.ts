@@ -29,7 +29,7 @@ export async function fetchApi<T>(
         if (typeof errorData.detail === 'string') {
           errorMessage = errorData.detail;
         } else if (Array.isArray(errorData.detail)) { // Validation error list
-          errorMessage = errorData.detail.map((e: any) => e.msg).join(', ');
+          errorMessage = (errorData.detail as { msg: string }[]).map((e) => e.msg).join(', ');
         }
       }
     } catch (e) {
@@ -87,5 +87,5 @@ export interface HistoryResponse {
 
 export interface BacktestResponse {
   simulation_id: string | null;
-  result: any; // Mapped from Python BacktestResult dict
+  result: Record<string, unknown>; // Mapped from Python BacktestResult dict
 }
