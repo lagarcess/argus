@@ -1,6 +1,11 @@
 "use client";
 
+import Link from "next/link";
+import { useAuth } from "./AuthContext";
+import { User } from "lucide-react";
+
 export function TopNav() {
+  const { user } = useAuth();
 
   return (
     <nav className="fixed top-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-neutral-950/40 backdrop-blur-xl border-b border-neutral-800/50 shadow-[0_20px_40px_rgba(0,0,0,0.4)]">
@@ -13,9 +18,22 @@ export function TopNav() {
 
       <div className="flex items-center gap-6 ml-auto">
 
-        <button className="h-11 px-8 rounded-full bg-cyan-400 text-neutral-950 text-xs font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] flex items-center justify-center">
-          Sign In
-        </button>
+        {user ? (
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-900 border border-neutral-800 hover:border-cyan-400/50 transition-all text-xs font-bold uppercase tracking-widest"
+          >
+            <User className="w-4 h-4 text-cyan-400" />
+            <span className="text-on-surface">Dashboard</span>
+          </Link>
+        ) : (
+          <Link
+            href="/#auth-panel"
+            className="h-11 px-8 rounded-full bg-cyan-400 text-neutral-950 text-xs font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] flex items-center justify-center"
+          >
+            Sign In
+          </Link>
+        )}
       </div>
     </nav>
   );
