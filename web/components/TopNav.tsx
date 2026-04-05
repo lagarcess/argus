@@ -12,7 +12,7 @@ export function TopNav() {
       <div className="flex items-center gap-8 md:hidden">
         <span className="text-2xl font-bold tracking-tighter text-cyan-400 font-headline">ARGUS</span>
       </div>
-      
+
       <div className="hidden md:flex items-center gap-6 text-sm font-headline tracking-tight">
         <Link href="#" className="text-neutral-400 hover:text-cyan-300 transition-colors duration-200">Markets</Link>
         <Link href="#" className="text-neutral-400 hover:text-cyan-300 transition-colors duration-200">Terminal</Link>
@@ -26,9 +26,9 @@ export function TopNav() {
             <div className="h-full bg-primary w-[14%]"></div>
           </div>
         </div>
-        
+
         <span className="hidden lg:block text-[10px] font-bold text-primary uppercase tracking-[0.2em] border border-primary/30 px-2 py-0.5 rounded">Pro Member</span>
-        
+
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-neutral-400 hover:text-cyan-300 cursor-pointer hidden sm:block">language</span>
           <Link href="/settings">
@@ -40,7 +40,7 @@ export function TopNav() {
             </span>
           </button>
         </div>
-        
+
         <div className="w-8 h-8 rounded-full border border-primary/20 bg-surface-variant flex items-center justify-center overflow-hidden">
              <span className="material-symbols-outlined text-sm text-primary">person</span>
         </div>

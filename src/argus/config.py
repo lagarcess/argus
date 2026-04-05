@@ -58,6 +58,11 @@ class Settings(BaseSettings):
         description="Enable disk caching for market data. Useful for backtesting/dev.",
     )
 
+    MARKET_DATA_CACHE_TTL: int = Field(
+        default=900,
+        description="Time-to-live for market data cache in seconds (15 minutes).",
+    )
+
     # Core Application Settings
     APP_ENV: str = Field(
         default="DEV",

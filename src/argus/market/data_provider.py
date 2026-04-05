@@ -5,15 +5,15 @@ This module abstracts the Alpaca API to provide clean, validated market data
 (Candles/Bars) and real-time prices for both Stocks and Crypto.
 """
 
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import joblib
 import pandas as pd
-from alpaca.common.enums import Sort
-from alpaca.data.enums import Adjustment, DataFeed
+from alpaca.data.enums import Adjustment
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from alpaca.data.requests import (
     CryptoBarsRequest,
@@ -22,6 +22,7 @@ from alpaca.data.requests import (
     StockLatestTradeRequest,
 )
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+from loguru import logger
 
 from argus.config import get_settings
 from argus.domain.schemas import AssetClass
@@ -177,68 +178,33 @@ class MarketDataProvider:
         try:
             tf = self._parse_timeframe(timeframe_str)
 
-            if asset_class == AssetClass.CRYPTO:
-                # Add optional crypto parameters
-                crypto_kwargs: Dict[str, Any] = {
-                    "symbol_or_symbols": symbol,
-                    "timeframe": tf,
-                    "start": start_dt,
-                    "end": end_dt,
-                }
-                if limit is not None:
-                    crypto_kwargs["limit"] = limit
-                if page_token is not None:
-                    crypto_kwargs["page_token"] = page_token
-                if sort is not None:
-                    crypto_kwargs["sort"] = (
-                        sort if isinstance(sort, Sort) else Sort(sort)
-                    )
-
-                crypto_req = CryptoBarsRequest(**crypto_kwargs)
-                bars = self.crypto_client.get_crypto_bars(crypto_req)
-
-            elif asset_class == AssetClass.EQUITY:
-                adj = Adjustment.SPLIT
-                if adjustment is not None:
-                    adj = (
-                        adjustment
-                        if isinstance(adjustment, Adjustment)
-                        else Adjustment(adjustment)
-                    )
-
-                stock_kwargs: Dict[str, Any] = {
-                    "symbol_or_symbols": symbol,
-                    "timeframe": tf,
-                    "start": start_dt,
-                    "end": end_dt,
-                    "adjustment": adj,
-                }
-                if limit is not None:
-                    stock_kwargs["limit"] = limit
-                if page_token is not None:
-                    stock_kwargs["page_token"] = page_token
-                if feed is not None:
-                    stock_kwargs["feed"] = (
-                        feed if isinstance(feed, DataFeed) else DataFeed(feed)
-                    )
-                if asof is not None:
-                    stock_kwargs["asof"] = asof
-
-                stock_req = StockBarsRequest(**stock_kwargs)
-                bars = self.stock_client.get_stock_bars(stock_req)
+            settings = get_settings()
+            if settings.ENABLE_MARKET_DATA_CACHE:
+                df = _fetch_bars_with_ttl(
+                    symbol=symbol,
+                    asset_class=asset_class,
+                    timeframe=tf,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
+                    stock_client=self.stock_client,
+                    crypto_client=self.crypto_client,
+                )
             else:
-                raise MarketDataError(f"Unsupported asset class: {asset_class}")
+                df = _fetch_bars_core(
+                    symbol=symbol,
+                    asset_class=asset_class,
+                    timeframe=tf,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
+                    stock_client=self.stock_client,
+                    crypto_client=self.crypto_client,
+                )
 
-            df = bars.df  # type: ignore
-
-            if df.empty:
-                raise MarketDataError(f"No bars found for {symbol}")
-
-            if isinstance(symbol, str) and isinstance(df.index, pd.MultiIndex):
-                df = df.reset_index(level=0, drop=True)
-
-            if not isinstance(df.index, pd.MultiIndex):
-                df.index = pd.to_datetime(df.index)
+            # Apply limit, page_token, etc., if any additional properties exist
+            # Note: _fetch_bars_core signature covers the essentials. We'll fetch everything
+            # in range and limit locally if limit is set (since limit/page_token aren't easily cached by date).
+            if limit is not None:
+                df = df.head(limit)
 
             return df
 
@@ -280,27 +246,29 @@ class MarketDataProvider:
         # If caching is enabled, use the cached wrapper.
         # Otherwise, call the core function directly.
         try:
-            if settings.ENABLE_MARKET_DATA_CACHE:
-                # Calculate cache key based on current DATE (midnight UTC) to ensure freshness
-                # This acts as a TTL for the joblib cache
-                cache_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            end_dt = datetime.now(timezone.utc)
+            start_dt = end_dt - timedelta(days=lookback_days)
+            timeframe = TimeFrame.Day
 
-                return _fetch_bars_cached(
+            if settings.ENABLE_MARKET_DATA_CACHE:
+                return _fetch_bars_with_ttl(
                     symbol=symbol,
                     asset_class=asset_class,
-                    lookback_days=lookback_days,
+                    timeframe=timeframe,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
                     stock_client=self.stock_client,
                     crypto_client=self.crypto_client,
-                    cache_key=cache_key,
                 )
             else:
                 return _fetch_bars_core(
                     symbol=symbol,
                     asset_class=asset_class,
-                    lookback_days=lookback_days,
+                    timeframe=timeframe,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
                     stock_client=self.stock_client,
                     crypto_client=self.crypto_client,
-                    cache_key="no-cache",
                 )
         except MarketDataError:
             raise
@@ -354,40 +322,28 @@ class MarketDataProvider:
 def _fetch_bars_core(
     symbol: str | list[str],
     asset_class: AssetClass,
-    lookback_days: int,
+    timeframe: TimeFrame,
+    start_dt: datetime,
+    end_dt: datetime,
     stock_client: StockHistoricalDataClient,
     crypto_client: CryptoHistoricalDataClient,
-    cache_key: str,
 ) -> pd.DataFrame:
     """
-    Core implementation of get_daily_bars (uncached).
-
-    Args:
-        symbol: Ticker symbol or list of symbols
-        asset_class: Asset Class
-        lookback_days: Lookback period
-        stock_client: Alpaca Stock Client
-        crypto_client: Alpaca Crypto Client
-        cache_key: Passed for compatibility with cached version, ignored here.
+    Core implementation of fetch_bars (uncached).
     """
     try:
-        end_dt = datetime.now(timezone.utc)
-        start_dt = end_dt - timedelta(days=lookback_days)
-
         if asset_class == AssetClass.CRYPTO:
-            # Crypto Request
             crypto_req = CryptoBarsRequest(
                 symbol_or_symbols=symbol,
-                timeframe=TimeFrame.Day,
+                timeframe=timeframe,
                 start=start_dt,
                 end=end_dt,
             )
             bars = crypto_client.get_crypto_bars(crypto_req)
         elif asset_class == AssetClass.EQUITY:
-            # Stock Request
             stock_req = StockBarsRequest(
                 symbol_or_symbols=symbol,
-                timeframe=TimeFrame.Day,
+                timeframe=timeframe,
                 start=start_dt,
                 end=end_dt,
                 adjustment=Adjustment.SPLIT,  # Adjust for splits
@@ -404,19 +360,10 @@ def _fetch_bars_core(
             raise MarketDataError(f"No daily bars found for {symbol}")
 
         # Reset index if multi-indexed (symbol, date) -> just date
-        # Alpaca bars.df usually has MultiIndex [symbol, timestamp]
-        # logic: if we passed a single symbol (str), we want to return just date index (convenience)
-        # if we passed a list, we KEEP the multiindex [symbol, timestamp] so caller can separate
         if isinstance(symbol, str) and isinstance(df.index, pd.MultiIndex):
             df = df.reset_index(level=0, drop=True)
 
-        # Ensure timestamp level (or index) is datetime
-        # If MultiIndex, level 1 is timestamp. If single index, index is timestamp.
-        if isinstance(df.index, pd.MultiIndex):
-            # Check if second level is not datetime (rare but possible if re-ordered)
-            # Usually Alpaca returns [symbol, timestamp]
-            pass  # Alpaca SDK handles this well usually
-        else:
+        if not isinstance(df.index, pd.MultiIndex):
             df.index = pd.to_datetime(df.index)
 
         return df
@@ -432,3 +379,74 @@ _fetch_bars_cached = memory.cache(
     _fetch_bars_core,
     ignore=["stock_client", "crypto_client"],
 )
+
+
+def _fetch_bars_with_ttl(
+    symbol: str | list[str],
+    asset_class: AssetClass,
+    timeframe: TimeFrame,
+    start_dt: datetime,
+    end_dt: datetime,
+    stock_client: StockHistoricalDataClient,
+    crypto_client: CryptoHistoricalDataClient,
+) -> pd.DataFrame:
+    settings = get_settings()
+    ttl = settings.MARKET_DATA_CACHE_TTL
+
+    args_id = _fetch_bars_cached._get_args_id(
+        symbol=symbol,
+        asset_class=asset_class,
+        timeframe=timeframe,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        stock_client=stock_client,
+        crypto_client=crypto_client,
+    )
+
+    is_in_cache = _fetch_bars_cached.check_call_in_cache(
+        symbol=symbol,
+        asset_class=asset_class,
+        timeframe=timeframe,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        stock_client=stock_client,
+        crypto_client=crypto_client,
+    )
+
+    cache_status = "miss"
+
+    if is_in_cache:
+        # Check TTL
+        item_info = _fetch_bars_cached.store_backend.get_item_info(args_id)
+        # item_info['location'] is the path to the cached dir
+        # inside it, there is typically 'output.pkl'
+        cache_dir = item_info.get("location")
+        if cache_dir and os.path.exists(cache_dir):
+            output_file = os.path.join(cache_dir, "output.pkl")
+            if os.path.exists(output_file):
+                mtime = os.path.getmtime(output_file)
+                if time.time() - mtime > ttl:
+                    # Stale, clear it
+                    _fetch_bars_cached.store_backend.clear_item(args_id)
+                else:
+                    cache_status = "hit"
+            else:
+                # no output file found, might be a different format or missing
+                pass
+
+    # Actually call
+    result = _fetch_bars_cached(
+        symbol=symbol,
+        asset_class=asset_class,
+        timeframe=timeframe,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        stock_client=stock_client,
+        crypto_client=crypto_client,
+    )
+
+    logger.debug(
+        f"Cache {cache_status} for {symbol} ({timeframe}) | Range: {start_dt} to {end_dt}"
+    )
+
+    return result
