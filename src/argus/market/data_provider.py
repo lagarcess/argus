@@ -111,6 +111,32 @@ class MarketDataProvider:
         self.stock_client = stock_client
         self.crypto_client = crypto_client
 
+    def _parse_timeframe(self, timeframe_str: str) -> TimeFrame:
+        import re
+
+        match = re.match(
+            r"^(\d+)?(Min|Hour|Day|Week|Month)$", timeframe_str, re.IGNORECASE
+        )
+        if not match:
+            raise MarketDataError(f"Invalid timeframe format: {timeframe_str}")
+
+        amount_str, unit_str = match.groups()
+        amount = int(amount_str) if amount_str else 1
+        unit_str = unit_str.capitalize()
+
+        unit_map = {
+            "Min": TimeFrameUnit.Minute,
+            "Hour": TimeFrameUnit.Hour,
+            "Day": TimeFrameUnit.Day,
+            "Week": TimeFrameUnit.Week,
+            "Month": TimeFrameUnit.Month,
+        }
+        unit = unit_map.get(unit_str)
+        if unit is None:
+            raise MarketDataError(f"Unsupported timeframe unit: {unit_str}")
+
+        return TimeFrame(amount, unit)
+
     @retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
     def get_historical_bars(
         self,
@@ -119,9 +145,16 @@ class MarketDataProvider:
         timeframe_str: str,
         start_dt: datetime,
         end_dt: datetime,
+        limit: Optional[int] = None,
+        adjustment: Optional[str] = None,
+        asof: Optional[str] = None,
+        feed: Optional[str] = None,
+        currency: Optional[str] = None,
+        page_token: Optional[str] = None,
+        sort: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Fetch historical bars with customizable timeframe.
+        Fetch historical bars with customizable timeframe and full Alpaca API parameter support.
 
         Args:
             symbol: Ticker symbol (e.g. "BTC/USD") or list of symbols
@@ -129,40 +162,75 @@ class MarketDataProvider:
             timeframe_str: Timeframe string e.g., '1Min', '15Min', '1Day'
             start_dt: Start datetime
             end_dt: End datetime
+            limit: Limit number of bars returned
+            adjustment: Corporate action adjustment for stocks
+            asof: Asof date for stock feeds
+            feed: Data feed
+            currency: Currency for crypto
+            page_token: Pagination token
+            sort: Sorting order
 
         Returns:
             pd.DataFrame: DataFrame containing historical bars
         """
         try:
-            # Simple manual mapping to TimeFrame
-            tf_map = {
-                "1Min": TimeFrame.Minute,
-                "5Min": TimeFrame(5, TimeFrameUnit.Minute),
-                "15Min": TimeFrame(15, TimeFrameUnit.Minute),
-                "1Hour": TimeFrame.Hour,
-                "1Day": TimeFrame.Day,
-            }
-            tf = tf_map.get(timeframe_str, TimeFrame.Day)
+            tf = self._parse_timeframe(timeframe_str)
 
             if asset_class == AssetClass.CRYPTO:
-                crypto_req = CryptoBarsRequest(
-                    symbol_or_symbols=symbol,
-                    timeframe=tf,
-                    start=start_dt,
-                    end=end_dt,
-                )
-                bars = self.crypto_client.get_crypto_bars(crypto_req)
-            elif asset_class == AssetClass.EQUITY:
-                from alpaca.data.enums import Adjustment
-                from alpaca.data.requests import StockBarsRequest
+                from alpaca.common.enums import Sort
+                from typing import Dict, Any
 
-                stock_req = StockBarsRequest(
-                    symbol_or_symbols=symbol,
-                    timeframe=tf,
-                    start=start_dt,
-                    end=end_dt,
-                    adjustment=Adjustment.SPLIT,
-                )
+                # Add optional crypto parameters
+                crypto_kwargs: Dict[str, Any] = {
+                    "symbol_or_symbols": symbol,
+                    "timeframe": tf,
+                    "start": start_dt,
+                    "end": end_dt,
+                }
+                if limit is not None:
+                    crypto_kwargs["limit"] = limit
+                if page_token is not None:
+                    crypto_kwargs["page_token"] = page_token
+                if sort is not None:
+                    crypto_kwargs["sort"] = (
+                        sort if isinstance(sort, Sort) else Sort(sort)
+                    )
+
+                crypto_req = CryptoBarsRequest(**crypto_kwargs)
+                bars = self.crypto_client.get_crypto_bars(crypto_req)
+
+            elif asset_class == AssetClass.EQUITY:
+                from alpaca.data.enums import Adjustment, DataFeed
+                from alpaca.data.requests import StockBarsRequest
+                from typing import Dict, Any
+
+                adj = Adjustment.SPLIT
+                if adjustment is not None:
+                    adj = (
+                        adjustment
+                        if isinstance(adjustment, Adjustment)
+                        else Adjustment(adjustment)
+                    )
+
+                stock_kwargs: Dict[str, Any] = {
+                    "symbol_or_symbols": symbol,
+                    "timeframe": tf,
+                    "start": start_dt,
+                    "end": end_dt,
+                    "adjustment": adj,
+                }
+                if limit is not None:
+                    stock_kwargs["limit"] = limit
+                if page_token is not None:
+                    stock_kwargs["page_token"] = page_token
+                if feed is not None:
+                    stock_kwargs["feed"] = (
+                        feed if isinstance(feed, DataFeed) else DataFeed(feed)
+                    )
+                if asof is not None:
+                    stock_kwargs["asof"] = asof
+
+                stock_req = StockBarsRequest(**stock_kwargs)
                 bars = self.stock_client.get_stock_bars(stock_req)
             else:
                 raise MarketDataError(f"Unsupported asset class: {asset_class}")

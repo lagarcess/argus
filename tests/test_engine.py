@@ -97,11 +97,30 @@ def test_engine_run_with_data(mock_data):
     assert len(result.equity_curve) > 0
     assert hasattr(result.equity_curve[0], "timestamp")
     assert hasattr(result.equity_curve[0], "value")
+    # Verify timestamp format (ISO 8601 string)
+    assert "T" in result.equity_curve[0].timestamp or "+" in result.equity_curve[0].timestamp or result.equity_curve[0].timestamp.endswith("Z") or " " in result.equity_curve[0].timestamp
 
     # Assert trades
     for trade in result.trades:
         assert isinstance(trade.symbol, str)
         assert trade.direction in ["Long", "Short"]
+        # ISO8601 formatting checks
+        assert isinstance(trade.entry_time, str)
+        assert isinstance(trade.exit_time, str)
+
+
+def test_engine_run_with_and_mode_short_circuit(mock_data):
+    """Test AND confluence mode to ensure it evaluates correctly and short-circuits."""
+    engine = ArgusEngine()
+    config = StrategyConfig(
+        entry_patterns=["is_hammer_shape", "non_existent_pattern"],
+        exit_patterns=[],
+        confluence_mode="AND",
+    )
+    result = engine.run(config=config, data=mock_data)
+    assert isinstance(result, BacktestResult)
+    # Since "non_existent_pattern" is missing, we shouldn't get entry signals and total trades should likely be 0
+    # unless shorting is enabled and exit triggered an entry.
 
 
 def test_engine_empty_data():

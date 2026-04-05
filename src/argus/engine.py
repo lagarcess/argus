@@ -86,6 +86,8 @@ class ArgusEngine:
         lookback_days: int = 365,
         timeframe: str = "1Day",
         freq: str = "1d",
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
     ) -> BacktestResult:
         """
         Run the backtest.
@@ -95,9 +97,11 @@ class ArgusEngine:
             data: Optional OHLCV DataFrame with MultiIndex [symbol, timestamp] or single [timestamp]
             symbols: Optional list of symbols to fetch if data is not provided
             asset_class: Type of asset being backtested
-            lookback_days: Days to look back if fetching data
+            lookback_days: Days to look back if fetching data (used if start_date is None)
             timeframe: Timeframe for Alpaca if fetching (e.g., '1Day', '1Min', '15Min')
             freq: Pandas frequency string for VectorBT (e.g., '1d', '1min')
+            start_date: Optional start datetime for fetching data
+            end_date: Optional end datetime for fetching data (maxes out at now - 15min)
 
         Returns:
             BacktestResult: Fully Pydantic validated output.
@@ -109,9 +113,18 @@ class ArgusEngine:
                 )
 
             # Fetch data with safety buffer
-            # Get data up to 15 minutes ago to avoid incomplete bars directly in API call
-            end_dt = datetime.now(timezone.utc) - timedelta(minutes=15)
-            start_dt = end_dt - timedelta(days=lookback_days)
+            # Max end_dt is up to 15 minutes ago to avoid incomplete bars directly in API call
+            max_end_dt = datetime.now(timezone.utc) - timedelta(minutes=15)
+
+            if end_date is None or end_date > max_end_dt:
+                end_dt = max_end_dt
+            else:
+                end_dt = end_date
+
+            if start_date is None:
+                start_dt = end_dt - timedelta(days=lookback_days)
+            else:
+                start_dt = start_date
 
             data = self.data_provider.get_historical_bars(
                 symbol=symbols,
@@ -214,6 +227,7 @@ class ArgusEngine:
                             entry_sigs = entry_sigs & symbol_signals[p_name]
                         else:
                             entry_sigs = pd.Series(False, index=symbol_data.index)
+                            break
                 if config.exit_patterns:
                     exit_sigs = pd.Series(True, index=symbol_data.index)
                     for p_name in config.exit_patterns:
@@ -221,6 +235,7 @@ class ArgusEngine:
                             exit_sigs = exit_sigs & symbol_signals[p_name]
                         else:
                             exit_sigs = pd.Series(False, index=symbol_data.index)
+                            break
 
             entries_df[symbol] = entry_sigs
             exits_df[symbol] = exit_sigs
@@ -243,7 +258,7 @@ class ArgusEngine:
             try:
                 val = metrics.get(key, default)
                 return float(val) if not pd.isna(val) else default
-            except Exception:
+            except (ValueError, TypeError):
                 return default
 
         metrics_result = MetricsResult(
@@ -264,7 +279,10 @@ class ArgusEngine:
             )  # Or keep individual, depending on needs. Let's do total.
 
         equity_curve = [
-            EquityCurvePoint(timestamp=str(idx), value=float(val))
+            EquityCurvePoint(
+                timestamp=idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
+                value=float(val)
+            )
             for idx, val in equity_series.items()
         ]
 
@@ -277,16 +295,21 @@ class ArgusEngine:
         )
         if total_trades > 0:
             trade_records = portfolio.trades.records_readable
-            for _, trade in trade_records.iterrows():
+            for trade in trade_records.to_dict("records"):
                 # Handling vectorbt trade records
                 col_name = trade.get("Column", "ASSET")
                 symbol_name = str(col_name) if pd.notna(col_name) else symbols[0]
 
+                entry_ts = trade["Entry Timestamp"]
+                exit_ts = trade["Exit Timestamp"]
+                entry_time_str = entry_ts.isoformat() if hasattr(entry_ts, 'isoformat') else str(entry_ts)
+                exit_time_str = exit_ts.isoformat() if hasattr(exit_ts, 'isoformat') else str(exit_ts)
+
                 trades.append(
                     TradeResult(
                         symbol=symbol_name,
-                        entry_time=str(trade["Entry Timestamp"]),
-                        exit_time=str(trade["Exit Timestamp"]),
+                        entry_time=entry_time_str,
+                        exit_time=exit_time_str,
                         entry_price=float(
                             trade.get("Entry Price", trade.get("Avg Entry Price", 0.0))
                         ),
