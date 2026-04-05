@@ -8,11 +8,12 @@ This module abstracts the Alpaca API to provide clean, validated market data
 import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import joblib
 import pandas as pd
-from alpaca.data.enums import Adjustment
+from alpaca.common.enums import Sort
+from alpaca.data.enums import Adjustment, DataFeed
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from alpaca.data.requests import (
     CryptoBarsRequest,
@@ -20,7 +21,7 @@ from alpaca.data.requests import (
     StockBarsRequest,
     StockLatestTradeRequest,
 )
-from alpaca.data.timeframe import TimeFrame
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 from argus.config import get_settings
 from argus.domain.schemas import AssetClass
@@ -110,6 +111,143 @@ class MarketDataProvider:
         """
         self.stock_client = stock_client
         self.crypto_client = crypto_client
+
+    def _parse_timeframe(self, timeframe_str: str) -> TimeFrame:
+        import re
+
+        match = re.match(
+            r"^(\d+)?(Min|Hour|Day|Week|Month)$", timeframe_str, re.IGNORECASE
+        )
+        if not match:
+            raise MarketDataError(f"Invalid timeframe format: {timeframe_str}")
+
+        amount_str, unit_str = match.groups()
+        amount = int(amount_str) if amount_str else 1
+        unit_str = unit_str.capitalize()
+
+        unit_map = {
+            "Min": TimeFrameUnit.Minute,
+            "Hour": TimeFrameUnit.Hour,
+            "Day": TimeFrameUnit.Day,
+            "Week": TimeFrameUnit.Week,
+            "Month": TimeFrameUnit.Month,
+        }
+        unit = unit_map.get(unit_str)
+        if unit is None:
+            raise MarketDataError(f"Unsupported timeframe unit: {unit_str}")
+
+        return TimeFrame(amount, unit)
+
+    @retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
+    def get_historical_bars(
+        self,
+        symbol: str | list[str],
+        asset_class: AssetClass,
+        timeframe_str: str,
+        start_dt: datetime,
+        end_dt: datetime,
+        limit: Optional[int] = None,
+        adjustment: Optional[str] = None,
+        asof: Optional[str] = None,
+        feed: Optional[str] = None,
+        currency: Optional[str] = None,
+        page_token: Optional[str] = None,
+        sort: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """
+        Fetch historical bars with customizable timeframe and full Alpaca API parameter support.
+
+        Args:
+            symbol: Ticker symbol (e.g. "BTC/USD") or list of symbols
+            asset_class: Asset class (CRYPTO or EQUITY)
+            timeframe_str: Timeframe string e.g., '1Min', '15Min', '1Day'
+            start_dt: Start datetime
+            end_dt: End datetime
+            limit: Limit number of bars returned
+            adjustment: Corporate action adjustment for stocks
+            asof: Asof date for stock feeds
+            feed: Data feed
+            currency: Currency for crypto
+            page_token: Pagination token
+            sort: Sorting order
+
+        Returns:
+            pd.DataFrame: DataFrame containing historical bars
+        """
+        try:
+            tf = self._parse_timeframe(timeframe_str)
+
+            if asset_class == AssetClass.CRYPTO:
+                # Add optional crypto parameters
+                crypto_kwargs: Dict[str, Any] = {
+                    "symbol_or_symbols": symbol,
+                    "timeframe": tf,
+                    "start": start_dt,
+                    "end": end_dt,
+                }
+                if limit is not None:
+                    crypto_kwargs["limit"] = limit
+                if page_token is not None:
+                    crypto_kwargs["page_token"] = page_token
+                if sort is not None:
+                    crypto_kwargs["sort"] = (
+                        sort if isinstance(sort, Sort) else Sort(sort)
+                    )
+
+                crypto_req = CryptoBarsRequest(**crypto_kwargs)
+                bars = self.crypto_client.get_crypto_bars(crypto_req)
+
+            elif asset_class == AssetClass.EQUITY:
+                adj = Adjustment.SPLIT
+                if adjustment is not None:
+                    adj = (
+                        adjustment
+                        if isinstance(adjustment, Adjustment)
+                        else Adjustment(adjustment)
+                    )
+
+                stock_kwargs: Dict[str, Any] = {
+                    "symbol_or_symbols": symbol,
+                    "timeframe": tf,
+                    "start": start_dt,
+                    "end": end_dt,
+                    "adjustment": adj,
+                }
+                if limit is not None:
+                    stock_kwargs["limit"] = limit
+                if page_token is not None:
+                    stock_kwargs["page_token"] = page_token
+                if feed is not None:
+                    stock_kwargs["feed"] = (
+                        feed if isinstance(feed, DataFeed) else DataFeed(feed)
+                    )
+                if asof is not None:
+                    stock_kwargs["asof"] = asof
+
+                stock_req = StockBarsRequest(**stock_kwargs)
+                bars = self.stock_client.get_stock_bars(stock_req)
+            else:
+                raise MarketDataError(f"Unsupported asset class: {asset_class}")
+
+            df = bars.df  # type: ignore
+
+            if df.empty:
+                raise MarketDataError(f"No bars found for {symbol}")
+
+            if isinstance(symbol, str) and isinstance(df.index, pd.MultiIndex):
+                df = df.reset_index(level=0, drop=True)
+
+            if not isinstance(df.index, pd.MultiIndex):
+                df.index = pd.to_datetime(df.index)
+
+            return df
+
+        except MarketDataError:
+            raise
+        except Exception as e:
+            raise MarketDataError(
+                f"Failed to fetch historical bars for {symbol}: {e}"
+            ) from e
 
     @retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
     def get_daily_bars(
