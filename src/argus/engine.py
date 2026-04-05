@@ -7,6 +7,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.analysis.harmonics import HarmonicAnalyzer
+from argus.analysis.indicators import IndicatorAnalyzer
 from argus.analysis.patterns import PatternAnalyzer
 from argus.domain.schemas import AssetClass
 from argus.market.data_provider import MarketDataProvider
@@ -35,22 +36,26 @@ class StrategyConfig(BaseModel):
     # --- Indicator Confluence ---
     rsi_period: Optional[int] = Field(
         default=None,
-        ge=2, le=200,
+        ge=2,
+        le=200,
         description="RSI period. When set, RSI is computed and used as confluence filter.",
     )
     rsi_oversold: float = Field(
         default=30.0,
-        ge=0.0, le=100.0,
+        ge=0.0,
+        le=100.0,
         description="RSI threshold below which market is considered oversold (entry signal).",
     )
     rsi_overbought: float = Field(
         default=70.0,
-        ge=0.0, le=100.0,
+        ge=0.0,
+        le=100.0,
         description="RSI threshold above which market is considered overbought (exit signal).",
     )
     ema_period: Optional[int] = Field(
         default=None,
-        ge=2, le=500,
+        ge=2,
+        le=500,
         description="EMA period. When set, price-vs-EMA crossover used as confluence filter.",
     )
     symbols: Optional[List[str]] = Field(
@@ -199,14 +204,6 @@ class ArgusEngine:
         entries_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
         exits_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
 
-        # Import pandas_ta outside the loop to avoid severe iterative overhead
-        try:
-            import pandas_ta as ta  # type: ignore
-            has_ta = True
-        except ImportError:
-            has_ta = False
-            logger.warning("pandas_ta not installed. TA-dependent indicators will be skipped.")
-
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
             if is_multi_index:
@@ -241,7 +238,9 @@ class ArgusEngine:
                 ) or pd.api.types.is_object_dtype(symbol_signals[col]):
                     # Silence Pandas 3.0 downcasting FutureWarnings during fillna
                     with pd.option_context("future.no_silent_downcasting", True):
-                        symbol_signals[col] = symbol_signals[col].fillna(False).infer_objects(copy=False)
+                        symbol_signals[col] = (
+                            symbol_signals[col].fillna(False).infer_objects(copy=False)
+                        )
 
             # Extract configured entries and exits
             entry_sigs = pd.Series(False, index=symbol_data.index)
@@ -281,11 +280,12 @@ class ArgusEngine:
             # Applied AFTER pattern signals, always AND-gate indicators
             # regardless of confluence_mode (indicators are always additive gates)
             try:
+                indicator_analyzer = IndicatorAnalyzer(symbol_data)
                 indicator_entry_mask = pd.Series(True, index=symbol_data.index)
                 indicator_exit_mask = pd.Series(True, index=symbol_data.index)
 
-                if has_ta and config.rsi_period is not None:
-                    rsi = ta.rsi(symbol_data["close"], length=config.rsi_period)
+                if config.rsi_period is not None:
+                    rsi = indicator_analyzer.get_rsi(config.rsi_period)
                     if rsi is not None and not rsi.empty:
                         # Entry: price is oversold (RSI below threshold)
                         indicator_entry_mask = indicator_entry_mask & (
@@ -296,8 +296,8 @@ class ArgusEngine:
                             rsi >= config.rsi_overbought
                         )
 
-                if has_ta and config.ema_period is not None:
-                    ema = ta.ema(symbol_data["close"], length=config.ema_period)
+                if config.ema_period is not None:
+                    ema = indicator_analyzer.get_ema(config.ema_period)
                     if ema is not None and not ema.empty:
                         # Entry: price is above EMA (bullish context)
                         indicator_entry_mask = indicator_entry_mask & (
@@ -310,8 +310,12 @@ class ArgusEngine:
 
                 # Apply indicator masks
                 if config.rsi_period is not None or config.ema_period is not None:
-                    entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(False)
-                    exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(False)
+                    entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(
+                        False
+                    )
+                    exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(
+                        False
+                    )
 
             except Exception as e:  # noqa: BLE001
                 # If indicator computation fails, log the error rather than skipping silently
@@ -358,8 +362,8 @@ class ArgusEngine:
 
         equity_curve = [
             EquityCurvePoint(
-                timestamp=idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
-                value=float(val)
+                timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),
+                value=float(val),
             )
             for idx, val in equity_series.items()
         ]
@@ -380,8 +384,14 @@ class ArgusEngine:
 
                 entry_ts = trade["Entry Timestamp"]
                 exit_ts = trade["Exit Timestamp"]
-                entry_time_str = entry_ts.isoformat() if hasattr(entry_ts, 'isoformat') else str(entry_ts)
-                exit_time_str = exit_ts.isoformat() if hasattr(exit_ts, 'isoformat') else str(exit_ts)
+                entry_time_str = (
+                    entry_ts.isoformat()
+                    if hasattr(entry_ts, "isoformat")
+                    else str(entry_ts)
+                )
+                exit_time_str = (
+                    exit_ts.isoformat() if hasattr(exit_ts, "isoformat") else str(exit_ts)
+                )
 
                 trades.append(
                     TradeResult(
