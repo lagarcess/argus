@@ -20,7 +20,7 @@ from alpaca.data.requests import (
     StockBarsRequest,
     StockLatestTradeRequest,
 )
-from alpaca.data.timeframe import TimeFrame
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
 from argus.config import get_settings
 from argus.domain.schemas import AssetClass
@@ -110,6 +110,82 @@ class MarketDataProvider:
         """
         self.stock_client = stock_client
         self.crypto_client = crypto_client
+
+    @retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
+    def get_historical_bars(
+        self,
+        symbol: str | list[str],
+        asset_class: AssetClass,
+        timeframe_str: str,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> pd.DataFrame:
+        """
+        Fetch historical bars with customizable timeframe.
+
+        Args:
+            symbol: Ticker symbol (e.g. "BTC/USD") or list of symbols
+            asset_class: Asset class (CRYPTO or EQUITY)
+            timeframe_str: Timeframe string e.g., '1Min', '15Min', '1Day'
+            start_dt: Start datetime
+            end_dt: End datetime
+
+        Returns:
+            pd.DataFrame: DataFrame containing historical bars
+        """
+        try:
+            # Simple manual mapping to TimeFrame
+            tf_map = {
+                "1Min": TimeFrame.Minute,
+                "5Min": TimeFrame(5, TimeFrameUnit.Minute),
+                "15Min": TimeFrame(15, TimeFrameUnit.Minute),
+                "1Hour": TimeFrame.Hour,
+                "1Day": TimeFrame.Day,
+            }
+            tf = tf_map.get(timeframe_str, TimeFrame.Day)
+
+            if asset_class == AssetClass.CRYPTO:
+                crypto_req = CryptoBarsRequest(
+                    symbol_or_symbols=symbol,
+                    timeframe=tf,
+                    start=start_dt,
+                    end=end_dt,
+                )
+                bars = self.crypto_client.get_crypto_bars(crypto_req)
+            elif asset_class == AssetClass.EQUITY:
+                from alpaca.data.enums import Adjustment
+                from alpaca.data.requests import StockBarsRequest
+
+                stock_req = StockBarsRequest(
+                    symbol_or_symbols=symbol,
+                    timeframe=tf,
+                    start=start_dt,
+                    end=end_dt,
+                    adjustment=Adjustment.SPLIT,
+                )
+                bars = self.stock_client.get_stock_bars(stock_req)
+            else:
+                raise MarketDataError(f"Unsupported asset class: {asset_class}")
+
+            df = bars.df  # type: ignore
+
+            if df.empty:
+                raise MarketDataError(f"No bars found for {symbol}")
+
+            if isinstance(symbol, str) and isinstance(df.index, pd.MultiIndex):
+                df = df.reset_index(level=0, drop=True)
+
+            if not isinstance(df.index, pd.MultiIndex):
+                df.index = pd.to_datetime(df.index)
+
+            return df
+
+        except MarketDataError:
+            raise
+        except Exception as e:
+            raise MarketDataError(
+                f"Failed to fetch historical bars for {symbol}: {e}"
+            ) from e
 
     @retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
     def get_daily_bars(
