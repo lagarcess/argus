@@ -213,9 +213,9 @@ def find_pivots(
     if len(df) == 0:
         return []
 
-    # Extract arrays for Numba
-    highs = df["high"].values.astype(np.float64)
-    lows = df["low"].values.astype(np.float64)
+    # Extract arrays for Numba and fill NaNs to prevent fastmath instability
+    highs = df["high"].ffill().bfill().values.astype(np.float64)
+    lows = df["low"].ffill().bfill().values.astype(np.float64)
 
     # Run optimized ZigZag
     raw_pivots = _zigzag_core(highs, lows, pct_threshold)
@@ -416,7 +416,7 @@ def fast_pip(
     if len(df) == 0:
         return []
 
-    prices = df[price_col].values.astype(np.float64)
+    prices = df[price_col].ffill().bfill().values.astype(np.float64)
     indices = np.arange(len(prices), dtype=np.float64)
 
     selected_mask = _fast_pip_core(indices, prices, max_points)

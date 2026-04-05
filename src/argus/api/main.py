@@ -147,12 +147,12 @@ def run_backtest(
 
         # 4. Execute
         result = engine.run(
-            symbol=symbols,
+            config=config,
+            symbols=symbols,
             asset_class=ac,
-            timeframe_str=request.timeframe,
-            start_dt=request.start_date,
-            end_dt=request.end_date,
-            strategy_config=config,
+            timeframe=request.timeframe,
+            start_date=request.start_date,
+            end_date=request.end_date,
         )
 
         # 5. Update Supabase with success
