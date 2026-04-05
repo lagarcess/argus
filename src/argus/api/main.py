@@ -88,26 +88,34 @@ def run_backtest(
     sim_id = None
     if supabase_client:
         try:
-            res = supabase_client.table("simulation_logs").insert(
-                {
-                    "user_id": user["sub"],
-                    "strategy_name": request.strategy_name,
-                    "symbols": symbols,
-                    "timeframe": request.timeframe,
-                    "start_date": request.start_date.isoformat() if request.start_date else None,
-                    "end_date": request.end_date.isoformat() if request.end_date else None,
-                    "confluence_mode": request.confluence_mode,
-                    "entry_patterns": request.entry_patterns,
-                    "exit_patterns": request.exit_patterns,
-                    "rsi_period": request.rsi_period,
-                    "rsi_oversold": request.rsi_oversold,
-                    "rsi_overbought": request.rsi_overbought,
-                    "ema_period": request.ema_period,
-                    "slippage": request.slippage,
-                    "fees": request.fees,
-                    "status": "processing",
-                }
-            ).execute()
+            res = (
+                supabase_client.table("simulation_logs")
+                .insert(
+                    {
+                        "user_id": user["sub"],
+                        "strategy_name": request.strategy_name,
+                        "symbols": symbols,
+                        "timeframe": request.timeframe,
+                        "start_date": request.start_date.isoformat()
+                        if request.start_date
+                        else None,
+                        "end_date": request.end_date.isoformat()
+                        if request.end_date
+                        else None,
+                        "confluence_mode": request.confluence_mode,
+                        "entry_patterns": request.entry_patterns,
+                        "exit_patterns": request.exit_patterns,
+                        "rsi_period": request.rsi_period,
+                        "rsi_oversold": request.rsi_oversold,
+                        "rsi_overbought": request.rsi_overbought,
+                        "ema_period": request.ema_period,
+                        "slippage": request.slippage,
+                        "fees": request.fees,
+                        "status": "processing",
+                    }
+                )
+                .execute()
+            )
             if res.data:
                 sim_id = res.data[0]["id"]
         except Exception as e:
@@ -139,12 +147,12 @@ def run_backtest(
 
         # 4. Execute
         result = engine.run(
-            symbol=symbols,
+            config=config,
+            symbols=symbols,
             asset_class=ac,
-            timeframe_str=request.timeframe,
-            start_dt=request.start_date,
-            end_dt=request.end_date,
-            strategy_config=config,
+            timeframe=request.timeframe,
+            start_date=request.start_date,
+            end_date=request.end_date,
         )
 
         # 5. Update Supabase with success
