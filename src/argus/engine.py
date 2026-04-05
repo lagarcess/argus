@@ -35,22 +35,26 @@ class StrategyConfig(BaseModel):
     # --- Indicator Confluence ---
     rsi_period: Optional[int] = Field(
         default=None,
-        ge=2, le=200,
+        ge=2,
+        le=200,
         description="RSI period. When set, RSI is computed and used as confluence filter.",
     )
     rsi_oversold: float = Field(
         default=30.0,
-        ge=0.0, le=100.0,
+        ge=0.0,
+        le=100.0,
         description="RSI threshold below which market is considered oversold (entry signal).",
     )
     rsi_overbought: float = Field(
         default=70.0,
-        ge=0.0, le=100.0,
+        ge=0.0,
+        le=100.0,
         description="RSI threshold above which market is considered overbought (exit signal).",
     )
     ema_period: Optional[int] = Field(
         default=None,
-        ge=2, le=500,
+        ge=2,
+        le=500,
         description="EMA period. When set, price-vs-EMA crossover used as confluence filter.",
     )
     symbols: Optional[List[str]] = Field(
@@ -202,10 +206,13 @@ class ArgusEngine:
         # Import pandas_ta outside the loop to avoid severe iterative overhead
         try:
             import pandas_ta as ta  # type: ignore
+
             has_ta = True
         except ImportError:
             has_ta = False
-            logger.warning("pandas_ta not installed. TA-dependent indicators will be skipped.")
+            logger.warning(
+                "pandas_ta not installed. TA-dependent indicators will be skipped."
+            )
 
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
@@ -241,7 +248,9 @@ class ArgusEngine:
                 ) or pd.api.types.is_object_dtype(symbol_signals[col]):
                     # Silence Pandas 3.0 downcasting FutureWarnings during fillna
                     with pd.option_context("future.no_silent_downcasting", True):
-                        symbol_signals[col] = symbol_signals[col].fillna(False).infer_objects(copy=False)
+                        symbol_signals[col] = (
+                            symbol_signals[col].fillna(False).infer_objects(copy=False)
+                        )
 
             # Extract configured entries and exits
             entry_sigs = pd.Series(False, index=symbol_data.index)
@@ -310,8 +319,12 @@ class ArgusEngine:
 
                 # Apply indicator masks
                 if config.rsi_period is not None or config.ema_period is not None:
-                    entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(False)
-                    exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(False)
+                    entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(
+                        False
+                    )
+                    exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(
+                        False
+                    )
 
             except Exception as e:  # noqa: BLE001
                 # If indicator computation fails, log the error rather than skipping silently
@@ -358,8 +371,8 @@ class ArgusEngine:
 
         equity_curve = [
             EquityCurvePoint(
-                timestamp=idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
-                value=float(val)
+                timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),
+                value=float(val),
             )
             for idx, val in equity_series.items()
         ]
@@ -380,8 +393,14 @@ class ArgusEngine:
 
                 entry_ts = trade["Entry Timestamp"]
                 exit_ts = trade["Exit Timestamp"]
-                entry_time_str = entry_ts.isoformat() if hasattr(entry_ts, 'isoformat') else str(entry_ts)
-                exit_time_str = exit_ts.isoformat() if hasattr(exit_ts, 'isoformat') else str(exit_ts)
+                entry_time_str = (
+                    entry_ts.isoformat()
+                    if hasattr(entry_ts, "isoformat")
+                    else str(entry_ts)
+                )
+                exit_time_str = (
+                    exit_ts.isoformat() if hasattr(exit_ts, "isoformat") else str(exit_ts)
+                )
 
                 trades.append(
                     TradeResult(
