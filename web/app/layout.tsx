@@ -3,7 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "ARGUS | Obsidian Observatory",
+  title: "ARGUS | Argus Observatory",
   description: "Retail trading simulation SaaS. Backtest with reality gaps applied.",
   manifest: "/manifest.json",
   icons: {
