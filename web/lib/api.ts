@@ -33,7 +33,7 @@ export async function fetchApi<T>(
         }
       }
     } catch (e) {
-      // JSON parse error, ignore
+      console.error(`Failed to parse error JSON from ${response.status} response`, e);
     }
     throw new Error(errorMessage);
   }
@@ -83,4 +83,9 @@ export interface SimulationLogEntry {
 export interface HistoryResponse {
   simulations: SimulationLogEntry[];
   total: number;
+}
+
+export interface BacktestResponse {
+  simulation_id: string | null;
+  result: any; // Mapped from Python BacktestResult dict
 }

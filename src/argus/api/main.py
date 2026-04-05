@@ -5,6 +5,7 @@ Serves the backtest engine and manages history/auth via Supabase.
 """
 
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -149,34 +150,36 @@ def run_backtest(
         # 5. Update Supabase with success
         if supabase_client and sim_id:
             try:
+                now_iso = datetime.now(timezone.utc).isoformat()
                 supabase_client.table("simulation_logs").update(
                     {
                         "status": "completed",
-                        "total_return_pct": float(result.total_return_pct),
-                        "sharpe_ratio": float(result.metrics.get("Sharpe Ratio", 0.0)),
-                        "sortino_ratio": float(result.metrics.get("Sortino Ratio", 0.0)),
-                        "max_drawdown_pct": float(result.metrics.get("Max Drawdown [%]", 0.0)),
-                        "win_rate_pct": float(result.metrics.get("Win Rate [%]", 0.0)),
-                        "total_trades": int(result.metrics.get("Total Trades", 0)),
+                        "total_return_pct": float(result.metrics.total_return_pct),
+                        "sharpe_ratio": float(result.metrics.sharpe_ratio),
+                        "sortino_ratio": float(result.metrics.sortino_ratio),
+                        "max_drawdown_pct": float(result.metrics.max_drawdown_pct),
+                        "win_rate_pct": float(result.metrics.win_rate_pct),
+                        "total_trades": int(result.metrics.total_trades),
                         "result_json": result.model_dump(mode="json"),
-                        "completed_at": "now()",
+                        "completed_at": now_iso,
                     }
                 ).eq("id", sim_id).execute()
             except Exception as e:
                 logger.error(f"Failed to update simulation log on success: {e}")
 
-        return result
+        return {"simulation_id": sim_id, "result": result}
 
     except Exception as e:
         logger.exception("Backtest execution failed")
         # Update Supabase with failure
         if supabase_client and sim_id:
             try:
+                now_iso = datetime.now(timezone.utc).isoformat()
                 supabase_client.table("simulation_logs").update(
                     {
                         "status": "failed",
                         "error_message": str(e),
-                        "completed_at": "now()",
+                        "completed_at": now_iso,
                     }
                 ).eq("id", sim_id).execute()
             except Exception as update_err:

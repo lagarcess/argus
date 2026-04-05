@@ -58,6 +58,12 @@ class Settings(BaseSettings):
         description="Enable disk caching for market data. Useful for backtesting/dev.",
     )
 
+    # Core Application Settings
+    APP_ENV: str = Field(
+        default="DEV",
+        description="Application environment flag (DEV, PROD, etc.)",
+    )
+
     # Supabase Configuration
     SUPABASE_URL: str | None = Field(default=None)
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default=None)

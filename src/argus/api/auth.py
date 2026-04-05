@@ -19,7 +19,7 @@ security = HTTPBearer(auto_error=False)
 # Supabase signs JWTs with the project JWT secret
 _settings = get_settings()
 _SUPABASE_JWT_SECRET: Optional[str] = _settings.SUPABASE_JWT_SECRET
-_DEV_MODE = _SUPABASE_JWT_SECRET is None
+_DEV_MODE = _settings.APP_ENV != "PROD"
 
 
 def _decode_supabase_jwt(token: str) -> Dict[str, Any]:

@@ -3,6 +3,7 @@ from typing import List, Literal, Optional
 
 import pandas as pd
 import vectorbt as vbt
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.analysis.harmonics import HarmonicAnalyzer
@@ -198,6 +199,14 @@ class ArgusEngine:
         entries_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
         exits_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
 
+        # Import pandas_ta outside the loop to avoid severe iterative overhead
+        try:
+            import pandas_ta as ta  # type: ignore
+            has_ta = True
+        except ImportError:
+            has_ta = False
+            logger.warning("pandas_ta not installed. TA-dependent indicators will be skipped.")
+
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
             if is_multi_index:
@@ -272,12 +281,10 @@ class ArgusEngine:
             # Applied AFTER pattern signals, always AND-gate indicators
             # regardless of confluence_mode (indicators are always additive gates)
             try:
-                import pandas_ta as ta  # type: ignore
-
                 indicator_entry_mask = pd.Series(True, index=symbol_data.index)
                 indicator_exit_mask = pd.Series(True, index=symbol_data.index)
 
-                if config.rsi_period is not None:
+                if has_ta and config.rsi_period is not None:
                     rsi = ta.rsi(symbol_data["close"], length=config.rsi_period)
                     if rsi is not None and not rsi.empty:
                         # Entry: price is oversold (RSI below threshold)
@@ -289,7 +296,7 @@ class ArgusEngine:
                             rsi >= config.rsi_overbought
                         )
 
-                if config.ema_period is not None:
+                if has_ta and config.ema_period is not None:
                     ema = ta.ema(symbol_data["close"], length=config.ema_period)
                     if ema is not None and not ema.empty:
                         # Entry: price is above EMA (bullish context)
@@ -306,9 +313,9 @@ class ArgusEngine:
                     entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(False)
                     exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(False)
 
-            except Exception:  # noqa: BLE001
-                # If indicator computation fails, skip silently (don't break backtest)
-                pass
+            except Exception as e:  # noqa: BLE001
+                # If indicator computation fails, log the error rather than skipping silently
+                logger.error(f"Indicator computation failed for {symbol}: {e}")
 
         # 3. VectorBT Simulation
         portfolio = vbt.Portfolio.from_signals(
