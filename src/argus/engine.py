@@ -35,28 +35,46 @@ class StrategyConfig(BaseModel):
     # --- Indicator Confluence ---
     rsi_period: Optional[int] = Field(
         default=None,
-        ge=2, le=200,
+        ge=2,
+        le=200,
         description="RSI period. When set, RSI is computed and used as confluence filter.",
     )
     rsi_oversold: float = Field(
         default=30.0,
-        ge=0.0, le=100.0,
+        ge=0.0,
+        le=100.0,
         description="RSI threshold below which market is considered oversold (entry signal).",
     )
     rsi_overbought: float = Field(
         default=70.0,
-        ge=0.0, le=100.0,
+        ge=0.0,
+        le=100.0,
         description="RSI threshold above which market is considered overbought (exit signal).",
     )
     ema_period: Optional[int] = Field(
         default=None,
-        ge=2, le=500,
+        ge=2,
+        le=500,
         description="EMA period. When set, price-vs-EMA crossover used as confluence filter.",
     )
     symbols: Optional[List[str]] = Field(
         default=None,
         max_length=3,
         description="Up to 3 symbols to backtest (max 3 per PRD batch limit).",
+    )
+    benchmark_symbol: Optional[str] = Field(
+        default="SPY",
+        description="Benchmark symbol for relative metrics.",
+    )
+
+    benchmark_symbol: Optional[str] = Field(
+        default="SPY",
+        description="Benchmark symbol for relative metrics.",
+    )
+
+    benchmark_symbol: Optional[str] = Field(
+        default="SPY",
+        description="Benchmark symbol for relative metrics.",
     )
 
 
@@ -84,6 +102,21 @@ class MetricsResult(BaseModel):
     max_drawdown_pct: float
     win_rate_pct: float
     total_trades: int
+    alpha: float
+    beta: float
+    calmar_ratio: float
+    avg_trade_duration: str
+    avg_trade_duration_bars: int
+    alpha: float
+    beta: float
+    calmar_ratio: float
+    avg_trade_duration: str
+    avg_trade_duration_bars: int
+    alpha: float
+    beta: float
+    calmar_ratio: float
+    avg_trade_duration: str
+    avg_trade_duration_bars: int
 
 
 class BacktestResult(BaseModel):
@@ -166,6 +199,44 @@ class ArgusEngine:
                 "Data is empty after fetching and applying 15-minute safety buffer."
             )
 
+        # Fetch benchmark data
+        benchmark_data = None
+        if config.benchmark_symbol and self.data_provider:
+            # Determine asset class from symbol (simple heuristic: contains '/')
+            bench_asset_class = (
+                AssetClass.CRYPTO if "/" in config.benchmark_symbol else AssetClass.EQUITY
+            )
+            try:
+                # Need to resolve start_dt/end_dt if data was provided directly
+                if start_date is None or end_date is None:
+                    # If we didn't calculate these above, we should infer from data.index
+                    if hasattr(data.index, "levels"):  # MultiIndex
+                        times = data.index.get_level_values(1)
+                    else:
+                        times = data.index
+
+                    if len(times) > 0:
+                        infer_start_dt = pd.to_datetime(times.min())
+                        infer_end_dt = pd.to_datetime(times.max())
+                    else:
+                        infer_start_dt = start_dt
+                        infer_end_dt = end_dt
+                else:
+                    infer_start_dt = start_dt
+                    infer_end_dt = end_dt
+
+                benchmark_data = self.data_provider.get_historical_bars(
+                    symbol=[config.benchmark_symbol],
+                    asset_class=bench_asset_class,
+                    timeframe_str=timeframe,
+                    start_dt=infer_start_dt,
+                    end_dt=infer_end_dt,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch benchmark data for {config.benchmark_symbol}: {e}"
+                )
+
         # 1. Standardize Data format for multi-asset broadcasting
         # We need data to be aligned columns per symbol for vectorbt if it's not already
         is_multi_index = isinstance(data.index, pd.MultiIndex)
@@ -202,10 +273,13 @@ class ArgusEngine:
         # Import pandas_ta outside the loop to avoid severe iterative overhead
         try:
             import pandas_ta as ta  # type: ignore
+
             has_ta = True
         except ImportError:
             has_ta = False
-            logger.warning("pandas_ta not installed. TA-dependent indicators will be skipped.")
+            logger.warning(
+                "pandas_ta not installed. TA-dependent indicators will be skipped."
+            )
 
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
@@ -241,7 +315,9 @@ class ArgusEngine:
                 ) or pd.api.types.is_object_dtype(symbol_signals[col]):
                     # Silence Pandas 3.0 downcasting FutureWarnings during fillna
                     with pd.option_context("future.no_silent_downcasting", True):
-                        symbol_signals[col] = symbol_signals[col].fillna(False).infer_objects(copy=False)
+                        symbol_signals[col] = (
+                            symbol_signals[col].fillna(False).infer_objects(copy=False)
+                        )
 
             # Extract configured entries and exits
             entry_sigs = pd.Series(False, index=symbol_data.index)
@@ -310,8 +386,12 @@ class ArgusEngine:
 
                 # Apply indicator masks
                 if config.rsi_period is not None or config.ema_period is not None:
-                    entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(False)
-                    exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(False)
+                    entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(
+                        False
+                    )
+                    exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(
+                        False
+                    )
 
             except Exception as e:  # noqa: BLE001
                 # If indicator computation fails, log the error rather than skipping silently
@@ -339,6 +419,133 @@ class ArgusEngine:
             except (ValueError, TypeError):
                 return default
 
+        # --- Relative Metrics (Alpha & Beta) ---
+        alpha = 0.0
+        beta = 0.0
+        calmar_ratio = 0.0
+        avg_trade_duration_str = "0s"
+        avg_trade_duration_bars = 0
+
+        # Safe Calmar Ratio
+        calmar_ratio = safe_metric("Calmar Ratio")
+        if calmar_ratio == 0.0:
+            # Fallback if Calmar is not calculated
+            ann_ret = safe_metric("Ann. Return [%]")
+            max_dd = safe_metric("Max Drawdown [%]")
+            if max_dd != 0:
+                calmar_ratio = ann_ret / abs(max_dd)
+
+        # Average Trade Duration
+        trade_records = portfolio.trades.records_readable
+        if (
+            not trade_records.empty
+            and "Entry Timestamp" in trade_records.columns
+            and "Exit Timestamp" in trade_records.columns
+        ):
+            durations = pd.to_datetime(trade_records["Exit Timestamp"]) - pd.to_datetime(
+                trade_records["Entry Timestamp"]
+            )
+            avg_duration = durations.mean()
+
+            # Format string e.g., "2d 4h 15m"
+            if not pd.isna(avg_duration):
+                days = avg_duration.components.days
+                hours = avg_duration.components.hours
+                minutes = avg_duration.components.minutes
+
+                parts = []
+                if days > 0:
+                    parts.append(f"{days}d")
+                if hours > 0:
+                    parts.append(f"{hours}h")
+                if minutes > 0 or (
+                    days == 0 and hours == 0
+                ):  # show minutes if nothing else
+                    parts.append(f"{minutes}m")
+                avg_trade_duration_str = " ".join(parts)
+
+            # Avg duration bars
+            if "Duration" in trade_records.columns:
+                avg_trade_duration_bars = int(trade_records["Duration"].mean())
+            else:
+                # Approximate based on freq if missing (though typically present)
+                # or from entry_idx/exit_idx in raw records
+                raw_records = portfolio.trades.records
+                if (
+                    not raw_records.empty
+                    and "entry_idx" in raw_records.columns
+                    and "exit_idx" in raw_records.columns
+                ):
+                    avg_trade_duration_bars = int(
+                        (raw_records["exit_idx"] - raw_records["entry_idx"]).mean()
+                    )
+
+        # Alpha and Beta calculation
+        if benchmark_data is not None and not benchmark_data.empty:
+            strat_returns = portfolio.returns()
+
+            # If multi-asset, returns might be a DataFrame, convert to portfolio total return series
+            if isinstance(strat_returns, pd.DataFrame):
+                # vectorbt portfolio.returns() usually returns a Series for the whole portfolio,
+                # but if not, aggregate it
+                strat_returns = strat_returns.mean(
+                    axis=1
+                )  # or portfolio.value().pct_change()
+
+            # Make sure strat_returns is a Series
+            if isinstance(portfolio.value(), pd.DataFrame):
+                # if multi-asset portfolio, use total value pct change
+                strat_returns = portfolio.value().sum(axis=1).pct_change()
+            elif isinstance(portfolio.value(), pd.Series):
+                strat_returns = portfolio.value().pct_change()
+
+            # Prepare benchmark returns
+            if isinstance(benchmark_data.index, pd.MultiIndex):
+                # Unstack if multi-asset
+                bench_close = benchmark_data["close"].unstack(level=0)
+                # If only one benchmark symbol
+                bench_close = bench_close.iloc[:, 0]
+            else:
+                bench_close = benchmark_data["close"]
+
+            bench_returns = bench_close.pct_change()
+
+            # Align indices
+            aligned_returns = pd.concat(
+                [strat_returns.rename("strat"), bench_returns.rename("bench")], axis=1
+            ).dropna()
+
+            if not aligned_returns.empty and len(aligned_returns) > 1:
+                cov_matrix = aligned_returns.cov()
+                var_bench = cov_matrix.loc["bench", "bench"]
+                cov_strat_bench = cov_matrix.loc["strat", "bench"]
+
+                if var_bench != 0:
+                    beta = cov_strat_bench / var_bench
+
+                    # Annualize returns for Alpha
+                    # Using vectorbt's annualized return approximation (252 for daily, etc.)
+                    # Let's use simple annualized return if daily freq: (1 + mean_ret) ** 252 - 1
+                    # To be robust regardless of freq, use vectorbt Ann. Return [%] / 100 for strategy
+                    ann_ret_strat = safe_metric("Ann. Return [%]") / 100.0
+
+                    # Calculate benchmark annualized return dynamically based on period
+                    days = (
+                        aligned_returns.index.max() - aligned_returns.index.min()
+                    ).days
+                    if days > 0:
+                        total_bench_ret = (1 + aligned_returns["bench"]).prod() - 1
+                        ann_ret_bench = (1 + total_bench_ret) ** (365.25 / days) - 1
+                    else:
+                        ann_ret_bench = 0.0
+
+                    alpha = ann_ret_strat - (beta * ann_ret_bench)
+
+                    # Scale to percentage for output if necessary. The requirement says:
+                    # Alpha Formula: alpha = R_strategy - (beta * R_benchmark).
+                    # Assuming we want Alpha to be formatted as a percentage like other metrics or just raw decimal.
+                    # Usually alpha/beta are decimals, but if the rest are pct, we might want alpha to be consistent. Let's stick to decimal for both alpha and beta.
+
         metrics_result = MetricsResult(
             total_return_pct=safe_metric("Total Return [%]"),
             sharpe_ratio=safe_metric("Sharpe Ratio"),
@@ -346,6 +553,11 @@ class ArgusEngine:
             max_drawdown_pct=safe_metric("Max Drawdown [%]"),
             win_rate_pct=safe_metric("Win Rate [%]"),
             total_trades=int(safe_metric("Total Trades", 0)),
+            alpha=alpha,
+            beta=beta,
+            calmar_ratio=calmar_ratio,
+            avg_trade_duration=avg_trade_duration_str,
+            avg_trade_duration_bars=avg_trade_duration_bars,
         )
 
         # Equity Curve
@@ -358,8 +570,8 @@ class ArgusEngine:
 
         equity_curve = [
             EquityCurvePoint(
-                timestamp=idx.isoformat() if hasattr(idx, 'isoformat') else str(idx),
-                value=float(val)
+                timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),
+                value=float(val),
             )
             for idx, val in equity_series.items()
         ]
@@ -380,8 +592,14 @@ class ArgusEngine:
 
                 entry_ts = trade["Entry Timestamp"]
                 exit_ts = trade["Exit Timestamp"]
-                entry_time_str = entry_ts.isoformat() if hasattr(entry_ts, 'isoformat') else str(entry_ts)
-                exit_time_str = exit_ts.isoformat() if hasattr(exit_ts, 'isoformat') else str(exit_ts)
+                entry_time_str = (
+                    entry_ts.isoformat()
+                    if hasattr(entry_ts, "isoformat")
+                    else str(entry_ts)
+                )
+                exit_time_str = (
+                    exit_ts.isoformat() if hasattr(exit_ts, "isoformat") else str(exit_ts)
+                )
 
                 trades.append(
                     TradeResult(

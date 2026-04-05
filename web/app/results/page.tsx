@@ -13,9 +13,9 @@ export default function ResultsPage() {
       <TopNav />
       <div className="flex pt-[60px]">
         <Sidebar />
-        
+
         <main className="flex-1 md:ml-64 p-8 min-h-[calc(100vh-60px)] grid grid-cols-1 lg:grid-cols-12 gap-8 tonal-shift">
-          
+
           <div className="lg:col-span-12">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
               <div>
@@ -31,7 +31,7 @@ export default function ResultsPage() {
                   Strategy execution completed with <span className="text-primary font-bold">Reality Gap</span> constraints applied. Output corresponds to the Obsidian Core network.
                 </p>
               </div>
-              
+
               <div className="flex gap-4">
                 <button className="px-6 py-2 rounded-full border border-outline-variant/30 hover:bg-surface-container-highest transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
                   <span className="material-symbols-outlined text-sm">share</span> Share
@@ -79,7 +79,7 @@ export default function ResultsPage() {
                      <span className="px-3 py-1 bg-primary text-on-primary-container rounded text-[10px] uppercase font-bold tracking-widest shadow-sm">1D</span>
                    </div>
                  </div>
-                 
+
                  {/* Visual Mock for Equity Curve Chart */}
                  <div className="flex-1 w-full relative flex items-end pt-10 pb-4">
                     {/* Y-Axis labels */}
@@ -107,16 +107,16 @@ export default function ResultsPage() {
                              <stop offset="100%" stopColor="#99f7ff" stopOpacity="0.0" />
                            </linearGradient>
                          </defs>
-                         <path 
-                           d="M 0 100 L 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5 L 100 100 Z" 
-                           fill="url(#lineGrad)" 
+                         <path
+                           d="M 0 100 L 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5 L 100 100 Z"
+                           fill="url(#lineGrad)"
                          />
-                         <path 
-                           d="M 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5" 
-                           fill="none" stroke="#99f7ff" strokeWidth="2" strokeLinejoin="round" 
+                         <path
+                           d="M 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5"
+                           fill="none" stroke="#99f7ff" strokeWidth="2" strokeLinejoin="round"
                            className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]"
                          />
-                         
+
                          {/* Peak dot */}
                          <circle cx="100" cy="5" r="3" fill="#ffffff" className="drop-shadow-[0_0_8px_#ffffff] animate-pulse" />
                        </svg>
@@ -171,7 +171,7 @@ export default function ResultsPage() {
                  </div>
               </div>
             </div>
-            
+
             {/* Extended Detail Table Mock */}
             <div className="mt-8 bg-surface-container-low rounded-xl border border-outline-variant/10 p-6 overflow-hidden">
                <h3 className="font-headline font-bold uppercase tracking-widest text-sm mb-6">Last 10 Executions</h3>

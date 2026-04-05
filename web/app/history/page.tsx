@@ -9,7 +9,7 @@ export default function HistoryPage() {
       <TopNav />
       <div className="flex pt-[60px]">
         <Sidebar />
-        
+
         <main className="flex-1 md:ml-64 p-8 min-h-[calc(100vh-60px)] tonal-shift">
           <header className="mb-12">
             <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface mb-2">History</h1>
@@ -27,21 +27,21 @@ export default function HistoryPage() {
               </span>
               <div className="text-4xl font-black font-headline text-on-surface">1,248</div>
             </div>
-            
+
             <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-2xl">
               <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">
                 Success Rate
               </span>
               <div className="text-4xl font-black font-headline text-secondary">64.2%</div>
             </div>
-            
+
             <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-2xl">
               <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">
                 Avg. Return
               </span>
               <div className="text-4xl font-black font-headline text-primary">+12.4%</div>
             </div>
-            
+
             <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-2xl flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">
@@ -103,7 +103,7 @@ export default function HistoryPage() {
                       </div>
                     </td>
                   </tr>
-                  
+
                   {/* Mock Pending Row */}
                   <tr className="hover:bg-primary/5 transition-colors group">
                     <td className="px-8 py-6">
@@ -132,7 +132,7 @@ export default function HistoryPage() {
                       </div>
                     </td>
                   </tr>
-                  
+
                   {/* Mock Failed Row */}
                   <tr className="hover:bg-primary/5 transition-colors group">
                     <td className="px-8 py-6">
@@ -168,7 +168,7 @@ export default function HistoryPage() {
                 </tbody>
               </table>
             </div>
-            
+
             <div className="px-8 py-4 bg-surface-container-high/30 flex justify-between items-center text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">
               <span>Showing 1-14 of 1,248 entries</span>
               <div className="flex gap-4">

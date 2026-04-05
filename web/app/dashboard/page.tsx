@@ -9,7 +9,7 @@ export default function DashboardPage() {
       <TopNav />
       <div className="flex pt-[60px]">
         <Sidebar />
-        
+
         <main className="flex-1 md:ml-64 p-8 min-h-[calc(100vh-60px)]">
           {/* Header Row */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
@@ -21,7 +21,7 @@ export default function DashboardPage() {
               <h1 className="text-4xl md:text-5xl font-black font-headline tracking-tighter text-on-surface">Dashboard</h1>
               <p className="text-on-surface-variant font-body text-sm mt-1">Real-time simulation metrics & system health.</p>
             </div>
-            
+
             <div className="flex gap-4">
               <button className="px-6 py-2 rounded-full border border-outline-variant/30 hover:border-primary/50 text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm">download</span> Report
@@ -44,7 +44,7 @@ export default function DashboardPage() {
                   <span className="text-on-surface-variant">vs last 30 days</span>
                 </div>
               </div>
-              
+
               <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-lg">
                 <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-4">Active Strategies</span>
                 <div className="text-4xl font-headline font-black text-on-surface">12</div>
@@ -142,7 +142,7 @@ export default function DashboardPage() {
             {/* System Resources */}
             <div className="lg:col-span-4 bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-lg">
               <h3 className="text-sm font-headline font-bold uppercase tracking-widest text-on-surface-variant mb-6">Obsidian Node Diagnostics</h3>
-              
+
               <div className="space-y-6">
                 <div>
                   <div className="flex justify-between text-xs mb-2">
