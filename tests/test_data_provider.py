@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+from alpaca.data.timeframe import TimeFrameUnit
 from argus.domain.schemas import AssetClass
 from argus.market.data_provider import MarketDataProvider
 from argus.market.exceptions import MarketDataError

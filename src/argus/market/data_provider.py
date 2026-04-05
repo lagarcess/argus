@@ -8,11 +8,12 @@ This module abstracts the Alpaca API to provide clean, validated market data
 import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import joblib
 import pandas as pd
-from alpaca.data.enums import Adjustment
+from alpaca.common.enums import Sort
+from alpaca.data.enums import Adjustment, DataFeed
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from alpaca.data.requests import (
     CryptoBarsRequest,
@@ -177,9 +178,6 @@ class MarketDataProvider:
             tf = self._parse_timeframe(timeframe_str)
 
             if asset_class == AssetClass.CRYPTO:
-                from alpaca.common.enums import Sort
-                from typing import Dict, Any
-
                 # Add optional crypto parameters
                 crypto_kwargs: Dict[str, Any] = {
                     "symbol_or_symbols": symbol,
@@ -200,10 +198,6 @@ class MarketDataProvider:
                 bars = self.crypto_client.get_crypto_bars(crypto_req)
 
             elif asset_class == AssetClass.EQUITY:
-                from alpaca.data.enums import Adjustment, DataFeed
-                from alpaca.data.requests import StockBarsRequest
-                from typing import Dict, Any
-
                 adj = Adjustment.SPLIT
                 if adjustment is not None:
                     adj = (

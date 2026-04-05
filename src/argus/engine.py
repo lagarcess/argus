@@ -204,7 +204,9 @@ class ArgusEngine:
                 if pd.api.types.is_bool_dtype(
                     symbol_signals[col]
                 ) or pd.api.types.is_object_dtype(symbol_signals[col]):
-                    symbol_signals[col] = symbol_signals[col].fillna(False)
+                    # Silence Pandas 3.0 downcasting FutureWarnings during fillna
+                    with pd.option_context("future.no_silent_downcasting", True):
+                        symbol_signals[col] = symbol_signals[col].fillna(False).infer_objects(copy=False)
 
             # Extract configured entries and exits
             entry_sigs = pd.Series(False, index=symbol_data.index)
@@ -251,7 +253,8 @@ class ArgusEngine:
         )
 
         # 4. Result Formatting
-        metrics = portfolio.stats()
+        # We pass silence_warnings=True to explicitly acknowledge the multiple columns aggregation and suppress the vectorbt UserWarning
+        metrics = portfolio.stats(silence_warnings=True)
 
         # Extract individual metrics safely
         def safe_metric(key: str, default: float = 0.0) -> float:
