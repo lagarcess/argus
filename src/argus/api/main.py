@@ -11,14 +11,14 @@ from typing import Any, Dict
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from supabase import Client, create_client
 
-from argus.api.auth import get_current_user
+from argus.api.auth import check_rate_limit
 from argus.api.schemas import BacktestRequest, HistoryResponse
 from argus.config import get_crypto_data_client, get_settings, get_stock_data_client
 from argus.domain.schemas import AssetClass
 from argus.engine import ArgusEngine, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
+from supabase import Client, create_client
 
 # Supabase Client Initialization
 # We use the Service Role key for backend operations (inserting logs safely)
@@ -73,7 +73,7 @@ def health_check():
 @app.post("/api/v1/backtest")
 def run_backtest(
     request: BacktestRequest,
-    user: Dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    user: Dict[str, Any] = Depends(check_rate_limit),  # noqa: B008
 ):
     """
     Execute a backtest simulation on multiple assets.
@@ -88,28 +88,37 @@ def run_backtest(
     sim_id = None
     if supabase_client:
         try:
-            res = supabase_client.table("simulation_logs").insert(
-                {
-                    "user_id": user["sub"],
-                    "strategy_name": request.strategy_name,
-                    "symbols": symbols,
-                    "timeframe": request.timeframe,
-                    "start_date": request.start_date.isoformat() if request.start_date else None,
-                    "end_date": request.end_date.isoformat() if request.end_date else None,
-                    "confluence_mode": request.confluence_mode,
-                    "entry_patterns": request.entry_patterns,
-                    "exit_patterns": request.exit_patterns,
-                    "rsi_period": request.rsi_period,
-                    "rsi_oversold": request.rsi_oversold,
-                    "rsi_overbought": request.rsi_overbought,
-                    "ema_period": request.ema_period,
-                    "slippage": request.slippage,
-                    "fees": request.fees,
-                    "status": "processing",
-                }
-            ).execute()
+            res = (
+                supabase_client.table("simulation_logs")
+                .insert(
+                    {
+                        "user_id": user["sub"],
+                        "strategy_name": request.strategy_name,
+                        "symbols": symbols,
+                        "timeframe": request.timeframe,
+                        "start_date": request.start_date.isoformat()
+                        if request.start_date
+                        else None,
+                        "end_date": request.end_date.isoformat()
+                        if request.end_date
+                        else None,
+                        "confluence_mode": request.confluence_mode,
+                        "entry_patterns": request.entry_patterns,
+                        "exit_patterns": request.exit_patterns,
+                        "rsi_period": request.rsi_period,
+                        "rsi_oversold": request.rsi_oversold,
+                        "rsi_overbought": request.rsi_overbought,
+                        "ema_period": request.ema_period,
+                        "slippage": request.slippage,
+                        "fees": request.fees,
+                        "status": "processing",
+                    }
+                )
+                .execute()
+            )
             if res.data:
-                sim_id = res.data[0]["id"]
+                item: Any = res.data[0]
+                sim_id = item.get("id") if isinstance(item, dict) else None
         except Exception as e:
             logger.error(f"Failed to create simulation log: {e}")
 
@@ -139,12 +148,20 @@ def run_backtest(
 
         # 4. Execute
         result = engine.run(
-            symbol=symbols,
+            config=config,
+            symbols=symbols,
             asset_class=ac,
-            timeframe_str=request.timeframe,
-            start_dt=request.start_date,
-            end_dt=request.end_date,
-            strategy_config=config,
+            timeframe=request.timeframe,
+            start_date=datetime.combine(request.start_date, datetime.min.time()).replace(
+                tzinfo=timezone.utc
+            )
+            if request.start_date
+            else None,
+            end_date=datetime.combine(request.end_date, datetime.min.time()).replace(
+                tzinfo=timezone.utc
+            )
+            if request.end_date
+            else None,
         )
 
         # 5. Update Supabase with success
@@ -195,7 +212,7 @@ def run_backtest(
 def get_user_history(
     limit: int = 50,
     offset: int = 0,
-    user: Dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    user: Dict[str, Any] = Depends(check_rate_limit),  # noqa: B008
 ):
     """Get the simulation history for the current user."""
     if not supabase_client:
@@ -207,7 +224,7 @@ def get_user_history(
         # Fetch count
         count_res = (
             supabase_client.table("simulation_logs")
-            .select("id", count="exact")
+            .select("id", count="exact")  # type: ignore[arg-type]
             .eq("user_id", user_id)
             .execute()
         )
@@ -227,7 +244,7 @@ def get_user_history(
             .execute()
         )
 
-        return HistoryResponse(simulations=res.data, total=total)
+        return HistoryResponse(simulations=res.data, total=total)  # type: ignore[arg-type]
 
     except Exception as e:
         logger.error(f"Failed to fetch history: {e}")

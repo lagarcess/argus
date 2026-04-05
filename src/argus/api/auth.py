@@ -5,6 +5,7 @@ Validates Supabase-issued JWTs. Falls back to a dev-mode mock
 when SUPABASE_JWT_SECRET is not set (local development only).
 """
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import jwt
@@ -12,7 +13,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
 
-from argus.config import get_settings
+from argus.config import get_settings, get_supabase_client
+from supabase import Client
 
 security = HTTPBearer(auto_error=False)
 
@@ -101,3 +103,77 @@ def get_optional_user(
         return get_current_user(credentials)
     except HTTPException:
         return None
+
+
+def check_rate_limit(
+    user: Dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> Dict[str, Any]:
+    """
+    FastAPI dependency: checks if user has exceeded their monthly usage limit.
+    Free tier allows 10 simulations per calendar month.
+    """
+    try:
+        supabase: Client = get_supabase_client()
+    except ValueError:
+        logger.warning("Supabase client not configured. Skipping rate limit check.")
+        return user
+
+    user_id = user["sub"]
+
+    # In dev mode with synthetic user, bypass rate limit
+    if _DEV_MODE and user_id == "dev-anon-user":
+        return user
+
+    try:
+        # Fetch user profile to get subscription tier
+        res = (
+            supabase.table("profiles")
+            .select("subscription_tier")
+            .eq("id", user_id)
+            .execute()
+        )
+        tier = "free"
+        if res.data:
+            item: Any = res.data[0]
+            tier = (
+                item.get("subscription_tier", "free")
+                if isinstance(item, dict)
+                else "free"
+            )
+
+        # Pro tier is unlimited
+        if tier == "pro":
+            return user
+
+        # Free tier limit check
+        now = datetime.now(timezone.utc)
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        # Count simulations for current month
+        count_res = (
+            supabase.table("simulation_logs")
+            .select("id", count="exact")  # type: ignore[arg-type]
+            .eq("user_id", user_id)
+            .gte("created_at", start_of_month.isoformat())
+            .execute()
+        )
+
+        count = count_res.count if count_res.count else 0
+
+        if count >= 10:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": "Monthly limit reached", "upgrade_url": "/settings"},
+            )
+
+        return user
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking rate limits for {user_id}: {e}")
+        # Fail open or fail closed? The prompt says implement rate limiting,
+        # but if Supabase is down, failing open might be better for UX,
+        # but the safest is failing closed or just logging and returning user.
+        # Let's fail open for robust API if db fails but auth succeeded.
+        return user

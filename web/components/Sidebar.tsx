@@ -21,7 +21,7 @@ export function Sidebar() {
           Obsidian Observatory
         </div>
       </div>
-      
+
       <div className="flex flex-col gap-1 px-4 flex-1">
         {links.map((link) => {
           const isActive = pathname === link.href || pathname.startsWith(link.href + "/");

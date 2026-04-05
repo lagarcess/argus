@@ -80,8 +80,8 @@ export default function LandingPage() {
               Find Alpha in the <span className="text-gradient-cyan">Noise</span>
             </h1>
             <p className="mt-6 text-on-surface-variant max-w-lg text-sm md:text-base leading-relaxed">
-              ARGUS provides institutional-grade volatility models and high-frequency 
-              backtesting protocols within the Obsidian environment. 
+              ARGUS provides institutional-grade volatility models and high-frequency
+              backtesting protocols within the Obsidian environment.
               Deploy simulated strategies without reality gaps.
             </p>
           </div>
@@ -217,7 +217,7 @@ export default function LandingPage() {
                 <FacebookIcon className="w-5 h-5 text-[#1877F2] group-hover:text-white" />
               </button>
             </div>
-            
+
             <p className="mt-6 text-center text-[10px] text-on-surface-variant font-label opacity-70">
               By connecting, you agree to our{" "}
               <a href="#" className="underline">Terms</a> and{" "}
@@ -226,7 +226,7 @@ export default function LandingPage() {
           </div>
         </div>
       </main>
-      
+
       <footer className="mt-auto px-6 py-8 border-t border-neutral-800/50 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] tracking-wider uppercase opacity-50">
         <div>© 2026 ARGUS QUANTITATIVE. REALITY GAP APPLIED.</div>
         <div className="font-bold text-error">
