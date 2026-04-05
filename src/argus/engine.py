@@ -3,6 +3,7 @@ from typing import List, Literal, Optional
 
 import pandas as pd
 import vectorbt as vbt
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.analysis.harmonics import HarmonicAnalyzer
@@ -30,6 +31,32 @@ class StrategyConfig(BaseModel):
     )
     fees: float = Field(
         default=0.001, description="Trading fees percentage (0.001 = 0.1%)."
+    )
+    # --- Indicator Confluence ---
+    rsi_period: Optional[int] = Field(
+        default=None,
+        ge=2, le=200,
+        description="RSI period. When set, RSI is computed and used as confluence filter.",
+    )
+    rsi_oversold: float = Field(
+        default=30.0,
+        ge=0.0, le=100.0,
+        description="RSI threshold below which market is considered oversold (entry signal).",
+    )
+    rsi_overbought: float = Field(
+        default=70.0,
+        ge=0.0, le=100.0,
+        description="RSI threshold above which market is considered overbought (exit signal).",
+    )
+    ema_period: Optional[int] = Field(
+        default=None,
+        ge=2, le=500,
+        description="EMA period. When set, price-vs-EMA crossover used as confluence filter.",
+    )
+    symbols: Optional[List[str]] = Field(
+        default=None,
+        max_length=3,
+        description="Up to 3 symbols to backtest (max 3 per PRD batch limit).",
     )
 
 
@@ -172,6 +199,14 @@ class ArgusEngine:
         entries_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
         exits_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
 
+        # Import pandas_ta outside the loop to avoid severe iterative overhead
+        try:
+            import pandas_ta as ta  # type: ignore
+            has_ta = True
+        except ImportError:
+            has_ta = False
+            logger.warning("pandas_ta not installed. TA-dependent indicators will be skipped.")
+
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
             if is_multi_index:
@@ -241,6 +276,46 @@ class ArgusEngine:
 
             entries_df[symbol] = entry_sigs
             exits_df[symbol] = exit_sigs
+
+            # --- Indicator Confluence Filters ---
+            # Applied AFTER pattern signals, always AND-gate indicators
+            # regardless of confluence_mode (indicators are always additive gates)
+            try:
+                indicator_entry_mask = pd.Series(True, index=symbol_data.index)
+                indicator_exit_mask = pd.Series(True, index=symbol_data.index)
+
+                if has_ta and config.rsi_period is not None:
+                    rsi = ta.rsi(symbol_data["close"], length=config.rsi_period)
+                    if rsi is not None and not rsi.empty:
+                        # Entry: price is oversold (RSI below threshold)
+                        indicator_entry_mask = indicator_entry_mask & (
+                            rsi <= config.rsi_oversold
+                        )
+                        # Exit: price is overbought (RSI above threshold)
+                        indicator_exit_mask = indicator_exit_mask & (
+                            rsi >= config.rsi_overbought
+                        )
+
+                if has_ta and config.ema_period is not None:
+                    ema = ta.ema(symbol_data["close"], length=config.ema_period)
+                    if ema is not None and not ema.empty:
+                        # Entry: price is above EMA (bullish context)
+                        indicator_entry_mask = indicator_entry_mask & (
+                            symbol_data["close"] > ema
+                        )
+                        # Exit: price is below EMA (bearish context)
+                        indicator_exit_mask = indicator_exit_mask & (
+                            symbol_data["close"] < ema
+                        )
+
+                # Apply indicator masks
+                if config.rsi_period is not None or config.ema_period is not None:
+                    entries_df[symbol] = entries_df[symbol] & indicator_entry_mask.fillna(False)
+                    exits_df[symbol] = exits_df[symbol] & indicator_exit_mask.fillna(False)
+
+            except Exception as e:  # noqa: BLE001
+                # If indicator computation fails, log the error rather than skipping silently
+                logger.error(f"Indicator computation failed for {symbol}: {e}")
 
         # 3. VectorBT Simulation
         portfolio = vbt.Portfolio.from_signals(
