@@ -58,6 +58,11 @@ class Settings(BaseSettings):
         description="Enable disk caching for market data. Useful for backtesting/dev.",
     )
 
+    # Supabase Configuration
+    SUPABASE_URL: str | None = Field(default=None)
+    SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default=None)
+    SUPABASE_JWT_SECRET: str | None = Field(default=None)
+
     # Rate Limiting Configuration
     RATE_LIMIT_DELAY: float = Field(
         default=0.5,

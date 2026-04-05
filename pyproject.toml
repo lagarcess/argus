@@ -21,6 +21,13 @@ pandas-ta-classic = {git = "https://github.com/xgboosted/pandas-ta-classic.git",
 numba = {version = ">=0.60.0", python = ">=3.10"}
 joblib = "^1.5.3"
 vectorbt = "^0.28.5"
+# API Server
+fastapi = "^0.115.0"
+uvicorn = {version = "^0.32.0", extras = ["standard"]}
+python-multipart = "^0.0.12"
+# Supabase Auth
+supabase = "^2.10.0"
+pyjwt = {version = "^2.9.0", extras = ["crypto"]}
 
 [build-system]
 requires = ["poetry-core"]
