@@ -28,7 +28,7 @@ export default function ResultsPage() {
                   Backtest Results
                 </h1>
                 <p className="text-on-surface-variant text-sm mt-2 max-w-2xl">
-                  Strategy execution completed with <span className="text-primary font-bold">Reality Gap</span> constraints applied. Output corresponds to the Obsidian Core network.
+                  Strategy simulation completed with <span className="text-primary font-bold">Reality Gap</span> constraints applied. Output corresponds to the Argus Core network.
                 </p>
               </div>
 
@@ -167,14 +167,14 @@ export default function ResultsPage() {
                     <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-500"></div>
                     <span className="material-symbols-outlined text-4xl text-primary mb-3 group-hover:scale-110 transition-transform duration-500">psychology</span>
                     <h3 className="font-headline font-bold uppercase tracking-widest text-sm">Deploy Matrix</h3>
-                    <p className="text-[10px] text-on-surface-variant uppercase tracking-widest leading-tight mt-2 text-center">Export Strategy to Live Sandbox</p>
+                    <p className="text-[10px] text-on-surface-variant uppercase tracking-widest leading-tight mt-2 text-center">Export Strategy to Simulated Sandbox</p>
                  </div>
               </div>
             </div>
 
             {/* Extended Detail Table Mock */}
             <div className="mt-8 bg-surface-container-low rounded-xl border border-outline-variant/10 p-6 overflow-hidden">
-               <h3 className="font-headline font-bold uppercase tracking-widest text-sm mb-6">Last 10 Executions</h3>
+               <h3 className="font-headline font-bold uppercase tracking-widest text-sm mb-6">Last 10 Simulations</h3>
                <table className="w-full text-left text-sm">
                   <thead className="bg-surface-container-highest text-[10px] uppercase tracking-widest text-on-surface-variant">
                     <tr>

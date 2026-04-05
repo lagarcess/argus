@@ -14,7 +14,7 @@ export default function HistoryPage() {
           <header className="mb-12">
             <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface mb-2">History</h1>
             <p className="text-on-surface-variant text-sm max-w-2xl">
-              Browse your complete log of simulated executions. Data integrity is maintained via the Obsidian core.
+              Browse your complete log of simulated backtests. Data integrity is maintained via the Argus core.
             </p>
           </header>
 
@@ -23,7 +23,7 @@ export default function HistoryPage() {
             <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full"></div>
               <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">
-                Total Executions
+                Total Simulations
               </span>
               <div className="text-4xl font-black font-headline text-on-surface">1,248</div>
             </div>
@@ -65,7 +65,7 @@ export default function HistoryPage() {
                 <thead>
                   <tr className="bg-surface-container-high/50 text-[10px] uppercase tracking-[0.2em] text-on-surface-variant font-bold">
                     <th className="px-8 py-5 border-b border-outline-variant/10">Strategy Name</th>
-                    <th className="px-8 py-5 border-b border-outline-variant/10">Execution Date</th>
+                    <th className="px-8 py-5 border-b border-outline-variant/10">Simulation Date</th>
                     <th className="px-8 py-5 border-b border-outline-variant/10">Return %</th>
                     <th className="px-8 py-5 border-b border-outline-variant/10">Status</th>
                     <th className="px-8 py-5 border-b border-outline-variant/10 text-right">Actions</th>
