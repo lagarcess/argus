@@ -11,8 +11,10 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
+from supabase import Client, create_client
 
 from argus.config import get_settings
+from argus.domain.schemas import User
 
 security = HTTPBearer(auto_error=False)
 
@@ -21,8 +23,15 @@ _settings = get_settings()
 _SUPABASE_JWT_SECRET: Optional[str] = _settings.SUPABASE_JWT_SECRET
 _DEV_MODE = _settings.APP_ENV != "PROD"
 
+SUPABASE_URL = _settings.SUPABASE_URL
+SUPABASE_SERVICE_KEY = _settings.SUPABASE_SERVICE_ROLE_KEY
 
-def _decode_supabase_jwt(token: str) -> Dict[str, Any]:
+supabase_client: Client | None = None
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+
+def _decode_supabase_jwt(token: str) -> Optional[Dict[str, Any]]:
     """Decode and validate a Supabase JWT."""
     try:
         payload = jwt.decode(
@@ -32,26 +41,23 @@ def _decode_supabase_jwt(token: str) -> Dict[str, Any]:
             options={"verify_aud": False},
         )
         return payload
-    except jwt.ExpiredSignatureError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-        ) from exc
-    except jwt.InvalidTokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token",
-        ) from exc
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token has expired")
+        return None
+    except jwt.InvalidTokenError:
+        logger.warning("Invalid authentication token")
+        return None
 
 
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),  # noqa: B008
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
     FastAPI dependency: validates Bearer token and returns user payload.
 
     In dev mode (no SUPABASE_JWT_SECRET), accepts any token and returns
     a synthetic user dict — never use in production.
+    Returns None if missing or invalid token.
     """
     if _DEV_MODE:
         if credentials is None:
@@ -85,19 +91,59 @@ def get_current_user(
             }
 
     if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication token",
-        )
+        return None
 
     return _decode_supabase_jwt(credentials.credentials)
 
 
-def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),  # noqa: B008
-) -> Optional[Dict[str, Any]]:
-    """Same as get_current_user but returns None instead of raising for public routes."""
-    try:
-        return get_current_user(credentials)
-    except HTTPException:
-        return None
+def auth_required(
+    payload: Optional[Dict[str, Any]] = Depends(get_current_user),  # noqa: B008
+) -> User:
+    """
+    Enforcer dependency: Calls get_current_user. If None, raises 401.
+    If valid, fetches subscription_tier from Supabase profiles table
+    and returns a User model.
+    """
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Valid authentication credentials required",
+        )
+
+    user_id = payload.get("sub")
+    email = payload.get("email", "")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload: missing sub",
+        )
+
+    subscription_tier = "free"
+
+    if supabase_client:
+        try:
+            res = (
+                supabase_client.table("profiles")
+                .select("subscription_tier")
+                .eq("id", user_id)
+                .single()
+                .execute()
+            )
+            if (
+                res.data
+                and isinstance(res.data, dict)
+                and "subscription_tier" in res.data
+            ):
+                subscription_tier = str(res.data["subscription_tier"])
+        except Exception as e:
+            # If profile not found or other db error, default to free
+            logger.info(
+                f"Failed to fetch profile for user {user_id}, defaulting to free tier: {e}"
+            )
+
+    return User(
+        user_id=user_id,
+        email=email,
+        subscription_tier=subscription_tier,
+    )

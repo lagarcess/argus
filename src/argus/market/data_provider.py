@@ -190,9 +190,7 @@ class MarketDataProvider:
                 if page_token is not None:
                     crypto_kwargs["page_token"] = page_token
                 if sort is not None:
-                    crypto_kwargs["sort"] = (
-                        sort if isinstance(sort, Sort) else Sort(sort)
-                    )
+                    crypto_kwargs["sort"] = sort if isinstance(sort, Sort) else Sort(sort)
 
                 crypto_req = CryptoBarsRequest(**crypto_kwargs)
                 bars = self.crypto_client.get_crypto_bars(crypto_req)
