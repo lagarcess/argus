@@ -69,6 +69,9 @@ class BacktestRequest(BaseModel):
     rsi_overbought: float = Field(default=70.0, ge=0.0, le=100.0)
     ema_period: Optional[int] = Field(default=None, ge=2, le=500)
 
+    # Risk Metrics & Benchmarking
+    benchmark_symbol: Optional[str] = Field(default="SPY", description="e.g. SPY, BTC-USD")
+
     @field_validator("symbols")
     @classmethod
     def validate_symbols_count(cls, v: List[str]) -> List[str]:
@@ -118,6 +121,13 @@ class SimulationLogEntry(BaseModel):
     max_drawdown_pct: Optional[float] = None
     win_rate_pct: Optional[float] = None
     total_trades: Optional[int] = None
+
+    # Advanced Metrics
+    alpha: Optional[float] = None
+    beta: Optional[float] = None
+    calmar_ratio: Optional[float] = None
+    avg_trade_duration: Optional[str] = None
+
     created_at: datetime
     completed_at: Optional[datetime] = None
 

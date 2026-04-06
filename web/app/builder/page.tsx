@@ -29,6 +29,7 @@ export default function BuilderPage() {
   const [emaPeriod, setEmaPeriod] = useState<number | "">("");
   const [slippage, setSlippage] = useState(0.001);
   const [fees, setFees] = useState(0.001);
+  const [benchmarkSymbol, setBenchmarkSymbol] = useState("SPY");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +72,7 @@ export default function BuilderPage() {
       rsi_oversold: Number(rsiOversold),
       rsi_overbought: Number(rsiOverbought),
       ema_period: emaPeriod === "" ? null : Number(emaPeriod),
+      benchmark_symbol: benchmarkSymbol,
     };
 
     try {
@@ -142,7 +144,22 @@ export default function BuilderPage() {
                   />
                 </div>
                 <div>
-                   <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
+                  <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
+                    Benchmark Asset
+                  </label>
+                  <input
+                    type="text"
+                    value={benchmarkSymbol}
+                    onChange={(e) => setBenchmarkSymbol(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg p-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-on-surface"
+                    placeholder="SPY"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 mb-8">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
                     Timeframe
                   </label>
                   <select

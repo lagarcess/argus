@@ -63,6 +63,10 @@ class StrategyConfig(BaseModel):
         max_length=3,
         description="Up to 3 symbols to backtest (max 3 per PRD batch limit).",
     )
+    benchmark_symbol: Optional[str] = Field(
+        default="SPY",
+        description="Benchmark symbol for relative metrics.",
+    )
 
 
 class EquityCurvePoint(BaseModel):
@@ -89,13 +93,17 @@ class MetricsResult(BaseModel):
     max_drawdown_pct: float
     win_rate_pct: float
     total_trades: int
-
+    alpha: float
+    beta: float
+    calmar_ratio: float
+    avg_trade_duration: str
+    avg_trade_duration_bars: int
 
 class BacktestResult(BaseModel):
     metrics: MetricsResult
     equity_curve: List[EquityCurvePoint]
+    benchmark_equity_curve: Optional[List[EquityCurvePoint]] = None
     trades: List[TradeResult]
-
 
 # --- Argus Engine ---
 
@@ -138,16 +146,22 @@ class ArgusEngine:
         Returns:
             BacktestResult: Fully Pydantic validated output.
         """
-        if data is None or data.empty:
+        # Ensure start_dt/end_dt are defined even if data is provided
+        if data is not None and not data.empty:
+            if hasattr(data.index, "levels"):  # MultiIndex
+                times = data.index.get_level_values(1)
+            else:
+                times = data.index
+            start_dt = pd.to_datetime(times.min()).to_pydatetime()
+            end_dt = pd.to_datetime(times.max()).to_pydatetime()
+        else:
             if not self.data_provider or not symbols:
                 raise ValueError(
                     "Must provide either 'data' DataFrame or both 'data_provider' and 'symbols' list."
                 )
 
             # Fetch data with safety buffer
-            # Max end_dt is up to 15 minutes ago to avoid incomplete bars directly in API call
             max_end_dt = datetime.now(timezone.utc) - timedelta(minutes=15)
-
             if end_date is None or end_date > max_end_dt:
                 end_dt = max_end_dt
             else:
@@ -170,6 +184,27 @@ class ArgusEngine:
             raise ValueError(
                 "Data is empty after fetching and applying 15-minute safety buffer."
             )
+
+        # Fetch benchmark data
+        benchmark_data = None
+        if config.benchmark_symbol and self.data_provider:
+            # Determine asset class from symbol (simple heuristic: contains '/')
+            bench_asset_class = (
+                AssetClass.CRYPTO if "/" in config.benchmark_symbol else AssetClass.EQUITY
+            )
+            try:
+                # Need to resolve start_dt/end_dt if data was provided directly
+                benchmark_data = self.data_provider.get_historical_bars(
+                    symbol=[config.benchmark_symbol],
+                    asset_class=bench_asset_class,
+                    timeframe_str=timeframe,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch benchmark data for {config.benchmark_symbol}: {e}"
+                )
 
         # 1. Standardize Data format for multi-asset broadcasting
         # We need data to be aligned columns per symbol for vectorbt if it's not already
@@ -203,7 +238,6 @@ class ArgusEngine:
         # Initialize signal dataframes with False
         entries_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
         exits_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
-
 
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
@@ -344,6 +378,119 @@ class ArgusEngine:
             except (ValueError, TypeError):
                 return default
 
+        # --- Relative Metrics (Alpha & Beta) ---
+        alpha = 0.0
+        beta = 0.0
+        calmar_ratio = 0.0
+        avg_trade_duration_str = "0s"
+        avg_trade_duration_bars = 0
+
+        # Safe Calmar Ratio
+        calmar_ratio = safe_metric("Calmar Ratio")
+        if calmar_ratio == 0.0:
+            # Fallback if Calmar is not calculated
+            ann_ret = safe_metric("Ann. Return [%]")
+            max_dd = safe_metric("Max Drawdown [%]")
+            if max_dd != 0:
+                calmar_ratio = ann_ret / abs(max_dd)
+
+        # Average Trade Duration
+        trade_records = portfolio.trades.records_readable
+        if (
+            not trade_records.empty
+            and "Entry Timestamp" in trade_records.columns
+            and "Exit Timestamp" in trade_records.columns
+        ):
+            durations = pd.to_datetime(trade_records["Exit Timestamp"]) - pd.to_datetime(
+                trade_records["Entry Timestamp"]
+            )
+            avg_duration = durations.mean()
+
+            # Format string e.g., "2d 4h 15m"
+            if not pd.isna(avg_duration):
+                days = avg_duration.components.days
+                hours = avg_duration.components.hours
+                minutes = avg_duration.components.minutes
+
+                parts = []
+                if days > 0:
+                    parts.append(f"{days}d")
+                if hours > 0:
+                    parts.append(f"{hours}h")
+                if minutes > 0:
+                    parts.append(f"{minutes}m")
+
+                # If everything is 0, show "0m"
+                if not parts:
+                    parts.append("0m")
+
+                avg_trade_duration_str = " ".join(parts)
+
+            # Avg duration bars
+            if "Duration" in trade_records.columns:
+                avg_trade_duration_bars = int(trade_records["Duration"].mean())
+            else:
+                raw_records = portfolio.trades.records
+                if (
+                    not raw_records.empty
+                    and "entry_idx" in raw_records.columns
+                    and "exit_idx" in raw_records.columns
+                ):
+                    avg_trade_duration_bars = int(
+                        (raw_records["exit_idx"] - raw_records["entry_idx"]).mean()
+                    )
+
+        # Alpha and Beta calculation
+        if benchmark_data is not None and not benchmark_data.empty:
+            # Use total portfolio value pct change (Equity)
+            portfolio_value = portfolio.value()
+            if isinstance(portfolio_value, pd.DataFrame):
+                portfolio_value = portfolio_value.sum(axis=1)
+
+            strat_equity = portfolio_value.rename("strat")
+
+            # Prepare benchmark price series
+            if isinstance(benchmark_data.index, pd.MultiIndex):
+                bench_price = benchmark_data["close"].unstack(level=0).iloc[:, 0]
+            else:
+                bench_price = benchmark_data["close"]
+            bench_price = bench_price.rename("bench")
+
+            # Institutional Beta alignment: Resample both to Daily ('D')
+            # Use forward fill for prices to handle weekend/holiday gaps
+            strat_daily = strat_equity.resample("D").last().ffill()
+            bench_daily = bench_price.resample("D").last().ffill()
+
+            # Calculate daily returns
+            strat_returns = strat_daily.pct_change()
+            bench_returns = bench_daily.pct_change()
+
+            # Final alignment: merge daily returns and drop NaNs
+            aligned_returns = pd.concat([strat_returns, bench_returns], axis=1).dropna()
+
+            if not aligned_returns.empty and len(aligned_returns) > 1:
+                cov_matrix = aligned_returns.cov()
+                var_bench = cov_matrix.loc["bench", "bench"]
+                cov_strat_bench = cov_matrix.loc["strat", "bench"]
+
+                if var_bench != 0:
+                    beta = cov_strat_bench / var_bench
+
+                    # Annualize returns for Alpha calculation
+                    # Strategy annualized return from vectorbt
+                    ann_ret_strat = safe_metric("Ann. Return [%]") / 100.0
+
+                    # Calculate benchmark annualized return dynamically
+                    days_diff = (aligned_returns.index.max() - aligned_returns.index.min()).days
+                    if days_diff > 0:
+                        bench_total_ret = (bench_daily.iloc[-1] / bench_daily.iloc[0]) - 1
+                        ann_ret_bench = (1 + bench_total_ret) ** (365.25 / days_diff) - 1
+                    else:
+                        ann_ret_bench = 0.0
+
+                    # Formula: alpha = R_strat - (beta * R_bench)
+                    alpha = ann_ret_strat - (beta * ann_ret_bench)
+
         metrics_result = MetricsResult(
             total_return_pct=safe_metric("Total Return [%]"),
             sharpe_ratio=safe_metric("Sharpe Ratio"),
@@ -351,6 +498,11 @@ class ArgusEngine:
             max_drawdown_pct=safe_metric("Max Drawdown [%]"),
             win_rate_pct=safe_metric("Win Rate [%]"),
             total_trades=int(safe_metric("Total Trades", 0)),
+            alpha=alpha,
+            beta=beta,
+            calmar_ratio=calmar_ratio,
+            avg_trade_duration=avg_trade_duration_str,
+            avg_trade_duration_bars=avg_trade_duration_bars,
         )
 
         # Equity Curve
@@ -418,6 +570,24 @@ class ArgusEngine:
                     )
                 )
 
+        # Benchmark Equity Curve
+        benchmark_equity_curve = None
+        if benchmark_data is not None and not benchmark_data.empty:
+            # We already have bench_daily from Alpha/Beta block if it reached there.
+            # But let's be safe and re-extract or use the prices.
+            # To match the strategy curve's timestamps/values:
+            bench_series = bench_daily if 'bench_daily' in locals() else bench_price
+            benchmark_equity_curve = [
+                EquityCurvePoint(
+                    timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),
+                    value=float(val),
+                )
+                for idx, val in bench_series.items()
+            ]
+
         return BacktestResult(
-            metrics=metrics_result, equity_curve=equity_curve, trades=trades
+            metrics=metrics_result,
+            equity_curve=equity_curve,
+            benchmark_equity_curve=benchmark_equity_curve,
+            trades=trades
         )

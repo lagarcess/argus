@@ -178,6 +178,7 @@ def run_backtest(
             rsi_overbought=request.rsi_overbought,
             ema_period=request.ema_period,
             symbols=symbols,
+            benchmark_symbol=request.benchmark_symbol,
         )
 
         ac = AssetClass.CRYPTO if request.asset_class == "crypto" else AssetClass.EQUITY
@@ -266,4 +267,36 @@ def get_user_history(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch simulation history.",
+        ) from e
+
+
+@app.get("/api/v1/simulations/{sim_id}")
+def get_simulation_detail(sim_id: str, user: User = Depends(auth_required)):  # noqa: B008
+    """Get the full details of a specific simulation."""
+    try:
+        user_id_str = str(user.user_id)
+        simulation = persistence_service.get_simulation(sim_id, user_id_str)
+
+        if not simulation:
+            # Fallback for "latest"
+            if sim_id == "latest":
+                summaries, _ = persistence_service.get_user_simulations(user_id_str, limit=1)
+                if summaries:
+                    simulation = persistence_service.get_simulation(str(summaries[0]["id"]), user_id_str)
+
+        if not simulation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Simulation not found.",
+            )
+
+        return simulation
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch simulation {sim_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch simulation details.",
         ) from e

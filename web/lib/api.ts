@@ -63,6 +63,7 @@ export interface BacktestRequest {
   rsi_oversold?: number;
   rsi_overbought?: number;
   ema_period?: number | null;
+  benchmark_symbol?: string;
 }
 
 export interface SimulationLogEntry {
@@ -76,6 +77,10 @@ export interface SimulationLogEntry {
   max_drawdown_pct?: number;
   win_rate_pct?: number;
   total_trades?: number;
+  alpha?: number;
+  beta?: number;
+  calmar_ratio?: number;
+  avg_trade_duration?: string;
   created_at: string;
   completed_at?: string;
 }
