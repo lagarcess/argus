@@ -6,6 +6,7 @@ when SUPABASE_JWT_SECRET is not set (local development only).
 """
 
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import jwt
@@ -18,6 +19,9 @@ from argus.domain.schemas import User
 from argus.supabase import supabase_client
 
 security = HTTPBearer(auto_error=False)
+
+# Rate limiting constants
+FREE_TIER_MONTHLY_LIMIT = 10
 
 # Supabase signs JWTs with the project JWT secret
 _settings = get_settings()
@@ -174,3 +178,63 @@ def auth_required(
         email=email,
         subscription_tier=subscription_tier,
     )
+
+
+def check_rate_limit(
+    user: User = Depends(auth_required),  # noqa: B008
+) -> User:
+    """
+    FastAPI dependency: checks if user has exceeded their monthly usage limit.
+    Free tier allows FREE_TIER_MONTHLY_LIMIT simulations per calendar month.
+    """
+    user_id = str(user.user_id)
+
+    # In dev mode with synthetic user, bypass rate limit
+    if _DEV_MODE and user_id == "dev-anon-user":
+        return user
+
+    # Pro tier is unlimited
+    if user.subscription_tier == "pro":
+        return user
+
+    if not supabase_client:
+        logger.warning("Supabase client not configured. Skipping rate limit check.")
+        return user
+
+    try:
+        # Free tier limit check using current calendar month
+        now = datetime.now(timezone.utc)
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        # Count simulations for current month using Service Role client (bypasses RLS)
+        count_res = (
+            supabase_client.table("simulation_logs")
+            .select("id", count="exact")  # type: ignore[arg-type]
+            .eq("user_id", user_id)
+            .gte("created_at", start_of_month.isoformat())
+            .execute()
+        )
+
+        count = count_res.count if count_res.count else 0
+
+        if count >= FREE_TIER_MONTHLY_LIMIT:
+            logger.info(
+                f"User {user_id} reached monthly limit: {count}/{FREE_TIER_MONTHLY_LIMIT}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "Monthly limit reached",
+                    "message": f"Free tier is limited to {FREE_TIER_MONTHLY_LIMIT} simulations per month.",
+                    "upgrade_url": "/settings",
+                },
+            )
+
+        return user
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking rate limits for {user_id}: {e}")
+        # Fail open for UX if DB fails but auth succeeded
+        return user

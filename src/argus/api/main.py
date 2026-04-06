@@ -12,7 +12,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.api.auth import auth_required
+from argus.api.auth import FREE_TIER_MONTHLY_LIMIT, auth_required, check_rate_limit
 from argus.api.schemas import (
     BacktestRequest,
     HistoryResponse,
@@ -23,6 +23,7 @@ from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, User
 from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
+from argus.supabase import supabase_client
 
 persistence_service = PersistenceService()
 
@@ -66,10 +67,9 @@ app = FastAPI(
 )
 
 # Configure CORS
-# Allow localhost (Nextjs dev) and eventual prod domains
 origins = [
     "http://localhost:3000",
-    "https://argus.vercel.app",  # Example Vercel domain
+    "https://argus.vercel.app",
 ]
 
 app.add_middleware(
@@ -93,11 +93,61 @@ def get_session(user: User = Depends(auth_required)):  # noqa: B008
     return user
 
 
+@app.get("/api/v1/usage")
+def get_usage(user: User = Depends(auth_required)):  # noqa: B008
+    """
+    Get the current user's simulation usage for the current calendar month.
+    """
+    user_id_str = str(user.user_id)
+
+    # Pro tier has unlimited limits
+    if user.subscription_tier == "pro":
+        return {
+            "count": 0,  # Could still show count for stats
+            "limit": None,
+            "tier": "pro",
+        }
+
+    # Free tier limit check using current calendar month
+    now = datetime.now(timezone.utc)
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    try:
+        if not supabase_client:
+            return {
+                "count": 0,
+                "limit": FREE_TIER_MONTHLY_LIMIT,
+                "tier": user.subscription_tier,
+            }
+
+        count_res = (
+            supabase_client.table("simulation_logs")
+            .select("id", count="exact")  # type: ignore[arg-type]
+            .eq("user_id", user_id_str)
+            .gte("created_at", start_of_month.isoformat())
+            .execute()
+        )
+        count = count_res.count if count_res.count else 0
+
+        return {
+            "count": count,
+            "limit": FREE_TIER_MONTHLY_LIMIT,
+            "tier": user.subscription_tier,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch usage for {user_id_str}: {e}")
+        return {
+            "count": 0,
+            "limit": FREE_TIER_MONTHLY_LIMIT,
+            "tier": user.subscription_tier,
+        }
+
+
 @app.post("/api/v1/backtest")
 def run_backtest(
     request: BacktestRequest,
     background_tasks: BackgroundTasks,
-    user: User = Depends(auth_required),  # noqa: B008
+    user: User = Depends(check_rate_limit),  # noqa: B008
 ):
     """
     Execute a backtest simulation on multiple assets.
@@ -133,7 +183,6 @@ def run_backtest(
         ac = AssetClass.CRYPTO if request.asset_class == "crypto" else AssetClass.EQUITY
 
         # 3. Execute Simulation
-        # Convert date to datetime for engine
         start_dt = (
             datetime.combine(request.start_date, time.min, tzinfo=timezone.utc)
             if request.start_date
@@ -158,7 +207,6 @@ def run_backtest(
         )
 
         # 4. Persistence (Background Task)
-        # We save the strategy first to get an ID, then the simulation
         strategy_id = persistence_service.save_strategy(
             user_id_str, request.strategy_name, config
         )

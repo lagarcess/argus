@@ -237,7 +237,6 @@ export default function LandingPage() {
                 {authMode === "login" ? "Don't have an account? Sign up" : "Already have an account? Log in"}
               </button>
             </div>
-
             <p className="mt-6 text-center text-[10px] text-on-surface-variant font-label opacity-70">
               By connecting, you agree to our{" "}
               <a href="#" className="underline">Terms</a> and{" "}
