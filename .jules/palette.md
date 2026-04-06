@@ -1,0 +1,3 @@
+## YYYY-MM-DD - [A11Y Keyboard Navigation in Builder]
+**Learning:** The strategy builder's pattern selection and confluence mode toggles were built using inaccessible div and button elements that screen readers and keyboard users could not interact with correctly. Additionally, the error banner did not aggressively announce itself to screen readers upon validation failure.
+**Action:** Replaced div elements acting as checkboxes with standard `<button type="button">` elements equipped with `role="checkbox"`, `aria-checked`, and visible keyboard focus states (`focus-visible:ring-2`). Updated Confluence toggles to use `aria-pressed`. Appended `role="alert"` and `aria-live="assertive"` to the form error banner to ensure immediate notification upon form submission failure.
