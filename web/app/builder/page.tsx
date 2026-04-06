@@ -76,7 +76,7 @@ export default function BuilderPage() {
     try {
       // In a real app we would get the response and maybe an ID,
       // then redirect to the results page for that specific simulation.
-      const result = await fetchApi<any>("/backtest", {
+      await fetchApi<unknown>("/backtest", {
         method: "POST",
         body: JSON.stringify(request),
       });
@@ -84,8 +84,8 @@ export default function BuilderPage() {
       // For MVP, just route to a dummy results page since we don't have persistence set up perfectly
       // to retrieve specific results by ID yet without another router endpoint.
       router.push("/results?id=latest");
-    } catch (e: any) {
-      setError(e.message || "Failed to run backtest");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to run backtest");
       setIsSubmitting(false);
     }
   };
@@ -299,7 +299,7 @@ export default function BuilderPage() {
                  <div className="flex gap-2">
                    <span className="material-symbols-outlined text-primary text-sm">info</span>
                    <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                     The Obsidian Core strictly applies a 15-minute market safety buffer to real-time inputs. Order routing will be delayed proportionally in live integration.
+                     The Argus Core strictly applies a 15-minute market safety buffer to real-time inputs. Backtest parameters will be applied to simulated results.
                    </p>
                  </div>
                </div>

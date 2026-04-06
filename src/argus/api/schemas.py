@@ -90,6 +90,23 @@ class BacktestRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class SimulationSummary(BaseModel):
+    id: str
+    strategy_name: str
+    symbol: str
+    date: datetime
+    total_return: float
+    sharpe_ratio: float
+
+
+class PaginatedHistoryResponse(BaseModel):
+    simulations: List[SimulationSummary]
+    total: int
+    limit: int
+    offset: int
+
+
+# Keeping old types to avoid breaking main.py immediately until we patch it next
 class SimulationLogEntry(BaseModel):
     id: str
     strategy_name: str

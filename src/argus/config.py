@@ -145,3 +145,17 @@ def get_supabase_client() -> Client:
     if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
         raise ValueError("Missing SUPABASE_URL or SUPABASE_ANON_KEY in environment.")
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+
+
+@lru_cache()
+def get_supabase_service_client() -> Client:
+    """
+    Get an authenticated Supabase Client using the SERVICE ROLE key.
+    Used for administrative tasks like querying rate limits.
+    """
+    settings = get_settings()
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise ValueError(
+            "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment."
+        )
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
