@@ -168,6 +168,7 @@ export default function BuilderPage() {
                       const isSelected = entryPatterns.includes(pattern);
                       return (
                         <button
+                          type="button"
                           key={pattern}
                           onClick={() => togglePattern(pattern)}
                           role="checkbox"
@@ -192,11 +193,13 @@ export default function BuilderPage() {
                    </h3>
                    <div className="flex bg-surface-container-high rounded p-1">
                       <button
+                        type="button"
                         onClick={() => setConfluenceMode("OR")}
                         aria-pressed={confluenceMode === "OR"}
                         className={`text-[10px] px-3 py-1 rounded font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${confluenceMode === "OR" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
                       >OR</button>
                       <button
+                        type="button"
                         onClick={() => setConfluenceMode("AND")}
                         aria-pressed={confluenceMode === "AND"}
                         className={`text-[10px] px-3 py-1 rounded font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${confluenceMode === "AND" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
