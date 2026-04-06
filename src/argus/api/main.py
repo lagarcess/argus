@@ -165,6 +165,7 @@ def run_backtest(
             config=config,
         )
 
+
         # 5. Update Supabase with success
         if supabase_client and sim_id:
             try:
