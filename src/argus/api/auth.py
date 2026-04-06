@@ -5,16 +5,17 @@ Validates Supabase-issued JWTs. Falls back to a dev-mode mock
 when SUPABASE_JWT_SECRET is not set (local development only).
 """
 
+import time
 from typing import Any, Dict, Optional
 
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
-from supabase import Client, create_client
 
 from argus.config import get_settings
 from argus.domain.schemas import User
+from argus.supabase import supabase_client
 
 security = HTTPBearer(auto_error=False)
 
@@ -23,12 +24,29 @@ _settings = get_settings()
 _SUPABASE_JWT_SECRET: Optional[str] = _settings.SUPABASE_JWT_SECRET
 _DEV_MODE = _settings.APP_ENV != "PROD"
 
-SUPABASE_URL = _settings.SUPABASE_URL
-SUPABASE_SERVICE_KEY = _settings.SUPABASE_SERVICE_ROLE_KEY
 
-supabase_client: Client | None = None
-if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-    supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+class UserCache:
+    """Simple TTL-based cache for user profiles."""
+
+    def __init__(self, ttl_seconds: int = 300):
+        self.cache: Dict[str, Dict[str, Any]] = {}
+        self.ttl = ttl_seconds
+
+    def get(self, user_id: str) -> Optional[str]:
+        """Get cached subscription tier if not expired."""
+        if user_id in self.cache:
+            entry = self.cache[user_id]
+            if time.time() - entry["timestamp"] < self.ttl:
+                return entry["tier"]
+            del self.cache[user_id]
+        return None
+
+    def set(self, user_id: str, tier: str) -> None:
+        """Cache the subscription tier."""
+        self.cache[user_id] = {"tier": tier, "timestamp": time.time()}
+
+
+_user_cache = UserCache()
 
 
 def _decode_supabase_jwt(token: str) -> Optional[Dict[str, Any]]:
@@ -119,8 +137,17 @@ def auth_required(
             detail="Invalid token payload: missing sub",
         )
 
-    subscription_tier = "free"
+    # 1. Check cache first
+    cached_tier = _user_cache.get(user_id)
+    if cached_tier:
+        return User(
+            user_id=user_id,
+            email=email,
+            subscription_tier=cached_tier,
+        )
 
+    # 2. Fetch from DB if not in cache
+    subscription_tier = "free"
     if supabase_client:
         try:
             res = (
@@ -130,20 +157,21 @@ def auth_required(
                 .single()
                 .execute()
             )
-            if (
-                res.data
-                and isinstance(res.data, dict)
-                and "subscription_tier" in res.data
-            ):
-                subscription_tier = str(res.data["subscription_tier"])
+            if res.data and isinstance(res.data, dict):
+                val = res.data.get("subscription_tier")
+                subscription_tier = str(val) if val is not None else "free"
         except Exception as e:
             # If profile not found or other db error, default to free
             logger.info(
                 f"Failed to fetch profile for user {user_id}, defaulting to free tier: {e}"
             )
 
+    # 3. Cache result
+    _user_cache.set(user_id, subscription_tier)
+
     return User(
         user_id=user_id,
         email=email,
         subscription_tier=subscription_tier,
     )
+

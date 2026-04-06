@@ -18,18 +18,7 @@ from argus.config import get_crypto_data_client, get_settings, get_stock_data_cl
 from argus.domain.schemas import AssetClass, User
 from argus.engine import ArgusEngine, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
-
-# Supabase Client Initialization
-# We use the Service Role key for backend operations (inserting logs safely)
-_settings = get_settings()
-SUPABASE_URL = _settings.SUPABASE_URL
-SUPABASE_SERVICE_KEY = _settings.SUPABASE_SERVICE_ROLE_KEY
-
-supabase_client: Client | None = None
-if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-    supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-else:
-    logger.warning("Supabase credentials missing. History logging disabled.")
+from argus.supabase import supabase_client
 
 
 @asynccontextmanager
