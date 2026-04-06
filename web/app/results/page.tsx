@@ -1,8 +1,135 @@
-import { Suspense, useEffect, useState } from "react";
+"use client";
+
+import React, { Suspense, useEffect, useState, useId } from "react";
 import { useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopNav } from "@/components/TopNav";
 import { fetchApi } from "@/lib/api";
+
+// PERFORMANCE: Wrap EquityCurve in React.memo to prevent expensive SVG re-renders during unrelated parent state updates
+// FEEDBACK: Use React.useId() for unique gradient IDs and add accessibility roles/labels.
+const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: any[], benchmarkCurve: any[] }) => {
+  const gradientId = useId();
+  
+  if (!equityCurve || equityCurve.length === 0) {
+    return (
+      <div className="flex-1 w-full flex items-center justify-center text-[10px] uppercase tracking-widest text-on-surface-variant/50 border border-outline-variant/10 rounded-xl bg-surface-container-low/30">
+        No equity vectors recorded for visualization
+      </div>
+    );
+  }
+
+  // Scaling Logic based on strategy vs benchmark
+  const allValues = [...equityCurve, ...(benchmarkCurve || [])].map(p => p.value);
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
+  const range = max - min || 1;
+
+  const getPoints = (curve: any[]) => {
+    return curve.map((p: any, i: number) => {
+      const x = (i / (curve.length - 1)) * 100;
+      const y = 100 - ((p.value - min) / range) * 80 - 10;
+      return `${x},${y}`;
+    });
+  };
+
+  const strategyPointsList = getPoints(equityCurve);
+  const strategyPathD = `M ${strategyPointsList[0]} ` + strategyPointsList.slice(1).map(p => `L ${p}`).join(" ");
+  const strategyAreaD = `${strategyPathD} L 100,100 L 0,100 Z`;
+
+  const benchmarkPoints = benchmarkCurve && benchmarkCurve.length > 0 ? getPoints(benchmarkCurve).join(" ") : "";
+
+  return (
+    <div className="flex-1 w-full relative flex items-end pt-10 pb-4">
+      {/* Y-Axis labels (Contextual to performance data) */}
+      <div className="absolute left-0 top-10 bottom-4 flex flex-col justify-between text-[10px] font-mono text-on-surface-variant w-12 z-10">
+          <span>${(max/1000).toFixed(1)}k</span>
+          <span>${((max+min)/2000).toFixed(1)}k</span>
+          <span>${(min/1000).toFixed(1)}k</span>
+      </div>
+
+      {/* Chart Area */}
+      <div className="flex-1 w-full h-full relative ml-12">
+          {/* Grid lines */}
+          <div className="absolute inset-0 border-b border-outline-variant/10"></div>
+          <div className="absolute top-[25%] left-0 w-full border-b border-outline-variant/5"></div>
+          <div className="absolute top-[50%] left-0 w-full border-b border-outline-variant/5"></div>
+          <div className="absolute top-[75%] left-0 w-full border-b border-outline-variant/5"></div>
+
+          {/* SVG Line Chart */}
+          <svg 
+            className="w-full h-full" 
+            viewBox="0 0 100 100" 
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Portfolio Equity Curve vs Market Benchmark"
+          >
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#99f7ff" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#99f7ff" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            {/* Benchmark Curve (Dotted Interface) */}
+            {benchmarkPoints && (
+               <polyline
+                 points={benchmarkPoints}
+                 fill="none"
+                 stroke="#ffffff44"
+                 strokeWidth="1"
+                 strokeDasharray="2,2"
+               />
+            )}
+
+            {/* Strategy Area & Line */}
+            <path d={strategyAreaD} fill={`url(#${gradientId})`} />
+            <path 
+              d={strategyPathD} 
+              fill="none" 
+              stroke="#99f7ff" 
+              strokeWidth="2" 
+              strokeLinejoin="round" 
+              className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]" 
+            />
+
+            {/* Terminal Peak Dot */}
+            <circle 
+              cx="100" 
+              cy={strategyPointsList[strategyPointsList.length - 1].split(',')[1]} 
+              r="2" 
+              fill="#ffffff" 
+              className="drop-shadow-[0_0_8px_#ffffff] animate-pulse" 
+            />
+          </svg>
+
+          {/* Legend Overlay */}
+          <div className="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-0.5 bg-primary shadow-[0_0_5px_#99f7ff]"></div>
+              <span className="text-[8px] uppercase tracking-widest text-on-surface-variant font-bold">Strategy</span>
+            </div>
+            {benchmarkCurve && benchmarkCurve.length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-px border-t border-dotted border-white/40"></div>
+                <span className="text-[8px] uppercase tracking-widest text-on-surface-variant font-bold">Benchmark</span>
+              </div>
+            )}
+          </div>
+
+          {/* Temporal axis markers (Mocked temporal spacing) */}
+          <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[10px] font-mono text-on-surface-variant">
+            <span>START</span>
+            <span>Q1</span>
+            <span>Q2</span>
+            <span>Q3</span>
+            <span>END</span>
+          </div>
+      </div>
+    </div>
+  );
+});
+EquityCurve.displayName = "EquityCurve";
 
 function ResultsContent() {
   const searchParams = useSearchParams();
@@ -135,72 +262,8 @@ function ResultsContent() {
                    </div>
                  </div>
 
-                  {/* Dynamic SVG Chart */}
-                  <div className="flex-1 w-full relative flex items-end pt-10 pb-4">
-                    <div className="flex-1 w-full h-full relative ml-2">
-                       <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                          <defs>
-                            <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#99f7ff" stopOpacity="0.3" />
-                              <stop offset="100%" stopColor="#99f7ff" stopOpacity="0.0" />
-                            </linearGradient>
-                          </defs>
-                          
-                          {/* Benchmark Curve (Dotted Grey) */}
-                          {benchmarkCurve.length > 0 && (() => {
-                             const min = Math.min(...benchmarkCurve.map((p: any) => p.value));
-                             const max = Math.max(...benchmarkCurve.map((p: any) => p.value));
-                             const range = max - min || 1;
-                             const points = benchmarkCurve.map((p: any, i: number) => {
-                               const x = (i / (benchmarkCurve.length - 1)) * 100;
-                               const y = 100 - ((p.value - min) / range) * 80 - 10;
-                               return `${x},${y}`;
-                             }).join(" ");
-                             return (
-                               <polyline
-                                 points={points}
-                                 fill="none"
-                                 stroke="#ffffff44"
-                                 strokeWidth="1"
-                                 strokeDasharray="2,2"
-                               />
-                             );
-                          })()}
-
-                          {/* Strategy Curve */}
-                          {equityCurve.length > 0 && (() => {
-                             const min = Math.min(...equityCurve.map((p: any) => p.value));
-                             const max = Math.max(...equityCurve.map((p: any) => p.value));
-                             const range = max - min || 1;
-                             const points = equityCurve.map((p: any, i: number) => {
-                               const x = (i / (equityCurve.length - 1)) * 100;
-                               const y = 100 - ((p.value - min) / range) * 80 - 10;
-                               return `${x},${y}`;
-                             });
-                             const pathD = `M ${points[0]} ` + points.slice(1).map(p => `L ${p}`).join(" ");
-                             const areaD = `${pathD} L 100,100 L 0,100 Z`;
-                             return (
-                               <>
-                                 <path d={areaD} fill="url(#lineGrad)" />
-                                 <path d={pathD} fill="none" stroke="#99f7ff" strokeWidth="2" strokeLinejoin="round" className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]" />
-                               </>
-                             );
-                          })()}
-                       </svg>
-                       <div className="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none">
-                          <div className="flex items-center gap-2">
-                             <div className="w-3 h-0.5 bg-primary shadow-[0_0_5px_#99f7ff]"></div>
-                             <span className="text-[8px] uppercase tracking-widest text-on-surface-variant font-bold">Strategy</span>
-                          </div>
-                          {benchmarkCurve.length > 0 && (
-                            <div className="flex items-center gap-2">
-                               <div className="w-3 h-px border-t border-dotted border-white/40"></div>
-                               <span className="text-[8px] uppercase tracking-widest text-on-surface-variant font-bold">Benchmark</span>
-                            </div>
-                          )}
-                       </div>
-                    </div>
-                  </div>
+                 {/* Memoized Dynamic Equity Curve Chart */}
+                 <EquityCurve equityCurve={equityCurve} benchmarkCurve={benchmarkCurve} />
               </div>
 
               {/* Simulation Diagnostics (Right) */}
