@@ -202,3 +202,23 @@ class TechnicalIndicators:
         """Check if required base columns exist."""
         required = {"open", "high", "low", "close", "volume"}
         return required.issubset(df.columns)
+
+
+class IndicatorAnalyzer:
+    """
+    Analyzes specific indicators for a given symbol dataframe.
+    Centralizes technical analysis logic outside the core engine.
+    """
+
+    def __init__(self, df: pd.DataFrame):
+        if "close" not in df.columns:
+            raise ValueError("DataFrame must contain a 'close' column for indicator analysis.")
+        self.df = df
+
+    def get_rsi(self, period: int) -> pd.Series:
+        """Calculate Relative Strength Index."""
+        return ta.rsi(self.df["close"], length=period)
+
+    def get_ema(self, period: int) -> pd.Series:
+        """Calculate Exponential Moving Average."""
+        return ta.ema(self.df["close"], length=period)
