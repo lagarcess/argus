@@ -7,6 +7,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.analysis.harmonics import HarmonicAnalyzer
+from argus.analysis.indicators import IndicatorAnalyzer
 from argus.analysis.patterns import PatternAnalyzer
 from argus.domain.schemas import AssetClass
 from argus.market.data_provider import MarketDataProvider
@@ -67,16 +68,6 @@ class StrategyConfig(BaseModel):
         description="Benchmark symbol for relative metrics.",
     )
 
-    benchmark_symbol: Optional[str] = Field(
-        default="SPY",
-        description="Benchmark symbol for relative metrics.",
-    )
-
-    benchmark_symbol: Optional[str] = Field(
-        default="SPY",
-        description="Benchmark symbol for relative metrics.",
-    )
-
 
 class EquityCurvePoint(BaseModel):
     timestamp: str
@@ -107,23 +98,12 @@ class MetricsResult(BaseModel):
     calmar_ratio: float
     avg_trade_duration: str
     avg_trade_duration_bars: int
-    alpha: float
-    beta: float
-    calmar_ratio: float
-    avg_trade_duration: str
-    avg_trade_duration_bars: int
-    alpha: float
-    beta: float
-    calmar_ratio: float
-    avg_trade_duration: str
-    avg_trade_duration_bars: int
-
 
 class BacktestResult(BaseModel):
     metrics: MetricsResult
     equity_curve: List[EquityCurvePoint]
+    benchmark_equity_curve: Optional[List[EquityCurvePoint]] = None
     trades: List[TradeResult]
-
 
 # --- Argus Engine ---
 
@@ -166,16 +146,22 @@ class ArgusEngine:
         Returns:
             BacktestResult: Fully Pydantic validated output.
         """
-        if data is None or data.empty:
+        # Ensure start_dt/end_dt are defined even if data is provided
+        if data is not None and not data.empty:
+            if hasattr(data.index, "levels"):  # MultiIndex
+                times = data.index.get_level_values(1)
+            else:
+                times = data.index
+            start_dt = pd.to_datetime(times.min()).to_pydatetime()
+            end_dt = pd.to_datetime(times.max()).to_pydatetime()
+        else:
             if not self.data_provider or not symbols:
                 raise ValueError(
                     "Must provide either 'data' DataFrame or both 'data_provider' and 'symbols' list."
                 )
 
             # Fetch data with safety buffer
-            # Max end_dt is up to 15 minutes ago to avoid incomplete bars directly in API call
             max_end_dt = datetime.now(timezone.utc) - timedelta(minutes=15)
-
             if end_date is None or end_date > max_end_dt:
                 end_dt = max_end_dt
             else:
@@ -208,29 +194,12 @@ class ArgusEngine:
             )
             try:
                 # Need to resolve start_dt/end_dt if data was provided directly
-                if start_date is None or end_date is None:
-                    # If we didn't calculate these above, we should infer from data.index
-                    if hasattr(data.index, "levels"):  # MultiIndex
-                        times = data.index.get_level_values(1)
-                    else:
-                        times = data.index
-
-                    if len(times) > 0:
-                        infer_start_dt = pd.to_datetime(times.min())
-                        infer_end_dt = pd.to_datetime(times.max())
-                    else:
-                        infer_start_dt = start_dt
-                        infer_end_dt = end_dt
-                else:
-                    infer_start_dt = start_dt
-                    infer_end_dt = end_dt
-
                 benchmark_data = self.data_provider.get_historical_bars(
                     symbol=[config.benchmark_symbol],
                     asset_class=bench_asset_class,
                     timeframe_str=timeframe,
-                    start_dt=infer_start_dt,
-                    end_dt=infer_end_dt,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
                 )
             except Exception as e:
                 logger.warning(
@@ -269,17 +238,6 @@ class ArgusEngine:
         # Initialize signal dataframes with False
         entries_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
         exits_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
-
-        # Import pandas_ta outside the loop to avoid severe iterative overhead
-        try:
-            import pandas_ta as ta  # type: ignore
-
-            has_ta = True
-        except ImportError:
-            has_ta = False
-            logger.warning(
-                "pandas_ta not installed. TA-dependent indicators will be skipped."
-            )
 
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
@@ -357,11 +315,12 @@ class ArgusEngine:
             # Applied AFTER pattern signals, always AND-gate indicators
             # regardless of confluence_mode (indicators are always additive gates)
             try:
+                indicator_analyzer = IndicatorAnalyzer(symbol_data)
                 indicator_entry_mask = pd.Series(True, index=symbol_data.index)
                 indicator_exit_mask = pd.Series(True, index=symbol_data.index)
 
-                if has_ta and config.rsi_period is not None:
-                    rsi = ta.rsi(symbol_data["close"], length=config.rsi_period)
+                if config.rsi_period is not None:
+                    rsi = indicator_analyzer.get_rsi(config.rsi_period)
                     if rsi is not None and not rsi.empty:
                         # Entry: price is oversold (RSI below threshold)
                         indicator_entry_mask = indicator_entry_mask & (
@@ -372,8 +331,8 @@ class ArgusEngine:
                             rsi >= config.rsi_overbought
                         )
 
-                if has_ta and config.ema_period is not None:
-                    ema = ta.ema(symbol_data["close"], length=config.ema_period)
+                if config.ema_period is not None:
+                    ema = indicator_analyzer.get_ema(config.ema_period)
                     if ema is not None and not ema.empty:
                         # Entry: price is above EMA (bullish context)
                         indicator_entry_mask = indicator_entry_mask & (
@@ -458,18 +417,19 @@ class ArgusEngine:
                     parts.append(f"{days}d")
                 if hours > 0:
                     parts.append(f"{hours}h")
-                if minutes > 0 or (
-                    days == 0 and hours == 0
-                ):  # show minutes if nothing else
+                if minutes > 0:
                     parts.append(f"{minutes}m")
+
+                # If everything is 0, show "0m"
+                if not parts:
+                    parts.append("0m")
+
                 avg_trade_duration_str = " ".join(parts)
 
             # Avg duration bars
             if "Duration" in trade_records.columns:
                 avg_trade_duration_bars = int(trade_records["Duration"].mean())
             else:
-                # Approximate based on freq if missing (though typically present)
-                # or from entry_idx/exit_idx in raw records
                 raw_records = portfolio.trades.records
                 if (
                     not raw_records.empty
@@ -482,38 +442,31 @@ class ArgusEngine:
 
         # Alpha and Beta calculation
         if benchmark_data is not None and not benchmark_data.empty:
-            strat_returns = portfolio.returns()
+            # Use total portfolio value pct change (Equity)
+            portfolio_value = portfolio.value()
+            if isinstance(portfolio_value, pd.DataFrame):
+                portfolio_value = portfolio_value.sum(axis=1)
 
-            # If multi-asset, returns might be a DataFrame, convert to portfolio total return series
-            if isinstance(strat_returns, pd.DataFrame):
-                # vectorbt portfolio.returns() usually returns a Series for the whole portfolio,
-                # but if not, aggregate it
-                strat_returns = strat_returns.mean(
-                    axis=1
-                )  # or portfolio.value().pct_change()
+            strat_equity = portfolio_value.rename("strat")
 
-            # Make sure strat_returns is a Series
-            if isinstance(portfolio.value(), pd.DataFrame):
-                # if multi-asset portfolio, use total value pct change
-                strat_returns = portfolio.value().sum(axis=1).pct_change()
-            elif isinstance(portfolio.value(), pd.Series):
-                strat_returns = portfolio.value().pct_change()
-
-            # Prepare benchmark returns
+            # Prepare benchmark price series
             if isinstance(benchmark_data.index, pd.MultiIndex):
-                # Unstack if multi-asset
-                bench_close = benchmark_data["close"].unstack(level=0)
-                # If only one benchmark symbol
-                bench_close = bench_close.iloc[:, 0]
+                bench_price = benchmark_data["close"].unstack(level=0).iloc[:, 0]
             else:
-                bench_close = benchmark_data["close"]
+                bench_price = benchmark_data["close"]
+            bench_price = bench_price.rename("bench")
 
-            bench_returns = bench_close.pct_change()
+            # Institutional Beta alignment: Resample both to Daily ('D')
+            # Use forward fill for prices to handle weekend/holiday gaps
+            strat_daily = strat_equity.resample("D").last().ffill()
+            bench_daily = bench_price.resample("D").last().ffill()
 
-            # Align indices
-            aligned_returns = pd.concat(
-                [strat_returns.rename("strat"), bench_returns.rename("bench")], axis=1
-            ).dropna()
+            # Calculate daily returns
+            strat_returns = strat_daily.pct_change()
+            bench_returns = bench_daily.pct_change()
+
+            # Final alignment: merge daily returns and drop NaNs
+            aligned_returns = pd.concat([strat_returns, bench_returns], axis=1).dropna()
 
             if not aligned_returns.empty and len(aligned_returns) > 1:
                 cov_matrix = aligned_returns.cov()
@@ -523,28 +476,20 @@ class ArgusEngine:
                 if var_bench != 0:
                     beta = cov_strat_bench / var_bench
 
-                    # Annualize returns for Alpha
-                    # Using vectorbt's annualized return approximation (252 for daily, etc.)
-                    # Let's use simple annualized return if daily freq: (1 + mean_ret) ** 252 - 1
-                    # To be robust regardless of freq, use vectorbt Ann. Return [%] / 100 for strategy
+                    # Annualize returns for Alpha calculation
+                    # Strategy annualized return from vectorbt
                     ann_ret_strat = safe_metric("Ann. Return [%]") / 100.0
 
-                    # Calculate benchmark annualized return dynamically based on period
-                    days = (
-                        aligned_returns.index.max() - aligned_returns.index.min()
-                    ).days
-                    if days > 0:
-                        total_bench_ret = (1 + aligned_returns["bench"]).prod() - 1
-                        ann_ret_bench = (1 + total_bench_ret) ** (365.25 / days) - 1
+                    # Calculate benchmark annualized return dynamically
+                    days_diff = (aligned_returns.index.max() - aligned_returns.index.min()).days
+                    if days_diff > 0:
+                        bench_total_ret = (bench_daily.iloc[-1] / bench_daily.iloc[0]) - 1
+                        ann_ret_bench = (1 + bench_total_ret) ** (365.25 / days_diff) - 1
                     else:
                         ann_ret_bench = 0.0
 
+                    # Formula: alpha = R_strat - (beta * R_bench)
                     alpha = ann_ret_strat - (beta * ann_ret_bench)
-
-                    # Scale to percentage for output if necessary. The requirement says:
-                    # Alpha Formula: alpha = R_strategy - (beta * R_benchmark).
-                    # Assuming we want Alpha to be formatted as a percentage like other metrics or just raw decimal.
-                    # Usually alpha/beta are decimals, but if the rest are pct, we might want alpha to be consistent. Let's stick to decimal for both alpha and beta.
 
         metrics_result = MetricsResult(
             total_return_pct=safe_metric("Total Return [%]"),
@@ -625,6 +570,24 @@ class ArgusEngine:
                     )
                 )
 
+        # Benchmark Equity Curve
+        benchmark_equity_curve = None
+        if benchmark_data is not None and not benchmark_data.empty:
+            # We already have bench_daily from Alpha/Beta block if it reached there.
+            # But let's be safe and re-extract or use the prices.
+            # To match the strategy curve's timestamps/values:
+            bench_series = bench_daily if 'bench_daily' in locals() else bench_price
+            benchmark_equity_curve = [
+                EquityCurvePoint(
+                    timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),
+                    value=float(val),
+                )
+                for idx, val in bench_series.items()
+            ]
+
         return BacktestResult(
-            metrics=metrics_result, equity_curve=equity_curve, trades=trades
+            metrics=metrics_result,
+            equity_curve=equity_curve,
+            benchmark_equity_curve=benchmark_equity_curve,
+            trades=trades
         )

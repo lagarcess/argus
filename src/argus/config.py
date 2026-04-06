@@ -12,6 +12,8 @@ from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDa
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from supabase import Client, create_client
+
 
 class Settings(BaseSettings):
     """
@@ -58,6 +60,11 @@ class Settings(BaseSettings):
         description="Enable disk caching for market data. Useful for backtesting/dev.",
     )
 
+    MARKET_DATA_CACHE_TTL: int = Field(
+        default=900,
+        description="Time-to-live for market data cache in seconds (15 minutes).",
+    )
+
     # Core Application Settings
     APP_ENV: str = Field(
         default="DEV",
@@ -66,6 +73,7 @@ class Settings(BaseSettings):
 
     # Supabase Configuration
     SUPABASE_URL: str | None = Field(default=None)
+    SUPABASE_ANON_KEY: str | None = Field(default=None)
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default=None)
     SUPABASE_JWT_SECRET: str | None = Field(default=None)
 
@@ -130,3 +138,29 @@ def get_crypto_data_client() -> CryptoHistoricalDataClient:
         api_key=settings.ALPACA_API_KEY,
         secret_key=settings.ALPACA_SECRET_KEY,
     )
+
+
+@lru_cache()
+def get_supabase_client() -> Client:
+    """
+    Get an authenticated Supabase Client using the ANON key.
+    Used for general API interactions and querying rate limits.
+    """
+    settings = get_settings()
+    if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
+        raise ValueError("Missing SUPABASE_URL or SUPABASE_ANON_KEY in environment.")
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+
+
+@lru_cache()
+def get_supabase_service_client() -> Client:
+    """
+    Get an authenticated Supabase Client using the SERVICE ROLE key.
+    Used for administrative tasks like querying rate limits.
+    """
+    settings = get_settings()
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise ValueError(
+            "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment."
+        )
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)

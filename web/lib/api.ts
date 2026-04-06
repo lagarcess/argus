@@ -29,7 +29,7 @@ export async function fetchApi<T>(
         if (typeof errorData.detail === 'string') {
           errorMessage = errorData.detail;
         } else if (Array.isArray(errorData.detail)) { // Validation error list
-          errorMessage = errorData.detail.map((e: any) => e.msg).join(', ');
+          errorMessage = (errorData.detail as { msg: string }[]).map((e) => e.msg).join(', ');
         }
       }
     } catch (e) {
@@ -63,6 +63,7 @@ export interface BacktestRequest {
   rsi_oversold?: number;
   rsi_overbought?: number;
   ema_period?: number | null;
+  benchmark_symbol?: string;
 }
 
 export interface SimulationLogEntry {
@@ -76,6 +77,10 @@ export interface SimulationLogEntry {
   max_drawdown_pct?: number;
   win_rate_pct?: number;
   total_trades?: number;
+  alpha?: number;
+  beta?: number;
+  calmar_ratio?: number;
+  avg_trade_duration?: string;
   created_at: string;
   completed_at?: string;
 }
@@ -87,5 +92,5 @@ export interface HistoryResponse {
 
 export interface BacktestResponse {
   simulation_id: string | null;
-  result: any; // Mapped from Python BacktestResult dict
+  result: Record<string, unknown>; // Mapped from Python BacktestResult dict
 }

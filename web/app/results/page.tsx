@@ -1,12 +1,40 @@
-"use client";
-
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopNav } from "@/components/TopNav";
+import { fetchApi } from "@/lib/api";
 
-export default function ResultsPage() {
+function ResultsContent() {
   const searchParams = useSearchParams();
-  const simId = searchParams.get("id");
+  const simId = searchParams.get("id") || "latest";
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const result = await fetchApi<any>(`/simulations/${simId}`);
+        setData(result);
+      } catch (err: any) {
+        setError(err.message || "Failed to load simulation results");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [simId]);
+
+  if (loading) return <div className="p-20 text-center uppercase tracking-widest font-black text-primary animate-pulse">Syncing with Argus Core...</div>;
+  if (error) return <div className="p-20 text-center text-error border border-error/20 bg-error/5 m-8 rounded-xl uppercase tracking-widest font-bold">Reality Gap Error: {error}</div>;
+  if (!data) return <div className="p-20 text-center text-on-surface-variant uppercase tracking-widest">No matrix found.</div>;
+
+  const result = data.result || {};
+  const metrics = result.metrics || {};
+  const strategyName = data.strategies?.name || "Unnamed Strategy";
+  const equityCurve = result.equity_curve || [];
+  const benchmarkCurve = result.benchmark_equity_curve || [];
 
   return (
     <div className="bg-background text-on-surface font-body selection:bg-primary/30 min-h-screen">
@@ -22,13 +50,13 @@ export default function ResultsPage() {
                 <div className="flex items-center gap-3 mb-2">
                   <div className="h-2 w-2 rounded-full bg-secondary shadow-[0_0_10px_#2ff801] animate-pulse"></div>
                   <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-secondary">Simulation Complete</span>
-                  <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-mono">ID: {simId || "LATEST_01"}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-mono">ID: {simId}</span>
                 </div>
                 <h1 className="text-4xl md:text-5xl font-black font-headline tracking-tighter text-on-surface uppercase drop-shadow-[0_0_15px_rgba(0,242,255,0.2)]">
-                  Backtest Results
+                  {strategyName}
                 </h1>
                 <p className="text-on-surface-variant text-sm mt-2 max-w-2xl">
-                  Strategy execution completed with <span className="text-primary font-bold">Reality Gap</span> constraints applied. Output corresponds to the Obsidian Core network.
+                  Strategy simulation completed with <span className="text-primary font-bold">Reality Gap</span> constraints applied. Output corresponds to the Argus Core network.
                 </p>
               </div>
 
@@ -47,24 +75,51 @@ export default function ResultsPage() {
               <div className="glass-panel p-6 rounded-xl border border-secondary/20 relative overflow-hidden">
                 <div className="absolute inset-0 bg-secondary/5"></div>
                 <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2 relative z-10">Net Return</span>
-                <div className="text-3xl font-headline font-black text-secondary relative z-10">+24.5%</div>
-              </div>
-              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
-                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">Max Drawdown</span>
-                <div className="text-3xl font-headline font-black text-on-surface">-8.2%</div>
-              </div>
-              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
-                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">Win Rate</span>
-                <div className="text-3xl font-headline font-black text-on-surface">62.4%</div>
+                <div className="text-3xl font-headline font-black text-secondary relative z-10">
+                  {metrics.total_return_pct >= 0 ? "+" : ""}{metrics.total_return_pct?.toFixed(1)}%
+                </div>
               </div>
               <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
                 <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">Sharpe Ratio</span>
-                <div className="text-3xl font-headline font-black text-on-surface">2.14</div>
+                <div className="text-3xl font-headline font-black text-on-surface">{metrics.sharpe_ratio?.toFixed(2)}</div>
               </div>
-              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 col-span-2 md:col-span-4 lg:col-span-1">
-                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">Total Trades</span>
-                <div className="text-3xl font-headline font-black text-on-surface">1,048</div>
+              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
+                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">Alpha / Beta</span>
+                <div className="text-xl font-headline font-black text-on-surface">
+                   {metrics.alpha?.toFixed(3)} / {metrics.beta?.toFixed(2)}
+                </div>
               </div>
+              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
+                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">Calmar Ratio</span>
+                <div className="text-3xl font-headline font-black text-on-surface">{metrics.calmar_ratio?.toFixed(2)}</div>
+              </div>
+              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
+                <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-2">Max Drawdown</span>
+                <div className="text-3xl font-headline font-black text-on-surface">-{Math.abs(metrics.max_drawdown_pct || 0).toFixed(1)}%</div>
+              </div>
+            </div>
+
+            {/* Sub Metrics Bar */}
+            <div className="flex flex-wrap gap-8 mb-8 px-6 py-4 bg-surface-container-low/50 rounded-xl border border-outline-variant/5">
+                <div>
+                   <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-1">Win Rate</span>
+                   <span className="text-sm font-headline font-bold text-on-surface">{metrics.win_rate_pct?.toFixed(1)}%</span>
+                </div>
+                <div className="w-px h-8 bg-outline-variant/10"></div>
+                <div>
+                   <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-1">Avg trade duration</span>
+                   <span className="text-sm font-headline font-bold text-on-surface">{metrics.avg_trade_duration || "N/A"}</span>
+                </div>
+                <div className="w-px h-8 bg-outline-variant/10"></div>
+                <div>
+                   <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-1">Total Trades</span>
+                   <span className="text-sm font-headline font-bold text-on-surface">{metrics.total_trades || 0}</span>
+                </div>
+                <div className="w-px h-8 bg-outline-variant/10"></div>
+                <div>
+                   <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-1">Sortino Ratio</span>
+                   <span className="text-sm font-headline font-bold text-on-surface">{metrics.sortino_ratio?.toFixed(2) || "0.00"}</span>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -80,58 +135,72 @@ export default function ResultsPage() {
                    </div>
                  </div>
 
-                 {/* Visual Mock for Equity Curve Chart */}
-                 <div className="flex-1 w-full relative flex items-end pt-10 pb-4">
-                    {/* Y-Axis labels */}
-                    <div className="absolute left-0 top-10 bottom-4 flex flex-col justify-between text-[10px] font-mono text-on-surface-variant w-12 z-10">
-                       <span>$12.5k</span>
-                       <span>$11.8k</span>
-                       <span>$11.0k</span>
-                       <span>$10.4k</span>
-                       <span>$10.0k</span>
-                    </div>
-
-                    {/* Chart Area */}
-                    <div className="flex-1 w-full h-full relative ml-12">
-                       {/* Grid lines */}
-                       <div className="absolute inset-0 border-b border-outline-variant/10"></div>
-                       <div className="absolute top-[25%] left-0 w-full border-b border-outline-variant/5"></div>
-                       <div className="absolute top-[50%] left-0 w-full border-b border-outline-variant/5"></div>
-                       <div className="absolute top-[75%] left-0 w-full border-b border-outline-variant/5"></div>
-
-                       {/* SVG Line Chart Mock */}
+                  {/* Dynamic SVG Chart */}
+                  <div className="flex-1 w-full relative flex items-end pt-10 pb-4">
+                    <div className="flex-1 w-full h-full relative ml-2">
                        <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                         <defs>
-                           <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                             <stop offset="0%" stopColor="#99f7ff" stopOpacity="0.4" />
-                             <stop offset="100%" stopColor="#99f7ff" stopOpacity="0.0" />
-                           </linearGradient>
-                         </defs>
-                         <path
-                           d="M 0 100 L 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5 L 100 100 Z"
-                           fill="url(#lineGrad)"
-                         />
-                         <path
-                           d="M 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5"
-                           fill="none" stroke="#99f7ff" strokeWidth="2" strokeLinejoin="round"
-                           className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]"
-                         />
+                          <defs>
+                            <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#99f7ff" stopOpacity="0.3" />
+                              <stop offset="100%" stopColor="#99f7ff" stopOpacity="0.0" />
+                            </linearGradient>
+                          </defs>
+                          
+                          {/* Benchmark Curve (Dotted Grey) */}
+                          {benchmarkCurve.length > 0 && (() => {
+                             const min = Math.min(...benchmarkCurve.map((p: any) => p.value));
+                             const max = Math.max(...benchmarkCurve.map((p: any) => p.value));
+                             const range = max - min || 1;
+                             const points = benchmarkCurve.map((p: any, i: number) => {
+                               const x = (i / (benchmarkCurve.length - 1)) * 100;
+                               const y = 100 - ((p.value - min) / range) * 80 - 10;
+                               return `${x},${y}`;
+                             }).join(" ");
+                             return (
+                               <polyline
+                                 points={points}
+                                 fill="none"
+                                 stroke="#ffffff44"
+                                 strokeWidth="1"
+                                 strokeDasharray="2,2"
+                               />
+                             );
+                          })()}
 
-                         {/* Peak dot */}
-                         <circle cx="100" cy="5" r="3" fill="#ffffff" className="drop-shadow-[0_0_8px_#ffffff] animate-pulse" />
+                          {/* Strategy Curve */}
+                          {equityCurve.length > 0 && (() => {
+                             const min = Math.min(...equityCurve.map((p: any) => p.value));
+                             const max = Math.max(...equityCurve.map((p: any) => p.value));
+                             const range = max - min || 1;
+                             const points = equityCurve.map((p: any, i: number) => {
+                               const x = (i / (equityCurve.length - 1)) * 100;
+                               const y = 100 - ((p.value - min) / range) * 80 - 10;
+                               return `${x},${y}`;
+                             });
+                             const pathD = `M ${points[0]} ` + points.slice(1).map(p => `L ${p}`).join(" ");
+                             const areaD = `${pathD} L 100,100 L 0,100 Z`;
+                             return (
+                               <>
+                                 <path d={areaD} fill="url(#lineGrad)" />
+                                 <path d={pathD} fill="none" stroke="#99f7ff" strokeWidth="2" strokeLinejoin="round" className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]" />
+                               </>
+                             );
+                          })()}
                        </svg>
-
-                       {/* X-axis labels */}
-                       <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[10px] font-mono text-on-surface-variant">
-                         <span>Jan</span>
-                         <span>Feb</span>
-                         <span>Mar</span>
-                         <span>Apr</span>
-                         <span>May</span>
-                         <span>Jun</span>
+                       <div className="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none">
+                          <div className="flex items-center gap-2">
+                             <div className="w-3 h-0.5 bg-primary shadow-[0_0_5px_#99f7ff]"></div>
+                             <span className="text-[8px] uppercase tracking-widest text-on-surface-variant font-bold">Strategy</span>
+                          </div>
+                          {benchmarkCurve.length > 0 && (
+                            <div className="flex items-center gap-2">
+                               <div className="w-3 h-px border-t border-dotted border-white/40"></div>
+                               <span className="text-[8px] uppercase tracking-widest text-on-surface-variant font-bold">Benchmark</span>
+                            </div>
+                          )}
                        </div>
                     </div>
-                 </div>
+                  </div>
               </div>
 
               {/* Simulation Diagnostics (Right) */}
@@ -167,40 +236,41 @@ export default function ResultsPage() {
                     <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-500"></div>
                     <span className="material-symbols-outlined text-4xl text-primary mb-3 group-hover:scale-110 transition-transform duration-500">psychology</span>
                     <h3 className="font-headline font-bold uppercase tracking-widest text-sm">Deploy Matrix</h3>
-                    <p className="text-[10px] text-on-surface-variant uppercase tracking-widest leading-tight mt-2 text-center">Export Strategy to Live Sandbox</p>
+                    <p className="text-[10px] text-on-surface-variant uppercase tracking-widest leading-tight mt-2 text-center">Export Strategy to Simulated Sandbox</p>
                  </div>
               </div>
             </div>
 
             {/* Extended Detail Table Mock */}
             <div className="mt-8 bg-surface-container-low rounded-xl border border-outline-variant/10 p-6 overflow-hidden">
-               <h3 className="font-headline font-bold uppercase tracking-widest text-sm mb-6">Last 10 Executions</h3>
+               <h3 className="font-headline font-bold uppercase tracking-widest text-sm mb-6">Simulation Trade Logs</h3>
                <table className="w-full text-left text-sm">
                   <thead className="bg-surface-container-highest text-[10px] uppercase tracking-widest text-on-surface-variant">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Date</th>
-                      <th className="px-4 py-3 font-medium">Action</th>
-                      <th className="px-4 py-3 font-medium">Price</th>
-                      <th className="px-4 py-3 font-medium">Shares/Qty</th>
-                      <th className="px-4 py-3 font-medium text-right">P&L</th>
+                      <th className="px-4 py-3 font-medium">Timestamp</th>
+                      <th className="px-4 py-3 font-medium">Symbol</th>
+                      <th className="px-4 py-3 font-medium">Direction</th>
+                      <th className="px-4 py-3 font-medium">Price In/Out</th>
+                      <th className="px-4 py-3 font-medium text-right">Return %</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/5">
-                    {/* Dummy Data */}
-                    <tr className="hover:bg-surface-container-highest/30">
-                      <td className="px-4 py-3 text-xs text-on-surface-variant">2026-06-15 14:30</td>
-                      <td className="px-4 py-3 text-[10px] font-bold uppercase text-error">Exit (Long)</td>
-                      <td className="px-4 py-3 font-mono font-medium">3,450.20</td>
-                      <td className="px-4 py-3 font-mono">2.45</td>
-                      <td className="px-4 py-3 text-right text-secondary font-mono">+$245.10</td>
-                    </tr>
-                    <tr className="hover:bg-surface-container-highest/30">
-                      <td className="px-4 py-3 text-xs text-on-surface-variant">2026-06-14 09:15</td>
-                      <td className="px-4 py-3 text-[10px] font-bold uppercase text-secondary">Entry (Long)</td>
-                      <td className="px-4 py-3 font-mono font-medium">3,350.15</td>
-                      <td className="px-4 py-3 font-mono">2.45</td>
-                      <td className="px-4 py-3 text-right text-on-surface-variant font-mono">--</td>
-                    </tr>
+                    {(result.trades || []).slice(0, 20).map((trade: any, i: number) => (
+                      <tr key={i} className="hover:bg-surface-container-highest/30">
+                        <td className="px-4 py-3 text-xs text-on-surface-variant">{trade.entry_time?.split('T')[0]}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-on-surface">{trade.symbol}</td>
+                        <td className={`px-4 py-3 text-[10px] font-bold uppercase ${trade.pnl_pct >= 0 ? "text-secondary" : "text-error"}`}>{trade.direction}</td>
+                        <td className="px-4 py-3 font-mono font-medium">{trade.entry_price?.toFixed(2)} → {trade.exit_price?.toFixed(2)}</td>
+                        <td className={`px-4 py-3 text-right font-mono ${trade.pnl_pct >= 0 ? "text-secondary" : "text-error"}`}>
+                          {trade.pnl_pct >= 0 ? "+" : ""}{(trade.pnl_pct * 100).toFixed(2)}%
+                        </td>
+                      </tr>
+                    ))}
+                    {(!result.trades || result.trades.length === 0) && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-10 text-center text-on-surface-variant uppercase tracking-widest text-xs">No trade vectors recorded.</td>
+                      </tr>
+                    )}
                   </tbody>
                </table>
             </div>
@@ -209,5 +279,13 @@ export default function ResultsPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={<div>Loading Results...</div>}>
+      <ResultsContent />
+    </Suspense>
   );
 }

@@ -29,3 +29,40 @@ def sample_ohlcv_data():
         },
         index=dates,
     )
+
+
+@pytest.fixture
+def mock_persistence_service(mocker):
+    """
+    Mock the PersistenceService to avoid live network calls to Supabase.
+    Ensures user_id is handled as a UUID string consistently.
+    """
+    from argus.domain.persistence import PersistenceService
+
+    mock_service = mocker.Mock(spec=PersistenceService)
+
+    # Simple ID generation for mocks
+    mock_service.save_strategy.return_value = "mock_strat_123"
+    mock_service.save_simulation.return_value = "mock_sim_456"
+
+    # Match frontend interface for history
+    mock_service.get_user_simulations.return_value = (
+        [
+            {
+                "id": "mock_sim_1",
+                "strategy_name": "Mock Strategy",
+                "symbols": ["AAPL", "BTC-USD"],
+                "timeframe": "1Day",
+                "status": "completed",
+                "total_return_pct": 12.5,
+                "sharpe_ratio": 2.1,
+                "win_rate_pct": 65.0,
+                "max_drawdown_pct": -5.2,
+                "total_trades": 12,
+                "created_at": "2024-03-01T10:00:00Z",
+            }
+        ],
+        1,
+    )
+
+    return mock_service
