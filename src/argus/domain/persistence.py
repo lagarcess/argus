@@ -45,12 +45,8 @@ class PersistenceService:
                 )
                 .execute()
             )
-            if res.data and len(res.data) > 0:
-                return (
-                    str(str(res.data[0]["id"]) if isinstance(res.data[0], dict) else None)
-                    if isinstance(res.data[0], dict)
-                    else None
-                )
+            if res.data:
+                return str(res.data[0]["id"])
             return None
         except Exception as e:
             logger.error(f"Failed to save strategy: {e}")
@@ -63,31 +59,26 @@ class PersistenceService:
         symbol: str,
         timeframe: str,
         result: BacktestResult,
+        simulation_id: Optional[str] = None,
     ) -> Optional[str]:
         """Saves a simulation result and returns its UUID."""
         if not self.client:
             return None
 
         try:
-            res = (
-                self.client.table("simulations")
-                .insert(
-                    {
-                        "user_id": user_id,
-                        "strategy_id": strategy_id,
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "result": result.model_dump(mode="json"),
-                    }
-                )
-                .execute()
-            )
-            if res.data and len(res.data) > 0:
-                return (
-                    str(str(res.data[0]["id"]) if isinstance(res.data[0], dict) else None)
-                    if isinstance(res.data[0], dict)
-                    else None
-                )
+            data = {
+                "user_id": user_id,
+                "strategy_id": strategy_id,
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "result": result.model_dump(mode="json"),
+            }
+            if simulation_id:
+                data["id"] = simulation_id
+
+            res = self.client.table("simulations").insert(data).execute()
+            if res.data:
+                return str(res.data[0]["id"])
             return None
         except Exception as e:
             logger.error(f"Failed to save simulation: {e}")
@@ -126,12 +117,10 @@ class PersistenceService:
             summaries = []
             for row in res.data:
                 # Safely extract metrics from the stored JSONB
-                result_data: Any = row.get("result", {}) if isinstance(row, dict) else {}
+                result_data: Any = row.get("result", {})
                 metrics = result_data.get("metrics", {})
 
-                strategy_data: Any = (
-                    row.get("strategies", {}) if isinstance(row, dict) else {}
-                )
+                strategy_data: Any = row.get("strategies", {})
                 # Some Supabase setups return objects, some arrays for joins depending on relation type
                 if isinstance(strategy_data, list) and len(strategy_data) > 0:
                     strategy_name = strategy_data[0].get("name", "Unknown Strategy")
@@ -140,14 +129,19 @@ class PersistenceService:
                 else:
                     strategy_name = "Unknown Strategy"
 
-                row_dict: Dict[str, Any] = row if isinstance(row, dict) else {}
+                # Map to SimulationLogEntry interface
                 summary = {
-                    "id": row_dict.get("id"),
+                    "id": row.get("id"),
                     "strategy_name": strategy_name,
-                    "symbol": row_dict.get("symbol"),
-                    "date": row_dict.get("created_at"),
-                    "total_return": metrics.get("total_return_pct", 0.0),
+                    "symbols": [row.get("symbol")] if row.get("symbol") else [],
+                    "timeframe": row.get("timeframe"),
+                    "status": "completed",  # Defaulting to completed for history
+                    "total_return_pct": metrics.get("total_return_pct", 0.0),
                     "sharpe_ratio": metrics.get("sharpe_ratio", 0.0),
+                    "win_rate_pct": metrics.get("win_rate_pct", 0.0),
+                    "max_drawdown_pct": metrics.get("max_drawdown_pct", 0.0),
+                    "total_trades": metrics.get("total_trades", 0),
+                    "created_at": row.get("created_at"),
                 }
                 summaries.append(summary)
 

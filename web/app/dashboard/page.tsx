@@ -1,27 +1,47 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import { TopNav } from "@/components/TopNav";
 
 export default function DashboardPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/");
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return (
+      <div className="bg-background min-h-screen flex items-center justify-center">
+        <div className="text-primary font-headline animate-pulse uppercase tracking-widest">Loading Session...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-background text-on-surface font-body selection:bg-primary/30 min-h-screen">
       <TopNav />
       <div className="flex pt-[60px]">
         <Sidebar />
-        
+
         <main className="flex-1 md:ml-64 p-8 min-h-[calc(100vh-60px)]">
           {/* Header Row */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-secondary shadow-[0_0_10px_rgba(47,248,1,0.5)] animate-pulse"></span>
-                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-secondary">Obsidian Core Active</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-secondary">Argus Core Active</span>
               </div>
               <h1 className="text-4xl md:text-5xl font-black font-headline tracking-tighter text-on-surface">Dashboard</h1>
               <p className="text-on-surface-variant font-body text-sm mt-1">Real-time simulation metrics & system health.</p>
             </div>
-            
+
             <div className="flex gap-4">
               <button className="px-6 py-2 rounded-full border border-outline-variant/30 hover:border-primary/50 text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm">download</span> Report
@@ -44,7 +64,7 @@ export default function DashboardPage() {
                   <span className="text-on-surface-variant">vs last 30 days</span>
                 </div>
               </div>
-              
+
               <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-lg">
                 <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold block mb-4">Active Strategies</span>
                 <div className="text-4xl font-headline font-black text-on-surface">12</div>
@@ -83,10 +103,10 @@ export default function DashboardPage() {
                </div>
             </div>
 
-            {/* Simulation Execution Log */}
+            {/* Simulation History Log */}
             <div className="lg:col-span-8 bg-surface-container-low rounded-xl border border-outline-variant/10 shadow-lg overflow-hidden flex flex-col">
               <div className="p-6 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-high/30">
-                <h3 className="text-sm font-headline font-bold uppercase tracking-widest">Simulation Execution Log</h3>
+                <h3 className="text-sm font-headline font-bold uppercase tracking-widest">Simulation History Log</h3>
                 <span className="text-[10px] text-primary uppercase tracking-widest font-bold cursor-pointer hover:underline">View All</span>
               </div>
               <div className="overflow-x-auto flex-1">
@@ -141,8 +161,8 @@ export default function DashboardPage() {
 
             {/* System Resources */}
             <div className="lg:col-span-4 bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-lg">
-              <h3 className="text-sm font-headline font-bold uppercase tracking-widest text-on-surface-variant mb-6">Obsidian Node Diagnostics</h3>
-              
+              <h3 className="text-sm font-headline font-bold uppercase tracking-widest text-on-surface-variant mb-6">Argus Node Diagnostics</h3>
+
               <div className="space-y-6">
                 <div>
                   <div className="flex justify-between text-xs mb-2">

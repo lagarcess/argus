@@ -62,7 +62,8 @@ _PEAK = 1
 _VALLEY = 2
 
 
-@njit(cache=True)
+# PERFORMANCE: fastmath=True allows aggressive LLVM mathematical optimizations, cutting Numba loop execution time.
+@njit(fastmath=True, cache=True)
 def _zigzag_core(highs: np.ndarray, lows: np.ndarray, pct_threshold: float) -> np.ndarray:
     """Core ZigZag algorithm with O(N) time complexity.
 
@@ -212,9 +213,9 @@ def find_pivots(
     if len(df) == 0:
         return []
 
-    # Extract arrays for Numba
-    highs = df["high"].values.astype(np.float64)
-    lows = df["low"].values.astype(np.float64)
+    # Extract arrays for Numba and fill NaNs to prevent fastmath instability
+    highs = df["high"].ffill().bfill().values.astype(np.float64)
+    lows = df["low"].ffill().bfill().values.astype(np.float64)
 
     # Run optimized ZigZag
     raw_pivots = _zigzag_core(highs, lows, pct_threshold)
@@ -238,7 +239,7 @@ def find_pivots(
     return pivots
 
 
-@njit(cache=True)
+@njit(fastmath=True, cache=True)
 def _perpendicular_distance(
     px: float, py: float, x1: float, y1: float, x2: float, y2: float
 ) -> float:
@@ -260,7 +261,7 @@ def _perpendicular_distance(
     return float(numerator / denominator)
 
 
-@njit(cache=True)
+@njit(fastmath=True, cache=True)
 def _fast_pip_core(
     indices: np.ndarray, prices: np.ndarray, max_points: int
 ) -> np.ndarray:
@@ -415,7 +416,7 @@ def fast_pip(
     if len(df) == 0:
         return []
 
-    prices = df[price_col].values.astype(np.float64)
+    prices = df[price_col].ffill().bfill().values.astype(np.float64)
     indices = np.arange(len(prices), dtype=np.float64)
 
     selected_mask = _fast_pip_core(indices, prices, max_points)

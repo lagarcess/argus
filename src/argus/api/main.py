@@ -5,33 +5,49 @@ Serves the backtest engine and manages history/auth via Supabase.
 """
 
 from contextlib import asynccontextmanager
-from typing import Any, Dict
+from datetime import datetime, time, timezone
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.api.auth import get_current_user
-from argus.api.schemas import BacktestRequest, PaginatedHistoryResponse
-from argus.config import get_crypto_data_client, get_settings, get_stock_data_client
+from argus.api.auth import auth_required
+from argus.api.schemas import (
+    BacktestRequest,
+    HistoryResponse,
+    SimulationLogEntry,
+)
+from argus.config import get_crypto_data_client, get_stock_data_client
 from argus.domain.persistence import PersistenceService
-from argus.domain.schemas import AssetClass
-from argus.engine import ArgusEngine, StrategyConfig
+from argus.domain.schemas import AssetClass, User
+from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
-from supabase import Client, create_client
 
-# Supabase Client Initialization
-# We use the Service Role key for backend operations (inserting logs safely)
-_settings = get_settings()
-SUPABASE_URL = _settings.SUPABASE_URL
-SUPABASE_SERVICE_KEY = _settings.SUPABASE_SERVICE_ROLE_KEY
-
-supabase_client: Client | None = None
 persistence_service = PersistenceService()
-if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-    supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-else:
-    logger.warning("Supabase credentials missing. History logging disabled.")
+
+
+def _background_save_simulation(
+    user_id: str,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    result: BacktestResult,
+    simulation_id: str,
+):
+    """Robust wrapper for background persistence with separate try/except."""
+    try:
+        persistence_service.save_simulation(
+            user_id=user_id,
+            strategy_id=strategy_id,
+            symbol=symbol,
+            timeframe=timeframe,
+            result=result,
+            simulation_id=simulation_id,
+        )
+        logger.info(f"Successfully saved simulation {simulation_id} in background.")
+    except Exception as e:
+        logger.error(f"Failed to save simulation {simulation_id} in background: {e}")
 
 
 @asynccontextmanager
@@ -71,19 +87,26 @@ def health_check():
     return {"status": "healthy", "version": "1.0.0"}
 
 
+@app.get("/api/v1/auth/session", response_model=User)
+def get_session(user: User = Depends(auth_required)):  # noqa: B008
+    """Return the current authenticated user session."""
+    return user
+
+
 @app.post("/api/v1/backtest")
 def run_backtest(
     request: BacktestRequest,
-    user: Dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    background_tasks: BackgroundTasks,
+    user: User = Depends(auth_required),  # noqa: B008
 ):
     """
     Execute a backtest simulation on multiple assets.
     """
     symbols = request.symbols
-    user_id = user.get("sub", "unknown")
+    user_id_str = str(user.user_id)
 
     logger.info(
-        f"User {user_id} initiated backtest '{request.strategy_name}' on {symbols}"
+        f"User {user_id_str} initiated backtest '{request.strategy_name}' on {symbols}"
     )
 
     try:
@@ -107,16 +130,10 @@ def run_backtest(
             symbols=symbols,
         )
 
-        # 3. Save Strategy to Persistence Service
-        strategy_id = persistence_service.save_strategy(
-            user_id, request.strategy_name, config
-        )
-
         ac = AssetClass.CRYPTO if request.asset_class == "crypto" else AssetClass.EQUITY
 
-        # 4. Execute Simulation
-        from datetime import datetime, time, timezone
-
+        # 3. Execute Simulation
+        # Convert date to datetime for engine
         start_dt = (
             datetime.combine(request.start_date, time.min, tzinfo=timezone.utc)
             if request.start_date
@@ -128,6 +145,9 @@ def run_backtest(
             else None
         )
 
+        # Pre-generate simulation ID for frontend tracking
+        simulation_id = str(uuid4())
+
         result = engine.run(
             symbols=symbols,
             asset_class=ac,
@@ -137,20 +157,36 @@ def run_backtest(
             config=config,
         )
 
-        # 5. Save Simulation Result
-        sim_id = None
+        # 4. Persistence (Background Task)
+        # We save the strategy first to get an ID, then the simulation
+        strategy_id = persistence_service.save_strategy(
+            user_id_str, request.strategy_name, config
+        )
+
         if strategy_id:
-            joined_symbols = ",".join(symbols)
-            sim_id = persistence_service.save_simulation(
-                user_id=user_id,
+            background_tasks.add_task(
+                _background_save_simulation,
+                user_id=user_id_str,
                 strategy_id=strategy_id,
-                symbol=joined_symbols,
+                symbol=",".join(symbols),
                 timeframe=request.timeframe,
                 result=result,
+                simulation_id=simulation_id,
             )
 
-        return {"simulation_id": sim_id, "strategy_id": strategy_id, "result": result}
+        return {
+            "status": "success",
+            "strategy_id": strategy_id,
+            "simulation_id": simulation_id,
+            "result": result,
+        }
 
+    except ValueError as e:
+        logger.warning(f"Engine validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
     except Exception as e:
         logger.exception("Backtest execution failed")
         raise HTTPException(
@@ -159,23 +195,22 @@ def run_backtest(
         ) from e
 
 
-@app.get("/api/v1/history", response_model=PaginatedHistoryResponse)
+@app.get("/api/v1/history", response_model=HistoryResponse)
 def get_user_history(
     limit: int = 10,
     offset: int = 0,
-    user: Dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    user: User = Depends(auth_required),  # noqa: B008
 ):
     """Get the summarized simulation history for the current user."""
     try:
-        user_id = user["sub"]
+        user_id_str = str(user.user_id)
         summaries, total = persistence_service.get_user_simulations(
-            user_id, limit, offset
+            user_id_str, limit, offset
         )
-        from argus.api.schemas import SimulationSummary
 
-        summary_models = [SimulationSummary(**s) for s in summaries]
-        return PaginatedHistoryResponse(
-            simulations=summary_models, total=total, limit=limit, offset=offset
+        return HistoryResponse(
+            simulations=[SimulationLogEntry(**s) for s in summaries],
+            total=total,
         )
 
     except Exception as e:

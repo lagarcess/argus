@@ -16,7 +16,7 @@ const AVAILABLE_PATTERNS = [
 
 export default function BuilderPage() {
   const router = useRouter();
-  
+
   // Strategy Form State
   const [strategyName, setStrategyName] = useState("");
   const [symbols, setSymbols] = useState(["BTC/USD"]);
@@ -29,7 +29,7 @@ export default function BuilderPage() {
   const [emaPeriod, setEmaPeriod] = useState<number | "">("");
   const [slippage, setSlippage] = useState(0.001);
   const [fees, setFees] = useState(0.001);
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +46,7 @@ export default function BuilderPage() {
       setError("Please select at least one entry pattern.");
       return;
     }
-    
+
     // Filter out empty symbols and enforce max 3
     const filteredSymbols = symbols.filter(s => s.trim() !== "").slice(0, 3);
     if (filteredSymbols.length === 0) {
@@ -76,16 +76,16 @@ export default function BuilderPage() {
     try {
       // In a real app we would get the response and maybe an ID,
       // then redirect to the results page for that specific simulation.
-      const result = await fetchApi<any>("/backtest", {
+      await fetchApi<unknown>("/backtest", {
         method: "POST",
         body: JSON.stringify(request),
       });
-      
+
       // For MVP, just route to a dummy results page since we don't have persistence set up perfectly
       // to retrieve specific results by ID yet without another router endpoint.
       router.push("/results?id=latest");
-    } catch (e: any) {
-      setError(e.message || "Failed to run backtest");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to run backtest");
       setIsSubmitting(false);
     }
   };
@@ -95,7 +95,7 @@ export default function BuilderPage() {
       <TopNav />
       <div className="flex pt-[60px]">
         <Sidebar />
-        
+
         <main className="flex-1 md:ml-64 p-8 min-h-[calc(100vh-60px)] grid grid-cols-1 lg:grid-cols-12 gap-8 tonal-shift">
           {/* Builder Canvas (Left) */}
           <div className="lg:col-span-8 flex flex-col gap-6">
@@ -107,7 +107,7 @@ export default function BuilderPage() {
                  Define rules. Set constraints. Deploy simulations.
               </p>
             </header>
-            
+
             {error && (
               <div className="bg-error/10 border border-error text-error p-3 rounded text-sm mb-4">
                 {error}
@@ -119,11 +119,11 @@ export default function BuilderPage() {
                 <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
                   Strategy Name
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={strategyName}
                   onChange={(e) => setStrategyName(e.target.value)}
-                  className="bg-transparent border-b border-outline-variant/30 w-full pb-2 text-2xl font-headline text-primary focus:outline-none focus:border-primary placeholder:text-outline-variant transition-colors" 
+                  className="bg-transparent border-b border-outline-variant/30 w-full pb-2 text-2xl font-headline text-primary focus:outline-none focus:border-primary placeholder:text-outline-variant transition-colors"
                   placeholder="e.g. Midnight Phoenix v2"
                 />
               </div>
@@ -133,8 +133,8 @@ export default function BuilderPage() {
                   <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
                     Assets (Max 3)
                   </label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={symbols.join(", ")}
                     onChange={(e) => setSymbols(e.target.value.split(",").map(s => s.trim()))}
                     className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg p-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-on-surface"
@@ -145,7 +145,7 @@ export default function BuilderPage() {
                    <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
                     Timeframe
                   </label>
-                  <select 
+                  <select
                     value={timeframe}
                     onChange={(e) => setTimeframe(e.target.value)}
                     className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg p-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-on-surface appearance-none"
@@ -167,12 +167,12 @@ export default function BuilderPage() {
                     {AVAILABLE_PATTERNS.map((pattern) => {
                       const isSelected = entryPatterns.includes(pattern);
                       return (
-                        <div 
+                        <div
                           key={pattern}
                           onClick={() => togglePattern(pattern)}
                           className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                            isSelected 
-                              ? "bg-primary/10 border-primary text-primary" 
+                            isSelected
+                              ? "bg-primary/10 border-primary text-primary"
                               : "bg-surface-container-low border-outline-variant/10 hover:border-primary/50 text-on-surface-variant"
                           }`}
                         >
@@ -189,11 +189,11 @@ export default function BuilderPage() {
                       Indicator Confluence
                    </h3>
                    <div className="flex bg-surface-container-high rounded p-1">
-                      <button 
+                      <button
                         onClick={() => setConfluenceMode("OR")}
                         className={`text-[10px] px-3 py-1 rounded font-bold transition-all ${confluenceMode === "OR" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
                       >OR</button>
-                      <button 
+                      <button
                         onClick={() => setConfluenceMode("AND")}
                         className={`text-[10px] px-3 py-1 rounded font-bold transition-all ${confluenceMode === "AND" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
                       >AND</button>
@@ -205,15 +205,15 @@ export default function BuilderPage() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <label className="text-xs font-bold text-on-surface">RSI Filter (Period)</label>
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           value={rsiPeriod}
                           onChange={(e) => setRsiPeriod(e.target.value === "" ? "" : Number(e.target.value))}
                           placeholder="None"
                           className="w-20 bg-surface-container border border-outline-variant/30 rounded text-xs p-1 text-right"
                         />
                       </div>
-                      
+
                       {typeof rsiPeriod === "number" && (
                         <div className="pt-2 border-t border-outline-variant/10 space-y-3">
                           <div>
@@ -221,10 +221,10 @@ export default function BuilderPage() {
                               <span>Oversold Entry</span>
                               <span>{rsiOversold}</span>
                             </div>
-                            <input 
-                              type="range" min="0" max="50" step="1" 
+                            <input
+                              type="range" min="0" max="50" step="1"
                               value={rsiOversold} onChange={(e) => setRsiOversold(Number(e.target.value))}
-                              className="w-full accent-primary" 
+                              className="w-full accent-primary"
                             />
                           </div>
                           <div>
@@ -232,10 +232,10 @@ export default function BuilderPage() {
                               <span>Overbought Exit</span>
                               <span>{rsiOverbought}</span>
                             </div>
-                            <input 
-                              type="range" min="50" max="100" step="1" 
+                            <input
+                              type="range" min="50" max="100" step="1"
                               value={rsiOverbought} onChange={(e) => setRsiOverbought(Number(e.target.value))}
-                              className="w-full accent-error" 
+                              className="w-full accent-error"
                             />
                           </div>
                         </div>
@@ -246,8 +246,8 @@ export default function BuilderPage() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <label className="text-xs font-bold text-on-surface">Cross EMA (Period)</label>
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           value={emaPeriod}
                           onChange={(e) => setEmaPeriod(e.target.value === "" ? "" : Number(e.target.value))}
                           placeholder="None"
@@ -269,17 +269,17 @@ export default function BuilderPage() {
           <div className="lg:col-span-4 flex flex-col gap-6">
             <div className="glass-panel p-6 rounded-xl border border-outline-variant/10 sticky top-[100px]">
                <h3 className="text-sm font-headline font-bold uppercase tracking-widest mb-6">Simulation Guardrails</h3>
-               
+
                <div className="space-y-6 mb-8">
                   <div>
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">
                        <span>Slippage %</span>
                        <span className="text-on-surface">{(slippage * 100).toFixed(2)}%</span>
                     </div>
-                    <input 
-                      type="range" min="0" max="0.05" step="0.001" 
+                    <input
+                      type="range" min="0" max="0.05" step="0.001"
                       value={slippage} onChange={(e) => setSlippage(Number(e.target.value))}
-                      className="w-full accent-primary" 
+                      className="w-full accent-primary"
                     />
                   </div>
                   <div>
@@ -287,10 +287,10 @@ export default function BuilderPage() {
                        <span>Trading Fees %</span>
                        <span className="text-on-surface">{(fees * 100).toFixed(2)}%</span>
                     </div>
-                    <input 
-                      type="range" min="0" max="0.05" step="0.001" 
+                    <input
+                      type="range" min="0" max="0.05" step="0.001"
                       value={fees} onChange={(e) => setFees(Number(e.target.value))}
-                      className="w-full accent-primary" 
+                      className="w-full accent-primary"
                     />
                   </div>
                </div>
@@ -299,12 +299,12 @@ export default function BuilderPage() {
                  <div className="flex gap-2">
                    <span className="material-symbols-outlined text-primary text-sm">info</span>
                    <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                     The Obsidian Core strictly applies a 15-minute market safety buffer to real-time inputs. Order routing will be delayed proportionally in live integration.
+                     The Argus Core strictly applies a 15-minute market safety buffer to real-time inputs. Backtest parameters will be applied to simulated results.
                    </p>
                  </div>
                </div>
 
-               <button 
+               <button
                   onClick={handleRunBacktest}
                   disabled={isSubmitting}
                   className="w-full py-4 rounded-xl bg-primary text-on-primary font-headline font-black uppercase tracking-widest shadow-[0_0_20px_rgba(153,247,255,0.3)] hover:shadow-[0_0_30px_rgba(153,247,255,0.5)] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
