@@ -312,6 +312,7 @@ export default function BuilderPage() {
                </div>
 
                <button
+                  type="button"
                   onClick={handleRunBacktest}
                   disabled={isSubmitting}
                   className="w-full py-4 rounded-xl bg-primary text-on-primary font-headline font-black uppercase tracking-widest shadow-[0_0_20px_rgba(153,247,255,0.3)] hover:shadow-[0_0_30px_rgba(153,247,255,0.5)] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
