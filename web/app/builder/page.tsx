@@ -109,7 +109,7 @@ export default function BuilderPage() {
             </header>
 
             {error && (
-              <div className="bg-error/10 border border-error text-error p-3 rounded text-sm mb-4">
+              <div role="alert" aria-live="assertive" className="bg-error/10 border border-error text-error p-3 rounded text-sm mb-4">
                 {error}
               </div>
             )}
@@ -167,17 +167,20 @@ export default function BuilderPage() {
                     {AVAILABLE_PATTERNS.map((pattern) => {
                       const isSelected = entryPatterns.includes(pattern);
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={pattern}
                           onClick={() => togglePattern(pattern)}
-                          className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                          role="checkbox"
+                          aria-checked={isSelected}
+                          className={`p-3 border rounded-lg cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 text-left ${
                             isSelected
                               ? "bg-primary/10 border-primary text-primary"
                               : "bg-surface-container-low border-outline-variant/10 hover:border-primary/50 text-on-surface-variant"
                           }`}
                         >
                            <div className="text-xs font-semibold">{pattern}</div>
-                        </div>
+                        </button>
                       )
                     })}
                  </div>
@@ -190,12 +193,16 @@ export default function BuilderPage() {
                    </h3>
                    <div className="flex bg-surface-container-high rounded p-1">
                       <button
+                        type="button"
                         onClick={() => setConfluenceMode("OR")}
-                        className={`text-[10px] px-3 py-1 rounded font-bold transition-all ${confluenceMode === "OR" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
+                        aria-pressed={confluenceMode === "OR"}
+                        className={`text-[10px] px-3 py-1 rounded font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${confluenceMode === "OR" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
                       >OR</button>
                       <button
+                        type="button"
                         onClick={() => setConfluenceMode("AND")}
-                        className={`text-[10px] px-3 py-1 rounded font-bold transition-all ${confluenceMode === "AND" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
+                        aria-pressed={confluenceMode === "AND"}
+                        className={`text-[10px] px-3 py-1 rounded font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${confluenceMode === "AND" ? "bg-primary text-on-primary" : "text-on-surface-variant"}`}
                       >AND</button>
                    </div>
                  </div>
@@ -305,6 +312,7 @@ export default function BuilderPage() {
                </div>
 
                <button
+                  type="button"
                   onClick={handleRunBacktest}
                   disabled={isSubmitting}
                   className="w-full py-4 rounded-xl bg-primary text-on-primary font-headline font-black uppercase tracking-widest shadow-[0_0_20px_rgba(153,247,255,0.3)] hover:shadow-[0_0_30px_rgba(153,247,255,0.5)] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -7,6 +7,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.analysis.harmonics import HarmonicAnalyzer
+from argus.analysis.indicators import IndicatorAnalyzer
 from argus.analysis.patterns import PatternAnalyzer
 from argus.domain.schemas import AssetClass
 from argus.market.data_provider import MarketDataProvider
@@ -203,16 +204,6 @@ class ArgusEngine:
         entries_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
         exits_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
 
-        # Import pandas_ta outside the loop to avoid severe iterative overhead
-        try:
-            import pandas_ta as ta  # type: ignore
-
-            has_ta = True
-        except ImportError:
-            has_ta = False
-            logger.warning(
-                "pandas_ta not installed. TA-dependent indicators will be skipped."
-            )
 
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
@@ -290,11 +281,12 @@ class ArgusEngine:
             # Applied AFTER pattern signals, always AND-gate indicators
             # regardless of confluence_mode (indicators are always additive gates)
             try:
+                indicator_analyzer = IndicatorAnalyzer(symbol_data)
                 indicator_entry_mask = pd.Series(True, index=symbol_data.index)
                 indicator_exit_mask = pd.Series(True, index=symbol_data.index)
 
-                if has_ta and config.rsi_period is not None:
-                    rsi = ta.rsi(symbol_data["close"], length=config.rsi_period)
+                if config.rsi_period is not None:
+                    rsi = indicator_analyzer.get_rsi(config.rsi_period)
                     if rsi is not None and not rsi.empty:
                         # Entry: price is oversold (RSI below threshold)
                         indicator_entry_mask = indicator_entry_mask & (
@@ -305,8 +297,8 @@ class ArgusEngine:
                             rsi >= config.rsi_overbought
                         )
 
-                if has_ta and config.ema_period is not None:
-                    ema = ta.ema(symbol_data["close"], length=config.ema_period)
+                if config.ema_period is not None:
+                    ema = indicator_analyzer.get_ema(config.ema_period)
                     if ema is not None and not ema.empty:
                         # Entry: price is above EMA (bullish context)
                         indicator_entry_mask = indicator_entry_mask & (
