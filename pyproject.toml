@@ -66,6 +66,10 @@ data_file = "temp/coverage/.coverage"
 pythonpath = ["src", "."]
 testpaths = ["tests"]
 addopts = "-v --cov=src --cov-report=term-missing --cov-report=html:temp/coverage/html --cov-report=xml:temp/coverage/coverage.xml"
+filterwarnings = [
+    "ignore::DeprecationWarning:postgrest.*",
+    "ignore::DeprecationWarning:supabase.*",
+]
 markers = [
     "slow: marks tests as slow (performance benchmarks requiring large datasets)",
 ]

@@ -84,6 +84,25 @@ class PersistenceService:
             logger.error(f"Failed to save simulation: {e}")
             return None
 
+    def get_simulation(self, simulation_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Fetches a specific simulation result by ID."""
+        if not self.client:
+            return None
+
+        try:
+            res = (
+                self.client.table("simulations")
+                .select("*, strategies(name, config)")
+                .eq("id", simulation_id)
+                .eq("user_id", user_id)
+                .single()
+                .execute()
+            )
+            return res.data
+        except Exception as e:
+            logger.error(f"Failed to fetch simulation {simulation_id}: {e}")
+            return None
+
     def get_user_simulations(
         self, user_id: str, limit: int = 10, offset: int = 0
     ) -> tuple[List[Dict[str, Any]], int]:
@@ -129,18 +148,21 @@ class PersistenceService:
                 else:
                     strategy_name = "Unknown Strategy"
 
-                # Map to SimulationLogEntry interface
                 summary = {
                     "id": row.get("id"),
                     "strategy_name": strategy_name,
                     "symbols": [row.get("symbol")] if row.get("symbol") else [],
                     "timeframe": row.get("timeframe"),
-                    "status": "completed",  # Defaulting to completed for history
+                    "status": "completed",
                     "total_return_pct": metrics.get("total_return_pct", 0.0),
                     "sharpe_ratio": metrics.get("sharpe_ratio", 0.0),
                     "win_rate_pct": metrics.get("win_rate_pct", 0.0),
                     "max_drawdown_pct": metrics.get("max_drawdown_pct", 0.0),
                     "total_trades": metrics.get("total_trades", 0),
+                    "alpha": metrics.get("alpha", 0.0),
+                    "beta": metrics.get("beta", 0.0),
+                    "calmar_ratio": metrics.get("calmar_ratio", 0.0),
+                    "avg_trade_duration": metrics.get("avg_trade_duration", "0m"),
                     "created_at": row.get("created_at"),
                 }
                 summaries.append(summary)
