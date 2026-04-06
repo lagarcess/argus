@@ -10,11 +10,10 @@ from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from supabase import Client, create_client
 
 from argus.api.auth import auth_required
 from argus.api.schemas import BacktestRequest, HistoryResponse
-from argus.config import get_crypto_data_client, get_settings, get_stock_data_client
+from argus.config import get_crypto_data_client, get_stock_data_client
 from argus.domain.schemas import AssetClass, User
 from argus.engine import ArgusEngine, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
