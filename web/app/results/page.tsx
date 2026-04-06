@@ -1,9 +1,67 @@
 "use client";
 
-import { Suspense } from "react";
+import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopNav } from "@/components/TopNav";
+
+// PERFORMANCE: Wrap EquityCurve in React.memo to prevent expensive SVG re-renders during unrelated parent state updates
+const EquityCurve = React.memo(() => {
+  return (
+    <div className="flex-1 w-full relative flex items-end pt-10 pb-4">
+      {/* Y-Axis labels */}
+      <div className="absolute left-0 top-10 bottom-4 flex flex-col justify-between text-[10px] font-mono text-on-surface-variant w-12 z-10">
+          <span>$12.5k</span>
+          <span>$11.8k</span>
+          <span>$11.0k</span>
+          <span>$10.4k</span>
+          <span>$10.0k</span>
+      </div>
+
+      {/* Chart Area */}
+      <div className="flex-1 w-full h-full relative ml-12">
+          {/* Grid lines */}
+          <div className="absolute inset-0 border-b border-outline-variant/10"></div>
+          <div className="absolute top-[25%] left-0 w-full border-b border-outline-variant/5"></div>
+          <div className="absolute top-[50%] left-0 w-full border-b border-outline-variant/5"></div>
+          <div className="absolute top-[75%] left-0 w-full border-b border-outline-variant/5"></div>
+
+          {/* SVG Line Chart Mock */}
+          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#99f7ff" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#99f7ff" stopOpacity="0.0" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 0 100 L 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5 L 100 100 Z"
+              fill="url(#lineGrad)"
+            />
+            <path
+              d="M 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5"
+              fill="none" stroke="#99f7ff" strokeWidth="2" strokeLinejoin="round"
+              className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]"
+            />
+
+            {/* Peak dot */}
+            <circle cx="100" cy="5" r="3" fill="#ffffff" className="drop-shadow-[0_0_8px_#ffffff] animate-pulse" />
+          </svg>
+
+          {/* X-axis labels */}
+          <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[10px] font-mono text-on-surface-variant">
+            <span>Jan</span>
+            <span>Feb</span>
+            <span>Mar</span>
+            <span>Apr</span>
+            <span>May</span>
+            <span>Jun</span>
+          </div>
+      </div>
+    </div>
+  );
+});
+EquityCurve.displayName = "EquityCurve";
 
 function ResultsContent() {
   const searchParams = useSearchParams();
@@ -82,57 +140,7 @@ function ResultsContent() {
                  </div>
 
                  {/* Visual Mock for Equity Curve Chart */}
-                 <div className="flex-1 w-full relative flex items-end pt-10 pb-4">
-                    {/* Y-Axis labels */}
-                    <div className="absolute left-0 top-10 bottom-4 flex flex-col justify-between text-[10px] font-mono text-on-surface-variant w-12 z-10">
-                       <span>$12.5k</span>
-                       <span>$11.8k</span>
-                       <span>$11.0k</span>
-                       <span>$10.4k</span>
-                       <span>$10.0k</span>
-                    </div>
-
-                    {/* Chart Area */}
-                    <div className="flex-1 w-full h-full relative ml-12">
-                       {/* Grid lines */}
-                       <div className="absolute inset-0 border-b border-outline-variant/10"></div>
-                       <div className="absolute top-[25%] left-0 w-full border-b border-outline-variant/5"></div>
-                       <div className="absolute top-[50%] left-0 w-full border-b border-outline-variant/5"></div>
-                       <div className="absolute top-[75%] left-0 w-full border-b border-outline-variant/5"></div>
-
-                       {/* SVG Line Chart Mock */}
-                       <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                         <defs>
-                           <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                             <stop offset="0%" stopColor="#99f7ff" stopOpacity="0.4" />
-                             <stop offset="100%" stopColor="#99f7ff" stopOpacity="0.0" />
-                           </linearGradient>
-                         </defs>
-                         <path
-                           d="M 0 100 L 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5 L 100 100 Z"
-                           fill="url(#lineGrad)"
-                         />
-                         <path
-                           d="M 0 70 L 10 75 L 20 60 L 30 65 L 40 40 L 50 45 L 60 20 L 70 30 L 80 15 L 90 25 L 100 5"
-                           fill="none" stroke="#99f7ff" strokeWidth="2" strokeLinejoin="round"
-                           className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]"
-                         />
-
-                         {/* Peak dot */}
-                         <circle cx="100" cy="5" r="3" fill="#ffffff" className="drop-shadow-[0_0_8px_#ffffff] animate-pulse" />
-                       </svg>
-
-                       {/* X-axis labels */}
-                       <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[10px] font-mono text-on-surface-variant">
-                         <span>Jan</span>
-                         <span>Feb</span>
-                         <span>Mar</span>
-                         <span>Apr</span>
-                         <span>May</span>
-                         <span>Jun</span>
-                       </div>
-                    </div>
-                 </div>
+                 <EquityCurve />
               </div>
 
               {/* Simulation Diagnostics (Right) */}
