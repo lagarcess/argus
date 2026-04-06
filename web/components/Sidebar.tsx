@@ -18,7 +18,7 @@ export function Sidebar() {
       <div className="px-8 mb-12 mt-8">
         <div className="text-xl font-black text-cyan-400 font-headline tracking-tighter">ARGUS</div>
         <div className="text-[10px] text-neutral-500 uppercase tracking-[0.3em] font-headline">
-          Obsidian Observatory
+          Argus Observatory
         </div>
       </div>
 

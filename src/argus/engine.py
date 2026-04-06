@@ -204,6 +204,7 @@ class ArgusEngine:
         entries_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
         exits_df = pd.DataFrame(False, index=unstacked_close.index, columns=symbols)
 
+
         for symbol in symbols:
             # Reconstruct per-symbol OHLCV
             if is_multi_index:

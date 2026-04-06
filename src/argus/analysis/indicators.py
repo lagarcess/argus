@@ -211,20 +211,14 @@ class IndicatorAnalyzer:
     """
 
     def __init__(self, df: pd.DataFrame):
+        if "close" not in df.columns:
+            raise ValueError("DataFrame must contain a 'close' column for indicator analysis.")
         self.df = df
 
     def get_rsi(self, period: int) -> pd.Series:
         """Calculate Relative Strength Index."""
-        try:
-            import pandas_ta_classic as ta
-        except ImportError:
-            import pandas_ta as ta
         return ta.rsi(self.df["close"], length=period)
 
     def get_ema(self, period: int) -> pd.Series:
         """Calculate Exponential Moving Average."""
-        try:
-            import pandas_ta_classic as ta
-        except ImportError:
-            import pandas_ta as ta
         return ta.ema(self.df["close"], length=period)
