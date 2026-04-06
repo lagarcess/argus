@@ -1,9 +1,29 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import { TopNav } from "@/components/TopNav";
 
 export default function DashboardPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/");
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return (
+      <div className="bg-background min-h-screen flex items-center justify-center">
+        <div className="text-primary font-headline animate-pulse uppercase tracking-widest">Loading Session...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-background text-on-surface font-body selection:bg-primary/30 min-h-screen">
       <TopNav />

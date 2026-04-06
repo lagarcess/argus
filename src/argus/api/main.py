@@ -6,31 +6,18 @@ Serves the backtest engine and manages history/auth via Supabase.
 
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from supabase import Client, create_client
 
-from argus.api.auth import get_current_user
+from argus.api.auth import auth_required
 from argus.api.schemas import BacktestRequest, HistoryResponse
-from argus.config import get_crypto_data_client, get_settings, get_stock_data_client
-from argus.domain.schemas import AssetClass
+from argus.config import get_crypto_data_client, get_stock_data_client
+from argus.domain.schemas import AssetClass, User
 from argus.engine import ArgusEngine, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
-
-# Supabase Client Initialization
-# We use the Service Role key for backend operations (inserting logs safely)
-_settings = get_settings()
-SUPABASE_URL = _settings.SUPABASE_URL
-SUPABASE_SERVICE_KEY = _settings.SUPABASE_SERVICE_ROLE_KEY
-
-supabase_client: Client | None = None
-if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-    supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-else:
-    logger.warning("Supabase credentials missing. History logging disabled.")
+from argus.supabase import supabase_client
 
 
 @asynccontextmanager
@@ -70,10 +57,16 @@ def health_check():
     return {"status": "healthy", "version": "1.0.0"}
 
 
+@app.get("/api/v1/auth/session", response_model=User)
+def get_session(user: User = Depends(auth_required)):  # noqa: B008
+    """Return the current authenticated user session."""
+    return user
+
+
 @app.post("/api/v1/backtest")
 def run_backtest(
     request: BacktestRequest,
-    user: Dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    user: User = Depends(auth_required),  # noqa: B008
 ):
     """
     Execute a backtest simulation on multiple assets.
@@ -81,7 +74,7 @@ def run_backtest(
     symbols = request.symbols
 
     logger.info(
-        f"User {user.get('sub')} initiated backtest '{request.strategy_name}' on {symbols}"
+        f"User {user.user_id} initiated backtest '{request.strategy_name}' on {symbols}"
     )
 
     # 1. Start a simulation log entry in Supabase (if configured)
@@ -92,7 +85,7 @@ def run_backtest(
                 supabase_client.table("simulation_logs")
                 .insert(
                     {
-                        "user_id": user["sub"],
+                        "user_id": user.user_id,
                         "strategy_name": request.strategy_name,
                         "symbols": symbols,
                         "timeframe": request.timeframe,
@@ -116,8 +109,13 @@ def run_backtest(
                 )
                 .execute()
             )
-            if res.data:
-                sim_id = res.data[0]["id"]
+            if (
+                res.data
+                and isinstance(res.data, list)
+                and len(res.data) > 0
+                and isinstance(res.data[0], dict)
+            ):
+                sim_id = res.data[0].get("id")
         except Exception as e:
             logger.error(f"Failed to create simulation log: {e}")
 
@@ -146,14 +144,26 @@ def run_backtest(
         ac = AssetClass.CRYPTO if request.asset_class == "crypto" else AssetClass.EQUITY
 
         # 4. Execute
+        # Convert date to datetime for engine
+        start_dt = (
+            datetime.combine(request.start_date, datetime.min.time())
+            if request.start_date
+            else None
+        )
+        end_dt = (
+            datetime.combine(request.end_date, datetime.min.time())
+            if request.end_date
+            else None
+        )
         result = engine.run(
-            config=config,
             symbols=symbols,
             asset_class=ac,
             timeframe=request.timeframe,
-            start_date=request.start_date,
-            end_date=request.end_date,
+            start_date=start_dt,
+            end_date=end_dt,
+            config=config,
         )
+
 
         # 5. Update Supabase with success
         if supabase_client and sim_id:
@@ -203,19 +213,19 @@ def run_backtest(
 def get_user_history(
     limit: int = 50,
     offset: int = 0,
-    user: Dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    user: User = Depends(auth_required),  # noqa: B008
 ):
     """Get the simulation history for the current user."""
     if not supabase_client:
         return HistoryResponse(simulations=[], total=0)
 
     try:
-        user_id = user["sub"]
+        user_id = user.user_id
 
         # Fetch count
         count_res = (
             supabase_client.table("simulation_logs")
-            .select("id", count="exact")
+            .select("id", count="exact")  # type: ignore[arg-type]
             .eq("user_id", user_id)
             .execute()
         )
@@ -235,7 +245,7 @@ def get_user_history(
             .execute()
         )
 
-        return HistoryResponse(simulations=res.data, total=total)
+        return HistoryResponse(simulations=res.data, total=total)  # type: ignore[arg-type]
 
     except Exception as e:
         logger.error(f"Failed to fetch history: {e}")

@@ -4,21 +4,72 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleIcon, AppleIcon, FacebookIcon } from "@/components/Icons";
 import { TopNav } from "@/components/TopNav";
-import { Eye, EyeOff, Zap } from "lucide-react";
+import { Eye, EyeOff, Zap, AlertCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthContext";
 
 export default function LandingPage() {
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
   const [showPassword, setShowPassword] = useState(false);
-  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const router = useRouter();
+  const { login } = useAuth();
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/dashboard");
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (authMode === "signup") {
+        const { data, error: signupError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (signupError) throw signupError;
+        if (data.session) {
+          login(data.session.access_token, data.session.user.email || email);
+          router.push("/dashboard");
+        } else {
+          setError("Verification email sent. Please check your inbox.");
+        }
+      } else {
+        const { data, error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (loginError) throw loginError;
+        if (data.session) {
+          login(data.session.access_token, data.session.user.email || email);
+          router.push("/dashboard");
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An error occurred during authentication.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSocialAuth = () => {
-    // Navigate straight to dashboard for now - mock MVP
-    router.push("/dashboard");
+  const handleSocialAuth = async (provider: 'google' | 'apple' | 'facebook') => {
+    setError(null);
+    try {
+      const { error: socialError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`
+        }
+      });
+      if (socialError) throw socialError;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Social authentication failed.";
+      setError(message);
+    }
   };
 
   return (
@@ -74,9 +125,16 @@ export default function LandingPage() {
           <div className="glass-panel relative z-10 rounded-2xl border border-outline-variant/30 p-8 shadow-2xl transform transition-transform duration-500">
             <div className="flex justify-center items-center mb-8">
               <h2 className="text-2xl font-headline font-black uppercase tracking-tighter text-gradient-cyan">
-                GET STARTED
+                {authMode === "login" ? "WELCOME BACK" : "GET STARTED"}
               </h2>
             </div>
+
+            {error && (
+              <div className="mb-6 p-4 bg-error/10 border border-error/20 rounded-xl flex items-start gap-3 text-error text-xs animate-in slide-in-from-top-1">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <p>{error}</p>
+              </div>
+            )}
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="space-y-1">
@@ -85,6 +143,8 @@ export default function LandingPage() {
                 </label>
                 <input
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
                   placeholder="operator@argus.io"
                   required
@@ -98,6 +158,8 @@ export default function LandingPage() {
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none pr-12"
                     placeholder="••••••••••••"
                     required
@@ -130,9 +192,10 @@ export default function LandingPage() {
 
               <button
                 type="submit"
-                className="w-full py-3.5 mt-4 bg-surface-container-highest border border-outline-variant hover:bg-primary hover:text-on-primary hover:border-primary rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg flex items-center justify-center"
+                disabled={loading}
+                className="w-full py-3.5 mt-4 bg-surface-container-highest border border-outline-variant hover:bg-primary hover:text-on-primary hover:border-primary rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                CONTINUE
+                {loading ? "PROCESSING..." : "CONTINUE"}
               </button>
             </form>
 
@@ -146,19 +209,19 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-3 gap-3">
               <button
-                onClick={() => handleSocialAuth()}
+                onClick={() => handleSocialAuth('google')}
                 className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-white hover:border-white group rounded-xl transition-all flex items-center justify-center"
               >
                 <GoogleIcon className="w-5 h-5 flex-shrink-0" />
               </button>
               <button
-                onClick={() => handleSocialAuth()}
+                onClick={() => handleSocialAuth('apple')}
                 className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-neutral-800 hover:text-white rounded-xl transition-all flex items-center justify-center group"
               >
                 <AppleIcon className="w-5 h-5 text-on-surface group-hover:text-white" />
               </button>
               <button
-                onClick={() => handleSocialAuth()}
+                onClick={() => handleSocialAuth('facebook')}
                 className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-[#1877F2] hover:border-[#1877F2] hover:text-white rounded-xl transition-all flex items-center justify-center group"
               >
                 <FacebookIcon className="w-5 h-5 text-[#1877F2] group-hover:text-white" />
