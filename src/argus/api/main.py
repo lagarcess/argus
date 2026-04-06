@@ -5,19 +5,49 @@ Serves the backtest engine and manages history/auth via Supabase.
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from argus.api.auth import auth_required
-from argus.api.schemas import BacktestRequest, HistoryResponse
+from argus.api.schemas import (
+    BacktestRequest,
+    HistoryResponse,
+    SimulationLogEntry,
+)
 from argus.config import get_crypto_data_client, get_stock_data_client
+from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, User
-from argus.engine import ArgusEngine, StrategyConfig
+from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
-from argus.supabase import supabase_client
+
+persistence_service = PersistenceService()
+
+
+def _background_save_simulation(
+    user_id: str,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    result: BacktestResult,
+    simulation_id: str,
+):
+    """Robust wrapper for background persistence with separate try/except."""
+    try:
+        persistence_service.save_simulation(
+            user_id=user_id,
+            strategy_id=strategy_id,
+            symbol=symbol,
+            timeframe=timeframe,
+            result=result,
+            simulation_id=simulation_id,
+        )
+        logger.info(f"Successfully saved simulation {simulation_id} in background.")
+    except Exception as e:
+        logger.error(f"Failed to save simulation {simulation_id} in background: {e}")
 
 
 @asynccontextmanager
@@ -66,68 +96,27 @@ def get_session(user: User = Depends(auth_required)):  # noqa: B008
 @app.post("/api/v1/backtest")
 def run_backtest(
     request: BacktestRequest,
+    background_tasks: BackgroundTasks,
     user: User = Depends(auth_required),  # noqa: B008
 ):
     """
     Execute a backtest simulation on multiple assets.
     """
     symbols = request.symbols
+    user_id_str = str(user.user_id)
 
     logger.info(
-        f"User {user.user_id} initiated backtest '{request.strategy_name}' on {symbols}"
+        f"User {user_id_str} initiated backtest '{request.strategy_name}' on {symbols}"
     )
 
-    # 1. Start a simulation log entry in Supabase (if configured)
-    sim_id = None
-    if supabase_client:
-        try:
-            res = (
-                supabase_client.table("simulation_logs")
-                .insert(
-                    {
-                        "user_id": user.user_id,
-                        "strategy_name": request.strategy_name,
-                        "symbols": symbols,
-                        "timeframe": request.timeframe,
-                        "start_date": request.start_date.isoformat()
-                        if request.start_date
-                        else None,
-                        "end_date": request.end_date.isoformat()
-                        if request.end_date
-                        else None,
-                        "confluence_mode": request.confluence_mode,
-                        "entry_patterns": request.entry_patterns,
-                        "exit_patterns": request.exit_patterns,
-                        "rsi_period": request.rsi_period,
-                        "rsi_oversold": request.rsi_oversold,
-                        "rsi_overbought": request.rsi_overbought,
-                        "ema_period": request.ema_period,
-                        "slippage": request.slippage,
-                        "fees": request.fees,
-                        "status": "processing",
-                    }
-                )
-                .execute()
-            )
-            if (
-                res.data
-                and isinstance(res.data, list)
-                and len(res.data) > 0
-                and isinstance(res.data[0], dict)
-            ):
-                sim_id = res.data[0].get("id")
-        except Exception as e:
-            logger.error(f"Failed to create simulation log: {e}")
-
     try:
-        # 2. Build Engine & Provider
-        # Settings already load from .env
+        # 1. Build Engine & Provider
         stock_client = get_stock_data_client()
         crypto_client = get_crypto_data_client()
         provider = MarketDataProvider(stock_client, crypto_client)
         engine = ArgusEngine(provider)
 
-        # 3. Configure Strategy
+        # 2. Configure Strategy
         config = StrategyConfig(
             entry_patterns=request.entry_patterns,
             exit_patterns=request.exit_patterns,
@@ -143,18 +132,22 @@ def run_backtest(
 
         ac = AssetClass.CRYPTO if request.asset_class == "crypto" else AssetClass.EQUITY
 
-        # 4. Execute
+        # 3. Execute Simulation
         # Convert date to datetime for engine
         start_dt = (
-            datetime.combine(request.start_date, datetime.min.time())
+            datetime.combine(request.start_date, time.min, tzinfo=timezone.utc)
             if request.start_date
             else None
         )
         end_dt = (
-            datetime.combine(request.end_date, datetime.min.time())
+            datetime.combine(request.end_date, time.max, tzinfo=timezone.utc)
             if request.end_date
             else None
         )
+
+        # Pre-generate simulation ID for frontend tracking
+        simulation_id = str(uuid4())
+
         result = engine.run(
             symbols=symbols,
             asset_class=ac,
@@ -164,45 +157,38 @@ def run_backtest(
             config=config,
         )
 
+        # 4. Persistence (Background Task)
+        # We save the strategy first to get an ID, then the simulation
+        strategy_id = persistence_service.save_strategy(
+            user_id_str, request.strategy_name, config
+        )
 
-        # 5. Update Supabase with success
-        if supabase_client and sim_id:
-            try:
-                now_iso = datetime.now(timezone.utc).isoformat()
-                supabase_client.table("simulation_logs").update(
-                    {
-                        "status": "completed",
-                        "total_return_pct": float(result.metrics.total_return_pct),
-                        "sharpe_ratio": float(result.metrics.sharpe_ratio),
-                        "sortino_ratio": float(result.metrics.sortino_ratio),
-                        "max_drawdown_pct": float(result.metrics.max_drawdown_pct),
-                        "win_rate_pct": float(result.metrics.win_rate_pct),
-                        "total_trades": int(result.metrics.total_trades),
-                        "result_json": result.model_dump(mode="json"),
-                        "completed_at": now_iso,
-                    }
-                ).eq("id", sim_id).execute()
-            except Exception as e:
-                logger.error(f"Failed to update simulation log on success: {e}")
+        if strategy_id:
+            background_tasks.add_task(
+                _background_save_simulation,
+                user_id=user_id_str,
+                strategy_id=strategy_id,
+                symbol=",".join(symbols),
+                timeframe=request.timeframe,
+                result=result,
+                simulation_id=simulation_id,
+            )
 
-        return {"simulation_id": sim_id, "result": result}
+        return {
+            "status": "success",
+            "strategy_id": strategy_id,
+            "simulation_id": simulation_id,
+            "result": result,
+        }
 
+    except ValueError as e:
+        logger.warning(f"Engine validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
     except Exception as e:
         logger.exception("Backtest execution failed")
-        # Update Supabase with failure
-        if supabase_client and sim_id:
-            try:
-                now_iso = datetime.now(timezone.utc).isoformat()
-                supabase_client.table("simulation_logs").update(
-                    {
-                        "status": "failed",
-                        "error_message": str(e),
-                        "completed_at": now_iso,
-                    }
-                ).eq("id", sim_id).execute()
-            except Exception as update_err:
-                logger.error(f"Failed to update simulation log on error: {update_err}")
-
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Backtest failed: {e}",
@@ -211,41 +197,21 @@ def run_backtest(
 
 @app.get("/api/v1/history", response_model=HistoryResponse)
 def get_user_history(
-    limit: int = 50,
+    limit: int = 10,
     offset: int = 0,
     user: User = Depends(auth_required),  # noqa: B008
 ):
-    """Get the simulation history for the current user."""
-    if not supabase_client:
-        return HistoryResponse(simulations=[], total=0)
-
+    """Get the summarized simulation history for the current user."""
     try:
-        user_id = user.user_id
-
-        # Fetch count
-        count_res = (
-            supabase_client.table("simulation_logs")
-            .select("id", count="exact")  # type: ignore[arg-type]
-            .eq("user_id", user_id)
-            .execute()
-        )
-        total = count_res.count if count_res.count else 0
-
-        # Fetch page
-        res = (
-            supabase_client.table("simulation_logs")
-            .select(
-                "id, strategy_name, symbols, timeframe, status, total_return_pct, "
-                "sharpe_ratio, max_drawdown_pct, win_rate_pct, total_trades, "
-                "created_at, completed_at",
-            )
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .range(offset, offset + limit - 1)
-            .execute()
+        user_id_str = str(user.user_id)
+        summaries, total = persistence_service.get_user_simulations(
+            user_id_str, limit, offset
         )
 
-        return HistoryResponse(simulations=res.data, total=total)  # type: ignore[arg-type]
+        return HistoryResponse(
+            simulations=[SimulationLogEntry(**s) for s in summaries],
+            total=total,
+        )
 
     except Exception as e:
         logger.error(f"Failed to fetch history: {e}")

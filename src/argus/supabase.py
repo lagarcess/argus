@@ -3,9 +3,9 @@ Shared Supabase client initialization for Argus.
 """
 
 from loguru import logger
-from supabase import Client, create_client
 
 from argus.config import get_settings
+from supabase import Client, create_client
 
 _settings = get_settings()
 SUPABASE_URL = _settings.SUPABASE_URL

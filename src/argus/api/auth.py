@@ -174,4 +174,3 @@ def auth_required(
         email=email,
         subscription_tier=subscription_tier,
     )
-
