@@ -10,7 +10,7 @@ import { fetchApi } from "@/lib/api";
 // FEEDBACK: Use React.useId() for unique gradient IDs and add accessibility roles/labels.
 const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: any[], benchmarkCurve: any[] }) => {
   const gradientId = useId();
-  
+
   if (!equityCurve || equityCurve.length === 0) {
     return (
       <div className="flex-1 w-full flex items-center justify-center text-[10px] uppercase tracking-widest text-on-surface-variant/50 border border-outline-variant/10 rounded-xl bg-surface-container-low/30">
@@ -57,9 +57,9 @@ const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: 
           <div className="absolute top-[75%] left-0 w-full border-b border-outline-variant/5"></div>
 
           {/* SVG Line Chart */}
-          <svg 
-            className="w-full h-full" 
-            viewBox="0 0 100 100" 
+          <svg
+            className="w-full h-full"
+            viewBox="0 0 100 100"
             preserveAspectRatio="none"
             role="img"
             aria-label="Portfolio Equity Curve vs Market Benchmark"
@@ -84,22 +84,22 @@ const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: 
 
             {/* Strategy Area & Line */}
             <path d={strategyAreaD} fill={`url(#${gradientId})`} />
-            <path 
-              d={strategyPathD} 
-              fill="none" 
-              stroke="#99f7ff" 
-              strokeWidth="2" 
-              strokeLinejoin="round" 
-              className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]" 
+            <path
+              d={strategyPathD}
+              fill="none"
+              stroke="#99f7ff"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]"
             />
 
             {/* Terminal Peak Dot */}
-            <circle 
-              cx="100" 
-              cy={strategyPointsList[strategyPointsList.length - 1].split(',')[1]} 
-              r="2" 
-              fill="#ffffff" 
-              className="drop-shadow-[0_0_8px_#ffffff] animate-pulse" 
+            <circle
+              cx="100"
+              cy={strategyPointsList[strategyPointsList.length - 1].split(',')[1]}
+              r="2"
+              fill="#ffffff"
+              className="drop-shadow-[0_0_8px_#ffffff] animate-pulse"
             />
           </svg>
 

@@ -70,7 +70,9 @@ class BacktestRequest(BaseModel):
     ema_period: Optional[int] = Field(default=None, ge=2, le=500)
 
     # Risk Metrics & Benchmarking
-    benchmark_symbol: Optional[str] = Field(default="SPY", description="e.g. SPY, BTC-USD")
+    benchmark_symbol: Optional[str] = Field(
+        default="SPY", description="e.g. SPY, BTC-USD"
+    )
 
     @field_validator("symbols")
     @classmethod

@@ -280,9 +280,13 @@ def get_simulation_detail(sim_id: str, user: User = Depends(auth_required)):  # 
         if not simulation:
             # Fallback for "latest"
             if sim_id == "latest":
-                summaries, _ = persistence_service.get_user_simulations(user_id_str, limit=1)
+                summaries, _ = persistence_service.get_user_simulations(
+                    user_id_str, limit=1
+                )
                 if summaries:
-                    simulation = persistence_service.get_simulation(str(summaries[0]["id"]), user_id_str)
+                    simulation = persistence_service.get_simulation(
+                        str(summaries[0]["id"]), user_id_str
+                    )
 
         if not simulation:
             raise HTTPException(

@@ -84,7 +84,9 @@ class PersistenceService:
             logger.error(f"Failed to save simulation: {e}")
             return None
 
-    def get_simulation(self, simulation_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    def get_simulation(
+        self, simulation_id: str, user_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Fetches a specific simulation result by ID."""
         if not self.client:
             return None

@@ -112,6 +112,7 @@ def get_settings() -> Settings:
     return Settings()
 
 
+@lru_cache()
 def get_stock_data_client() -> StockHistoricalDataClient:
     """
     Get an authenticated Alpaca StockHistoricalDataClient.
@@ -119,6 +120,7 @@ def get_stock_data_client() -> StockHistoricalDataClient:
     Returns:
         StockHistoricalDataClient: Authenticated client
     """
+    # PERFORMANCE: Cache the Alpaca client to avoid creating a new instance on every request
     settings = get_settings()
     return StockHistoricalDataClient(
         api_key=settings.ALPACA_API_KEY,
@@ -126,6 +128,7 @@ def get_stock_data_client() -> StockHistoricalDataClient:
     )
 
 
+@lru_cache()
 def get_crypto_data_client() -> CryptoHistoricalDataClient:
     """
     Get an authenticated Alpaca CryptoHistoricalDataClient.
@@ -133,6 +136,7 @@ def get_crypto_data_client() -> CryptoHistoricalDataClient:
     Returns:
         CryptoHistoricalDataClient: Authenticated client
     """
+    # PERFORMANCE: Cache the Alpaca client to avoid creating a new instance on every request
     settings = get_settings()
     return CryptoHistoricalDataClient(
         api_key=settings.ALPACA_API_KEY,
