@@ -99,11 +99,13 @@ class MetricsResult(BaseModel):
     avg_trade_duration: str
     avg_trade_duration_bars: int
 
+
 class BacktestResult(BaseModel):
     metrics: MetricsResult
     equity_curve: List[EquityCurvePoint]
     benchmark_equity_curve: Optional[List[EquityCurvePoint]] = None
     trades: List[TradeResult]
+
 
 # --- Argus Engine ---
 
@@ -481,7 +483,9 @@ class ArgusEngine:
                     ann_ret_strat = safe_metric("Ann. Return [%]") / 100.0
 
                     # Calculate benchmark annualized return dynamically
-                    days_diff = (aligned_returns.index.max() - aligned_returns.index.min()).days
+                    days_diff = (
+                        aligned_returns.index.max() - aligned_returns.index.min()
+                    ).days
                     if days_diff > 0:
                         bench_total_ret = (bench_daily.iloc[-1] / bench_daily.iloc[0]) - 1
                         ann_ret_bench = (1 + bench_total_ret) ** (365.25 / days_diff) - 1
@@ -576,7 +580,7 @@ class ArgusEngine:
             # We already have bench_daily from Alpha/Beta block if it reached there.
             # But let's be safe and re-extract or use the prices.
             # To match the strategy curve's timestamps/values:
-            bench_series = bench_daily if 'bench_daily' in locals() else bench_price
+            bench_series = bench_daily if "bench_daily" in locals() else bench_price
             benchmark_equity_curve = [
                 EquityCurvePoint(
                     timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),
@@ -589,5 +593,5 @@ class ArgusEngine:
             metrics=metrics_result,
             equity_curve=equity_curve,
             benchmark_equity_curve=benchmark_equity_curve,
-            trades=trades
+            trades=trades,
         )

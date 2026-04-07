@@ -212,7 +212,9 @@ class IndicatorAnalyzer:
 
     def __init__(self, df: pd.DataFrame):
         if "close" not in df.columns:
-            raise ValueError("DataFrame must contain a 'close' column for indicator analysis.")
+            raise ValueError(
+                "DataFrame must contain a 'close' column for indicator analysis."
+            )
         self.df = df
 
     def get_rsi(self, period: int) -> pd.Series:

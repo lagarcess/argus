@@ -4,13 +4,13 @@ import React, { Suspense, useEffect, useState, useId } from "react";
 import { useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopNav } from "@/components/TopNav";
-import { fetchApi } from "@/lib/api";
+import { fetchApi, SimulationData, Trade } from "@/lib/api";
 
 // PERFORMANCE: Wrap EquityCurve in React.memo to prevent expensive SVG re-renders during unrelated parent state updates
 // FEEDBACK: Use React.useId() for unique gradient IDs and add accessibility roles/labels.
-const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: any[], benchmarkCurve: any[] }) => {
+const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: {value: number}[], benchmarkCurve: {value: number}[] }) => {
   const gradientId = useId();
-  
+
   if (!equityCurve || equityCurve.length === 0) {
     return (
       <div className="flex-1 w-full flex items-center justify-center text-[10px] uppercase tracking-widest text-on-surface-variant/50 border border-outline-variant/10 rounded-xl bg-surface-container-low/30">
@@ -25,8 +25,8 @@ const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: 
   const max = Math.max(...allValues);
   const range = max - min || 1;
 
-  const getPoints = (curve: any[]) => {
-    return curve.map((p: any, i: number) => {
+  const getPoints = (curve: {value: number}[]) => {
+    return curve.map((p: {value: number}, i: number) => {
       const x = (i / (curve.length - 1)) * 100;
       const y = 100 - ((p.value - min) / range) * 80 - 10;
       return `${x},${y}`;
@@ -57,9 +57,9 @@ const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: 
           <div className="absolute top-[75%] left-0 w-full border-b border-outline-variant/5"></div>
 
           {/* SVG Line Chart */}
-          <svg 
-            className="w-full h-full" 
-            viewBox="0 0 100 100" 
+          <svg
+            className="w-full h-full"
+            viewBox="0 0 100 100"
             preserveAspectRatio="none"
             role="img"
             aria-label="Portfolio Equity Curve vs Market Benchmark"
@@ -84,22 +84,22 @@ const EquityCurve = React.memo(({ equityCurve, benchmarkCurve }: { equityCurve: 
 
             {/* Strategy Area & Line */}
             <path d={strategyAreaD} fill={`url(#${gradientId})`} />
-            <path 
-              d={strategyPathD} 
-              fill="none" 
-              stroke="#99f7ff" 
-              strokeWidth="2" 
-              strokeLinejoin="round" 
-              className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]" 
+            <path
+              d={strategyPathD}
+              fill="none"
+              stroke="#99f7ff"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              className="drop-shadow-[0_0_5px_rgba(153,247,255,0.8)]"
             />
 
             {/* Terminal Peak Dot */}
-            <circle 
-              cx="100" 
-              cy={strategyPointsList[strategyPointsList.length - 1].split(',')[1]} 
-              r="2" 
-              fill="#ffffff" 
-              className="drop-shadow-[0_0_8px_#ffffff] animate-pulse" 
+            <circle
+              cx="100"
+              cy={strategyPointsList[strategyPointsList.length - 1].split(',')[1]}
+              r="2"
+              fill="#ffffff"
+              className="drop-shadow-[0_0_8px_#ffffff] animate-pulse"
             />
           </svg>
 
@@ -134,7 +134,7 @@ EquityCurve.displayName = "EquityCurve";
 function ResultsContent() {
   const searchParams = useSearchParams();
   const simId = searchParams.get("id") || "latest";
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<SimulationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,10 +142,14 @@ function ResultsContent() {
     async function loadData() {
       try {
         setLoading(true);
-        const result = await fetchApi<any>(`/simulations/${simId}`);
+        const result = await fetchApi<SimulationData>(`/simulations/${simId}`);
         setData(result);
-      } catch (err: any) {
-        setError(err.message || "Failed to load simulation results");
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+            setError(err.message || "Failed to load simulation results");
+        } else {
+            setError("Failed to load simulation results");
+        }
       } finally {
         setLoading(false);
       }
@@ -318,7 +322,7 @@ function ResultsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/5">
-                    {(result.trades || []).slice(0, 20).map((trade: any, i: number) => (
+                    {(result.trades || []).slice(0, 20).map((trade: Trade, i: number) => (
                       <tr key={i} className="hover:bg-surface-container-highest/30">
                         <td className="px-4 py-3 text-xs text-on-surface-variant">{trade.entry_time?.split('T')[0]}</td>
                         <td className="px-4 py-3 text-xs font-bold text-on-surface">{trade.symbol}</td>

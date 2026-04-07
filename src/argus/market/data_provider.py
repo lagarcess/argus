@@ -344,9 +344,7 @@ def _fetch_bars_core(
             if page_token is not None:
                 crypto_kwargs["page_token"] = page_token
             if sort is not None:
-                crypto_kwargs["sort"] = (
-                    sort if isinstance(sort, Sort) else Sort(sort)
-                )
+                crypto_kwargs["sort"] = sort if isinstance(sort, Sort) else Sort(sort)
 
             crypto_req = CryptoBarsRequest(**crypto_kwargs)
             bars = crypto_client.get_crypto_bars(crypto_req)
@@ -457,9 +455,7 @@ def _fetch_bars_with_ttl(
     if is_in_cache:
         logger.debug(f"Cache HIT for {symbol} | Bin: {cache_bin}")
     else:
-        logger.info(
-            f"Cache MISS for {symbol} | Fetching from Alpaca | Bin: {cache_bin}"
-        )
+        logger.info(f"Cache MISS for {symbol} | Fetching from Alpaca | Bin: {cache_bin}")
 
     # 4. Execute (Joblib handles the actual caching logic)
     return _fetch_bars_cached(
