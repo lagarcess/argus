@@ -95,10 +95,6 @@ Run a single-symbol backtest synchronously.
 - `402` – Quota exhausted
 - `422` – Validation error
 
-```
-
-```
-
 ### Troubleshooting Guide
 
 ````markdown
