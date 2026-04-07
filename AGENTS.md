@@ -121,4 +121,5 @@ Usage:
 5. **<3 Second Backtest**: Single-symbol backtest must execute end-to-end in <3s.
 6. **No Backend Secrets in Frontend**: Root `.env` (backend), `web/.env.local` (frontend NEXT*PUBLIC*\* only).
 7. **Use `temp/`**: Never dump scratch files in project root.
-8. **Monorepo Coordination**: Backend + frontend must run together after `setup.sh` (deploy together, test together).9. **Critical Findings Only**: Agents journal only critical improvements (security bugs, >20% perf gain, new test coverage). No action? Write "no finding" and stop (no PR).
+8. **Monorepo Coordination**: Backend + frontend must run together after `setup.sh` (deploy together, test together).
+9. **Critical Findings Only**: Agents journal only critical improvements (security bugs, >20% perf gain, new test coverage). No action? Write "no finding" and stop (no PR).
