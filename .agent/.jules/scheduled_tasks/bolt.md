@@ -19,7 +19,7 @@
 **Backend Profiling:**
 
 ```bash
-cd d:\Users\garce\git-repos\argus
+cd /path/to/your/argus/repository
 poetry shell
 poetry run pytest tests/ -v --tb=short
 

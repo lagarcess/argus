@@ -201,7 +201,7 @@ SELECT monthly_reset_quotas();  -- Edge Function
 
 **Only log critical findings & proposals** (new table needed, RLS gap, missing index, constraint violation).
 
-Write to: `.agent/.julius/journal/architect.md`
+Write to: `.agent/.jules/journal/architect.md`
 
 **FEEDBACK LOOP (Critical): Before writing, check journal for:**
 

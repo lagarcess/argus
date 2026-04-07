@@ -32,7 +32,7 @@ poetry --version   # Should be ≥1.7.0
 
 ```bash
 # Navigate to project root
-cd d:\Users\garce\git-repos\argus
+cd /path/to/argus
 
 # Install Python dependencies via Poetry
 poetry install

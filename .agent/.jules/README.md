@@ -6,7 +6,7 @@ This directory contains reference documentation and journals for Jules (scheduli
 
 ## 📚 Structure
 
-### `.jules/scheduled_tasks/`
+### `.agent/.jules/scheduled_tasks/`
 
 Reference documents for each scheduled task agent. **For reference only** — these are read by Jules during task execution to understand its role, best practices, anti-patterns, and where to journal findings.
 
