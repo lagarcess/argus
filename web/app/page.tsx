@@ -85,7 +85,7 @@ export default function LandingPage() {
             </h1>
             <p className="mt-6 text-on-surface-variant max-w-lg text-sm md:text-base leading-relaxed">
               Argus provides high-performance pattern recognition and battle-tested simulation protocols.
-              Validate your strategies against real-world friction—slippage, fees, and latency—within the high-performance Argus environment.
+              Validate your strategies against real-world friction—slippage and fees—within the high-performance Argus environment.
             </p>
             <button
               onClick={() => router.push("/builder")}

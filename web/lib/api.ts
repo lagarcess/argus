@@ -90,6 +90,40 @@ export interface HistoryResponse {
   total: number;
 }
 
+export interface Trade {
+  entry_time: string;
+  symbol: string;
+  direction: string;
+  entry_price: number;
+  exit_price: number;
+  pnl_pct: number;
+}
+
+export interface BacktestMetrics {
+  total_return_pct: number;
+  sharpe_ratio: number;
+  alpha: number;
+  beta: number;
+  calmar_ratio: number;
+  max_drawdown_pct: number;
+  win_rate_pct: number;
+  avg_trade_duration: string;
+  total_trades: number;
+  sortino_ratio: number;
+}
+
+export interface BacktestResultData {
+  metrics: BacktestMetrics;
+  equity_curve: { value: number }[];
+  benchmark_equity_curve: { value: number }[];
+  trades: Trade[];
+}
+
+export interface SimulationData {
+  result: BacktestResultData;
+  strategies: { name: string };
+}
+
 export interface BacktestResponse {
   simulation_id: string | null;
   result: Record<string, unknown>; // Mapped from Python BacktestResult dict

@@ -368,6 +368,8 @@ class ArgusEngine:
             freq=freq,
         )
 
+        bench_daily = None
+
         # 4. Result Formatting
         # We pass silence_warnings=True to explicitly acknowledge the multiple columns aggregation and suppress the vectorbt UserWarning
         metrics = portfolio.stats(silence_warnings=True)
@@ -577,10 +579,7 @@ class ArgusEngine:
         # Benchmark Equity Curve
         benchmark_equity_curve = None
         if benchmark_data is not None and not benchmark_data.empty:
-            # We already have bench_daily from Alpha/Beta block if it reached there.
-            # But let's be safe and re-extract or use the prices.
-            # To match the strategy curve's timestamps/values:
-            bench_series = bench_daily if "bench_daily" in locals() else bench_price
+            bench_series = bench_daily if bench_daily is not None else benchmark_data["close"]
             benchmark_equity_curve = [
                 EquityCurvePoint(
                     timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),
