@@ -35,18 +35,11 @@ def create_strategy(
         response.headers["X-RateLimit-Remaining"] = "29"
 
         strategy_data = strategy.model_dump()
-        strategy_id = persistence_service.save_strategy(user_id_str, strategy_data)
+        db_strategy = persistence_service.save_strategy(user_id_str, strategy_data)
 
-        if not strategy_id:
-            raise HTTPException(
-                status_code=500, detail="Failed to create strategy in database."
-            )
-
-        # Refetch to return the full StrategyResponse
-        db_strategy = persistence_service.get_strategy(strategy_id, user_id_str)
         if not db_strategy:
             raise HTTPException(
-                status_code=500, detail="Failed to fetch created strategy."
+                status_code=500, detail="Failed to create strategy in database."
             )
 
         return db_strategy

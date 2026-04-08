@@ -31,34 +31,28 @@ class PersistenceService:
         user_id: str,
         strategy_data: Dict[str, Any],
         strategy_id: Optional[str] = None,
-    ) -> Optional[str]:
-        """Saves a strategy using the new schema and returns its UUID."""
+    ) -> Optional[Dict[str, Any]]:
+        """Saves a strategy using the new schema and returns the full record."""
         if not self.client:
             return None
 
         try:
             data: Dict[str, Any] = {
                 "user_id": user_id,
-                "name": cast(Dict[str, Any], strategy_data).get("name"),
-                "symbol": cast(Dict[str, Any], strategy_data).get("symbol"),
-                "timeframe": cast(Dict[str, Any], strategy_data).get("timeframe"),
+                "name": strategy_data.get("name"),
+                "symbol": strategy_data.get("symbol"),
+                "timeframe": strategy_data.get("timeframe"),
                 "start_date": strategy_data["start_date"].isoformat()
-                if cast(Dict[str, Any], strategy_data).get("start_date")
+                if strategy_data.get("start_date")
                 else None,
                 "end_date": strategy_data["end_date"].isoformat()
-                if cast(Dict[str, Any], strategy_data).get("end_date")
+                if strategy_data.get("end_date")
                 else None,
-                "entry_criteria": cast(Dict[str, Any], strategy_data).get(
-                    "entry_criteria", []
-                ),
-                "exit_criteria": cast(Dict[str, Any], strategy_data).get(
-                    "exit_criteria", {}
-                ),
-                "indicators_config": cast(Dict[str, Any], strategy_data).get(
-                    "indicators_config", {}
-                ),
-                "patterns": cast(Dict[str, Any], strategy_data).get("patterns", []),
-                "executed_at": cast(Dict[str, Any], strategy_data).get("executed_at"),
+                "entry_criteria": strategy_data.get("entry_criteria", []),
+                "exit_criteria": strategy_data.get("exit_criteria", {}),
+                "indicators_config": strategy_data.get("indicators_config", {}),
+                "patterns": strategy_data.get("patterns", []),
+                "executed_at": strategy_data.get("executed_at"),
             }
             if strategy_id:
                 data["id"] = strategy_id
@@ -69,7 +63,7 @@ class PersistenceService:
                 .execute()
             )
             if res.data:
-                return str(cast(Dict[str, Any], res.data[0])["id"])
+                return cast(Dict[str, Any], res.data[0])
             return None
         except Exception as e:
             logger.error(f"Failed to save strategy: {e}")
