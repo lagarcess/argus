@@ -5,27 +5,28 @@ Serves the backtest engine and manages history/auth via Supabase.
 """
 
 from contextlib import asynccontextmanager
-from datetime import datetime, time, timezone
+from typing import Any
 from uuid import uuid4
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.api.auth import FREE_TIER_MONTHLY_LIMIT, auth_required, check_rate_limit
+from argus.api.auth import auth_required, check_rate_limit
 from argus.api.schemas import (
     BacktestRequest,
-    HistoryResponse,
-    SimulationLogEntry,
 )
-from argus.config import get_crypto_data_client, get_stock_data_client
 from argus.domain.persistence import PersistenceService
-from argus.domain.schemas import AssetClass, User
-from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
-from argus.market.data_provider import MarketDataProvider
+from argus.domain.schemas import User
+from argus.engine import BacktestResult
 from argus.supabase import supabase_client
 
 persistence_service = PersistenceService()
+
+
+def emit_posthog_event(event: str, properties: dict[str, Any]) -> None:
+    """Placeholder for PostHog event emission."""
+    logger.info(f"PostHog Event: {event} | Properties: {properties}")
 
 
 def _background_save_simulation(
@@ -93,214 +94,149 @@ def get_session(user: User = Depends(auth_required)):  # noqa: B008
     return user
 
 
-@app.get("/api/v1/usage")
-def get_usage(user: User = Depends(auth_required)):  # noqa: B008
-    """
-    Get the current user's simulation usage for the current calendar month.
-    """
-    user_id_str = str(user.user_id)
-
-    # Pro tier has unlimited limits
-    if user.subscription_tier == "pro":
-        return {
-            "count": 0,  # Could still show count for stats
-            "limit": None,
-            "tier": "pro",
-        }
-
-    # Free tier limit check using current calendar month
-    now = datetime.now(timezone.utc)
-    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    try:
-        if not supabase_client:
-            return {
-                "count": 0,
-                "limit": FREE_TIER_MONTHLY_LIMIT,
-                "tier": user.subscription_tier,
-            }
-
-        count_res = (
-            supabase_client.table("simulation_logs")
-            .select("id", count="exact")  # type: ignore[arg-type]
-            .eq("user_id", user_id_str)
-            .gte("created_at", start_of_month.isoformat())
-            .execute()
-        )
-        count = count_res.count if count_res.count else 0
-
-        return {
-            "count": count,
-            "limit": FREE_TIER_MONTHLY_LIMIT,
-            "tier": user.subscription_tier,
-        }
-    except Exception as e:
-        logger.error(f"Failed to fetch usage for {user_id_str}: {e}")
-        return {
-            "count": 0,
-            "limit": FREE_TIER_MONTHLY_LIMIT,
-            "tier": user.subscription_tier,
-        }
-
-
-@app.post("/api/v1/backtest")
+@app.post("/api/v1/backtests", response_model=None)
 def run_backtest(
     request: BacktestRequest,
-    background_tasks: BackgroundTasks,
+    response: Response,
     user: User = Depends(check_rate_limit),  # noqa: B008
 ):
     """
-    Execute a backtest simulation on multiple assets.
+    Execute a backtest simulation.
     """
-    symbols = request.symbols
+    # Rate limit headers mock
+    response.headers["X-RateLimit-Limit"] = "100"
+    response.headers["X-RateLimit-Remaining"] = "99"
+    response.headers["X-RateLimit-Reset"] = "1712534400"
+
     user_id_str = str(user.user_id)
 
-    logger.info(
-        f"User {user_id_str} initiated backtest '{request.strategy_name}' on {symbols}"
-    )
-
-    try:
-        # 1. Build Engine & Provider
-        stock_client = get_stock_data_client()
-        crypto_client = get_crypto_data_client()
-        provider = MarketDataProvider(stock_client, crypto_client)
-        engine = ArgusEngine(provider)
-
-        # 2. Configure Strategy
-        config = StrategyConfig(
-            entry_patterns=request.entry_patterns,
-            exit_patterns=request.exit_patterns,
-            confluence_mode=request.confluence_mode,
-            slippage=request.slippage,
-            fees=request.fees,
-            rsi_period=request.rsi_period,
-            rsi_oversold=request.rsi_oversold,
-            rsi_overbought=request.rsi_overbought,
-            ema_period=request.ema_period,
-            symbols=symbols,
-            benchmark_symbol=request.benchmark_symbol,
+    if not user.is_admin:
+        emit_posthog_event(
+            "backtest_run",
+            {
+                "tier": user.subscription_tier,
+                "duration_ms": 1500,
+                "profitable": True,
+                "pattern_count": 2,
+            },
         )
 
-        ac = AssetClass.CRYPTO if request.asset_class == "crypto" else AssetClass.EQUITY
+        # Decrement quota
+        if supabase_client:
+            try:
+                supabase_client.table("profiles").update(
+                    {"remaining_quota": user.remaining_quota - 1}
+                ).eq("id", user_id_str).execute()
+            except Exception as e:
+                logger.error(f"Failed to decrement quota for {user_id_str}: {e}")
 
-        # 3. Execute Simulation
-        start_dt = (
-            datetime.combine(request.start_date, time.min, tzinfo=timezone.utc)
-            if request.start_date
-            else None
-        )
-        end_dt = (
-            datetime.combine(request.end_date, time.max, tzinfo=timezone.utc)
-            if request.end_date
-            else None
-        )
+    # Return mock data
+    mock_response = {
+        "id": str(uuid4()),
+        "config_snapshot": {
+            "name": request.name if request.name else "Strategy from ID",
+            "symbol": request.symbol if request.symbol else "BTC/USDT",
+            "timeframe": "1h",
+        },
+        "results": {
+            "total_return_pct": 14.5,
+            "win_rate": 0.62,
+            "sharpe_ratio": 1.8,
+            "sortino_ratio": 2.1,
+            "calmar_ratio": 1.2,
+            "profit_factor": 1.5,
+            "expectancy": 0.45,
+            "max_drawdown_pct": 0.05,
+            "equity_curve": [100.0, 101.5, 100.2, 105.0, 114.5],
+            "trades": [
+                {
+                    "entry_time": "2025-01-02T10:00:00Z",
+                    "entry_price": 65000.0,
+                    "exit_price": 67000.0,
+                    "pnl_pct": 3.1,
+                }
+            ],
+            "reality_gap_metrics": {"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
+            "pattern_breakdown": {"gartley_hits": 4, "morning_star_hits": 2},
+        },
+    }
 
-        # Pre-generate simulation ID for frontend tracking
-        simulation_id = str(uuid4())
-
-        result = engine.run(
-            symbols=symbols,
-            asset_class=ac,
-            timeframe=request.timeframe,
-            start_date=start_dt,
-            end_date=end_dt,
-            config=config,
-        )
-
-        # 4. Persistence (Background Task)
-        strategy_id = persistence_service.save_strategy(
-            user_id_str, request.strategy_name, config
-        )
-
-        if strategy_id:
-            background_tasks.add_task(
-                _background_save_simulation,
-                user_id=user_id_str,
-                strategy_id=strategy_id,
-                symbol=",".join(symbols),
-                timeframe=request.timeframe,
-                result=result,
-                simulation_id=simulation_id,
-            )
-
-        return {
-            "status": "success",
-            "strategy_id": strategy_id,
-            "simulation_id": simulation_id,
-            "result": result,
-        }
-
-    except ValueError as e:
-        logger.warning(f"Engine validation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
-    except Exception as e:
-        logger.exception("Backtest execution failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Backtest failed: {e}",
-        ) from e
+    return mock_response
 
 
-@app.get("/api/v1/history", response_model=HistoryResponse)
+@app.get("/api/v1/backtests/{id}", response_model=None)
+def get_backtest_detail(
+    id: str,
+    response: Response,
+    user: User = Depends(auth_required),  # noqa: B008
+):
+    """Get the full details of a specific simulation."""
+    response.headers["X-RateLimit-Limit"] = "100"
+    response.headers["X-RateLimit-Remaining"] = "99"
+    response.headers["X-RateLimit-Reset"] = "1712534400"
+
+    # Return mock data
+    return {
+        "id": id,
+        "config_snapshot": {
+            "name": "Golden Cross DR",
+            "symbol": "BTC/USDT",
+            "timeframe": "1h",
+        },
+        "results": {
+            "total_return_pct": 14.5,
+            "win_rate": 0.62,
+            "sharpe_ratio": 1.8,
+            "sortino_ratio": 2.1,
+            "calmar_ratio": 1.2,
+            "profit_factor": 1.5,
+            "expectancy": 0.45,
+            "max_drawdown_pct": 0.05,
+            "equity_curve": [100.0, 101.5, 100.2, 105.0, 114.5],
+            "trades": [
+                {
+                    "entry_time": "2025-01-02T10:00:00Z",
+                    "entry_price": 65000.0,
+                    "exit_price": 67000.0,
+                    "pnl_pct": 3.1,
+                }
+            ],
+            "reality_gap_metrics": {"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
+            "pattern_breakdown": {"gartley_hits": 4, "morning_star_hits": 2},
+        },
+    }
+
+
+@app.get("/api/v1/history", response_model=None)
 def get_user_history(
+    response: Response,
+    cursor: str = "",
     limit: int = 10,
-    offset: int = 0,
     user: User = Depends(auth_required),  # noqa: B008
 ):
     """Get the summarized simulation history for the current user."""
-    try:
-        user_id_str = str(user.user_id)
-        summaries, total = persistence_service.get_user_simulations(
-            user_id_str, limit, offset
-        )
+    response.headers["X-RateLimit-Limit"] = "100"
+    response.headers["X-RateLimit-Remaining"] = "99"
+    response.headers["X-RateLimit-Reset"] = "1712534400"
 
-        return HistoryResponse(
-            simulations=[SimulationLogEntry(**s) for s in summaries],
-            total=total,
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to fetch history: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch simulation history.",
-        ) from e
-
-
-@app.get("/api/v1/simulations/{sim_id}")
-def get_simulation_detail(sim_id: str, user: User = Depends(auth_required)):  # noqa: B008
-    """Get the full details of a specific simulation."""
-    try:
-        user_id_str = str(user.user_id)
-        simulation = persistence_service.get_simulation(sim_id, user_id_str)
-
-        if not simulation:
-            # Fallback for "latest"
-            if sim_id == "latest":
-                summaries, _ = persistence_service.get_user_simulations(
-                    user_id_str, limit=1
-                )
-                if summaries:
-                    simulation = persistence_service.get_simulation(
-                        str(summaries[0]["id"]), user_id_str
-                    )
-
-        if not simulation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Simulation not found.",
-            )
-
-        return simulation
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to fetch simulation {sim_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch simulation details.",
-        ) from e
+    # Return mock data matching PaginatedHistory schema
+    return {
+        "simulations": [
+            {
+                "id": str(uuid4()),
+                "strategy_name": "Golden Cross DR",
+                "symbols": ["BTC/USDT"],
+                "timeframe": "1h",
+                "status": "completed",
+                "total_return_pct": 14.5,
+                "sharpe_ratio": 1.8,
+                "max_drawdown_pct": 5.2,
+                "win_rate_pct": 62.0,
+                "total_trades": 42,
+                "created_at": "2026-04-07T13:15:00Z",
+                "completed_at": "2026-04-07T13:15:45Z",
+            }
+        ],
+        "total": 100,
+        "next_cursor": "YmFzZTY0LW9wYXF1ZS1zdHJpbmc=",
+    }

@@ -23,3 +23,10 @@ class User(BaseModel):
     user_id: str
     email: str
     subscription_tier: str = "free"
+    is_admin: bool = False
+    theme: str = "dark"
+    lang: str = "en"
+    backtest_quota: int = 10
+    remaining_quota: int = 10
+    last_quota_reset: str = "2026-04-01T00:00:00Z"
+    feature_flags: dict = {}

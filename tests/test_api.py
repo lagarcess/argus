@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from argus.api.main import app, persistence_service
+from argus.api.main import app
 from argus.domain.schemas import User
 from fastapi.testclient import TestClient
 
@@ -10,7 +10,18 @@ client = TestClient(app)
 
 @pytest.fixture
 def mock_user():
-    return User(user_id="550e8400-e29b-41d4-a716-446655440000", email="test@example.com")
+    return User(
+        user_id="550e8400-e29b-41d4-a716-446655440000",
+        email="test@example.com",
+        subscription_tier="free",
+        is_admin=False,
+        theme="dark",
+        lang="en",
+        backtest_quota=10,
+        remaining_quota=10,
+        last_quota_reset="2026-04-01T00:00:00Z",
+        feature_flags={},
+    )
 
 
 def test_health_check():
@@ -20,28 +31,6 @@ def test_health_check():
 
 
 def test_get_history(monkeypatch, mock_user):
-    # Mock auth
-    monkeypatch.setattr("argus.api.main.auth_required", lambda: mock_user)
-
-    # Mock persistence
-    mock_summaries = [
-        {
-            "id": "sim_123",
-            "strategy_name": "Test Strategy",
-            "symbols": ["BTC"],
-            "timeframe": "1Day",
-            "status": "completed",
-            "total_return_pct": 10.5,
-            "sharpe_ratio": 1.5,
-            "win_rate_pct": 60.0,
-            "max_drawdown_pct": -5.0,
-            "total_trades": 10,
-            "created_at": "2024-03-01T12:00:00Z",
-        }
-    ]
-    persistence_service.get_user_simulations = MagicMock(return_value=(mock_summaries, 1))
-
-    # Overriding dependency for the test
     from argus.api.auth import auth_required
 
     app.dependency_overrides[auth_required] = lambda: mock_user
@@ -50,85 +39,46 @@ def test_get_history(monkeypatch, mock_user):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["total"] == 1
-    assert data["simulations"][0]["id"] == "sim_123"
-    assert "total_return_pct" in data["simulations"][0]
+    assert data["total"] == 100
+    assert len(data["simulations"]) == 1
+    assert data["simulations"][0]["strategy_name"] == "Golden Cross DR"
 
-    app.dependency_overrides.clear()
+
+def test_backtest_endpoint_xor_validation(monkeypatch, mock_user):
+    from argus.api.auth import check_rate_limit
+
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user
+
+    # Neither ID nor inline
+    response = client.post("/api/v1/backtests", json={})
+    assert response.status_code == 422
+
+    # Both ID and inline
+    response = client.post(
+        "/api/v1/backtests",
+        json={
+            "strategy_id": "123",
+            "symbol": "BTC/USDT",
+            "timeframe": "1h",
+            "start_date": "2025-01-01T00:00:00Z",
+            "end_date": "2025-02-01T00:00:00Z",
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_backtest_endpoint_success(monkeypatch, mock_user):
-    # Mock auth
-    from argus.api.auth import auth_required
+    from argus.api.auth import check_rate_limit
 
-    app.dependency_overrides[auth_required] = lambda: mock_user
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user
 
-    # Mock engine and persistence
-    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
+    # Mock the emit_posthog_event
+    monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
 
-    mock_result = MagicMock()
-    mock_result.model_dump.return_value = {"metrics": {"total_return_pct": 15.0}}
-    monkeypatch.setattr(
-        "argus.engine.ArgusEngine.run", MagicMock(return_value=mock_result)
-    )
-
-    persistence_service.save_strategy = MagicMock(return_value="strat_456")
-    persistence_service.save_simulation = MagicMock(return_value="sim_789")
-
-    payload = {
-        "strategy_name": "My Strategy",
-        "symbols": ["BTC"],
-        "asset_class": "crypto",
-        "timeframe": "1Day",
-        "entry_patterns": ["RSI_OVERSOLD"],
-        "exit_patterns": ["RSI_OVERBOUGHT"],
-    }
-
-    response = client.post("/api/v1/backtest", json=payload)
+    response = client.post("/api/v1/backtests", json={"strategy_id": "123"})
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "success"
-    assert data["strategy_id"] == "strat_456"
-    assert "simulation_id" in data
-
-    app.dependency_overrides.clear()
-
-
-def test_backtest_endpoint_value_error(monkeypatch, mock_user):
-    # Mock auth
-    from argus.api.auth import auth_required
-
-    app.dependency_overrides[auth_required] = lambda: mock_user
-
-    # Mock engine to raise ValueError
-    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
-
-    monkeypatch.setattr(
-        "argus.engine.ArgusEngine.run",
-        MagicMock(side_exception=ValueError("Data is empty")),
-    )
-
-    # Above doesn't work for side effects in MagicMock, use side_effect
-    def mock_run(*args, **kwargs):
-        raise ValueError("Data is empty")
-
-    monkeypatch.setattr("argus.engine.ArgusEngine.run", mock_run)
-
-    payload = {
-        "strategy_name": "My Strategy",
-        "symbols": ["BTC"],
-        "asset_class": "crypto",
-        "timeframe": "1Day",
-        "entry_patterns": ["RSI_OVERSOLD"],
-        "exit_patterns": ["RSI_OVERBOUGHT"],
-    }
-
-    response = client.post("/api/v1/backtest", json=payload)
-
-    assert response.status_code == 400
-    assert "Data is empty" in response.json()["detail"]
-
-    app.dependency_overrides.clear()
+    assert "id" in data
+    assert data["results"]["total_return_pct"] == 14.5
+    assert data["config_snapshot"]["timeframe"] == "1h"

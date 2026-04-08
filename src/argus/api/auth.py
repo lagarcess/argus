@@ -6,7 +6,6 @@ when SUPABASE_JWT_SECRET is not set (local development only).
 """
 
 import time
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import jwt
@@ -40,8 +39,8 @@ class UserCache:
         """Get cached subscription tier if not expired."""
         if user_id in self.cache:
             entry = self.cache[user_id]
-            if time.time() - entry["timestamp"] < self.ttl:
-                return entry["tier"]
+            if time.time() - float(entry["timestamp"]) < self.ttl:
+                return str(entry["tier"])
             del self.cache[user_id]
         return None
 
@@ -141,42 +140,51 @@ def auth_required(
             detail="Invalid token payload: missing sub",
         )
 
-    # 1. Check cache first
-    cached_tier = _user_cache.get(user_id)
-    if cached_tier:
-        return User(
-            user_id=user_id,
-            email=email,
-            subscription_tier=cached_tier,
-        )
+    # Since we need full profile data (is_admin, quota, flags) we will bypass the simple tier cache for now
+    # or fetch the full object.
 
-    # 2. Fetch from DB if not in cache
-    subscription_tier = "free"
+    # 1. Default fallback profile
+    profile_data: Dict[str, Any] = {
+        "subscription_tier": "free",
+        "is_admin": False,
+        "theme": "dark",
+        "lang": "en",
+        "backtest_quota": 10,
+        "remaining_quota": 10,
+        "last_quota_reset": "2026-04-01T00:00:00Z",
+        "feature_flags": {},
+    }
+
+    # 2. Fetch full profile from DB
     if supabase_client:
         try:
             res = (
                 supabase_client.table("profiles")
-                .select("subscription_tier")
+                .select("*")
                 .eq("id", user_id)
                 .single()
                 .execute()
             )
             if res.data and isinstance(res.data, dict):
-                val = res.data.get("subscription_tier")
-                subscription_tier = str(val) if val is not None else "free"
+                profile_data.update({k: v for k, v in res.data.items() if v is not None})
         except Exception as e:
-            # If profile not found or other db error, default to free
             logger.info(
-                f"Failed to fetch profile for user {user_id}, defaulting to free tier: {e}"
+                f"Failed to fetch full profile for user {user_id}, using defaults: {e}"
             )
-
-    # 3. Cache result
-    _user_cache.set(user_id, subscription_tier)
 
     return User(
         user_id=user_id,
         email=email,
-        subscription_tier=subscription_tier,
+        subscription_tier=str(profile_data["subscription_tier"]),
+        is_admin=bool(profile_data["is_admin"]),
+        theme=str(profile_data["theme"]),
+        lang=str(profile_data["lang"]),
+        backtest_quota=int(profile_data["backtest_quota"]),
+        remaining_quota=int(profile_data["remaining_quota"]),
+        last_quota_reset=str(profile_data["last_quota_reset"]),
+        feature_flags=dict(profile_data["feature_flags"])
+        if isinstance(profile_data["feature_flags"], dict)
+        else {},
     )
 
 
@@ -184,57 +192,21 @@ def check_rate_limit(
     user: User = Depends(auth_required),  # noqa: B008
 ) -> User:
     """
-    FastAPI dependency: checks if user has exceeded their monthly usage limit.
-    Free tier allows FREE_TIER_MONTHLY_LIMIT simulations per calendar month.
+    FastAPI dependency: checks if user has exceeded their quota.
     """
-    user_id = str(user.user_id)
-
-    # In dev mode with synthetic user, bypass rate limit
-    if _DEV_MODE and user_id == "dev-anon-user":
+    if user.is_admin:
         return user
 
-    # Pro tier is unlimited
-    if user.subscription_tier == "pro":
-        return user
-
-    if not supabase_client:
-        logger.warning("Supabase client not configured. Skipping rate limit check.")
-        return user
-
-    try:
-        # Free tier limit check using current calendar month
-        now = datetime.now(timezone.utc)
-        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-        # Count simulations for current month using Service Role client (bypasses RLS)
-        count_res = (
-            supabase_client.table("simulation_logs")
-            .select("id", count="exact")  # type: ignore[arg-type]
-            .eq("user_id", user_id)
-            .gte("created_at", start_of_month.isoformat())
-            .execute()
+    if user.remaining_quota <= 0:
+        logger.info(f"User {user.user_id} reached quota limit.")
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "Quota exceeded",
+                "message": "You have exhausted your backtest quota.",
+                "upgrade_url": "/settings",
+            },
         )
 
-        count = count_res.count if count_res.count else 0
-
-        if count >= FREE_TIER_MONTHLY_LIMIT:
-            logger.info(
-                f"User {user_id} reached monthly limit: {count}/{FREE_TIER_MONTHLY_LIMIT}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "error": "Monthly limit reached",
-                    "message": f"Free tier is limited to {FREE_TIER_MONTHLY_LIMIT} simulations per month.",
-                    "upgrade_url": "/settings",
-                },
-            )
-
-        return user
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error checking rate limits for {user_id}: {e}")
-        # Fail open for UX if DB fails but auth succeeded
-        return user
+    # We will simulate rate limits with headers in the endpoint responses directly
+    return user
