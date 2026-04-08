@@ -44,6 +44,13 @@ jobs:
   frontend-lint:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false || github.event_name == 'push'
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_MOCK_API: ${{ vars.NEXT_PUBLIC_MOCK_API || 'false' }}
+      NEXT_PUBLIC_FEATURE_MULTI_ASSET: ${{ vars.NEXT_PUBLIC_FEATURE_MULTI_ASSET || 'false' }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -100,6 +107,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false || github.event_name == 'push'
     continue-on-error: true
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_MOCK_API: ${{ vars.NEXT_PUBLIC_MOCK_API || 'false' }}
+      NEXT_PUBLIC_FEATURE_MULTI_ASSET: ${{ vars.NEXT_PUBLIC_FEATURE_MULTI_ASSET || 'false' }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
