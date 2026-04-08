@@ -137,3 +137,23 @@ class SimulationLogEntry(BaseModel):
 class HistoryResponse(BaseModel):
     simulations: List[SimulationLogEntry]
     total: int
+
+
+class ProfileUpdate(BaseModel):
+    """Schema for updating user profile preferences."""
+
+    theme: Optional[str] = None
+    lang: Optional[str] = None
+
+
+class SSORequest(BaseModel):
+    """Schema for SSO sign-in request."""
+
+    provider: str
+    redirect_to: str
+
+
+class SSOResponse(BaseModel):
+    """Schema for SSO sign-in response."""
+
+    auth_url: str

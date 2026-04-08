@@ -8,19 +8,30 @@ from contextlib import asynccontextmanager
 from datetime import datetime, time, timezone
 from uuid import uuid4
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.api.auth import FREE_TIER_MONTHLY_LIMIT, auth_required, check_rate_limit
+from argus.api.auth import auth_required, check_rate_limit
 from argus.api.schemas import (
     BacktestRequest,
     HistoryResponse,
+    ProfileUpdate,
     SimulationLogEntry,
+    SSORequest,
+    SSOResponse,
 )
 from argus.config import get_crypto_data_client, get_stock_data_client
 from argus.domain.persistence import PersistenceService
-from argus.domain.schemas import AssetClass, User
+from argus.domain.schemas import AssetClass, UserResponse
 from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
 from argus.supabase import supabase_client
@@ -87,73 +98,128 @@ def health_check():
     return {"status": "healthy", "version": "1.0.0"}
 
 
-@app.get("/api/v1/auth/session", response_model=User)
-def get_session(user: User = Depends(auth_required)):  # noqa: B008
+@app.get("/api/v1/auth/session", response_model=UserResponse)
+def get_session(user: UserResponse = Depends(auth_required)):  # noqa: B008
     """Return the current authenticated user session."""
     return user
 
 
-@app.get("/api/v1/usage")
-def get_usage(user: User = Depends(auth_required)):  # noqa: B008
-    """
-    Get the current user's simulation usage for the current calendar month.
-    """
-    user_id_str = str(user.user_id)
-
-    # Pro tier has unlimited limits
-    if user.subscription_tier == "pro":
-        return {
-            "count": 0,  # Could still show count for stats
-            "limit": None,
-            "tier": "pro",
-        }
-
-    # Free tier limit check using current calendar month
-    now = datetime.now(timezone.utc)
-    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+@app.post("/api/v1/auth/sso", response_model=SSOResponse)
+def sso_login(request: SSORequest):
+    """Initiate an SSO login flow."""
+    if not supabase_client:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Supabase client not configured.",
+        )
 
     try:
-        if not supabase_client:
-            return {
-                "count": 0,
-                "limit": FREE_TIER_MONTHLY_LIMIT,
-                "tier": user.subscription_tier,
+        # Currently supabase-py v2+ auth.sign_in_with_oauth takes provider and options
+        res = supabase_client.auth.sign_in_with_oauth(
+            {
+                "provider": request.provider,  # type: ignore
+                "options": {"redirect_to": request.redirect_to},
             }
+        )
+        return SSOResponse(auth_url=res.url)
+    except Exception as e:
+        logger.error(f"SSO login failed: {e}")
+        # Note: If there's an identity linking issue, supabase usually handles it,
+        # but if we get an exception we return it.
+        if "conflict" in str(e).lower() or "already linked" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=str(e)
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initiate SSO: {str(e)}",
+        ) from e
 
-        count_res = (
-            supabase_client.table("simulation_logs")
-            .select("id", count="exact")  # type: ignore[arg-type]
-            .eq("user_id", user_id_str)
-            .gte("created_at", start_of_month.isoformat())
+
+@app.patch("/api/v1/auth/profile", response_model=UserResponse)
+def update_profile(
+    updates: ProfileUpdate,
+    user: UserResponse = Depends(auth_required),  # noqa: B008
+):
+    """Update current user's profile preferences."""
+    if not supabase_client:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Supabase client not configured.",
+        )
+
+    update_dict = {}
+    if updates.theme is not None:
+        update_dict["theme"] = updates.theme
+    if updates.lang is not None:
+        update_dict["lang"] = updates.lang
+
+    if not update_dict:
+        return user  # No changes
+
+    try:
+        res = (
+            supabase_client.table("profiles")
+            .update(update_dict)
+            .eq("id", user.id)
             .execute()
         )
-        count = count_res.count if count_res.count else 0
-
-        return {
-            "count": count,
-            "limit": FREE_TIER_MONTHLY_LIMIT,
-            "tier": user.subscription_tier,
-        }
+        if res.data and len(res.data) > 0:
+            updated_data = res.data[0]
+            user.theme = str(updated_data.get("theme", user.theme))
+            user.lang = str(updated_data.get("lang", user.lang))
+            return user
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found."
+            )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Failed to fetch usage for {user_id_str}: {e}")
-        return {
-            "count": 0,
-            "limit": FREE_TIER_MONTHLY_LIMIT,
-            "tier": user.subscription_tier,
-        }
+        logger.error(f"Profile update failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Update failed: {e}",
+        ) from e
+
+
+@app.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response, request: Request):
+    """Clear auth cookies and revoke session."""
+
+    # Check if there is an active session cookie to revoke
+    token = request.cookies.get("sb-access-token")
+    if token and supabase_client:
+        try:
+            # Set the session on the client so we can sign out
+            supabase_client.auth.set_session(access_token=token, refresh_token="")
+            supabase_client.auth.sign_out()
+        except Exception as e:
+            logger.warning(f"Failed to sign out from Supabase: {e}")
+
+    # Clear the cookie
+    response.delete_cookie(
+        key="sb-access-token", path="/", secure=True, httponly=True, samesite="strict"
+    )
+    # Also delete the refresh token if it exists (assuming named sb-refresh-token)
+    response.delete_cookie(
+        key="sb-refresh-token", path="/", secure=True, httponly=True, samesite="strict"
+    )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/api/v1/backtest")
 def run_backtest(
     request: BacktestRequest,
     background_tasks: BackgroundTasks,
-    user: User = Depends(check_rate_limit),  # noqa: B008
+    user: UserResponse = Depends(check_rate_limit),  # noqa: B008
 ):
     """
     Execute a backtest simulation on multiple assets.
     """
     symbols = request.symbols
-    user_id_str = str(user.user_id)
+    user_id_str = str(user.id)
 
     logger.info(
         f"User {user_id_str} initiated backtest '{request.strategy_name}' on {symbols}"
@@ -248,11 +314,11 @@ def run_backtest(
 def get_user_history(
     limit: int = 10,
     offset: int = 0,
-    user: User = Depends(auth_required),  # noqa: B008
+    user: UserResponse = Depends(auth_required),  # noqa: B008
 ):
     """Get the summarized simulation history for the current user."""
     try:
-        user_id_str = str(user.user_id)
+        user_id_str = str(user.id)
         summaries, total = persistence_service.get_user_simulations(
             user_id_str, limit, offset
         )
@@ -271,10 +337,10 @@ def get_user_history(
 
 
 @app.get("/api/v1/simulations/{sim_id}")
-def get_simulation_detail(sim_id: str, user: User = Depends(auth_required)):  # noqa: B008
+def get_simulation_detail(sim_id: str, user: UserResponse = Depends(auth_required)):  # noqa: B008
     """Get the full details of a specific simulation."""
     try:
-        user_id_str = str(user.user_id)
+        user_id_str = str(user.id)
         simulation = persistence_service.get_simulation(sim_id, user_id_str)
 
         if not simulation:
