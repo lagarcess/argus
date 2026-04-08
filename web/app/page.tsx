@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GoogleIcon, AppleIcon, FacebookIcon } from "@/components/Icons";
+import { GoogleIcon, DiscordIcon } from "@/components/Icons";
 import { TopNav } from "@/components/TopNav";
 import { Eye, EyeOff, Zap, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -59,7 +59,7 @@ export default function LandingPage() {
     }
   };
 
-  const handleSocialAuth = async (provider: 'google' | 'apple' | 'facebook') => {
+  const handleSocialAuth = async (provider: 'google' | 'discord') => {
     setError(null);
     try {
       const { error: socialError } = await supabase.auth.signInWithOAuth({
@@ -210,7 +210,7 @@ export default function LandingPage() {
               <div className="flex-1 h-px bg-outline-variant/20"></div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => handleSocialAuth('google')}
                 className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-white hover:border-white group rounded-xl transition-all flex items-center justify-center"
@@ -218,16 +218,10 @@ export default function LandingPage() {
                 <GoogleIcon className="w-5 h-5 flex-shrink-0" />
               </button>
               <button
-                onClick={() => handleSocialAuth('apple')}
-                className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-neutral-800 hover:text-white rounded-xl transition-all flex items-center justify-center group"
+                onClick={() => handleSocialAuth('discord')}
+                className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-[#5865F2] hover:border-[#5865F2] hover:text-white rounded-xl transition-all flex items-center justify-center group"
               >
-                <AppleIcon className="w-5 h-5 text-on-surface group-hover:text-white" />
-              </button>
-              <button
-                onClick={() => handleSocialAuth('facebook')}
-                className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-[#1877F2] hover:border-[#1877F2] hover:text-white rounded-xl transition-all flex items-center justify-center group"
-              >
-                <FacebookIcon className="w-5 h-5 text-[#1877F2] group-hover:text-white" />
+                <DiscordIcon className="w-5 h-5 text-[#5865F2] group-hover:text-white" />
               </button>
             </div>
 

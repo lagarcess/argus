@@ -17,7 +17,7 @@ class AuthRequest(BaseModel):
     mode: Literal["login", "signup"] = Field(
         default="login", description="login or signup"
     )
-    provider: Optional[Literal["email", "google", "apple", "facebook"]] = Field(
+    provider: Optional[Literal["email", "google", "discord"]] = Field(
         default="email"
     )
     email: Optional[str] = None
@@ -105,7 +105,7 @@ class ProfileUpdate(BaseModel):
 class SSORequest(BaseModel):
     """Schema for SSO sign-in request."""
 
-    provider: str
+    provider: Literal["google", "discord"]
     redirect_to: str
 
 
