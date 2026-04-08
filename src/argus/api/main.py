@@ -15,6 +15,8 @@ from loguru import logger
 from argus.api.auth import auth_required, check_rate_limit
 from argus.api.schemas import (
     BacktestRequest,
+    BacktestResponse,
+    PaginatedHistory,
 )
 from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import User
@@ -94,7 +96,7 @@ def get_session(user: User = Depends(auth_required)):  # noqa: B008
     return user
 
 
-@app.post("/api/v1/backtests", response_model=None)
+@app.post("/api/v1/backtests", response_model=BacktestResponse)
 def run_backtest(
     request: BacktestRequest,
     response: Response,
@@ -164,7 +166,7 @@ def run_backtest(
     return mock_response
 
 
-@app.get("/api/v1/backtests/{id}", response_model=None)
+@app.get("/api/v1/backtests/{id}", response_model=BacktestResponse)
 def get_backtest_detail(
     id: str,
     response: Response,
@@ -207,7 +209,7 @@ def get_backtest_detail(
     }
 
 
-@app.get("/api/v1/history", response_model=None)
+@app.get("/api/v1/history", response_model=PaginatedHistory)
 def get_user_history(
     response: Response,
     cursor: str = "",
