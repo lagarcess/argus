@@ -1,15 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Using the provided environment variable names directly.
-// These are shimmed in next.config.ts for browser accessibility.
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+// Use actual env vars if available, or placeholders during build time
+// At runtime, Next.js will have these available from .env.local
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error(
-    'Supabase environment variables are missing. ' +
-    'Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in your web/.env file and restart the server.'
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  console.warn(
+    'Supabase environment variables are not set. ' +
+    'Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your web/.env.local file.'
   )
 }
 
-export const supabase = createClient(supabaseUrl!, supabaseAnonKey!)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)

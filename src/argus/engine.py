@@ -579,7 +579,9 @@ class ArgusEngine:
         # Benchmark Equity Curve
         benchmark_equity_curve = None
         if benchmark_data is not None and not benchmark_data.empty:
-            bench_series = bench_daily if bench_daily is not None else benchmark_data["close"]
+            bench_series = (
+                bench_daily if bench_daily is not None else benchmark_data["close"]
+            )
             benchmark_equity_curve = [
                 EquityCurvePoint(
                     timestamp=idx.isoformat() if hasattr(idx, "isoformat") else str(idx),

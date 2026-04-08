@@ -15,7 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
+  # Backend: Lint & Build
+  backend-lint:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false || github.event_name == 'push'
     steps:
@@ -26,19 +27,115 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: 'pip'
+          cache: "pip"
 
       - name: Install Poetry
         run: pip install poetry
 
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: |
+          poetry install --no-interaction
+          poetry sync
 
-      - name: Lint
+      - name: Lint backend
         run: poetry run ruff check .
 
-      - name: Test
+  # Frontend: Lint & Build
+  frontend-lint:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_MOCK_API: ${{ vars.NEXT_PUBLIC_MOCK_API || 'false' }}
+      NEXT_PUBLIC_FEATURE_MULTI_ASSET: ${{ vars.NEXT_PUBLIC_FEATURE_MULTI_ASSET || 'false' }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies
+        run: |
+          cd web
+          bun install
+
+      - name: Lint frontend
+        run: |
+          cd web
+          bun run lint
+
+      - name: Build frontend
+        run: |
+          cd web
+          bun run build
+
+  # Backend: Tests (optional until tests exist)
+  backend-test:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction
+          poetry sync
+
+      - name: Run backend tests
         run: |
           PYTHONPATH=src poetry run pytest tests/ \
           --cov=src/argus \
           --cov-report=term-missing
+
+  # Frontend: Tests (optional until tests exist)
+  frontend-test:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    continue-on-error: true
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_MOCK_API: ${{ vars.NEXT_PUBLIC_MOCK_API || 'false' }}
+      NEXT_PUBLIC_FEATURE_MULTI_ASSET: ${{ vars.NEXT_PUBLIC_FEATURE_MULTI_ASSET || 'false' }}
+      NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies
+        run: |
+          cd web
+          bun install
+
+      - name: Run frontend tests
+        run: |
+          cd web
+          bun test
+
+  # Aggregator job for GitHub branch protection
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    needs: [backend-lint, frontend-lint, backend-test, frontend-test]
+    steps:
+      - name: All checks passed
+        run: echo "All CI checks passed successfully."

@@ -16,7 +16,7 @@ alpaca-py = "^0.38.0"
 loguru = "^0.7.3"
 # Data Analysis
 pandas = "^2.2.0"
-pandas-ta-classic = {git = "https://github.com/xgboosted/pandas-ta-classic.git", branch = "main"}
+pandas-ta-classic = {git = "https://github.com/xgboosted/pandas-ta-classic.git", rev = "6e4cb10"}
 # High-Performance Computing
 numba = {version = ">=0.60.0", python = ">=3.10"}
 joblib = "^1.5.3"
@@ -37,6 +37,9 @@ build-backend = "poetry.core.masonry.api"
 pytest = ">=8.0,<9.0"
 pytest-mock = ">=3.15.1,<4.0.0"
 pytest-cov = ">=4.0.0"
+pytest-asyncio = "^0.23.6"
+httpx = "^0.28.1"
+faker = "^30.0.0"
 pre-commit = "<4.0"
 ruff = ">=0.4.0,<0.5.0"
 icdiff = ">=2.0.7,<3.0.0"

@@ -88,6 +88,7 @@ export interface SimulationLogEntry {
 export interface HistoryResponse {
   simulations: SimulationLogEntry[];
   total: number;
+  next_cursor?: string | null;
 }
 
 export interface Trade {
