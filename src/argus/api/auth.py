@@ -141,6 +141,14 @@ def auth_required(
             detail="Invalid token payload: missing sub",
         )
 
+    # 1. Check cache first to avoid DB calls on every request
+    cached_user = _user_cache.get(user_id)
+    if cached_user:
+        logger.debug(f"UserCache hit for user_id: {user_id}")
+        return cached_user
+
+    logger.debug(f"UserCache miss for user_id: {user_id}")
+
     is_admin = False
     subscription_tier = "free"
     theme = "dark"
@@ -216,7 +224,7 @@ def auth_required(
         except Exception as e:
             logger.info(f"Failed to fetch quota usage: {e}")
 
-    return UserResponse(
+    user = UserResponse(
         user_id=user_id,
         id=user_id,
         email=email,
@@ -229,6 +237,9 @@ def auth_required(
         last_quota_reset=last_quota_reset,
         feature_flags=feature_flags,
     )
+
+    _user_cache.set(user_id, user)
+    return user
 
 
 def check_rate_limit(
