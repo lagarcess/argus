@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from argus.api.main import app, persistence_service
-from argus.domain.schemas import User
+from argus.domain.schemas import UserResponse
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -10,7 +10,9 @@ client = TestClient(app)
 
 @pytest.fixture
 def mock_user():
-    return User(user_id="550e8400-e29b-41d4-a716-446655440000", email="test@example.com")
+    return UserResponse(
+        user_id="550e8400-e29b-41d4-a716-446655440000", email="test@example.com"
+    )
 
 
 def test_health_check():
