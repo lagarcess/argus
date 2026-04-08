@@ -282,37 +282,53 @@ export default function LandingPage() {
             </div>
           )}
 
-            <div className="my-6 flex items-center gap-4">
-              <div className="flex-1 h-px bg-outline-variant/20"></div>
-              <span className="text-[10px] lowercase tracking-widest text-on-surface-variant">
-                {authMode === "signup" ? "sign up with" : "log in with"}
-              </span>
-              <div className="flex-1 h-px bg-outline-variant/20"></div>
-            </div>
+            {authMode !== "forgot_password" && !resetSent && (
+              <>
+                <div className="my-6 flex items-center gap-4">
+                  <div className="flex-1 h-px bg-outline-variant/20"></div>
+                  <span className="text-[10px] lowercase tracking-widest text-on-surface-variant">
+                    {authMode === "signup" ? "sign up with" : "log in with"}
+                  </span>
+                  <div className="flex-1 h-px bg-outline-variant/20"></div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleSocialAuth('google')}
-                className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-white hover:border-white group rounded-xl transition-all flex items-center justify-center"
-              >
-                <GoogleIcon className="w-5 h-5 flex-shrink-0" />
-              </button>
-              <button
-                onClick={() => handleSocialAuth('discord')}
-                className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-[#5865F2] hover:border-[#5865F2] hover:text-white rounded-xl transition-all flex items-center justify-center group"
-              >
-                <DiscordIcon className="w-5 h-5 text-[#5865F2] group-hover:text-white" />
-              </button>
-            </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleSocialAuth('google')}
+                    className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-white hover:border-white group rounded-xl transition-all flex items-center justify-center"
+                    type="button"
+                  >
+                    <GoogleIcon className="w-5 h-5 flex-shrink-0" />
+                  </button>
+                  <button
+                    onClick={() => handleSocialAuth('discord')}
+                    className="py-3 bg-surface-container-low border border-outline-variant/30 hover:bg-[#5865F2] hover:border-[#5865F2] hover:text-white rounded-xl transition-all flex items-center justify-center group"
+                    type="button"
+                  >
+                    <DiscordIcon className="w-5 h-5 text-[#5865F2] group-hover:text-white" />
+                  </button>
+                </div>
+              </>
+            )}
 
             <div className="mt-8 text-center">
-              <button
-                onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
-                className="text-[10px] text-on-surface-variant hover:text-primary uppercase tracking-[0.2em] font-bold transition-colors"
-                type="button"
-              >
-                {authMode === "login" ? "Don't have an account? Sign up" : "Already have an account? Log in"}
-              </button>
+              {authMode === "forgot_password" ? (
+                <button
+                  onClick={() => { setAuthMode("login"); setError(null); }}
+                  className="text-[10px] text-primary hover:text-primary-dim uppercase tracking-[0.2em] font-bold transition-colors"
+                  type="button"
+                >
+                  Back to Login
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setAuthMode(authMode === "login" ? "signup" : "login"); setError(null); }}
+                  className="text-[10px] text-on-surface-variant hover:text-primary uppercase tracking-[0.2em] font-bold transition-colors"
+                  type="button"
+                >
+                  {authMode === "login" ? "Don't have an account? Sign up" : "Already have an account? Log in"}
+                </button>
+              )}
             </div>
             <p className="mt-6 text-center text-[10px] text-on-surface-variant font-label opacity-70">
               By connecting, you agree to our{" "}
