@@ -23,3 +23,4 @@ class User(BaseModel):
     user_id: str
     email: str
     subscription_tier: str = "free"
+    is_admin: bool = False

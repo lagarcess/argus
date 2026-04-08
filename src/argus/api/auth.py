@@ -36,18 +36,22 @@ class UserCache:
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.ttl = ttl_seconds
 
-    def get(self, user_id: str) -> Optional[str]:
+    def get(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get cached subscription tier if not expired."""
         if user_id in self.cache:
             entry = self.cache[user_id]
             if time.time() - entry["timestamp"] < self.ttl:
-                return entry["tier"]
+                return {"tier": entry["tier"], "is_admin": entry.get("is_admin", False)}
             del self.cache[user_id]
         return None
 
-    def set(self, user_id: str, tier: str) -> None:
+    def set(self, user_id: str, tier: str, is_admin: bool = False) -> None:
         """Cache the subscription tier."""
-        self.cache[user_id] = {"tier": tier, "timestamp": time.time()}
+        self.cache[user_id] = {
+            "tier": tier,
+            "is_admin": is_admin,
+            "timestamp": time.time(),
+        }
 
 
 _user_cache = UserCache()
@@ -142,21 +146,23 @@ def auth_required(
         )
 
     # 1. Check cache first
-    cached_tier = _user_cache.get(user_id)
-    if cached_tier:
+    cached_data = _user_cache.get(user_id)
+    if cached_data:
         return User(
             user_id=user_id,
             email=email,
-            subscription_tier=cached_tier,
+            subscription_tier=cached_data["tier"],
+            is_admin=cached_data["is_admin"],
         )
 
     # 2. Fetch from DB if not in cache
     subscription_tier = "free"
+    is_admin = False
     if supabase_client:
         try:
             res = (
                 supabase_client.table("profiles")
-                .select("subscription_tier")
+                .select("subscription_tier, is_admin")
                 .eq("id", user_id)
                 .single()
                 .execute()
@@ -164,6 +170,7 @@ def auth_required(
             if res.data and isinstance(res.data, dict):
                 val = res.data.get("subscription_tier")
                 subscription_tier = str(val) if val is not None else "free"
+                is_admin = bool(res.data.get("is_admin", False))
         except Exception as e:
             # If profile not found or other db error, default to free
             logger.info(
@@ -171,12 +178,13 @@ def auth_required(
             )
 
     # 3. Cache result
-    _user_cache.set(user_id, subscription_tier)
+    _user_cache.set(user_id, subscription_tier, is_admin)
 
     return User(
         user_id=user_id,
         email=email,
         subscription_tier=subscription_tier,
+        is_admin=is_admin,
     )
 
 
@@ -238,3 +246,75 @@ def check_rate_limit(
         logger.error(f"Error checking rate limits for {user_id}: {e}")
         # Fail open for UX if DB fails but auth succeeded
         return user
+
+
+# Asset search rate limits
+ASSET_SEARCH_RATE_LIMIT = 100
+ASSET_SEARCH_RATE_LIMIT_WINDOW = 60  # seconds
+_asset_search_rate_limits: Dict[str, list[float]] = {}
+
+
+def check_asset_search_rate_limit(
+    user: User = Depends(auth_required),  # noqa: B008
+) -> Dict[str, Any]:
+    """
+    Rate limiter for the GET /assets endpoint.
+    Allows 100 searches per minute. Bypassed for admins.
+    Returns headers to be appended to the response.
+    """
+    if user.is_admin:
+        return {
+            "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
+            "X-RateLimit-Remaining": str(ASSET_SEARCH_RATE_LIMIT),
+            "X-RateLimit-Reset": "0",
+            "Retry-After": "0",
+        }
+
+    now = time.time()
+    user_id = str(user.user_id)
+
+    if user_id not in _asset_search_rate_limits:
+        _asset_search_rate_limits[user_id] = []
+
+    # Clean up old timestamps
+    _asset_search_rate_limits[user_id] = [
+        t
+        for t in _asset_search_rate_limits[user_id]
+        if now - t < ASSET_SEARCH_RATE_LIMIT_WINDOW
+    ]
+
+    current_requests = len(_asset_search_rate_limits[user_id])
+    remaining = max(0, ASSET_SEARCH_RATE_LIMIT - current_requests)
+
+    # Calculate reset time (when the oldest request in the window falls out)
+    if current_requests > 0:
+        reset_time = int(
+            _asset_search_rate_limits[user_id][0] + ASSET_SEARCH_RATE_LIMIT_WINDOW
+        )
+    else:
+        reset_time = int(now + ASSET_SEARCH_RATE_LIMIT_WINDOW)
+
+    if remaining == 0:
+        retry_after = reset_time - int(now)
+        logger.warning(f"User {user_id} exceeded asset search rate limit.")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many asset searches. Please try again later.",
+            headers={
+                "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(reset_time),
+                "Retry-After": str(retry_after),
+            },
+        )
+
+    # Record the new request
+    _asset_search_rate_limits[user_id].append(now)
+    remaining -= 1
+
+    return {
+        "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
+        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Reset": str(reset_time),
+        "Retry-After": "0",
+    }

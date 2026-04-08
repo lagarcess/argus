@@ -6,19 +6,28 @@ Serves the backtest engine and manages history/auth via Supabase.
 
 from contextlib import asynccontextmanager
 from datetime import datetime, time, timezone
+from typing import Any, List
 from uuid import uuid4
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
+from alpaca.trading.enums import AssetClass as TradingAssetClass
+from alpaca.trading.enums import AssetStatus
+from alpaca.trading.requests import GetAssetsRequest
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.api.auth import FREE_TIER_MONTHLY_LIMIT, auth_required, check_rate_limit
+from argus.api.auth import (
+    FREE_TIER_MONTHLY_LIMIT,
+    auth_required,
+    check_asset_search_rate_limit,
+    check_rate_limit,
+)
 from argus.api.schemas import (
     BacktestRequest,
     HistoryResponse,
     SimulationLogEntry,
 )
-from argus.config import get_crypto_data_client, get_stock_data_client
+from argus.config import get_crypto_data_client, get_stock_data_client, get_trading_client
 from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, User
 from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
@@ -303,4 +312,63 @@ def get_simulation_detail(sim_id: str, user: User = Depends(auth_required)):  # 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch simulation details.",
+        ) from e
+
+
+@app.get("/api/v1/assets", response_model=List[str])
+def get_assets(
+    search: str,
+    timeframe: str,
+    response: Response,
+    rate_limit_headers: dict[str, Any] = Depends(check_asset_search_rate_limit),  # noqa: B008
+):
+    """
+    Search for active assets (US Equity and Crypto).
+    Applies an in-memory case-insensitive search to symbol or name.
+    """
+    # Validate timeframe (must be >= 15m)
+    allowed_timeframes = {"15Min", "1Hour", "4Hour", "1Day", "15m", "1h", "4h", "1d"}
+    if timeframe not in allowed_timeframes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"timeframe must be one of {allowed_timeframes} (min 15m)",
+        )
+
+    # Attach rate limit headers
+    for key, value in rate_limit_headers.items():
+        response.headers[key] = value
+
+    try:
+        trading_client = get_trading_client()
+        req_equity = GetAssetsRequest(
+            status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.US_EQUITY
+        )
+        req_crypto = GetAssetsRequest(
+            status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.CRYPTO
+        )
+        equity_assets = trading_client.get_all_assets(req_equity)
+        crypto_assets = trading_client.get_all_assets(req_crypto)
+        assets = []
+        if isinstance(equity_assets, list):
+            assets.extend(equity_assets)
+        if isinstance(crypto_assets, list):
+            assets.extend(crypto_assets)
+
+        search_lower = search.lower()
+        matched_symbols = []
+        for a in assets:
+            if not hasattr(a, "symbol"):
+                continue
+            sym = getattr(a, "symbol", "")
+            name = getattr(a, "name", "")
+            if sym and sym not in matched_symbols:
+                if (sym and search_lower in sym.lower()) or (name and search_lower in name.lower()):
+                    matched_symbols.append(sym)
+
+        return matched_symbols
+    except Exception as e:
+        logger.error(f"Failed to fetch assets: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch assets.",
         ) from e
