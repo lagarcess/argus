@@ -148,7 +148,7 @@ class BacktestResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class SimulationSummary(BaseModel):
+class SimulationLogEntry(BaseModel):
     id: str
     strategy_name: str
     symbols: List[str]
@@ -164,6 +164,6 @@ class SimulationSummary(BaseModel):
 
 
 class PaginatedHistory(BaseModel):
-    simulations: List[SimulationSummary]
+    simulations: List[SimulationLogEntry]
     total: int
     next_cursor: Optional[str] = None

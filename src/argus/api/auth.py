@@ -5,7 +5,6 @@ Validates Supabase-issued JWTs. Falls back to a dev-mode mock
 when SUPABASE_JWT_SECRET is not set (local development only).
 """
 
-import time
 from typing import Any, Dict, Optional
 
 import jwt
@@ -26,30 +25,6 @@ FREE_TIER_MONTHLY_LIMIT = 10
 _settings = get_settings()
 _SUPABASE_JWT_SECRET: Optional[str] = _settings.SUPABASE_JWT_SECRET
 _DEV_MODE = _settings.APP_ENV != "PROD"
-
-
-class UserCache:
-    """Simple TTL-based cache for user profiles."""
-
-    def __init__(self, ttl_seconds: int = 300):
-        self.cache: Dict[str, Dict[str, Any]] = {}
-        self.ttl = ttl_seconds
-
-    def get(self, user_id: str) -> Optional[str]:
-        """Get cached subscription tier if not expired."""
-        if user_id in self.cache:
-            entry = self.cache[user_id]
-            if time.time() - float(entry["timestamp"]) < self.ttl:
-                return str(entry["tier"])
-            del self.cache[user_id]
-        return None
-
-    def set(self, user_id: str, tier: str) -> None:
-        """Cache the subscription tier."""
-        self.cache[user_id] = {"tier": tier, "timestamp": time.time()}
-
-
-_user_cache = UserCache()
 
 
 def _decode_supabase_jwt(token: str) -> Optional[Dict[str, Any]]:

@@ -121,12 +121,12 @@ def run_backtest(
             },
         )
 
-        # Decrement quota
+        # Decrement quota atomically
         if supabase_client:
             try:
-                supabase_client.table("profiles").update(
-                    {"remaining_quota": user.remaining_quota - 1}
-                ).eq("id", user_id_str).execute()
+                supabase_client.rpc(
+                    "decrement_user_quota", {"user_uuid": user_id_str}
+                ).execute()
             except Exception as e:
                 logger.error(f"Failed to decrement quota for {user_id_str}: {e}")
 
