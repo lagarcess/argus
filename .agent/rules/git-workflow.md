@@ -1,4 +1,5 @@
 ---
+trigger: always_on
 description: Conventional commits, branch naming, monorepo coordination, feature flags, PR process.
 ---
 
@@ -19,8 +20,11 @@ Use the following prefixes to categorize your work:
 
 - `feat/*` – New features or capabilities
 - `fix/*` – Bug fixes and security patches
-- `chore/*` – Maintenance, performance, tests, or build changes
+- `chore/*` – Maintenance or build changes
 - `docs/*` – Documentation-only updates
+- `perf/*` – Performance improvements
+- `refactor/*` – Code restructuring
+- `test/*` – Testing updates
 
 **Optional scope prefix for monorepo clarity:**
 - `web/feat/...` (Frontend focus)
@@ -30,7 +34,7 @@ Use the following prefixes to categorize your work:
 - `feat/strategy-builder-ui`
 - `web/fix/chart-tooltip`
 - `core/chore/numba-jit-warmup`
-- `docs/api-contract-v2`
+- `docs/api-contract-v[x.x.x]`
 
 ## GitHub Labels
 

@@ -15,7 +15,7 @@ description: Create a comprehensive pull request from current changes.
    - **Labels**: Select relevant labels (e.g. `feature`, `core`).
 
 3. **Branch naming**: `[scope/]<type>/*` (e.g. `feat/strategy-builder` or `web/fix/header`)
-   - Types: `feat`, `fix`, `chore`, `docs`
+   - Types: feat, fix, chore, docs, perf, refactor, test
 
 4. **Commit message format** (conventional commits):
    ```

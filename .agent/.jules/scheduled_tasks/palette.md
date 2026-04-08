@@ -128,7 +128,7 @@ Use **Robinhood design tokens:**
 - Neutral: `#6C757D` (gray)
 - Font: `Inter, -apple-system, BlinkMacSystemFont`
 
----Tolerance
+---
 ## 🌳 Branching & PRs
 
 Follow the naming convention in `.agent/.jules/README.md`:
