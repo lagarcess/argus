@@ -6,6 +6,7 @@
  * Mock data is generated using @faker-js/faker for realistic-looking test data
  */
 
+import { faker } from "@faker-js/faker";
 import {
   generateMockBacktest,
   generateMockBacktestHistory,
@@ -183,19 +184,3 @@ export async function mockGetAssets(): Promise<
 export function isMockModeEnabled(): boolean {
   return MOCK_MODE;
 }
-
-/**
- * Helper for Faker usage in this module
- */
-const faker = {
-  number: {
-    int: ({ min, max }: { min: number; max: number }) =>
-      Math.floor(Math.random() * (max - min + 1)) + min,
-  },
-  string: {
-    alphaNumeric: (length: number) =>
-      Array.from({ length }, () =>
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 36)]
-      ).join(""),
-  },
-};
