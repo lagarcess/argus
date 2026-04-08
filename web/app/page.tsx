@@ -7,12 +7,13 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleIcon, DiscordIcon } from "@/components/Icons";
 import { TopNav } from "@/components/TopNav";
-import { Eye, EyeOff, Zap, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Zap, AlertCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthContext";
 
 export default function LandingPage() {
-  const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
+  const [authMode, setAuthMode] = useState<"login" | "signup" | "forgot_password">("signup");
+  const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -89,6 +90,27 @@ export default function LandingPage() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (resetError) throw resetError;
+
+      setResetSent(true);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to send reset email.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSocialAuth = async (provider: 'google' | 'discord') => {
     setError(null);
     try {
@@ -107,7 +129,7 @@ export default function LandingPage() {
 
   return (
     <div className="bg-background text-on-background font-body selection:bg-primary/30 min-h-screen flex flex-col">
-      <TopNav />
+      <TopNav onSignInClick={() => scrollToAuth("login")} />
 
       <main className="flex-1 pt-32 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
         {/* Left Column: Value Prop */}
@@ -162,79 +184,103 @@ export default function LandingPage() {
           <div className={`glass-panel relative z-10 rounded-2xl border transition-all duration-500 p-8 shadow-2xl ${isHighlighted ? 'border-primary shadow-[0_0_50px_rgba(153,247,255,0.2)]' : 'border-outline-variant/30'}`}>
             <div className="flex justify-center items-center mb-8">
               <h2 className="text-2xl font-headline font-black uppercase tracking-tighter text-gradient-cyan">
-                {authMode === "login" ? "WELCOME BACK" : "GET STARTED"}
+                {authMode === "login" ? "WELCOME BACK" : authMode === "signup" ? "GET STARTED" : "RECOVERY"}
               </h2>
             </div>
 
-            {error && (
-              <div className="mb-6 p-4 bg-error/10 border border-error/20 rounded-xl flex items-start gap-3 text-error text-xs animate-in slide-in-from-top-1">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <p>{error}</p>
+            {resetSent ? (
+              <div className="py-8 text-center space-y-4 animate-in fade-in zoom-in duration-500">
+                <CheckCircle2 className="w-12 h-12 text-success mx-auto" strokeWidth={1.5} />
+                <h3 className="text-lg font-bold text-on-surface uppercase tracking-tight">Email Dispatched</h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  We've sent a recovery link to <span className="text-primary font-bold">{email}</span>. 
+                  Check your inbox to finalize your credentials.
+                </p>
+                <button
+                  onClick={() => { setAuthMode("login"); setResetSent(false); }}
+                  className="text-[10px] text-primary hover:underline uppercase tracking-widest font-bold pt-4"
+                >
+                  Return to Sign In
+                </button>
               </div>
-            )}
-
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
-                  placeholder="operator@argus.io"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">
-                  PASSWORD
-                </label>
-                <div className="relative">
+            ) : (
+              <div className="space-y-4">
+                {error && (
+                  <div className="mb-6 p-4 bg-error/10 border border-error/20 rounded-xl flex items-start gap-3 text-error text-xs animate-in slide-in-from-top-1">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <p>{error}</p>
+                  </div>
+                )}
+                <form onSubmit={authMode === "forgot_password" ? handleForgotPassword : handleLoginSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">
+                    Email Address
+                  </label>
                   <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none pr-12"
-                    placeholder="••••••••••••"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
+                    placeholder="operator@argus.io"
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-on-surface-variant hover:text-on-surface transition-colors focus:outline-none"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
                 </div>
-              </div>
 
-              {authMode === "login" && (
-                <div className="flex justify-end">
-                  <a
-                    href="#"
-                    className="text-[10px] text-primary hover:text-primary-dim uppercase tracking-widest font-bold"
-                  >
-                    Forgot Password?
-                  </a>
-                </div>
-              )}
+                {authMode !== "forgot_password" && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">
+                      PASSWORD
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none pr-12"
+                        placeholder="••••••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-on-surface-variant hover:text-on-surface transition-colors focus:outline-none"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3.5 mt-4 bg-surface-container-highest border border-outline-variant hover:bg-primary hover:text-on-primary hover:border-primary rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? "PROCESSING..." : "CONTINUE"}
-              </button>
-            </form>
+                {authMode === "login" && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode("forgot_password")}
+                      className="text-[10px] text-primary hover:text-primary-dim uppercase tracking-widest font-bold"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 mt-4 bg-surface-container-highest border border-outline-variant hover:bg-primary hover:text-on-primary hover:border-primary rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "PROCESSING..." : (
+                    authMode === "login" ? "SIGN IN TO TERMINAL" : 
+                    authMode === "signup" ? "CREATE FREE ACCOUNT" : "SEND RECOVERY LINK"
+                  )}
+                </button>
+              </form>
+            </div>
+          )}
 
             <div className="my-6 flex items-center gap-4">
               <div className="flex-1 h-px bg-outline-variant/20"></div>
