@@ -1,5 +1,8 @@
 "use client";
 
+// Skip static generation for this auth page
+export const dynamic = "force-dynamic";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleIcon, AppleIcon, FacebookIcon } from "@/components/Icons";
