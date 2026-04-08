@@ -137,3 +137,41 @@ class SimulationLogEntry(BaseModel):
 class HistoryResponse(BaseModel):
     simulations: List[SimulationLogEntry]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# Strategies CRUD
+# ---------------------------------------------------------------------------
+
+
+class StrategyCreate(BaseModel):
+    """Payload for creating or updating a strategy draft."""
+
+    name: str = Field(..., max_length=120)
+    symbol: str
+    timeframe: str
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    entry_criteria: List[Dict[str, Any]] = Field(default_factory=list)
+    exit_criteria: Dict[str, Any] = Field(default_factory=dict)
+    indicators_config: Dict[str, Any] = Field(default_factory=dict)
+    patterns: List[str] = Field(default_factory=list)
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe_strategy(cls, v: str) -> str:
+        # Allowing typical timeframe strings. Can tighten up based on engine later
+        return v
+
+
+class StrategyResponse(StrategyCreate):
+    """Response model for a strategy, includes db fields."""
+
+    id: str
+    user_id: str
+    executed_at: Optional[datetime] = None
+
+
+class PaginatedStrategiesResponse(BaseModel):
+    strategies: List[StrategyResponse]
+    next_cursor: Optional[str] = None
