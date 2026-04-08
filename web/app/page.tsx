@@ -3,7 +3,7 @@
 // Skip static generation for this auth page
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleIcon, DiscordIcon } from "@/components/Icons";
 import { TopNav } from "@/components/TopNav";
@@ -18,9 +18,39 @@ export default function LandingPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const authPanelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { login } = useAuth();
+
+  // Handle hash-based navigation for mode switching
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash;
+      if (hash === "#auth-panel" || hash === "#login") {
+        setAuthMode("login");
+        scrollToAuth();
+      } else if (hash === "#signup") {
+        setAuthMode("signup");
+        scrollToAuth();
+      }
+    };
+
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  const scrollToAuth = (mode?: "login" | "signup") => {
+    if (mode) setAuthMode(mode);
+    
+    // Smooth scroll to the panel
+    authPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    
+    // Trigger highlight effect
+    setIsHighlighted(true);
+    setTimeout(() => setIsHighlighted(false), 2000);
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +121,7 @@ export default function LandingPage() {
               Validate your strategies against real-world friction—slippage and fees—within the high-performance Argus environment.
             </p>
             <button
-              onClick={() => router.push("/builder")}
+              onClick={() => scrollToAuth("signup")}
               className="mt-8 px-8 py-4 rounded-xl bg-primary text-on-primary text-sm font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_30px_rgba(153,247,255,0.3)] flex items-center justify-center gap-3"
             >
               RUN YOUR FIRST SIMULATION
@@ -122,10 +152,14 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div id="auth-panel" className="relative group perspective-1000">
-          <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full group-hover:bg-primary/30 transition-colors duration-700 pointer-events-none"></div>
+        <div 
+          id="auth-panel" 
+          ref={authPanelRef}
+          className={`relative group perspective-1000 transition-all duration-700 ${isHighlighted ? 'scale-[1.02]' : ''}`}
+        >
+          <div className={`absolute inset-0 bg-primary/20 blur-[100px] rounded-full group-hover:bg-primary/30 transition-all duration-700 pointer-events-none ${isHighlighted ? 'bg-primary/50 blur-[120px]' : ''}`}></div>
 
-          <div className="glass-panel relative z-10 rounded-2xl border border-outline-variant/30 p-8 shadow-2xl transform transition-transform duration-500">
+          <div className={`glass-panel relative z-10 rounded-2xl border transition-all duration-500 p-8 shadow-2xl ${isHighlighted ? 'border-primary shadow-[0_0_50px_rgba(153,247,255,0.2)]' : 'border-outline-variant/30'}`}>
             <div className="flex justify-center items-center mb-8">
               <h2 className="text-2xl font-headline font-black uppercase tracking-tighter text-gradient-cyan">
                 {authMode === "login" ? "WELCOME BACK" : "GET STARTED"}

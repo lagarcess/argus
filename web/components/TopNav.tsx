@@ -75,7 +75,7 @@ export function TopNav() {
           </div>
         ) : (
           <Link
-            href="/#auth-panel"
+            href="/#login"
             className="h-11 px-8 rounded-full bg-cyan-400 text-neutral-950 text-xs font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] flex items-center justify-center font-bold"
           >
             Sign In
