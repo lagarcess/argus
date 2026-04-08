@@ -192,7 +192,7 @@ def auth_required(
 
                 if last_quota_reset_str:
                     try:
-                        # Convert Supabase timestamp (e.g. 2026-04-01T00:00:00+00:00) to python datetime
+                        # Convert Supabase timestamp to python datetime
                         last_quota_reset = datetime.fromisoformat(
                             last_quota_reset_str.replace("Z", "+00:00")
                         )
@@ -278,8 +278,82 @@ def check_rate_limit(
             detail={
                 "error": "QUOTA_EXCEEDED",
                 "message": "You have 0 backtests remaining this month.",
-                "details": {"next_reset": next_reset.isoformat()},
+                "details": {
+                    "next_reset": next_reset.isoformat().replace("+00:00", "Z")
+                },
             },
         )
 
     return user
+
+
+# Asset search rate limits
+ASSET_SEARCH_RATE_LIMIT = 100
+ASSET_SEARCH_RATE_LIMIT_WINDOW = 60  # seconds
+_asset_search_rate_limits: Dict[str, list[float]] = {}
+
+
+def check_asset_search_rate_limit(
+    user: UserResponse = Depends(auth_required),  # noqa: B008
+) -> Dict[str, Any]:
+    """
+    Rate limiter for the GET /assets endpoint.
+    Allows 100 searches per minute. Bypassed for admins.
+    Returns headers to be appended to the response.
+    """
+    if user.is_admin:
+        return {
+            "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
+            "X-RateLimit-Remaining": str(ASSET_SEARCH_RATE_LIMIT),
+            "X-RateLimit-Reset": "0",
+            "Retry-After": "0",
+        }
+
+    now = time.time()
+    user_id = str(user.id)
+
+    if user_id not in _asset_search_rate_limits:
+        _asset_search_rate_limits[user_id] = []
+
+    # Clean up old timestamps
+    _asset_search_rate_limits[user_id] = [
+        t
+        for t in _asset_search_rate_limits[user_id]
+        if now - t < ASSET_SEARCH_RATE_LIMIT_WINDOW
+    ]
+
+    current_requests = len(_asset_search_rate_limits[user_id])
+    remaining = max(0, ASSET_SEARCH_RATE_LIMIT - current_requests)
+
+    # Calculate reset time (when the oldest request in the window falls out)
+    if current_requests > 0:
+        reset_time = int(
+            _asset_search_rate_limits[user_id][0] + ASSET_SEARCH_RATE_LIMIT_WINDOW
+        )
+    else:
+        reset_time = int(now + ASSET_SEARCH_RATE_LIMIT_WINDOW)
+
+    if remaining == 0:
+        retry_after = reset_time - int(now)
+        logger.warning(f"User {user_id} exceeded asset search rate limit.")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many asset searches. Please try again later.",
+            headers={
+                "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(reset_time),
+                "Retry-After": str(retry_after),
+            },
+        )
+
+    # Record the new request
+    _asset_search_rate_limits[user_id].append(now)
+    remaining -= 1
+
+    return {
+        "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
+        "X-RateLimit-Remaining": str(remaining),
+        "X-RateLimit-Reset": str(reset_time),
+        "Retry-After": "0",
+    }

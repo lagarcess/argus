@@ -4,10 +4,15 @@ Argus FastAPI entrypoint.
 Serves the backtest engine and manages history/auth via Supabase.
 """
 
+import time as time_module
 from contextlib import asynccontextmanager
 from datetime import datetime, time, timezone
+from typing import Any, List
 from uuid import uuid4
 
+from alpaca.trading.enums import AssetClass as TradingAssetClass
+from alpaca.trading.enums import AssetStatus
+from alpaca.trading.requests import GetAssetsRequest
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -20,7 +25,12 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.api.auth import _user_cache, auth_required, check_rate_limit
+from argus.api.auth import (
+    _user_cache,
+    auth_required,
+    check_asset_search_rate_limit,
+    check_rate_limit,
+)
 from argus.api.schemas import (
     BacktestRequest,
     HistoryResponse,
@@ -29,7 +39,7 @@ from argus.api.schemas import (
     SSORequest,
     SSOResponse,
 )
-from argus.config import get_crypto_data_client, get_stock_data_client
+from argus.config import get_crypto_data_client, get_stock_data_client, get_trading_client
 from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, UserResponse
 from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
@@ -39,13 +49,38 @@ from argus.supabase import supabase_client
 persistence_service = PersistenceService()
 
 
+class AssetCache:
+    """
+    In-memory TTL cache for the global Alpaca asset list.
+    Avoids fetching thousands of assets on every search request.
+    """
+
+    def __init__(self, ttl_seconds: int = 3600):
+        self._assets: List[Any] = []
+        self._timestamp: float = 0
+        self._ttl = ttl_seconds
+
+    def get(self) -> List[Any]:
+        if time_module.time() - self._timestamp > self._ttl:
+            return []
+        return self._assets
+
+    def set(self, assets: List[Any]) -> None:
+        self._assets = assets
+        self._timestamp = time_module.time()
+
+
+# Global singleton cache for the asset endpoint
+asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
+
+
 def _background_save_simulation(
     user_id: str,
     strategy_id: str,
     symbol: str,
-    timeframe: str,
     result: BacktestResult,
     simulation_id: str,
+    timeframe: str | None = None,
 ):
     """Robust wrapper for background persistence with separate try/except."""
     try:
@@ -53,7 +88,7 @@ def _background_save_simulation(
             user_id=user_id,
             strategy_id=strategy_id,
             symbol=symbol,
-            timeframe=timeframe,
+            timeframe=timeframe or "",
             result=result,
             simulation_id=simulation_id,
         )
@@ -388,4 +423,78 @@ def get_simulation_detail(sim_id: str, user: UserResponse = Depends(auth_require
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch simulation details.",
+        ) from e
+
+
+@app.get("/api/v1/assets", response_model=List[str])
+def get_assets(
+    search: str,
+    response: Response,
+    rate_limit_headers: dict[str, Any] = Depends(check_asset_search_rate_limit),  # noqa: B008
+    timeframe: str | None = None,
+):
+    """
+    Search for active assets (US Equity and Crypto).
+    Applies an in-memory case-insensitive search to symbol or name.
+    Uses a 1-hour TTL cache to avoid frequent Alpaca API calls.
+    """
+    # Validate timeframe if provided (must be >= 15m)
+    allowed_timeframes = {"15Min", "1Hour", "4Hour", "1Day", "15m", "1h", "4h", "1d"}
+    if timeframe and timeframe not in allowed_timeframes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"timeframe must be one of {allowed_timeframes} (min 15m)",
+        )
+
+    # Attach rate limit headers
+    for key, value in rate_limit_headers.items():
+        response.headers[key] = value
+
+    try:
+        # Check cache first
+        assets = asset_cache.get()
+
+        # Fetch from Alpaca if cache miss
+        if not assets:
+            logger.info("AssetCache miss: fetching from Alpaca")
+            trading_client = get_trading_client()
+            req_equity = GetAssetsRequest(
+                status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.US_EQUITY
+            )
+            req_crypto = GetAssetsRequest(
+                status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.CRYPTO
+            )
+
+            equity_assets = trading_client.get_all_assets(req_equity)
+            crypto_assets = trading_client.get_all_assets(req_crypto)
+
+            if isinstance(equity_assets, list):
+                assets.extend(equity_assets)
+            if isinstance(crypto_assets, list):
+                assets.extend(crypto_assets)
+
+            # Update cache
+            asset_cache.set(assets)
+
+        # O(N) case-insensitive search with set for uniqueness
+        search_lower = search.lower()
+        matched_symbols = set()
+
+        for a in assets:
+            sym = getattr(a, "symbol", None)
+            if not sym or sym in matched_symbols:
+                continue
+
+            name = getattr(a, "name", "")
+            if search_lower in sym.lower() or (name and search_lower in name.lower()):
+                matched_symbols.add(sym)
+
+        # Return alphabetically sorted matches
+        return sorted(list(matched_symbols))
+
+    except Exception as e:
+        logger.error(f"Failed to fetch assets: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch assets.",
         ) from e
