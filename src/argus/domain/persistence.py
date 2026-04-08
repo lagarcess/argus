@@ -136,7 +136,10 @@ class PersistenceService:
                     # format: timestamp_iso+id
                     if "+" in decoded:
                         timestamp_str, id_str = decoded.split("+", 1)
-                        query = query.lt("created_at", timestamp_str)
+                        # Use complex filter for tie-breaking
+                        query = query.or_(
+                            f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
+                        )
                 except Exception as e:
                     logger.warning(f"Invalid cursor format: {cursor}, {e}")
 

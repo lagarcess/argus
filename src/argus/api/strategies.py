@@ -111,15 +111,13 @@ def update_strategy(
 
     # 2. Update
     strategy_data = strategy.model_dump()
-    updated_id = persistence_service.save_strategy(
+    updated_strategy = persistence_service.save_strategy(
         user_id_str, strategy_data, strategy_id
     )
 
-    if not updated_id:
+    if not updated_strategy:
         raise HTTPException(status_code=500, detail="Failed to update strategy.")
 
-    # 3. Refetch
-    updated_strategy = persistence_service.get_strategy(updated_id, user_id_str)
     return updated_strategy
 
 

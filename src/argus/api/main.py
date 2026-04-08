@@ -223,7 +223,14 @@ def run_backtest(
             "patterns": request.entry_patterns + request.exit_patterns,
             "executed_at": datetime.now(timezone.utc).isoformat(),
         }
-        strategy_id = persistence_service.save_strategy(user_id_str, strategy_data)
+        strategy_record = persistence_service.save_strategy(user_id_str, strategy_data)
+        strategy_id = (
+            strategy_record.get("id")
+            if isinstance(strategy_record, dict)
+            else None
+            if strategy_record
+            else None
+        )
 
         if strategy_id:
             background_tasks.add_task(
