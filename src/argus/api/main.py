@@ -39,7 +39,12 @@ from argus.api.schemas import (
     SSORequest,
     SSOResponse,
 )
-from argus.config import get_crypto_data_client, get_stock_data_client, get_trading_client
+from argus.api.strategies import router as strategies_router
+from argus.config import (
+    get_crypto_data_client,
+    get_stock_data_client,
+    get_trading_client,
+)
 from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, UserResponse
 from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
@@ -125,6 +130,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(strategies_router)
 
 
 @app.get("/health")
@@ -325,8 +331,25 @@ def run_backtest(
         )
 
         # 4. Persistence (Background Task)
-        strategy_id = persistence_service.save_strategy(
-            user_id_str, request.strategy_name, config
+        strategy_data: dict[str, Any] = {
+            "name": request.strategy_name,
+            "symbol": symbols[0] if symbols else "",
+            "timeframe": request.timeframe,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "entry_criteria": [],
+            "exit_criteria": {},
+            "indicators_config": {},
+            "patterns": request.entry_patterns + request.exit_patterns,
+            "executed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        strategy_record = persistence_service.save_strategy(user_id_str, strategy_data)
+        strategy_id = (
+            strategy_record.get("id")
+            if isinstance(strategy_record, dict)
+            else None
+            if strategy_record
+            else None
         )
 
         if strategy_id:

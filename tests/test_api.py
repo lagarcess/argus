@@ -75,7 +75,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
         "argus.engine.ArgusEngine.run", MagicMock(return_value=mock_result)
     )
 
-    persistence_service.save_strategy = MagicMock(return_value="strat_456")
+    persistence_service.save_strategy = MagicMock(return_value={"id": "strat_456"})
     persistence_service.save_simulation = MagicMock(return_value="sim_789")
 
     payload = {
