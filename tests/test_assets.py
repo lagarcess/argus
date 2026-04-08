@@ -39,11 +39,13 @@ def test_get_assets_success_and_caching(
     # Client will be called twice (for equity and crypto) in a cache miss
     mock_client.get_all_assets.side_effect = [[mock_asset1], [mock_asset2, mock_asset3]]
 
-    # Clear cache before test
+    # Clear cache before test explicitly safely
     from argus.api.main import asset_cache
 
-    asset_cache._assets = []
-    asset_cache._timestamp = 0
+    if hasattr(asset_cache, "_assets"):
+        asset_cache._assets = []
+    if hasattr(asset_cache, "_timestamp"):
+        asset_cache._timestamp = 0
 
     # 1. First call - should hit Alpaca API
     response1 = client.get(
