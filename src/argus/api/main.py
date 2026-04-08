@@ -20,7 +20,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.api.auth import auth_required, check_rate_limit
+from argus.api.auth import _user_cache, auth_required, check_rate_limit
 from argus.api.schemas import (
     BacktestRequest,
     HistoryResponse,
@@ -164,11 +164,17 @@ def update_profile(
             .eq("id", user.id)
             .execute()
         )
+
         if res.data and len(res.data) > 0:
             updated_data = res.data[0]
             user.theme = str(updated_data.get("theme", user.theme))
             user.lang = str(updated_data.get("lang", user.lang))
+
+            # Invalidate cache so subsequent requests load new theme/lang
+            _user_cache.invalidate(user.id)
+
             return user
+
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found."
@@ -189,24 +195,34 @@ def logout(response: Response, request: Request):
 
     # Check if there is an active session cookie to revoke
     token = request.cookies.get("sb-access-token")
-    if token and supabase_client:
+    if token:
         try:
-            # Set the session on the client so we can sign out
-            supabase_client.auth.set_session(access_token=token, refresh_token="")
-            supabase_client.auth.sign_out()
+            # Create a request-local Supabase client to avoid global state race conditions
+            from argus.config import get_settings
+            from supabase import create_client
+
+            settings = get_settings()
+            if settings.SUPABASE_URL and settings.SUPABASE_ANON_KEY:
+                local_client = create_client(
+                    settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY
+                )
+                # Set the session on the local client
+                local_client.auth.set_session(access_token=token, refresh_token="")
+                local_client.auth.sign_out()
         except Exception as e:
             logger.warning(f"Failed to sign out from Supabase: {e}")
 
-    # Clear the cookie
+    # Clear the cookies on the INJECTED response object
     response.delete_cookie(
         key="sb-access-token", path="/", secure=True, httponly=True, samesite="strict"
     )
-    # Also delete the refresh token if it exists (assuming named sb-refresh-token)
+    # Also delete the refresh token if it exists
     response.delete_cookie(
         key="sb-refresh-token", path="/", secure=True, httponly=True, samesite="strict"
     )
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @app.post("/api/v1/backtest")
@@ -288,6 +304,9 @@ def run_backtest(
                 result=result,
                 simulation_id=simulation_id,
             )
+
+        # Invalidate quota cache since they just used one
+        _user_cache.invalidate(user_id_str)
 
         return {
             "status": "success",

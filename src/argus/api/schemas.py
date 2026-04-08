@@ -10,10 +10,6 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-# ---------------------------------------------------------------------------
-# Auth
-# ---------------------------------------------------------------------------
-
 
 class AuthRequest(BaseModel):
     """Unified auth request supporting email/password and social SSO."""
@@ -26,7 +22,6 @@ class AuthRequest(BaseModel):
     )
     email: Optional[str] = None
     password: Optional[str] = None
-    # Social SSO flow sends an OAuth code/token instead
     oauth_token: Optional[str] = None
 
 
@@ -36,18 +31,10 @@ class AuthResponse(BaseModel):
     user: Dict[str, Any]
 
 
-# ---------------------------------------------------------------------------
-# Backtest request (extends engine StrategyConfig with API-specific fields)
-# ---------------------------------------------------------------------------
-
-
 class BacktestRequest(BaseModel):
     """API backtest request payload from the Strategy Builder UI."""
 
-    # Strategy identity
     strategy_name: str = Field(default="Unnamed Strategy", max_length=120)
-
-    # Assets (batched, max 3 per PRD)
     symbols: List[str] = Field(
         ..., min_length=1, max_length=3, description="1–3 symbols to backtest"
     )
@@ -55,21 +42,15 @@ class BacktestRequest(BaseModel):
     timeframe: str = Field(default="1Day", description="e.g. 1Day, 1Hour, 15Min")
     start_date: Optional[date] = Field(default=None)
     end_date: Optional[date] = Field(default=None)
-
-    # Strategy config fields (mirrors engine.StrategyConfig)
     entry_patterns: List[str] = Field(default_factory=list)
     exit_patterns: List[str] = Field(default_factory=list)
     confluence_mode: Literal["OR", "AND"] = Field(default="OR")
     slippage: float = Field(default=0.001, ge=0.0, le=0.05)
     fees: float = Field(default=0.001, ge=0.0, le=0.05)
-
-    # Indicator confluence
     rsi_period: Optional[int] = Field(default=None, ge=2, le=200)
     rsi_oversold: float = Field(default=30.0, ge=0.0, le=100.0)
     rsi_overbought: float = Field(default=70.0, ge=0.0, le=100.0)
     ema_period: Optional[int] = Field(default=None, ge=2, le=500)
-
-    # Risk Metrics & Benchmarking
     benchmark_symbol: Optional[str] = Field(
         default="SPY", description="e.g. SPY, BTC-USD"
     )
@@ -90,28 +71,6 @@ class BacktestRequest(BaseModel):
         return v
 
 
-# ---------------------------------------------------------------------------
-# Simulation history
-# ---------------------------------------------------------------------------
-
-
-class SimulationSummary(BaseModel):
-    id: str
-    strategy_name: str
-    symbol: str
-    date: datetime
-    total_return: float
-    sharpe_ratio: float
-
-
-class PaginatedHistoryResponse(BaseModel):
-    simulations: List[SimulationSummary]
-    total: int
-    limit: int
-    offset: int
-
-
-# Keeping old types to avoid breaking main.py immediately until we patch it next
 class SimulationLogEntry(BaseModel):
     id: str
     strategy_name: str
@@ -123,13 +82,10 @@ class SimulationLogEntry(BaseModel):
     max_drawdown_pct: Optional[float] = None
     win_rate_pct: Optional[float] = None
     total_trades: Optional[int] = None
-
-    # Advanced Metrics
     alpha: Optional[float] = None
     beta: Optional[float] = None
     calmar_ratio: Optional[float] = None
     avg_trade_duration: Optional[str] = None
-
     created_at: datetime
     completed_at: Optional[datetime] = None
 
@@ -157,3 +113,10 @@ class SSOResponse(BaseModel):
     """Schema for SSO sign-in response."""
 
     auth_url: str
+
+
+class PaginatedHistoryResponse(BaseModel):
+    simulations: List[SimulationLogEntry]
+    total: int
+    limit: int
+    offset: int
