@@ -4,6 +4,7 @@ Argus FastAPI entrypoint.
 Serves the backtest engine and manages history/auth via Supabase.
 """
 
+import time as time_module
 from contextlib import asynccontextmanager
 from datetime import datetime, time, timezone
 from typing import Any, List
@@ -37,13 +38,38 @@ from argus.supabase import supabase_client
 persistence_service = PersistenceService()
 
 
+class AssetCache:
+    """
+    In-memory TTL cache for the global Alpaca asset list.
+    Avoids fetching thousands of assets on every search request.
+    """
+
+    def __init__(self, ttl_seconds: int = 3600):
+        self._assets: List[Any] = []
+        self._timestamp: float = 0
+        self._ttl = ttl_seconds
+
+    def get(self) -> List[Any]:
+        if time_module.time() - self._timestamp > self._ttl:
+            return []
+        return self._assets
+
+    def set(self, assets: List[Any]) -> None:
+        self._assets = assets
+        self._timestamp = time_module.time()
+
+
+# Global singleton cache for the asset endpoint
+asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
+
+
 def _background_save_simulation(
     user_id: str,
     strategy_id: str,
     symbol: str,
-    timeframe: str,
     result: BacktestResult,
     simulation_id: str,
+    timeframe: str | None = None,
 ):
     """Robust wrapper for background persistence with separate try/except."""
     try:
@@ -51,7 +77,7 @@ def _background_save_simulation(
             user_id=user_id,
             strategy_id=strategy_id,
             symbol=symbol,
-            timeframe=timeframe,
+            timeframe=timeframe or "",
             result=result,
             simulation_id=simulation_id,
         )
@@ -318,17 +344,18 @@ def get_simulation_detail(sim_id: str, user: User = Depends(auth_required)):  # 
 @app.get("/api/v1/assets", response_model=List[str])
 def get_assets(
     search: str,
-    timeframe: str,
     response: Response,
     rate_limit_headers: dict[str, Any] = Depends(check_asset_search_rate_limit),  # noqa: B008
+    timeframe: str | None = None,
 ):
     """
     Search for active assets (US Equity and Crypto).
     Applies an in-memory case-insensitive search to symbol or name.
+    Uses a 1-hour TTL cache to avoid frequent Alpaca API calls.
     """
-    # Validate timeframe (must be >= 15m)
+    # Validate timeframe if provided (must be >= 15m)
     allowed_timeframes = {"15Min", "1Hour", "4Hour", "1Day", "15m", "1h", "4h", "1d"}
-    if timeframe not in allowed_timeframes:
+    if timeframe and timeframe not in allowed_timeframes:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"timeframe must be one of {allowed_timeframes} (min 15m)",
@@ -339,33 +366,47 @@ def get_assets(
         response.headers[key] = value
 
     try:
-        trading_client = get_trading_client()
-        req_equity = GetAssetsRequest(
-            status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.US_EQUITY
-        )
-        req_crypto = GetAssetsRequest(
-            status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.CRYPTO
-        )
-        equity_assets = trading_client.get_all_assets(req_equity)
-        crypto_assets = trading_client.get_all_assets(req_crypto)
-        assets = []
-        if isinstance(equity_assets, list):
-            assets.extend(equity_assets)
-        if isinstance(crypto_assets, list):
-            assets.extend(crypto_assets)
+        # Check cache first
+        assets = asset_cache.get()
 
+        # Fetch from Alpaca if cache miss
+        if not assets:
+            logger.info("AssetCache miss: fetching from Alpaca")
+            trading_client = get_trading_client()
+            req_equity = GetAssetsRequest(
+                status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.US_EQUITY
+            )
+            req_crypto = GetAssetsRequest(
+                status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.CRYPTO
+            )
+
+            equity_assets = trading_client.get_all_assets(req_equity)
+            crypto_assets = trading_client.get_all_assets(req_crypto)
+
+            if isinstance(equity_assets, list):
+                assets.extend(equity_assets)
+            if isinstance(crypto_assets, list):
+                assets.extend(crypto_assets)
+
+            # Update cache
+            asset_cache.set(assets)
+
+        # O(N) case-insensitive search with set for uniqueness
         search_lower = search.lower()
-        matched_symbols = []
-        for a in assets:
-            if not hasattr(a, "symbol"):
-                continue
-            sym = getattr(a, "symbol", "")
-            name = getattr(a, "name", "")
-            if sym and sym not in matched_symbols:
-                if (sym and search_lower in sym.lower()) or (name and search_lower in name.lower()):
-                    matched_symbols.append(sym)
+        matched_symbols = set()
 
-        return matched_symbols
+        for a in assets:
+            sym = getattr(a, "symbol", None)
+            if not sym or sym in matched_symbols:
+                continue
+
+            name = getattr(a, "name", "")
+            if search_lower in sym.lower() or (name and search_lower in name.lower()):
+                matched_symbols.add(sym)
+
+        # Return alphabetically sorted matches
+        return sorted(list(matched_symbols))
+
     except Exception as e:
         logger.error(f"Failed to fetch assets: {e}")
         raise HTTPException(
