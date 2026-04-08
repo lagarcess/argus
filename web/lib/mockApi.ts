@@ -134,7 +134,7 @@ export async function mockGetHistory(
 
   const simulations: SimulationLogEntry[] = paginatedBacktests.map((bt) => ({
     id: bt.id,
-    strategy_name: `Strategy ${faker.string.alphaNumeric(4).toUpperCase()}`,
+    strategy_name: `Strategy ${faker.string.alphanumeric(4).toUpperCase()}`,
     symbols: [bt.asset],
     timeframe: bt.timeframe,
     status: bt.full_result ? "completed" : "pending",
