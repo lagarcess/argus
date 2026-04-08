@@ -172,6 +172,18 @@ metrics: 'profitable' // Random or specific?
 
 ---
 
+## 🌳 Branching & PRs
+
+Follow the naming convention in `.agent/.jules/README.md`:
+- `docs/api-...` or `chore/docs-chronicler-...`
+- For vague documentation tasks, infer a branch name that reflects the guide or artifact created.
+- All documentation updates MUST be committed to a short-lived feature branch before opening a PR.
+
+### PR Labels
+Suggest labels: `docs` and `low-priority`.
+
+---
+
 ## Journal
 
 **Only log documentation gaps that were filled** (new skill, API update, troubleshooting guide, architecture decision).

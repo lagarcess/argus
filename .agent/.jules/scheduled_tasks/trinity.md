@@ -148,6 +148,18 @@ describe('StrategyBuilder', () => {
 
 ---
 
+## 🌳 Branching & PRs
+
+Follow the naming convention in `.agent/.jules/README.md`:
+- `test/coverage-...` or `core/test/trinity-...`
+- For vague testing tasks, infer a branch name that reflects the test suite or path covered.
+- All new tests MUST be committed to a short-lived feature branch before opening a PR.
+
+### PR Labels
+Suggest labels: `test` and correct scope (`core` or `web`).
+
+---
+
 ## Journal
 
 **Only log meaningful test additions** (new endpoint coverage, quota tier validation, critical path).

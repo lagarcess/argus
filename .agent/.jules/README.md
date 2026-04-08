@@ -127,8 +127,10 @@ Scheduled tasks need to know where to find setup instructions and API docs:
 1. Read `sentinel.md` (mission, focus areas, patterns)
 2. Read relevant skills (security-review, coding-standards)
 3. Audit codebase for security gaps
-4. If critical finding: Write to `.agent/.jules/journal/sentinel.md` + create PR
-5. If no issues: Write "no critical findings" in journal + stop
+4. If critical finding:
+    a. Create a short-lived feature branch (see **Branching & PRs** below).
+    b. Write to `.agent/.jules/journal/sentinel.md` + create PR.
+5. If no issues: Write "no critical findings" in journal + stop.
 6. Never create PR if there's no actionable improvement
 
 ---
@@ -145,6 +147,31 @@ Scheduled tasks need to know where to find setup instructions and API docs:
 - **PR:** #42 (or "none" if no action needed)
 
 Additional notes...
+
+---
+
+## 🌳 Branching & PRs
+
+Jules follows **trunk-based development** with short-lived feature branches.
+
+### Naming Convention
+- `feat/*` – New features
+- `fix/*` – Bug fixes
+- `chore/*` – Maintenance, docs, performance, tests, etc.
+- `docs/*` – Documentation only
+
+**Optional scope prefix:** Use `web/` or `core/` for targeted changes (e.g. `web/feat/strategy-builder`).
+
+### Guidelines
+- **Obvious Tasks**: Use clear, descriptive branch names (e.g., `web/fix/header-z-index`).
+- **Dubious/Complex Tasks**: Infer a logical branch name based on the core change.
+- **Protected Main**: Never commit directly to `main`. All changes require a PR.
+
+### PR Labels
+Always suggest or apply relevant labels when creating PRs:
+- **Type**: `feature`, `bug`, `chore`, `docs`, `perf`, `refactor`, `test`
+- **Scope**: `core`, `web`, `api`, `db`
+- **Priority**: `high-priority`, `med-priority`, `low-priority`
 ```
 
 ---

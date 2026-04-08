@@ -128,6 +128,17 @@ Use **Robinhood design tokens:**
 - Neutral: `#6C757D` (gray)
 - Font: `Inter, -apple-system, BlinkMacSystemFont`
 
+---Tolerance
+## 🌳 Branching & PRs
+
+Follow the naming convention in `.agent/.jules/README.md`:
+- `feat/ux-...` or `web/feat/palette-...`
+- For vague UX tasks, infer a branch name that reflects the component or flow improved.
+- All improvements MUST be committed to a short-lived feature branch before opening a PR.
+
+### PR Labels
+Suggest labels: `feature` (or `refactor`), `web`, and `low-priority`.
+
 ---
 
 ## Journal

@@ -4,16 +4,41 @@ description: Conventional commits, branch naming, monorepo coordination, feature
 
 # Git Workflow Rule
 
+## Trunk-Based Development
+
+Argus follows **trunk-based development** with short-lived feature branches.
+
+1. **Short-Lived Branches**: Branches should ideally live for less than 48 hours.
+2. **Protected Main**: The `main` branch is protected. Direct commits are forbidden.
+3. **PR Requirements**: Merging to `main` requires passing all CI checks (run `/verify`) and getting PR approval.
+4. **Always Deployable**: `main` must always be in a stable, deployable state.
+
 ## Branch Naming
 
-`<type>/issue-<num>-<short-desc>` — e.g., `feat/issue-42-backtest-api` or `feat/issue-43-ui-custom-entry`
+Use the following prefixes to categorize your work:
 
-**Optional scope for monorepo clarity:**
+- `feat/*` – New features or capabilities
+- `fix/*` – Bug fixes and security patches
+- `chore/*` – Maintenance, performance, tests, or build changes
+- `docs/*` – Documentation-only updates
 
-- `feat/issue-42-api-custom-entry` (backend focus)
-- `feat/issue-43-web-custom-entry-form` (frontend focus)
+**Optional scope prefix for monorepo clarity:**
+- `web/feat/...` (Frontend focus)
+- `core/fix/...` (Backend/Engine focus)
 
-**Types:** `feat`, `fix`, `refactor`, `chore`, `docs`, `perf`, `test`, `strip`
+**Examples:**
+- `feat/strategy-builder-ui`
+- `web/fix/chart-tooltip`
+- `core/chore/numba-jit-warmup`
+- `docs/api-contract-v2`
+
+## GitHub Labels
+
+Categorize PRs using these labels for better organization:
+
+- **Type**: `feature`, `bug`, `chore`, `docs`, `perf`, `refactor`, `test`
+- **Scope**: `core`, `web`, `api`, `db`
+- **Priority**: `high-priority`, `med-priority`, `low-priority`
 
 ## Commit Messages
 

@@ -275,5 +275,5 @@ All list endpoints use cursor pagination.
 
 If all ✅, lock it. If ❌ on any, send back for revision.
 
-**Next Iteration Briefing**  
+**Next Iteration Briefing**
 V2 (informed by this V1 contract as source-of-truth): optional `data_adjusted: false` raw mode + corporate-action impact breakdown, multi-asset (behind flag), basic options with Greeks (Pro+ tier), custom indicator uploads, and full walk-forward/OOS in engine (addressing 2026 overfitting gaps). Engine rebuild will expose these via feature flags without breaking V1 clients.

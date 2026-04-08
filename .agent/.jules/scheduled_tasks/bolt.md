@@ -115,6 +115,18 @@ async def run_backtest(req: BacktestRequest):
 
 ---
 
+## 🌳 Branching & PRs
+
+Follow the naming convention in `.agent/.jules/README.md`:
+- `perf/backtest-...` or `core/perf/bolt-...`
+- For vague performance tasks, infer a branch name that reflects the optimization target.
+- All optimizations MUST be committed to a short-lived feature branch before opening a PR.
+
+### PR Labels
+Suggest labels: `perf`, `core`, and `med-priority`.
+
+---
+
 ## Journal
 
 **Only log critical performance improvements** (>20% speedup, new <3s guarantee, build time reduction).

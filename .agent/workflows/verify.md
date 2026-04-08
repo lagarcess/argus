@@ -16,9 +16,9 @@ description: Run the full test suite, linting, and type checking.
    poetry run pytest tests/ -v --cov=src/argus --cov-report=term-missing
    ```
 
-3. Verify no legacy references:
-   ```
-   grep -r "crypto_signals" src/ tests/ --include="*.py"
+3. Verify no local enviroment files are about to be commited:
+   ```bash
+   git ls-files "**/.env*" ":(exclude)**/*.env.example" 2>/dev/null | grep -q . && echo "❌ SECRETS IN GIT!" || echo "✅ Clean"
    ```
 
 4. Report results: pass/fail for each step + coverage percentage.
