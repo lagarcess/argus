@@ -48,6 +48,8 @@
   - Per-hour limit (Tier 4): 1000 req/hour (ecosystem protection)
     **is_admin = true** bypasses all rate limits and quotas.
 - **Admin Bypass**: Any user with `is_admin: true` in profiles gets unlimited access and is excluded from PostHog tracking (set once for founder email).
+- **Data fetching**: All market data always sourced from Alpaca (with retries and exponential backoff); no user uploads or alternative providers in V1.
+- **Corporate actions**: Automatically handled using Alpaca's adjusted close/volume data for stocks/ETFs (splits, dividends); explicit flag planned for V2.
 
 **Endpoints (API Version: /api/v1/)**
 
@@ -106,6 +108,8 @@ All list endpoints use cursor pagination.
     "name": "Golden Cross DR",
     "symbol": "BTC/USDT",
     "timeframe": "1h",
+    "start_date": "2025-01-01T00:00:00Z",
+    "end_date": "2026-04-01T00:00:00Z",
     "entry_criteria": [
       {
         "indicator": "SMA",
@@ -158,6 +162,11 @@ All list endpoints use cursor pagination.
     "results": {
       "total_return_pct": 14.5,
       "win_rate": 0.62,
+      "sharpe_ratio": 1.8,
+      "sortino_ratio": 2.1,
+      "calmar_ratio": 1.2,
+      "profit_factor": 1.5,
+      "expectancy": 0.45,
       "max_drawdown_pct": 0.05,
       "equity_curve": [100, 101.5, 100.2, ...],   // portfolio value, starts at 100
       "trades": [ { "entry_time": "...", "entry_price": 65000, "exit_price": 67000, "pnl_pct": 3.1 } ],  // first 5 trades only (snippet)
@@ -220,7 +229,7 @@ All list endpoints use cursor pagination.
 **Database Schema (PostgreSQL + RLS)**
 
 - **profiles**: id (PK), is_admin (boolean, default false), subscription_tier, theme, lang, backtest_quota, last_quota_reset, feature_flags (JSONB).
-- **strategies**: id (PK), user_id (FK), name, symbol, timeframe, entry_criteria (JSONB), exit_criteria (JSONB), indicators_config (JSONB), patterns (text[]), executed_at (nullable timestamp → immutable).
+- **strategies**: id (PK), user_id (FK), name, symbol, timeframe, start_date, end_date, entry_criteria (JSONB), exit_criteria (JSONB), indicators_config (JSONB), patterns (text[]), executed_at (nullable timestamp → immutable).
 - **simulations**: id (PK), strategy_id (FK), config_snapshot (JSONB), summary (JSONB — sparkline + basic metrics), reality_gap_metrics (JSONB), full_result (JSONB — full trades + curve; capped <10MB or moved to Supabase Storage), created_at.
 - **features**: id (PK — flag name), is_enabled (bool).
 
@@ -265,3 +274,6 @@ All list endpoints use cursor pagination.
 - [ ] Endpoint dependency order clear?
 
 If all ✅, lock it. If ❌ on any, send back for revision.
+
+**Next Iteration Briefing**  
+V2 (informed by this V1 contract as source-of-truth): optional `data_adjusted: false` raw mode + corporate-action impact breakdown, multi-asset (behind flag), basic options with Greeks (Pro+ tier), custom indicator uploads, and full walk-forward/OOS in engine (addressing 2026 overfitting gaps). Engine rebuild will expose these via feature flags without breaking V1 clients.
