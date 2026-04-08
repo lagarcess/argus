@@ -4,7 +4,7 @@ description: TDD development loop — write test, implement, verify.
 
 # /implement — Test-Driven Development
 
-1. **Create branch**: `<type>/issue-<num>-<short-desc>` (e.g., `feat/issue-42-backtest-api`).
+1. **Create branch**: `[scope/]<type>/*` (e.g., `feat/backtest-api` or `web/fix/form-validation`).
 
 2. **Write failing test** (Red phase):
    - Create or update test file in `tests/`.

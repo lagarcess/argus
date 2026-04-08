@@ -12,9 +12,10 @@ description: Create a comprehensive pull request from current changes.
    - **Changes**: List of modified files grouped by component.
    - **Testing**: What tests were added/modified.
    - **Screenshots**: If UI changes (link to capture).
+   - **Labels**: Select relevant labels (e.g. `feature`, `core`).
 
-3. **Branch naming**: `<type>/issue-<num>-<short-desc>`
-   - Types: `feat`, `fix`, `refactor`, `chore`, `docs`
+3. **Branch naming**: `[scope/]<type>/*` (e.g. `feat/strategy-builder` or `web/fix/header`)
+   - Types: feat, fix, chore, docs, perf, refactor, test
 
 4. **Commit message format** (conventional commits):
    ```

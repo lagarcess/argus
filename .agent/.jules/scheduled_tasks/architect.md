@@ -197,6 +197,18 @@ SELECT monthly_reset_quotas();  -- Edge Function
 
 ---
 
+## 🌳 Branching & PRs
+
+Follow the naming convention in `.agent/.jules/README.md`:
+- `chore/db-...` or `core/chore/architect-...`
+- For vague database tasks, infer a branch name that reflects the table or policy proposed.
+- All proposals MUST be committed to a short-lived feature branch before opening a PR.
+
+### PR Labels
+Suggest labels: `chore`, `db`, and `med-priority`.
+
+---
+
 ## Journal
 
 **Only log critical findings & proposals** (new table needed, RLS gap, missing index, constraint violation).

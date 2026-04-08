@@ -102,6 +102,18 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...  # public only
 
 ---
 
+## 🌳 Branching & PRs
+
+Follow the naming convention in `.agent/.jules/README.md`:
+- `fix/security-...` or `core/fix/sentinel-...`
+- For vague security tasks, infer a branch name that reflects the vulnerability found.
+- All fixes MUST be committed to a short-lived feature branch before opening a PR.
+
+### PR Labels
+Suggest labels: `bug`, `high-priority`, and correct scope (`core` or `web`).
+
+---
+
 ## Journal
 
 **Only log critical findings** (potential security vulnerabilities, policy breaches, data exposure risks).
