@@ -114,9 +114,7 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     )
     monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
 
-    from argus.api.main import supabase_client
-
-    monkeypatch.setattr(supabase_client, "rpc", MagicMock())
+    monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
 
     response = client.post(
         "/api/v1/backtests",

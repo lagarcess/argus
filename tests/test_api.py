@@ -134,9 +134,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
 
     # Mock the RPC quota decrement
-    from argus.api.main import supabase_client
-
-    monkeypatch.setattr(supabase_client, "rpc", MagicMock())
+    monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
 
     # Mock persistence service calls
     persistence_service.get_strategy = MagicMock(
@@ -153,9 +151,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     persistence_service.save_simulation = MagicMock(return_value="sim_789")
 
     # Mock the RPC quota decrement
-    from argus.api.main import supabase_client
-
-    monkeypatch.setattr(supabase_client, "rpc", MagicMock())
+    monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
 
     response = client.post(
         "/api/v1/backtests",
