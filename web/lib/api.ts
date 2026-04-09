@@ -5,7 +5,7 @@
  * auto-generated types from the backend FastAPI schema.
  */
 
-import { UserResponse as GeneratedUserResponse, BacktestRequest, SimulationLogEntry, PaginatedHistory, ProfileUpdate, SsoRequest, SsoResponse } from "./generated";
+import { UserResponse as GeneratedUserResponse, BacktestRequest, SimulationLogEntry, PaginatedHistory, ProfileUpdate, SsoRequest, SsoResponse, BacktestResponse } from "./generated";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -64,7 +64,7 @@ export async function fetchApi<T>(
 
 export type UserResponse = GeneratedUserResponse;
 export type HistoryResponse = PaginatedHistory;
-export type { BacktestRequest, SimulationLogEntry, ProfileUpdate, SsoRequest, SsoResponse };
+export type { BacktestRequest, SimulationLogEntry, ProfileUpdate, SsoRequest, SsoResponse, BacktestResponse };
 
 /* ==========================================================================
    MANUALLY MAINTAINED TYPES (Internal Simulation Data Structures)
@@ -102,9 +102,4 @@ export interface BacktestResultData {
 export interface SimulationData {
   result: BacktestResultData;
   strategies: { name: string };
-}
-
-export interface BacktestResponse {
-  simulation_id: string | null;
-  result: Record<string, unknown>; // Mapped from Python BacktestResult dict
 }

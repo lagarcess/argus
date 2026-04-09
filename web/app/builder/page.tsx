@@ -50,8 +50,8 @@ export default function BuilderPage() {
 
     // Filter out empty symbols and enforce max 3
     const filteredSymbols = symbols.filter(s => s.trim() !== "").slice(0, 3);
-    if (filteredSymbols.length === 0) {
-      setError("Please provide at least one asset symbol.");
+    if (filteredSymbols.length !== 1) {
+      setError("Please provide exactly one asset symbol.");
       return;
     }
 
@@ -62,9 +62,18 @@ export default function BuilderPage() {
       name: strategyName || "Unnamed Strategy",
       symbol: filteredSymbols[0],
       timeframe,
-      patterns: entryPatterns, // Assuming entry patterns maps to patterns
-      indicators_config: { rsi: { period: rsiPeriod === "" ? null : Number(rsiPeriod) } },
-      entry_criteria: [], // Optional
+      patterns: entryPatterns,
+      indicators_config: {
+        rsi: {
+          period: rsiPeriod === "" ? null : Number(rsiPeriod),
+          oversold: Number(rsiOversold),
+          overbought: Number(rsiOverbought)
+        },
+        ema: { period: emaPeriod === "" ? null : Number(emaPeriod) },
+        slippage: Number(slippage),
+        fees: Number(fees),
+        benchmark: benchmarkSymbol
+      },
     };
 
     try {
@@ -125,7 +134,7 @@ export default function BuilderPage() {
               <div className="grid grid-cols-2 gap-6 mb-8">
                 <div>
                   <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
-                    Assets (Max 3)
+                    Asset Symbol
                   </label>
                   <input
                     type="text"
