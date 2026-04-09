@@ -96,8 +96,8 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
 
     # Mock engine and dependencies to avoid real DB/API calls/instantiation
-    from argus.engine import BacktestResult, MetricsResult, EquityCurvePoint
-    
+    from argus.engine import EquityCurvePoint, MetricsResult
+
     metrics = MetricsResult(
         total_return_pct=14.5,
         sharpe_ratio=1.8,
@@ -112,45 +112,49 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
         beta=1.1,
         calmar_ratio=1.2,
         avg_trade_duration="2d 4h",
-        avg_trade_duration_bars=50
+        avg_trade_duration_bars=50,
     )
     equity_curve = [
         EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
-        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5)
+        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
     ]
     mock_result = BacktestResult(
         metrics=metrics,
         equity_curve=equity_curve,
         trades=[],
         reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
-        pattern_breakdown={}
+        pattern_breakdown={},
     )
-    
+
     mock_engine = MagicMock()
     mock_engine.run.return_value = mock_result
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
     monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
-    
+
     # Mock the RPC quota decrement
     from argus.api.main import supabase_client
+
     monkeypatch.setattr(supabase_client, "rpc", MagicMock())
 
     # Mock persistence service calls
-    persistence_service.get_strategy = MagicMock(return_value={
-        "id": "123",
-        "name": "Test Strategy",
-        "symbol": "BTC/USDT",
-        "timeframe": "1h",
-        "start_date": None,
-        "end_date": None
-    })
+    persistence_service.get_strategy = MagicMock(
+        return_value={
+            "id": "123",
+            "name": "Test Strategy",
+            "symbol": "BTC/USDT",
+            "timeframe": "1h",
+            "start_date": None,
+            "end_date": None,
+        }
+    )
     persistence_service.save_strategy = MagicMock(return_value={"id": "strat_456"})
     persistence_service.save_simulation = MagicMock(return_value="sim_789")
 
     # Mock the RPC quota decrement
     from argus.api.main import supabase_client
+
     monkeypatch.setattr(supabase_client, "rpc", MagicMock())
 
     response = client.post(

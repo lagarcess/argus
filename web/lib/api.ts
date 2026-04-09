@@ -1,7 +1,7 @@
 /**
  * Argus API Client
  *
- * This file consolidates hand-written network helpers with 
+ * This file consolidates hand-written network helpers with
  * auto-generated types from the backend FastAPI schema.
  */
 

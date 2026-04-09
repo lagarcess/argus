@@ -181,7 +181,9 @@ class PersistenceService:
                 "summary": result.metrics.model_dump(safe=True),
                 "reality_gap_metrics": result.reality_gap_metrics,
                 "full_result": {
-                    "equity_curve": [p.model_dump(safe=True) for p in result.equity_curve],
+                    "equity_curve": [
+                        p.model_dump(safe=True) for p in result.equity_curve
+                    ],
                     "trades": [t.model_dump(safe=True) for t in result.trades],
                     "pattern_breakdown": result.pattern_breakdown,
                 },

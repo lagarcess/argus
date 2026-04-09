@@ -50,6 +50,8 @@ class UserCache:
 
 
 _user_cache = UserCache()
+
+
 def _decode_supabase_jwt(token: str) -> Optional[Dict[str, Any]]:
     """Decode and validate a Supabase JWT."""
     try:

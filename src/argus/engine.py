@@ -606,5 +606,5 @@ class ArgusEngine:
             benchmark_equity_curve=benchmark_equity_curve,
             trades=trades,
             reality_gap_metrics={"slippage_impact_pct": 0.0, "fee_impact_pct": 0.0},
-            pattern_breakdown={}
+            pattern_breakdown={},
         )

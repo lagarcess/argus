@@ -17,9 +17,7 @@ class AuthRequest(BaseModel):
     mode: Literal["login", "signup"] = Field(
         default="login", description="login or signup"
     )
-    provider: Optional[Literal["email", "google", "discord"]] = Field(
-        default="email"
-    )
+    provider: Optional[Literal["email", "google", "discord"]] = Field(default="email")
     email: Optional[str] = None
     password: Optional[str] = None
     oauth_token: Optional[str] = None
@@ -73,7 +71,9 @@ class BacktestRequest(BaseModel):
             if not self.end_date:
                 missing.append("end_date")
             if missing:
-                raise ValueError(f"Missing required inline strategy fields: {', '.join(missing)}")
+                raise ValueError(
+                    f"Missing required inline strategy fields: {', '.join(missing)}"
+                )
 
         return self
 

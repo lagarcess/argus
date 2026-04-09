@@ -22,7 +22,7 @@ export default function LandingPage() {
   const [isHighlighted, setIsHighlighted] = useState(false);
   const authPanelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { login } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   // Handle hash-based navigation for mode switching
   useEffect(() => {
@@ -42,12 +42,19 @@ export default function LandingPage() {
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
 
+  // Redirect if authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, authLoading, router]);
+
   const scrollToAuth = (mode?: "login" | "signup") => {
     if (mode) setAuthMode(mode);
-    
+
     // Smooth scroll to the panel
     authPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    
+
     // Trigger highlight effect
     setIsHighlighted(true);
     setTimeout(() => setIsHighlighted(false), 2000);
@@ -66,7 +73,6 @@ export default function LandingPage() {
         });
         if (signupError) throw signupError;
         if (data.session) {
-          login(data.session.access_token, data.session.user.email || email);
           router.push("/dashboard");
         } else {
           setError("Verification email sent. Please check your inbox.");
@@ -78,7 +84,6 @@ export default function LandingPage() {
         });
         if (loginError) throw loginError;
         if (data.session) {
-          login(data.session.access_token, data.session.user.email || email);
           router.push("/dashboard");
         }
       }
@@ -174,8 +179,8 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div 
-          id="auth-panel" 
+        <div
+          id="auth-panel"
           ref={authPanelRef}
           className={`relative group perspective-1000 transition-all duration-700 ${isHighlighted ? 'scale-[1.02]' : ''}`}
         >
@@ -193,7 +198,7 @@ export default function LandingPage() {
                 <CheckCircle2 className="w-12 h-12 text-success mx-auto" strokeWidth={1.5} />
                 <h3 className="text-lg font-bold text-on-surface uppercase tracking-tight">Email Dispatched</h3>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  We've sent a recovery link to <span className="text-primary font-bold">{email}</span>. 
+                  We've sent a recovery link to <span className="text-primary font-bold">{email}</span>.
                   Check your inbox to finalize your credentials.
                 </p>
                 <button
@@ -274,7 +279,7 @@ export default function LandingPage() {
                   className="w-full py-3.5 mt-4 bg-surface-container-highest border border-outline-variant hover:bg-primary hover:text-on-primary hover:border-primary rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "PROCESSING..." : (
-                    authMode === "login" ? "SIGN IN TO TERMINAL" : 
+                    authMode === "login" ? "SIGN IN TO TERMINAL" :
                     authMode === "signup" ? "CREATE FREE ACCOUNT" : "SEND RECOVERY LINK"
                   )}
                 </button>

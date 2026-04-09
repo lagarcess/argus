@@ -291,7 +291,9 @@ def run_backtest(
         # 1. Resolve Strategy Configuration
         if request.strategy_id:
             logger.info(f"Fetching strategy {request.strategy_id} for backtest")
-            strat_record = persistence_service.get_strategy(request.strategy_id, user_id_str)
+            strat_record = persistence_service.get_strategy(
+                request.strategy_id, user_id_str
+            )
             if not strat_record:
                 raise HTTPException(status_code=404, detail="Strategy not found")
 
@@ -347,7 +349,11 @@ def run_backtest(
         )
 
         # Determine asset class from symbols
-        ac = AssetClass.CRYPTO if any(s in (symbols[0] or "") for s in ["BTC", "ETH", "SOL"]) else AssetClass.EQUITY
+        ac = (
+            AssetClass.CRYPTO
+            if any(s in (symbols[0] or "") for s in ["BTC", "ETH", "SOL"])
+            else AssetClass.EQUITY
+        )
 
         result = engine.run(
             symbols=symbols,
@@ -360,14 +366,19 @@ def run_backtest(
 
         # 3. Post-Execution Hooks (Atomic Quota + PostHog)
         if not user.is_admin:
-            emit_posthog_event("backtest_run", {
-                "user_id": user_id_str,
-                "tier": user.subscription_tier,
-                "symbol": symbols[0] if symbols else "unknown"
-            })
+            emit_posthog_event(
+                "backtest_run",
+                {
+                    "user_id": user_id_str,
+                    "tier": user.subscription_tier,
+                    "symbol": symbols[0] if symbols else "unknown",
+                },
+            )
             if supabase_client:
                 try:
-                    supabase_client.rpc("decrement_user_quota", {"user_uuid": user_id_str}).execute()
+                    supabase_client.rpc(
+                        "decrement_user_quota", {"user_uuid": user_id_str}
+                    ).execute()
                 except Exception as e:
                     logger.error(f"Failed to decrement quota: {e}")
 
@@ -412,15 +423,21 @@ def run_backtest(
                         entry_time=t.entry_time,
                         entry_price=t.entry_price,
                         exit_price=t.exit_price,
-                        pnl_pct=t.pnl_pct
-                    ) for t in result.trades[:50] # Top 50 recent
+                        pnl_pct=t.pnl_pct,
+                    )
+                    for t in result.trades[:50]  # Top 50 recent
                 ],
                 reality_gap_metrics=RealityGapMetrics(
-                    slippage_impact_pct=result.reality_gap_metrics.get("slippage_impact_pct", 0.0),
-                    fee_impact_pct=result.reality_gap_metrics.get("fee_impact_pct", 0.0)
-                ) if hasattr(result, "reality_gap_metrics") and isinstance(result.reality_gap_metrics, dict) else RealityGapMetrics(slippage_impact_pct=0, fee_impact_pct=0),
-                pattern_breakdown=getattr(result, "pattern_breakdown", {})
-            )
+                    slippage_impact_pct=result.reality_gap_metrics.get(
+                        "slippage_impact_pct", 0.0
+                    ),
+                    fee_impact_pct=result.reality_gap_metrics.get("fee_impact_pct", 0.0),
+                )
+                if hasattr(result, "reality_gap_metrics")
+                and isinstance(result.reality_gap_metrics, dict)
+                else RealityGapMetrics(slippage_impact_pct=0, fee_impact_pct=0),
+                pattern_breakdown=getattr(result, "pattern_breakdown", {}),
+            ),
         )
 
     except ValueError as e:
@@ -428,7 +445,10 @@ def run_backtest(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.exception("Backtest execution failed")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Backtest failed: {e}") from e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Backtest failed: {e}",
+        ) from e
 
 
 @app.get("/api/v1/backtests/{id}", response_model=BacktestResponse)
@@ -470,15 +490,20 @@ def get_backtest_detail(
                     entry_time=t.get("entry_time"),
                     entry_price=t.get("entry_price"),
                     exit_price=t.get("exit_price"),
-                    pnl_pct=t.get("pnl_pct")
-                ) for t in full_result.get("trades", [])[:50]
+                    pnl_pct=t.get("pnl_pct"),
+                )
+                for t in full_result.get("trades", [])[:50]
             ],
             reality_gap_metrics=RealityGapMetrics(
-                slippage_impact_pct=sim_data.get("reality_gap_metrics", {}).get("slippage_impact_pct", 0.0),
-                fee_impact_pct=sim_data.get("reality_gap_metrics", {}).get("fee_impact_pct", 0.0)
+                slippage_impact_pct=sim_data.get("reality_gap_metrics", {}).get(
+                    "slippage_impact_pct", 0.0
+                ),
+                fee_impact_pct=sim_data.get("reality_gap_metrics", {}).get(
+                    "fee_impact_pct", 0.0
+                ),
             ),
-            pattern_breakdown=full_result.get("pattern_breakdown", {})
-        )
+            pattern_breakdown=full_result.get("pattern_breakdown", {}),
+        ),
     )
 
 
@@ -504,7 +529,9 @@ def get_user_history(
         return PaginatedHistory(
             simulations=[SimulationLogEntry(**s) for s in summaries],
             total=total,
-            next_cursor=summaries[-1].get("id") if (summaries and len(summaries) >= limit) else None
+            next_cursor=summaries[-1].get("id")
+            if (summaries and len(summaries) >= limit)
+            else None,
         )
 
     except Exception as e:

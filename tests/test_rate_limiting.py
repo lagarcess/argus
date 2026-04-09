@@ -50,6 +50,7 @@ def mock_user_admin():
 def test_rate_limit_exceeded(mock_user_free):
     """Test that 402 is raised when quota is 0."""
     from argus.api.auth import auth_required
+
     app.dependency_overrides[auth_required] = lambda: mock_user_free
 
     response = client.post(
@@ -65,11 +66,12 @@ def test_rate_limit_exceeded(mock_user_free):
 def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     """Test that pro user with remaining quota succeeds."""
     from argus.api.auth import check_rate_limit
+
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_pro
 
     # Mock engine and dependencies
-    from argus.engine import BacktestResult, MetricsResult, EquityCurvePoint
-    
+    from argus.engine import BacktestResult, EquityCurvePoint, MetricsResult
+
     metrics = MetricsResult(
         total_return_pct=14.5,
         sharpe_ratio=1.8,
@@ -84,30 +86,36 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
         beta=1.1,
         calmar_ratio=1.2,
         avg_trade_duration="2d 4h",
-        avg_trade_duration_bars=50
+        avg_trade_duration_bars=50,
     )
     equity_curve = [
         EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
-        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5)
+        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
     ]
     mock_result = BacktestResult(
         metrics=metrics,
         equity_curve=equity_curve,
         trades=[],
         reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
-        pattern_breakdown={}
+        pattern_breakdown={},
     )
-    
+
     mock_engine = MagicMock()
     mock_engine.run.return_value = mock_result
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
     monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.persistence_service.get_strategy", MagicMock(return_value={"id":"123", "name":"X", "symbol":"BTC", "timeframe":"1h"}))
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_strategy",
+        MagicMock(
+            return_value={"id": "123", "name": "X", "symbol": "BTC", "timeframe": "1h"}
+        ),
+    )
     monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
-    
+
     from argus.api.main import supabase_client
+
     monkeypatch.setattr(supabase_client, "rpc", MagicMock())
 
     response = client.post(
@@ -122,10 +130,11 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
 def test_admin_bypass(mock_user_admin, monkeypatch):
     """Test that admin bypasses quota even if 0."""
     from argus.api.auth import check_rate_limit
+
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_admin
 
-    from argus.engine import BacktestResult, MetricsResult, EquityCurvePoint
-    
+    from argus.engine import BacktestResult, EquityCurvePoint, MetricsResult
+
     metrics = MetricsResult(
         total_return_pct=14.5,
         sharpe_ratio=1.8,
@@ -140,30 +149,36 @@ def test_admin_bypass(mock_user_admin, monkeypatch):
         beta=1.1,
         calmar_ratio=1.2,
         avg_trade_duration="2d 4h",
-        avg_trade_duration_bars=50
+        avg_trade_duration_bars=50,
     )
     equity_curve = [
         EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
-        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5)
+        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
     ]
     mock_result = BacktestResult(
         metrics=metrics,
         equity_curve=equity_curve,
         trades=[],
         reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
-        pattern_breakdown={}
+        pattern_breakdown={},
     )
-    
+
     mock_engine = MagicMock()
     mock_engine.run.return_value = mock_result
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
     monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.persistence_service.get_strategy", MagicMock(return_value={"id":"123", "name":"X", "symbol":"BTC", "timeframe":"1h"}))
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_strategy",
+        MagicMock(
+            return_value={"id": "123", "name": "X", "symbol": "BTC", "timeframe": "1h"}
+        ),
+    )
     monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
-    
+
     from argus.api.main import supabase_client
+
     monkeypatch.setattr(supabase_client, "rpc", MagicMock())
 
     response = client.post(
