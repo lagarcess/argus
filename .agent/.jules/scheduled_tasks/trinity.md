@@ -14,6 +14,19 @@
 
 ---
 
+## 🔍 Discovery & Organization Rules (MANDATORY)
+
+To prevent file duplication and maintain a clean test suite, follow these rules:
+
+1. **Greedy Discovery**: Before creating any new test file, you MUST run `ls tests/` and `grep` to check for existing tests for that module.
+2. **Naming Convention**:
+   - Use `tests/test_<module_name>.py` for backend.
+   - Use `web/__tests__/<Component>.test.tsx` for frontend.
+3. **Consolidation First**: If `tests/test_<module>.py` already exists, **append** your new test cases to that file. ONLY create a new file if no relevant test file exists for the domain.
+4. **No Fragmented Tests**: Do not create separate files for different HTTP methods of the same endpoint (e.g., no `test_strat_get.py` + `test_strat_post.py`). Keep them in one shared file.
+
+---
+
 ## Key Commands
 
 **Backend Tests:**
@@ -135,6 +148,7 @@ describe('StrategyBuilder', () => {
 - ❌ No rate-limit tests (quota tier logic unchecked)
 - ❌ Mock data doesn't use Faker (unrealistic test scenarios)
 - ❌ Slow tests without `@pytest.mark.slow` skip
+- ❌ **Creating `test_<module>_endpoints.py` when `test_<module>.py` already exists.** (Consolidate into the existing file instead).
 
 ---
 
