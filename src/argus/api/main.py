@@ -360,16 +360,8 @@ def run_backtest(
             )
         )
 
-        # Determine asset class from symbols
-        # Determine asset class from symbols (Robust check: Alpaca crypto uses '/' or specific coin identifiers)
-        is_crypto = False
-        if symbols:
-            first_symbol = symbols[0] or ""
-            is_crypto = "/" in first_symbol or any(
-                coin in first_symbol.upper()
-                for coin in ["BTC", "ETH", "SOL", "USDT", "DOGE"]
-            )
-        ac = AssetClass.CRYPTO if is_crypto else AssetClass.EQUITY
+        # Determine asset class from symbols using centralized utility
+        ac = AssetClass.from_symbol(symbols[0] if symbols else "")
 
         result = engine.run(
             config=config,
@@ -432,7 +424,7 @@ def run_backtest(
                         exit_price=t["exit_price"],
                         pnl_pct=t["pnl_pct"],
                     )
-                    for t in result.trades[:5]
+                    for t in result.trades[:50]
                 ],
                 reality_gap_metrics=RealityGapMetrics(
                     slippage_impact_pct=result.reality_gap_metrics.get(
@@ -530,8 +522,16 @@ def get_user_history(
             user_id_str, limit=limit, cursor=cursor
         )
 
+        # Map to SimulationLogEntry, ensuring win_rate is decimal
+        formatted_simulations = []
+        for s in summaries:
+            s_copy = s.copy()
+            if s_copy.get("win_rate") is not None and s_copy["win_rate"] > 1.0:
+                s_copy["win_rate"] = s_copy["win_rate"] / 100.0
+            formatted_simulations.append(SimulationLogEntry(**s_copy))
+
         return PaginatedHistory(
-            simulations=[SimulationLogEntry(**s) for s in summaries],
+            simulations=formatted_simulations,
             total=total,
             next_cursor=summaries[-1].get("id")
             if (summaries and len(summaries) >= limit)

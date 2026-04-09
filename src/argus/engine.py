@@ -73,6 +73,28 @@ class ArgusEngine:
                 return df[target.lower()]
         return 0.0
 
+    def _to_pandas_freq(self, timeframe: str) -> str:
+        """Maps Argus timeframe strings to standard Pandas frequency aliases."""
+        mapping = {
+            "1day": "D",
+            "1d": "D",
+            "1hour": "h",
+            "1h": "h",
+            "4hour": "4h",
+            "4h": "4h",
+            "15min": "15T",
+            "15m": "15T",
+            "1min": "1T",
+            "1m": "1T",
+            "month": "M",
+            "mo": "M",
+            "week": "W",
+            "w": "W",
+        }
+        # Normalize and map
+        clean = timeframe.lower().replace(" ", "")
+        return mapping.get(clean, timeframe)
+
     def _evaluate_criteria(
         self, df: pd.DataFrame, criteria: List[Dict[str, Any]]
     ) -> pd.Series:
@@ -91,7 +113,13 @@ class ArgusEngine:
             col_name = f"{indicator_name.upper()}_{period}"
             if col_name not in df.columns:
                 try:
-                    # pandas-ta dynamic call
+                    # pandas-ta dynamic call with validation
+                    if not hasattr(df.ta, indicator_name):
+                        logger.warning(
+                            f"Indicator '{indicator_name}' not supported by pandas-ta"
+                        )
+                        continue
+
                     func = getattr(df.ta, indicator_name)
                     func(length=period, append=True)
                     # Note: pandas-ta naming can vary, but usually matches IND_PERIOD
@@ -221,7 +249,7 @@ class ArgusEngine:
             tp_stop=config.exit_criteria.get("take_profit_pct"),
             fees=config.fees,
             slippage=config.slippage,
-            freq=config.timeframe,  # VectorBT uses freq but usually matches timeframe string if standard
+            freq=self._to_pandas_freq(config.timeframe),
         )
 
         # 7. Metrics Extraction

@@ -72,7 +72,7 @@ def test_get_history(monkeypatch, mock_user):
                     "total_return_pct": 14.5,
                     "sharpe_ratio": 1.8,
                     "max_drawdown_pct": 5.2,
-                    "win_rate_pct": 62.0,
+                    "win_rate": 62.0,  # Legacy pct in DB, should be mapped to 0.62 by API
                     "total_trades": 42,
                     "created_at": "2026-04-07T13:15:00Z",
                 }
@@ -88,6 +88,7 @@ def test_get_history(monkeypatch, mock_user):
     assert data["total"] == 100
     assert len(data["simulations"]) == 1
     assert data["simulations"][0]["strategy_name"] == "Golden Cross DR"
+    assert data["simulations"][0]["win_rate"] == 0.62
 
 
 def test_backtest_endpoint_xor_validation(monkeypatch, mock_user):
@@ -133,7 +134,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     # Mock engine and dependencies to avoid real DB/API calls/instantiation
     mock_result = EngineBacktestResults(
         total_return_pct=14.5,
-        win_rate=0.62,
+        win_rate=62.0,  # Engine returns percentage
         sharpe_ratio=1.8,
         sortino_ratio=2.1,
         calmar_ratio=1.2,
@@ -180,6 +181,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     data = response.json()
     assert "id" in data
     assert data["results"]["total_return_pct"] == 14.5
+    assert data["results"]["win_rate"] == 0.62
     assert data["config_snapshot"]["timeframe"] == "1h"
 
 
