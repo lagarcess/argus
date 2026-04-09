@@ -59,20 +59,12 @@ export default function BuilderPage() {
     setError(null);
 
     const request: BacktestRequest = {
-      strategy_name: strategyName || "Unnamed Strategy",
-      symbols: filteredSymbols,
-      asset_class: "crypto",
+      name: strategyName || "Unnamed Strategy",
+      symbol: filteredSymbols[0],
       timeframe,
-      entry_patterns: entryPatterns,
-      exit_patterns: [], // Simplified for UI
-      confluence_mode: confluenceMode,
-      slippage,
-      fees,
-      rsi_period: rsiPeriod === "" ? null : Number(rsiPeriod),
-      rsi_oversold: Number(rsiOversold),
-      rsi_overbought: Number(rsiOverbought),
-      ema_period: emaPeriod === "" ? null : Number(emaPeriod),
-      benchmark_symbol: benchmarkSymbol,
+      patterns: entryPatterns, // Assuming entry patterns maps to patterns
+      indicators_config: { rsi: { period: rsiPeriod === "" ? null : Number(rsiPeriod) } },
+      entry_criteria: [], // Optional
     };
 
     try {
