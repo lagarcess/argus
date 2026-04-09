@@ -198,7 +198,7 @@ export default function LandingPage() {
                 <CheckCircle2 className="w-12 h-12 text-success mx-auto" strokeWidth={1.5} />
                 <h3 className="text-lg font-bold text-on-surface uppercase tracking-tight">Email Dispatched</h3>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  We've sent a recovery link to <span className="text-primary font-bold">{email}</span>.
+                  We&apos;ve sent a recovery link to <span className="text-primary font-bold">{email}</span>.
                   Check your inbox to finalize your credentials.
                 </p>
                 <button

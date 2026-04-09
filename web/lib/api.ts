@@ -116,6 +116,7 @@ export type SimulationLogEntry = {
 export type HistoryResponse = {
     simulations: Array<SimulationLogEntry>;
     total: number;
+    next_cursor?: string | null;
 };
 
 export type ProfileUpdate = {
