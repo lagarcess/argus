@@ -248,15 +248,33 @@ def test_delete_strategy_failed_delete(mock_strategy_db, monkeypatch):
 def test_create_strategy_success(
     mock_user, mock_strategy_db, valid_strategy_payload, monkeypatch
 ):
+    """
+    Test creating a strategy.
+    Verifies success status, payload mapping, and implementation efficiency
+    (no redundant fetch after save).
+    """
+    # Mock the save operation
     mock_save = MagicMock(return_value=mock_strategy_db)
     monkeypatch.setattr(persistence_service, "save_strategy", mock_save)
 
+    #  Mock get_strategy to verify it is NOT called (efficiency check)
+    mock_get = MagicMock()
+    monkeypatch.setattr(persistence_service, "get_strategy", mock_get)
+
+    # Act
     response = client.post("/api/v1/strategies", json=valid_strategy_payload)
+
+    # Assert Functionality
     assert response.status_code == 201
     assert response.json()["id"] == mock_strategy_db["id"]
     assert "x-ratelimit-limit" in response.headers
     assert response.headers["x-ratelimit-limit"] == "30"
+
+    # Assert Correct Params
     mock_save.assert_called_once_with(str(mock_user.id), valid_strategy_payload)
+
+    # Assert Efficiency
+    mock_get.assert_not_called()
 
 
 def test_create_strategy_failed_save(valid_strategy_payload, monkeypatch):
