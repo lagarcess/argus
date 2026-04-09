@@ -92,9 +92,11 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
 
     app.dependency_overrides[check_rate_limit] = lambda: mock_user
 
-    # Mock the emit_posthog_event
+    # Mock the emit_posthog_event and market data clients
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
     monkeypatch.setattr("argus.api.main.get_alpaca_fetcher", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
 
     # Mock engine and dependencies to avoid real DB/API calls/instantiation
     from argus.engine import EquityCurvePoint, MetricsResult
