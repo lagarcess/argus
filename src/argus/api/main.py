@@ -45,7 +45,7 @@ from argus.config import (
 )
 from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, UserResponse
-from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
+from argus.engine import ArgusEngine, StrategyConfig
 from argus.market.data_provider import MarketDataProvider
 from argus.supabase import supabase_client
 
@@ -80,29 +80,6 @@ class AssetCache:
 
 # Global singleton cache for the asset endpoint
 asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
-
-
-def _background_save_simulation(
-    user_id: str,
-    strategy_id: str,
-    symbol: str,
-    result: BacktestResult,
-    simulation_id: str,
-    timeframe: str | None = None,
-):
-    """Robust wrapper for background persistence with separate try/except."""
-    try:
-        persistence_service.save_simulation(
-            user_id=user_id,
-            strategy_id=strategy_id,
-            symbol=symbol,
-            timeframe=timeframe or "",
-            result=result,
-            simulation_id=simulation_id,
-        )
-        logger.info(f"Successfully saved simulation {simulation_id} in background.")
-    except Exception as e:
-        logger.error(f"Failed to save simulation {simulation_id} in background: {e}")
 
 
 @asynccontextmanager
@@ -329,8 +306,8 @@ def run_backtest(
                 "name": config.name,
                 "symbol": symbols[0] if symbols else "",
                 "timeframe": timeframe or "",
-                "start_date": start_dt.isoformat() if start_dt else None,
-                "end_date": end_dt.isoformat() if end_dt else None,
+                "start_date": start_dt,
+                "end_date": end_dt,
                 "entry_criteria": config.entry_criteria,
                 "exit_criteria": config.exit_criteria,
                 "indicators_config": config.indicators_config,
@@ -349,11 +326,12 @@ def run_backtest(
         )
 
         # Determine asset class from symbols
-        ac = (
-            AssetClass.CRYPTO
-            if any(s in (symbols[0] or "") for s in ["BTC", "ETH", "SOL"])
-            else AssetClass.EQUITY
+        # Determine asset class from symbols (Robust check: Alpaca crypto uses '/' or specific coin identifiers)
+        is_crypto = "/" in (symbols[0] or "") or any(
+            coin in (symbols[0] or "").upper()
+            for coin in ["BTC", "ETH", "SOL", "USDT", "DOGE"]
         )
+        ac = AssetClass.CRYPTO if is_crypto else AssetClass.EQUITY
 
         result = engine.run(
             symbols=symbols,
@@ -460,7 +438,7 @@ def get_backtest_detail(
     """Get the full details of a specific simulation."""
     response.headers["X-RateLimit-Limit"] = "100"
     response.headers["X-RateLimit-Remaining"] = "99"
-    response.headers["X-RateLimit-Reset"] = "1712534400"
+    response.headers["X-RateLimit-Reset"] = str(int(time.time() + 3600))
 
     # Fetch real data from persistence
     sim_data = persistence_service.get_simulation(id, user.id)
@@ -517,7 +495,7 @@ def get_user_history(
     """Get the summarized simulation history for the current user with pagination."""
     response.headers["X-RateLimit-Limit"] = "100"
     response.headers["X-RateLimit-Remaining"] = "99"
-    response.headers["X-RateLimit-Reset"] = str(int(datetime.now().timestamp() + 3600))
+    response.headers["X-RateLimit-Reset"] = str(int(time.time() + 3600))
 
     try:
         user_id_str = str(user.id)

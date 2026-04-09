@@ -189,7 +189,7 @@ class StrategyCreate(BaseModel):
     @field_validator("timeframe")
     @classmethod
     def validate_timeframe_strategy(cls, v: str) -> str:
-        allowed = {"1Day", "1Hour", "4Hour", "15Min", "1Min"}
+        allowed = {"1Day", "1Hour", "4Hour", "15Min", "1Min", "1d", "4h", "1h", "15m"}
         if v not in allowed:
             raise ValueError(f"timeframe must be one of {allowed}")
         return v

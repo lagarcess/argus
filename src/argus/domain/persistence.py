@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, cast
 
 from loguru import logger
 
+from argus.api.schemas import SimulationLogEntry
 from argus.config import get_settings
 from argus.engine import BacktestResult
 from supabase import Client, create_client
@@ -243,7 +244,7 @@ class PersistenceService:
             # Fetch paginated data joined with strategy name
             res = (
                 self.client.table("simulations")
-                .select("id, symbol, timeframe, created_at, result, strategies(name)")
+                .select("id, symbol, timeframe, created_at, summary, strategies(name)")
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
                 .range(offset, offset + limit - 1)
@@ -252,12 +253,7 @@ class PersistenceService:
 
             summaries: List[Dict[str, Any]] = []
             for row in res.data:
-                # Safely extract metrics from the stored JSONB
-                result_data: Any = cast(Dict[str, Any], row).get("result", {})
-                metrics = cast(Dict[str, Any], result_data).get("metrics", {})
-
                 strategy_data: Any = cast(Dict[str, Any], row).get("strategies", {})
-                # Some Supabase setups return objects, some arrays for joins depending on relation type
                 if isinstance(strategy_data, list) and len(strategy_data) > 0:
                     strategy_name = strategy_data[0].get("name", "Unknown Strategy")
                 elif isinstance(strategy_data, dict):
@@ -267,37 +263,22 @@ class PersistenceService:
                 else:
                     strategy_name = "Unknown Strategy"
 
-                summary = {
+                # Map row to SimulationLogEntry for consistent API response
+                entry_data = {
                     "id": cast(Dict[str, Any], row).get("id"),
                     "strategy_name": strategy_name,
-                    "symbols": [cast(Dict[str, Any], row).get("symbol")]
-                    if cast(Dict[str, Any], row).get("symbol")
-                    else [],
+                    "symbols": [cast(Dict[str, Any], row).get("symbol")],
                     "timeframe": cast(Dict[str, Any], row).get("timeframe"),
                     "status": "completed",
-                    "total_return_pct": cast(Dict[str, Any], metrics).get(
-                        "total_return_pct", 0.0
-                    ),
-                    "sharpe_ratio": cast(Dict[str, Any], metrics).get(
-                        "sharpe_ratio", 0.0
-                    ),
-                    "win_rate_pct": cast(Dict[str, Any], metrics).get(
-                        "win_rate_pct", 0.0
-                    ),
-                    "max_drawdown_pct": cast(Dict[str, Any], metrics).get(
-                        "max_drawdown_pct", 0.0
-                    ),
-                    "total_trades": cast(Dict[str, Any], metrics).get("total_trades", 0),
-                    "alpha": cast(Dict[str, Any], metrics).get("alpha", 0.0),
-                    "beta": cast(Dict[str, Any], metrics).get("beta", 0.0),
-                    "calmar_ratio": cast(Dict[str, Any], metrics).get(
-                        "calmar_ratio", 0.0
-                    ),
-                    "avg_trade_duration": cast(Dict[str, Any], metrics).get(
-                        "avg_trade_duration", "0m"
-                    ),
                     "created_at": cast(Dict[str, Any], row).get("created_at"),
                 }
+
+                # Mix in the summary metrics
+                metrics = cast(Dict[str, Any], row).get("summary", {})
+                entry_data.update(metrics)
+
+                # Validate against schema and dump for response
+                summary = SimulationLogEntry.model_validate(entry_data).model_dump()
                 summaries.append(summary)
 
             return summaries, total

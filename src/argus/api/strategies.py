@@ -1,3 +1,4 @@
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -33,6 +34,7 @@ def create_strategy(
         # Add rate limit headers mock (actual rate limit via check_rate_limit would normally set this in middleware)
         response.headers["X-RateLimit-Limit"] = "30"
         response.headers["X-RateLimit-Remaining"] = "29"
+        response.headers["X-RateLimit-Reset"] = str(int(time.time() + 3600))
 
         strategy_data = strategy.model_dump()
         db_strategy = persistence_service.save_strategy(user_id_str, strategy_data)

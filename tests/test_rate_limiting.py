@@ -175,9 +175,8 @@ def test_admin_bypass(mock_user_admin, monkeypatch):
     )
     monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
 
-    from argus.api.main import supabase_client
-
-    monkeypatch.setattr(supabase_client, "rpc", MagicMock())
+    # Mock the RPC quota decrement
+    monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
 
     response = client.post(
         "/api/v1/backtests",
