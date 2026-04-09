@@ -12,6 +12,7 @@ from fastapi import (
     Depends,
     FastAPI,
     HTTPException,
+    Query,
     Request,
     Response,
     status,
@@ -102,6 +103,13 @@ asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
 async def lifespan(app: FastAPI):
     """Lifecycle events."""
     logger.info("Initializing Argus API...")
+    try:
+        # Prime the asset cache to avoid latency on first request
+        fetcher = get_alpaca_fetcher()
+        fetcher.get_active_assets()
+        logger.info("Asset registry primed.")
+    except Exception as e:
+        logger.warning(f"Could not prime asset registry: {e}")
     yield
     logger.info("Shutting down Argus API...")
 
@@ -279,6 +287,7 @@ def run_backtest(
     request: BacktestRequest,
     response: Response,
     background_tasks: BackgroundTasks,
+    strategy_id: Optional[str] = Query(None),  # noqa: B008
     user: UserResponse = Depends(check_rate_limit),  # noqa: B008
     fetcher: AlpacaDataFetcher = Depends(get_alpaca_fetcher),  # noqa: B008
     stock_client: StockHistoricalDataClient = Depends(get_stock_data_client),  # noqa: B008
@@ -287,6 +296,8 @@ def run_backtest(
     """
     Execute a backtest simulation with XOR logic (Strategy ID or Inline config).
     """
+    # 0. Sync strategy_id from Query or Body for XOR check
+    sid = strategy_id or request.strategy_id
     # Rate limit headers mock for the UI
     response.headers["X-RateLimit-Limit"] = "100"
     response.headers["X-RateLimit-Remaining"] = "99"
@@ -298,11 +309,9 @@ def run_backtest(
 
     try:
         # 1. Resolve Strategy Configuration
-        if request.strategy_id:
-            logger.info(f"Fetching strategy {request.strategy_id} for backtest")
-            strat_record = persistence_service.get_strategy(
-                request.strategy_id, user_id_str
-            )
+        if sid:
+            logger.info(f"Fetching strategy {sid} for backtest")
+            strat_record = persistence_service.get_strategy(sid, user_id_str)
             if not strat_record:
                 raise HTTPException(status_code=404, detail="Strategy not found")
 
@@ -324,7 +333,7 @@ def run_backtest(
             timeframe = strat_record["timeframe"]
             start_dt = strat_record.get("start_date")
             end_dt = strat_record.get("end_date")
-            strategy_id = request.strategy_id
+            strategy_id = sid
         else:
             # Inline configuration
             config = StrategyInput(
@@ -371,8 +380,16 @@ def run_backtest(
             )
         )
 
-        # Determine asset class from symbols using centralized utility
-        ac = AssetClass.from_symbol(symbols[0] if symbols else "")
+        # 3. Determine Asset Class (Registry-first with Heuristic fallback)
+        symbol = symbols[0] if symbols else ""
+        is_valid, alpaca_class = fetcher.validate_asset(symbol)
+
+        if is_valid and alpaca_class:
+            ac = AssetClass.from_alpaca(alpaca_class)
+        else:
+            ac = AssetClass.from_symbol(symbol)
+            if symbol:
+                logger.debug(f"Symbol {symbol} not in registry, using heuristic: {ac}")
 
         result = engine.run(
             config=config,

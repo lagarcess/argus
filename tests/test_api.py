@@ -134,7 +134,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     from argus.engine import EngineBacktestResults
 
     app.dependency_overrides[check_rate_limit] = lambda: mock_user
-    app.dependency_overrides[get_alpaca_fetcher] = lambda: MagicMock()
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
 

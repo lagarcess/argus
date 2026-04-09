@@ -19,6 +19,15 @@ class AssetClass(str, Enum):
     EQUITY = "EQUITY"
 
     @classmethod
+    def from_alpaca(cls, alpaca_class: str) -> "AssetClass":
+        """Map Alpaca asset class strings to internal enum."""
+        mapping = {
+            "crypto": cls.CRYPTO,
+            "us_equity": cls.EQUITY,
+        }
+        return mapping.get(alpaca_class.lower(), cls.EQUITY)
+
+    @classmethod
     def from_symbol(cls, symbol: str) -> "AssetClass":
         """
         Heuristic to determine asset class from symbol.

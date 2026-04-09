@@ -72,7 +72,10 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_pro
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
-    app.dependency_overrides[get_alpaca_fetcher] = lambda: MagicMock()
+    # Create a mock that supports unpacking for validate_asset
+    fetcher_mock = MagicMock()
+    fetcher_mock.validate_asset.return_value = (True, "equity")
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
 
     # Mock engine and dependencies
     from argus.engine import EngineBacktestResults
@@ -124,7 +127,10 @@ def test_admin_bypass(mock_user_admin, monkeypatch):
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_admin
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
-    app.dependency_overrides[get_alpaca_fetcher] = lambda: MagicMock()
+    # Create a mock that supports unpacking for validate_asset
+    fetcher_mock = MagicMock()
+    fetcher_mock.validate_asset.return_value = (True, "equity")
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
 
     from argus.engine import EngineBacktestResults
 
