@@ -17,7 +17,7 @@ class MockAlpacaFetcher:
 
     def fetch_bars(self, symbol, timeframe, start, end=None):
         # Generate 100 periods of mock data
-        dates = pd.date_range(start=start, periods=100, freq="H", tz=timezone.utc)
+        dates = pd.date_range(start=start, periods=100, freq="h", tz=timezone.utc)
         df = pd.DataFrame(
             {
                 "open": np.random.uniform(40000, 45000, 100),
@@ -221,7 +221,7 @@ def test_get_assets(monkeypatch, mock_user):
     assert response.headers["X-RateLimit-Limit"] == "100"
 
 
-def test_v1_backtest_e2e_high_fidelity(monkeypatch, mock_user):
+def test_backtest_e2e(monkeypatch, mock_user):
     """
     High-fidelity E2E test integrated into test_api.py.
     Verifies full Engine-to-Response logic flow using MockAlpacaFetcher.
