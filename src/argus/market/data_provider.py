@@ -102,16 +102,19 @@ class MarketDataProvider:
         self,
         stock_client: StockHistoricalDataClient,
         crypto_client: CryptoHistoricalDataClient,
+        fetcher: Optional[Any] = None,
     ):
         """
-        Initialize with data clients.
+        Initialize with data clients and optional hybrid fetcher.
 
         Args:
             stock_client: Alpaca Stock client
             crypto_client: Alpaca Crypto client
+            fetcher: AlpacaDataFetcher instance for hybrid proxy routing
         """
         self.stock_client = stock_client
         self.crypto_client = crypto_client
+        self.fetcher = fetcher
 
     def _parse_timeframe(self, timeframe_str: str) -> TimeFrame:
         import re
@@ -176,8 +179,41 @@ class MarketDataProvider:
             pd.DataFrame: DataFrame containing historical bars
         """
         try:
-            tf = self._parse_timeframe(timeframe_str)
             settings = get_settings()
+
+            # Hybrid Router: Try Proxy first if enabled and standard request
+            if (
+                self.fetcher
+                and settings.ENABLE_MARKET_DATA_PROXY
+                and not adjustment
+                and not asof
+                and not feed
+                and not page_token
+                and not sort
+                and isinstance(symbol, str)
+            ):
+                try:
+                    df = self.fetcher.fetch_bars(
+                        symbol=symbol,
+                        timeframe=timeframe_str,
+                        start=start_dt,
+                        end=end_dt,
+                    )
+                    if not df.empty:
+                        # Ensure column normalization
+                        try:
+                            df.columns = [str(c).lower() for c in df.columns]
+                        except Exception as e:
+                            logger.warning(
+                                f"Proxy column normalization failed for {symbol}: {e}"
+                            )
+                        return df
+                except Exception as e:
+                    logger.warning(
+                        f"Proxy fetch failed for {symbol}, falling back to SDK: {e}"
+                    )
+
+            tf = self._parse_timeframe(timeframe_str)
 
             # Convert string parameters to Alpaca Enums if provided
             adj = None
@@ -221,6 +257,13 @@ class MarketDataProvider:
                     page_token=page_token,
                     sort=sort,
                 )
+
+            # Post-processing: Normalize all columns to lowercase
+            if df_out is not None and not df_out.empty:
+                try:
+                    df_out.columns = [str(c).lower() for c in df_out.columns]
+                except Exception as e:
+                    logger.warning(f"SDK column normalization failed for {symbol}: {e}")
 
             return df_out
 

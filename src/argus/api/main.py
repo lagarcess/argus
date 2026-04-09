@@ -4,9 +4,6 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 from uuid import uuid4
 
-from alpaca.trading.enums import AssetClass as TradingAssetClass
-from alpaca.trading.enums import AssetStatus
-from alpaca.trading.requests import GetAssetsRequest
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -41,8 +38,8 @@ from argus.api.strategies import router as strategies_router
 from argus.config import (
     get_crypto_data_client,
     get_stock_data_client,
-    get_trading_client,
 )
+from argus.core.alpaca_fetcher import AlpacaDataFetcher
 from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, UserResponse
 from argus.engine import ArgusEngine, StrategyConfig
@@ -50,6 +47,7 @@ from argus.market.data_provider import MarketDataProvider
 from argus.supabase import supabase_client
 
 persistence_service = PersistenceService()
+alpaca_fetcher = AlpacaDataFetcher()
 
 
 def emit_posthog_event(event: str, properties: dict[str, Any]) -> None:
@@ -321,7 +319,9 @@ def run_backtest(
         logger.info(f"Running engine for simulation {simulation_id}")
         engine = ArgusEngine(
             data_provider=MarketDataProvider(
-                get_stock_data_client(), get_crypto_data_client()
+                get_stock_data_client(),
+                get_crypto_data_client(),
+                fetcher=alpaca_fetcher,
             )
         )
 
@@ -583,43 +583,19 @@ def get_assets(
         # Check cache first
         assets = asset_cache.get()
 
-        # Fetch from Alpaca if cache miss
+        # Fetch from Alpaca (via Proxy) if cache miss
         if not assets:
-            logger.info("AssetCache miss: fetching from Alpaca")
-            trading_client = get_trading_client()
-            req_equity = GetAssetsRequest(
-                status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.US_EQUITY
-            )
-            req_crypto = GetAssetsRequest(
-                status=AssetStatus.ACTIVE, asset_class=TradingAssetClass.CRYPTO
-            )
-
-            equity_assets = trading_client.get_all_assets(req_equity)
-            crypto_assets = trading_client.get_all_assets(req_crypto)
-
-            if isinstance(equity_assets, list):
-                assets.extend(equity_assets)
-            if isinstance(crypto_assets, list):
-                assets.extend(crypto_assets)
-
+            logger.info("AssetCache miss: fetching from Alpaca Proxy")
+            assets = alpaca_fetcher.get_active_assets()
             # Update cache
             asset_cache.set(assets)
 
-        # O(N) case-insensitive search with set for uniqueness
+        # O(N) case-insensitive search
         search_lower = search.lower()
-        matched_symbols = set()
-
-        for a in assets:
-            sym = getattr(a, "symbol", None)
-            if not sym or sym in matched_symbols:
-                continue
-
-            name = getattr(a, "name", "")
-            if search_lower in sym.lower() or (name and search_lower in name.lower()):
-                matched_symbols.add(sym)
+        matched_symbols = [sym for sym in assets if search_lower in sym.lower()]
 
         # Return alphabetically sorted matches
-        return sorted(list(matched_symbols))
+        return sorted(matched_symbols)
 
     except Exception as e:
         logger.error(f"Failed to fetch assets: {e}")

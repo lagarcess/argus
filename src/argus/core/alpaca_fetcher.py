@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
 
 import httpx
@@ -79,6 +80,7 @@ class AlpacaDataFetcher:
         }
         logger.debug(f"Cached {len(self._assets_map)} active assets.")
 
+    @lru_cache(maxsize=128)  # noqa: B019
     def validate_asset(self, symbol: str) -> tuple[bool, str | None]:
         """
         Validates if an asset is active using the local cache.
@@ -109,6 +111,12 @@ class AlpacaDataFetcher:
 
         return False, None
 
+    def get_active_assets(self) -> list[str]:
+        """Returns a list of all active asset symbols from the local cache."""
+        self._load_assets()
+        assert self._assets_map is not None
+        return list(self._assets_map.keys())
+
     @retry_with_backoff(max_retries=3)
     def fetch_bars(
         self,
@@ -123,8 +131,8 @@ class AlpacaDataFetcher:
         Args:
             symbol: The asset symbol
             timeframe: The timeframe for the bars (e.g., '1Day' or '1d')
-            start: The start datetime
-            end: The end datetime (optional)
+            start: The start datetime (UTC)
+            end: The end datetime (optional, UTC)
 
         Returns:
             Pandas DataFrame with UTC DateTimeIndex and standard OHLCV columns
@@ -141,7 +149,9 @@ class AlpacaDataFetcher:
             raise ValueError(f"Asset '{symbol}' is not valid or active.")
 
         # Ensure UTC safety for start/end
-        start_utc = pd.to_datetime(start, utc=True)
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        start_utc = start.astimezone(timezone.utc)
         start_str = start_utc.isoformat().replace("+00:00", "Z")
 
         params = {
@@ -153,7 +163,9 @@ class AlpacaDataFetcher:
         }
 
         if end:
-            end_utc = pd.to_datetime(end, utc=True)
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+            end_utc = end.astimezone(timezone.utc)
             params["end"] = end_utc.isoformat().replace("+00:00", "Z")
 
         logger.info(

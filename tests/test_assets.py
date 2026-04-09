@@ -1,17 +1,16 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from argus.api.main import app
+from faker import Faker
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
 
-@patch("argus.api.main.get_trading_client")
+@patch("argus.api.main.alpaca_fetcher.get_active_assets")
 @patch("argus.api.main.check_asset_search_rate_limit")
 @patch("argus.api.auth._decode_supabase_jwt")
-def test_get_assets_success_and_caching(
-    mock_decode, mock_rate_limit, mock_get_trading_client
-):
+def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_assets):
     # Setup mocks
     mock_decode.return_value = {"sub": "user123", "email": "test@test.com"}
     mock_rate_limit.return_value = {
@@ -21,23 +20,9 @@ def test_get_assets_success_and_caching(
         "Retry-After": "0",
     }
 
-    mock_client = MagicMock()
-    mock_get_trading_client.return_value = mock_client
-
-    mock_asset1 = MagicMock()
-    mock_asset1.symbol = "AAPL"
-    mock_asset1.name = "Apple Inc."
-
-    mock_asset2 = MagicMock()
-    mock_asset2.symbol = "BTC/USD"
-    mock_asset2.name = "Bitcoin"
-
-    mock_asset3 = MagicMock()
-    mock_asset3.symbol = "ZZZ"
-    mock_asset3.name = "Sleepy Co."
-
-    # Client will be called twice (for equity and crypto) in a cache miss
-    mock_client.get_all_assets.side_effect = [[mock_asset1], [mock_asset2, mock_asset3]]
+    # Setup mock data using Faker
+    fake = Faker()
+    mock_get_assets.return_value = ["AAPL", "BTC/USD", "ZZZ", fake.word().upper()]
 
     # Clear cache before test explicitly safely
     from argus.api.main import asset_cache
@@ -47,7 +32,7 @@ def test_get_assets_success_and_caching(
     if hasattr(asset_cache, "_timestamp"):
         asset_cache._timestamp = 0
 
-    # 1. First call - should hit Alpaca API
+    # 1. First call - should hit Alpaca Proxy
     response1 = client.get(
         "/api/v1/assets?search=a&timeframe=15m",
         headers={"Authorization": "Bearer fake_token"},
@@ -56,7 +41,7 @@ def test_get_assets_success_and_caching(
     assert response1.status_code == 200
     assert response1.json() == ["AAPL"]
     assert "X-RateLimit-Limit" in response1.headers
-    assert mock_client.get_all_assets.call_count == 2
+    assert mock_get_assets.call_count == 1
 
     # 2. Second call - should hit cache
     response2 = client.get(
@@ -67,7 +52,7 @@ def test_get_assets_success_and_caching(
     assert response2.status_code == 200
     assert response2.json() == ["BTC/USD"]
     # Verify Alpaca wasn't called again
-    assert mock_client.get_all_assets.call_count == 2
+    assert mock_get_assets.call_count == 1
 
 
 @patch("argus.api.auth._decode_supabase_jwt")

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+import pandas as pd
 import pytest
 from alpaca.data.timeframe import TimeFrameUnit
 from argus.domain.schemas import AssetClass
@@ -13,9 +14,16 @@ def test_timeframe_parsing_valid(mocker):
     mock_crypto_client = mocker.Mock()
 
     # Mocking the response df
-    mock_df = mocker.Mock()
-    mock_df.empty = False
-    mock_df.index = [datetime.now(timezone.utc)]
+    mock_df = pd.DataFrame(
+        data={
+            "Open": [150.0],
+            "High": [155.0],
+            "Low": [149.0],
+            "Close": [152.0],
+            "Volume": [1000],
+        },
+        index=[datetime.now(timezone.utc)],
+    )
 
     mock_response = mocker.Mock()
     mock_response.df = mock_df

@@ -175,12 +175,16 @@ def test_get_assets(monkeypatch, mock_user):
         "X-RateLimit-Reset": "1712534400",
     }
 
-    mock_client = MagicMock()
-    mock_client.get_all_assets.return_value = [
-        MagicMock(symbol="BTC/USDT", name="Bitcoin"),
-        MagicMock(symbol="AAPL", name="Apple Inc"),
-    ]
-    monkeypatch.setattr("argus.api.main.get_trading_client", lambda: mock_client)
+    # Mock alpaca_fetcher's get_active_assets instead of trading client
+    mock_assets = ["BTC/USDT", "AAPL", "ETH/USD", "TSLA"]
+    monkeypatch.setattr(
+        "argus.api.main.alpaca_fetcher.get_active_assets", lambda: mock_assets
+    )
+
+    # Clear cache to ensure hit
+    from argus.api.main import asset_cache
+
+    asset_cache.set([])
 
     # Test search
     response = client.get("/api/v1/assets?search=btc")
