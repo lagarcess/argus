@@ -129,12 +129,12 @@ describe('StrategyBuilder', () => {
 
 ## Anti-Patterns ❌
 
-❌ Writing tests after code (defeats TDD)
-❌ 100% coverage goal (focus on critical paths)
-❌ Tests that verify implementation, not behavior
-❌ No rate-limit tests (quota tier logic unchecked)
-❌ Mock data doesn't use Faker (unrealistic test scenarios)
-❌ Slow tests without `@pytest.mark.slow` skip
+- ❌ Writing tests after code (defeats TDD)
+- ❌ 100% coverage goal (focus on critical paths)
+- ❌ Tests that verify implementation, not behavior
+- ❌ No rate-limit tests (quota tier logic unchecked)
+- ❌ Mock data doesn't use Faker (unrealistic test scenarios)
+- ❌ Slow tests without `@pytest.mark.slow` skip
 
 ---
 

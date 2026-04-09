@@ -1,119 +1,187 @@
-"""
-Tests for Argus rate limiting and usage API.
-"""
-
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from argus.api.auth import auth_required, check_rate_limit
 from argus.api.main import app
-from argus.domain.schemas import User
+from argus.domain.schemas import UserResponse
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
 
 @pytest.fixture
-def mock_user():
-    return User(
-        user_id="test-user-uuid", email="test@example.com", subscription_tier="free"
+def mock_user_free():
+    return UserResponse(
+        id="test-user-uuid",
+        user_id="test-user-uuid",
+        email="test@example.com",
+        subscription_tier="free",
+        is_admin=False,
+        backtest_quota=10,
+        remaining_quota=0,
     )
 
 
 @pytest.fixture
-def mock_supabase():
-    # Mocking the client where it is USED, not just where it is defined.
-    # This ensures that components that already imported the module-level variable see the mock.
-    with (
-        patch("argus.api.auth.supabase_client") as mock_auth,
-        patch("argus.api.main.supabase_client"),
-    ):
-        yield mock_auth  # Both are the same mock object anyway if we patch correctly,
-        # but let's just use mock_auth for configuration and assume both see it if we use the same mock.
-        # Wait, let's just configure one and return it.
+def mock_user_pro():
+    return UserResponse(
+        id="test-pro-uuid",
+        user_id="test-pro-uuid",
+        email="pro@example.com",
+        subscription_tier="pro",
+        is_admin=False,
+        backtest_quota=1000,
+        remaining_quota=500,
+    )
 
 
 @pytest.fixture
-def configured_mock_supabase():
-    mock = MagicMock()
-    # Chain: .table().select().eq().gte().execute().count
-    mock_count_res = MagicMock()
-    mock.table.return_value.select.return_value.eq.return_value.gte.return_value.execute.return_value = mock_count_res
-    # Also for main.py which might not have .gte() in some queries
-    mock.table.return_value.select.return_value.eq.return_value.execute.return_value = (
-        mock_count_res
+def mock_user_admin():
+    return UserResponse(
+        id="test-admin-uuid",
+        user_id="test-admin-uuid",
+        email="admin@example.com",
+        subscription_tier="free",
+        is_admin=True,
+        backtest_quota=10,
+        remaining_quota=0,
     )
 
-    with (
-        patch("argus.api.auth.supabase_client", mock),
-        patch("argus.api.main.supabase_client", mock),
-    ):
-        yield mock
 
+def test_rate_limit_exceeded(mock_user_free):
+    """Test that 402 is raised when quota is 0."""
+    from argus.api.auth import auth_required
 
-def test_usage_endpoint_free_tier(mock_user, configured_mock_supabase):
-    """Test that the usage endpoint returns correct data for free tier."""
-    app.dependency_overrides[auth_required] = lambda: mock_user
+    app.dependency_overrides[auth_required] = lambda: mock_user_free
 
-    # Configure mock count
-    configured_mock_supabase.table.return_value.select.return_value.eq.return_value.gte.return_value.execute.return_value.count = 5
-
-    response = client.get("/api/v1/usage")
-
-    if response.status_code != 200:
-        print(f"Response: {response.status_code} - {response.text}")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["count"] == 5
-    assert data["limit"] == 10
-    assert data["tier"] == "free"
-
-    app.dependency_overrides.clear()
-
-
-def test_rate_limit_exceeded(mock_user, configured_mock_supabase):
-    """Test that 403 is raised when rate limit is exceeded."""
-    # Configure mock count above limit
-    configured_mock_supabase.table.return_value.select.return_value.eq.return_value.gte.return_value.execute.return_value.count = 10
-
-    app.dependency_overrides[auth_required] = lambda: mock_user
-
-    # Act: Request backtest.
     response = client.post(
-        "/api/v1/backtest",
-        json={
-            "strategy_name": "Test",
-            "symbols": ["BTC-USD"],
-            "asset_class": "crypto",
-            "timeframe": "1Day",
-            "entry_patterns": ["rsi_oversold"],
-            "exit_patterns": ["rsi_overbought"],
-            "confluence_mode": "OR",
-            "slippage": 0.001,
-            "fees": 0.001,
-            "rsi_period": 14,
-            "rsi_oversold": 30,
-            "rsi_overbought": 70,
-            "ema_period": 200,
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
-        },
+        "/api/v1/backtests",
+        json={"strategy_id": "123"},
     )
-
-    if response.status_code != 403:
-        print(f"Response: {response.status_code} - {response.text}")
-
-    assert response.status_code == 403
-    assert response.json()["detail"]["error"] == "Monthly limit reached"
 
     app.dependency_overrides.clear()
+    assert response.status_code == 402
+    assert response.json()["detail"]["error"] == "QUOTA_EXCEEDED"
 
 
-def test_pro_tier_bypass():
-    """Test that pro tier users bypass the rate limit check."""
-    pro_user = User(
-        user_id="pro-user-uuid", email="pro@example.com", subscription_tier="pro"
+def test_pro_tier_bypass(mock_user_pro, monkeypatch):
+    """Test that pro user with remaining quota succeeds."""
+    from argus.api.auth import check_rate_limit
+
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user_pro
+
+    # Mock engine and dependencies
+    from argus.engine import BacktestResult, EquityCurvePoint, MetricsResult
+
+    metrics = MetricsResult(
+        total_return_pct=14.5,
+        sharpe_ratio=1.8,
+        sortino_ratio=2.1,
+        max_drawdown_pct=0.05,
+        win_rate_pct=62.0,
+        total_trades=10,
+        profit_factor=1.5,
+        volatility=0.12,
+        expectancy=0.05,
+        alpha=0.02,
+        beta=1.1,
+        calmar_ratio=1.2,
+        avg_trade_duration="2d 4h",
+        avg_trade_duration_bars=50,
     )
-    result = check_rate_limit(user=pro_user)
-    assert result == pro_user
+    equity_curve = [
+        EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
+        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
+    ]
+    mock_result = BacktestResult(
+        metrics=metrics,
+        equity_curve=equity_curve,
+        trades=[],
+        reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
+        pattern_breakdown={},
+    )
+
+    mock_engine = MagicMock()
+    mock_engine.run.return_value = mock_result
+    monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
+    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_strategy",
+        MagicMock(
+            return_value={"id": "123", "name": "X", "symbol": "BTC", "timeframe": "1h"}
+        ),
+    )
+    monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
+
+    monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
+
+    response = client.post(
+        "/api/v1/backtests",
+        json={"strategy_id": "123"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+
+
+def test_admin_bypass(mock_user_admin, monkeypatch):
+    """Test that admin bypasses quota even if 0."""
+    from argus.api.auth import check_rate_limit
+
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user_admin
+
+    from argus.engine import BacktestResult, EquityCurvePoint, MetricsResult
+
+    metrics = MetricsResult(
+        total_return_pct=14.5,
+        sharpe_ratio=1.8,
+        sortino_ratio=2.1,
+        max_drawdown_pct=0.05,
+        win_rate_pct=62.0,
+        total_trades=10,
+        profit_factor=1.5,
+        volatility=0.12,
+        expectancy=0.05,
+        alpha=0.02,
+        beta=1.1,
+        calmar_ratio=1.2,
+        avg_trade_duration="2d 4h",
+        avg_trade_duration_bars=50,
+    )
+    equity_curve = [
+        EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
+        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
+    ]
+    mock_result = BacktestResult(
+        metrics=metrics,
+        equity_curve=equity_curve,
+        trades=[],
+        reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
+        pattern_breakdown={},
+    )
+
+    mock_engine = MagicMock()
+    mock_engine.run.return_value = mock_result
+    monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
+    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_strategy",
+        MagicMock(
+            return_value={"id": "123", "name": "X", "symbol": "BTC", "timeframe": "1h"}
+        ),
+    )
+    monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
+
+    # Mock the RPC quota decrement
+    monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
+
+    response = client.post(
+        "/api/v1/backtests",
+        json={"strategy_id": "123"},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200

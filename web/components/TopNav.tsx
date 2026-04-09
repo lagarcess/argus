@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "./AuthContext";
 import { User, Settings } from "lucide-react";
 
-export function TopNav() {
+export function TopNav({ onSignInClick }: { onSignInClick?: () => void }) {
   const { user, token } = useAuth();
   const [usage, setUsage] = useState<{ count: number, limit: number | null, tier: string } | null>(null);
 
@@ -73,9 +73,16 @@ export function TopNav() {
               <span className="text-neutral-200">Dashboard</span>
             </Link>
           </div>
+        ) : onSignInClick ? (
+          <button
+            onClick={onSignInClick}
+            className="h-11 px-8 rounded-full bg-cyan-400 text-neutral-950 text-xs font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] flex items-center justify-center font-bold"
+          >
+            Sign In
+          </button>
         ) : (
           <Link
-            href="/#auth-panel"
+            href="/#login"
             className="h-11 px-8 rounded-full bg-cyan-400 text-neutral-950 text-xs font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] flex items-center justify-center font-bold"
           >
             Sign In

@@ -93,12 +93,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...  # public only
 
 ## Anti-Patterns ❌
 
-❌ Secrets in `.gitignore` but committed accidentally
-❌ Frontend code tries to use SERVICE_ROLE_KEY
-❌ RLS disabled on user-owned tables
-❌ No validation on pattern names (injection risk)
-❌ Rate limit only on backend, not per-subnet
-❌ Mock data contains real API keys
+- ❌ Secrets in `.gitignore` but committed accidentally
+- ❌ Frontend code tries to use SERVICE_ROLE_KEY
+- ❌ RLS disabled on user-owned tables
+- ❌ No validation on pattern names (injection risk)
+- ❌ Rate limit only on backend, not per-subnet
+- ❌ Mock data contains real API keys
 
 ---
 

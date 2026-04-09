@@ -5,14 +5,10 @@ Separate from engine.py schemas to keep API contracts clean
 and allow versioning independently of core engine models.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
-
-# ---------------------------------------------------------------------------
-# Auth
-# ---------------------------------------------------------------------------
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AuthRequest(BaseModel):
@@ -21,12 +17,9 @@ class AuthRequest(BaseModel):
     mode: Literal["login", "signup"] = Field(
         default="login", description="login or signup"
     )
-    provider: Optional[Literal["email", "google", "apple", "facebook"]] = Field(
-        default="email"
-    )
+    provider: Optional[Literal["email", "google", "discord"]] = Field(default="email")
     email: Optional[str] = None
     password: Optional[str] = None
-    # Social SSO flow sends an OAuth code/token instead
     oauth_token: Optional[str] = None
 
 
@@ -37,57 +30,85 @@ class AuthResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Backtest request (extends engine StrategyConfig with API-specific fields)
+# Backtest
 # ---------------------------------------------------------------------------
 
 
 class BacktestRequest(BaseModel):
-    """API backtest request payload from the Strategy Builder UI."""
+    """API backtest request payload (XOR)."""
 
-    # Strategy identity
-    strategy_name: str = Field(default="Unnamed Strategy", max_length=120)
+    strategy_id: Optional[str] = None
 
-    # Assets (batched, max 3 per PRD)
-    symbols: List[str] = Field(
-        ..., min_length=1, max_length=3, description="1–3 symbols to backtest"
-    )
-    asset_class: Literal["crypto", "equity"] = Field(default="crypto")
-    timeframe: str = Field(default="1Day", description="e.g. 1Day, 1Hour, 15Min")
-    start_date: Optional[date] = Field(default=None)
-    end_date: Optional[date] = Field(default=None)
+    # Inline strategy definition (XOR with strategy_id)
+    name: Optional[str] = None
+    symbol: Optional[str] = None
+    timeframe: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    entry_criteria: Optional[List[Dict[str, Any]]] = None
+    exit_criteria: Optional[Dict[str, Any]] = None
+    indicators_config: Optional[Dict[str, Any]] = None
+    patterns: Optional[List[str]] = None
 
-    # Strategy config fields (mirrors engine.StrategyConfig)
-    entry_patterns: List[str] = Field(default_factory=list)
-    exit_patterns: List[str] = Field(default_factory=list)
-    confluence_mode: Literal["OR", "AND"] = Field(default="OR")
-    slippage: float = Field(default=0.001, ge=0.0, le=0.05)
-    fees: float = Field(default=0.001, ge=0.0, le=0.05)
+    @model_validator(mode="after")
+    def validate_xor(self):
+        has_id = bool(self.strategy_id)
+        has_inline = bool(self.symbol or self.timeframe)
 
-    # Indicator confluence
-    rsi_period: Optional[int] = Field(default=None, ge=2, le=200)
-    rsi_oversold: float = Field(default=30.0, ge=0.0, le=100.0)
-    rsi_overbought: float = Field(default=70.0, ge=0.0, le=100.0)
-    ema_period: Optional[int] = Field(default=None, ge=2, le=500)
+        if has_id == has_inline:
+            raise ValueError(
+                "Must provide either strategy_id OR inline strategy fields (not both, not neither)"
+            )
 
-    # Risk Metrics & Benchmarking
-    benchmark_symbol: Optional[str] = Field(
-        default="SPY", description="e.g. SPY, BTC-USD"
-    )
+        if has_inline:
+            missing = []
+            if not self.symbol:
+                missing.append("symbol")
+            if not self.timeframe:
+                missing.append("timeframe")
+            if not self.start_date:
+                missing.append("start_date")
+            if not self.end_date:
+                missing.append("end_date")
+            if missing:
+                raise ValueError(
+                    f"Missing required inline strategy fields: {', '.join(missing)}"
+                )
 
-    @field_validator("symbols")
-    @classmethod
-    def validate_symbols_count(cls, v: List[str]) -> List[str]:
-        if len(v) > 3:
-            raise ValueError("Maximum 3 symbols allowed per batch (PRD §7.1)")
-        return [s.upper().strip() for s in v]
+        return self
 
-    @field_validator("timeframe")
-    @classmethod
-    def validate_timeframe(cls, v: str) -> str:
-        allowed = {"1Day", "1Hour", "4Hour", "15Min", "1Min"}
-        if v not in allowed:
-            raise ValueError(f"timeframe must be one of {allowed}")
-        return v
+
+class TradeSnippet(BaseModel):
+    entry_time: str
+    entry_price: float
+    exit_price: float
+    pnl_pct: float
+
+
+class RealityGapMetrics(BaseModel):
+    slippage_impact_pct: float
+    fee_impact_pct: float
+
+
+class BacktestResults(BaseModel):
+    total_return_pct: float
+    win_rate: float
+    sharpe_ratio: float
+    sortino_ratio: float
+    calmar_ratio: float
+    profit_factor: float
+    expectancy: float
+    max_drawdown_pct: float
+    equity_curve: List[float]
+    trades: List[TradeSnippet]
+    reality_gap_metrics: RealityGapMetrics
+    pattern_breakdown: Dict[str, int]
+
+
+class BacktestResponse(BaseModel):
+    id: str
+    config_snapshot: Dict[str, Any]
+    results: BacktestResults
 
 
 # ---------------------------------------------------------------------------
@@ -95,23 +116,6 @@ class BacktestRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class SimulationSummary(BaseModel):
-    id: str
-    strategy_name: str
-    symbol: str
-    date: datetime
-    total_return: float
-    sharpe_ratio: float
-
-
-class PaginatedHistoryResponse(BaseModel):
-    simulations: List[SimulationSummary]
-    total: int
-    limit: int
-    offset: int
-
-
-# Keeping old types to avoid breaking main.py immediately until we patch it next
 class SimulationLogEntry(BaseModel):
     id: str
     strategy_name: str
@@ -123,17 +127,82 @@ class SimulationLogEntry(BaseModel):
     max_drawdown_pct: Optional[float] = None
     win_rate_pct: Optional[float] = None
     total_trades: Optional[int] = None
-
-    # Advanced Metrics
     alpha: Optional[float] = None
     beta: Optional[float] = None
     calmar_ratio: Optional[float] = None
     avg_trade_duration: Optional[str] = None
-
     created_at: datetime
     completed_at: Optional[datetime] = None
 
 
-class HistoryResponse(BaseModel):
+class PaginatedHistory(BaseModel):
     simulations: List[SimulationLogEntry]
     total: int
+    next_cursor: Optional[str] = None
+
+
+class ProfileUpdate(BaseModel):
+    """Schema for updating user profile preferences."""
+
+    theme: Optional[str] = None
+    lang: Optional[str] = None
+
+
+class SSORequest(BaseModel):
+    """Schema for SSO sign-in request."""
+
+    provider: Literal["google", "discord"]
+    redirect_to: str
+
+
+class SSOResponse(BaseModel):
+    """Schema for SSO sign-in response."""
+
+    auth_url: str
+
+
+class PaginatedHistoryResponse(BaseModel):
+    simulations: List[SimulationLogEntry]
+    total: int
+    limit: int
+    offset: int
+
+
+# ---------------------------------------------------------------------------
+# Strategies CRUD
+# ---------------------------------------------------------------------------
+
+
+class StrategyCreate(BaseModel):
+    """Payload for creating or updating a strategy draft."""
+
+    name: str = Field(..., max_length=120)
+    symbol: str
+    timeframe: str
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    entry_criteria: List[Dict[str, Any]] = Field(default_factory=list)
+    exit_criteria: Dict[str, Any] = Field(default_factory=dict)
+    indicators_config: Dict[str, Any] = Field(default_factory=dict)
+    patterns: List[str] = Field(default_factory=list)
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe_strategy(cls, v: str) -> str:
+        allowed = {"1Day", "1Hour", "4Hour", "15Min", "1Min", "1d", "4h", "1h", "15m"}
+        if v not in allowed:
+            raise ValueError(f"timeframe must be one of {allowed}")
+        return v
+
+
+class StrategyResponse(StrategyCreate):
+    """Response model for a strategy, includes db fields."""
+
+    id: str
+    user_id: str
+    executed_at: Optional[datetime] = None
+
+
+class PaginatedStrategiesResponse(BaseModel):
+    strategies: List[StrategyResponse]
+    next_cursor: Optional[str] = None

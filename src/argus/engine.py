@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 import pandas as pd
 import vectorbt as vbt
@@ -17,6 +17,8 @@ from argus.market.data_provider import MarketDataProvider
 
 class StrategyConfig(BaseModel):
     """Configuration for signal generation strategy."""
+
+    name: str = Field(default="Unnamed Strategy", description="Human-readable name.")
 
     entry_patterns: List[str] = Field(
         default_factory=list, description="List of pattern names for entry signals."
@@ -93,6 +95,9 @@ class MetricsResult(BaseModel):
     max_drawdown_pct: float
     win_rate_pct: float
     total_trades: int
+    profit_factor: float
+    volatility: float
+    expectancy: float
     alpha: float
     beta: float
     calmar_ratio: float
@@ -105,6 +110,8 @@ class BacktestResult(BaseModel):
     equity_curve: List[EquityCurvePoint]
     benchmark_equity_curve: Optional[List[EquityCurvePoint]] = None
     trades: List[TradeResult]
+    reality_gap_metrics: Dict[str, float] = Field(default_factory=dict)
+    pattern_breakdown: Dict[str, int] = Field(default_factory=dict)
 
 
 # --- Argus Engine ---
@@ -504,6 +511,9 @@ class ArgusEngine:
             max_drawdown_pct=safe_metric("Max Drawdown [%]"),
             win_rate_pct=safe_metric("Win Rate [%]"),
             total_trades=int(safe_metric("Total Trades", 0)),
+            profit_factor=safe_metric("Profit Factor"),
+            volatility=safe_metric("Volatility (Ann.) [%]"),
+            expectancy=safe_metric("Expectancy"),
             alpha=alpha,
             beta=beta,
             calmar_ratio=calmar_ratio,
@@ -595,4 +605,6 @@ class ArgusEngine:
             equity_curve=equity_curve,
             benchmark_equity_curve=benchmark_equity_curve,
             trades=trades,
+            reality_gap_metrics={"slippage_impact_pct": 0.0, "fee_impact_pct": 0.0},
+            pattern_breakdown={},
         )

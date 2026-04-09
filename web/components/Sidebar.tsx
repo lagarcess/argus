@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "./AuthContext";
+import { LogOut } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -12,6 +14,9 @@ export function Sidebar() {
     { href: "/history", icon: "history", label: "History" },
     { href: "/settings", icon: "settings", label: "Settings" },
   ];
+
+  const { logout } = useAuth();
+  const router = useRouter();
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-neutral-950 border-r border-neutral-800/30 flex-col py-8 z-40 hidden md:flex">
@@ -44,8 +49,19 @@ export function Sidebar() {
         })}
       </div>
 
-      <div className="mt-auto px-6">
-        <Link href="/builder" className="w-full flex items-center justify-center bg-primary text-on-primary-container font-black text-[10px] tracking-widest uppercase py-4 rounded-xl shadow-[0_0_20px_rgba(153,247,255,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-transform">
+      <div className="mt-auto px-6 space-y-3">
+        <button
+          onClick={async () => {
+            await logout();
+            router.push("/");
+          }}
+          className="w-full flex items-center gap-4 px-4 py-3 rounded-xl font-headline text-sm uppercase tracking-widest text-neutral-500 hover:text-error hover:bg-error/5 transition-all duration-300 group"
+        >
+          <LogOut className="w-5 h-5 group-hover:text-error" />
+          Log Out
+        </button>
+
+        <Link href="/builder" className="w-full h-12 flex items-center justify-center bg-cyan-400 text-neutral-950 font-black text-[10px] tracking-widest uppercase rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-transform">
           Execute Backtest
         </Link>
       </div>

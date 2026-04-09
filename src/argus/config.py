@@ -9,6 +9,7 @@ from functools import lru_cache
 from typing import Any
 
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
+from alpaca.trading.client import TradingClient
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -168,3 +169,20 @@ def get_supabase_service_client() -> Client:
             "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment."
         )
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+
+
+@lru_cache()
+def get_trading_client() -> TradingClient:
+    """
+    Get an authenticated Alpaca TradingClient.
+
+    Returns:
+        TradingClient: Authenticated client
+    """
+    # PERFORMANCE: Cache the Alpaca client to avoid creating a new instance on every request
+    settings = get_settings()
+    return TradingClient(
+        api_key=settings.ALPACA_API_KEY,
+        secret_key=settings.ALPACA_SECRET_KEY,
+        paper=settings.ALPACA_PAPER_TRADING,
+    )
