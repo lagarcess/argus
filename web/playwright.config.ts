@@ -4,7 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './tests/vrt',
+  testDir: './e2e/vrt',
+  testMatch: '**/*.vrt.ts',
   /* Maximum time one test can run for. */
   timeout: 30 * 1000,
   expect: {

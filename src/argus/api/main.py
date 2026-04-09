@@ -1,6 +1,7 @@
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any, List, Optional
 from uuid import uuid4
 
@@ -47,7 +48,12 @@ from argus.market.data_provider import MarketDataProvider
 from argus.supabase import supabase_client
 
 persistence_service = PersistenceService()
-alpaca_fetcher = AlpacaDataFetcher()
+
+
+@lru_cache()
+def get_alpaca_fetcher() -> AlpacaDataFetcher:
+    """Lazy initialize the AlpacaDataFetcher."""
+    return AlpacaDataFetcher()
 
 
 def emit_posthog_event(event: str, properties: dict[str, Any]) -> None:
@@ -321,7 +327,7 @@ def run_backtest(
             data_provider=MarketDataProvider(
                 get_stock_data_client(),
                 get_crypto_data_client(),
-                fetcher=alpaca_fetcher,
+                fetcher=get_alpaca_fetcher(),
             )
         )
 
@@ -586,7 +592,7 @@ def get_assets(
         # Fetch from Alpaca (via Proxy) if cache miss
         if not assets:
             logger.info("AssetCache miss: fetching from Alpaca Proxy")
-            assets = alpaca_fetcher.get_active_assets()
+            assets = get_alpaca_fetcher().get_active_assets()
             # Update cache
             asset_cache.set(assets)
 

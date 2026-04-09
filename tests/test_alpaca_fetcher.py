@@ -17,6 +17,7 @@ def bypass_rate_limit_delay(monkeypatch):
 
 @pytest.fixture
 def mock_settings(monkeypatch):
+    get_settings.cache_clear()
     monkeypatch.setenv("SUPABASE_URL", "http://mock-supabase.com")
     monkeypatch.setenv("SUPABASE_ANON_KEY", "mock-anon-key")
     return get_settings()

@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from argus.api.main import app
 from fastapi.testclient import TestClient
@@ -6,10 +6,14 @@ from fastapi.testclient import TestClient
 client = TestClient(app)
 
 
-@patch("argus.api.main.alpaca_fetcher.get_active_assets")
+@patch("argus.api.main.get_alpaca_fetcher")
 @patch("argus.api.main.check_asset_search_rate_limit")
 @patch("argus.api.auth._decode_supabase_jwt")
-def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_assets):
+def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_fetcher):
+    # Mock the fetcher returned by the function
+    mock_fetcher = MagicMock()
+    mock_get_fetcher.return_value = mock_fetcher
+    mock_get_assets = mock_fetcher.get_active_assets
     # Setup mocks
     mock_decode.return_value = {"sub": "user123", "email": "test@test.com"}
     mock_rate_limit.return_value = {
