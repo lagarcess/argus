@@ -23,6 +23,13 @@ export default function LandingPage() {
   const authPanelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Fix hydration and mount state
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle hash-based navigation for mode switching
   useEffect(() => {
@@ -69,6 +76,11 @@ export default function LandingPage() {
 
     try {
       if (authMode === "signup") {
+        if (password !== confirmPassword) {
+          setError("Passwords do not match.");
+          setLoading(false);
+          return;
+        }
         const { data, error: signupError } = await supabase.auth.signUp({
           email,
           password,
@@ -195,7 +207,11 @@ export default function LandingPage() {
               </h2>
             </div>
 
-            {resetSent ? (
+            {!mounted ? (
+               <div className="h-[400px] flex items-center justify-center">
+                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+               </div>
+            ) : resetSent ? (
               <div className="py-8 text-center space-y-4 animate-in fade-in zoom-in duration-500">
                 <CheckCircle2 className="w-12 h-12 text-success mx-auto" strokeWidth={1.5} />
                 <h3 className="text-lg font-bold text-on-surface uppercase tracking-tight">Email Dispatched</h3>
@@ -259,6 +275,24 @@ export default function LandingPage() {
                           <Eye className="w-4 h-4" />
                         )}
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {authMode === "signup" && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">
+                      CONFIRM PASSWORD
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none pr-12"
+                        placeholder="••••••••••••"
+                        required
+                      />
                     </div>
                   </div>
                 )}
@@ -343,6 +377,7 @@ export default function LandingPage() {
               <a href="#" className="underline">Privacy Policy</a>.
             </p>
           </div>
+          {!mounted && <div className="hidden">Hydration Seal</div>}
         </div>
       </main>
 
