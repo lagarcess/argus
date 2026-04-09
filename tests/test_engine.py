@@ -102,14 +102,7 @@ def test_engine_adapter_v1_full_flow():
     # 5. Check Pattern Breakdown
     assert isinstance(results.pattern_breakdown, dict)
 
-    # Print results for visual verification as requested in Task 10 verification
-    print("\n--- Backtest Results Summary ---")
-    print(f"Total Return: {results.total_return_pct:.2f}%")
-    print(f"Win Rate: {results.win_rate:.2f}%")
-    print(f"Sharpe Ratio: {results.sharpe_ratio:.2f}")
-    print(f"Expectancy: {results.expectancy:.2f}")
-    print(f"Trades Count: {len(results.trades)}")
-    print(f"Pattern Breakdown: {results.pattern_breakdown}")
+    # 6. Ensure it's JSON serializable (production requirement)
 
     # Ensure it's JSON serializable (production requirement)
     # Use a custom encoder for datetime if necessary, but here we expect strings
