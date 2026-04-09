@@ -14,13 +14,8 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // For Render deployment compatibility
-  serverRuntimeConfig: {
-    apiUrl: process.env.BACKEND_URL || 'http://localhost:8000',
-  },
-  publicRuntimeConfig: {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL,
-  },
+  // Fix Next.js 16 HMR cross-origin warnings
+  allowedDevOrigins: ['192.168.1.76', 'localhost:3000'],
 };
 
 export default nextConfig;
