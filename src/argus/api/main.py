@@ -380,16 +380,17 @@ def run_backtest(
             )
         )
 
-        # 3. Determine Asset Class (Registry-first with Heuristic fallback)
+        # 3. Determine Asset Class (Strict Registry Validation)
         symbol = symbols[0] if symbols else ""
         is_valid, alpaca_class = fetcher.validate_asset(symbol)
 
-        if is_valid and alpaca_class:
-            ac = AssetClass.from_alpaca(alpaca_class)
-        else:
-            ac = AssetClass.from_symbol(symbol)
-            if symbol:
-                logger.debug(f"Symbol {symbol} not in registry, using heuristic: {ac}")
+        if not is_valid or not alpaca_class:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Asset '{symbol}' is not supported by the Alpaca registry. Check symbol for typos (e.g. 'BTC/USD' or 'AAPL').",
+            )
+
+        ac = AssetClass.from_alpaca(alpaca_class)
 
         result = engine.run(
             config=config,
