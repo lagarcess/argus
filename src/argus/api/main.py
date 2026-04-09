@@ -1,3 +1,4 @@
+import math
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -60,6 +61,16 @@ def get_alpaca_fetcher() -> AlpacaDataFetcher:
 def emit_posthog_event(event: str, properties: dict[str, Any]) -> None:
     """Placeholder for PostHog event emission."""
     logger.info(f"PostHog Event: {event} | Properties: {properties}")
+
+
+def sanitize_metric(v: Any) -> Any:
+    """Ensure floating point values are JSON compliant (no inf/nan)."""
+    if isinstance(v, float):
+        if math.isinf(v) or math.isnan(v):
+            return 0.0
+    elif isinstance(v, list):
+        return [sanitize_metric(x) for x in v]
+    return v
 
 
 class AssetCache:
@@ -408,29 +419,31 @@ def run_backtest(
             id=simulation_id,
             config_snapshot=config.model_dump(),
             results=BacktestResults(
-                total_return_pct=result.total_return_pct,
-                win_rate=result.win_rate / 100.0,
-                sharpe_ratio=result.sharpe_ratio,
-                sortino_ratio=result.sortino_ratio,
-                calmar_ratio=result.calmar_ratio,
-                profit_factor=result.profit_factor,
-                expectancy=result.expectancy,
-                max_drawdown_pct=result.max_drawdown_pct,
-                equity_curve=result.equity_curve,
+                total_return_pct=sanitize_metric(result.total_return_pct),
+                win_rate=sanitize_metric(result.win_rate / 100.0),
+                sharpe_ratio=sanitize_metric(result.sharpe_ratio),
+                sortino_ratio=sanitize_metric(result.sortino_ratio),
+                calmar_ratio=sanitize_metric(result.calmar_ratio),
+                profit_factor=sanitize_metric(result.profit_factor),
+                expectancy=sanitize_metric(result.expectancy),
+                max_drawdown_pct=sanitize_metric(result.max_drawdown_pct),
+                equity_curve=sanitize_metric(result.equity_curve),
                 trades=[
                     TradeSnippet(
                         entry_time=t["entry_time"],
-                        entry_price=t["entry_price"],
-                        exit_price=t["exit_price"],
-                        pnl_pct=t["pnl_pct"],
+                        entry_price=sanitize_metric(t["entry_price"]),
+                        exit_price=sanitize_metric(t["exit_price"]),
+                        pnl_pct=sanitize_metric(t["pnl_pct"]),
                     )
                     for t in result.trades[:50]
                 ],
                 reality_gap_metrics=RealityGapMetrics(
-                    slippage_impact_pct=result.reality_gap_metrics.get(
-                        "slippage_impact_pct", 0.0
+                    slippage_impact_pct=sanitize_metric(
+                        result.reality_gap_metrics.get("slippage_impact_pct", 0.0)
                     ),
-                    fee_impact_pct=result.reality_gap_metrics.get("fee_impact_pct", 0.0),
+                    fee_impact_pct=sanitize_metric(
+                        result.reality_gap_metrics.get("fee_impact_pct", 0.0)
+                    ),
                 ),
                 pattern_breakdown=result.pattern_breakdown,
             ),

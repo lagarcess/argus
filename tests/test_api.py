@@ -17,7 +17,9 @@ class MockAlpacaFetcher:
 
     def fetch_bars(self, symbol, timeframe, start, end=None):
         # Generate 100 periods of mock data
-        dates = pd.date_range(start=start, periods=100, freq="h", tz=timezone.utc)
+        # Normalize start to naive to avoid Pandas timezone disagreement error in CI
+        start_naive = pd.to_datetime(start).replace(tzinfo=None)
+        dates = pd.date_range(start=start_naive, periods=100, freq="h", tz=timezone.utc)
         df = pd.DataFrame(
             {
                 "open": np.random.uniform(40000, 45000, 100),
@@ -93,8 +95,16 @@ def test_get_history(monkeypatch, mock_user):
 
 def test_backtest_endpoint_xor_validation(monkeypatch, mock_user):
     from argus.api.auth import check_rate_limit
+    from argus.api.main import (
+        get_alpaca_fetcher,
+        get_crypto_data_client,
+        get_stock_data_client,
+    )
 
     app.dependency_overrides[check_rate_limit] = lambda: mock_user
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: MagicMock()
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
 
     # Neither ID nor inline
     response = client.post("/api/v1/backtests", json={})
@@ -221,16 +231,22 @@ def test_get_assets(monkeypatch, mock_user):
     assert response.headers["X-RateLimit-Limit"] == "100"
 
 
-def test_backtest_e2e(monkeypatch, mock_user):
+def test_backtest(monkeypatch, mock_user):
     """
     High-fidelity E2E test integrated into test_api.py.
     Verifies full Engine-to-Response logic flow using MockAlpacaFetcher.
     """
     from argus.api.auth import check_rate_limit
-    from argus.api.main import get_alpaca_fetcher
+    from argus.api.main import (
+        get_alpaca_fetcher,
+        get_crypto_data_client,
+        get_stock_data_client,
+    )
 
     app.dependency_overrides[check_rate_limit] = lambda: mock_user
     app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
 
     # Mock persistence
     monkeypatch.setattr(
