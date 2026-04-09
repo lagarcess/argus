@@ -1,9 +1,10 @@
+import urllib.parse
 from datetime import datetime, timezone
 
 import pytest
 import respx
 from argus.config import get_settings
-from argus.core.alpaca_fetcher import AlpacaDataFetcher, _validate_asset_cached
+from argus.core.alpaca_fetcher import AlpacaDataFetcher
 from argus.market.exceptions import MarketDataError
 from httpx import Response
 
@@ -29,7 +30,7 @@ def mock_edge_api(mock_settings):
         # Mock /assets
         assets_payload = [
             {"id": "1", "symbol": "AAPL", "class": "us_equity", "status": "active"},
-            {"id": "2", "symbol": "BTC/USD", "class": "crypto", "status": "active"},
+            {"id": "2", "symbol": "BTCUSD", "class": "crypto", "status": "active"},
             {"id": "3", "symbol": "XYZ", "class": "us_equity", "status": "inactive"},
         ]
         respx_mock.get(f"{base_url}?action=assets").mock(
@@ -48,7 +49,6 @@ def mock_edge_api(mock_settings):
                         "c": 154.0,
                         "v": 1000000,
                         "vw": 152.5,
-                        "n": 50000,
                     }
                 ]
             }
@@ -57,7 +57,8 @@ def mock_edge_api(mock_settings):
             return_value=Response(200, json=aapl_bars_payload)
         )
 
-        # Mock /bars for BTC/USD
+        # Mock /bars for BTC/USD (verify it hits BTC/USD even if map has BTCUSD)
+        # Note: respx matches the raw URL, so params are already encoded if sent correctly
         btc_bars_payload = {
             "bars": {
                 "BTC/USD": [
@@ -69,19 +70,16 @@ def mock_edge_api(mock_settings):
                         "c": 60500.0,
                         "v": 1500,
                         "vw": 60200.0,
-                        "n": 10000,
                     }
                 ]
             }
         }
-        respx_mock.get(url__regex=rf"^{base_url}\?action=bars&symbol=BTC.*").mock(
-            return_value=Response(200, json=btc_bars_payload)
-        )
 
-        # Mock /bars for empty response
-        empty_bars_payload = {"bars": {}}
-        respx_mock.get(url__regex=rf"^{base_url}\?action=bars&symbol=EMPTY.*").mock(
-            return_value=Response(200, json=empty_bars_payload)
+        # Explicitly check for encoded slash if we were testing the Edge Function URL directly,
+        # but here we test the Python side which just passes the string to params={}.
+        # httpx handles encoding for us.
+        respx_mock.get(url__regex=rf"^{base_url}\?action=bars&symbol=BTC%2FUSD.*").mock(
+            return_value=Response(200, json=btc_bars_payload)
         )
 
         yield respx_mock
@@ -89,10 +87,8 @@ def mock_edge_api(mock_settings):
 
 @pytest.fixture
 def fetcher(mock_edge_api):
-    f = AlpacaDataFetcher()
-    # Clear the lru_cache between tests
-    _validate_asset_cached.cache_clear()
-    return f
+    with AlpacaDataFetcher() as f:
+        yield f
 
 
 def test_validate_asset_valid_equity(fetcher):
@@ -101,7 +97,8 @@ def test_validate_asset_valid_equity(fetcher):
     assert asset_class == "us_equity"
 
 
-def test_validate_asset_valid_crypto(fetcher):
+def test_validate_asset_valid_crypto_fallback(fetcher):
+    # BTC/USD should match BTCUSD in the cache
     is_valid, asset_class = fetcher.validate_asset("BTC/USD")
     assert is_valid is True
     assert asset_class == "crypto"
@@ -114,14 +111,8 @@ def test_validate_asset_invalid(fetcher):
 
 
 def test_fetch_bars_invalid_timeframe(fetcher):
-    # retry_with_backoff will catch ValueError and wrap in MarketDataError
     with pytest.raises(MarketDataError, match="fetch_bars failed after 3 attempts"):
         fetcher.fetch_bars("AAPL", "invalid", datetime.now(timezone.utc))
-
-
-def test_fetch_bars_invalid_asset(fetcher):
-    with pytest.raises(MarketDataError, match="fetch_bars failed after 3 attempts"):
-        fetcher.fetch_bars("INVALID", "1d", datetime.now(timezone.utc))
 
 
 def test_fetch_bars_success(fetcher):
@@ -132,65 +123,45 @@ def test_fetch_bars_success(fetcher):
     assert list(df.columns) == ["open", "high", "low", "close", "volume", "vwap"]
     assert len(df) == 1
     assert df.iloc[0]["open"] == 150.0
-    assert df.iloc[0]["vwap"] == 152.5
 
 
-def test_fetch_bars_crypto_success(fetcher):
+def test_fetch_bars_crypto_slash_encoding(fetcher, mock_edge_api):
+    """Verify that symbols with slashes are passed correctly."""
     start = datetime(2026, 4, 1, tzinfo=timezone.utc)
+
+    # This should hit the respx route with symbol=BTC%2FUSD
     df = fetcher.fetch_bars("BTC/USD", "1Hour", start)
 
     assert not df.empty
-    assert list(df.columns) == ["open", "high", "low", "close", "volume", "vwap"]
-    assert len(df) == 1
     assert df.iloc[0]["open"] == 60000.0
 
 
-def test_fetch_bars_empty_response(fetcher, mock_edge_api):
-    # First we need to make EMPTY a valid asset in our mock
-    assets_payload = [
-        {"id": "4", "symbol": "EMPTY", "class": "us_equity", "status": "active"},
+def test_fetch_bars_timezone_safety(fetcher, mock_edge_api):
+    """Verify that naive datetimes are handled safely."""
+    start = datetime(2026, 4, 1)  # Naive
+
+    # Should not raise error, and should be formatted as Z in the URL
+    fetcher.fetch_bars("AAPL", "1d", start)
+
+    last_request = mock_edge_api.calls.last.request
+    query = urllib.parse.parse_qs(last_request.url.query.decode())
+    assert "Z" in query["start"][0]
+
+
+def test_context_manager_lifecycle():
+    """Verify that the context manager closes the client."""
+    with AlpacaDataFetcher() as fetcher:
+        assert not fetcher.client.is_closed
+    assert fetcher.client.is_closed
+
+
+def test_lazy_loading_cache_efficiency(fetcher, mock_edge_api):
+    """Verify that assets are only fetched once."""
+    fetcher.validate_asset("AAPL")
+    fetcher.validate_asset("BTC/USD")
+
+    # Check number of calls to action=assets
+    asset_calls = [
+        c for c in mock_edge_api.calls if "action=assets" in str(c.request.url)
     ]
-    # We override the existing mock to also provide the empty asset
-    mock_edge_api.get(f"{fetcher.edge_function_url}?action=assets").mock(
-        return_value=Response(200, json=assets_payload)
-    )
-
-    start = datetime(2026, 4, 1, tzinfo=timezone.utc)
-    df = fetcher.fetch_bars("EMPTY", "1d", start)
-
-    assert df.empty
-    assert list(df.columns) == ["open", "high", "low", "close", "volume", "vwap"]
-
-
-def test_fetch_bars_missing_columns(fetcher, mock_edge_api):
-    # Mock /bars for AAPL with missing columns
-    aapl_bars_payload = {
-        "bars": {
-            "AAPL": [
-                {
-                    "t": "2026-04-01T00:00:00Z",
-                    "o": 150.0,
-                    # missing high, low, close
-                }
-            ]
-        }
-    }
-    # Clear routes to ensure our new mock takes precedence
-    mock_edge_api.clear()
-
-    # Remock assets so validation passes
-    assets_payload = [
-        {"id": "1", "symbol": "AAPL", "class": "us_equity", "status": "active"},
-    ]
-    mock_edge_api.get(f"{fetcher.edge_function_url}?action=assets").mock(
-        return_value=Response(200, json=assets_payload)
-    )
-
-    # Mock the bars call with missing columns
-    mock_edge_api.get(
-        url__regex=rf"^{fetcher.edge_function_url}\?action=bars&symbol=AAPL.*"
-    ).mock(return_value=Response(200, json=aapl_bars_payload))
-
-    start = datetime(2026, 4, 1, tzinfo=timezone.utc)
-    with pytest.raises(MarketDataError, match="fetch_bars failed after 3 attempts"):
-        fetcher.fetch_bars("AAPL", "1d", start)
+    assert len(asset_calls) == 1

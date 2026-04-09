@@ -72,11 +72,11 @@ serve(async (req) => {
 
       let fetchUrl = "";
       if (assetClass === "crypto") {
-        fetchUrl = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${symbol}&timeframe=${timeframe}&start=${start}`;
+        fetchUrl = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${encodeURIComponent(symbol)}&timeframe=${timeframe}&start=${start}`;
         if (end) fetchUrl += `&end=${end}`;
       } else {
         // us_equity
-        fetchUrl = `https://data.alpaca.markets/v2/stocks/bars?symbols=${symbol}&timeframe=${timeframe}&start=${start}&adjustment=all`;
+        fetchUrl = `https://data.alpaca.markets/v2/stocks/bars?symbols=${encodeURIComponent(symbol)}&timeframe=${timeframe}&start=${start}&adjustment=all`;
         if (end) fetchUrl += `&end=${end}`;
       }
 

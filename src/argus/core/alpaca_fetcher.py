@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from functools import lru_cache
+from datetime import datetime
+from typing import Any
 
 import httpx
 import pandas as pd
@@ -21,34 +21,10 @@ TIME_MAP = {
 ALLOWED_TIMEFRAMES = list(TIME_MAP.keys())
 
 
-@lru_cache(maxsize=128)
-@retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
-def _validate_asset_cached(
-    client: httpx.Client,
-    edge_function_url: str,
-    headers: tuple[tuple[str, str], ...],
-    symbol: str,
-) -> tuple[bool, str | None]:
-    """Cached internal method for validation."""
-    response = client.get(
-        edge_function_url, params={"action": "assets"}, headers=dict(headers)
-    )
-    response.raise_for_status()
-
-    assets = response.json()
-    symbol_upper = symbol.upper()
-
-    for asset in assets:
-        if asset.get("symbol", "").upper() == symbol_upper:
-            return True, asset.get("class")
-
-    return False, None
-
-
 class AlpacaDataFetcher:
     """
     Client for fetching market data via the Supabase Edge Function proxy.
-    This utilizes the Supabase Global CDN for caching responses.
+    This utilizes the Supabase Global CDN and local lazy-loading for caching.
     """
 
     def __init__(self):
@@ -65,12 +41,47 @@ class AlpacaDataFetcher:
             "Content-Type": "application/json",
         }
 
-        # Use httpx Client for connection pooling and efficient HTTP requests
+        # Shared client for connection pooling
         self.client = httpx.Client(timeout=30.0)
+        self._assets_map: dict[str, str] | None = None
+
+    def __enter__(self) -> "AlpacaDataFetcher":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Explicitly close the HTTP client to prevent connection leaks."""
+        self.client.close()
+
+    @retry_with_backoff(max_retries=3)
+    def _load_assets(self) -> None:
+        """
+        Lazy-loads the active asset list from Alpaca.
+        This is a heavy operation (~1MB fetch) cached locally once per instance.
+        """
+        if self._assets_map is not None:
+            return
+
+        logger.info("Initializing regional Alpaca asset cache...")
+        response = self.client.get(
+            self.edge_function_url, params={"action": "assets"}, headers=self.headers
+        )
+        response.raise_for_status()
+
+        assets = response.json()
+        # Map symbol -> asset_class for O(1) lookup
+        self._assets_map = {
+            asset["symbol"].upper(): asset["class"]
+            for asset in assets
+            if "symbol" in asset and "class" in asset
+        }
+        logger.debug(f"Cached {len(self._assets_map)} active assets.")
 
     def validate_asset(self, symbol: str) -> tuple[bool, str | None]:
         """
-        Validates if an asset is active and returns its asset class.
+        Validates if an asset is active using the local cache.
 
         Args:
             symbol: The asset symbol (e.g., 'AAPL', 'BTC/USD')
@@ -80,12 +91,25 @@ class AlpacaDataFetcher:
             - bool: True if the asset is valid and active
             - str | None: The asset class ('us_equity' or 'crypto'), or None if invalid
         """
-        headers_tuple = tuple(self.headers.items())
-        return _validate_asset_cached(
-            self.client, self.edge_function_url, headers_tuple, symbol
-        )
+        self._load_assets()
+        assert self._assets_map is not None
 
-    @retry_with_backoff(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
+        symbol_upper = symbol.upper()
+        asset_class = self._assets_map.get(symbol_upper)
+
+        if asset_class:
+            return True, asset_class
+
+        # Fallback for crypto common formats (e.g., BTC/USD -> BTCUSD)
+        if "/" in symbol_upper:
+            stripped = symbol_upper.replace("/", "")
+            asset_class = self._assets_map.get(stripped)
+            if asset_class:
+                return True, asset_class
+
+        return False, None
+
+    @retry_with_backoff(max_retries=3)
     def fetch_bars(
         self,
         symbol: str,
@@ -99,14 +123,11 @@ class AlpacaDataFetcher:
         Args:
             symbol: The asset symbol
             timeframe: The timeframe for the bars (e.g., '1Day' or '1d')
-            start: The start datetime (will be converted to ISO format)
+            start: The start datetime
             end: The end datetime (optional)
 
         Returns:
-            Pandas DataFrame with UTC DateTimeIndex and columns ['open', 'high', 'low', 'close', 'volume', 'vwap']
-
-        Raises:
-            ValueError: If the asset is invalid or timeframe is not supported
+            Pandas DataFrame with UTC DateTimeIndex and standard OHLCV columns
         """
         if timeframe not in ALLOWED_TIMEFRAMES:
             raise ValueError(
@@ -114,16 +135,15 @@ class AlpacaDataFetcher:
             )
 
         mapped_timeframe = TIME_MAP[timeframe]
-
         is_valid, asset_class = self.validate_asset(symbol)
+
         if not is_valid or not asset_class:
             raise ValueError(f"Asset '{symbol}' is not valid or active.")
 
-        logger.info(
-            f"Fetching bars for {symbol} ({asset_class}) on {mapped_timeframe} from {start}"
-        )
+        # Ensure UTC safety for start/end
+        start_utc = pd.to_datetime(start, utc=True)
+        start_str = start_utc.isoformat().replace("+00:00", "Z")
 
-        start_str = start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
         params = {
             "action": "bars",
             "symbol": symbol,
@@ -133,38 +153,38 @@ class AlpacaDataFetcher:
         }
 
         if end:
-            end_str = end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-            params["end"] = end_str
+            end_utc = pd.to_datetime(end, utc=True)
+            params["end"] = end_utc.isoformat().replace("+00:00", "Z")
+
+        logger.info(
+            f"Fetching {mapped_timeframe} bars for {symbol} ({asset_class}) from {start_str}"
+        )
 
         response = self.client.get(
             self.edge_function_url, params=params, headers=self.headers
         )
         response.raise_for_status()
-
         data = response.json()
 
         bars = data.get("bars", {})
-        if not bars:
-            logger.warning(f"No bars returned for {symbol}")
-            return pd.DataFrame(
-                columns=["open", "high", "low", "close", "volume", "vwap"]
-            )
-
         symbol_bars = bars.get(symbol, [])
-        if not symbol_bars:
-            if "crypto" in asset_class:
+
+        # Fallback for Alpaca's occasional non-symbol-keyed crypto response
+        if not symbol_bars and "crypto" in asset_class:
+            if bars and isinstance(bars, dict):
                 values = list(bars.values())
                 if values:
                     symbol_bars = values[0]
 
         if not symbol_bars:
-            logger.warning(f"No bars found for specific symbol {symbol} in response")
+            logger.warning(f"No bars returned for {symbol}")
             return pd.DataFrame(
                 columns=["open", "high", "low", "close", "volume", "vwap"]
             )
 
         df = pd.DataFrame(symbol_bars)
 
+        # Consistent OHLCV mapping
         column_mapping = {
             "t": "timestamp",
             "o": "open",
@@ -172,22 +192,15 @@ class AlpacaDataFetcher:
             "l": "low",
             "c": "close",
             "v": "volume",
-            "n": "trade_count",
             "vw": "vwap",
         }
         df = df.rename(
             columns={k: v for k, v in column_mapping.items() if k in df.columns}
         )
 
-        required_cols = ["timestamp", "open", "high", "low", "close", "volume", "vwap"]
-        missing_cols = [col for col in required_cols if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns in API response: {missing_cols}")
-
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
-        df = df.set_index("timestamp")
+        df = df.set_index("timestamp").sort_index()
 
-        df = df[["open", "high", "low", "close", "volume", "vwap"]]
-        df = df.astype(float)
-
-        return df
+        required = ["open", "high", "low", "close", "volume", "vwap"]
+        df = df[[c for c in required if c in df.columns]]
+        return df.astype(float)
