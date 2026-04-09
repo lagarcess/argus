@@ -46,6 +46,7 @@ class AlpacaDataFetcher:
 
             self.headers = {
                 "Authorization": f"Bearer {settings.SUPABASE_ANON_KEY}",
+                "apikey": settings.SUPABASE_ANON_KEY,
                 "Content-Type": "application/json",
             }
 
@@ -78,6 +79,10 @@ class AlpacaDataFetcher:
         response = self.client.get(
             self.edge_function_url, params={"action": "assets"}, headers=self.headers
         )
+        if response.status_code != 200:
+            logger.error(
+                f"Edge Function (assets) Error ({response.status_code}): {response.text}"
+            )
         response.raise_for_status()
 
         assets = response.json()
@@ -192,6 +197,8 @@ class AlpacaDataFetcher:
         response = self.client.get(
             self.edge_function_url, params=params, headers=self.headers
         )
+        if response.status_code != 200:
+            logger.error(f"Edge Function Error ({response.status_code}): {response.text}")
         response.raise_for_status()
         data = response.json()
 

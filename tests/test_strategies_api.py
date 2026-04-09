@@ -50,6 +50,8 @@ def valid_strategy_payload():
         "exit_criteria": {},
         "indicators_config": {},
         "patterns": [],
+        "fees": 0.001,
+        "slippage": 0.001,
     }
 
 
@@ -67,6 +69,8 @@ def mock_strategy_db():
         "exit_criteria": {},
         "indicators_config": {},
         "patterns": [],
+        "fees": 0.001,
+        "slippage": 0.001,
         "executed_at": None,
     }
 

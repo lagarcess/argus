@@ -18,6 +18,28 @@ class AssetClass(str, Enum):
     CRYPTO = "CRYPTO"
     EQUITY = "EQUITY"
 
+    @classmethod
+    def from_alpaca(cls, alpaca_class: str) -> "AssetClass":
+        """Map Alpaca asset class strings to internal enum."""
+        mapping = {
+            "crypto": cls.CRYPTO,
+            "us_equity": cls.EQUITY,
+        }
+        return mapping.get(alpaca_class.lower(), cls.EQUITY)
+
+    @classmethod
+    def from_symbol(cls, symbol: str) -> "AssetClass":
+        """
+        Heuristic to determine asset class from symbol.
+        Crypto symbols typically contain '/' or specific coin identifiers in Alpaca.
+        """
+        s = symbol.upper()
+        # Alpaca crypto format 'BTC/USD' or 'USDT'
+        is_crypto = "/" in s or any(
+            coin in s for coin in ["BTC", "ETH", "SOL", "USDT", "DOGE"]
+        )
+        return cls.CRYPTO if is_crypto else cls.EQUITY
+
 
 class UserResponse(BaseModel):
     """User profile and identity response."""
