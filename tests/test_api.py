@@ -129,10 +129,6 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     mock_engine = MagicMock()
     mock_engine.run.return_value = mock_result
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
-    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
-
     # Mock the RPC quota decrement
     monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
 

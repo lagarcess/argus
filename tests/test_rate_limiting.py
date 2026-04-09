@@ -105,7 +105,6 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
     monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_strategy",
         MagicMock(
@@ -166,7 +165,6 @@ def test_admin_bypass(mock_user_admin, monkeypatch):
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
     monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
     monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_strategy",
         MagicMock(
