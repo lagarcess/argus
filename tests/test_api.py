@@ -92,8 +92,11 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
 
     app.dependency_overrides[check_rate_limit] = lambda: mock_user
 
-    # Mock the emit_posthog_event
+    # Mock the emit_posthog_event and market data clients
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_alpaca_fetcher", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
 
     # Mock engine and dependencies to avoid real DB/API calls/instantiation
     from argus.engine import EquityCurvePoint, MetricsResult
@@ -129,10 +132,6 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     mock_engine = MagicMock()
     mock_engine.run.return_value = mock_result
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
-    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_trading_client", MagicMock())
-
     # Mock the RPC quota decrement
     monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
 
@@ -175,12 +174,21 @@ def test_get_assets(monkeypatch, mock_user):
         "X-RateLimit-Reset": "1712534400",
     }
 
-    mock_client = MagicMock()
-    mock_client.get_all_assets.return_value = [
-        MagicMock(symbol="BTC/USDT", name="Bitcoin"),
-        MagicMock(symbol="AAPL", name="Apple Inc"),
+    # Mock the get_alpaca_fetcher function to return a mock fetcher
+    mock_assets = [
+        {"symbol": "BTC/USDT", "name": "Bitcoin"},
+        {"symbol": "AAPL", "name": "Apple Inc."},
+        {"symbol": "ETH/USD", "name": "Ethereum"},
+        {"symbol": "TSLA", "name": "Tesla Inc."},
     ]
-    monkeypatch.setattr("argus.api.main.get_trading_client", lambda: mock_client)
+    mock_fetcher = MagicMock()
+    mock_fetcher.get_active_assets.return_value = mock_assets
+    monkeypatch.setattr("argus.api.main.get_alpaca_fetcher", lambda: mock_fetcher)
+
+    # Clear cache to ensure hit
+    from argus.api.main import asset_cache
+
+    asset_cache.set([])
 
     # Test search
     response = client.get("/api/v1/assets?search=btc")
