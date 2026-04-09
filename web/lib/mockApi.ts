@@ -102,8 +102,22 @@ export async function mockRunBacktest(
   });
 
   return {
-    simulation_id: mockBacktest.id,
-    result: mockBacktest.full_result,
+    id: mockBacktest.id,
+    config_snapshot: {}, // Mock
+    results: {
+        total_return_pct: mockBacktest.full_result.metrics.total_return_pct,
+        win_rate: mockBacktest.full_result.metrics.win_rate,
+        sharpe_ratio: mockBacktest.full_result.metrics.sharpe_ratio,
+        sortino_ratio: mockBacktest.full_result.metrics.sortino_ratio,
+        calmar_ratio: mockBacktest.full_result.metrics.sortino_ratio, // mock
+        profit_factor: 1.5,
+        expectancy: 1.2,
+        max_drawdown_pct: mockBacktest.full_result.metrics.max_drawdown_pct,
+        equity_curve: mockBacktest.full_result.equity_curve,
+        trades: mockBacktest.full_result.trades,
+        reality_gap_metrics: mockBacktest.full_result.reality_gap,
+        pattern_breakdown: {}
+    },
   };
 }
 
