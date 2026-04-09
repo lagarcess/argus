@@ -163,6 +163,7 @@ class PersistenceService:
         symbol: str,
         timeframe: str,
         result: BacktestResult,
+        config_snapshot: Dict[str, Any],
         simulation_id: Optional[str] = None,
     ) -> Optional[str]:
         """Saves a simulation result and returns its UUID."""
@@ -170,12 +171,20 @@ class PersistenceService:
             return None
 
         try:
+            # Prepare data according to aligned schema
             data: Dict[str, Any] = {
                 "user_id": user_id,
                 "strategy_id": strategy_id,
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "result": result.model_dump(mode="json"),
+                "config_snapshot": config_snapshot,
+                "summary": result.metrics.model_dump(safe=True),
+                "reality_gap_metrics": result.reality_gap_metrics,
+                "full_result": {
+                    "equity_curve": [p.model_dump(safe=True) for p in result.equity_curve],
+                    "trades": [t.model_dump(safe=True) for t in result.trades],
+                    "pattern_breakdown": result.pattern_breakdown,
+                },
             }
             if simulation_id:
                 data["id"] = simulation_id
@@ -198,7 +207,7 @@ class PersistenceService:
         try:
             res = (
                 self.client.table("simulations")
-                .select("*, strategies(name, config)")
+                .select("*")
                 .eq("id", simulation_id)
                 .eq("user_id", user_id)
                 .single()

@@ -376,9 +376,14 @@ def run_backtest(
             persistence_service.save_simulation,
             user_id=user_id_str,
             strategy_id=strategy_id,
-            symbol=",".join(symbols),
+            symbol=symbols[0] if symbols else "",
             timeframe=timeframe,
             result=result,
+            config_snapshot={
+                "name": config.name,
+                "symbol": symbols[0] if symbols else "",
+                "timeframe": timeframe or "",
+            },
             simulation_id=simulation_id,
         )
 
@@ -437,36 +442,44 @@ def get_backtest_detail(
     response.headers["X-RateLimit-Remaining"] = "99"
     response.headers["X-RateLimit-Reset"] = "1712534400"
 
-    # Return mock data
-    return {
-        "id": id,
-        "config_snapshot": {
-            "name": "Golden Cross DR",
-            "symbol": "BTC/USDT",
-            "timeframe": "1h",
-        },
-        "results": {
-            "total_return_pct": 14.5,
-            "win_rate": 0.62,
-            "sharpe_ratio": 1.8,
-            "sortino_ratio": 2.1,
-            "calmar_ratio": 1.2,
-            "profit_factor": 1.5,
-            "expectancy": 0.45,
-            "max_drawdown_pct": 0.05,
-            "equity_curve": [100.0, 101.5, 100.2, 105.0, 114.5],
-            "trades": [
-                {
-                    "entry_time": "2025-01-02T10:00:00Z",
-                    "entry_price": 65000.0,
-                    "exit_price": 67000.0,
-                    "pnl_pct": 3.1,
-                }
+    # Fetch real data from persistence
+    sim_data = persistence_service.get_simulation(id, user.id)
+    if not sim_data:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    # Map database structure back to BacktestResponse
+    summary = sim_data.get("summary", {})
+    full_result = sim_data.get("full_result", {})
+    config_snapshot = sim_data.get("config_snapshot", {})
+
+    return BacktestResponse(
+        id=id,
+        config_snapshot=config_snapshot,
+        results=BacktestResults(
+            total_return_pct=summary.get("total_return_pct", 0.0),
+            win_rate=summary.get("win_rate_pct", 0.0) / 100.0,
+            sharpe_ratio=summary.get("sharpe_ratio", 0.0),
+            sortino_ratio=summary.get("sortino_ratio", 0.0),
+            calmar_ratio=summary.get("calmar_ratio", 0.0),
+            profit_factor=summary.get("profit_factor", 0.0),
+            expectancy=summary.get("expectancy", 0.0),
+            max_drawdown_pct=summary.get("max_drawdown_pct", 0.0),
+            equity_curve=[p.get("value") for p in full_result.get("equity_curve", [])],
+            trades=[
+                TradeSnippet(
+                    entry_time=t.get("entry_time"),
+                    entry_price=t.get("entry_price"),
+                    exit_price=t.get("exit_price"),
+                    pnl_pct=t.get("pnl_pct")
+                ) for t in full_result.get("trades", [])[:50]
             ],
-            "reality_gap_metrics": {"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
-            "pattern_breakdown": {"gartley_hits": 4, "morning_star_hits": 2},
-        },
-    }
+            reality_gap_metrics=RealityGapMetrics(
+                slippage_impact_pct=sim_data.get("reality_gap_metrics", {}).get("slippage_impact_pct", 0.0),
+                fee_impact_pct=sim_data.get("reality_gap_metrics", {}).get("fee_impact_pct", 0.0)
+            ),
+            pattern_breakdown=full_result.get("pattern_breakdown", {})
+        )
+    )
 
 
 @app.get("/api/v1/history", response_model=PaginatedHistory)
