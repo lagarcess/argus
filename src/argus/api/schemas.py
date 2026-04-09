@@ -49,6 +49,8 @@ class BacktestRequest(BaseModel):
     exit_criteria: Optional[Dict[str, Any]] = None
     indicators_config: Optional[Dict[str, Any]] = None
     patterns: Optional[List[str]] = None
+    slippage: float = Field(default=0.001, ge=0.0, le=0.05)
+    fees: float = Field(default=0.001, ge=0.0, le=0.02)
 
     @model_validator(mode="after")
     def validate_xor(self):
@@ -125,7 +127,7 @@ class SimulationLogEntry(BaseModel):
     total_return_pct: Optional[float] = None
     sharpe_ratio: Optional[float] = None
     max_drawdown_pct: Optional[float] = None
-    win_rate_pct: Optional[float] = None
+    win_rate: Optional[float] = None
     total_trades: Optional[int] = None
     alpha: Optional[float] = None
     beta: Optional[float] = None
@@ -185,6 +187,18 @@ class StrategyCreate(BaseModel):
     exit_criteria: Dict[str, Any] = Field(default_factory=dict)
     indicators_config: Dict[str, Any] = Field(default_factory=dict)
     patterns: List[str] = Field(default_factory=list)
+    slippage: float = Field(
+        default=0.001,
+        ge=0.0,
+        le=0.05,
+        description="Slippage percentage (e.g., 0.001 = 0.1%)",
+    )
+    fees: float = Field(
+        default=0.001,
+        ge=0.0,
+        le=0.02,
+        description="Trading fees percentage (e.g., 0.001 = 0.1%)",
+    )
 
     @field_validator("timeframe")
     @classmethod

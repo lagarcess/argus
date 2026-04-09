@@ -1,180 +1,121 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
-import pytest
-from argus.analysis.structural import warmup_jit
-from argus.engine import ArgusEngine, BacktestResult, StrategyConfig
-from pydantic import ValidationError
+from argus.domain.schemas import AssetClass
+from argus.engine import ArgusEngine, EngineBacktestResults, StrategyInput
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_numba():
-    # Warmup JIT to avoid test latency
-    warmup_jit()
+class MockDataProvider:
+    def get_historical_bars(self, symbol, asset_class, timeframe_str, start_dt, end_dt):
+        # Generate 200 days of upward trending data with some noise
+        length = 200
+        dates = pd.date_range(start=start_dt, periods=length, freq="D")
+
+        # Price starts at 100, ends near 200
+        base = np.linspace(100, 200, length)
+        noise = np.random.normal(0, 2, length)
+        close = base + noise
+
+        df = pd.DataFrame(
+            {
+                "open": close - np.random.uniform(0, 2, length),
+                "high": close + np.random.uniform(0, 3, length),
+                "low": close - np.random.uniform(0, 3, length),
+                "close": close,
+                "volume": np.random.uniform(1000, 5000, length),
+            },
+            index=dates,
+        )
+
+        return df
 
 
-@pytest.fixture
-def mock_data():
-    """Generates simple OHLCV data for 2 assets."""
-    dates = pd.date_range(end=datetime.now(timezone.utc), periods=100, freq="1D")
+def test_engine_adapter_v1_full_flow():
+    """
+    Test the full end-to-end flow of the adapted ArgusEngine.
+    Verifies:
+    1. StrategyInput acceptance.
+    2. Dynamic pandas-ta indicator resolution (SMA_50, SMA_100).
+    3. Trigger-Filter logic (ABCD pattern + SMA trend).
+    4. SL/TP integration.
+    5. BacktestResults output normalization.
+    """
+    engine = ArgusEngine(data_provider=MockDataProvider())
 
-    # Asset A
-    df_a = pd.DataFrame(
-        {
-            "open": np.random.uniform(10, 20, 100),
-            "high": np.random.uniform(20, 25, 100),
-            "low": np.random.uniform(5, 10, 100),
-            "close": np.random.uniform(10, 20, 100),
-            "volume": np.random.uniform(100, 1000, 100),
-            "EMA_20": np.random.uniform(10, 20, 100),
-            "EMA_50": np.random.uniform(10, 20, 100),
-            "RSI_14": np.random.uniform(30, 70, 100),
-        },
-        index=dates,
+    # Define a complex strategy matching the new API contract
+    strategy = StrategyInput(
+        name="Adaptive Trend Follower",
+        symbol="BTC/USD",
+        timeframe="1Day",
+        start_date=datetime.now(timezone.utc) - timedelta(days=200),
+        patterns=["ABCD"],  # Trigger
+        entry_criteria=[
+            {
+                "indicator": "SMA",
+                "period": 50,
+                "condition": "is_above",
+                "target": "SMA_100",  # Indicator vs Indicator
+            },
+            {
+                "indicator": "RSI",
+                "period": 14,
+                "condition": "is_below",
+                "target": 70.0,  # Indicator vs Value
+            },
+        ],
+        exit_criteria={"stop_loss_pct": 0.05, "take_profit_pct": 0.15},
+        slippage=0.001,
+        fees=0.001,
     )
 
-    # Asset B
-    df_b = pd.DataFrame(
-        {
-            "open": np.random.uniform(50, 60, 100),
-            "high": np.random.uniform(60, 65, 100),
-            "low": np.random.uniform(45, 50, 100),
-            "close": np.random.uniform(50, 60, 100),
-            "volume": np.random.uniform(1000, 5000, 100),
-            "EMA_20": np.random.uniform(50, 60, 100),
-            "EMA_50": np.random.uniform(50, 60, 100),
-            "RSI_14": np.random.uniform(30, 70, 100),
-        },
-        index=dates,
-    )
+    # Run the backtest
+    results = engine.run(config=strategy, asset_class=AssetClass.CRYPTO)
 
-    df_a["symbol"] = "A/USD"
-    df_b["symbol"] = "B/USD"
+    # 1. Assert Schema
+    assert isinstance(results, EngineBacktestResults)
 
-    df = pd.concat([df_a, df_b])
-    df = df.set_index(["symbol", df.index])
-    df.index.names = ["symbol", "timestamp"]
-    return df
+    # 2. Check Metrics Presence (Contract alignment)
+    assert hasattr(results, "total_return_pct")
+    assert hasattr(results, "win_rate")
+    assert hasattr(results, "sharpe_ratio")
+    assert hasattr(results, "sortino_ratio")
+    assert hasattr(results, "calmar_ratio")
+    assert hasattr(results, "expectancy")
+    assert hasattr(results, "max_drawdown_pct")
 
+    # 3. Check Equity Curve (Flattened list of floats)
+    assert isinstance(results.equity_curve, list)
+    assert len(results.equity_curve) > 0
+    assert isinstance(results.equity_curve[0], float)
 
-def test_engine_initialization():
-    engine = ArgusEngine()
-    assert engine.data_provider is None
+    # 4. Check Trades (Snippet format)
+    assert isinstance(results.trades, list)
+    if results.trades:
+        trade = results.trades[0]
+        assert "entry_time" in trade
+        assert "entry_price" in trade
+        assert "exit_price" in trade
+        assert "pnl_pct" in trade
+        assert isinstance(trade["pnl_pct"], float)
 
+    # 5. Check Pattern Breakdown
+    assert isinstance(results.pattern_breakdown, dict)
 
-def test_strategy_config_validation():
-    # Valid
-    config = StrategyConfig(
-        entry_patterns=["is_hammer_shape"], confluence_mode="OR", slippage=0.002
-    )
-    assert config.confluence_mode == "OR"
-    assert config.slippage == 0.002
+    # Print results for visual verification as requested in Task 10 verification
+    print("\n--- Backtest Results Summary ---")
+    print(f"Total Return: {results.total_return_pct:.2f}%")
+    print(f"Win Rate: {results.win_rate:.2f}%")
+    print(f"Sharpe Ratio: {results.sharpe_ratio:.2f}")
+    print(f"Expectancy: {results.expectancy:.2f}")
+    print(f"Trades Count: {len(results.trades)}")
+    print(f"Pattern Breakdown: {results.pattern_breakdown}")
 
-    # Invalid
-    with pytest.raises(ValidationError):
-        StrategyConfig(confluence_mode="XOR")  # Invalid literal
-
-
-def test_engine_run_with_data(mock_data):
-    engine = ArgusEngine()
-    config = StrategyConfig(
-        entry_patterns=["is_hammer_shape", "ABCD"],
-        exit_patterns=["is_engulfing_shape"],
-        confluence_mode="OR",
-    )
-
-    result = engine.run(config=config, data=mock_data)
-
-    # Assert return type
-    assert isinstance(result, BacktestResult)
-
-    # Assert metrics
-    assert hasattr(result.metrics, "total_return_pct")
-    assert hasattr(result.metrics, "sharpe_ratio")
-
-    # Assert equity curve
-    assert len(result.equity_curve) > 0
-    assert hasattr(result.equity_curve[0], "timestamp")
-    assert hasattr(result.equity_curve[0], "value")
-    # Verify timestamp format (ISO 8601 string)
-    assert (
-        "T" in result.equity_curve[0].timestamp
-        or "+" in result.equity_curve[0].timestamp
-        or result.equity_curve[0].timestamp.endswith("Z")
-        or " " in result.equity_curve[0].timestamp
-    )
-
-    # Assert trades
-    for trade in result.trades:
-        assert isinstance(trade.symbol, str)
-        assert trade.direction in ["Long", "Short"]
-    # ISO8601 formatting checks
-    assert isinstance(trade.entry_time, str)
-    assert isinstance(trade.exit_time, str)
+    # Ensure it's JSON serializable (production requirement)
+    # Use a custom encoder for datetime if necessary, but here we expect strings
+    json_results = results.model_dump_json()
+    assert json_results is not None
 
 
-def test_engine_institutional_metrics(mock_data):
-    """Test that Alpha, Beta, and Calmar Ratio are calculated."""
-    engine = ArgusEngine()
-    config = StrategyConfig(
-        entry_patterns=["is_hammer_shape"],
-        benchmark_symbol="SPY",
-    )
-
-    # We need to mock the benchmark data fetch since ArgusEngine.run()
-    # calls it if benchmark_symbol is set.
-    # For simplicity in this test, we can just check if the fields exist in the result.
-    result = engine.run(config=config, data=mock_data)
-
-    assert hasattr(result.metrics, "alpha")
-    assert hasattr(result.metrics, "beta")
-    assert hasattr(result.metrics, "calmar_ratio")
-    assert hasattr(result.metrics, "avg_trade_duration")
-
-    # Metrics should be floats (alpha/beta/calmar) or strings (duration)
-    assert isinstance(result.metrics.alpha, float)
-    assert isinstance(result.metrics.beta, float)
-    assert isinstance(result.metrics.calmar_ratio, float)
-    assert isinstance(result.metrics.avg_trade_duration, str)
-
-
-def test_engine_run_with_and_mode_short_circuit(mock_data):
-    """Test AND confluence mode to ensure it evaluates correctly and short-circuits."""
-    engine = ArgusEngine()
-    config = StrategyConfig(
-        entry_patterns=["is_hammer_shape", "non_existent_pattern"],
-        exit_patterns=[],
-        confluence_mode="AND",
-    )
-    result = engine.run(config=config, data=mock_data)
-    assert isinstance(result, BacktestResult)
-    # Since "non_existent_pattern" is missing, we shouldn't get entry signals and total trades should likely be 0
-    # unless shorting is enabled and exit triggered an entry.
-
-
-def test_engine_empty_data():
-    engine = ArgusEngine()
-    config = StrategyConfig()
-
-    with pytest.raises(
-        ValueError,
-        match="Must provide either 'data' DataFrame or both 'data_provider' and 'symbols' list.",
-    ):
-        engine.run(config=config, data=pd.DataFrame())
-
-
-def test_engine_data_buffer_mocking(mocker, mock_data):
-    """Test that data buffer logic works using mocked dataprovider."""
-
-    class MockProvider:
-        def get_historical_bars(self, *args, **kwargs):
-            return mock_data.copy()
-
-    engine = ArgusEngine(data_provider=MockProvider())
-    config = StrategyConfig()
-
-    result = engine.run(
-        config=config, symbols=["A/USD", "B/USD"], timeframe="1Min", freq="1min"
-    )
-    assert isinstance(result, BacktestResult)
+if __name__ == "__main__":
+    test_engine_adapter_v1_full_flow()

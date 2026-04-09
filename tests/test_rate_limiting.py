@@ -1,7 +1,13 @@
 from unittest.mock import MagicMock
 
 import pytest
-from argus.api.main import app
+from argus.api.auth import auth_required, check_rate_limit
+from argus.api.main import (
+    app,
+    get_alpaca_fetcher,
+    get_crypto_data_client,
+    get_stock_data_client,
+)
 from argus.domain.schemas import UserResponse
 from fastapi.testclient import TestClient
 
@@ -49,8 +55,6 @@ def mock_user_admin():
 
 def test_rate_limit_exceeded(mock_user_free):
     """Test that 402 is raised when quota is 0."""
-    from argus.api.auth import auth_required
-
     app.dependency_overrides[auth_required] = lambda: mock_user_free
 
     response = client.post(
@@ -65,36 +69,24 @@ def test_rate_limit_exceeded(mock_user_free):
 
 def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     """Test that pro user with remaining quota succeeds."""
-    from argus.api.auth import check_rate_limit
-
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_pro
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: MagicMock()
 
     # Mock engine and dependencies
-    from argus.engine import BacktestResult, EquityCurvePoint, MetricsResult
+    from argus.engine import EngineBacktestResults
 
-    metrics = MetricsResult(
+    mock_result = EngineBacktestResults(
         total_return_pct=14.5,
+        win_rate=0.62,
         sharpe_ratio=1.8,
         sortino_ratio=2.1,
-        max_drawdown_pct=0.05,
-        win_rate_pct=62.0,
-        total_trades=10,
-        profit_factor=1.5,
-        volatility=0.12,
-        expectancy=0.05,
-        alpha=0.02,
-        beta=1.1,
         calmar_ratio=1.2,
-        avg_trade_duration="2d 4h",
-        avg_trade_duration_bars=50,
-    )
-    equity_curve = [
-        EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
-        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
-    ]
-    mock_result = BacktestResult(
-        metrics=metrics,
-        equity_curve=equity_curve,
+        profit_factor=1.5,
+        expectancy=0.05,
+        max_drawdown_pct=0.05,
+        equity_curve=[100.0, 114.5],
         trades=[],
         reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
         pattern_breakdown={},
@@ -103,13 +95,16 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     mock_engine = MagicMock()
     mock_engine.run.return_value = mock_result
     monkeypatch.setattr("argus.api.main.ArgusEngine", MagicMock(return_value=mock_engine))
-    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
+
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_strategy",
         MagicMock(
             return_value={"id": "123", "name": "X", "symbol": "BTC", "timeframe": "1h"}
         ),
+    )
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_strategy",
+        MagicMock(return_value={"id": "123"}),
     )
     monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
 
@@ -126,35 +121,23 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
 
 def test_admin_bypass(mock_user_admin, monkeypatch):
     """Test that admin bypasses quota even if 0."""
-    from argus.api.auth import check_rate_limit
-
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_admin
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: MagicMock()
 
-    from argus.engine import BacktestResult, EquityCurvePoint, MetricsResult
+    from argus.engine import EngineBacktestResults
 
-    metrics = MetricsResult(
+    mock_result = EngineBacktestResults(
         total_return_pct=14.5,
+        win_rate=0.62,
         sharpe_ratio=1.8,
         sortino_ratio=2.1,
-        max_drawdown_pct=0.05,
-        win_rate_pct=62.0,
-        total_trades=10,
-        profit_factor=1.5,
-        volatility=0.12,
-        expectancy=0.05,
-        alpha=0.02,
-        beta=1.1,
         calmar_ratio=1.2,
-        avg_trade_duration="2d 4h",
-        avg_trade_duration_bars=50,
-    )
-    equity_curve = [
-        EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
-        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
-    ]
-    mock_result = BacktestResult(
-        metrics=metrics,
-        equity_curve=equity_curve,
+        profit_factor=1.5,
+        expectancy=0.05,
+        max_drawdown_pct=0.05,
+        equity_curve=[100.0, 114.5],
         trades=[],
         reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
         pattern_breakdown={},

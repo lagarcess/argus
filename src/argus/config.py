@@ -55,10 +55,14 @@ class Settings(BaseSettings):
         description="List of equity symbols to analyze",
     )
 
-    # Market Data Caching
     ENABLE_MARKET_DATA_CACHE: bool = Field(
         default=False,
         description="Enable disk caching for market data. Useful for backtesting/dev.",
+    )
+
+    ENABLE_MARKET_DATA_PROXY: bool = Field(
+        default=True,
+        description="Enable fetching market data via the Supabase Edge Function proxy.",
     )
 
     MARKET_DATA_CACHE_TTL: int = Field(

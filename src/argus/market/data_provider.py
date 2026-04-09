@@ -119,24 +119,45 @@ class MarketDataProvider:
     def _parse_timeframe(self, timeframe_str: str) -> TimeFrame:
         import re
 
+        # Support both long names (Minute, Hour...) and shorthands (m, h, d, w, mo)
         match = re.match(
-            r"^(\d+)?(Min|Hour|Day|Week|Month)$", timeframe_str, re.IGNORECASE
+            r"^(\d+)?(Min|Minute|m|Hour|h|Day|d|Week|w|Month|mo)$",
+            timeframe_str,
+            re.IGNORECASE,
         )
         if not match:
             raise MarketDataError(f"Invalid timeframe format: {timeframe_str}")
 
         amount_str, unit_str = match.groups()
         amount = int(amount_str) if amount_str else 1
-        unit_str = unit_str.capitalize()
+        unit_str = unit_str.lower()
 
         unit_map = {
-            "Min": TimeFrameUnit.Minute,
-            "Hour": TimeFrameUnit.Hour,
-            "Day": TimeFrameUnit.Day,
-            "Week": TimeFrameUnit.Week,
-            "Month": TimeFrameUnit.Month,
+            "min": TimeFrameUnit.Minute,
+            "minute": TimeFrameUnit.Minute,
+            "m": TimeFrameUnit.Minute,
+            "hour": TimeFrameUnit.Hour,
+            "h": TimeFrameUnit.Hour,
+            "day": TimeFrameUnit.Day,
+            "d": TimeFrameUnit.Day,
+            "week": TimeFrameUnit.Week,
+            "w": TimeFrameUnit.Week,
+            "month": TimeFrameUnit.Month,
+            "mo": TimeFrameUnit.Month,
         }
         unit = unit_map.get(unit_str)
+        if unit is None:
+            # Fallback for Capitalized forms like "Min"
+            unit_str = unit_str.capitalize()
+            unit_map_cap = {
+                "Min": TimeFrameUnit.Minute,
+                "Hour": TimeFrameUnit.Hour,
+                "Day": TimeFrameUnit.Day,
+                "Week": TimeFrameUnit.Week,
+                "Month": TimeFrameUnit.Month,
+            }
+            unit = unit_map_cap.get(unit_str)
+
         if unit is None:
             raise MarketDataError(f"Unsupported timeframe unit: {unit_str}")
 

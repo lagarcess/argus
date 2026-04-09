@@ -1,11 +1,38 @@
+from datetime import timezone
 from unittest.mock import MagicMock
 
+import numpy as np
+import pandas as pd
 import pytest
 from argus.api.main import app, persistence_service
 from argus.domain.schemas import UserResponse
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
+
+
+class MockAlpacaFetcher:
+    def validate_asset(self, symbol):
+        return True, "crypto"
+
+    def fetch_bars(self, symbol, timeframe, start, end=None):
+        # Generate 100 periods of mock data
+        dates = pd.date_range(start=start, periods=100, freq="H", tz=timezone.utc)
+        df = pd.DataFrame(
+            {
+                "open": np.random.uniform(40000, 45000, 100),
+                "high": np.random.uniform(45000, 46000, 100),
+                "low": np.random.uniform(39000, 40000, 100),
+                "close": np.random.uniform(40000, 45000, 100),
+                "volume": np.random.uniform(1, 10, 100),
+                "vwap": np.random.uniform(40000, 45000, 100),
+            },
+            index=dates,
+        )
+        return df
+
+    def close(self):
+        pass
 
 
 @pytest.fixture
@@ -88,42 +115,32 @@ def test_backtest_endpoint_xor_validation(monkeypatch, mock_user):
 
 def test_backtest_endpoint_success(monkeypatch, mock_user):
     from argus.api.auth import check_rate_limit
-    from argus.engine import BacktestResult
+    from argus.api.main import (
+        get_alpaca_fetcher,
+        get_crypto_data_client,
+        get_stock_data_client,
+    )
+    from argus.engine import EngineBacktestResults
 
     app.dependency_overrides[check_rate_limit] = lambda: mock_user
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: MagicMock()
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
 
-    # Mock the emit_posthog_event and market data clients
+    # Mock the emit_posthog_event
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_alpaca_fetcher", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_stock_data_client", MagicMock())
-    monkeypatch.setattr("argus.api.main.get_crypto_data_client", MagicMock())
 
     # Mock engine and dependencies to avoid real DB/API calls/instantiation
-    from argus.engine import EquityCurvePoint, MetricsResult
-
-    metrics = MetricsResult(
+    mock_result = EngineBacktestResults(
         total_return_pct=14.5,
+        win_rate=0.62,
         sharpe_ratio=1.8,
         sortino_ratio=2.1,
-        max_drawdown_pct=0.05,
-        win_rate_pct=62.0,
-        total_trades=10,
-        profit_factor=1.5,
-        volatility=0.12,
-        expectancy=0.05,
-        alpha=0.02,
-        beta=1.1,
         calmar_ratio=1.2,
-        avg_trade_duration="2d 4h",
-        avg_trade_duration_bars=50,
-    )
-    equity_curve = [
-        EquityCurvePoint(timestamp="2024-01-01T00:00:00Z", value=100.0),
-        EquityCurvePoint(timestamp="2024-01-02T00:00:00Z", value=114.5),
-    ]
-    mock_result = BacktestResult(
-        metrics=metrics,
-        equity_curve=equity_curve,
+        profit_factor=1.5,
+        expectancy=0.05,
+        max_drawdown_pct=0.05,
+        equity_curve=[100.0, 114.5],
         trades=[],
         reality_gap_metrics={"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
         pattern_breakdown={},
@@ -144,6 +161,8 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
             "timeframe": "1h",
             "start_date": None,
             "end_date": None,
+            "fees": 0.001,
+            "slippage": 0.001,
         }
     )
     persistence_service.save_strategy = MagicMock(return_value={"id": "strat_456"})
@@ -198,3 +217,51 @@ def test_get_assets(monkeypatch, mock_user):
     assert "BTC/USDT" in data
     assert "AAPL" not in data
     assert response.headers["X-RateLimit-Limit"] == "100"
+
+
+def test_v1_backtest_e2e_high_fidelity(monkeypatch, mock_user):
+    """
+    High-fidelity E2E test integrated into test_api.py.
+    Verifies full Engine-to-Response logic flow using MockAlpacaFetcher.
+    """
+    from argus.api.auth import check_rate_limit
+    from argus.api.main import get_alpaca_fetcher
+
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
+
+    # Mock persistence
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_simulation",
+        lambda **kwargs: "mock-sim-id",
+    )
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_strategy",
+        lambda user_id, data: {"id": "mock-strat-id"},
+    )
+
+    payload = {
+        "symbol": "BTC/USD",
+        "timeframe": "1h",
+        "start_date": "2024-01-01T00:00:00Z",
+        "end_date": "2024-01-05T00:00:00Z",
+        "strategy_id": None,
+        "name": "E2E Strategy",
+        "entry_criteria": [
+            {"indicator": "rsi", "period": 14, "condition": "is_below", "target": 30}
+        ],
+        "exit_criteria": {"stop_loss_pct": 0.02, "take_profit_pct": 0.05},
+        "indicators_config": {"rsi": {"period": 14}},
+        "slippage": 0.001,
+        "fees": 0.001,
+    }
+
+    response = client.post("/api/v1/backtests", json=payload)
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["results"]["win_rate"] <= 1.0
+    assert len(data["results"]["trades"]) <= 5
+    assert "config_snapshot" in data
+    assert "rsi" in data["config_snapshot"]["indicators_config"]

@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -43,7 +44,7 @@ from argus.config import (
 from argus.core.alpaca_fetcher import AlpacaDataFetcher
 from argus.domain.persistence import PersistenceService
 from argus.domain.schemas import AssetClass, UserResponse
-from argus.engine import ArgusEngine, StrategyConfig
+from argus.engine import ArgusEngine, StrategyInput
 from argus.market.data_provider import MarketDataProvider
 from argus.supabase import supabase_client
 
@@ -268,6 +269,9 @@ def run_backtest(
     response: Response,
     background_tasks: BackgroundTasks,
     user: UserResponse = Depends(check_rate_limit),  # noqa: B008
+    fetcher: AlpacaDataFetcher = Depends(get_alpaca_fetcher),  # noqa: B008
+    stock_client: StockHistoricalDataClient = Depends(get_stock_data_client),  # noqa: B008
+    crypto_client: CryptoHistoricalDataClient = Depends(get_crypto_data_client),  # noqa: B008
 ):
     """
     Execute a backtest simulation with XOR logic (Strategy ID or Inline config).
@@ -279,6 +283,7 @@ def run_backtest(
 
     user_id_str = str(user.id)
     simulation_id = str(uuid4())
+    start_time = time.time()
 
     try:
         # 1. Resolve Strategy Configuration
@@ -291,12 +296,18 @@ def run_backtest(
                 raise HTTPException(status_code=404, detail="Strategy not found")
 
             # Map DB record to Engine Config
-            config = StrategyConfig(
+            config = StrategyInput(
                 name=strat_record["name"],
+                symbol=strat_record["symbol"],
+                timeframe=strat_record["timeframe"],
+                start_date=strat_record.get("start_date"),
+                end_date=strat_record.get("end_date"),
                 entry_criteria=strat_record.get("entry_criteria", []),
                 exit_criteria=strat_record.get("exit_criteria", {}),
                 indicators_config=strat_record.get("indicators_config", {}),
                 patterns=strat_record.get("patterns", []),
+                slippage=request.slippage,  # Use request values if provided
+                fees=request.fees,
             )
             symbols = [strat_record["symbol"]]
             timeframe = strat_record["timeframe"]
@@ -305,12 +316,18 @@ def run_backtest(
             strategy_id = request.strategy_id
         else:
             # Inline configuration
-            config = StrategyConfig(
+            config = StrategyInput(
                 name=request.name or "Inline Strategy",
+                symbol=request.symbol or "",
+                timeframe=request.timeframe or "",
+                start_date=request.start_date,
+                end_date=request.end_date,
                 entry_criteria=request.entry_criteria or [],
                 exit_criteria=request.exit_criteria or {},
                 indicators_config=request.indicators_config or {},
                 patterns=request.patterns or [],
+                slippage=request.slippage,
+                fees=request.fees,
             )
             symbols = [request.symbol] if request.symbol else []
             timeframe = request.timeframe
@@ -337,27 +354,26 @@ def run_backtest(
         logger.info(f"Running engine for simulation {simulation_id}")
         engine = ArgusEngine(
             data_provider=MarketDataProvider(
-                get_stock_data_client(),
-                get_crypto_data_client(),
-                fetcher=get_alpaca_fetcher(),
+                stock_client,
+                crypto_client,
+                fetcher=fetcher,
             )
         )
 
         # Determine asset class from symbols
         # Determine asset class from symbols (Robust check: Alpaca crypto uses '/' or specific coin identifiers)
-        is_crypto = "/" in (symbols[0] or "") or any(
-            coin in (symbols[0] or "").upper()
-            for coin in ["BTC", "ETH", "SOL", "USDT", "DOGE"]
-        )
+        is_crypto = False
+        if symbols:
+            first_symbol = symbols[0] or ""
+            is_crypto = "/" in first_symbol or any(
+                coin in first_symbol.upper()
+                for coin in ["BTC", "ETH", "SOL", "USDT", "DOGE"]
+            )
         ac = AssetClass.CRYPTO if is_crypto else AssetClass.EQUITY
 
         result = engine.run(
-            symbols=symbols,
-            asset_class=ac,
-            timeframe=timeframe or "1Hour",
-            start_date=start_dt,
-            end_date=end_dt,
             config=config,
+            asset_class=ac,
         )
 
         # 3. Post-Execution Hooks (Atomic Quota + PostHog)
@@ -386,53 +402,45 @@ def run_backtest(
             symbol=symbols[0] if symbols else "",
             timeframe=timeframe,
             result=result,
-            config_snapshot={
-                "name": config.name,
-                "symbol": symbols[0] if symbols else "",
-                "timeframe": timeframe or "",
-            },
+            config_snapshot=config.model_dump(),
             simulation_id=simulation_id,
         )
 
         _user_cache.invalidate(user_id_str)
 
+        execution_time = time.time() - start_time
+        logger.info(f"Backtest {simulation_id} completed in {execution_time:.2f}s")
+
         # Map to BacktestResponse (Mapping Engine -> API schema)
         return BacktestResponse(
             id=simulation_id,
-            config_snapshot={
-                "name": config.name,
-                "symbol": symbols[0] if symbols else "",
-                "timeframe": timeframe or "",
-            },
+            config_snapshot=config.model_dump(),
             results=BacktestResults(
-                total_return_pct=result.metrics.total_return_pct,
-                win_rate=result.metrics.win_rate_pct / 100.0,
-                sharpe_ratio=result.metrics.sharpe_ratio,
-                sortino_ratio=result.metrics.sortino_ratio,
-                calmar_ratio=result.metrics.calmar_ratio,
-                profit_factor=result.metrics.profit_factor,
-                expectancy=result.metrics.expectancy,
-                max_drawdown_pct=result.metrics.max_drawdown_pct,
-                equity_curve=[p.value for p in result.equity_curve],
+                total_return_pct=result.total_return_pct,
+                win_rate=result.win_rate / 100.0,
+                sharpe_ratio=result.sharpe_ratio,
+                sortino_ratio=result.sortino_ratio,
+                calmar_ratio=result.calmar_ratio,
+                profit_factor=result.profit_factor,
+                expectancy=result.expectancy,
+                max_drawdown_pct=result.max_drawdown_pct,
+                equity_curve=result.equity_curve,
                 trades=[
                     TradeSnippet(
-                        entry_time=t.entry_time,
-                        entry_price=t.entry_price,
-                        exit_price=t.exit_price,
-                        pnl_pct=t.pnl_pct,
+                        entry_time=t["entry_time"],
+                        entry_price=t["entry_price"],
+                        exit_price=t["exit_price"],
+                        pnl_pct=t["pnl_pct"],
                     )
-                    for t in result.trades[:50]  # Top 50 recent
+                    for t in result.trades[:5]
                 ],
                 reality_gap_metrics=RealityGapMetrics(
                     slippage_impact_pct=result.reality_gap_metrics.get(
                         "slippage_impact_pct", 0.0
                     ),
                     fee_impact_pct=result.reality_gap_metrics.get("fee_impact_pct", 0.0),
-                )
-                if hasattr(result, "reality_gap_metrics")
-                and isinstance(result.reality_gap_metrics, dict)
-                else RealityGapMetrics(slippage_impact_pct=0, fee_impact_pct=0),
-                pattern_breakdown=getattr(result, "pattern_breakdown", {}),
+                ),
+                pattern_breakdown=result.pattern_breakdown,
             ),
         )
 
@@ -473,14 +481,14 @@ def get_backtest_detail(
         config_snapshot=config_snapshot,
         results=BacktestResults(
             total_return_pct=summary.get("total_return_pct", 0.0),
-            win_rate=summary.get("win_rate_pct", 0.0) / 100.0,
+            win_rate=summary.get("win_rate", 0.0) / 100.0,
             sharpe_ratio=summary.get("sharpe_ratio", 0.0),
             sortino_ratio=summary.get("sortino_ratio", 0.0),
             calmar_ratio=summary.get("calmar_ratio", 0.0),
             profit_factor=summary.get("profit_factor", 0.0),
             expectancy=summary.get("expectancy", 0.0),
             max_drawdown_pct=summary.get("max_drawdown_pct", 0.0),
-            equity_curve=[p.get("value") for p in full_result.get("equity_curve", [])],
+            equity_curve=full_result.get("equity_curve", []),
             trades=[
                 TradeSnippet(
                     entry_time=t.get("entry_time"),

@@ -11,7 +11,7 @@ from loguru import logger
 
 from argus.api.schemas import SimulationLogEntry
 from argus.config import get_settings
-from argus.engine import BacktestResult
+from argus.engine import EngineBacktestResults
 from supabase import Client, create_client
 
 
@@ -163,7 +163,7 @@ class PersistenceService:
         strategy_id: str,
         symbol: str,
         timeframe: str,
-        result: BacktestResult,
+        result: EngineBacktestResults,
         config_snapshot: Dict[str, Any],
         simulation_id: Optional[str] = None,
     ) -> Optional[str]:
@@ -172,6 +172,21 @@ class PersistenceService:
             return None
 
         try:
+            # Prepare summary from flattened results
+            summary_fields = {
+                "total_return_pct",
+                "win_rate",
+                "sharpe_ratio",
+                "sortino_ratio",
+                "calmar_ratio",
+                "profit_factor",
+                "expectancy",
+                "max_drawdown_pct",
+            }
+            summary_data = {
+                k: v for k, v in result.model_dump().items() if k in summary_fields
+            }
+
             # Prepare data according to aligned schema
             data: Dict[str, Any] = {
                 "user_id": user_id,
@@ -179,13 +194,11 @@ class PersistenceService:
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "config_snapshot": config_snapshot,
-                "summary": result.metrics.model_dump(safe=True),
+                "summary": summary_data,
                 "reality_gap_metrics": result.reality_gap_metrics,
                 "full_result": {
-                    "equity_curve": [
-                        p.model_dump(safe=True) for p in result.equity_curve
-                    ],
-                    "trades": [t.model_dump(safe=True) for t in result.trades],
+                    "equity_curve": result.equity_curve,
+                    "trades": result.trades,
                     "pattern_breakdown": result.pattern_breakdown,
                 },
             }
