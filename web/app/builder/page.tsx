@@ -50,8 +50,8 @@ export default function BuilderPage() {
 
     // Filter out empty symbols and enforce max 3
     const filteredSymbols = symbols.filter(s => s.trim() !== "").slice(0, 3);
-    if (filteredSymbols.length === 0) {
-      setError("Please provide at least one asset symbol.");
+    if (filteredSymbols.length !== 1) {
+      setError("Please provide exactly one asset symbol.");
       return;
     }
 
@@ -59,20 +59,21 @@ export default function BuilderPage() {
     setError(null);
 
     const request: BacktestRequest = {
-      strategy_name: strategyName || "Unnamed Strategy",
-      symbols: filteredSymbols,
-      asset_class: "crypto",
+      name: strategyName || "Unnamed Strategy",
+      symbol: filteredSymbols[0],
       timeframe,
-      entry_patterns: entryPatterns,
-      exit_patterns: [], // Simplified for UI
-      confluence_mode: confluenceMode,
-      slippage,
-      fees,
-      rsi_period: rsiPeriod === "" ? null : Number(rsiPeriod),
-      rsi_oversold: Number(rsiOversold),
-      rsi_overbought: Number(rsiOverbought),
-      ema_period: emaPeriod === "" ? null : Number(emaPeriod),
-      benchmark_symbol: benchmarkSymbol,
+      patterns: entryPatterns,
+      indicators_config: {
+        rsi: {
+          period: rsiPeriod === "" ? null : Number(rsiPeriod),
+          oversold: Number(rsiOversold),
+          overbought: Number(rsiOverbought)
+        },
+        ema: { period: emaPeriod === "" ? null : Number(emaPeriod) },
+        slippage: Number(slippage),
+        fees: Number(fees),
+        benchmark: benchmarkSymbol
+      },
     };
 
     try {
@@ -133,7 +134,7 @@ export default function BuilderPage() {
               <div className="grid grid-cols-2 gap-6 mb-8">
                 <div>
                   <label className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2 block">
-                    Assets (Max 3)
+                    Asset Symbol
                   </label>
                   <input
                     type="text"

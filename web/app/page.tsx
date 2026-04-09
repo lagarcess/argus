@@ -52,8 +52,10 @@ export default function LandingPage() {
   const scrollToAuth = (mode?: "login" | "signup") => {
     if (mode) setAuthMode(mode);
 
-    // Smooth scroll to the panel
-    authPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Smooth scroll to the panel with a slight delay to ensure the DOM is ready if mode changed
+    setTimeout(() => {
+      authPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
 
     // Trigger highlight effect
     setIsHighlighted(true);
@@ -133,7 +135,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="bg-background text-on-background font-body selection:bg-primary/30 min-h-screen flex flex-col">
+    <div className="flex flex-col min-h-screen">
       <TopNav onSignInClick={() => scrollToAuth("login")} />
 
       <main className="flex-1 pt-32 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
@@ -276,7 +278,7 @@ export default function LandingPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 mt-4 bg-surface-container-highest border border-outline-variant hover:bg-primary hover:text-on-primary hover:border-primary rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3.5 mt-4 bg-primary text-on-primary border border-primary hover:scale-[1.02] active:scale-[0.98] rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(153,247,255,0.2)] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "PROCESSING..." : (
                     authMode === "login" ? "SIGN IN TO TERMINAL" :
