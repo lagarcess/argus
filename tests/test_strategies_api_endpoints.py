@@ -1,14 +1,13 @@
 from unittest.mock import MagicMock
 
 import pytest
+from argus.api.main import app
+from argus.api.strategies import persistence_service
+from argus.domain.schemas import UserResponse
 from faker import Faker
 from fastapi.testclient import TestClient
 
 faker = Faker()
-
-from argus.api.main import app
-from argus.api.strategies import persistence_service
-from argus.domain.schemas import UserResponse
 
 client = TestClient(app)
 
@@ -16,7 +15,6 @@ client = TestClient(app)
 @pytest.fixture
 def mock_user():
     return UserResponse(
-        user_id=faker.uuid4(),
         id=faker.uuid4(),
         email=faker.email(),
         subscription_tier="free",
@@ -73,11 +71,12 @@ def mock_strategy_db():
 # --- GET /api/v1/strategies (List) ---
 
 
-def test_list_strategies_success(mock_strategy_db, monkeypatch):
+def test_list_strategies_success(mock_user, mock_strategy_db, monkeypatch):
+    mock_list = MagicMock(return_value=([mock_strategy_db], "next_cursor_123"))
     monkeypatch.setattr(
         persistence_service,
         "list_strategies",
-        MagicMock(return_value=([mock_strategy_db], "next_cursor_123")),
+        mock_list,
     )
 
     response = client.get("/api/v1/strategies")
@@ -86,6 +85,7 @@ def test_list_strategies_success(mock_strategy_db, monkeypatch):
     assert len(data["strategies"]) == 1
     assert data["strategies"][0]["id"] == mock_strategy_db["id"]
     assert data["next_cursor"] == "next_cursor_123"
+    mock_list.assert_called_once_with(str(mock_user.id), 10, None)
 
 
 def test_list_strategies_error(monkeypatch):
@@ -103,14 +103,14 @@ def test_list_strategies_error(monkeypatch):
 # --- GET /api/v1/strategies/{id} ---
 
 
-def test_get_strategy_success(mock_strategy_db, monkeypatch):
-    monkeypatch.setattr(
-        persistence_service, "get_strategy", MagicMock(return_value=mock_strategy_db)
-    )
+def test_get_strategy_success(mock_user, mock_strategy_db, monkeypatch):
+    mock_get = MagicMock(return_value=mock_strategy_db)
+    monkeypatch.setattr(persistence_service, "get_strategy", mock_get)
 
     response = client.get(f"/api/v1/strategies/{mock_strategy_db['id']}")
     assert response.status_code == 200
     assert response.json()["id"] == mock_strategy_db["id"]
+    mock_get.assert_called_once_with(mock_strategy_db["id"], str(mock_user.id))
 
 
 def test_get_strategy_not_found(mock_strategy_db, monkeypatch):
@@ -124,25 +124,30 @@ def test_get_strategy_not_found(mock_strategy_db, monkeypatch):
 # --- PUT /api/v1/strategies/{id} ---
 
 
-def test_update_strategy_success(mock_strategy_db, valid_strategy_payload, monkeypatch):
-    monkeypatch.setattr(
-        persistence_service, "get_strategy", MagicMock(return_value=mock_strategy_db)
-    )
+def test_update_strategy_success(
+    mock_user, mock_strategy_db, valid_strategy_payload, monkeypatch
+):
+    strategy_id = mock_strategy_db["id"]
+    user_id = str(mock_user.id)
 
-    updated_db = mock_strategy_db.copy()
-    updated_db["name"] = "Updated Name"
-    monkeypatch.setattr(
-        persistence_service, "save_strategy", MagicMock(return_value=updated_db)
-    )
+    # Mock getter
+    mock_get = MagicMock(return_value=mock_strategy_db)
+    monkeypatch.setattr(persistence_service, "get_strategy", mock_get)
 
-    valid_strategy_payload["name"] = "Updated Name"
-    response = client.put(
-        f"/api/v1/strategies/{mock_strategy_db['id']}", json=valid_strategy_payload
-    )
+    # Mock saver
+    updated_db = {**mock_strategy_db, "name": "Updated Name"}
+    mock_save = MagicMock(return_value=updated_db)
+    monkeypatch.setattr(persistence_service, "save_strategy", mock_save)
 
+    # Act
+    payload = {**valid_strategy_payload, "name": "Updated Name"}
+    response = client.put(f"/api/v1/strategies/{strategy_id}", json=payload)
+
+    # Assert
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Name"
-    # Assert logic for mocking is omitted here, we trust the endpoints function.
+    mock_get.assert_called_once_with(strategy_id, user_id)
+    mock_save.assert_called_once_with(user_id, payload, strategy_id)
 
 
 def test_update_strategy_not_found(valid_strategy_payload, mock_strategy_db, monkeypatch):
@@ -189,16 +194,16 @@ def test_update_strategy_failed_save(
 # --- DELETE /api/v1/strategies/{id} ---
 
 
-def test_delete_strategy_success(mock_strategy_db, monkeypatch):
-    monkeypatch.setattr(
-        persistence_service, "get_strategy", MagicMock(return_value=mock_strategy_db)
-    )
-    monkeypatch.setattr(
-        persistence_service, "delete_strategy", MagicMock(return_value=True)
-    )
+def test_delete_strategy_success(mock_user, mock_strategy_db, monkeypatch):
+    mock_get = MagicMock(return_value=mock_strategy_db)
+    monkeypatch.setattr(persistence_service, "get_strategy", mock_get)
+    mock_delete = MagicMock(return_value=True)
+    monkeypatch.setattr(persistence_service, "delete_strategy", mock_delete)
 
     response = client.delete(f"/api/v1/strategies/{mock_strategy_db['id']}")
     assert response.status_code == 204
+    mock_get.assert_called_once_with(mock_strategy_db["id"], str(mock_user.id))
+    mock_delete.assert_called_once_with(mock_strategy_db["id"], str(mock_user.id))
 
 
 def test_delete_strategy_not_found(mock_strategy_db, monkeypatch):
@@ -237,16 +242,18 @@ def test_delete_strategy_failed_delete(mock_strategy_db, monkeypatch):
 # --- POST /api/v1/strategies ---
 
 
-def test_create_strategy_success(mock_strategy_db, valid_strategy_payload, monkeypatch):
-    monkeypatch.setattr(
-        persistence_service, "save_strategy", MagicMock(return_value=mock_strategy_db)
-    )
+def test_create_strategy_success(
+    mock_user, mock_strategy_db, valid_strategy_payload, monkeypatch
+):
+    mock_save = MagicMock(return_value=mock_strategy_db)
+    monkeypatch.setattr(persistence_service, "save_strategy", mock_save)
 
     response = client.post("/api/v1/strategies", json=valid_strategy_payload)
     assert response.status_code == 201
     assert response.json()["id"] == mock_strategy_db["id"]
     assert "x-ratelimit-limit" in response.headers
     assert response.headers["x-ratelimit-limit"] == "30"
+    mock_save.assert_called_once_with(str(mock_user.id), valid_strategy_payload)
 
 
 def test_create_strategy_failed_save(valid_strategy_payload, monkeypatch):
