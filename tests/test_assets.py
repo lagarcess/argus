@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 from argus.api.main import app
-from faker import Faker
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -21,8 +20,7 @@ def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_a
     }
 
     # Setup mock data using Faker
-    fake = Faker()
-    mock_get_assets.return_value = ["AAPL", "BTC/USD", "ZZZ", fake.word().upper()]
+    mock_get_assets.return_value = ["AAPL", "BTC/USD", "ZZZ", "MSFT"]
 
     # Clear cache before test explicitly safely
     from argus.api.main import asset_cache

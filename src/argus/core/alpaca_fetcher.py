@@ -30,17 +30,24 @@ class AlpacaDataFetcher:
 
     def __init__(self):
         settings = get_settings()
+        self.enabled = True
+
         if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
-            raise ValueError("Missing SUPABASE_URL or SUPABASE_ANON_KEY in environment.")
+            logger.warning(
+                "Supabase credentials missing. AlpacaDataFetcher will be disabled."
+            )
+            self.enabled = False
+            self.edge_function_url = ""
+            self.headers = {}
+        else:
+            # Construct the Edge Function URL based on SUPABASE_URL
+            base_url = settings.SUPABASE_URL.rstrip("/")
+            self.edge_function_url = f"{base_url}/functions/v1/alpaca-data-service"
 
-        # Construct the Edge Function URL based on SUPABASE_URL
-        base_url = settings.SUPABASE_URL.rstrip("/")
-        self.edge_function_url = f"{base_url}/functions/v1/alpaca-data-service"
-
-        self.headers = {
-            "Authorization": f"Bearer {settings.SUPABASE_ANON_KEY}",
-            "Content-Type": "application/json",
-        }
+            self.headers = {
+                "Authorization": f"Bearer {settings.SUPABASE_ANON_KEY}",
+                "Content-Type": "application/json",
+            }
 
         # Shared client for connection pooling
         self.client = httpx.Client(timeout=30.0)
@@ -62,6 +69,8 @@ class AlpacaDataFetcher:
         Lazy-loads the active asset list from Alpaca.
         This is a heavy operation (~1MB fetch) cached locally once per instance.
         """
+        if not self.enabled:
+            raise ValueError("AlpacaDataFetcher is disabled (missing credentials).")
         if self._assets_map is not None:
             return
 
@@ -137,6 +146,8 @@ class AlpacaDataFetcher:
         Returns:
             Pandas DataFrame with UTC DateTimeIndex and standard OHLCV columns
         """
+        if not self.enabled:
+            raise ValueError("AlpacaDataFetcher is disabled (missing credentials).")
         if timeframe not in ALLOWED_TIMEFRAMES:
             raise ValueError(
                 f"Timeframe '{timeframe}' is not supported. Allowed: {ALLOWED_TIMEFRAMES}"
