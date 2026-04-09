@@ -2,7 +2,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import (
@@ -127,6 +127,18 @@ def health_check():
 def get_session(user: UserResponse = Depends(auth_required)):  # noqa: B008
     """Return the current authenticated user session."""
     return user
+
+
+@app.get("/api/v1/usage", response_model=Dict[str, Any])
+def get_usage(user: UserResponse = Depends(check_rate_limit)):  # noqa: B008
+    """
+    Get current user usage and quota (used by TopNav).
+    """
+    return {
+        "count": user.backtest_quota - user.remaining_quota,
+        "limit": user.backtest_quota,
+        "tier": user.subscription_tier,
+    }
 
 
 @app.post("/api/v1/auth/sso", response_model=SSOResponse)
@@ -596,12 +608,17 @@ def get_assets(
             # Update cache
             asset_cache.set(assets)
 
-        # O(N) case-insensitive search
+        # O(N) case-insensitive search across symbol and name
         search_lower = search.lower()
-        matched_symbols = [sym for sym in assets if search_lower in sym.lower()]
+        matched_symbols = {
+            asset["symbol"]
+            for asset in assets
+            if search_lower in asset["symbol"].lower()
+            or (asset.get("name") and search_lower in asset["name"].lower())
+        }
 
         # Return alphabetically sorted matches
-        return sorted(matched_symbols)
+        return sorted(list(matched_symbols))
 
     except Exception as e:
         logger.error(f"Failed to fetch assets: {e}")

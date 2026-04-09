@@ -30,9 +30,27 @@ def mock_edge_api(mock_settings):
     with respx.mock(assert_all_called=False) as respx_mock:
         # Mock /assets
         assets_payload = [
-            {"id": "1", "symbol": "AAPL", "class": "us_equity", "status": "active"},
-            {"id": "2", "symbol": "BTCUSD", "class": "crypto", "status": "active"},
-            {"id": "3", "symbol": "XYZ", "class": "us_equity", "status": "inactive"},
+            {
+                "id": "1",
+                "symbol": "AAPL",
+                "name": "Apple Inc.",
+                "class": "us_equity",
+                "status": "active",
+            },
+            {
+                "id": "2",
+                "symbol": "BTCUSD",
+                "name": "Bitcoin",
+                "class": "crypto",
+                "status": "active",
+            },
+            {
+                "id": "3",
+                "symbol": "XYZ",
+                "name": "XYZ Corp",
+                "class": "us_equity",
+                "status": "inactive",
+            },
         ]
         respx_mock.get(f"{base_url}?action=assets").mock(
             return_value=Response(200, json=assets_payload)

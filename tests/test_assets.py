@@ -23,8 +23,13 @@ def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_f
         "Retry-After": "0",
     }
 
-    # Setup mock data using Faker
-    mock_get_assets.return_value = ["AAPL", "BTC/USD", "ZZZ", "MSFT"]
+    # Setup mock data using enriched format
+    mock_get_assets.return_value = [
+        {"symbol": "AAPL", "name": "Apple Inc."},
+        {"symbol": "BTC/USD", "name": "Bitcoin"},
+        {"symbol": "ZZZ", "name": "Sleeping Corp"},
+        {"symbol": "MSFT", "name": "Microsoft"},
+    ]
 
     # Clear cache before test explicitly safely
     from argus.api.main import asset_cache
@@ -55,6 +60,14 @@ def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_f
     assert response2.json() == ["BTC/USD"]
     # Verify Alpaca wasn't called again
     assert mock_get_assets.call_count == 1
+
+    # 3. Search by name
+    response3 = client.get(
+        "/api/v1/assets?search=Micros",
+        headers={"Authorization": "Bearer fake_token"},
+    )
+    assert response3.status_code == 200
+    assert response3.json() == ["MSFT"]
 
 
 @patch("argus.api.auth._decode_supabase_jwt")

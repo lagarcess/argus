@@ -94,6 +94,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
 
     # Mock the emit_posthog_event
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
+    monkeypatch.setattr("argus.api.main.get_alpaca_fetcher", MagicMock())
 
     # Mock engine and dependencies to avoid real DB/API calls/instantiation
     from argus.engine import EquityCurvePoint, MetricsResult
@@ -172,7 +173,12 @@ def test_get_assets(monkeypatch, mock_user):
     }
 
     # Mock the get_alpaca_fetcher function to return a mock fetcher
-    mock_assets = ["BTC/USDT", "AAPL", "ETH/USD", "TSLA"]
+    mock_assets = [
+        {"symbol": "BTC/USDT", "name": "Bitcoin"},
+        {"symbol": "AAPL", "name": "Apple Inc."},
+        {"symbol": "ETH/USD", "name": "Ethereum"},
+        {"symbol": "TSLA", "name": "Tesla Inc."},
+    ]
     mock_fetcher = MagicMock()
     mock_fetcher.get_active_assets.return_value = mock_assets
     monkeypatch.setattr("argus.api.main.get_alpaca_fetcher", lambda: mock_fetcher)

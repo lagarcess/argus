@@ -51,7 +51,7 @@ class AlpacaDataFetcher:
 
         # Shared client for connection pooling
         self.client = httpx.Client(timeout=30.0)
-        self._assets_map: dict[str, str] | None = None
+        self._assets_map: dict[str, dict[str, str]] | None = None
 
     def __enter__(self) -> "AlpacaDataFetcher":
         return self
@@ -81,9 +81,12 @@ class AlpacaDataFetcher:
         response.raise_for_status()
 
         assets = response.json()
-        # Map symbol -> asset_class for O(1) lookup
+        # Map symbol -> enriched asset data
         self._assets_map = {
-            asset["symbol"].upper(): asset["class"]
+            asset["symbol"].upper(): {
+                "class": asset["class"],
+                "name": asset.get("name", ""),
+            }
             for asset in assets
             if "symbol" in asset and "class" in asset
         }
@@ -106,25 +109,28 @@ class AlpacaDataFetcher:
         assert self._assets_map is not None
 
         symbol_upper = symbol.upper()
-        asset_class = self._assets_map.get(symbol_upper)
+        asset_info = self._assets_map.get(symbol_upper)
 
-        if asset_class:
-            return True, asset_class
+        if asset_info:
+            return True, asset_info["class"]
 
         # Fallback for crypto common formats (e.g., BTC/USD -> BTCUSD)
         if "/" in symbol_upper:
             stripped = symbol_upper.replace("/", "")
-            asset_class = self._assets_map.get(stripped)
-            if asset_class:
-                return True, asset_class
+            asset_info = self._assets_map.get(stripped)
+            if asset_info:
+                return True, asset_info["class"]
 
         return False, None
 
-    def get_active_assets(self) -> list[str]:
-        """Returns a list of all active asset symbols from the local cache."""
+    def get_active_assets(self) -> list[dict[str, str]]:
+        """Returns a list of all active assets (symbol + name) from the local cache."""
         self._load_assets()
         assert self._assets_map is not None
-        return list(self._assets_map.keys())
+        return [
+            {"symbol": symbol, "name": info["name"]}
+            for symbol, info in self._assets_map.items()
+        ]
 
     @retry_with_backoff(max_retries=3)
     def fetch_bars(
