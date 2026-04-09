@@ -108,13 +108,13 @@ const BacktestCard = ({ backtest }: { backtest: Backtest }) => (
 
 ## Anti-Patterns ❌
 
-❌ No loading skeleton (user sees blank screen)
-❌ Form submits with validation errors
-❌ Buttons <44px without spacing (mobile frustration)
-❌ Charts missing tooltips (readability)
-❌ No "empty state" message when no backtests exist
-❌ Color contrast <4.5:1 (WCAG fails)
-❌ Form fields lack ARIA labels
+- ❌ No loading skeleton (user sees blank screen)
+- ❌ Form submits with validation errors
+- ❌ Buttons <44px without spacing (mobile frustration)
+- ❌ Charts missing tooltips (readability)
+- ❌ No "empty state" message when no backtests exist
+- ❌ Color contrast <4.5:1 (WCAG fails)
+- ❌ Form fields lack ARIA labels
 
 ---
 

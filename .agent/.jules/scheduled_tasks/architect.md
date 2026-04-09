@@ -1,4 +1,4 @@
-# Architect 🏗️ — Database & Schema Guardian Reference
+- # Architect 🏗️ — Database & Schema Guardian Reference
 
 **Mission:** Audit database schema against API contract. Propose (not execute) critical migrations and RLS improvements.
 
@@ -188,12 +188,12 @@ SELECT monthly_reset_quotas();  -- Edge Function
 
 ## Anti-Patterns ❌
 
-❌ No RLS on user-owned tables
-❌ Missing foreign key constraints
-❌ No indexes on user_id or created_at (slow pagination)
-❌ Quota stored in auth but not reset (stale values)
-❌ Allowing strategy updates after first execution (immutability broken)
-❌ Missing unique constraints (duplicate data)
+- ❌ No RLS on user-owned tables
+- ❌ Missing foreign key constraints
+- ❌ No indexes on user_id or created_at (slow pagination)
+- ❌ Quota stored in auth but not reset (stale values)
+- ❌ Allowing strategy updates after first execution (immutability broken)
+- ❌ Missing unique constraints (duplicate data)
 
 ---
 

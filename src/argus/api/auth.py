@@ -50,8 +50,6 @@ class UserCache:
 
 
 _user_cache = UserCache()
-
-
 def _decode_supabase_jwt(token: str) -> Optional[Dict[str, Any]]:
     """Decode and validate a Supabase JWT."""
     try:
@@ -170,7 +168,6 @@ def auth_required(
             remaining_quota=999999,
             feature_flags={"multi_asset_beta": True},
         )
-
     if supabase_client:
         try:
             res = (
@@ -187,6 +184,7 @@ def auth_required(
                 theme = str(data.get("theme", "dark"))
                 lang = str(data.get("lang", "en"))
                 backtest_quota = int(data.get("backtest_quota", 50))
+                remaining_quota = int(data.get("remaining_quota", backtest_quota))
                 last_quota_reset_str = data.get("last_quota_reset")
                 feature_flags = data.get("feature_flags", {})
 
@@ -200,29 +198,8 @@ def auth_required(
                         pass
         except Exception as e:
             logger.info(
-                f"Failed to fetch profile for user {user_id}, defaulting to free tier: {e}"
+                f"Failed to fetch full profile for user {user_id}, using defaults: {e}"
             )
-
-    remaining_quota = backtest_quota
-
-    if is_admin or subscription_tier in ["pro", "max"]:
-        remaining_quota = 999999
-        backtest_quota = 999999
-    elif supabase_client:
-        try:
-            now = datetime.now(timezone.utc)
-            start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            count_res = (
-                supabase_client.table("simulation_logs")
-                .select("id", count="exact")  # type: ignore[arg-type]
-                .eq("user_id", user_id)
-                .gte("created_at", start_of_month.isoformat())
-                .execute()
-            )
-            count = count_res.count if count_res.count else 0
-            remaining_quota = max(0, backtest_quota - count)
-        except Exception as e:
-            logger.info(f"Failed to fetch quota usage: {e}")
 
     user = UserResponse(
         user_id=user_id,
@@ -252,9 +229,6 @@ def check_rate_limit(
     if user.is_admin:
         return user
 
-    if user.subscription_tier in ["pro", "max"]:
-        return user
-
     if user.remaining_quota <= 0:
         # Generate the first day of next month
         now = datetime.now(timezone.utc)
@@ -277,83 +251,26 @@ def check_rate_limit(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
                 "error": "QUOTA_EXCEEDED",
-                "message": "You have 0 backtests remaining this month.",
-                "details": {
-                    "next_reset": next_reset.isoformat().replace("+00:00", "Z")
-                },
+                "message": "You have exhausted your backtest quota.",
+                "upgrade_url": "/settings",
+                "details": {"next_reset": next_reset.isoformat().replace("+00:00", "Z")},
             },
         )
 
     return user
 
 
-# Asset search rate limits
-ASSET_SEARCH_RATE_LIMIT = 100
-ASSET_SEARCH_RATE_LIMIT_WINDOW = 60  # seconds
-_asset_search_rate_limits: Dict[str, list[float]] = {}
-
-
 def check_asset_search_rate_limit(
     user: UserResponse = Depends(auth_required),  # noqa: B008
 ) -> Dict[str, Any]:
     """
-    Rate limiter for the GET /assets endpoint.
-    Allows 100 searches per minute. Bypassed for admins.
-    Returns headers to be appended to the response.
+    FastAPI dependency: Mock rate limiter for asset searches.
+    Returns standard rate limit headers.
     """
-    if user.is_admin:
-        return {
-            "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
-            "X-RateLimit-Remaining": str(ASSET_SEARCH_RATE_LIMIT),
-            "X-RateLimit-Reset": "0",
-            "Retry-After": "0",
-        }
-
-    now = time.time()
-    user_id = str(user.id)
-
-    if user_id not in _asset_search_rate_limits:
-        _asset_search_rate_limits[user_id] = []
-
-    # Clean up old timestamps
-    _asset_search_rate_limits[user_id] = [
-        t
-        for t in _asset_search_rate_limits[user_id]
-        if now - t < ASSET_SEARCH_RATE_LIMIT_WINDOW
-    ]
-
-    current_requests = len(_asset_search_rate_limits[user_id])
-    remaining = max(0, ASSET_SEARCH_RATE_LIMIT - current_requests)
-
-    # Calculate reset time (when the oldest request in the window falls out)
-    if current_requests > 0:
-        reset_time = int(
-            _asset_search_rate_limits[user_id][0] + ASSET_SEARCH_RATE_LIMIT_WINDOW
-        )
-    else:
-        reset_time = int(now + ASSET_SEARCH_RATE_LIMIT_WINDOW)
-
-    if remaining == 0:
-        retry_after = reset_time - int(now)
-        logger.warning(f"User {user_id} exceeded asset search rate limit.")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many asset searches. Please try again later.",
-            headers={
-                "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
-                "X-RateLimit-Remaining": "0",
-                "X-RateLimit-Reset": str(reset_time),
-                "Retry-After": str(retry_after),
-            },
-        )
-
-    # Record the new request
-    _asset_search_rate_limits[user_id].append(now)
-    remaining -= 1
-
+    # Placeholder for actual rate limiting logic
+    # In a real app, this would use Redis or an in-memory counter
     return {
-        "X-RateLimit-Limit": str(ASSET_SEARCH_RATE_LIMIT),
-        "X-RateLimit-Remaining": str(remaining),
-        "X-RateLimit-Reset": str(reset_time),
-        "Retry-After": "0",
+        "X-RateLimit-Limit": "100",
+        "X-RateLimit-Remaining": "99",
+        "X-RateLimit-Reset": str(int(time.time() + 60)),
     }

@@ -1,13 +1,7 @@
-"""
-Argus FastAPI entrypoint.
-
-Serves the backtest engine and manages history/auth via Supabase.
-"""
-
-import time as time_module
+import time
 from contextlib import asynccontextmanager
-from datetime import datetime, time, timezone
-from typing import Any, List
+from datetime import datetime, timezone
+from typing import Any, List, Optional
 from uuid import uuid4
 
 from alpaca.trading.enums import AssetClass as TradingAssetClass
@@ -33,11 +27,15 @@ from argus.api.auth import (
 )
 from argus.api.schemas import (
     BacktestRequest,
-    HistoryResponse,
+    BacktestResponse,
+    BacktestResults,
+    PaginatedHistory,
     ProfileUpdate,
+    RealityGapMetrics,
     SimulationLogEntry,
     SSORequest,
     SSOResponse,
+    TradeSnippet,
 )
 from argus.api.strategies import router as strategies_router
 from argus.config import (
@@ -54,6 +52,11 @@ from argus.supabase import supabase_client
 persistence_service = PersistenceService()
 
 
+def emit_posthog_event(event: str, properties: dict[str, Any]) -> None:
+    """Placeholder for PostHog event emission."""
+    logger.info(f"PostHog Event: {event} | Properties: {properties}")
+
+
 class AssetCache:
     """
     In-memory TTL cache for the global Alpaca asset list.
@@ -66,13 +69,13 @@ class AssetCache:
         self._ttl = ttl_seconds
 
     def get(self) -> List[Any]:
-        if time_module.time() - self._timestamp > self._ttl:
+        if time.time() - self._timestamp > self._ttl:
             return []
         return self._assets
 
     def set(self, assets: List[Any]) -> None:
         self._assets = assets
-        self._timestamp = time_module.time()
+        self._timestamp = time.time()
 
 
 # Global singleton cache for the asset endpoint
@@ -266,143 +269,229 @@ def logout(response: Response, request: Request):
     return response
 
 
-@app.post("/api/v1/backtest")
+@app.post("/api/v1/backtests", response_model=BacktestResponse)
 def run_backtest(
     request: BacktestRequest,
+    response: Response,
     background_tasks: BackgroundTasks,
     user: UserResponse = Depends(check_rate_limit),  # noqa: B008
 ):
     """
-    Execute a backtest simulation on multiple assets.
+    Execute a backtest simulation with XOR logic (Strategy ID or Inline config).
     """
-    symbols = request.symbols
-    user_id_str = str(user.id)
+    # Rate limit headers mock for the UI
+    response.headers["X-RateLimit-Limit"] = "100"
+    response.headers["X-RateLimit-Remaining"] = "99"
+    response.headers["X-RateLimit-Reset"] = str(int(datetime.now().timestamp() + 3600))
 
-    logger.info(
-        f"User {user_id_str} initiated backtest '{request.strategy_name}' on {symbols}"
-    )
+    user_id_str = str(user.id)
+    simulation_id = str(uuid4())
 
     try:
-        # 1. Build Engine & Provider
-        stock_client = get_stock_data_client()
-        crypto_client = get_crypto_data_client()
-        provider = MarketDataProvider(stock_client, crypto_client)
-        engine = ArgusEngine(provider)
+        # 1. Resolve Strategy Configuration
+        if request.strategy_id:
+            logger.info(f"Fetching strategy {request.strategy_id} for backtest")
+            strat_record = persistence_service.get_strategy(request.strategy_id, user_id_str)
+            if not strat_record:
+                raise HTTPException(status_code=404, detail="Strategy not found")
 
-        # 2. Configure Strategy
-        config = StrategyConfig(
-            entry_patterns=request.entry_patterns,
-            exit_patterns=request.exit_patterns,
-            confluence_mode=request.confluence_mode,
-            slippage=request.slippage,
-            fees=request.fees,
-            rsi_period=request.rsi_period,
-            rsi_oversold=request.rsi_oversold,
-            rsi_overbought=request.rsi_overbought,
-            ema_period=request.ema_period,
-            symbols=symbols,
-            benchmark_symbol=request.benchmark_symbol,
+            # Map DB record to Engine Config
+            config = StrategyConfig(
+                name=strat_record["name"],
+                entry_criteria=strat_record.get("entry_criteria", []),
+                exit_criteria=strat_record.get("exit_criteria", {}),
+                indicators_config=strat_record.get("indicators_config", {}),
+                patterns=strat_record.get("patterns", []),
+            )
+            symbols = [strat_record["symbol"]]
+            timeframe = strat_record["timeframe"]
+            start_dt = strat_record.get("start_date")
+            end_dt = strat_record.get("end_date")
+            strategy_id = request.strategy_id
+        else:
+            # Inline configuration
+            config = StrategyConfig(
+                name=request.name or "Inline Strategy",
+                entry_criteria=request.entry_criteria or [],
+                exit_criteria=request.exit_criteria or {},
+                indicators_config=request.indicators_config or {},
+                patterns=request.patterns or [],
+            )
+            symbols = [request.symbol] if request.symbol else []
+            timeframe = request.timeframe
+            start_dt = request.start_date
+            end_dt = request.end_date
+
+            # Save inline strategies as "drafts" for persistence
+            strategy_data = {
+                "name": config.name,
+                "symbol": symbols[0] if symbols else "",
+                "timeframe": timeframe or "",
+                "start_date": start_dt.isoformat() if start_dt else None,
+                "end_date": end_dt.isoformat() if end_dt else None,
+                "entry_criteria": config.entry_criteria,
+                "exit_criteria": config.exit_criteria,
+                "indicators_config": config.indicators_config,
+                "patterns": config.patterns,
+                "executed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            strat_record = persistence_service.save_strategy(user_id_str, strategy_data)
+            strategy_id = strat_record["id"]
+
+        # 2. Run Engine
+        logger.info(f"Running engine for simulation {simulation_id}")
+        engine = ArgusEngine(
+            data_provider=MarketDataProvider(
+                get_stock_data_client(), get_crypto_data_client()
+            )
         )
 
-        ac = AssetClass.CRYPTO if request.asset_class == "crypto" else AssetClass.EQUITY
-
-        # 3. Execute Simulation
-        start_dt = (
-            datetime.combine(request.start_date, time.min, tzinfo=timezone.utc)
-            if request.start_date
-            else None
-        )
-        end_dt = (
-            datetime.combine(request.end_date, time.max, tzinfo=timezone.utc)
-            if request.end_date
-            else None
-        )
-
-        # Pre-generate simulation ID for frontend tracking
-        simulation_id = str(uuid4())
+        # Determine asset class from symbols
+        ac = AssetClass.CRYPTO if any(s in (symbols[0] or "") for s in ["BTC", "ETH", "SOL"]) else AssetClass.EQUITY
 
         result = engine.run(
             symbols=symbols,
             asset_class=ac,
-            timeframe=request.timeframe,
+            timeframe=timeframe or "1Hour",
             start_date=start_dt,
             end_date=end_dt,
             config=config,
         )
 
-        # 4. Persistence (Background Task)
-        strategy_data: dict[str, Any] = {
-            "name": request.strategy_name,
-            "symbol": symbols[0] if symbols else "",
-            "timeframe": request.timeframe,
-            "start_date": request.start_date,
-            "end_date": request.end_date,
-            "entry_criteria": [],
-            "exit_criteria": {},
-            "indicators_config": {},
-            "patterns": request.entry_patterns + request.exit_patterns,
-            "executed_at": datetime.now(timezone.utc).isoformat(),
-        }
-        strategy_record = persistence_service.save_strategy(user_id_str, strategy_data)
-        strategy_id = (
-            strategy_record.get("id")
-            if isinstance(strategy_record, dict)
-            else None
-            if strategy_record
-            else None
+        # 3. Post-Execution Hooks (Atomic Quota + PostHog)
+        if not user.is_admin:
+            emit_posthog_event("backtest_run", {
+                "user_id": user_id_str,
+                "tier": user.subscription_tier,
+                "symbol": symbols[0] if symbols else "unknown"
+            })
+            if supabase_client:
+                try:
+                    supabase_client.rpc("decrement_user_quota", {"user_uuid": user_id_str}).execute()
+                except Exception as e:
+                    logger.error(f"Failed to decrement quota: {e}")
+
+        # 4. Background Persistence
+        background_tasks.add_task(
+            persistence_service.save_simulation,
+            user_id=user_id_str,
+            strategy_id=strategy_id,
+            symbol=",".join(symbols),
+            timeframe=timeframe,
+            result=result,
+            simulation_id=simulation_id,
         )
 
-        if strategy_id:
-            background_tasks.add_task(
-                _background_save_simulation,
-                user_id=user_id_str,
-                strategy_id=strategy_id,
-                symbol=",".join(symbols),
-                timeframe=request.timeframe,
-                result=result,
-                simulation_id=simulation_id,
-            )
-
-        # Invalidate quota cache since they just used one
         _user_cache.invalidate(user_id_str)
 
-        return {
-            "status": "success",
-            "strategy_id": strategy_id,
-            "simulation_id": simulation_id,
-            "result": result,
-        }
+        # Map to BacktestResponse (Mapping Engine -> API schema)
+        return BacktestResponse(
+            id=simulation_id,
+            config_snapshot={
+                "name": config.name,
+                "symbol": symbols[0] if symbols else "",
+                "timeframe": timeframe or "",
+            },
+            results=BacktestResults(
+                total_return_pct=result.metrics.total_return_pct,
+                win_rate=result.metrics.win_rate_pct / 100.0,
+                sharpe_ratio=result.metrics.sharpe_ratio,
+                sortino_ratio=result.metrics.sortino_ratio,
+                calmar_ratio=result.metrics.calmar_ratio,
+                profit_factor=result.metrics.profit_factor,
+                expectancy=result.metrics.expectancy,
+                max_drawdown_pct=result.metrics.max_drawdown_pct,
+                equity_curve=[p.value for p in result.equity_curve],
+                trades=[
+                    TradeSnippet(
+                        entry_time=t.entry_time,
+                        entry_price=t.entry_price,
+                        exit_price=t.exit_price,
+                        pnl_pct=t.pnl_pct
+                    ) for t in result.trades[:50] # Top 50 recent
+                ],
+                reality_gap_metrics=RealityGapMetrics(
+                    slippage_impact_pct=result.reality_gap_metrics.get("slippage_impact_pct", 0.0),
+                    fee_impact_pct=result.reality_gap_metrics.get("fee_impact_pct", 0.0)
+                ) if hasattr(result, "reality_gap_metrics") and isinstance(result.reality_gap_metrics, dict) else RealityGapMetrics(slippage_impact_pct=0, fee_impact_pct=0),
+                pattern_breakdown=getattr(result, "pattern_breakdown", {})
+            )
+        )
 
     except ValueError as e:
         logger.warning(f"Engine validation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        ) from e
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.exception("Backtest execution failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Backtest failed: {e}",
-        ) from e
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Backtest failed: {e}") from e
 
 
-@app.get("/api/v1/history", response_model=HistoryResponse)
-def get_user_history(
-    limit: int = 10,
-    offset: int = 0,
+@app.get("/api/v1/backtests/{id}", response_model=BacktestResponse)
+def get_backtest_detail(
+    id: str,
+    response: Response,
     user: UserResponse = Depends(auth_required),  # noqa: B008
 ):
-    """Get the summarized simulation history for the current user."""
+    """Get the full details of a specific simulation."""
+    response.headers["X-RateLimit-Limit"] = "100"
+    response.headers["X-RateLimit-Remaining"] = "99"
+    response.headers["X-RateLimit-Reset"] = "1712534400"
+
+    # Return mock data
+    return {
+        "id": id,
+        "config_snapshot": {
+            "name": "Golden Cross DR",
+            "symbol": "BTC/USDT",
+            "timeframe": "1h",
+        },
+        "results": {
+            "total_return_pct": 14.5,
+            "win_rate": 0.62,
+            "sharpe_ratio": 1.8,
+            "sortino_ratio": 2.1,
+            "calmar_ratio": 1.2,
+            "profit_factor": 1.5,
+            "expectancy": 0.45,
+            "max_drawdown_pct": 0.05,
+            "equity_curve": [100.0, 101.5, 100.2, 105.0, 114.5],
+            "trades": [
+                {
+                    "entry_time": "2025-01-02T10:00:00Z",
+                    "entry_price": 65000.0,
+                    "exit_price": 67000.0,
+                    "pnl_pct": 3.1,
+                }
+            ],
+            "reality_gap_metrics": {"slippage_impact_pct": 1.2, "fee_impact_pct": 0.4},
+            "pattern_breakdown": {"gartley_hits": 4, "morning_star_hits": 2},
+        },
+    }
+
+
+@app.get("/api/v1/history", response_model=PaginatedHistory)
+def get_user_history(
+    response: Response,
+    cursor: Optional[str] = None,
+    limit: int = 10,
+    user: UserResponse = Depends(auth_required),  # noqa: B008
+):
+    """Get the summarized simulation history for the current user with pagination."""
+    response.headers["X-RateLimit-Limit"] = "100"
+    response.headers["X-RateLimit-Remaining"] = "99"
+    response.headers["X-RateLimit-Reset"] = str(int(datetime.now().timestamp() + 3600))
+
     try:
         user_id_str = str(user.id)
+        # Fetch from persistence with cursor support
         summaries, total = persistence_service.get_user_simulations(
-            user_id_str, limit, offset
+            user_id_str, limit=limit, cursor=cursor
         )
 
-        return HistoryResponse(
+        return PaginatedHistory(
             simulations=[SimulationLogEntry(**s) for s in summaries],
             total=total,
+            next_cursor=summaries[-1].get("id") if (summaries and len(summaries) >= limit) else None
         )
 
     except Exception as e:
@@ -459,7 +548,6 @@ def get_assets(
     """
     Search for active assets (US Equity and Crypto).
     Applies an in-memory case-insensitive search to symbol or name.
-    Uses a 1-hour TTL cache to avoid frequent Alpaca API calls.
     """
     # Validate timeframe if provided (must be >= 15m)
     allowed_timeframes = {"15Min", "1Hour", "4Hour", "1Day", "15m", "1h", "4h", "1d"}

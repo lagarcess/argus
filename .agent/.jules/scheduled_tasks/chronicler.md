@@ -150,12 +150,12 @@ metrics: 'profitable' // Random or specific?
 
 ## Anti-Patterns ❌
 
-❌ Outdated README (doesn't reflect current architecture)
-❌ API contract missing endpoint schemas
-❌ No troubleshooting guide (users blocked)
-❌ Skill docs lack code examples
-❌ Journal entries aren't clear about what was learned/decided
-❌ Broken links in documentation
+- ❌ Outdated README (doesn't reflect current architecture)
+- ❌ API contract missing endpoint schemas
+- ❌ No troubleshooting guide (users blocked)
+- ❌ Skill docs lack code examples
+- ❌ Journal entries aren't clear about what was learned/decided
+- ❌ Broken links in documentation
 
 ---
 

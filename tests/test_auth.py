@@ -29,12 +29,10 @@ def test_user_cache_utilized(mock_supabase_client):
         "theme": "dark",
         "lang": "en",
         "backtest_quota": 50,
+        "remaining_quota": 45,
         "last_quota_reset": "2026-04-01T00:00:00Z",
         "feature_flags": {},
     }
-
-    # Setup mock for logs count
-    mock_supabase_client.table.return_value.select.return_value.eq.return_value.gte.return_value.execute.return_value.count = 5
 
     # First call: Should be a cache miss and hit the database
     user1 = auth_required(payload=payload)
@@ -42,8 +40,8 @@ def test_user_cache_utilized(mock_supabase_client):
     assert user1.id == user_id
     assert user1.remaining_quota == 45
 
-    # Verify the database was called twice (once for profile, once for count)
-    assert mock_supabase_client.table.call_count == 2
+    # Verify the database was called once for the profile query
+    assert mock_supabase_client.table.call_count == 1
 
     # Second call: Should be a cache hit and NOT hit the database again
     user2 = auth_required(payload=payload)
@@ -51,8 +49,8 @@ def test_user_cache_utilized(mock_supabase_client):
     assert user2.id == user_id
     assert user2.remaining_quota == 45
 
-    # Call count should still be 2, proving it didn't query the DB again
-    assert mock_supabase_client.table.call_count == 2
+    # Call count should still be 1, proving it didn't query the DB again
+    assert mock_supabase_client.table.call_count == 1
 
 
 def test_auth_required_missing_payload():

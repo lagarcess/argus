@@ -97,12 +97,12 @@ async def run_backtest(req: BacktestRequest):
 
 ## Anti-Patterns ❌
 
-❌ Repeated expensive computations in loops
-❌ React re-renders entire chart on every data change
-❌ Numba @njit functions without `cache=True`
-❌ Large API payloads without compression
-❌ No lazy-loading for long equity curves (1000+ points)
-❌ Backtest >3s due to redundant Alpaca API calls
+- ❌ Repeated expensive computations in loops
+- ❌ React re-renders entire chart on every data change
+- ❌ Numba @njit functions without `cache=True`
+- ❌ Large API payloads without compression
+- ❌ No lazy-loading for long equity curves (1000+ points)
+- ❌ Backtest >3s due to redundant Alpaca API calls
 
 ---
 

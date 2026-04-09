@@ -5,10 +5,10 @@ Separate from engine.py schemas to keep API contracts clean
 and allow versioning independently of core engine models.
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AuthRequest(BaseModel):
@@ -31,44 +31,89 @@ class AuthResponse(BaseModel):
     user: Dict[str, Any]
 
 
+# ---------------------------------------------------------------------------
+# Backtest
+# ---------------------------------------------------------------------------
+
+
 class BacktestRequest(BaseModel):
-    """API backtest request payload from the Strategy Builder UI."""
+    """API backtest request payload (XOR)."""
 
-    strategy_name: str = Field(default="Unnamed Strategy", max_length=120)
-    symbols: List[str] = Field(
-        ..., min_length=1, max_length=3, description="1–3 symbols to backtest"
-    )
-    asset_class: Literal["crypto", "equity"] = Field(default="crypto")
-    timeframe: str = Field(default="1Day", description="e.g. 1Day, 1Hour, 15Min")
-    start_date: Optional[date] = Field(default=None)
-    end_date: Optional[date] = Field(default=None)
-    entry_patterns: List[str] = Field(default_factory=list)
-    exit_patterns: List[str] = Field(default_factory=list)
-    confluence_mode: Literal["OR", "AND"] = Field(default="OR")
-    slippage: float = Field(default=0.001, ge=0.0, le=0.05)
-    fees: float = Field(default=0.001, ge=0.0, le=0.05)
-    rsi_period: Optional[int] = Field(default=None, ge=2, le=200)
-    rsi_oversold: float = Field(default=30.0, ge=0.0, le=100.0)
-    rsi_overbought: float = Field(default=70.0, ge=0.0, le=100.0)
-    ema_period: Optional[int] = Field(default=None, ge=2, le=500)
-    benchmark_symbol: Optional[str] = Field(
-        default="SPY", description="e.g. SPY, BTC-USD"
-    )
+    strategy_id: Optional[str] = None
 
-    @field_validator("symbols")
-    @classmethod
-    def validate_symbols_count(cls, v: List[str]) -> List[str]:
-        if len(v) > 3:
-            raise ValueError("Maximum 3 symbols allowed per batch (PRD §7.1)")
-        return [s.upper().strip() for s in v]
+    # Inline strategy definition (XOR with strategy_id)
+    name: Optional[str] = None
+    symbol: Optional[str] = None
+    timeframe: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    entry_criteria: Optional[List[Dict[str, Any]]] = None
+    exit_criteria: Optional[Dict[str, Any]] = None
+    indicators_config: Optional[Dict[str, Any]] = None
+    patterns: Optional[List[str]] = None
 
-    @field_validator("timeframe")
-    @classmethod
-    def validate_timeframe(cls, v: str) -> str:
-        allowed = {"1Day", "1Hour", "4Hour", "15Min", "1Min"}
-        if v not in allowed:
-            raise ValueError(f"timeframe must be one of {allowed}")
-        return v
+    @model_validator(mode="after")
+    def validate_xor(self):
+        has_id = bool(self.strategy_id)
+        has_inline = bool(self.symbol or self.timeframe)
+
+        if has_id == has_inline:
+            raise ValueError(
+                "Must provide either strategy_id OR inline strategy fields (not both, not neither)"
+            )
+
+        if has_inline:
+            missing = []
+            if not self.symbol:
+                missing.append("symbol")
+            if not self.timeframe:
+                missing.append("timeframe")
+            if not self.start_date:
+                missing.append("start_date")
+            if not self.end_date:
+                missing.append("end_date")
+            if missing:
+                raise ValueError(f"Missing required inline strategy fields: {', '.join(missing)}")
+
+        return self
+
+
+class TradeSnippet(BaseModel):
+    entry_time: str
+    entry_price: float
+    exit_price: float
+    pnl_pct: float
+
+
+class RealityGapMetrics(BaseModel):
+    slippage_impact_pct: float
+    fee_impact_pct: float
+
+
+class BacktestResults(BaseModel):
+    total_return_pct: float
+    win_rate: float
+    sharpe_ratio: float
+    sortino_ratio: float
+    calmar_ratio: float
+    profit_factor: float
+    expectancy: float
+    max_drawdown_pct: float
+    equity_curve: List[float]
+    trades: List[TradeSnippet]
+    reality_gap_metrics: RealityGapMetrics
+    pattern_breakdown: Dict[str, int]
+
+
+class BacktestResponse(BaseModel):
+    id: str
+    config_snapshot: Dict[str, Any]
+    results: BacktestResults
+
+
+# ---------------------------------------------------------------------------
+# Simulation history
+# ---------------------------------------------------------------------------
 
 
 class SimulationLogEntry(BaseModel):
@@ -90,9 +135,10 @@ class SimulationLogEntry(BaseModel):
     completed_at: Optional[datetime] = None
 
 
-class HistoryResponse(BaseModel):
+class PaginatedHistory(BaseModel):
     simulations: List[SimulationLogEntry]
     total: int
+    next_cursor: Optional[str] = None
 
 
 class ProfileUpdate(BaseModel):
