@@ -9,7 +9,6 @@ from argus.api.main import (
     get_stock_data_client,
 )
 from argus.domain.schemas import UserResponse
-from fastapi import Request
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -198,9 +197,6 @@ def test_check_rate_limit_december_rollover(monkeypatch, mock_user_free):
 
 def test_check_asset_search_rate_limit_headers(mock_user_free):
     from argus.api.auth import check_asset_search_rate_limit
-
-    request = MagicMock(spec=Request)
-    request.client.host = "1.2.3.4"
 
     headers = check_asset_search_rate_limit(user=mock_user_free)
     assert "X-RateLimit-Limit" in headers
