@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { GoogleIcon, DiscordIcon } from "@/components/Icons";
 import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { Features } from "@/lib/features";
 
 export interface AuthPanelHandle {
   setMode: (mode: "login" | "signup" | "forgot_password") => void;

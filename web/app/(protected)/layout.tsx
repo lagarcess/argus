@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { Activity, LayoutDashboard, Search, History, User, Crown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 // In a real app we'd fetch the generated OpenAPI via lib/api
@@ -30,9 +28,7 @@ function QuotaBadge({ remaining, isAdmin }: { remaining: number; isAdmin: boolea
 }
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // Middleware handles the secure boundary check, preventing screen flashing.
 

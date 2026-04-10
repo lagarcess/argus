@@ -1,7 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { Copy, Plus, Play, Save } from "lucide-react";
+import { Plus, Play, Save, Trash2, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,7 +13,7 @@ import { showErrorToast } from "@/components/ErrorToast";
 import { cn } from "@/lib/utils";
 import { checkProfanity } from "glin-profanity";
 import { Controller } from "react-hook-form";
-import { Trash2, AlertCircle, ChevronDown, Activity, Settings2 } from "lucide-react";
+import { Plus, Play, Save, Activity } from "lucide-react";
 
 const MAJOR_ASSETS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "BRK.B", "BTC/USD", "ETH/USD"];
 const AVAILABLE_INDICATORS = ["SMA", "EMA", "RSI", "MACD", "ATR", "Bollinger Bands", "VWAP", "Stochastic"];
@@ -25,7 +25,7 @@ type StrategyCreate = {
   timeframe: "1Min" | "5Min" | "15Min" | "1H" | "1D";
   period_start: string;
   period_end: string;
-  parameters: Record<string, any>; // Using generic dict for indicators
+  parameters: Record<string, number | boolean>; // Using generic dict for indicators
   entry_criteria: Array<{
     indicator_a: string;
     operator: "gt" | "lt" | "cross_above" | "cross_below" | "eq";
@@ -52,7 +52,7 @@ const OPERATORS = [
   { value: "eq", label: "is equal to" },
 ];
 
-function CurrencyInput({ control, name, label, error }: { control: any; name: string; label: string; error?: any }) {
+function CurrencyInput({ control, name, label, error }: { control: unknown; name: string; label: string; error?: Record<string, unknown> }) {
   const MAX_CAPITAL = 100000000;
 
   const format = (val: number | string) => {
@@ -109,6 +109,8 @@ function CurrencyInput({ control, name, label, error }: { control: any; name: st
   );
 }
 
+type CriteriaItem = StrategyCreate['entry_criteria'][number];
+
 function CriteriaBuilder({
   label,
   items,
@@ -118,10 +120,10 @@ function CriteriaBuilder({
   indicators
 }: {
   label: string;
-  items: any[];
+  items: CriteriaItem[];
   onAdd: () => void;
   onRemove: (idx: number) => void;
-  onChange: (idx: number, field: string, value: any) => void;
+  onChange: (idx: number, field: keyof CriteriaItem, value: string | number | undefined) => void;
   indicators: string[];
 }) {
   const canAddRule = items.length < 1 || process.env.NEXT_PUBLIC_FEATURE_MULTI_RULES === "true";
@@ -142,63 +144,100 @@ function CriteriaBuilder({
       </div>
 
       <div className="space-y-3">
-        {items.map((item, idx) => (
-          <div key={idx} className="flex flex-col sm:flex-row items-center gap-2 bg-slate-900/30 p-3 rounded-xl border border-slate-800/50 group animate-in slide-in-from-left-2 duration-300">
-            <div className="w-full sm:flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <select
-                value={item.indicator_a}
-                onChange={(e) => onChange(idx, "indicator_a", e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
-              >
-                {indicators.map(i => <option key={i} value={i}>{i}</option>)}
-              </select>
+        {items.map((item, idx) => {
+          const indA = item.indicator_a.split('_')[0] || "SMA";
+          const paramA = item.indicator_a.split('_')[1] || "10";
+          const isBIndicator = !!item.indicator_b;
+          const indB = isBIndicator ? (item.indicator_b!.split('_')[0] || "SMA") : "";
+          const paramB = isBIndicator ? (item.indicator_b!.split('_')[1] || "10") : "";
 
-              <select
-                value={item.operator}
-                onChange={(e) => onChange(idx, "operator", e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-cyan-400 font-bold focus:outline-none focus:border-cyan-400"
-              >
-                {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-              </select>
+          return (
+            <div key={`${idx}-${item.indicator_a}`} className="flex flex-col sm:flex-row items-center gap-2 bg-slate-900/30 p-3 rounded-xl border border-slate-800/50 group animate-in slide-in-from-left-2 duration-300">
+              <div className="w-full sm:flex-1 grid grid-cols-1 sm:grid-cols-[1fr_min-content_1fr] gap-2 items-center">
 
-              <div className="relative">
-                <select
-                  value={item.indicator_b || "value"}
-                  onChange={(e) => {
-                    if (e.target.value === "value") {
-                      onChange(idx, "indicator_b", undefined);
-                      onChange(idx, "value", 50);
-                    } else {
-                      onChange(idx, "indicator_b", e.target.value);
-                      onChange(idx, "value", undefined);
-                    }
-                  }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
-                >
-                  <option value="value">Constant Value</option>
-                  {indicators.filter(i => i !== item.indicator_a).map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
-
-                {item.value !== undefined && (
+                {/* Indicator A */}
+                <div className="flex bg-slate-950 border border-slate-800 rounded-lg overflow-hidden focus-within:border-cyan-400">
+                  <select
+                    value={indA}
+                    onChange={(e) => onChange(idx, "indicator_a", `${e.target.value}_${paramA}`)}
+                    className="w-full bg-transparent px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                  >
+                    {indicators.map(i => <option key={`a-${i}`} value={i}>{i}</option>)}
+                  </select>
                   <input
                     type="number"
-                    value={item.value}
-                    onChange={(e) => onChange(idx, "value", parseFloat(e.target.value))}
-                    className="absolute inset-0 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
-                    placeholder="50"
+                    value={paramA}
+                    onChange={(e) => onChange(idx, "indicator_a", `${indA}_${e.target.value}`)}
+                    className="w-16 border-l border-slate-800 bg-slate-900/50 px-2 py-1.5 text-xs text-slate-400 text-center focus:outline-none focus:text-cyan-400"
                   />
-                )}
+                </div>
+
+                {/* Operator */}
+                <select
+                  value={item.operator}
+                  onChange={(e) => onChange(idx, "operator", e.target.value as CriteriaItem['operator'])}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-cyan-400 font-bold focus:outline-none focus:border-cyan-400 min-w-32"
+                >
+                  {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+                </select>
+
+                {/* Target (Indicator B or Value) */}
+                <div className="flex gap-2">
+                  <select
+                    value={item.indicator_b ? "indicator" : "value"}
+                    onChange={(e) => {
+                      if (e.target.value === "value") {
+                        onChange(idx, "indicator_b", undefined);
+                        onChange(idx, "value", 50);
+                      } else {
+                        const nextInd = indicators.filter(i => i !== indA)[0] || "RSI";
+                        onChange(idx, "indicator_b", `${nextInd}_14`);
+                        onChange(idx, "value", undefined);
+                      }
+                    }}
+                    className="w-32 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 shrink-0"
+                  >
+                    <option value="value">Constant Value</option>
+                    <option value="indicator">Indicator</option>
+                  </select>
+
+                  {item.indicator_b ? (
+                    <div className="flex flex-1 bg-slate-950 border border-slate-800 rounded-lg overflow-hidden focus-within:border-cyan-400">
+                      <select
+                        value={indB}
+                        onChange={(e) => onChange(idx, "indicator_b", `${e.target.value}_${paramB}`)}
+                        className="w-full bg-transparent px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                      >
+                        {indicators.map(i => <option key={`b-${i}`} value={i}>{i}</option>)}
+                      </select>
+                      <input
+                        type="number"
+                        value={paramB}
+                        onChange={(e) => onChange(idx, "indicator_b", `${indB}_${e.target.value}`)}
+                        className="w-16 border-l border-slate-800 bg-slate-900/50 px-2 py-1.5 text-xs text-slate-400 text-center focus:outline-none focus:text-cyan-400"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      value={item.value !== undefined ? item.value : 50}
+                      onChange={(e) => onChange(idx, "value", parseFloat(e.target.value))}
+                      className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
+                      placeholder="50"
+                    />
+                  )}
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => onRemove(idx)}
+                className="p-2 text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onRemove(idx)}
-              className="p-2 text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
+          );
+        })}
         {items.length === 0 && (
           <div className="py-8 text-center border border-dashed border-slate-800 rounded-2xl">
             <p className="text-[10px] text-slate-600 uppercase tracking-widest font-bold">No active rules defined</p>
@@ -265,11 +304,8 @@ export default function BuilderPage() {
 
     // Execute backtest immediately
     await mutateAsync({
-      strategy_payload: data,
-      symbol: data.asset_symbol,
-      period_start: data.period_start,
-      period_end: data.period_end
-    } as any);
+      strategy_payload: data
+    });
   };
 
   return (
@@ -434,7 +470,7 @@ export default function BuilderPage() {
                     }}
                     onChange={(idx, field, value) => {
                       const current = [...form.getValues("entry_criteria")];
-                      (current[idx] as any)[field] = value;
+                      (current[idx] as Partial<CriteriaItem>)[field] = value;
                       form.setValue("entry_criteria", current);
                     }}
                   />
@@ -453,7 +489,7 @@ export default function BuilderPage() {
                     }}
                     onChange={(idx, field, value) => {
                       const current = [...form.getValues("exit_criteria")];
-                      (current[idx] as any)[field] = value;
+                      (current[idx] as Partial<CriteriaItem>)[field] = value;
                       form.setValue("exit_criteria", current);
                     }}
                   />

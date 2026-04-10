@@ -57,8 +57,8 @@ export function EquityChart({
 
     chart.timeScale().fitContent();
 
-    // @ts-expect-error - addAreaSeries exists but TS definitions might be outdated or strict
-    const newSeries = chart.addAreaSeries({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const newSeries = (chart as any).addAreaSeries({
       lineColor,
       topColor: 'rgba(0, 240, 255, 0.2)',
       bottomColor: 'rgba(0, 240, 255, 0.0)',

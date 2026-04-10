@@ -1,10 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Copy, Trash2, ArrowRight, Activity, Clock } from "lucide-react";
+import { Copy, Trash2, ArrowRight, Clock } from "lucide-react";
 import Link from "next/link";
 // In real app, import from lib/api
 import { mockGetStrategies } from "@/lib/mockApi";
+
+type StrategyListItem = {
+  id: string;
+  name: string;
+  timeframe: string;
+  is_executed: boolean;
+  created_at: string;
+};
 
 export default function StrategiesPage() {
   const { data: strategies, isLoading } = useQuery({
@@ -47,7 +55,7 @@ export default function StrategiesPage() {
              <Link href="/builder" className="btn-secondary text-sm">Create Strategy</Link>
            </div>
         ) : (
-          strategies?.map((strat: any) => (
+          strategies?.map((strat: StrategyListItem) => (
             <div key={strat.id} className="glass-card p-5 border-slate-800 hover:border-emerald-400/30 transition-colors flex flex-col justify-between group h-40">
                <div>
                   <div className="flex items-start justify-between mb-2">

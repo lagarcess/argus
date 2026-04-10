@@ -15,7 +15,7 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -32,8 +32,6 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isMockMode = process.env.NEXT_PUBLIC_MOCK_API === "true"
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
-  const isPublicRoute = request.nextUrl.pathname === '/' || isAuthRoute
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/builder') ||
                            request.nextUrl.pathname.startsWith('/strategies') ||
                            request.nextUrl.pathname.startsWith('/history') ||

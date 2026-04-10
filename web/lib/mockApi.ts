@@ -13,7 +13,6 @@ import {
   generateMockProfile,
   generateMockStrategies,
   generateMockStrategy,
-  type MockBacktest,
   type MockProfile,
   type MockStrategy,
 } from "./mockData";
@@ -37,7 +36,7 @@ function delay(ms: number = 500): Promise<void> {
 /**
  * Mock authentication endpoint
  */
-export async function mockLogin(email: string, password: string): Promise<{ // eslint-disable-line @typescript-eslint/no-unused-vars
+export async function mockLogin(_email: string, _password: string): Promise<{ // eslint-disable-line @typescript-eslint/no-unused-vars
   access_token: string;
   user: MockProfile;
 }> {
@@ -47,8 +46,8 @@ export async function mockLogin(email: string, password: string): Promise<{ // e
   return {
     access_token: `mock_token_${Date.now()}`,
     user: generateMockProfile({
-      email,
-      is_admin: email.includes("admin"),
+      email: _email,
+      is_admin: _email.includes("admin"),
     }),
   };
 }
@@ -141,7 +140,7 @@ export async function mockGetBacktest(id: string): Promise<BacktestResponse> {
         profit_factor: 1.5,
         expectancy: 1.2,
         max_drawdown_pct: mockBacktest.full_result.metrics.max_drawdown_pct,
-        equity_curve: mockBacktest.full_result.equity_curve as unknown as any[],
+        equity_curve: mockBacktest.full_result.equity_curve as unknown as { timestamp: number; equity: number }[],
         trades: mockBacktest.full_result.trades,
         reality_gap_metrics: mockBacktest.full_result.reality_gap,
         pattern_breakdown: {}

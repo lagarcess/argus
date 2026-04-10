@@ -33,14 +33,20 @@ export default function BacktestResultsPage() {
   }
 
   const stats = backtest.results;
+  const capital = (backtest.config_snapshot?.capital as number) || 100000;
   const metrics = [
     { label: "Net Return", value: `${stats.total_return_pct.toFixed(2)}%`, icon: Percent },
-    { label: "Absolute Profit", value: `$${(stats.total_return_pct * 1000).toLocaleString()}`, icon: DollarSign },
+    { label: "Absolute Profit", value: `$${((stats.total_return_pct / 100) * capital).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, icon: DollarSign },
     { label: "Win Rate", value: `${stats.win_rate.toFixed(1)}%`, icon: TrendingUp },
     { label: "Max Drawdown", value: `${stats.max_drawdown_pct.toFixed(2)}%`, icon: TrendingDown },
     { label: "Sharpe Ratio", value: stats.sharpe_ratio.toFixed(2), icon: Activity },
     { label: "Total Trades", value: stats.trades?.length || 0, icon: Activity },
   ];
+
+  const startDate = new Date((backtest.config_snapshot?.period_start as string) || Date.now());
+  const tf = (backtest.config_snapshot?.timeframe as string) || "1D";
+  const msPerCandle = tf === "1Min" ? 60000 : tf === "5Min" ? 300000 : tf === "15Min" ? 900000 : tf === "1H" ? 3600000 : 86400000;
+  const startMs = startDate.getTime();
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20">
@@ -70,9 +76,9 @@ export default function BacktestResultsPage() {
          </div>
          {backtest.results.equity_curve.length > 0 ? (
            <EquityChart
-              data={backtest.results.equity_curve.map((ec: any, idx: number) => ({
-                  time: typeof ec === 'object' ? ec.timestamp : Date.now() + idx * 1000,
-                  value: typeof ec === 'object' ? ec.equity : ec
+              data={backtest.results.equity_curve.map((ec: { timestamp?: number; equity?: number } | number, idx: number) => ({
+                  time: typeof ec === 'object' && ec !== null && 'timestamp' in ec ? ec.timestamp : startMs + idx * msPerCandle,
+                  value: typeof ec === 'object' && ec !== null && 'equity' in ec ? ec.equity : ec
               }))}
            />
          ) : (
@@ -85,8 +91,8 @@ export default function BacktestResultsPage() {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-         {metrics.map((m, i) => (
-           <div key={i} className="glass-card p-4 border-slate-800/50 flex flex-col items-center justify-center text-center hover:border-cyan-400/30 transition-colors">
+         {metrics.map((m) => (
+           <div key={m.label} className="glass-card p-4 border-slate-800/50 flex flex-col items-center justify-center text-center hover:border-cyan-400/30 transition-colors">
               <m.icon className="w-5 h-5 text-cyan-400 mb-2 opacity-50" />
               <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mb-1">{m.label}</p>
               <p className="text-lg font-bold text-slate-100">{m.value}</p>

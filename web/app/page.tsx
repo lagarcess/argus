@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Activity, Shield, Zap, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Activity, Shield, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { AuthPanel, AuthPanelHandle } from "@/components/AuthPanel";
 import { NebulaBackground } from "@/components/NebulaTransition";
 import { useAuth } from "@/components/AuthContext";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+
 
 export default function LandingPage() {
   const authPanelRef = useRef<AuthPanelHandle>(null);

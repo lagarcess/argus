@@ -4,7 +4,7 @@ import { AlertCircle } from "lucide-react";
 export interface ApiContractError {
   error: string;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export const showErrorToast = (err: ApiContractError | unknown) => {

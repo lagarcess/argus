@@ -1,10 +1,21 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { History as HistoryIcon, ArrowRight, DollarSign, Activity } from "lucide-react";
+import { History as HistoryIcon, ArrowRight, Activity } from "lucide-react";
 import Link from "next/link";
 // In real app, import from lib/api
 import { mockGetHistory } from "@/lib/mockApi";
+
+export type SimulationLogEntry = {
+  id: string;
+  strategy_name?: string;
+  symbols: string[];
+  timeframe: string;
+  total_return_pct: number;
+  created_at: string;
+  period_start?: string;
+  period_end?: string;
+};
 
 export default function HistoryPage() {
   const { data: backtests, isLoading } = useQuery({
@@ -42,27 +53,27 @@ export default function HistoryPage() {
              <Link href="/builder" className="btn-secondary text-sm">Go to Builder</Link>
            </div>
         ) : (
-          backtests?.simulations?.map((bt: any) => (
+          backtests?.simulations?.map((bt: SimulationLogEntry) => (
             <Link key={bt.id} href={`/backtest/${bt.id}`} className="block">
               <div className="glass-card p-5 border-slate-800 hover:border-cyan-400/50 transition-colors flex flex-col justify-between group h-32 relative overflow-hidden">
 
                  {/* Decorative Glow */}
                  <div className={`absolute top-0 right-0 w-32 h-32 blur-3xl opacity-10 rounded-full ${
-                    bt.results?.summary_stats?.total_return_pct >= 0 ? "bg-emerald-500" : "bg-red-500"
+                    bt.total_return_pct >= 0 ? "bg-emerald-500" : "bg-red-500"
                  }`} />
 
                  <div className="relative z-10 flex items-start justify-between">
                     <div>
                       <h3 className="font-bold text-slate-100 uppercase tracking-widest">{bt.symbols?.[0] || 'UNKNOWN'}</h3>
                       <p className="text-xs text-slate-500 mt-1">
-                        {new Date(bt.period_start).toLocaleDateString()} - {new Date(bt.period_end).toLocaleDateString()}
+                        {bt.period_start ? new Date(bt.period_start).toLocaleDateString() : new Date(bt.created_at).toLocaleDateString()} - {bt.period_end ? new Date(bt.period_end).toLocaleDateString() : "Now"}
                       </p>
                     </div>
                     <div className={`text-sm font-bold flex items-center gap-1 ${
-                      bt.results?.summary_stats?.total_return_pct >= 0 ? "text-emerald-400" : "text-red-400"
+                      bt.total_return_pct >= 0 ? "text-emerald-400" : "text-red-400"
                     }`}>
-                       {bt.results?.summary_stats?.total_return_pct >= 0 ? "+" : ""}
-                       {bt.results?.summary_stats?.total_return_pct?.toFixed(2)}%
+                       {bt.total_return_pct >= 0 ? "+" : ""}
+                       {bt.total_return_pct?.toFixed(2)}%
                     </div>
                  </div>
 
