@@ -180,8 +180,6 @@ def test_check_rate_limit_december_rollover(monkeypatch, mock_user_free):
 
     from argus.api.auth import check_rate_limit
 
-    mock_user_free.remaining_quota = 0
-
     class MockDatetime:
         @classmethod
         def now(cls, tz=None):
