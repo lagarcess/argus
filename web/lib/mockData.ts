@@ -47,7 +47,7 @@ export interface MockProfile {
   id: string;
   email: string;
   is_admin: boolean;
-  subscription_tier: "free" | "pro" | "max";
+  subscription_tier: "free" | "plus" | "pro" | "max";
   remaining_quota: number;
   created_at: string;
 }
@@ -162,7 +162,7 @@ export function generateMockSparkline(): number[] {
  * Generate a mock user profile
  */
 export function generateMockProfile(overrides?: Partial<MockProfile>): MockProfile {
-  const subscriptionTiers: Array<"free" | "pro" | "max"> = ["free", "pro", "max"];
+  const subscriptionTiers: Array<"free" | "plus" | "pro" | "max"> = ["free", "plus", "pro", "max"];
   const tier = faker.helpers.arrayElement(subscriptionTiers);
 
   return {

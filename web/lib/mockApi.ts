@@ -13,7 +13,6 @@ import {
   generateMockProfile,
   generateMockStrategies,
   generateMockStrategy,
-  type MockBacktest,
   type MockProfile,
   type MockStrategy,
 } from "./mockData";
@@ -37,7 +36,7 @@ function delay(ms: number = 500): Promise<void> {
 /**
  * Mock authentication endpoint
  */
-export async function mockLogin(email: string, password: string): Promise<{ // eslint-disable-line @typescript-eslint/no-unused-vars
+export async function mockLogin(_email: string, _password: string): Promise<{ // eslint-disable-line @typescript-eslint/no-unused-vars
   access_token: string;
   user: MockProfile;
 }> {
@@ -47,8 +46,8 @@ export async function mockLogin(email: string, password: string): Promise<{ // e
   return {
     access_token: `mock_token_${Date.now()}`,
     user: generateMockProfile({
-      email,
-      is_admin: email.includes("admin"),
+      email: _email,
+      is_admin: _email.includes("admin"),
     }),
   };
 }
@@ -124,11 +123,30 @@ export async function mockRunBacktest(
 /**
  * Mock backtest detail endpoint
  */
-export async function mockGetBacktest(id: string): Promise<MockBacktest> {
+export async function mockGetBacktest(id: string): Promise<BacktestResponse> {
   if (!MOCK_MODE) throw new Error("Mock mode is disabled");
   await delay(200);
 
-  return generateMockBacktest({ id });
+  const mockBacktest = generateMockBacktest({ id });
+  return {
+    id: mockBacktest.id,
+    config_snapshot: mockBacktest.config_snapshot as unknown as Record<string, unknown>,
+    results: {
+        total_return_pct: mockBacktest.full_result.metrics.total_return_pct,
+        win_rate: mockBacktest.full_result.metrics.win_rate,
+        sharpe_ratio: mockBacktest.full_result.metrics.sharpe_ratio,
+        sortino_ratio: mockBacktest.full_result.metrics.sortino_ratio,
+        calmar_ratio: mockBacktest.full_result.metrics.sortino_ratio,
+        profit_factor: 1.5,
+        expectancy: 1.2,
+        max_drawdown_pct: mockBacktest.full_result.metrics.max_drawdown_pct,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        equity_curve: mockBacktest.full_result.equity_curve as any,
+        trades: mockBacktest.full_result.trades,
+        reality_gap_metrics: mockBacktest.full_result.reality_gap,
+        pattern_breakdown: {}
+    },
+  };
 }
 
 /**
