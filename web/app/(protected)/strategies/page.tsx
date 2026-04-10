@@ -55,7 +55,8 @@ export default function StrategiesPage() {
              <Link href="/builder" className="btn-secondary text-sm">Create Strategy</Link>
            </div>
         ) : (
-          strategies?.map((strat: any) => (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          strategies?.map((strat: StrategyListItem | any) => (
             <div key={strat.id} className="glass-card p-5 border-slate-800 hover:border-emerald-400/30 transition-colors flex flex-col justify-between group h-40">
                <div>
                   <div className="flex items-start justify-between mb-2">

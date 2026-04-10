@@ -140,6 +140,7 @@ export async function mockGetBacktest(id: string): Promise<BacktestResponse> {
         profit_factor: 1.5,
         expectancy: 1.2,
         max_drawdown_pct: mockBacktest.full_result.metrics.max_drawdown_pct,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         equity_curve: mockBacktest.full_result.equity_curve as any,
         trades: mockBacktest.full_result.trades,
         reality_gap_metrics: mockBacktest.full_result.reality_gap,

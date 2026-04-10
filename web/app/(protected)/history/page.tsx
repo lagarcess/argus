@@ -57,6 +57,7 @@ export default function HistoryPage() {
                     <div>
                       <h3 className="font-bold text-slate-100 uppercase tracking-widest">{bt.symbols?.[0] || 'UNKNOWN'}</h3>
                       <p className="text-xs text-slate-500 mt-1">
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(bt as any).period_start ? new Date((bt as any).period_start).toLocaleDateString() : new Date(bt.created_at).toLocaleDateString()} - {(bt as any).period_end ? new Date((bt as any).period_end).toLocaleDateString() : "Now"}
                       </p>
                     </div>

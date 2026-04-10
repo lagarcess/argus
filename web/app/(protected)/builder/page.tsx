@@ -52,6 +52,7 @@ const OPERATORS = [
   { value: "eq", label: "is equal to" },
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CurrencyInput({ control, name, label, error }: { control: any; name: string; label: string; error?: { message?: string } }) {
   const MAX_CAPITAL = 100000000;
 
