@@ -1,60 +1,58 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light dark;
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    /* Accent Cyan (#00f0ff) */
+    --accent-cyan: 191 100% 50%;
+    /* Accent Emerald (#00ff9d) */
+    --accent-emerald: 157 100% 50%;
+
+    color-scheme: dark;
+  }
 }
 
-body {
-  font-family: 'Inter', sans-serif;
-}
-
-h1, h2, h3, .headline {
-  font-family: 'Space Grotesk', sans-serif;
-}
-
-.material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased selection:bg-cyan-500/30;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
 }
 
 @layer utilities {
-  .glass-panel {
-    background: rgba(19, 19, 21, 0.4);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+  .glass-card {
+    @apply bg-slate-900/80 backdrop-blur-md border border-cyan-400/30 rounded-3xl shadow-xl;
   }
 
-  .text-gradient-cyan {
-    background: linear-gradient(135deg, #99f7ff 0%, #00f1fe 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  .btn-primary {
+    @apply bg-gradient-to-r from-cyan-400 to-emerald-400 text-black font-semibold rounded-full px-6 py-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all outline-none focus:ring-2 focus:ring-cyan-500/50 shadow-[0_0_15px_rgba(0,240,255,0.2)];
   }
 
-  .tonal-shift {
-    background: linear-gradient(180deg, transparent 0%, rgba(153, 247, 255, 0.03) 100%);
+  .btn-secondary {
+    @apply bg-slate-800/80 backdrop-blur-md border border-slate-700 text-slate-200 font-medium rounded-full px-6 py-2 cursor-pointer hover:bg-slate-700/80 hover:border-slate-600 active:scale-95 transition-all outline-none focus:ring-2 focus:ring-slate-500/50;
+  }
+
+  .glass-nav {
+    @apply bg-slate-950/80 backdrop-blur-xl border-t border-slate-800/50;
   }
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar for a premium feel */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0e0e10;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #48474a;
-  border-radius: 10px;
+  @apply bg-slate-800 rounded-full;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #767577;
-}
-
-/* Base styles for dark mode enforcement */
-html.dark {
-  color-scheme: dark;
+  @apply bg-slate-700;
 }

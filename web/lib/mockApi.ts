@@ -124,11 +124,29 @@ export async function mockRunBacktest(
 /**
  * Mock backtest detail endpoint
  */
-export async function mockGetBacktest(id: string): Promise<MockBacktest> {
+export async function mockGetBacktest(id: string): Promise<BacktestResponse> {
   if (!MOCK_MODE) throw new Error("Mock mode is disabled");
   await delay(200);
 
-  return generateMockBacktest({ id });
+  const mockBacktest = generateMockBacktest({ id });
+  return {
+    id: mockBacktest.id,
+    config_snapshot: mockBacktest.config_snapshot as unknown as Record<string, unknown>,
+    results: {
+        total_return_pct: mockBacktest.full_result.metrics.total_return_pct,
+        win_rate: mockBacktest.full_result.metrics.win_rate,
+        sharpe_ratio: mockBacktest.full_result.metrics.sharpe_ratio,
+        sortino_ratio: mockBacktest.full_result.metrics.sortino_ratio,
+        calmar_ratio: mockBacktest.full_result.metrics.sortino_ratio,
+        profit_factor: 1.5,
+        expectancy: 1.2,
+        max_drawdown_pct: mockBacktest.full_result.metrics.max_drawdown_pct,
+        equity_curve: mockBacktest.full_result.equity_curve as unknown as any[],
+        trades: mockBacktest.full_result.trades,
+        reality_gap_metrics: mockBacktest.full_result.reality_gap,
+        pattern_breakdown: {}
+    },
+  };
 }
 
 /**
