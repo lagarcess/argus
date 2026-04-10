@@ -172,3 +172,34 @@ def test_admin_bypass(mock_user_admin, monkeypatch):
 
     app.dependency_overrides.clear()
     assert response.status_code == 200
+
+
+def test_check_rate_limit_december_rollover(monkeypatch, mock_user_free):
+    from datetime import datetime, timezone
+
+    from argus.api.auth import check_rate_limit
+
+    class MockDatetime:
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2025, 12, 15, tzinfo=timezone.utc)
+
+    monkeypatch.setattr("argus.api.auth.datetime", MockDatetime)
+
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc:
+        check_rate_limit(mock_user_free)
+
+    assert exc.value.status_code == 402
+    assert "2026-01-01" in exc.value.detail["details"]["next_reset"]
+
+
+def test_check_asset_search_rate_limit_headers(mock_user_free):
+    from argus.api.auth import check_asset_search_rate_limit
+
+    headers = check_asset_search_rate_limit(user=mock_user_free)
+    assert "X-RateLimit-Limit" in headers
+    assert "X-RateLimit-Remaining" in headers
+    assert "X-RateLimit-Reset" in headers
+    assert headers["X-RateLimit-Limit"] == "100"
