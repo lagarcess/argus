@@ -77,8 +77,8 @@ export default function BacktestResultsPage() {
          {backtest.results.equity_curve.length > 0 ? (
            <EquityChart
               data={backtest.results.equity_curve.map((ec: { timestamp?: number; equity?: number } | number, idx: number) => ({
-                  time: typeof ec === 'object' && ec !== null && 'timestamp' in ec ? ec.timestamp : startMs + idx * msPerCandle,
-                  value: typeof ec === 'object' && ec !== null && 'equity' in ec ? ec.equity : ec
+                  time: typeof ec === 'object' && ec !== null && 'timestamp' in ec && ec.timestamp ? new Date(ec.timestamp).toISOString() : new Date(startMs + idx * msPerCandle).toISOString(),
+                  value: typeof ec === 'object' && ec !== null && 'equity' in ec && ec.equity !== undefined ? Number(ec.equity) : Number(ec)
               }))}
            />
          ) : (

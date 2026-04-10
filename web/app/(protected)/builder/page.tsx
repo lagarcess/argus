@@ -8,12 +8,12 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 // In real app, import from lib/api
 import { mockRunBacktest } from "@/lib/mockApi";
+import type { BacktestRequest } from "@/lib/api";
 import { toast } from "sonner";
 import { showErrorToast } from "@/components/ErrorToast";
 import { cn } from "@/lib/utils";
 import { checkProfanity } from "glin-profanity";
 import { Controller } from "react-hook-form";
-import { Plus, Play, Save, Activity } from "lucide-react";
 
 const MAJOR_ASSETS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "BRK.B", "BTC/USD", "ETH/USD"];
 const AVAILABLE_INDICATORS = ["SMA", "EMA", "RSI", "MACD", "ATR", "Bollinger Bands", "VWAP", "Stochastic"];
@@ -52,7 +52,7 @@ const OPERATORS = [
   { value: "eq", label: "is equal to" },
 ];
 
-function CurrencyInput({ control, name, label, error }: { control: unknown; name: string; label: string; error?: Record<string, unknown> }) {
+function CurrencyInput({ control, name, label, error }: { control: any; name: string; label: string; error?: { message?: string } }) {
   const MAX_CAPITAL = 100000000;
 
   const format = (val: number | string) => {
@@ -303,9 +303,7 @@ export default function BuilderPage() {
     }
 
     // Execute backtest immediately
-    await mutateAsync({
-      strategy_payload: data
-    });
+    await mutateAsync(data as unknown as BacktestRequest);
   };
 
   return (
@@ -470,7 +468,8 @@ export default function BuilderPage() {
                     }}
                     onChange={(idx, field, value) => {
                       const current = [...form.getValues("entry_criteria")];
-                      (current[idx] as Partial<CriteriaItem>)[field] = value;
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      (current[idx] as any)[field] = value;
                       form.setValue("entry_criteria", current);
                     }}
                   />
@@ -489,7 +488,8 @@ export default function BuilderPage() {
                     }}
                     onChange={(idx, field, value) => {
                       const current = [...form.getValues("exit_criteria")];
-                      (current[idx] as Partial<CriteriaItem>)[field] = value;
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      (current[idx] as any)[field] = value;
                       form.setValue("exit_criteria", current);
                     }}
                   />

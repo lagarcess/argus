@@ -6,16 +6,7 @@ import Link from "next/link";
 // In real app, import from lib/api
 import { mockGetHistory } from "@/lib/mockApi";
 
-export type SimulationLogEntry = {
-  id: string;
-  strategy_name?: string;
-  symbols: string[];
-  timeframe: string;
-  total_return_pct: number;
-  created_at: string;
-  period_start?: string;
-  period_end?: string;
-};
+import type { SimulationLogEntry } from "@/lib/api";
 
 export default function HistoryPage() {
   const { data: backtests, isLoading } = useQuery({
@@ -59,21 +50,21 @@ export default function HistoryPage() {
 
                  {/* Decorative Glow */}
                  <div className={`absolute top-0 right-0 w-32 h-32 blur-3xl opacity-10 rounded-full ${
-                    bt.total_return_pct >= 0 ? "bg-emerald-500" : "bg-red-500"
+                    (bt.total_return_pct ?? 0) >= 0 ? "bg-emerald-500" : "bg-red-500"
                  }`} />
 
                  <div className="relative z-10 flex items-start justify-between">
                     <div>
                       <h3 className="font-bold text-slate-100 uppercase tracking-widest">{bt.symbols?.[0] || 'UNKNOWN'}</h3>
                       <p className="text-xs text-slate-500 mt-1">
-                        {bt.period_start ? new Date(bt.period_start).toLocaleDateString() : new Date(bt.created_at).toLocaleDateString()} - {bt.period_end ? new Date(bt.period_end).toLocaleDateString() : "Now"}
+                        {(bt as any).period_start ? new Date((bt as any).period_start).toLocaleDateString() : new Date(bt.created_at).toLocaleDateString()} - {(bt as any).period_end ? new Date((bt as any).period_end).toLocaleDateString() : "Now"}
                       </p>
                     </div>
                     <div className={`text-sm font-bold flex items-center gap-1 ${
-                      bt.total_return_pct >= 0 ? "text-emerald-400" : "text-red-400"
+                      (bt.total_return_pct ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
                     }`}>
-                       {bt.total_return_pct >= 0 ? "+" : ""}
-                       {bt.total_return_pct?.toFixed(2)}%
+                       {(bt.total_return_pct ?? 0) >= 0 ? "+" : ""}
+                       {bt.total_return_pct?.toFixed(2) ?? "0.00"}%
                     </div>
                  </div>
 

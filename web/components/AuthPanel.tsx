@@ -91,7 +91,7 @@ export const AuthPanel = forwardRef<AuthPanelHandle>((_, ref) => {
     try {
       const { error: socialError } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: `${window.location.origin}/builder` }
+        options: { redirectTo: `${window.location.origin}/auth/callback` }
       });
       if (socialError) throw socialError;
     } catch (err: unknown) {
