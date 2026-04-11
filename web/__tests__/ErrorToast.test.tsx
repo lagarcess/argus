@@ -12,12 +12,24 @@ mock.module("sonner", () => ({
 }));
 
 describe("showErrorToast", () => {
+  let originalClipboard: PropertyDescriptor | undefined;
+
   beforeEach(() => {
     (toast as Mock<typeof toast>).mockClear();
+    originalClipboard = Object.getOwnPropertyDescriptor(global.navigator, 'clipboard');
   });
 
   afterEach(() => {
     mock.restore();
+    if (originalClipboard) {
+      Object.defineProperty(global.navigator, 'clipboard', originalClipboard);
+    } else {
+      // If it didn't exist, we delete our mocked version
+      // In JS, delete global.navigator.clipboard might fail if configurable is false,
+      // but in tests we defined it as configurable
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (global.navigator as any).clipboard;
+    }
   });
 
   it("should handle standardized ApiContractError", () => {
