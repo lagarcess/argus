@@ -1,0 +1,516 @@
+openapi: 3.1.0
+info:
+  title: Argus Observatory API
+  description: High-fidelity retail trading backtesting with walk-forward analysis and AI.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local Development (FastAPI)
+  - url: https://argus-app-suz5.onrender.com/api/v1
+    description: Production & Staging (Render)
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sb-access-token
+  schemas:
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        is_admin:
+          type: boolean
+        subscription_tier:
+          type: string
+          enum: [free, plus, pro, max]
+        backtest_quota:
+          type: integer
+        remaining_quota:
+          type: integer
+        feature_flags:
+          type: object
+          properties:
+            advanced_charting:
+              type: boolean
+            options_enabled:
+              type: boolean
+            memos_sync:
+              type: boolean
+        theme:
+          type: string
+          enum: [light, dark, system]
+      required: [id, is_admin, subscription_tier, backtest_quota, remaining_quota, feature_flags, theme]
+
+    ErrorResponse:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        error_code:
+          type: string
+      required: [type, title, status, detail, error_code]
+
+    StrategySchema:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        symbols:
+          type: array
+          items:
+            type: string
+        timeframe:
+          type: string
+        slippage:
+          type: number
+        fees:
+          type: number
+        entry_criteria:
+          type: array
+          items:
+            type: object
+        exit_criteria:
+          type: object
+        ai_explanation:
+          type: string
+      required: [name, symbols, timeframe]
+
+    BacktestRequest:
+      type: object
+      properties:
+        strategy_id:
+          type: string
+          format: uuid
+        symbols:
+          type: array
+          items:
+            type: string
+        timeframe:
+          type: string
+        slippage:
+          type: number
+        fees:
+          type: number
+        entry_criteria:
+          type: array
+          items:
+            type: object
+        exit_criteria:
+          type: object
+
+    BacktestResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        config_snapshot:
+          type: object
+        summary:
+          type: object
+          properties:
+            total_return_pct:
+              type: number
+            win_rate:
+              type: number
+            sharpe_ratio:
+              type: number
+            max_drawdown_pct:
+              type: number
+        reality_gap_metrics:
+          type: object
+          properties:
+            slippage_impact_pct:
+              type: number
+            fee_impact_pct:
+              type: number
+        full_result:
+          type: object
+      required: [id, config_snapshot, summary, reality_gap_metrics, full_result]
+
+    ShareResponse:
+      type: object
+      properties:
+        vanity_url:
+          type: string
+        og_image:
+          type: string
+        og_title:
+          type: string
+      required: [vanity_url, og_image]
+
+paths:
+  /auth/session:
+    get:
+      summary: Get current authenticated user session
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /auth/profile:
+    patch:
+      summary: Update user profile settings
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                theme:
+                  type: string
+                  enum: [light, dark, system]
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  /strategies:
+    get:
+      summary: List user strategies
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Paginated strategies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StrategySchema'
+                  next_cursor:
+                    type: string
+    post:
+      summary: Save a new strategy
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrategySchema'
+      responses:
+        '201':
+          description: Strategy created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategySchema'
+
+  /strategies/{id}:
+    put:
+      summary: Update a strategy
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StrategySchema'
+      responses:
+        '200':
+          description: Structure updated
+    delete:
+      summary: Delete a strategy
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Strategy deleted
+
+  /history:
+    get:
+      summary: Get user run history
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated run history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BacktestResponse'
+                  next_cursor:
+                    type: string
+
+  /backtests:
+    post:
+      summary: Execute a backtest simulation
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BacktestRequest'
+      responses:
+        '200':
+          description: Backtest results returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestResponse'
+        '402':
+          description: Quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agent/draft:
+    post:
+      summary: Draft a strategy using AI Natural Language input
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+      responses:
+        '200':
+          description: Returns an unexecuted draft StrategySchema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategySchema'
+
+  /assets:
+    get:
+      summary: Search available market assets
+      parameters:
+        - in: query
+          name: search
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of matched tickers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /market/bars:
+    get:
+      summary: TradingView Universal Datafeed Proxy
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: symbol
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: from
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: to
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: resolution
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: UDF formatted arrays
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  t:
+                    type: array
+                    items:
+                      type: integer
+                  o:
+                    type: array
+                    items:
+                      type: number
+                  h:
+                    type: array
+                    items:
+                      type: number
+                  l:
+                    type: array
+                    items:
+                      type: number
+                  c:
+                    type: array
+                    items:
+                      type: number
+                  v:
+                    type: array
+                    items:
+                      type: integer
+                  s:
+                    type: string
+                    example: "ok"
+
+  /screeners:
+    get:
+      summary: Alpaca Movers / Most-Actives proxy
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [movers, active]
+      responses:
+        '200':
+          description: Assets list
+
+  /billing/checkout:
+    post:
+      summary: Initialize payment gateway session
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Checkout URL
+
+  /webhook/billing:
+    post:
+      summary: Supabase Edge Function to intercept gateway updates
+      responses:
+        '200':
+          description: Billing updated
+
+  /share:
+    post:
+      summary: Create OpenGraph shareable link from simulation
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                simulation_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Vanity URL configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareResponse'
+
+  /feedback:
+    post:
+      summary: Submit user feedback
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [bug, feature_request, general]
+                message:
+                  type: string
+                simulation_id:
+                  type: string
+      responses:
+        '201':
+          description: Feedback received
+
+  /health:
+    get:
+      summary: API health and uptime check
+      responses:
+        '200':
+          description: OK
+
+  /_mocks/backtest:
+    post:
+      summary: Dev-only endpoint for Prism mocking
+      responses:
+        '200':
+          description: Mocked BacktestResponse return
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestResponse'
