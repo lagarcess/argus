@@ -43,6 +43,8 @@ Argus uses **Jules** (Antigravity's async AI scheduler) to run autonomous agents
 | `testing-patterns/`       | pytest, TDD workflow, coverage strategy, rate-limit tests                      |
 | `frontend-patterns/`      | React/Next.js, Robinhood design system, component patterns, form validation    |
 | `security-review/`        | RLS policies, JWT handling, Supabase auth, Alpaca secrets, is_admin bypass     |
+| **`supabase/`**          | Supabase CLI, Auth, Edge Functions, and migration workflows                    |
+| **`postgres-best-practices/`** | Performance optimization, GIN indexing for arrays, and RLS bottlenecks   |
 | **`mock-data-patterns/`** | Faker generators, mock API endpoints, toggle mechanism (NEXT_PUBLIC_MOCK_API)  |
 | **`database-patterns/`**  | Supabase migrations, RLS immutability, quota management, Edge Functions        |
 | **`monorepo-patterns/`**  | API contract sync, coordinated deployment, Bun + Poetry, TypeScript ↔ Pydantic |
@@ -107,7 +109,8 @@ Usage:
 ## � Documentation
 
 **Setup & Launch:** [`docs/startup.md`](./docs/startup.md) — Dependencies, environment config, running backend/frontend, troubleshooting
-**API Contract:** [`docs/api_contract.md`](./docs/api_contract.md) — Endpoint specs, request/response schemas, error codes
+**API Contract:** [`docs/api/api_contract.md`](./docs/api/api_contract.md) — Endpoint specs, request/response schemas, error codes
+**OpenAPI Spec:** [`docs/api/openapi.yaml`](./docs/api/openapi.yaml) — Machine-readable API definition
 **Agent Framework:** [`.jules/README.md`](./.jules/README.md) — Jules scheduler, scheduled tasks, skills, rules, workflows
 
 ---
@@ -123,3 +126,4 @@ Usage:
 7. **Use `temp/`**: Never dump scratch files in project root.
 8. **Monorepo Coordination**: Backend + frontend must run together after `setup.sh` (deploy together, test together).
 9. **Critical Findings Only**: Agents journal only critical improvements (security bugs, >20% perf gain, new test coverage). No action? Write "no finding" and stop (no PR).
+10. **Postgres Performance**: All SQL migrations and RLS policies must be audited against `postgres-best-practices/` skill before PR.
