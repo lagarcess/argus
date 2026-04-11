@@ -41,7 +41,10 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^8.4.1",
+    "@hey-api/client-fetch": "^0.13.1",
+    "@hey-api/openapi-ts": "^0.95.0",
     "@playwright/test": "^1.59.1",
+    "@stoplight/prism-cli": "^5.14.2",
     "@testing-library/react": "^15.0.6",
     "@types/node": "^20",
     "@types/react": "^19.0.0",

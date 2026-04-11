@@ -5,17 +5,18 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, TrendingUp, TrendingDown, Percent, DollarSign, Activity } from "lucide-react";
 import Link from "next/link";
 // In real app, import from lib/api
-import { mockGetBacktest } from "@/lib/mockApi";
+
 import { EquityChart } from "@/components/EquityChart";
 
 export default function BacktestResultsPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const { data: backtest, isLoading } = useQuery({
-    queryKey: ['backtest', id],
-    queryFn: () => mockGetBacktest(id),
-  });
+  const { data: backtest, isLoading } = { data: null as any, isLoading: false };
+  // const { data: backtest, isLoading } = useQuery({
+    // queryKey
+    // queryFn
+  // });
 
   if (isLoading) {
     return (

@@ -1,9 +1,11 @@
-export default {
-  client: 'fetch',
-  input: 'http://127.0.0.1:8000/openapi.json',
-  output: {
-    format: 'prettier',
-    lint: 'eslint',
-    path: './lib/generated',
-  },
-};
+import { defineConfig, defaultPlugins } from '@hey-api/openapi-ts';
+
+export default defineConfig({
+  input: '../docs/api/openapi.yaml',
+  output: 'lib/api',
+  plugins: [
+    ...defaultPlugins,
+    '@hey-api/client-fetch',
+    '@tanstack/react-query'
+  ]
+});
