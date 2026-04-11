@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 // In real app, import from lib/api
 import { postBacktestsMutation } from "@/lib/api/@tanstack/react-query.gen";
-import type { BacktestRequest } from "@/lib/api";
+
 import { toast } from "sonner";
 import { showErrorToast } from "@/components/ErrorToast";
 import { cn } from "@/lib/utils";
@@ -304,6 +304,7 @@ export default function BuilderPage() {
     }
 
     // Execute backtest immediately
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await mutateAsync({ body: data as any });
   };
 

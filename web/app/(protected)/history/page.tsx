@@ -4,7 +4,7 @@ import { History as HistoryIcon, ArrowRight, Activity } from "lucide-react";
 import Link from "next/link";
 import { getHistoryOptions } from "@/lib/api/@tanstack/react-query.gen";
 import { useQuery } from "@tanstack/react-query";
-import type { SimulationLogEntry } from "@/lib/api";
+
 
 export default function HistoryPage() {
   const { data: backtests, isLoading } = useQuery(getHistoryOptions());
@@ -39,6 +39,7 @@ export default function HistoryPage() {
              <Link href="/builder" className="btn-secondary text-sm">Go to Builder</Link>
            </div>
         ) : (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           backtests?.data?.map((bt: any) => (
             <Link key={bt.id} href={`/backtest/${bt.id}`} className="block">
               <div className="glass-card p-5 border-slate-800 hover:border-cyan-400/50 transition-colors flex flex-col justify-between group h-32 relative overflow-hidden">

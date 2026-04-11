@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+
+
 import { ArrowLeft, TrendingUp, TrendingDown, Percent, DollarSign, Activity } from "lucide-react";
 import Link from "next/link";
 // In real app, import from lib/api
@@ -9,9 +9,10 @@ import Link from "next/link";
 import { EquityChart } from "@/components/EquityChart";
 
 export default function BacktestResultsPage() {
-  const params = useParams();
-  const id = params.id as string;
 
+
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: backtest, isLoading } = { data: null as any, isLoading: false };
   // const { data: backtest, isLoading } = useQuery({
     // queryKey
