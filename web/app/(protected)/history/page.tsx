@@ -1,18 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { History as HistoryIcon, ArrowRight, Activity } from "lucide-react";
 import Link from "next/link";
-// In real app, import from lib/api
-import { mockGetHistory } from "@/lib/mockApi";
+import { getHistoryOptions } from "@/lib/api/@tanstack/react-query.gen";
+import { useQuery } from "@tanstack/react-query";
 
-import type { SimulationLogEntry } from "@/lib/api";
 
 export default function HistoryPage() {
-  const { data: backtests, isLoading } = useQuery({
-    queryKey: ['backtests'],
-    queryFn: () => mockGetHistory(),
-  });
+  const { data: backtests, isLoading } = useQuery(getHistoryOptions());
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-20">
@@ -36,7 +31,7 @@ export default function HistoryPage() {
              </div>
              <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-4 animate-pulse">Retrieving History...</p>
            </div>
-        ) : backtests?.simulations?.length === 0 ? (
+        ) : backtests?.data?.length === 0 ? (
            <div className="col-span-full py-20 text-center glass-card border-slate-800 border-dashed flex flex-col items-center justify-center">
              <Activity className="w-8 h-8 text-slate-600 mb-4" />
              <h3 className="text-lg font-semibold text-slate-300">No Backtests Found</h3>
@@ -44,7 +39,8 @@ export default function HistoryPage() {
              <Link href="/builder" className="btn-secondary text-sm">Go to Builder</Link>
            </div>
         ) : (
-          backtests?.simulations?.map((bt: SimulationLogEntry) => (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          backtests?.data?.map((bt: any) => (
             <Link key={bt.id} href={`/backtest/${bt.id}`} className="block">
               <div className="glass-card p-5 border-slate-800 hover:border-cyan-400/50 transition-colors flex flex-col justify-between group h-32 relative overflow-hidden">
 
