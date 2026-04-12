@@ -41,7 +41,7 @@ class PersistenceService:
             data: Dict[str, Any] = {
                 "user_id": user_id,
                 "name": strategy_data.get("name"),
-                "symbol": strategy_data.get("symbol"),
+                "symbols": strategy_data.get("symbols", []),
                 "timeframe": strategy_data.get("timeframe"),
                 "start_date": strategy_data["start_date"].isoformat()
                 if strategy_data.get("start_date")
@@ -161,7 +161,7 @@ class PersistenceService:
         self,
         user_id: str,
         strategy_id: str,
-        symbol: str,
+        symbols: List[str],
         timeframe: str,
         result: EngineBacktestResults,
         config_snapshot: Dict[str, Any],
@@ -187,11 +187,10 @@ class PersistenceService:
                 k: v for k, v in result.model_dump().items() if k in summary_fields
             }
 
-            # Prepare data according to aligned schema
             data: Dict[str, Any] = {
                 "user_id": user_id,
                 "strategy_id": strategy_id,
-                "symbol": symbol,
+                "symbols": symbols,
                 "timeframe": timeframe,
                 "config_snapshot": config_snapshot,
                 "summary": summary_data,
@@ -257,7 +256,7 @@ class PersistenceService:
             # Fetch paginated data joined with strategy name
             res = (
                 self.client.table("simulations")
-                .select("id, symbol, timeframe, created_at, summary, strategies(name)")
+                .select("id, symbols, timeframe, created_at, summary, strategies(name)")
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
                 .range(offset, offset + limit - 1)
@@ -276,11 +275,10 @@ class PersistenceService:
                 else:
                     strategy_name = "Unknown Strategy"
 
-                # Map row to SimulationLogEntry for consistent API response
                 entry_data = {
                     "id": cast(Dict[str, Any], row).get("id"),
                     "strategy_name": strategy_name,
-                    "symbols": [cast(Dict[str, Any], row).get("symbol")],
+                    "symbols": cast(Dict[str, Any], row).get("symbols") or [],
                     "timeframe": cast(Dict[str, Any], row).get("timeframe"),
                     "status": "completed",
                     "created_at": cast(Dict[str, Any], row).get("created_at"),

@@ -41,7 +41,7 @@ class BacktestRequest(BaseModel):
 
     # Inline strategy definition (XOR with strategy_id)
     name: Optional[str] = None
-    symbol: Optional[str] = None
+    symbols: Optional[List[str]] = None
     timeframe: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
@@ -55,7 +55,7 @@ class BacktestRequest(BaseModel):
     @model_validator(mode="after")
     def validate_xor(self):
         has_id = bool(self.strategy_id)
-        has_inline = bool(self.symbol or self.timeframe)
+        has_inline = bool(self.symbols or self.timeframe)
 
         if has_id == has_inline:
             raise ValueError(
@@ -64,8 +64,8 @@ class BacktestRequest(BaseModel):
 
         if has_inline:
             missing = []
-            if not self.symbol:
-                missing.append("symbol")
+            if not self.symbols:
+                missing.append("symbols")
             if not self.timeframe:
                 missing.append("timeframe")
             if not self.start_date:
@@ -179,7 +179,7 @@ class StrategyCreate(BaseModel):
     """Payload for creating or updating a strategy draft."""
 
     name: str = Field(..., max_length=120)
-    symbol: str
+    symbols: List[str] = Field(default_factory=list, min_length=1)
     timeframe: str
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None

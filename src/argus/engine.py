@@ -19,7 +19,7 @@ class StrategyInput(BaseModel):
     """Domain-level configuration for signal generation, mirroring API StrategyCreate."""
 
     name: str = Field(default="Unnamed Strategy")
-    symbol: str
+    symbols: list[str] = Field(default_factory=list, min_length=1)
     timeframe: str
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
@@ -29,6 +29,15 @@ class StrategyInput(BaseModel):
     patterns: List[str] = Field(default_factory=list)
     slippage: float = Field(default=0.001)
     fees: float = Field(default=0.001)
+
+    @property
+    def symbol(self) -> str:
+        """Backward-compat accessor for single-symbol internal paths."""
+        return self.symbols[0] if self.symbols else ""
+
+
+# BacktestConfig is a semantic alias used at the API boundary.
+BacktestConfig = StrategyInput
 
 
 class EngineBacktestResults(BaseModel):
@@ -55,6 +64,7 @@ class ArgusEngine:
     """
     Stateless, pure facade for Argus Backtesting Engine.
     Orchestrates Data Ingestion, Signal Generation, and Simulation.
+    Supports single-symbol and multi-symbol (vectorized VectorBT Portfolio) modes.
     """
 
     def __init__(self, data_provider: Optional[MarketDataProvider] = None):
@@ -91,7 +101,6 @@ class ArgusEngine:
             "week": "W",
             "w": "W",
         }
-        # Normalize and map
         clean = timeframe.lower().replace(" ", "")
         return mapping.get(clean, timeframe)
 
@@ -122,8 +131,6 @@ class ArgusEngine:
 
                     func = getattr(df.ta, indicator_name)
                     func(length=period, append=True)
-                    # Note: pandas-ta naming can vary, but usually matches IND_PERIOD
-                    # We look for the new column
                     potential_cols = [
                         col
                         for col in df.columns
@@ -165,23 +172,23 @@ class ArgusEngine:
 
         return mask
 
-    def run(
+    def _run_single_symbol(
         self,
+        symbol: str,
         config: StrategyInput,
-        asset_class: AssetClass = AssetClass.CRYPTO,
-    ) -> EngineBacktestResults:
+        asset_class: AssetClass,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> tuple[pd.Series, pd.Series, pd.DataFrame, Dict[str, int]]:
         """
-        Run a single-symbol backtest based on StrategyInput.
+        Fetch data and generate entry/exit signal Series for one symbol.
+        Returns (close_series, entries_series, data_df, pattern_counts).
         """
         if not self.data_provider:
             raise ValueError("MarketDataProvider is required for ArgusEngine.run")
 
-        # 1. Fetch Data
-        end_dt = config.end_date or (datetime.now(timezone.utc) - timedelta(minutes=15))
-        start_dt = config.start_date or (end_dt - timedelta(days=365))
-
         data = self.data_provider.get_historical_bars(
-            symbol=config.symbol,
+            symbol=symbol,
             asset_class=asset_class,
             timeframe_str=config.timeframe,
             start_dt=start_dt,
@@ -189,12 +196,12 @@ class ArgusEngine:
         )
 
         if data.empty:
-            raise ValueError(f"No data found for {config.symbol} on {config.timeframe}")
+            raise ValueError(f"No data found for {symbol} on {config.timeframe}")
 
-        # 2. Add technical indicators (standard stack)
+        # Add technical indicators
         TechnicalIndicators.add_all_indicators(data)
 
-        # 3. Pattern Recognition (Trigger)
+        # Pattern Recognition
         pattern_analyzer = PatternAnalyzer(data)
         pattern_results = pattern_analyzer.check_patterns()
 
@@ -203,15 +210,13 @@ class ArgusEngine:
 
         # Build trigger mask (OR patterns)
         trigger_mask = pd.Series(False, index=data.index)
-        pattern_counts = {}
+        pattern_counts: Dict[str, int] = {}
 
         if config.patterns:
             for p_name in config.patterns:
-                # Check standard patterns
                 if p_name in pattern_results.columns:
                     trigger_mask |= pattern_results[p_name].fillna(False)
                     pattern_counts[p_name] = int(pattern_results[p_name].sum())
-                # Check harmonic patterns
                 else:
                     h_matches = [
                         h
@@ -226,47 +231,113 @@ class ArgusEngine:
             if not any(pattern_counts.values()):
                 logger.debug("No requested patterns found in the dataset.")
 
-        # 4. Filter Evaluation (AND criteria)
+        # Filter Evaluation (AND criteria)
         filter_mask = self._evaluate_criteria(data, config.entry_criteria)
 
-        # 5. Signal Combination (Trigger & Filter)
-        # If no patterns requested, criteria themselves act as triggers
+        # Signal Combination
         if not config.patterns:
             entries = filter_mask
         else:
             entries = trigger_mask & filter_mask
 
-        # For exits, we currently use the exit_criteria from contract (SL/TP handles it)
-        # But we create an empty exits_df for from_signals
-        exits = pd.Series(False, index=data.index)
+        return data["close"], entries, data, pattern_counts
 
-        # 6. VectorBT Simulation
-        portfolio = vbt.Portfolio.from_signals(
-            close=data["close"],
-            entries=entries,
-            exits=exits,
-            sl_stop=config.exit_criteria.get("stop_loss_pct"),
-            tp_stop=config.exit_criteria.get("take_profit_pct"),
-            fees=config.fees,
-            slippage=config.slippage,
-            freq=self._to_pandas_freq(config.timeframe),
-        )
+    def run(
+        self,
+        config: StrategyInput,
+        asset_class: AssetClass = AssetClass.CRYPTO,
+    ) -> EngineBacktestResults:
+        """
+        Run a single or multi-symbol backtest using VectorBT's native Portfolio.
+        Single-symbol: standard from_signals flow.
+        Multi-symbol: vectorized Portfolio with one column per symbol — no Python loops
+        for simulation (signals are generated per-symbol, portfolio runs in one pass).
+        """
+        if not self.data_provider:
+            raise ValueError("MarketDataProvider is required for ArgusEngine.run")
 
-        # 7. Metrics Extraction
+        end_dt = config.end_date or (datetime.now(timezone.utc) - timedelta(minutes=15))
+        start_dt = config.start_date or (end_dt - timedelta(days=365))
+
+        freq = self._to_pandas_freq(config.timeframe)
+        sl_stop = config.exit_criteria.get("stop_loss_pct")
+        tp_stop = config.exit_criteria.get("take_profit_pct")
+
+        if len(config.symbols) == 1:
+            # ── Single-symbol path (original flow) ──────────────────────────
+            symbol = config.symbols[0]
+            close, entries, _, pattern_counts = self._run_single_symbol(
+                symbol, config, asset_class, start_dt, end_dt
+            )
+            exits = pd.Series(False, index=close.index)
+
+            portfolio = vbt.Portfolio.from_signals(
+                close=close,
+                entries=entries,
+                exits=exits,
+                sl_stop=sl_stop,
+                tp_stop=tp_stop,
+                fees=config.fees,
+                slippage=config.slippage,
+                freq=freq,
+            )
+        else:
+            # ── Multi-symbol vectorized path ─────────────────────────────────
+            # Generate signals per symbol, then feed all columns to VectorBT
+            # in a single Portfolio.from_signals call — no Python loops for sim.
+            logger.info(
+                f"Running multi-symbol backtest for {len(config.symbols)} symbols"
+            )
+            close_dict: Dict[str, pd.Series] = {}
+            entries_dict: Dict[str, pd.Series] = {}
+            pattern_counts: Dict[str, int] = {}
+
+            for sym in config.symbols:
+                try:
+                    close_s, entries_s, _, sym_patterns = self._run_single_symbol(
+                        sym, config, asset_class, start_dt, end_dt
+                    )
+                    close_dict[sym] = close_s
+                    entries_dict[sym] = entries_s
+                    # Aggregate pattern counts across symbols
+                    for k, v in sym_patterns.items():
+                        pattern_counts[k] = pattern_counts.get(k, 0) + v
+                except ValueError as e:
+                    logger.warning(f"Skipping {sym}: {e}")
+
+            if not close_dict:
+                raise ValueError(f"No valid data found for any of {config.symbols}")
+
+            # Align all series to a common index (inner join on timestamps)
+            close_df = pd.DataFrame(close_dict).dropna(how="all")
+            entries_df = pd.DataFrame(entries_dict).reindex(close_df.index).fillna(False)
+            exits_df = pd.DataFrame(False, index=close_df.index, columns=close_df.columns)
+
+            portfolio = vbt.Portfolio.from_signals(
+                close=close_df,
+                entries=entries_df,
+                exits=exits_df,
+                sl_stop=sl_stop,
+                tp_stop=tp_stop,
+                fees=config.fees,
+                slippage=config.slippage,
+                freq=freq,
+            )
+
+        # ── Metrics Extraction (same for both paths) ─────────────────────
         stats = portfolio.stats(silence_warnings=True)
 
-        def get_stat(key, default=0.0):
+        def get_stat(key: str, default: float = 0.0) -> float:
             val = stats.get(key, default)
             return float(val) if not pd.isna(val) else default
 
-        # Equity Curve (Flattened as list of floats)
-        equity_curve = portfolio.value().tolist()
+        # Equity curve: portfolio total value flattened to list of floats
+        equity_curve: List[float] = portfolio.value().tolist()
 
         # Trades (Strict TradeSnippet format)
-        trades = []
+        trades: List[Dict[str, Any]] = []
         if not portfolio.trades.records_readable.empty:
             for t in portfolio.trades.records_readable.to_dict("records"):
-                # Handle potential key variations in VectorBT output
                 entry_price = t.get("Entry Price") or t.get("Avg Entry Price") or 0.0
                 exit_price = t.get("Exit Price") or t.get("Avg Exit Price") or 0.0
                 pnl = t.get("Return") or t.get("PnL") or 0.0
