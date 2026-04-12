@@ -67,7 +67,7 @@ def test_rate_limit_exceeded(mock_user_free):
     assert response.json()["detail"]["error"] == "QUOTA_EXCEEDED"
 
 
-def test_pro_tier_bypass(mock_user_pro, monkeypatch):
+def test_pro_tier_bypass(mock_user_pro, monkeypatch, make_engine_results):
     """Test that pro user with remaining quota succeeds."""
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_pro
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
@@ -122,7 +122,7 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     assert response.status_code == 200
 
 
-def test_admin_bypass(mock_user_admin, monkeypatch):
+def test_admin_bypass(mock_user_admin, monkeypatch, make_engine_results):
     """Test that admin bypasses quota even if 0."""
     app.dependency_overrides[check_rate_limit] = lambda: mock_user_admin
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()

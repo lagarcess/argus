@@ -1,0 +1,4 @@
+# file: /app/src/argus/core/alpaca_fetcher.py
+# hypothesis_version: 6.151.12
+
+[30.0, 128, 200, '+00:00', '/', '15Min', '15m', '1Day', '1Hour', '1d', '1h', '4Hour', '4h', 'AlpacaDataFetcher', 'Authorization', 'Content-Type', 'Z', 'action', 'apikey', 'application/json', 'asset_class', 'assets', 'bars', 'c', 'class', 'close', 'crypto', 'end', 'h', 'high', 'l', 'low', 'name', 'o', 'open', 'start', 'symbol', 't', 'timeframe', 'timestamp', 'v', 'volume', 'vw', 'vwap']

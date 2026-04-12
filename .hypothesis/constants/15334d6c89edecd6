@@ -1,0 +1,4 @@
+# file: /app/src/argus/domain/schemas.py
+# hypothesis_version: 6.151.12
+
+['/', 'AssetClass', 'BTC', 'CRYPTO', 'DOGE', 'EQUITY', 'ETH', 'SOL', 'USDT', 'crypto', 'dark', 'en', 'free', 'us_equity', 'user_id']

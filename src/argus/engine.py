@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from loguru import logger
@@ -37,7 +38,83 @@ class StrategyInput(BaseModel):
 
 
 # BacktestConfig is a semantic alias used at the API boundary.
-BacktestConfig = StrategyInput
+class BacktestConfig:
+    """
+    Modular Interceptor wrapper around StrategyInput.
+    Responsible for fetching data and producing Aligned N-Dimensional Arrays
+    for multi-asset vectorization.
+    """
+
+    def __init__(self, config: StrategyInput):
+        self.config = config
+
+    def prepare_vectors(
+        self,
+        data_provider: MarketDataProvider,
+        asset_class: AssetClass,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Fetch data for all symbols and align them into orthagonal matrices (Time x Assets).
+        Handles UTC normalization and ffill/bfill for missing bars.
+        """
+        close_dict = {}
+        open_dict = {}
+        high_dict = {}
+        low_dict = {}
+        volume_dict = {}
+
+        for sym in self.config.symbols:
+            try:
+                data = data_provider.get_historical_bars(
+                    symbol=sym,
+                    asset_class=asset_class,
+                    timeframe_str=self.config.timeframe,
+                    start_dt=start_dt,
+                    end_dt=end_dt,
+                )
+                if data.empty:
+                    logger.warning(f"No data found for {sym} on {self.config.timeframe}")
+                    continue
+
+                # Ensure UTC normalization
+                if data.index.tz is None:
+                    data.index = data.index.tz_localize("UTC")
+                else:
+                    data.index = data.index.tz_convert("UTC")
+
+                close_dict[sym] = data["close"]
+                open_dict[sym] = data["open"]
+                high_dict[sym] = data["high"]
+                low_dict[sym] = data["low"]
+                volume_dict[sym] = data["volume"]
+
+            except ValueError as e:
+                logger.warning(f"Skipping {sym}: {e}")
+
+        if not close_dict:
+            raise ValueError(f"No valid data found for any of {self.config.symbols}")
+
+        # Memory Sanity Gate
+        try:
+            est_rows = max(len(s) for s in close_dict.values())
+            est_bytes = 5 * 8 * est_rows * len(close_dict)
+
+            if est_bytes > 1_073_741_824:
+                logger.warning(
+                    f"Memory Sanity Gate Warning: Aligned matrix footprint estimated at {est_bytes / (1024*1024):.2f} MB! Potential OOM risk."
+                )
+        except Exception as e:
+            logger.debug(f"Failed to estimate memory footprint: {e}")
+
+        close_df = pd.DataFrame(close_dict).ffill().bfill()
+        open_df = pd.DataFrame(open_dict).reindex(close_df.index).ffill().bfill()
+        high_df = pd.DataFrame(high_dict).reindex(close_df.index).ffill().bfill()
+        low_df = pd.DataFrame(low_dict).reindex(close_df.index).ffill().bfill()
+        volume_df = pd.DataFrame(volume_dict).reindex(close_df.index).fillna(0)
+
+        return open_df, high_df, low_df, close_df, volume_df
 
 
 class EngineBacktestResults(BaseModel):
@@ -172,76 +249,6 @@ class ArgusEngine:
 
         return mask
 
-    def _run_single_symbol(
-        self,
-        symbol: str,
-        config: StrategyInput,
-        asset_class: AssetClass,
-        start_dt: datetime,
-        end_dt: datetime,
-    ) -> tuple[pd.Series, pd.Series, pd.DataFrame, Dict[str, int]]:
-        """
-        Fetch data and generate entry/exit signal Series for one symbol.
-        Returns (close_series, entries_series, data_df, pattern_counts).
-        """
-        if not self.data_provider:
-            raise ValueError("MarketDataProvider is required for ArgusEngine.run")
-
-        data = self.data_provider.get_historical_bars(
-            symbol=symbol,
-            asset_class=asset_class,
-            timeframe_str=config.timeframe,
-            start_dt=start_dt,
-            end_dt=end_dt,
-        )
-
-        if data.empty:
-            raise ValueError(f"No data found for {symbol} on {config.timeframe}")
-
-        # Add technical indicators
-        TechnicalIndicators.add_all_indicators(data)
-
-        # Pattern Recognition
-        pattern_analyzer = PatternAnalyzer(data)
-        pattern_results = pattern_analyzer.check_patterns()
-
-        harmonic_analyzer = HarmonicAnalyzer(pattern_analyzer.pivots)
-        harmonic_patterns = harmonic_analyzer.scan_all_patterns()
-
-        # Build trigger mask (OR patterns)
-        trigger_mask = pd.Series(False, index=data.index)
-        pattern_counts: Dict[str, int] = {}
-
-        if config.patterns:
-            for p_name in config.patterns:
-                if p_name in pattern_results.columns:
-                    trigger_mask |= pattern_results[p_name].fillna(False)
-                    pattern_counts[p_name] = int(pattern_results[p_name].sum())
-                else:
-                    h_matches = [
-                        h
-                        for h in harmonic_patterns
-                        if h.pattern_type.lower() == p_name.lower()
-                    ]
-                    if h_matches:
-                        for h in h_matches:
-                            trigger_mask.loc[h.pivots[-1].index] = True
-                        pattern_counts[p_name] = len(h_matches)
-
-            if not any(pattern_counts.values()):
-                logger.debug("No requested patterns found in the dataset.")
-
-        # Filter Evaluation (AND criteria)
-        filter_mask = self._evaluate_criteria(data, config.entry_criteria)
-
-        # Signal Combination
-        if not config.patterns:
-            entries = filter_mask
-        else:
-            entries = trigger_mask & filter_mask
-
-        return data["close"], entries, data, pattern_counts
-
     def run(
         self,
         config: StrategyInput,
@@ -249,9 +256,7 @@ class ArgusEngine:
     ) -> EngineBacktestResults:
         """
         Run a single or multi-symbol backtest using VectorBT's native Portfolio.
-        Single-symbol: standard from_signals flow.
-        Multi-symbol: vectorized Portfolio with one column per symbol — no Python loops
-        for simulation (signals are generated per-symbol, portfolio runs in one pass).
+        Implements Dual-Sim architecture to calculate Reality Gap metrics.
         """
         if not self.data_provider:
             raise ValueError("MarketDataProvider is required for ArgusEngine.run")
@@ -263,78 +268,205 @@ class ArgusEngine:
         sl_stop = config.exit_criteria.get("stop_loss_pct")
         tp_stop = config.exit_criteria.get("take_profit_pct")
 
-        if len(config.symbols) == 1:
-            # ── Single-symbol path (original flow) ──────────────────────────
-            symbol = config.symbols[0]
-            close, entries, _, pattern_counts = self._run_single_symbol(
-                symbol, config, asset_class, start_dt, end_dt
-            )
-            exits = pd.Series(False, index=close.index)
+        # ── Vector Preparation Layer ─────────────────────────────────────
+        bc = BacktestConfig(config)
+        open_df, high_df, low_df, close_df, volume_df = bc.prepare_vectors(
+            self.data_provider, asset_class, start_dt, end_dt
+        )
 
-            portfolio = vbt.Portfolio.from_signals(
-                close=close,
-                entries=entries,
-                exits=exits,
-                sl_stop=sl_stop,
-                tp_stop=tp_stop,
-                fees=config.fees,
-                slippage=config.slippage,
-                freq=freq,
+        # Determine signals
+        entries_dict: Dict[str, pd.Series] = {}
+        pattern_counts: Dict[str, int] = {}
+
+        for sym in config.symbols:
+            try:
+                if sym not in close_df.columns:
+                    continue
+                sym_data = pd.DataFrame(
+                    {
+                        "open": open_df[sym],
+                        "high": high_df[sym],
+                        "low": low_df[sym],
+                        "close": close_df[sym],
+                        "volume": volume_df[sym],
+                    }
+                )
+
+                # Tech Indicators & Patterns
+                TechnicalIndicators.add_all_indicators(sym_data)
+
+                pattern_analyzer = PatternAnalyzer(sym_data)
+                pattern_results = pattern_analyzer.check_patterns()
+
+                harmonic_analyzer = HarmonicAnalyzer(pattern_analyzer.pivots)
+                harmonic_patterns = harmonic_analyzer.scan_all_patterns()
+
+                trigger_mask = pd.Series(False, index=sym_data.index)
+                sym_patterns = {}
+
+                if config.patterns:
+                    for p_name in config.patterns:
+                        if p_name in pattern_results.columns:
+                            trigger_mask |= pattern_results[p_name].fillna(False)
+                            sym_patterns[p_name] = int(pattern_results[p_name].sum())
+                        else:
+                            h_matches = [
+                                h
+                                for h in harmonic_patterns
+                                if h.pattern_type.lower() == p_name.lower()
+                            ]
+                            if h_matches:
+                                for h in h_matches:
+                                    trigger_mask.loc[h.pivots[-1].index] = True
+                                sym_patterns[p_name] = len(h_matches)
+
+                filter_mask = self._evaluate_criteria(sym_data, config.entry_criteria)
+
+                if not config.patterns:
+                    entries_s = filter_mask
+                else:
+                    entries_s = trigger_mask & filter_mask
+
+                entries_dict[sym] = entries_s
+                for k, v in sym_patterns.items():
+                    pattern_counts[k] = pattern_counts.get(k, 0) + v
+
+            except ValueError as e:
+                logger.warning(f"Skipping signal generation for {sym}: {e}")
+
+        if not list(entries_dict.keys()):
+            raise ValueError(
+                f"No valid signals could be generated for any of {config.symbols}"
             )
+
+        entries_df = pd.DataFrame(entries_dict).reindex(close_df.index).fillna(False)
+        exits_df = pd.DataFrame(False, index=close_df.index, columns=close_df.columns)
+
+        # ── Dual-Sim Orchestration ───────────────────────────────────────
+
+        # 1. Ideal Portfolio (0 slippage, 0 fees)
+        portfolio_ideal = vbt.Portfolio.from_signals(
+            close=close_df,
+            entries=entries_df,
+            exits=exits_df,
+            sl_stop=sl_stop,
+            tp_stop=tp_stop,
+            fees=0.0,
+            slippage=0.0,
+            freq=freq,
+        )
+
+        # 2. Real Portfolio (configured slippage & fees)
+        portfolio_real = vbt.Portfolio.from_signals(
+            close=close_df,
+            entries=entries_df,
+            exits=exits_df,
+            sl_stop=sl_stop,
+            tp_stop=tp_stop,
+            fees=config.fees,
+            slippage=config.slippage,
+            freq=freq,
+        )
+
+        # ── Attribution Engine (Reality Gap) ─────────────────────────────
+        ideal_return = portfolio_ideal.total_return()
+
+        ideal_returns_series = portfolio_ideal.returns()
+        real_returns_series = portfolio_real.returns()
+
+        # Fidelity Score: Correlation Coefficient
+        if isinstance(ideal_returns_series, pd.DataFrame):
+            ideal_var = ideal_returns_series.var().mean()
+            real_var = real_returns_series.var().mean()
+            if ideal_var > 0 and real_var > 0:
+                ideal_arr = ideal_returns_series.sum(axis=1).values
+                real_arr = real_returns_series.sum(axis=1).values
+                fidelity_score = float(np.corrcoef(ideal_arr, real_arr)[0, 1])
+            else:
+                fidelity_score = 1.0
         else:
-            # ── Multi-symbol vectorized path ─────────────────────────────────
-            # Generate signals per symbol, then feed all columns to VectorBT
-            # in a single Portfolio.from_signals call — no Python loops for sim.
-            logger.info(
-                f"Running multi-symbol backtest for {len(config.symbols)} symbols"
+            if ideal_returns_series.var() > 0 and real_returns_series.var() > 0:
+                fidelity_score = float(
+                    np.corrcoef(ideal_returns_series.values, real_returns_series.values)[
+                        0, 1
+                    ]
+                )
+            else:
+                fidelity_score = 1.0
+
+        if pd.isna(fidelity_score):
+            fidelity_score = 1.0
+
+        portfolio_slip_only = vbt.Portfolio.from_signals(
+            close=close_df,
+            entries=entries_df,
+            exits=exits_df,
+            sl_stop=sl_stop,
+            tp_stop=tp_stop,
+            fees=0.0,
+            slippage=config.slippage,
+            freq=freq,
+        )
+        portfolio_fee_only = vbt.Portfolio.from_signals(
+            close=close_df,
+            entries=entries_df,
+            exits=exits_df,
+            sl_stop=sl_stop,
+            tp_stop=tp_stop,
+            fees=config.fees,
+            slippage=0.0,
+            freq=freq,
+        )
+
+        slip_return = (
+            float(portfolio_slip_only.total_return().mean())
+            if isinstance(portfolio_slip_only.total_return(), pd.Series)
+            else float(portfolio_slip_only.total_return())
+        )
+        fee_return = (
+            float(portfolio_fee_only.total_return().mean())
+            if isinstance(portfolio_fee_only.total_return(), pd.Series)
+            else float(portfolio_fee_only.total_return())
+        )
+        ideal_return_scalar = (
+            float(ideal_return.mean())
+            if isinstance(ideal_return, pd.Series)
+            else float(ideal_return)
+        )
+
+        slippage_impact_pct = (
+            float(ideal_return_scalar - slip_return) if ideal_return_scalar != 0 else 0.0
+        )
+        fee_impact_pct = (
+            float(ideal_return_scalar - fee_return) if ideal_return_scalar != 0 else 0.0
+        )
+
+        if ideal_return_scalar != 0:
+            slippage_impact_pct = (slippage_impact_pct / ideal_return_scalar) * 100
+            fee_impact_pct = (fee_impact_pct / ideal_return_scalar) * 100
+
+        if fidelity_score < 0.9:
+            logger.warning(
+                f"REALITY GAP ALERT: Fidelity Score is unusually low ({fidelity_score:.3f}). High variance detected between ideal and real execution."
             )
-            close_dict: Dict[str, pd.Series] = {}
-            entries_dict: Dict[str, pd.Series] = {}
-            pattern_counts: Dict[str, int] = {}
 
-            for sym in config.symbols:
-                try:
-                    close_s, entries_s, _, sym_patterns = self._run_single_symbol(
-                        sym, config, asset_class, start_dt, end_dt
-                    )
-                    close_dict[sym] = close_s
-                    entries_dict[sym] = entries_s
-                    # Aggregate pattern counts across symbols
-                    for k, v in sym_patterns.items():
-                        pattern_counts[k] = pattern_counts.get(k, 0) + v
-                except ValueError as e:
-                    logger.warning(f"Skipping {sym}: {e}")
+        # ── Metrics Extraction ───────────────────────────────────────────
 
-            if not close_dict:
-                raise ValueError(f"No valid data found for any of {config.symbols}")
-
-            # Align all series to a common index (inner join on timestamps)
-            close_df = pd.DataFrame(close_dict).dropna(how="all")
-            entries_df = pd.DataFrame(entries_dict).reindex(close_df.index).fillna(False)
-            exits_df = pd.DataFrame(False, index=close_df.index, columns=close_df.columns)
-
-            portfolio = vbt.Portfolio.from_signals(
-                close=close_df,
-                entries=entries_df,
-                exits=exits_df,
-                sl_stop=sl_stop,
-                tp_stop=tp_stop,
-                fees=config.fees,
-                slippage=config.slippage,
-                freq=freq,
-            )
-
-        # ── Metrics Extraction (same for both paths) ─────────────────────
+        portfolio = portfolio_real
         stats = portfolio.stats(silence_warnings=True)
 
         def get_stat(key: str, default: float = 0.0) -> float:
             val = stats.get(key, default)
+            if isinstance(val, pd.Series):
+                val = val.mean()
             return float(val) if not pd.isna(val) else default
 
-        # Equity curve: portfolio total value flattened to list of floats
-        equity_curve: List[float] = portfolio.value().tolist()
+        equity_vals = portfolio.value()
+        if isinstance(equity_vals, pd.DataFrame):
+            equity_curve = equity_vals.sum(axis=1).tolist()
+        else:
+            equity_curve = equity_vals.tolist()
 
-        # Trades (Strict TradeSnippet format)
         trades: List[Dict[str, Any]] = []
         if not portfolio.trades.records_readable.empty:
             for t in portfolio.trades.records_readable.to_dict("records"):
@@ -362,6 +494,10 @@ class ArgusEngine:
             max_drawdown_pct=get_stat("Max Drawdown [%]"),
             equity_curve=equity_curve,
             trades=trades,
-            reality_gap_metrics={"slippage_impact_pct": 0.0, "fee_impact_pct": 0.0},
+            reality_gap_metrics={
+                "slippage_impact_pct": float(slippage_impact_pct),
+                "fee_impact_pct": float(fee_impact_pct),
+                "fidelity_score": float(fidelity_score),
+            },
             pattern_breakdown=pattern_counts,
         )

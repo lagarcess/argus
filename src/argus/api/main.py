@@ -454,17 +454,19 @@ def run_backtest(
             config_snapshot=config.model_dump(),
             results=BacktestResults(
                 total_return_pct=sanitize_metric(result.total_return_pct),
-                win_rate=sanitize_metric(result.win_rate / 100.0),
+                win_rate=sanitize_metric(result.win_rate),
                 sharpe_ratio=sanitize_metric(result.sharpe_ratio),
                 sortino_ratio=sanitize_metric(result.sortino_ratio),
                 calmar_ratio=sanitize_metric(result.calmar_ratio),
                 profit_factor=sanitize_metric(result.profit_factor),
                 expectancy=sanitize_metric(result.expectancy),
                 max_drawdown_pct=sanitize_metric(result.max_drawdown_pct),
-                equity_curve=sanitize_metric(result.equity_curve),
+                equity_curve=[float(x) for x in result.equity_curve]
+                if result.equity_curve
+                else [],
                 trades=[
                     TradeSnippet(
-                        entry_time=t["entry_time"],
+                        entry_time=str(t["entry_time"]),
                         entry_price=sanitize_metric(t["entry_price"]),
                         exit_price=sanitize_metric(t["exit_price"]),
                         pnl_pct=sanitize_metric(t["pnl_pct"]),
@@ -477,6 +479,9 @@ def run_backtest(
                     ),
                     fee_impact_pct=sanitize_metric(
                         result.reality_gap_metrics.get("fee_impact_pct", 0.0)
+                    ),
+                    fidelity_score=sanitize_metric(
+                        result.reality_gap_metrics.get("fidelity_score", 1.0)
                     ),
                 ),
                 pattern_breakdown=result.pattern_breakdown,
@@ -543,6 +548,9 @@ def get_backtest_detail(
                 ),
                 fee_impact_pct=sim_data.get("reality_gap_metrics", {}).get(
                     "fee_impact_pct", 0.0
+                ),
+                fidelity_score=sim_data.get("reality_gap_metrics", {}).get(
+                    "fidelity_score", 1.0
                 ),
             ),
             pattern_breakdown=full_result.get("pattern_breakdown", {}),

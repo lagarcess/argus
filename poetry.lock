@@ -1184,6 +1184,40 @@ files = [
 ]
 
 [[package]]
+name = "hypothesis"
+version = "6.151.12"
+description = "The property-based testing library for Python"
+optional = false
+python-versions = ">=3.10"
+groups = ["dev"]
+files = [
+    {file = "hypothesis-6.151.12-py3-none-any.whl", hash = "sha256:37d4f3a768365c30571b11dfd7a6857a12173d933010b2c4ab65619f1b5952c5"},
+    {file = "hypothesis-6.151.12.tar.gz", hash = "sha256:be485f503979af4c3dfa19e3fc2b967d0458e7f8c4e28128d7e215e0a55102e0"},
+]
+
+[package.dependencies]
+exceptiongroup = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
+sortedcontainers = ">=2.1.0,<3.0.0"
+
+[package.extras]
+all = ["black (>=20.8b0)", "click (>=7.0)", "crosshair-tool (>=0.0.102)", "django (>=4.2)", "dpcontracts (>=0.4)", "hypothesis-crosshair (>=0.0.27)", "lark (>=0.10.1)", "libcst (>=0.3.16)", "numpy (>=1.21.6)", "pandas (>=1.1)", "pytest (>=4.6)", "python-dateutil (>=1.4)", "pytz (>=2014.1)", "redis (>=3.0.0)", "rich (>=9.0.0)", "tzdata (>=2025.3) ; sys_platform == \"win32\" or sys_platform == \"emscripten\"", "watchdog (>=4.0.0)"]
+cli = ["black (>=20.8b0)", "click (>=7.0)", "rich (>=9.0.0)"]
+codemods = ["libcst (>=0.3.16)"]
+crosshair = ["crosshair-tool (>=0.0.102)", "hypothesis-crosshair (>=0.0.27)"]
+dateutil = ["python-dateutil (>=1.4)"]
+django = ["django (>=4.2)"]
+dpcontracts = ["dpcontracts (>=0.4)"]
+ghostwriter = ["black (>=20.8b0)"]
+lark = ["lark (>=0.10.1)"]
+numpy = ["numpy (>=1.21.6)"]
+pandas = ["pandas (>=1.1)"]
+pytest = ["pytest (>=4.6)"]
+pytz = ["pytz (>=2014.1)"]
+redis = ["redis (>=3.0.0)"]
+watchdog = ["watchdog (>=4.0.0)"]
+zoneinfo = ["tzdata (>=2025.3) ; sys_platform == \"win32\" or sys_platform == \"emscripten\""]
+
+[[package]]
 name = "icdiff"
 version = "2.0.7"
 description = "improved colored diff"
@@ -3044,6 +3078,41 @@ files = [
 ]
 
 [[package]]
+name = "psutil"
+version = "7.2.2"
+description = "Cross-platform lib for process and system monitoring."
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "psutil-7.2.2-cp313-cp313t-macosx_10_13_x86_64.whl", hash = "sha256:2edccc433cbfa046b980b0df0171cd25bcaeb3a68fe9022db0979e7aa74a826b"},
+    {file = "psutil-7.2.2-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:e78c8603dcd9a04c7364f1a3e670cea95d51ee865e4efb3556a3a63adef958ea"},
+    {file = "psutil-7.2.2-cp313-cp313t-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1a571f2330c966c62aeda00dd24620425d4b0cc86881c89861fbc04549e5dc63"},
+    {file = "psutil-7.2.2-cp313-cp313t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:917e891983ca3c1887b4ef36447b1e0873e70c933afc831c6b6da078ba474312"},
+    {file = "psutil-7.2.2-cp313-cp313t-win_amd64.whl", hash = "sha256:ab486563df44c17f5173621c7b198955bd6b613fb87c71c161f827d3fb149a9b"},
+    {file = "psutil-7.2.2-cp313-cp313t-win_arm64.whl", hash = "sha256:ae0aefdd8796a7737eccea863f80f81e468a1e4cf14d926bd9b6f5f2d5f90ca9"},
+    {file = "psutil-7.2.2-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:eed63d3b4d62449571547b60578c5b2c4bcccc5387148db46e0c2313dad0ee00"},
+    {file = "psutil-7.2.2-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:7b6d09433a10592ce39b13d7be5a54fbac1d1228ed29abc880fb23df7cb694c9"},
+    {file = "psutil-7.2.2-cp314-cp314t-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1fa4ecf83bcdf6e6c8f4449aff98eefb5d0604bf88cb883d7da3d8d2d909546a"},
+    {file = "psutil-7.2.2-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e452c464a02e7dc7822a05d25db4cde564444a67e58539a00f929c51eddda0cf"},
+    {file = "psutil-7.2.2-cp314-cp314t-win_amd64.whl", hash = "sha256:c7663d4e37f13e884d13994247449e9f8f574bc4655d509c3b95e9ec9e2b9dc1"},
+    {file = "psutil-7.2.2-cp314-cp314t-win_arm64.whl", hash = "sha256:11fe5a4f613759764e79c65cf11ebdf26e33d6dd34336f8a337aa2996d71c841"},
+    {file = "psutil-7.2.2-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:ed0cace939114f62738d808fdcecd4c869222507e266e574799e9c0faa17d486"},
+    {file = "psutil-7.2.2-cp36-abi3-macosx_11_0_arm64.whl", hash = "sha256:1a7b04c10f32cc88ab39cbf606e117fd74721c831c98a27dc04578deb0c16979"},
+    {file = "psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:076a2d2f923fd4821644f5ba89f059523da90dc9014e85f8e45a5774ca5bc6f9"},
+    {file = "psutil-7.2.2-cp36-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b0726cecd84f9474419d67252add4ac0cd9811b04d61123054b9fb6f57df6e9e"},
+    {file = "psutil-7.2.2-cp36-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:fd04ef36b4a6d599bbdb225dd1d3f51e00105f6d48a28f006da7f9822f2606d8"},
+    {file = "psutil-7.2.2-cp36-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b58fabe35e80b264a4e3bb23e6b96f9e45a3df7fb7eed419ac0e5947c61e47cc"},
+    {file = "psutil-7.2.2-cp37-abi3-win_amd64.whl", hash = "sha256:eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988"},
+    {file = "psutil-7.2.2-cp37-abi3-win_arm64.whl", hash = "sha256:8c233660f575a5a89e6d4cb65d9f938126312bca76d8fe087b947b3a1aaac9ee"},
+    {file = "psutil-7.2.2.tar.gz", hash = "sha256:0746f5f8d406af344fd547f1c8daa5f5c33dbc293bb8d6a16d80b4bb88f59372"},
+]
+
+[package.extras]
+dev = ["abi3audit", "black", "check-manifest", "colorama ; os_name == \"nt\"", "coverage", "packaging", "psleak", "pylint", "pyperf", "pypinfo", "pyreadline3 ; os_name == \"nt\"", "pytest", "pytest-cov", "pytest-instafail", "pytest-xdist", "pywin32 ; os_name == \"nt\" and implementation_name != \"pypy\"", "requests", "rstcheck", "ruff", "setuptools", "sphinx", "sphinx_rtd_theme", "toml-sort", "twine", "validate-pyproject[all]", "virtualenv", "vulture", "wheel", "wheel ; os_name == \"nt\" and implementation_name != \"pypy\"", "wmi ; os_name == \"nt\" and implementation_name != \"pypy\""]
+test = ["psleak", "pytest", "pytest-instafail", "pytest-xdist", "pywin32 ; os_name == \"nt\" and implementation_name != \"pypy\"", "setuptools", "wheel ; os_name == \"nt\" and implementation_name != \"pypy\"", "wmi ; os_name == \"nt\" and implementation_name != \"pypy\""]
+
+[[package]]
 name = "psygnal"
 version = "0.15.1"
 description = "Fast python callback/event system modeled after Qt Signals"
@@ -3111,6 +3180,18 @@ files = [
 
 [package.extras]
 tests = ["pytest"]
+
+[[package]]
+name = "py-cpuinfo"
+version = "9.0.0"
+description = "Get CPU info with pure Python"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+files = [
+    {file = "py-cpuinfo-9.0.0.tar.gz", hash = "sha256:3cdbbf3fac90dc6f118bfd64384f309edeadd902d7c8fb17f02ffa1fc3f49690"},
+    {file = "py_cpuinfo-9.0.0-py3-none-any.whl", hash = "sha256:859625bc251f64e21f077d099d4162689c762b5d6a4c3c97553d56241c9674d5"},
+]
 
 [[package]]
 name = "pycparser"
@@ -3573,6 +3654,27 @@ pytest = ">=7.0.0,<9"
 [package.extras]
 docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1.0)"]
 testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
+
+[[package]]
+name = "pytest-benchmark"
+version = "5.2.3"
+description = "A ``pytest`` fixture for benchmarking code. It will group the tests into rounds that are calibrated to the chosen timer."
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "pytest_benchmark-5.2.3-py3-none-any.whl", hash = "sha256:bc839726ad20e99aaa0d11a127445457b4219bdb9e80a1afc4b51da7f96b0803"},
+    {file = "pytest_benchmark-5.2.3.tar.gz", hash = "sha256:deb7317998a23c650fd4ff76e1230066a76cb45dcece0aca5607143c619e7779"},
+]
+
+[package.dependencies]
+py-cpuinfo = "*"
+pytest = ">=8.1"
+
+[package.extras]
+aspect = ["aspectlib"]
+elasticsearch = ["elasticsearch"]
+histogram = ["pygal", "pygaljs", "setuptools"]
 
 [[package]]
 name = "pytest-cov"
@@ -4263,6 +4365,18 @@ groups = ["main", "dev"]
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
+]
+
+[[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+files = [
+    {file = "sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0"},
+    {file = "sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88"},
 ]
 
 [[package]]
@@ -5282,4 +5396,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "d75874059809363096ebeb438d662ad4becb9b06f1266b8998c0a8ece7c90f2e"
+content-hash = "b8ad7b5898171eeaefe1d3eb9bc201c2ac597f90ced995b7c82b4b3a1fd53134"

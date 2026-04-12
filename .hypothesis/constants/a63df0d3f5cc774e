@@ -1,0 +1,4 @@
+# file: /app/src/argus/api/schemas.py
+# hypothesis_version: 6.151.12
+
+[0.0, 0.001, 0.02, 0.05, 120, '15Min', '15m', '1Day', '1Hour', '1Min', '1d', '1h', '4Hour', '4h', 'after', 'bearer', 'completed', 'discord', 'email', 'end_date', 'failed', 'google', 'login', 'login or signup', 'pending', 'processing', 'signup', 'start_date', 'symbols', 'timeframe']

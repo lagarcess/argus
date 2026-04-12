@@ -14,7 +14,7 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-from numba import njit
+from numba import njit, prange
 
 
 def warmup_jit() -> None:
@@ -22,19 +22,19 @@ def warmup_jit() -> None:
 
     Call this during application startup (e.g., in main.py or health check)
     to ensure the JIT compilation happens before live trading runs.
-
-    Example:
-        >>> from argus.analysis.structural import warmup_jit
-        >>> warmup_jit()  # Call once during startup
     """
     # Small dummy arrays to trigger compilation
-    dummy_highs = np.array([100.0, 105.0, 102.0, 108.0, 103.0], dtype=np.float64)
-    dummy_lows = np.array([95.0, 100.0, 98.0, 102.0, 99.0], dtype=np.float64)
+    dummy_highs = np.array([100.0, 105.0, 102.0, 108.0, 103.0], dtype=np.float64).reshape(
+        -1, 1
+    )
+    dummy_lows = np.array([95.0, 100.0, 98.0, 102.0, 99.0], dtype=np.float64).reshape(
+        -1, 1
+    )
     dummy_indices = np.arange(5, dtype=np.float64)
     dummy_prices = np.array([100.0, 103.0, 99.0, 106.0, 101.0], dtype=np.float64)
 
     # Trigger JIT compilation of core functions
-    _zigzag_core(dummy_highs, dummy_lows, 0.05)
+    _zigzag_batch(dummy_highs, dummy_lows, 0.05)
     _fast_pip_core(dummy_indices, dummy_prices, 3)
     _perpendicular_distance(1.0, 100.0, 0.0, 95.0, 4.0, 101.0)
 
@@ -62,7 +62,124 @@ _PEAK = 1
 _VALLEY = 2
 
 
-# PERFORMANCE: fastmath=True allows aggressive LLVM mathematical optimizations, cutting Numba loop execution time.
+# PERFORMANCE: fastmath=True allows aggressive LLVM mathematical optimizations.
+# parallel=True and prange allow parallel execution across the Asset dimension.
+@njit(parallel=True, fastmath=True, cache=True)
+def _zigzag_batch(
+    highs: np.ndarray, lows: np.ndarray, pct_threshold: float
+) -> np.ndarray:
+    """Batch ZigZag algorithm processing multiple assets concurrently.
+
+    Args:
+        highs: 2D array of high prices (Time x Assets)
+        lows: 2D array of low prices (Time x Assets)
+        pct_threshold: Minimum percentage change to register a reversal
+
+    Returns:
+        3D array of shape (Assets, Time, 3) containing [index, price, type] for each pivot.
+        Type: 1 = PEAK, 2 = VALLEY. Rows with type 0 are empty/unused.
+    """
+    n_time, n_assets = highs.shape
+
+    # Pre-allocate output for all assets
+    result = np.zeros((n_assets, n_time, 3), dtype=np.float64)
+
+    for a in prange(n_assets):
+        asset_highs = highs[:, a]
+        asset_lows = lows[:, a]
+
+        pivot_count = 0
+        trend = 0
+        last_high_idx = 0
+        last_high_val = asset_highs[0]
+        last_low_idx = 0
+        last_low_val = asset_lows[0]
+
+        for i in range(1, n_time):
+            current_high = asset_highs[i]
+            current_low = asset_lows[i]
+
+            if trend == 0:
+                if current_high > last_high_val:
+                    last_high_idx = i
+                    last_high_val = current_high
+                if current_low < last_low_val:
+                    last_low_idx = i
+                    last_low_val = current_low
+
+                up_pct = (
+                    (last_high_val - asset_lows[0]) / asset_lows[0]
+                    if asset_lows[0] > 0
+                    else 0
+                )
+                down_pct = (
+                    (asset_highs[0] - last_low_val) / asset_highs[0]
+                    if asset_highs[0] > 0
+                    else 0
+                )
+
+                if up_pct >= pct_threshold:
+                    result[a, pivot_count, 0] = 0
+                    result[a, pivot_count, 1] = asset_lows[0]
+                    result[a, pivot_count, 2] = _VALLEY
+                    pivot_count += 1
+                    trend = 1
+                elif down_pct >= pct_threshold:
+                    result[a, pivot_count, 0] = 0
+                    result[a, pivot_count, 1] = asset_highs[0]
+                    result[a, pivot_count, 2] = _PEAK
+                    pivot_count += 1
+                    trend = -1
+            elif trend == 1:
+                if current_high > last_high_val:
+                    last_high_idx = i
+                    last_high_val = current_high
+
+                down_pct = (
+                    (last_high_val - current_low) / last_high_val
+                    if last_high_val > 0
+                    else 0
+                )
+                if down_pct >= pct_threshold:
+                    result[a, pivot_count, 0] = last_high_idx
+                    result[a, pivot_count, 1] = last_high_val
+                    result[a, pivot_count, 2] = _PEAK
+                    pivot_count += 1
+                    trend = -1
+                    last_low_idx = i
+                    last_low_val = current_low
+            elif trend == -1:
+                if current_low < last_low_val:
+                    last_low_idx = i
+                    last_low_val = current_low
+
+                up_pct = (
+                    (current_high - last_low_val) / last_low_val
+                    if last_low_val > 0
+                    else 0
+                )
+                if up_pct >= pct_threshold:
+                    result[a, pivot_count, 0] = last_low_idx
+                    result[a, pivot_count, 1] = last_low_val
+                    result[a, pivot_count, 2] = _VALLEY
+                    pivot_count += 1
+                    trend = 1
+                    last_high_idx = i
+                    last_high_val = current_high
+
+        # Add final point as a pivot
+        if trend == 1:
+            result[a, pivot_count, 0] = last_high_idx
+            result[a, pivot_count, 1] = last_high_val
+            result[a, pivot_count, 2] = _PEAK
+        elif trend == -1:
+            result[a, pivot_count, 0] = last_low_idx
+            result[a, pivot_count, 1] = last_low_val
+            result[a, pivot_count, 2] = _VALLEY
+
+    return result
+
+
 @njit(fastmath=True, cache=True)
 def _zigzag_core(highs: np.ndarray, lows: np.ndarray, pct_threshold: float) -> np.ndarray:
     """Core ZigZag algorithm with O(N) time complexity.

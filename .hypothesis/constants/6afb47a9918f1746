@@ -1,0 +1,4 @@
+# file: /app/src/argus/engine.py
+# hypothesis_version: 6.151.12
+
+[0.0, 0.001, 100.0, 365, 1073741824, '15T', '15m', '15min', '1T', '1d', '1day', '1h', '1hour', '1m', '1min', '4h', '4hour', 'Avg Entry Price', 'Avg Exit Price', 'Calmar Ratio', 'D', 'Entry Price', 'Entry Timestamp', 'Exit Price', 'Expectancy', 'M', 'Max Drawdown [%]', 'PnL', 'Profit Factor', 'Return', 'Sharpe Ratio', 'Sortino Ratio', 'Total Return [%]', 'UTC', 'Unnamed Strategy', 'W', 'Win Rate [%]', 'all', 'close', 'condition', 'crosses_above', 'crosses_below', 'entry_price', 'entry_time', 'exit_price', 'fee_impact_pct', 'h', 'high', 'indicator', 'is_above', 'is_below', 'low', 'mo', 'month', 'open', 'period', 'pnl_pct', 'records', 'slippage_impact_pct', 'stop_loss_pct', 'take_profit_pct', 'target', 'volume', 'w', 'week']
