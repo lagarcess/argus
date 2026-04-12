@@ -46,7 +46,7 @@ def test_engine_adapter_v1_full_flow():
     # Define a complex strategy matching the new API contract
     strategy = StrategyInput(
         name="Adaptive Trend Follower",
-        symbol="BTC/USD",
+        symbols=["BTC/USD"],
         timeframe="1Day",
         start_date=datetime.now(timezone.utc) - timedelta(days=200),
         patterns=["ABCD"],  # Trigger

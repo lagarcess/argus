@@ -275,7 +275,7 @@ export type GetMarketBarsData = {
     body?: never;
     path?: never;
     query: {
-        symbol: string;
+        symbols: Array<string>;
         from: number;
         to: number;
         resolution: string;

@@ -28,7 +28,7 @@ def test_save_strategy_success(mock_get_settings, mock_supabase):
 
     strategy_data = {
         "name": "Test",
-        "symbol": "BTC/USD",
+        "symbols": ["BTC/USD"],
         "timeframe": "1h",
         "start_date": None,
         "end_date": None,
@@ -173,7 +173,7 @@ def test_save_simulation(mock_get_settings, mock_supabase):
         pattern_breakdown={},
     )
 
-    sim_id = service.save_simulation("user1", "strat1", "BTC", "1h", mock_result, {})
+    sim_id = service.save_simulation("user1", "strat1", ["BTC"], "1h", mock_result, {})
     assert sim_id == "sim_123"
 
 
@@ -193,7 +193,7 @@ def test_get_user_simulations(mock_get_settings, mock_supabase):
     mock_range.execute.return_value.data = [
         {
             "id": "sim1",
-            "symbol": "BTC/USD",
+            "symbols": ["BTC/USD"],
             "timeframe": "1h",
             "created_at": "2025-01-01T00:00:00Z",
             "summary": {"total_return_pct": 5.0},
