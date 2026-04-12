@@ -380,20 +380,27 @@ def run_backtest(
             )
         )
 
-        # 3. Determine Asset Class (Strict Registry Validation — uses first symbol)
-        primary_symbol = symbols[0] if symbols else ""
-        is_valid, alpaca_class = fetcher.validate_asset(primary_symbol)
-
-        if not is_valid or not alpaca_class:
+        # 3. Determine Asset Class (Strict Registry Validation for all symbols)
+        if not symbols:
             raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Asset '{primary_symbol}' is not supported by the Alpaca registry."
-                    " Check symbol for typos (e.g. 'BTC/USD' or 'AAPL')."
-                ),
+                status_code=400, detail="No symbols provided for backtest."
             )
 
-        ac = AssetClass.from_alpaca(alpaca_class)
+        first_alpaca_class = None
+        for sym in symbols:
+            is_valid, alpaca_class = fetcher.validate_asset(sym)
+            if not is_valid or not alpaca_class:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Asset '{sym}' is not supported by the Alpaca registry."
+                        " Check symbol for typos (e.g. 'BTC/USD' or 'AAPL')."
+                    ),
+                )
+            if first_alpaca_class is None:
+                first_alpaca_class = alpaca_class
+
+        ac = AssetClass.from_alpaca(first_alpaca_class)
 
         result = engine.run(
             config=config,

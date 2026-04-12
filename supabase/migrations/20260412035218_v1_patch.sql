@@ -8,10 +8,12 @@
 -- SECTION A: strategies — symbol (TEXT) → symbols (TEXT[]) + GIN Index
 -- =============================================================================
 
+-- Section A: symbols TEXT[] transition
+ALTER TABLE public.strategies ADD COLUMN IF NOT EXISTS symbols TEXT[];
+UPDATE public.strategies SET symbols = ARRAY[symbol] WHERE symbol IS NOT NULL AND symbols IS NULL;
+ALTER TABLE public.strategies ALTER COLUMN symbols SET DEFAULT '{}';
+ALTER TABLE public.strategies ALTER COLUMN symbols SET NOT NULL;
 ALTER TABLE public.strategies DROP COLUMN IF EXISTS symbol;
-
-ALTER TABLE public.strategies
-    ADD COLUMN symbols TEXT[] NOT NULL DEFAULT '{}';
 
 -- GIN index for high-speed @>, &&, ANY()-based multi-asset searches (Rule #4)
 CREATE INDEX IF NOT EXISTS idx_strategies_symbols_gin
@@ -22,10 +24,12 @@ CREATE INDEX IF NOT EXISTS idx_strategies_symbols_gin
 -- SECTION B: simulations — symbol (TEXT) → symbols (TEXT[]) + GIN Index
 -- =============================================================================
 
+-- Section B: symbols TEXT[] transition
+ALTER TABLE public.simulations ADD COLUMN IF NOT EXISTS symbols TEXT[];
+UPDATE public.simulations SET symbols = ARRAY[symbol] WHERE symbol IS NOT NULL AND symbols IS NULL;
+ALTER TABLE public.simulations ALTER COLUMN symbols SET DEFAULT '{}';
+ALTER TABLE public.simulations ALTER COLUMN symbols SET NOT NULL;
 ALTER TABLE public.simulations DROP COLUMN IF EXISTS symbol;
-
-ALTER TABLE public.simulations
-    ADD COLUMN symbols TEXT[] NOT NULL DEFAULT '{}';
 
 -- GIN index for high-speed @>, &&, ANY()-based multi-asset searches (Rule #4)
 CREATE INDEX IF NOT EXISTS idx_simulations_symbols_gin
@@ -96,29 +100,27 @@ SECURITY DEFINER
 SET search_path = '' AS $$
 DECLARE
     is_user_admin   BOOLEAN;
-    current_quota   INTEGER;
+    rows_affected   INTEGER;
 BEGIN
-    -- Fetch admin status and quota in a single round-trip
-    SELECT is_admin, remaining_quota
-      INTO is_user_admin, current_quota
-      FROM public.profiles
-     WHERE id = user_uuid;
-
-    -- Admin bypass: skip enforcement entirely
+    -- 1. Check admin status (admins bypass quota entirely)
+    SELECT is_admin INTO is_user_admin FROM public.profiles WHERE id = user_uuid;
     IF is_user_admin THEN
         RETURN;
     END IF;
 
-    -- Quota exhausted: raise exception so API can return 402
-    IF current_quota IS NULL OR current_quota <= 0 THEN
+    -- 2. Atomic decrement with check (Rule #5: single-row UPDATE is atomic)
+    UPDATE public.profiles
+       SET remaining_quota = remaining_quota - 1
+     WHERE id = user_uuid
+       AND remaining_quota > 0;
+
+    GET DIAGNOSTICS rows_affected = ROW_COUNT;
+
+    -- 3. If no row was updated, it means quota was already 0 or NULL
+    IF rows_affected = 0 THEN
         RAISE EXCEPTION 'quota_exhausted'
             USING ERRCODE = 'P0001',
                   DETAIL  = 'User has no remaining quota. Upgrade plan to continue.';
     END IF;
-
-    -- Atomic decrement (single-row UPDATE — no GREATEST() silent swallowing)
-    UPDATE public.profiles
-       SET remaining_quota = remaining_quota - 1
-     WHERE id = user_uuid;
 END;
 $$;
