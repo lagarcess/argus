@@ -33,3 +33,11 @@ The Python backend is currently under reconstruction and considered broken. To u
 - Frontend development can now proceed continuously without relying on a functional Python server.
 - The UI components correctly interact with mock API endpoints utilizing strict `Zod`-like typing from the OpenAPI spec, eliminating undefined property crashes.
 - The Golden Path Playwright E2E tests pass reliably in the CI-like headless mode.
+
+## [2026-04-12] - Proposal: Add Main API Endpoints Tests
+
+- **Gap:** `/api/v1/auth/session`, `/api/v1/usage`, `/api/v1/auth/sso`, `/api/v1/auth/profile`, `/api/v1/auth/logout`, and `/api/v1/simulations/{sim_id}` endpoints lacked coverage.
+- **Proposed:** Implement test cases in `tests/test_api.py` to cover standard requests, missing dependencies (like supabase_client), "latest" fallbacks, and exception handling.
+- **Status:** ADDED + merged in PR (mock dependencies via FastAPI `dependency_overrides` and MagicMock).
+- **Coverage gain:** `src/argus/api/main.py` 62% -> 82%
+- **Result:** RESOLVED (New branch `core/test/trinity-api-endpoints`)
