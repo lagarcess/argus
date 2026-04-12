@@ -37,7 +37,7 @@ Jules is the **Antigravity AI scheduling framework**. It orchestrates background
 
 Jules draws from the **global Argus skills** located in `.agent/skills/`.
 
-**Autonomous Selection**: Jules is authorized to proactively select and apply *any* relevant skill from the global library `~/.agent/skills/` based on the context of the task, ensuring best practices are maintained without explicit instruction.
+**Autonomous Selection**: Jules is authorized to proactively select and apply *any* relevant skill from the global library `.agent/skills/` based on the context of the task, ensuring best practices are maintained without explicit instruction.
 
 **Core available skills:**
 - `coding-standards/`
@@ -59,7 +59,7 @@ Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent
 
 ## 📖 Documentation References
 
-- **API contract:** `docs/api_contract.md`
+- **API contract:** `docs/api/api_contract.md`
 - **Master Registry:** `AGENTS.md` (overall agent structure, skills, rules)
 
 ---
@@ -67,7 +67,7 @@ Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent
 ## 📝 Realignment Checklist (Mandatory)
 
 1. **Synchronize**: Force rebase of `main`, prioritize upstream.
-2. **Realignment**: Re-verify mission against current `docs/api_contract.md`.
+2. **Realignment**: Re-verify mission against current `docs/api/api_contract.md`.
 3. **Validation**: Enforce `/verify` and iterate failures with `/fix`.
 4. **Reporting**: Summarize shifts necessitated by drift.
 
@@ -85,5 +85,5 @@ Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent
 ## Resources
 
 - **Antigravity Docs:** https://antigravity.google/docs/
-- **API reference:** `docs/api_contract.md`
+- **API reference:** `docs/api/api_contract.md`
 - **Project agents:** `AGENTS.md`

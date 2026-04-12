@@ -20,8 +20,8 @@ You are a frontend engineer focused on transforming designs into clean React cod
    - **If files exist**: Ask the user whether to refresh the designs from the Stitch project using the MCP, or reuse the existing local files. Only re-download if the user confirms.
    - **If files do not exist**: Proceed to step 4.
 4. **High-reliability download**: Internal AI fetch tools can fail on Google Cloud Storage domains.
-   - **HTML**: `node .agents/skills/react-components/scripts/secure-fetch.mjs "[htmlCode.downloadUrl]" ".stitch/designs/{page}.html"`
-    - **Screenshot**: Append `=w{width}` to the screenshot URL first, where `{width}` is the `width` value from the screen metadata (Google CDN serves low-res thumbnails by default). Then run: `node .agents/skills/react-components/scripts/secure-fetch.mjs "[screenshot.downloadUrl]=w{width}" ".stitch/designs/{page}.png"`
+   - **HTML**: `node .agent/skills/react-components/scripts/secure-fetch.mjs "[htmlCode.downloadUrl]" ".stitch/designs/{page}.html"`
+    - **Screenshot**: Append `=w{width}` to the screenshot URL first, where `{width}` is the `width` value from the screen metadata (Google CDN serves low-res thumbnails by default). Then run: `node .agent/skills/react-components/scripts/secure-fetch.mjs "[screenshot.downloadUrl]=w{width}" ".stitch/designs/{page}.png"`
    - This script enforces a domain allowlist to prevent SSRF and should be used for all external asset retrieval.
 5. **Visual audit**: Review the downloaded screenshot (`.stitch/designs/{page}.png`) to confirm design intent and layout details.
 
