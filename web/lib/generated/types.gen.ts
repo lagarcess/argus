@@ -19,9 +19,9 @@ export type BacktestRequest = {
    */
   name?: string | null;
   /**
-   * Symbol
+   * Symbols
    */
-  symbol?: string | null;
+  symbols?: Array<string> | null;
   /**
    * Timeframe
    */
@@ -309,9 +309,9 @@ export type StrategyCreate = {
    */
   name: string;
   /**
-   * Symbol
+   * Symbols
    */
-  symbol: string;
+  symbols: Array<string>;
   /**
    * Timeframe
    */
@@ -359,9 +359,9 @@ export type StrategyResponse = {
    */
   name: string;
   /**
-   * Symbol
+   * Symbols
    */
-  symbol: string;
+  symbols: Array<string>;
   /**
    * Timeframe
    */

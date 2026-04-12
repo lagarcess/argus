@@ -42,7 +42,9 @@ def auth_override(mock_user):
 def valid_strategy_payload():
     return {
         "name": faker.catch_phrase(),
-        "symbol": faker.random_element(elements=("BTC/USDT", "ETH/USD", "AAPL", "MSFT")),
+        "symbols": [
+            faker.random_element(elements=("BTC/USDT", "ETH/USD", "AAPL", "MSFT"))
+        ],
         "timeframe": faker.random_element(elements=("1Hour", "4Hour", "1Day")),
         "start_date": None,
         "end_date": None,
@@ -61,7 +63,9 @@ def mock_strategy_db():
         "id": faker.uuid4(),
         "user_id": faker.uuid4(),
         "name": faker.catch_phrase(),
-        "symbol": faker.random_element(elements=("BTC/USDT", "ETH/USD", "AAPL", "MSFT")),
+        "symbols": [
+            faker.random_element(elements=("BTC/USDT", "ETH/USD", "AAPL", "MSFT"))
+        ],
         "timeframe": faker.random_element(elements=("1Hour", "4Hour", "1Day")),
         "start_date": None,
         "end_date": None,
@@ -310,7 +314,7 @@ def test_strategy_create_timeframe_validator_valid():
     # Should not raise
     StrategyCreate(
         name="Valid",
-        symbol="BTC",
+        symbols=["BTC"],
         timeframe="1Hour",
         start_date=None,
         end_date=None,
@@ -325,7 +329,7 @@ def test_strategy_create_timeframe_validator_invalid():
     with pytest.raises(ValueError) as excinfo:
         StrategyCreate(
             name="Invalid",
-            symbol="BTC",
+            symbols=["BTC"],
             timeframe="5Min",  # Not in allowed list
             start_date=None,
             end_date=None,

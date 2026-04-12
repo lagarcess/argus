@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Activity, LayoutDashboard, Search, History, User, Crown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 // In a real app we'd fetch the generated OpenAPI via lib/api
-import { mockGetSession } from "@/lib/mockApi";
+import { getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
 
 function QuotaBadge({ remaining, isAdmin }: { remaining: number; isAdmin: boolean }) {
   if (isAdmin) {
@@ -32,10 +32,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   // Middleware handles the secure boundary check, preventing screen flashing.
 
-  const { data: sessionData } = useQuery({
-    queryKey: ['session'],
-    queryFn: () => mockGetSession(), // Stubbed to mockApi for building UI
-  });
+  const { data: sessionData } = useQuery(getAuthSessionOptions());
+  // const { data: sessionData } = useQuery({
+    // queryKey
+    // queryFn // Stubbed to mockApi for building UI
+  // });
 
   const navLinks = [
     { name: "Builder", href: "/builder", icon: LayoutDashboard },

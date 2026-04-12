@@ -102,7 +102,7 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch):
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_strategy",
         MagicMock(
-            return_value={"id": "123", "name": "X", "symbol": "BTC", "timeframe": "1h"}
+            return_value={"id": "123", "name": "X", "symbols": ["BTC"], "timeframe": "1h"}
         ),
     )
     monkeypatch.setattr(
@@ -157,7 +157,7 @@ def test_admin_bypass(mock_user_admin, monkeypatch):
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_strategy",
         MagicMock(
-            return_value={"id": "123", "name": "X", "symbol": "BTC", "timeframe": "1h"}
+            return_value={"id": "123", "name": "X", "symbols": ["BTC"], "timeframe": "1h"}
         ),
     )
     monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())

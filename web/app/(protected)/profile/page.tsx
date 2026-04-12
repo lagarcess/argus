@@ -1,12 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+
 import { User, Shield, LogOut, Zap, Globe, Moon, Sun, Monitor, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 // In real app, import from lib/api
-import { mockGetSession } from "@/lib/mockApi";
+import { getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const NEUTRAL_AVATARS = [
@@ -124,10 +125,12 @@ export default function ProfilePage() {
   const [lang, setLang] = useState("EN");
   const [showPricing, setShowPricing] = useState(false);
 
-  const { data: sessionData } = useQuery({
-    queryKey: ['session'],
-    queryFn: () => mockGetSession(),
-  });
+  const { data: sessionData } = useQuery(getAuthSessionOptions());
+
+  // const { data: sessionData } = useQuery({
+    // queryKey: ['session'],
+    // queryFn: () => mockGetSession(),
+  // });
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();

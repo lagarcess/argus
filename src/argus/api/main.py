@@ -316,9 +316,10 @@ def run_backtest(
                 raise HTTPException(status_code=404, detail="Strategy not found")
 
             # Map DB record to Engine Config
+            symbols = strat_record.get("symbols") or []
             config = StrategyInput(
                 name=strat_record["name"],
-                symbol=strat_record["symbol"],
+                symbols=symbols,
                 timeframe=strat_record["timeframe"],
                 start_date=strat_record.get("start_date"),
                 end_date=strat_record.get("end_date"),
@@ -326,19 +327,19 @@ def run_backtest(
                 exit_criteria=strat_record.get("exit_criteria", {}),
                 indicators_config=strat_record.get("indicators_config", {}),
                 patterns=strat_record.get("patterns", []),
-                slippage=request.slippage,  # Use request values if provided
+                slippage=request.slippage,
                 fees=request.fees,
             )
-            symbols = [strat_record["symbol"]]
             timeframe = strat_record["timeframe"]
             start_dt = strat_record.get("start_date")
             end_dt = strat_record.get("end_date")
             strategy_id = sid
         else:
             # Inline configuration
+            symbols = request.symbols or []
             config = StrategyInput(
                 name=request.name or "Inline Strategy",
-                symbol=request.symbol or "",
+                symbols=symbols,
                 timeframe=request.timeframe or "",
                 start_date=request.start_date,
                 end_date=request.end_date,
@@ -349,7 +350,6 @@ def run_backtest(
                 slippage=request.slippage,
                 fees=request.fees,
             )
-            symbols = [request.symbol] if request.symbol else []
             timeframe = request.timeframe
             start_dt = request.start_date
             end_dt = request.end_date
@@ -357,7 +357,7 @@ def run_backtest(
             # Save inline strategies as "drafts" for persistence
             strategy_data = {
                 "name": config.name,
-                "symbol": symbols[0] if symbols else "",
+                "symbols": symbols,
                 "timeframe": timeframe or "",
                 "start_date": start_dt,
                 "end_date": end_dt,
@@ -380,17 +380,27 @@ def run_backtest(
             )
         )
 
-        # 3. Determine Asset Class (Strict Registry Validation)
-        symbol = symbols[0] if symbols else ""
-        is_valid, alpaca_class = fetcher.validate_asset(symbol)
-
-        if not is_valid or not alpaca_class:
+        # 3. Determine Asset Class (Strict Registry Validation for all symbols)
+        if not symbols:
             raise HTTPException(
-                status_code=400,
-                detail=f"Asset '{symbol}' is not supported by the Alpaca registry. Check symbol for typos (e.g. 'BTC/USD' or 'AAPL').",
+                status_code=400, detail="No symbols provided for backtest."
             )
 
-        ac = AssetClass.from_alpaca(alpaca_class)
+        first_alpaca_class = None
+        for sym in symbols:
+            is_valid, alpaca_class = fetcher.validate_asset(sym)
+            if not is_valid or not alpaca_class:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Asset '{sym}' is not supported by the Alpaca registry."
+                        " Check symbol for typos (e.g. 'BTC/USD' or 'AAPL')."
+                    ),
+                )
+            if first_alpaca_class is None:
+                first_alpaca_class = alpaca_class
+
+        ac = AssetClass.from_alpaca(first_alpaca_class)
 
         result = engine.run(
             config=config,
@@ -404,7 +414,7 @@ def run_backtest(
                 {
                     "user_id": user_id_str,
                     "tier": user.subscription_tier,
-                    "symbol": symbols[0] if symbols else "unknown",
+                    "symbols": symbols,
                 },
             )
             if supabase_client:
@@ -413,6 +423,12 @@ def run_backtest(
                         "decrement_user_quota", {"user_uuid": user_id_str}
                     ).execute()
                 except Exception as e:
+                    err_str = str(e)
+                    if "P0001" in err_str or "quota_exhausted" in err_str:
+                        raise HTTPException(
+                            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                            detail="Quota exhausted. Upgrade your plan to continue.",
+                        ) from e
                     logger.error(f"Failed to decrement quota: {e}")
 
         # 4. Background Persistence
@@ -420,7 +436,7 @@ def run_backtest(
             persistence_service.save_simulation,
             user_id=user_id_str,
             strategy_id=strategy_id,
-            symbol=symbols[0] if symbols else "",
+            symbols=symbols,
             timeframe=timeframe,
             result=result,
             config_snapshot=config.model_dump(),

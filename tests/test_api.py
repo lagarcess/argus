@@ -15,23 +15,29 @@ class MockAlpacaFetcher:
     def validate_asset(self, symbol):
         return True, "crypto"
 
-    def fetch_bars(self, symbol, timeframe, start, end=None):
-        # Generate 100 periods of mock data
-        # Normalize start to naive to avoid Pandas timezone disagreement error in CI
+    def _make_df(self, start, periods=100):
         start_naive = pd.to_datetime(start).replace(tzinfo=None)
-        dates = pd.date_range(start=start_naive, periods=100, freq="h", tz=timezone.utc)
-        df = pd.DataFrame(
+        dates = pd.date_range(
+            start=start_naive, periods=periods, freq="h", tz=timezone.utc
+        )
+        return pd.DataFrame(
             {
-                "open": np.random.uniform(40000, 45000, 100),
-                "high": np.random.uniform(45000, 46000, 100),
-                "low": np.random.uniform(39000, 40000, 100),
-                "close": np.random.uniform(40000, 45000, 100),
-                "volume": np.random.uniform(1, 10, 100),
-                "vwap": np.random.uniform(40000, 45000, 100),
+                "open": np.random.uniform(40000, 45000, periods),
+                "high": np.random.uniform(45000, 46000, periods),
+                "low": np.random.uniform(39000, 40000, periods),
+                "close": np.random.uniform(40000, 45000, periods),
+                "volume": np.random.uniform(1, 10, periods),
+                "vwap": np.random.uniform(40000, 45000, periods),
             },
             index=dates,
         )
-        return df
+
+    def fetch_bars(self, symbol, timeframe, start, end=None):
+        return self._make_df(start)
+
+    def get_historical_bars(self, symbol, asset_class, timeframe_str, start_dt, end_dt):
+        """MarketDataProvider-compatible interface used by ArgusEngine._run_single_symbol."""
+        return self._make_df(start_dt)
 
     def close(self):
         pass
@@ -115,7 +121,7 @@ def test_backtest_endpoint_xor_validation(monkeypatch, mock_user):
         "/api/v1/backtests",
         json={
             "strategy_id": "123",
-            "symbol": "BTC/USDT",
+            "symbols": ["BTC/USDT"],
             "timeframe": "1h",
             "start_date": "2025-01-01T00:00:00Z",
             "end_date": "2025-02-01T00:00:00Z",
@@ -168,7 +174,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
         return_value={
             "id": "123",
             "name": "Test Strategy",
-            "symbol": "BTC/USDT",
+            "symbols": ["BTC/USDT"],
             "timeframe": "1h",
             "start_date": None,
             "end_date": None,
@@ -257,9 +263,21 @@ def test_backtest(monkeypatch, mock_user):
         "argus.api.main.persistence_service.save_strategy",
         lambda user_id, data: {"id": "mock-strat-id"},
     )
+    monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
+
+    # Patch MarketDataProvider so the real engine gets valid OHLCV data
+    _fetcher = MockAlpacaFetcher()
+    monkeypatch.setattr(
+        "argus.market.data_provider.MarketDataProvider.get_historical_bars",
+        lambda self, symbol, asset_class, timeframe_str, start_dt, end_dt, **kw: (
+            _fetcher.get_historical_bars(
+                symbol, asset_class, timeframe_str, start_dt, end_dt
+            )
+        ),
+    )
 
     payload = {
-        "symbol": "BTC/USD",
+        "symbols": ["BTC/USD"],
         "timeframe": "1h",
         "start_date": "2024-01-01T00:00:00Z",
         "end_date": "2024-01-05T00:00:00Z",

@@ -79,7 +79,7 @@ Categorize PRs using these labels for better organization:
 1. Pass `/verify` before opening PR.
 2. Reference issue number in PR title and body.
 3. One logical change per PR — avoid mega-PRs (but related backend + frontend changes can be in one PR if they touch the API contract).
-4. If PR touches API schema, include link to `docs/api_contract.md` update.
+4. If PR touches API schema, include link to `docs/api/api_contract.md` update.
 5. Squash merge to main.
 
 See: `.agent/workflows/pr.md` for full PR workflow, `.agent/skills/monorepo-patterns/SKILL.md` for coordination details.
