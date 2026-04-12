@@ -42,6 +42,7 @@ from argus.api.schemas import (
 from argus.api.strategies import router as strategies_router
 from argus.config import (
     get_crypto_data_client,
+    get_settings,
     get_stock_data_client,
 )
 from argus.core.alpaca_fetcher import AlpacaDataFetcher
@@ -179,6 +180,10 @@ def sso_login(request: SSORequest):
             detail="Supabase client not configured.",
         )
 
+    settings = get_settings()
+    if request.redirect_to not in settings.ALLOWED_REDIRECT_URLS:
+        raise HTTPException(status_code=400, detail="Invalid redirect URL")
+
     try:
         # Currently supabase-py v2+ auth.sign_in_with_oauth takes provider and options
         res = supabase_client.auth.sign_in_with_oauth(
@@ -264,7 +269,6 @@ def logout(response: Response, request: Request):
     if token:
         try:
             # Create a request-local Supabase client to avoid global state race conditions
-            from argus.config import get_settings
             from supabase import create_client
 
             settings = get_settings()
@@ -456,6 +460,13 @@ def run_backtest(
                 )
             if first_alpaca_class is None:
                 first_alpaca_class = alpaca_class
+            elif alpaca_class != first_alpaca_class:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Mixed asset classes (e.g., Crypto and Stocks) are not supported in a single backtest.",
+                )
+
+        ac = AssetClass.from_alpaca(first_alpaca_class)
 
         result = engine.run(config=config)
 
