@@ -52,3 +52,15 @@ temp/*
 .DS_Store
 Thumbs.db
 .hypothesis/
+
+# Node
+node_modules/
+.npm/
+
+# Next.js
+.next/
+tsconfig.tsbuildinfo
+
+# Playwright / Testing
+playwright-report/
+test-results/
