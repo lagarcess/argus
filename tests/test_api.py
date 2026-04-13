@@ -144,6 +144,12 @@ def test_backtest_endpoint_success(monkeypatch, mock_user, make_engine_results):
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
 
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
+
     # Mock the emit_posthog_event
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
 
@@ -253,6 +259,12 @@ def test_backtest(monkeypatch, mock_user):
     app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
 
     # Mock persistence
     monkeypatch.setattr(

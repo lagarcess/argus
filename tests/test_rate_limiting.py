@@ -77,6 +77,12 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch, make_engine_results):
     fetcher_mock.validate_asset.return_value = (True, "equity")
     app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
 
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
+
     # Mock engine and dependencies
     from argus.engine import EngineBacktestResults
 
@@ -131,6 +137,12 @@ def test_admin_bypass(mock_user_admin, monkeypatch, make_engine_results):
     fetcher_mock = MagicMock()
     fetcher_mock.validate_asset.return_value = (True, "equity")
     app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
+
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
 
     from argus.engine import EngineBacktestResults
 
@@ -224,6 +236,12 @@ def test_tier_gating_symbol_count_violation(monkeypatch, make_engine_results):
     fetcher_mock = MagicMock()
     fetcher_mock.validate_asset.return_value = (True, "equity")
     app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
+
+    # Mock memory for this test
+    mock_mem = MagicMock()
+    mock_mem.available = 80 * 1024 * 1024
+    mock_mem.total = 100 * 1024 * 1014
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
     monkeypatch.setattr(
         "argus.api.main.persistence_service.save_strategy",
         lambda *args, **kwargs: {"id": "mock-strat-id"},
@@ -269,6 +287,12 @@ def test_tier_gating_daily_lookback_violation(monkeypatch, make_engine_results):
     fetcher_mock = MagicMock()
     fetcher_mock.validate_asset.return_value = (True, "equity")
     app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
+
+    # Mock memory for this test
+    mock_mem = MagicMock()
+    mock_mem.available = 80 * 1024 * 1024
+    mock_mem.total = 100 * 1024 * 1014
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
     monkeypatch.setattr(
         "argus.api.main.persistence_service.save_strategy",
         lambda *args, **kwargs: {"id": "mock-strat-id"},
@@ -314,6 +338,12 @@ def test_tier_gating_intraday_lookback_violation(monkeypatch, make_engine_result
     fetcher_mock = MagicMock()
     fetcher_mock.validate_asset.return_value = (True, "equity")
     app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
+
+    # Mock memory for this test
+    mock_mem = MagicMock()
+    mock_mem.available = 80 * 1024 * 1024
+    mock_mem.total = 100 * 1024 * 1014
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
     monkeypatch.setattr(
         "argus.api.main.persistence_service.save_strategy",
         lambda *args, **kwargs: {"id": "mock-strat-id"},
