@@ -130,7 +130,7 @@ def test_backtest_endpoint_xor_validation(monkeypatch, mock_user):
     assert response.status_code == 422
 
 
-def test_backtest_endpoint_success(monkeypatch, mock_user):
+def test_backtest_endpoint_success(monkeypatch, mock_user, make_engine_results):
     from argus.api.auth import check_rate_limit
     from argus.api.main import (
         get_alpaca_fetcher,
@@ -143,6 +143,12 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
 
     # Mock the emit_posthog_event
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
@@ -197,7 +203,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     data = response.json()
     assert "id" in data
     assert data["results"]["total_return_pct"] == 14.5
-    assert data["results"]["win_rate"] == 0.62
+    assert data["results"]["win_rate"] == 62.0
     assert data["config_snapshot"]["timeframe"] == "1h"
 
 
@@ -274,7 +280,7 @@ def test_sso_login(monkeypatch):
 
     response = client.post(
         "/api/v1/auth/sso",
-        json={"provider": "google", "redirect_to": "http://localhost:3000"},
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
     )
     assert response.status_code == 200
     assert response.json()["auth_url"] == url
@@ -285,7 +291,7 @@ def test_sso_login(monkeypatch):
     )
     response_conflict = client.post(
         "/api/v1/auth/sso",
-        json={"provider": "google", "redirect_to": "http://localhost:3000"},
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
     )
     assert response_conflict.status_code == 409
 
@@ -295,7 +301,7 @@ def test_sso_login(monkeypatch):
     )
     response_generic = client.post(
         "/api/v1/auth/sso",
-        json={"provider": "google", "redirect_to": "http://localhost:3000"},
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
     )
     assert response_generic.status_code == 500
 
@@ -303,7 +309,7 @@ def test_sso_login(monkeypatch):
     monkeypatch.setattr("argus.api.main.supabase_client", None)
     response_missing = client.post(
         "/api/v1/auth/sso",
-        json={"provider": "google", "redirect_to": "http://localhost:3000"},
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
     )
     assert response_missing.status_code == 500
 
@@ -326,12 +332,14 @@ def test_update_profile(monkeypatch, mock_user):
     monkeypatch.setattr("argus.api.main.supabase_client", mock_supabase)
 
     # Mock user cache invalidation
-    monkeypatch.setattr("argus.api.main._user_cache.invalidate", MagicMock())
+    mock_invalidate = MagicMock()
+    monkeypatch.setattr("argus.api.main._user_cache.invalidate", mock_invalidate)
 
     response = client.patch("/api/v1/auth/profile", json={"theme": theme, "lang": lang})
     assert response.status_code == 200
     assert response.json()["theme"] == theme
     assert response.json()["lang"] == lang
+    mock_invalidate.assert_called_once_with(mock_user.id)
 
     # Test empty update
     response_empty = client.patch("/api/v1/auth/profile", json={})
@@ -435,6 +443,12 @@ def test_backtest(monkeypatch, mock_user):
     app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
 
     # Mock persistence
     monkeypatch.setattr(

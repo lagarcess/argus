@@ -1,7 +1,7 @@
 import math
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -20,6 +20,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from argus.analysis.structural import warmup_jit
 from argus.api.auth import (
     _user_cache,
     auth_required,
@@ -41,6 +42,7 @@ from argus.api.schemas import (
 from argus.api.strategies import router as strategies_router
 from argus.config import (
     get_crypto_data_client,
+    get_settings,
     get_stock_data_client,
 )
 from argus.core.alpaca_fetcher import AlpacaDataFetcher
@@ -103,6 +105,14 @@ asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
 async def lifespan(app: FastAPI):
     """Lifecycle events."""
     logger.info("Initializing Argus API...")
+    try:
+        # Pre-compile Numba logic to prevent first-request cold-start latency
+        logger.info("Triggering Numba JIT warmup...")
+        warmup_jit()
+        logger.info("Numba JIT warmup complete.")
+    except Exception as e:
+        logger.warning(f"Could not complete Numba JIT warmup: {e}")
+
     try:
         # Prime the asset cache to avoid latency on first request
         fetcher = get_alpaca_fetcher()
@@ -169,6 +179,10 @@ def sso_login(request: SSORequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Supabase client not configured.",
         )
+
+    settings = get_settings()
+    if request.redirect_to not in settings.ALLOWED_REDIRECT_URLS:
+        raise HTTPException(status_code=400, detail="Invalid redirect URL")
 
     try:
         # Currently supabase-py v2+ auth.sign_in_with_oauth takes provider and options
@@ -255,7 +269,6 @@ def logout(response: Response, request: Request):
     if token:
         try:
             # Create a request-local Supabase client to avoid global state race conditions
-            from argus.config import get_settings
             from supabase import create_client
 
             settings = get_settings()
@@ -296,7 +309,21 @@ def run_backtest(
     """
     Execute a backtest simulation with XOR logic (Strategy ID or Inline config).
     """
-    # 0. Sync strategy_id from Query or Body for XOR check
+    # 0. System Guard (Memory Safety)
+    import psutil
+
+    mem = psutil.virtual_memory()
+    # Ensure available memory is at least 15% to protect host
+    if mem.available / mem.total < 0.15:
+        logger.error(
+            f"OOM Risk: Available memory is at {mem.available / mem.total * 100:.1f}%. Rejecting backtest."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="System memory is critically low. Please try again later.",
+        )
+
+    # 1. Sync strategy_id from Query or Body for XOR check
     sid = strategy_id or request.strategy_id
     # Rate limit headers mock for the UI
     response.headers["X-RateLimit-Limit"] = "100"
@@ -353,6 +380,40 @@ def run_backtest(
             timeframe = request.timeframe
             start_dt = request.start_date
             end_dt = request.end_date
+        # --- Multi-Dimensional Tier Gating Validation ---
+        if not user.is_admin:
+            from datetime import timezone
+
+            from argus.domain.quotas import TIER_CONFIG
+
+            tier = user.subscription_tier or "free"
+            limits = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
+
+            # 1. Symbol Count
+            if len(symbols) > limits["max_symbols"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Tier '{tier}' is limited to {limits['max_symbols']} symbols per backtest.",
+                )
+
+            # 2. Lookback Horizon
+            if start_dt:
+                s_dt = start_dt
+                e_dt = end_dt if end_dt else datetime.now(timezone.utc)
+                delta_days = (e_dt - s_dt).days
+
+                is_intraday = timeframe and any(x in timeframe for x in ["Min", "Hour"])
+                if is_intraday and delta_days > limits["intraday_lookback_days"]:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Tier '{tier}' is limited to {limits['intraday_lookback_days']} days for intraday data.",
+                    )
+                elif not is_intraday and delta_days > limits["daily_lookback_days"]:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Tier '{tier}' is limited to {limits['daily_lookback_days']} days for daily data.",
+                    )
+            # ------------------------------------------------
 
             # Save inline strategies as "drafts" for persistence
             strategy_data = {
@@ -399,13 +460,15 @@ def run_backtest(
                 )
             if first_alpaca_class is None:
                 first_alpaca_class = alpaca_class
+            elif alpaca_class != first_alpaca_class:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Mixed asset classes (e.g., Crypto and Stocks) are not supported in a single backtest.",
+                )
 
         ac = AssetClass.from_alpaca(first_alpaca_class)
 
-        result = engine.run(
-            config=config,
-            asset_class=ac,
-        )
+        result = engine.run(config=config, asset_class=ac)
 
         # 3. Post-Execution Hooks (Atomic Quota + PostHog)
         if not user.is_admin:
@@ -454,17 +517,19 @@ def run_backtest(
             config_snapshot=config.model_dump(),
             results=BacktestResults(
                 total_return_pct=sanitize_metric(result.total_return_pct),
-                win_rate=sanitize_metric(result.win_rate / 100.0),
+                win_rate=sanitize_metric(result.win_rate),
                 sharpe_ratio=sanitize_metric(result.sharpe_ratio),
                 sortino_ratio=sanitize_metric(result.sortino_ratio),
                 calmar_ratio=sanitize_metric(result.calmar_ratio),
                 profit_factor=sanitize_metric(result.profit_factor),
                 expectancy=sanitize_metric(result.expectancy),
                 max_drawdown_pct=sanitize_metric(result.max_drawdown_pct),
-                equity_curve=sanitize_metric(result.equity_curve),
+                equity_curve=[float(x) for x in result.equity_curve]
+                if result.equity_curve
+                else [],
                 trades=[
                     TradeSnippet(
-                        entry_time=t["entry_time"],
+                        entry_time=str(t["entry_time"]),
                         entry_price=sanitize_metric(t["entry_price"]),
                         exit_price=sanitize_metric(t["exit_price"]),
                         pnl_pct=sanitize_metric(t["pnl_pct"]),
@@ -478,6 +543,9 @@ def run_backtest(
                     fee_impact_pct=sanitize_metric(
                         result.reality_gap_metrics.get("fee_impact_pct", 0.0)
                     ),
+                    fidelity_score=sanitize_metric(
+                        result.reality_gap_metrics.get("fidelity_score", 1.0)
+                    ),
                 ),
                 pattern_breakdown=result.pattern_breakdown,
             ),
@@ -486,6 +554,8 @@ def run_backtest(
     except ValueError as e:
         logger.warning(f"Engine validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Backtest execution failed")
         raise HTTPException(
@@ -543,6 +613,9 @@ def get_backtest_detail(
                 ),
                 fee_impact_pct=sim_data.get("reality_gap_metrics", {}).get(
                     "fee_impact_pct", 0.0
+                ),
+                fidelity_score=sim_data.get("reality_gap_metrics", {}).get(
+                    "fidelity_score", 1.0
                 ),
             ),
             pattern_breakdown=full_result.get("pattern_breakdown", {}),

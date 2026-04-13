@@ -20,11 +20,14 @@ build/
 
 # Virtual environments
 .venv/
+.python-version
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
+.benchmarks/
+.hypothesis/
 
 # Linting / Type checking
 .ruff_cache/
@@ -48,6 +51,25 @@ temp/*
 # Joblib cache (market data)
 .gemini/cache/
 
+# Supabase temp
+supabase/.temp/
+
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node
+node_modules/
+.npm/
+
+# Next.js
+.next/
+tsconfig.tsbuildinfo
+web/out/
+
+# Playwright / Testing
+playwright-report/
+test-results/
+
+# Editor swap files
+**/*.swp

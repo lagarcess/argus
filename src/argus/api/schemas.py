@@ -90,6 +90,8 @@ class TradeSnippet(BaseModel):
 class RealityGapMetrics(BaseModel):
     slippage_impact_pct: float
     fee_impact_pct: float
+    fidelity_score: float
+    assets: Optional[Dict[str, float]] = None
 
 
 class BacktestResults(BaseModel):

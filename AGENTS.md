@@ -1,23 +1,6 @@
 # Project Agents & Tools: Argus
 
-AI agent configuration registry for the Argus backtesting engine.
-
----
-
-## 🎯 Jules Agents — Autonomous Scheduled Tasks
-
-Argus uses **Jules** (Antigravity's async AI scheduler) to run autonomous agents on a fixed schedule. See [`.jules/README.md`](./.jules/README.md) for framework overview.
-
-| Agent             | Role                   | Frequency        | Reference                                                                        | Journal                               |
-| :---------------- | :--------------------- | :--------------- | :------------------------------------------------------------------------------- | :------------------------------------ |
-| **Sentinel** 🛡️   | Security Guardian      | Weekly (Tue 9am) | [`.jules/scheduled_tasks/sentinel.md`](./.jules/scheduled_tasks/sentinel.md)     | `.agent/.jules/journal/sentinel.md`   |
-| **Bolt** ⚡       | Performance Guardian   | Daily (6am)      | [`.jules/scheduled_tasks/bolt.md`](./.jules/scheduled_tasks/bolt.md)             | `.agent/.jules/journal/bolt.md`       |
-| **Palette** 🎨    | UX Guardian            | Daily (7am)      | [`.jules/scheduled_tasks/palette.md`](./.jules/scheduled_tasks/palette.md)       | `.agent/.jules/journal/palette.md`    |
-| **Trinity** 🧪    | Test Automation        | Daily (8am)      | [`.jules/scheduled_tasks/trinity.md`](./.jules/scheduled_tasks/trinity.md)       | `.agent/.jules/journal/trinity.md`    |
-| **Architect** 🏗️  | Database Guardian      | Weekly (Sat 3pm) | [`.jules/scheduled_tasks/architect.md`](./.jules/scheduled_tasks/architect.md)   | `.agent/.jules/journal/architect.md`  |
-| **Chronicler** 📚 | Documentation Guardian | Weekly (Sun 6pm) | [`.jules/scheduled_tasks/chronicler.md`](./.jules/scheduled_tasks/chronicler.md) | `.agent/.jules/journal/chronicler.md` |
-
-**Journal rule:** Only log critical findings. If no action required, write "no critical finding" and stop (no PR creation).
+AI agent configuration registry for the Argus backtesting engine. This file serves as the primary index for skills, rules, and workflows used by all AI agents (both interactive and autonomous) working on the project.
 
 ---
 
@@ -35,19 +18,27 @@ Argus uses **Jules** (Antigravity's async AI scheduler) to run autonomous agents
 
 ## 🧠 Skills (`.agent/skills/`) — Domain Knowledge
 
-| Skill                     | When to Use                                                                    |
-| :------------------------ | :----------------------------------------------------------------------------- |
-| `coding-standards/`       | Python/TypeScript style, logging, validation patterns                          |
-| `numba-patterns/`         | JIT compilation, warmup, pure-math constraints                                 |
-| `backend-patterns/`       | API-first design, sync execution, error responses, caching                     |
-| `testing-patterns/`       | pytest, TDD workflow, coverage strategy, rate-limit tests                      |
-| `frontend-patterns/`      | React/Next.js, Robinhood design system, component patterns, form validation    |
-| `security-review/`        | RLS policies, JWT handling, Supabase auth, Alpaca secrets, is_admin bypass     |
-| **`supabase/`**          | Supabase CLI, Auth, Edge Functions, and migration workflows                    |
-| **`postgres-best-practices/`** | Performance optimization, GIN indexing for arrays, and RLS bottlenecks   |
-| **`mock-data-patterns/`** | Faker generators, mock API endpoints, toggle mechanism (NEXT_PUBLIC_MOCK_API)  |
-| **`database-patterns/`**  | Supabase migrations, RLS immutability, quota management, Edge Functions        |
-| **`monorepo-patterns/`**  | API contract sync, coordinated deployment, Bun + Poetry, TypeScript ↔ Pydantic |
+| Skill                                | When to Use                                                                 |
+| :----------------------------------- | :-------------------------------------------------------------------------- |
+| `coding-standards/`                  | Python/TypeScript style, logging, validation patterns                       |
+| `numba-patterns/`                    | JIT compilation, warmup, pure-math constraints                              |
+| `backend-patterns/`                  | API-first design, sync execution, error responses, caching                  |
+| `testing-patterns/`                  | pytest, TDD workflow, coverage strategy, rate-limit tests                   |
+| `frontend-patterns/`                 | React/Next.js, Robinhood design system, component patterns, form validation |
+| `security-review/`                   | RLS policies, JWT handling, Supabase auth, Alpaca secrets                   |
+| `supabase/`                          | Supabase CLI, Auth, Edge Functions, and migration workflows                 |
+| `supabase-postgres-best-practices/`  | Performance optimization, GIN indexing, and RLS bottlenecks                 |
+| `mock-data-patterns/`                | Faker generators, mock API endpoints, toggle mechanism                      |
+| `database-patterns/`                 | Supabase migrations, RLS immutability, quota management                     |
+| `monorepo-patterns/`                 | API contract sync, Bun + Poetry coordination                                |
+| `design-taste-frontend/`             | High-end UI/UX, CSS hardware acceleration, metric-based design              |
+| `emil-design-eng/`                   | UI polish, animation physics, and micro-interaction details                 |
+| `react-components/`                  | Stitch-to-React conversion, modular component architecture                  |
+| `redesign-existing-projects/`        | Upgrading legacy UI to premium, anti-generic standards                      |
+| `shadcn-ui/`                         | Shadcn component integration, customization, and best practices             |
+| `stitch-design/`                     | Stitch MCP orchestration, prompt enhancement, screen generation             |
+| `stitch-design-taste/`               | Semantic design system enforcement, premium aesthetics                      |
+| `stitch-loop/`                       | Iterative Baton-Passing loop for rapid UI development                       |
 
 ---
 
@@ -65,7 +56,7 @@ Argus uses **Jules** (Antigravity's async AI scheduler) to run autonomous agents
 
 | Command   | Description                                                                  |
 | :-------- | :--------------------------------------------------------------------------- |
-| `/review` | Code review: standards, security (Sentinel checks), design (Palette checks)  |
+| `/review` | Code review: standards, security, design audits                              |
 | `/verify` | Full suite: pytest + Bun lint + coverage check (63%+) + backtest perf (<3s)  |
 | `/pr`     | Create PR: include API contract link if schema changed, mark scope (api/web) |
 | `/perf`   | Benchmark: Numba analysis, backtest latency, Bun build time                  |
@@ -99,31 +90,29 @@ Usage:
 ## 🚀 Quick Start (Local Development)
 
 1. **Initialize workspace**: Run `.github/setup.sh` (Poetry + Bun + mock data ready)
-2. **Read setup guide**: See [`docs/startup.md`](./docs/startup.md) for full step-by-step instructions
-3. **Start dev environment**: Terminal 1: `poetry shell && fastapi dev src/argus/api/main.py`, Terminal 2: `cd web && bun run dev`
-4. **Toggle mock data**: `NEXT_PUBLIC_MOCK_API=true` (frontend only for independent dev), `NEXT_PUBLIC_MOCK_API=false` (real API)
-5. **Build + test**: `poetry run pytest` (backend), `bun test` (frontend), `bun run build` (production)
+2. **Start dev environment**: Terminal 1: `poetry run fastapi dev src/argus/api/main.py`, Terminal 2: `cd web && bun run dev`
+3. **Build + test**: `poetry run pytest` (backend), `bun test` (frontend)
 
 ---
 
-## � Documentation
+## 📖 Documentation
 
-**Setup & Launch:** [`docs/startup.md`](./docs/startup.md) — Dependencies, environment config, running backend/frontend, troubleshooting
-**API Contract:** [`docs/api/api_contract.md`](./docs/api/api_contract.md) — Endpoint specs, request/response schemas, error codes
-**OpenAPI Spec:** [`docs/api/openapi.yaml`](./docs/api/openapi.yaml) — Machine-readable API definition
-**Agent Framework:** [`.jules/README.md`](./.jules/README.md) — Jules scheduler, scheduled tasks, skills, rules, workflows
+**API Contract:** [`docs/api/api_contract.md`](./docs/api/api_contract.md)
+**OpenAPI Spec:** [`docs/api/openapi.yaml`](./docs/api/openapi.yaml)
+**Scheduled Framework:** [`.agent/.jules/README.md`](./.agent/.jules/README.md)
 
 ---
 
-## �🛑 Never-Violate Standards
+## 🛑 Never-Violate Standards
 
-1. **API Contract First**: Update `docs/api_contract.md` before backend/frontend PRs; Pydantic ↔ TypeScript types must sync.
+1. **API Contract First**: Update `docs/api_contract.md` before implementation PRs.
 2. **Structured Logging**: Use `loguru` (backend) + React Query logs (frontend). No `print()`.
-3. **TDD First**: Write failing test before fixing any bug; use Faker for realistic test data.
+3. **TDD First**: Write failing test before fixing any bug.
 4. **JIT Warmup**: Changes to `src/argus/analysis/` require `warmup_jit()` in tests.
-5. **<3 Second Backtest**: Single-symbol backtest must execute end-to-end in <3s.
-6. **No Backend Secrets in Frontend**: Root `.env` (backend), `web/.env.local` (frontend NEXT*PUBLIC*\* only).
+5. **<3 Second Backtest**: Single-symbol backtest must execute in <3s.
+6. **No Backend Secrets in Frontend**: Root `.env` (backend), `web/.env.local` (frontend).
 7. **Use `temp/`**: Never dump scratch files in project root.
-8. **Monorepo Coordination**: Backend + frontend must run together after `setup.sh` (deploy together, test together).
-9. **Critical Findings Only**: Agents journal only critical improvements (security bugs, >20% perf gain, new test coverage). No action? Write "no finding" and stop (no PR).
-10. **Postgres Performance**: All SQL migrations and RLS policies must be audited against `postgres-best-practices/` skill before PR.
+8. **Monorepo Coordination**: Backend + frontend must run together after `setup.sh`.
+9. **Critical Findings Only**: Only PR/Journal critical improvements (security bugs, >20% perf gain).
+10. **Postgres Performance**: All SQL/RLS must be audited against `postgres-best-practices`.
+11. **Branch Sync & Goal Realignment**: Every agent session must fetch/rebase `main` and re-verify original mission against any architectural drift before completion.
