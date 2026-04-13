@@ -399,42 +399,33 @@ class ArgusEngine:
         if pd.isna(fidelity_score):
             fidelity_score = 1.0
 
-        portfolio_slip_only = vbt.Portfolio.from_signals(
-            close=close_df,
-            entries=entries_df,
-            exits=exits_df,
-            sl_stop=sl_stop,
-            tp_stop=tp_stop,
-            fees=0.0,
-            slippage=config.slippage,
-            freq=freq,
-        )
-        portfolio_fee_only = vbt.Portfolio.from_signals(
-            close=close_df,
-            entries=entries_df,
-            exits=exits_df,
-            sl_stop=sl_stop,
-            tp_stop=tp_stop,
-            fees=config.fees,
-            slippage=0.0,
-            freq=freq,
-        )
-
-        slip_return = (
-            float(portfolio_slip_only.total_return().mean())
-            if isinstance(portfolio_slip_only.total_return(), pd.Series)
-            else float(portfolio_slip_only.total_return())
-        )
-        fee_return = (
-            float(portfolio_fee_only.total_return().mean())
-            if isinstance(portfolio_fee_only.total_return(), pd.Series)
-            else float(portfolio_fee_only.total_return())
-        )
+        # ── Analytical Cost Attribution ──────────────────────────────────────────
+        # Eliminates 2 extra VBT sims (slip_only / fee_only) by proportionally
+        # splitting the total cost delta (ideal - real) between slippage and fees
+        # using their configured rates as weights. This halves VBT overhead.
+        real_return_val = portfolio_real.total_return()
         ideal_return_scalar = (
             float(ideal_return.mean())
             if isinstance(ideal_return, pd.Series)
             else float(ideal_return)
         )
+        real_return_scalar = (
+            float(real_return_val.mean())
+            if isinstance(real_return_val, pd.Series)
+            else float(real_return_val)
+        )
+
+        total_cost = config.slippage + config.fees
+        if total_cost > 0:
+            slip_ratio = config.slippage / total_cost
+            fee_ratio = config.fees / total_cost
+        else:
+            slip_ratio = 0.5
+            fee_ratio = 0.5
+
+        cost_delta = ideal_return_scalar - real_return_scalar
+        slip_return = ideal_return_scalar - cost_delta * slip_ratio
+        fee_return = ideal_return_scalar - cost_delta * fee_ratio
 
         slippage_impact_pct = (
             float(ideal_return_scalar - slip_return) if ideal_return_scalar != 0 else 0.0
