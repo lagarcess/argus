@@ -243,6 +243,190 @@ def test_get_assets(monkeypatch, mock_user):
     assert response.headers["X-RateLimit-Limit"] == "100"
 
 
+def test_get_session(monkeypatch, mock_user):
+    from argus.api.auth import auth_required
+
+    monkeypatch.setitem(app.dependency_overrides, auth_required, lambda: mock_user)
+    response = client.get("/api/v1/auth/session")
+    assert response.status_code == 200
+    assert response.json()["email"] == mock_user.email
+
+
+def test_get_usage(monkeypatch, mock_user):
+    from argus.api.auth import check_rate_limit
+
+    monkeypatch.setitem(app.dependency_overrides, check_rate_limit, lambda: mock_user)
+    response = client.get("/api/v1/usage")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["count"] == 0
+    assert data["limit"] == 50
+    assert data["tier"] == "free"
+
+
+def test_sso_login(monkeypatch):
+    import faker
+
+    fake = faker.Faker()
+    url = fake.url()
+
+    mock_auth_res = MagicMock()
+    mock_auth_res.url = url
+
+    # Needs to mock the auth.sign_in_with_oauth call
+    mock_supabase = MagicMock()
+    mock_supabase.auth.sign_in_with_oauth.return_value = mock_auth_res
+    monkeypatch.setattr("argus.api.main.supabase_client", mock_supabase)
+
+    response = client.post(
+        "/api/v1/auth/sso",
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
+    )
+    assert response.status_code == 200
+    assert response.json()["auth_url"] == url
+
+    # Test Exception handling for conflict
+    mock_supabase.auth.sign_in_with_oauth.side_effect = Exception(
+        "User already linked via conflict"
+    )
+    response_conflict = client.post(
+        "/api/v1/auth/sso",
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
+    )
+    assert response_conflict.status_code == 409
+
+    # Test Exception handling for generic error
+    mock_supabase.auth.sign_in_with_oauth.side_effect = Exception(
+        "Generic internal error"
+    )
+    response_generic = client.post(
+        "/api/v1/auth/sso",
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
+    )
+    assert response_generic.status_code == 500
+
+    # Test missing supabase
+    monkeypatch.setattr("argus.api.main.supabase_client", None)
+    response_missing = client.post(
+        "/api/v1/auth/sso",
+        json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
+    )
+    assert response_missing.status_code == 500
+
+
+def test_update_profile(monkeypatch, mock_user):
+    import faker
+    from argus.api.auth import auth_required
+
+    fake = faker.Faker()
+    theme = fake.word()
+    lang = fake.language_code()
+
+    monkeypatch.setitem(app.dependency_overrides, auth_required, lambda: mock_user)
+
+    mock_supabase = MagicMock()
+    mock_execute = MagicMock()
+    # Mock update to return data
+    mock_execute.execute.return_value.data = [{"theme": theme, "lang": lang}]
+    mock_supabase.table.return_value.update.return_value.eq.return_value = mock_execute
+    monkeypatch.setattr("argus.api.main.supabase_client", mock_supabase)
+
+    # Mock user cache invalidation
+    mock_invalidate = MagicMock()
+    monkeypatch.setattr("argus.api.main._user_cache.invalidate", mock_invalidate)
+
+    response = client.patch("/api/v1/auth/profile", json={"theme": theme, "lang": lang})
+    assert response.status_code == 200
+    assert response.json()["theme"] == theme
+    assert response.json()["lang"] == lang
+    mock_invalidate.assert_called_once_with(mock_user.id)
+
+    # Test empty update
+    response_empty = client.patch("/api/v1/auth/profile", json={})
+    assert response_empty.status_code == 200
+
+    # Test update not found
+    mock_execute.execute.return_value.data = []
+    response_not_found = client.patch("/api/v1/auth/profile", json={"theme": "dark"})
+    assert response_not_found.status_code == 404
+
+    # Test exception handling
+    mock_execute.execute.side_effect = Exception("DB error")
+    response_db_err = client.patch("/api/v1/auth/profile", json={"theme": "dark"})
+    assert response_db_err.status_code == 500
+
+    # Test missing supabase
+    monkeypatch.setattr("argus.api.main.supabase_client", None)
+    response_missing = client.patch("/api/v1/auth/profile", json={"theme": "light"})
+    assert response_missing.status_code == 500
+
+
+def test_logout(monkeypatch):
+    response = client.post("/api/v1/auth/logout")
+    assert response.status_code == 204
+
+
+def test_get_simulation_detail(monkeypatch, mock_user):
+    import faker
+    from argus.api.auth import auth_required
+
+    fake = faker.Faker()
+    sim_id = f"sim_{fake.uuid4()}"
+    strat_name = fake.sentence(nb_words=3)
+
+    monkeypatch.setitem(app.dependency_overrides, auth_required, lambda: mock_user)
+
+    # Mock persistence
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_simulation",
+        lambda query_sim_id, user_id: {
+            "id": query_sim_id,
+            "strategy_name": strat_name,
+            "symbols": ["BTC"],
+            "timeframe": "1h",
+            "summary": {"total_return_pct": 10.0},
+        }
+        if query_sim_id == sim_id
+        else None,
+    )
+
+    response = client.get(f"/api/v1/simulations/{sim_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == sim_id
+
+    # Test not found
+    response_not_found = client.get("/api/v1/simulations/sim_999")
+    assert response_not_found.status_code == 404
+
+    # Test "latest" fallback
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_user_simulations",
+        lambda user_id, limit: (
+            [{"id": "sim_latest"}],
+            1,
+        ),
+    )
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_simulation",
+        lambda query_sim_id, user_id: {
+            "id": query_sim_id,
+        }
+        if query_sim_id == "sim_latest"
+        else None,
+    )
+    response_latest = client.get("/api/v1/simulations/latest")
+    assert response_latest.status_code == 200
+    assert response_latest.json()["id"] == "sim_latest"
+
+    # Test exception handling
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.get_simulation",
+        MagicMock(side_effect=Exception("Database down")),
+    )
+    response_error = client.get(f"/api/v1/simulations/{sim_id}")
+    assert response_error.status_code == 500
+
+
 def test_backtest(monkeypatch, mock_user):
     """
     High-fidelity E2E test integrated into test_api.py.
