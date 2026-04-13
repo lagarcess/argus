@@ -47,7 +47,7 @@ from argus.config import (
 )
 from argus.core.alpaca_fetcher import AlpacaDataFetcher
 from argus.domain.persistence import PersistenceService
-from argus.domain.schemas import UserResponse
+from argus.domain.schemas import AssetClass, UserResponse
 from argus.engine import ArgusEngine, StrategyInput
 from argus.market.data_provider import MarketDataProvider
 from argus.supabase import supabase_client
@@ -468,7 +468,7 @@ def run_backtest(
 
         ac = AssetClass.from_alpaca(first_alpaca_class)
 
-        result = engine.run(config=config)
+        result = engine.run(config=config, asset_class=ac)
 
         # 3. Post-Execution Hooks (Atomic Quota + PostHog)
         if not user.is_admin:

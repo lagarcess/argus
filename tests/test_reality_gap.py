@@ -2,9 +2,51 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 from argus.analysis.structural import warmup_jit
-from argus.engine import ArgusEngine, BacktestConfig, StrategyInput
+from argus.engine import ArgusEngine, StrategyInput
 from hypothesis import given, settings
 from hypothesis import strategies as st
+
+
+def _prepare_vectors(config: StrategyInput, provider, start_dt, end_dt):
+    """Replicate BacktestConfig.prepare_vectors for tests (Phase C refactored it into engine)."""
+
+    close_dict, open_dict, high_dict, low_dict, volume_dict = {}, {}, {}, {}, {}
+    from argus.domain.schemas import AssetClass
+
+    for sym in config.symbols:
+        try:
+            sym_ac = AssetClass.from_symbol(sym)
+            data = provider.get_historical_bars(
+                symbol=sym,
+                asset_class=sym_ac,
+                timeframe_str=config.timeframe,
+                start_dt=start_dt,
+                end_dt=end_dt,
+            )
+            if data.empty:
+                continue
+            if data.index.tz is None:
+                data.index = data.index.tz_localize("UTC")
+            else:
+                data.index = data.index.tz_convert("UTC")
+            close_dict[sym] = data["close"]
+            open_dict[sym] = data["open"]
+            high_dict[sym] = data["high"]
+            low_dict[sym] = data["low"]
+            volume_dict[sym] = data["volume"]
+        except (ValueError, KeyError):
+            continue
+    if not close_dict:
+        raise ValueError("No valid data found")
+    import pandas as pd
+
+    close_df = pd.DataFrame(close_dict).ffill().dropna(how="all")
+    open_df = pd.DataFrame(open_dict).reindex(close_df.index).ffill()
+    high_df = pd.DataFrame(high_dict).reindex(close_df.index).ffill()
+    low_df = pd.DataFrame(low_dict).reindex(close_df.index).ffill()
+    volume_df = pd.DataFrame(volume_dict).reindex(close_df.index).fillna(0)
+    return open_df, high_df, low_df, close_df, volume_df
+
 
 warmup_jit()
 
@@ -64,12 +106,11 @@ def test_hypothesis_matrix_alignment(symbols):
         start_date=datetime.now(timezone.utc) - timedelta(days=50),
         entry_criteria=[],
     )
-    bc = BacktestConfig(config)
     provider = MockVBTDataProvider(use_sparse=True)
 
     # Should not crash, and should return FFilled aligned DataFrames
-    open_df, high_df, low_df, close_df, volume_df = bc.prepare_vectors(
-        provider, config.start_date, datetime.now(timezone.utc)
+    open_df, high_df, low_df, close_df, volume_df = _prepare_vectors(
+        config, provider, config.start_date, datetime.now(timezone.utc)
     )
 
     # Assert matrix shape integrity
@@ -180,11 +221,10 @@ def test_cross_asset_alignment():
         start_date=datetime.now(timezone.utc) - timedelta(days=50),
         entry_criteria=[],
     )
-    bc = BacktestConfig(config)
     provider = MockVBTDataProvider(use_sparse=True)
 
-    open_df, high_df, low_df, close_df, volume_df = bc.prepare_vectors(
-        provider, config.start_date, datetime.now(timezone.utc)
+    open_df, high_df, low_df, close_df, volume_df = _prepare_vectors(
+        config, provider, config.start_date, datetime.now(timezone.utc)
     )
 
     assert close_df.shape[1] == len(symbols)

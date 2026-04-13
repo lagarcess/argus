@@ -332,7 +332,14 @@ class ArgusEngine:
             return float(val) if not pd.isna(val) else default
 
         # Equity curve: portfolio total value flattened to list of floats
-        equity_curve: List[float] = portfolio.value().tolist()
+        # value() returns a DataFrame for multi-symbol, Series for single-symbol
+        _val = portfolio.value()
+        if hasattr(_val, "sum"):
+            equity_curve: List[float] = (
+                _val.sum(axis=1).tolist() if hasattr(_val, "columns") else _val.tolist()
+            )
+        else:
+            equity_curve = list(_val)
 
         # Trades (Strict TradeSnippet format)
         trades: List[Dict[str, Any]] = []
@@ -362,6 +369,10 @@ class ArgusEngine:
             max_drawdown_pct=get_stat("Max Drawdown [%]"),
             equity_curve=equity_curve,
             trades=trades,
-            reality_gap_metrics={"slippage_impact_pct": 0.0, "fee_impact_pct": 0.0},
+            reality_gap_metrics={
+                "slippage_impact_pct": 0.0,
+                "fee_impact_pct": 0.0,
+                "fidelity_score": 1.0,
+            },
             pattern_breakdown=pattern_counts,
         )
