@@ -50,6 +50,13 @@ class Settings(BaseSettings):
         ],
         description="List of crypto pairs to analyze",
     )
+    ALLOWED_REDIRECT_URLS: list[str] = Field(
+        default=[
+            "http://localhost:3000/auth/callback",
+            "https://argus-app-suz5.onrender.com/auth/callback",
+        ],
+        description="Allowed URLs for SSO redirect",
+    )
     EQUITY_SYMBOLS: Any = Field(
         default=[],
         description="List of equity symbols to analyze",
@@ -93,7 +100,9 @@ class Settings(BaseSettings):
         le=10.0,
     )
 
-    @field_validator("CRYPTO_SYMBOLS", "EQUITY_SYMBOLS", mode="before")
+    @field_validator(
+        "CRYPTO_SYMBOLS", "EQUITY_SYMBOLS", "ALLOWED_REDIRECT_URLS", mode="before"
+    )
     @classmethod
     def parse_list_from_str(cls, v: Any) -> Any:
         """Parse comma-separated string into list."""
