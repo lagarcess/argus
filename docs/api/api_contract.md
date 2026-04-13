@@ -22,16 +22,17 @@ This section aligns the aspirational Master Contract against our *current* codeb
 - [x] **High-Speed Execution Core**: `src/argus/engine.py` + `analysis/patterns.py`, `harmonics.py`, `structural.py`, `indicators.py` successfully use Numba JIT + VectorBT for single-symbol pattern/harmonic confluence and simulation. This rigorously meets the `<3s` SLA on daily data.
 - [x] **Hybrid Caching Router**: `market/data_provider.py` + Alpaca fetcher with TTL disk cache blocks UI latency.
 - [x] **Strict RLS Security**: Supabase JWT `httpOnly` sessions are accurately mapped to Row-Level Security ensuring `auth.uid()` matches.
+- [x] **Engine: Portfolio-Level Processing**: Engine core and API fully support multi-symbol `symbols: string[]` via vectorized VectorBT Portfolio paths.
+- [x] **Strategy Persistence (CRUD)**: `GET/POST/PUT/DELETE /strategies` fully implemented with PersistenceService sync.
+- [x] **Simulation History / Listing**: `/api/v1/history` supports cursor-based pagination and summary retrieval.
 
 **What We Lack (Critical Gaps to Build for Ecosystem Loop)**:
-- [ ] **Engine: Portfolio-Level Processing**: Current engine accepts only a single symbol (see `StrategyInput.symbol`). Must upgrade to `symbols: string[]` utilizing native VectorBT multi-asset Portfolio capabilities.
-- [ ] **Engine: WFA & Configurable Reality Gap**: The engine currently has no native Walk-Forward Analysis, and slippage/fees are either missing or post-processed rather than natively integrated into the simulation.
-- [ ] **Strategy Persistence (CRUD)**: `POST/PUT/GET/DELETE /strategies` is missing. Users cannot save or reuse AI drafts.
+- [ ] **Engine: Walk-Forward Analysis (WFA)**: Missing orchestration layer for train/test splitting and parameter optimization.
+- [ ] **Engine: Configurable Reality Gap Attribution**: Engine simulates with slippage/fees, but needs dual-sim to report differential impact % as required by schema.
 - [ ] **Datafeed Compliance**: `/market/bars` must implement full TradingView UDF (gated by `advanced_charting`).
-- [ ] **Simulation History / Listing**: Missing `GET /history` to load past runs via cursor pagination with sparklines.
-- [ ] **Quota Reset Mechanics**: Missing Supabase Edge Function cron job for monthly `remaining_quota` reset.
+- [ ] **Quota Reset Mechanics**: `reset_monthly_quotas` function exists but missing Supabase Edge Function cron job/trigger.
 - [ ] **Agentic AI Drafting (`POST /agent/draft`)**: Missing LangChain endpoint returning unexecuted `StrategySchema` drafts.
-- [ ] **Social Sharing & Storage (`POST /share`)**: Lacks dynamic OpenGraph image generation via Supabase Storage.
+- [ ] **Social Sharing & Storage (`POST /share`)**: Implementing Lightweight Text Card MVP.
 - [ ] **Monetization Architecture**: Missing protected `/billing/checkout` endpoint and Supabase Edge Function webhook (`/webhook/billing`).
 - [ ] **Agentic Journaling Auth**: Missing `USEMEMOS_API_KEY` configuration and secure background push logic.
 - [ ] **Discovery Screeners**: Lacks `/screeners` proxy to Alpaca Movers / Most-Actives.
