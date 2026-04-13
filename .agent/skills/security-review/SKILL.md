@@ -42,3 +42,9 @@ When reviewing PRs, flag:
 - Unvalidated user input
 - Overly permissive CORS or auth
 - Logging of sensitive data (passwords, tokens, PII)
+
+## Agent Operational Security (OpsSec)
+- **Safe Retrieval**: Never use generic `curl` or `fetch` for external assets. Use `secure-fetch.mjs` with domain allowlisting.
+- **Dependency Guard**: Audit `package.json` and request user confirmation before *any* `npm install` or `npx` execution.
+- **HTML Sanitization**: All AI-generated HTML must be audited for `<script>` tags and `onEvent` handlers before integration into project paths.
+- **Command Safety**: Never use the `// turbo` or `SafeToAutoRun` flags for commands that modify the filesystem or network state unless they are part of a user-approved implementation plan.
