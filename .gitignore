@@ -51,6 +51,7 @@ temp/*
 # OS files
 .DS_Store
 Thumbs.db
+.hypothesis/
 
 # Node
 node_modules/

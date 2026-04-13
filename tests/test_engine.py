@@ -2,7 +2,6 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
-from argus.domain.schemas import AssetClass
 from argus.engine import ArgusEngine, EngineBacktestResults, StrategyInput
 
 
@@ -70,7 +69,7 @@ def test_engine_adapter_v1_full_flow():
     )
 
     # Run the backtest
-    results = engine.run(config=strategy, asset_class=AssetClass.CRYPTO)
+    results = engine.run(config=strategy)
 
     # 1. Assert Schema
     assert isinstance(results, EngineBacktestResults)

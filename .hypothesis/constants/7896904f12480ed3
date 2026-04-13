@@ -1,0 +1,4 @@
+# file: /app/src/argus/analysis/harmonics.py
+# hypothesis_version: 6.151.12
+
+[0.0, 0.001, 0.236, 0.382, 0.5, 0.618, 0.786, 0.886, 1.0, 1.27, 1.618, 'ABCD', 'AB_CD_price_ratio', 'AB_CD_time_ratio', 'BAT', 'BUTTERFLY', 'B_ratio', 'CRAB', 'D_ratio', 'ELLIOTT_WAVE_135', 'GARTLEY', 'PEAK', 'VALLEY', 'wave3_to_wave1_ratio', 'wave4_retrace_ratio']

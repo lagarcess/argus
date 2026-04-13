@@ -130,7 +130,7 @@ def test_backtest_endpoint_xor_validation(monkeypatch, mock_user):
     assert response.status_code == 422
 
 
-def test_backtest_endpoint_success(monkeypatch, mock_user):
+def test_backtest_endpoint_success(monkeypatch, mock_user, make_engine_results):
     from argus.api.auth import check_rate_limit
     from argus.api.main import (
         get_alpaca_fetcher,
@@ -143,6 +143,12 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
 
     # Mock the emit_posthog_event
     monkeypatch.setattr("argus.api.main.emit_posthog_event", MagicMock())
@@ -197,7 +203,7 @@ def test_backtest_endpoint_success(monkeypatch, mock_user):
     data = response.json()
     assert "id" in data
     assert data["results"]["total_return_pct"] == 14.5
-    assert data["results"]["win_rate"] == 0.62
+    assert data["results"]["win_rate"] == 62.0
     assert data["config_snapshot"]["timeframe"] == "1h"
 
 
@@ -253,6 +259,12 @@ def test_backtest(monkeypatch, mock_user):
     app.dependency_overrides[get_alpaca_fetcher] = lambda: MockAlpacaFetcher()
     app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
     app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+
+    # Mock memory to prevent 503 Service Unavailable guard from triggering
+    mock_mem = MagicMock()
+    mock_mem.available = 800 * 1024 * 1024
+    mock_mem.total = 1000 * 1024 * 1024  # 80% available
+    monkeypatch.setattr("psutil.virtual_memory", lambda: mock_mem)
 
     # Mock persistence
     monkeypatch.setattr(
