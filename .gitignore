@@ -51,3 +51,15 @@ temp/*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node
+node_modules/
+.npm/
+
+# Next.js
+.next/
+tsconfig.tsbuildinfo
+
+# Playwright / Testing
+playwright-report/
+test-results/
