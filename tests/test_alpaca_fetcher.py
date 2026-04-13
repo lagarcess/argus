@@ -144,7 +144,7 @@ def test_fetch_bars_success(fetcher):
     assert df.iloc[0]["open"] == 150.0
 
 
-def test_fetch_bars_crypto_slash_encoding(fetcher, mock_edge_api):
+def test_fetch_bars_crypto_slash_encoding(fetcher, mock_edge_api, monkeypatch):
     """Verify that symbols with slashes are passed correctly."""
     start = datetime(2026, 4, 1, tzinfo=timezone.utc)
 
@@ -155,7 +155,7 @@ def test_fetch_bars_crypto_slash_encoding(fetcher, mock_edge_api):
     assert df.iloc[0]["open"] == 60000.0
 
 
-def test_fetch_bars_timezone_safety(fetcher, mock_edge_api):
+def test_fetch_bars_timezone_safety(fetcher, mock_edge_api, monkeypatch):
     """Verify that naive datetimes are handled safely."""
     start = datetime(2026, 4, 1)  # Naive
 

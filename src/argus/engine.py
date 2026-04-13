@@ -51,13 +51,12 @@ class BacktestConfig:
     def prepare_vectors(
         self,
         data_provider: MarketDataProvider,
-        asset_class: AssetClass,
         start_dt: datetime,
         end_dt: datetime,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Fetch data for all symbols and align them into orthagonal matrices (Time x Assets).
-        Handles UTC normalization and ffill/bfill for missing bars.
+        Handles UTC normalization and institutional ffill bias correction.
         """
         close_dict = {}
         open_dict = {}
@@ -67,9 +66,12 @@ class BacktestConfig:
 
         for sym in self.config.symbols:
             try:
+                # Dynamic Asset Class deduction per symbol
+                sym_asset_class = AssetClass.from_symbol(sym)
+
                 data = data_provider.get_historical_bars(
                     symbol=sym,
-                    asset_class=asset_class,
+                    asset_class=sym_asset_class,
                     timeframe_str=self.config.timeframe,
                     start_dt=start_dt,
                     end_dt=end_dt,
@@ -78,7 +80,6 @@ class BacktestConfig:
                     logger.warning(f"No data found for {sym} on {self.config.timeframe}")
                     continue
 
-                # Ensure UTC normalization
                 if data.index.tz is None:
                     data.index = data.index.tz_localize("UTC")
                 else:
@@ -97,21 +98,23 @@ class BacktestConfig:
             raise ValueError(f"No valid data found for any of {self.config.symbols}")
 
         # Memory Sanity Gate
-        try:
-            est_rows = max(len(s) for s in close_dict.values())
-            est_bytes = 5 * 8 * est_rows * len(close_dict)
+        est_rows = max(len(s) for s in close_dict.values())
+        est_bytes = 5 * 8 * est_rows * len(close_dict)
 
-            if est_bytes > 1_073_741_824:
-                logger.warning(
-                    f"Memory Sanity Gate Warning: Aligned matrix footprint estimated at {est_bytes / (1024*1024):.2f} MB! Potential OOM risk."
-                )
-        except Exception as e:
-            logger.debug(f"Failed to estimate memory footprint: {e}")
+        if est_bytes > 1_073_741_824:  # > 1GB
+            logger.error(
+                f"Allocation Guard Violation: Aligned matrix footprint estimated at {est_bytes / (1024*1024):.2f} MB."
+            )
+            raise MemoryError(
+                "Requested simulation exceeds maximum memory allocation limits. Please reduce symbol count or timeframe range."
+            )
 
-        close_df = pd.DataFrame(close_dict).ffill().bfill()
-        open_df = pd.DataFrame(open_dict).reindex(close_df.index).ffill().bfill()
-        high_df = pd.DataFrame(high_dict).reindex(close_df.index).ffill().bfill()
-        low_df = pd.DataFrame(low_dict).reindex(close_df.index).ffill().bfill()
+        # Institutional Alignment: ffill ONLY. Drop rows where all assets are NaN.
+        # This prevents look-ahead bias and correctly handles assets with different inception dates.
+        close_df = pd.DataFrame(close_dict).ffill().dropna(how="all")
+        open_df = pd.DataFrame(open_dict).reindex(close_df.index).ffill()
+        high_df = pd.DataFrame(high_dict).reindex(close_df.index).ffill()
+        low_df = pd.DataFrame(low_dict).reindex(close_df.index).ffill()
         volume_df = pd.DataFrame(volume_dict).reindex(close_df.index).fillna(0)
 
         return open_df, high_df, low_df, close_df, volume_df
@@ -252,7 +255,6 @@ class ArgusEngine:
     def run(
         self,
         config: StrategyInput,
-        asset_class: AssetClass = AssetClass.CRYPTO,
     ) -> EngineBacktestResults:
         """
         Run a single or multi-symbol backtest using VectorBT's native Portfolio.
@@ -271,7 +273,7 @@ class ArgusEngine:
         # ── Vector Preparation Layer ─────────────────────────────────────
         bc = BacktestConfig(config)
         open_df, high_df, low_df, close_df, volume_df = bc.prepare_vectors(
-            self.data_provider, asset_class, start_dt, end_dt
+            self.data_provider, start_dt, end_dt
         )
 
         # Determine signals

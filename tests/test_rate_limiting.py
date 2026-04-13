@@ -203,3 +203,138 @@ def test_check_asset_search_rate_limit_headers(mock_user_free):
     assert "X-RateLimit-Remaining" in headers
     assert "X-RateLimit-Reset" in headers
     assert headers["X-RateLimit-Limit"] == "100"
+
+
+def test_tier_gating_symbol_count_violation(monkeypatch, make_engine_results):
+    from argus.api.auth import check_rate_limit
+
+    mock_user_free = UserResponse(
+        id="test-free-uuid",
+        email="free@example.com",
+        is_admin=False,
+        subscription_tier="free",
+        theme="dark",
+        lang="en",
+        backtest_quota=50,
+        remaining_quota=50,
+    )
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user_free
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+    fetcher_mock = MagicMock()
+    fetcher_mock.validate_asset.return_value = (True, "equity")
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_strategy",
+        lambda *args, **kwargs: {"id": "mock-strat-id"},
+    )
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_simulation",
+        lambda *args, **kwargs: "mock-sim-id",
+    )
+
+    payload = {
+        "symbols": ["BTC/USD", "ETH/USD"],  # Free tier allows 1
+        "timeframe": "1Day",
+        "start_date": "2024-01-01T00:00:00Z",
+        "end_date": "2024-01-05T00:00:00Z",
+        "strategy_id": None,
+        "name": "E2E Strategy",
+        "entry_criteria": [],
+    }
+
+    response = client.post("/api/v1/backtests", json=payload)
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert "limited to 1 symbols" in response.json()["detail"]
+
+
+def test_tier_gating_daily_lookback_violation(monkeypatch, make_engine_results):
+    from argus.api.auth import check_rate_limit
+
+    mock_user_free = UserResponse(
+        id="test-free-uuid",
+        email="free@example.com",
+        is_admin=False,
+        subscription_tier="free",
+        theme="dark",
+        lang="en",
+        backtest_quota=50,
+        remaining_quota=50,
+    )
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user_free
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+    fetcher_mock = MagicMock()
+    fetcher_mock.validate_asset.return_value = (True, "equity")
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_strategy",
+        lambda *args, **kwargs: {"id": "mock-strat-id"},
+    )
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_simulation",
+        lambda *args, **kwargs: "mock-sim-id",
+    )
+
+    payload = {
+        "symbols": ["BTC/USD"],
+        "timeframe": "1Day",
+        "start_date": "2020-01-01T00:00:00Z",  # Free tier daily lookback is 365 days
+        "end_date": "2024-01-05T00:00:00Z",
+        "strategy_id": None,
+        "name": "E2E Strategy",
+        "entry_criteria": [],
+    }
+
+    response = client.post("/api/v1/backtests", json=payload)
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert "limited to 365 days" in response.json()["detail"]
+
+
+def test_tier_gating_intraday_lookback_violation(monkeypatch, make_engine_results):
+    from argus.api.auth import check_rate_limit
+
+    mock_user_free = UserResponse(
+        id="test-free-uuid",
+        email="free@example.com",
+        is_admin=False,
+        subscription_tier="free",
+        theme="dark",
+        lang="en",
+        backtest_quota=50,
+        remaining_quota=50,
+    )
+    app.dependency_overrides[check_rate_limit] = lambda: mock_user_free
+    app.dependency_overrides[get_stock_data_client] = lambda: MagicMock()
+    app.dependency_overrides[get_crypto_data_client] = lambda: MagicMock()
+    fetcher_mock = MagicMock()
+    fetcher_mock.validate_asset.return_value = (True, "equity")
+    app.dependency_overrides[get_alpaca_fetcher] = lambda: fetcher_mock
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_strategy",
+        lambda *args, **kwargs: {"id": "mock-strat-id"},
+    )
+    monkeypatch.setattr(
+        "argus.api.main.persistence_service.save_simulation",
+        lambda *args, **kwargs: "mock-sim-id",
+    )
+
+    payload = {
+        "symbols": ["BTC/USD"],
+        "timeframe": "1Hour",
+        "start_date": "2024-01-01T00:00:00Z",  # Free tier intraday lookback is 3 days
+        "end_date": "2024-01-05T00:00:00Z",
+        "strategy_id": None,
+        "name": "E2E Strategy",
+        "entry_criteria": [],
+    }
+
+    response = client.post("/api/v1/backtests", json=payload)
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 403
+    assert "limited to 3 days" in response.json()["detail"]
