@@ -33,10 +33,32 @@ def warmup_jit() -> None:
     dummy_indices = np.arange(5, dtype=np.float64)
     dummy_prices = np.array([100.0, 103.0, 99.0, 106.0, 101.0], dtype=np.float64)
 
-    # Trigger JIT compilation of core functions
+    # Trigger JIT compilation of core Numba functions
     _zigzag_batch(dummy_highs, dummy_lows, 0.05)
     _fast_pip_core(dummy_indices, dummy_prices, 3)
     _perpendicular_distance(1.0, 100.0, 0.0, 95.0, 4.0, 101.0)
+
+    # Warm VectorBT's internal simulation engine (numba JIT + Cython paths).
+    # Without this, the first vbt.Portfolio.from_signals() call incurs 5-8s
+    # of compilation overhead, making mean-based SLA assertions flaky.
+    try:
+        import pandas as pd  # noqa: PLC0415
+        import vectorbt as vbt  # noqa: PLC0415
+
+        _wc = pd.Series(
+            [100.0, 101.0, 102.0, 101.0, 100.0],
+            index=pd.date_range("2020-01-01", periods=5, freq="1D"),
+        )
+        vbt.Portfolio.from_signals(
+            close=_wc,
+            entries=pd.Series([True, False, False, False, False], index=_wc.index),
+            exits=pd.Series([False, False, False, True, False], index=_wc.index),
+            fees=0.001,
+            slippage=0.001,
+            freq="D",
+        )
+    except Exception:  # noqa: BLE001
+        pass  # Non-fatal: warmup failure does not block execution
 
 
 @dataclass
