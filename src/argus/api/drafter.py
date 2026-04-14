@@ -1,12 +1,10 @@
-from typing import Any
-
 from langchain_openai import ChatOpenAI
 from loguru import logger
 from pydantic import BaseModel
 
 from argus.api.exceptions import DraftingError
 from argus.api.schemas import StrategyCreate
-from argus.config import get_settings
+from argus.config import Settings, get_settings
 from argus.market.data_provider import retry_with_backoff
 
 
@@ -43,7 +41,7 @@ Assistant: {"strategy": {"name": "SPY Golden Cross", "symbols": ["SPY"], "timefr
 
 
 @retry_with_backoff(max_retries=3)
-def _call_llm_with_fallback(prompt: str, settings: Any) -> _StrategyDraftOutput:
+def _call_llm_with_fallback(prompt: str, settings: Settings) -> _StrategyDraftOutput:
     """Calls OpenRouter LLM using Langchain's with_structured_output. Implements fallback."""
     try:
         if not settings.OPENROUTER_API_KEY:
@@ -63,6 +61,8 @@ def _call_llm_with_fallback(prompt: str, settings: Any) -> _StrategyDraftOutput:
         res = structured_llm.invoke(messages)
         if not res:
             raise ValueError("Empty structured output")
+        # Canonicalize symbols
+        res.strategy.symbols = [s.upper() for s in res.strategy.symbols]
         return res
     except Exception as e:
         logger.warning(
@@ -85,6 +85,10 @@ def _call_llm_with_fallback(prompt: str, settings: Any) -> _StrategyDraftOutput:
             res_fallback = structured_llm_fallback.invoke(messages)
             if not res_fallback:
                 raise ValueError("Empty structured output from fallback")
+            # Canonicalize symbols
+            res_fallback.strategy.symbols = [
+                s.upper() for s in res_fallback.strategy.symbols
+            ]
             return res_fallback
         except Exception as e_fallback:
             logger.error("Fallback model also failed.")

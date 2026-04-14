@@ -37,14 +37,11 @@ def create_agent_draft(
         supabase = get_supabase_client()
 
         try:
-            # Manually retry using our decorator if needed, or just let postgrest throw
-            @retry_with_backoff(max_retries=3)
-            def _call_rpc():
-                return supabase.rpc(
+            retry_with_backoff(max_retries=3)(
+                lambda: supabase.rpc(
                     "decrement_ai_draft_quota", {"user_uuid": user.id}
                 ).execute()
-
-            _call_rpc()
+            )()
         except Exception as e:
             error_msg = str(e)
             if "P0001" in error_msg or "quota" in error_msg.lower():
@@ -81,9 +78,9 @@ def create_agent_draft(
             status_code=500,
             detail="Failed to generate strategy draft due to reasoning engine error.",
         ) from de
-    except HTTPException:
-        raise
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
         logger.exception("Unexpected error in draft generation", request_id=request_id)
         raise HTTPException(
             status_code=500, detail="An unexpected error occurred."

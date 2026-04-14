@@ -74,9 +74,13 @@ def test_draft_strategy_success(mock_supabase, mock_drafter):
 @patch("argus.api.agent.retry_with_backoff")
 def test_draft_strategy_quota_exhausted(mock_retry, mock_supabase):
     # Ensure retry wrapper just passes through exception for the test
+    # Mock the retry loop so it just runs once and raises the actual exception
     def bypass_retry(*args, **kwargs):
         def decorator(func):
-            return func
+            def wrapper(*a, **kw):
+                return func(*a, **kw)
+
+            return wrapper
 
         return decorator
 
