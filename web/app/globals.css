@@ -57,8 +57,8 @@
   @apply bg-slate-700;
 }
 
-/* Sentinel Discovery - Date Input Cleanup */
+/* Mock Auth Discovery - Date Input Cleanup */
 input[type='date']::-webkit-calendar-picker-indicator {
   display: none;
   -webkit-appearance: none;
-} 
+}

@@ -33,8 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("🛡️ Mock Auth Active: Bypassing Supabase");
         setUser({
           id: "mock-dev-id",
-          email: "sentinel@argus.ai",
-          user_metadata: { full_name: "Sentinel Developer" },
+          email: "mock@argus.ai",
+          user_metadata: { full_name: "Mock Developer" },
           app_metadata: { provider: "email" },
           aud: "authenticated",
           role: "authenticated",

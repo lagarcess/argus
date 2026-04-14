@@ -108,6 +108,17 @@ Usage:
 **OpenAPI Spec:** [`docs/api/openapi.yaml`](./docs/api/openapi.yaml)
 **Scheduled Framework:** [`.agent/.jules/README.md`](./.agent/.jules/README.md)
 
+### 🛡️ Developer Identity: Mock Auth Mode
+To bypass the Supabase OAuth wall in development environments (e.g., remote VMs), set the following environment variable:
+
+`NEXT_PUBLIC_MOCK_AUTH=true`
+
+**Benefits for Agents:**
+- **Auth Bypass**: Instantly logs in as "Mock Developer" (mock user).
+- **Sticky Sessions**: Automatically hydrated session across all refreshes.
+- **Access Control**: Grants access to `/builder`, `/strategies`, etc., without OAuth.
+
+
 ---
 
 ## 🛑 Never-Violate Standards

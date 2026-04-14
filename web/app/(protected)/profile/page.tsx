@@ -134,7 +134,7 @@ export default function ProfilePage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    // Explicitly disable the Sentinel bypass on sign out to prevent redirect loops
+    // Explicitly disable the Mock Auth bypass on sign out to prevent redirect loops
     router.push("/?bypass_auth=false");
   };
 
