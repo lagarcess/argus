@@ -21,7 +21,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // 1. Initial session check
     const initAuth = async () => {
-      const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
+      const searchParams = new URLSearchParams(window.location.search);
+      const bypassParam = searchParams.get("bypass_auth");
+      const hasBypassParam = bypassParam === "true";
+      const isExplicitDisable = bypassParam === "false";
+      const hasBypassCookie = typeof document !== "undefined" && document.cookie.includes("sb-mock-bypass=true");
+
+      const isMock = !isExplicitDisable && (process.env.NEXT_PUBLIC_MOCK_AUTH === "true" || (process.env.NODE_ENV === "development" && (hasBypassParam || hasBypassCookie)));
 
       if (isMock) {
         console.log("🛡️ Mock Auth Active: Bypassing Supabase");
@@ -39,6 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      if (isExplicitDisable) {
+        setUser(null);
+        setToken(null);
+        // Supabase session should also be cleared just in case
+        await supabase.auth.signOut();
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setUser(session.user);
@@ -51,7 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Listen for auth changes (SSO, Logout, Session refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (process.env.NEXT_PUBLIC_MOCK_AUTH === "true") return;
+      const searchParams = new URLSearchParams(window.location.search);
+      const hasBypassCookie = typeof document !== "undefined" && document.cookie.includes("sb-mock-bypass=true");
+      const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true" || (process.env.NODE_ENV === "development" && (searchParams.get("bypass_auth") === "true" || hasBypassCookie));
+      if (isMock) return;
 
       if (session) {
         setUser(session.user);

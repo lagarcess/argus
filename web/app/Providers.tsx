@@ -16,7 +16,15 @@ export default function Providers({ children }: { children: ReactNode }) {
       },
     });
 
-    if (process.env.NEXT_PUBLIC_MOCK_AUTH === "true") {
+    const isMock = typeof window !== "undefined" && (
+      process.env.NEXT_PUBLIC_MOCK_AUTH === "true" ||
+      (process.env.NODE_ENV === "development" && (
+        new URLSearchParams(window.location.search).get("bypass_auth") === "true" ||
+        document.cookie.includes("sb-mock-bypass=true")
+      ))
+    );
+
+    if (isMock) {
       client.setQueryData(getAuthSessionOptions().queryKey, {
         id: "mock-dev-id",
         is_admin: true,
