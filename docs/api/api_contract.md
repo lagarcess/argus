@@ -59,6 +59,7 @@ We expose high-value AI features broadly to capture market share but cap daily v
 | **Charting**     | Basic Equity Curve    | Basic               | TradingView UL          | TradingView UL       |
 | **Assets**       | Equities/Crypto       | + Forex             | + Options (Greeks)      | + Multi-Leg Spreads  |
 | **AI Agent**     | Explainer Only        | Explainer           | **Drafting Agent**      | Agentic Refit        |
+| **Execution**    | Retail (Fixed Drag)   | Retail               | **Institutional Forge** | **Institutional Forge**|
 
 ---
 
@@ -92,6 +93,10 @@ We expose high-value AI features broadly to capture market share but cap daily v
     "timeframe": "15m",
     "slippage": 0.001,
     "fees": 0.005,
+    "participation_rate": 0.1,    // [PRO] 0.001 to 1.0 (Liquidity Gating)
+    "execution_priority": 1.0,   // [PRO] 0.0 (Maker) to 1.0 (Taker)
+    "va_sensitivity": 1.0,       // [PRO] Volatility sensitivity scaling
+    "slippage_model": "vol_adjusted", // [PRO] "fixed" | "vol_adjusted"
     "entry_criteria": [{"indicator": "RSI", "operator": "<", "value": 30}],
     "exit_criteria": {"take_profit_pct": 5.0}
   }
@@ -107,7 +112,12 @@ We expose high-value AI features broadly to capture market share but cap daily v
       "sharpe_ratio": 1.8,
       "max_drawdown_pct": -0.05
     },
-    "reality_gap_metrics": { "slippage_impact_pct": 1.2, "fee_impact_pct": 0.4 },
+    "reality_gap_metrics": { 
+      "slippage_impact_pct": 1.2, 
+      "fee_impact_pct": 0.4, 
+      "vol_hazard_pct": 0.8,      // Cost of volatility/liquidity drag
+      "fidelity_score": 94.5      // Aggregated confidence/realism score
+    },
     "full_result": { // Separated to prevent enormous bloated tables unless queried
       "equity_curve": [100, 101.5, 99.8],
       "trades": [{"entry_time": "...", "entry_price": 405.10, "exit_price": 410.20, "pnl_pct": 1.2}],
