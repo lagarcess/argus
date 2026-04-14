@@ -18,7 +18,10 @@ export default function Providers({ children }: { children: ReactNode }) {
 
     const isMock = typeof window !== "undefined" && (
       process.env.NEXT_PUBLIC_MOCK_AUTH === "true" ||
-      (process.env.NODE_ENV === "development" && new URLSearchParams(window.location.search).get("bypass_auth") === "true")
+      (process.env.NODE_ENV === "development" && (
+        new URLSearchParams(window.location.search).get("bypass_auth") === "true" ||
+        document.cookie.includes("sb-mock-bypass=true")
+      ))
     );
 
     if (isMock) {

@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
   const bypassCookie = request.cookies.get('sb-mock-bypass')?.value
 
   const isBypassActive = bypassParam === 'true' || bypassCookie === 'true'
-  const isMockMode = process.env.NEXT_PUBLIC_MOCK_API === "true" ||
+  const isMockMode = process.env.NEXT_PUBLIC_MOCK_AUTH === "true" ||
                      (process.env.NODE_ENV === "development" && isBypassActive)
 
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/builder') ||
@@ -50,16 +50,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Persist bypass via cookie if parameter is present
-  if (bypassParam === 'true') {
-    supabaseResponse.cookies.set('sb-mock-bypass', 'true', {
-      path: '/',
-      maxAge: 60 * 60 * 24, // 1 day
-      httpOnly: true,
-      sameSite: 'lax',
-    })
-  } else if (bypassParam === 'false') {
-    supabaseResponse.cookies.delete('sb-mock-bypass')
+  // Persist bypass via cookie if parameter is present (development only)
+  if (process.env.NODE_ENV === "development") {
+    if (bypassParam === 'true') {
+      supabaseResponse.cookies.set('sb-mock-bypass', 'true', {
+        path: '/',
+        maxAge: 60 * 60 * 24, // 1 day
+        httpOnly: false, // Allow client-side detection for session hydration
+        sameSite: 'lax',
+      })
+    } else if (bypassParam === 'false') {
+      supabaseResponse.cookies.delete('sb-mock-bypass')
+    }
   }
 
   return supabaseResponse
