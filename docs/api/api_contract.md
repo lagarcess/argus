@@ -25,10 +25,13 @@ This section aligns the aspirational Master Contract against our *current* codeb
 - [x] **Engine: Portfolio-Level Processing**: Engine core and API fully support multi-symbol `symbols: string[]` via vectorized VectorBT Portfolio paths.
 - [x] **Strategy Persistence (CRUD)**: `GET/POST/PUT/DELETE /strategies` fully implemented with PersistenceService sync.
 - [x] **Simulation History / Listing**: `/api/v1/history` supports cursor-based pagination and summary retrieval.
+- [x] **Institutional Execution Model**: High-fidelity 2-pass simulation (Ideal vs. Realistic) implemented. Engine decomposes total drag into priority-scaled slippage, fees, and volatility hazards as required by the institutional schema.
 
 **What We Lack (Critical Gaps to Build for Ecosystem Loop)**:
+- [ ] **Hybrid Resource-Aware Quotas**: Evolving from simple "one-way" counts to an execution-weighted model (Pro) and concurrency-slot model (Max) to handle high-complexity portfolio simulations.
 - [ ] **Engine: Walk-Forward Analysis (WFA)**: Missing orchestration layer for train/test splitting and parameter optimization.
-- [ ] **Engine: Configurable Reality Gap Attribution**: Engine simulates with slippage/fees, but needs dual-sim to report differential impact % as required by schema.
+- [ ] **AI: Collaborative Drafting Engine**: Integration of liteLLM/OpenRouter for NL-to-Strategy conversion and "Psychological Mirroring" (connecting Memos to user bias).
+- [ ] **Persistence: usememos Integration**: Bridging the journaling layer with the simulation history for a complete trader's loop.
 - [ ] **Datafeed Compliance**: `/market/bars` must implement full TradingView UDF (gated by `advanced_charting`).
 - [ ] **Quota Reset Mechanics**: `reset_monthly_quotas` function exists but missing Supabase Edge Function cron job/trigger.
 - [ ] **Agentic AI Drafting (`POST /agent/draft`)**: Missing LangChain endpoint returning unexecuted `StrategySchema` drafts.
@@ -55,11 +58,55 @@ We expose high-value AI features broadly to capture market share but cap daily v
 | Feature          | **Free for Everyone** | **Plus (Active)**   | **Pro (Advanced)**      | **Max (P99 Power)**  |
 | :--------------- | :-------------------- | :------------------ | :---------------------- | :------------------- |
 | **Quota**        | 10 execs / day        | 500 / month         | Unlimited               | Unlimited (Clustered)|
-| **Portfolio**    | Single Symbol         | Multi-Symbol (5)    | Multi-Symbol (50)       | Multi-Symbol (UL)    |
-| **Charting**     | Basic Equity Curve    | Basic               | TradingView UL          | TradingView UL       |
-| **Assets**       | Equities/Crypto       | + Forex             | + Options (Greeks)      | + Multi-Leg Spreads  |
-| **AI Agent**     | Explainer Only        | Explainer           | **Drafting Agent**      | Agentic Refit        |
-| **Execution**    | Retail (Fixed Drag)   | Retail               | **Institutional Forge** | **Institutional Forge**|
+| **Portfolio**    | Single Symbol         | Multi-Symbol (5)    | Multi-Symbol (15)       | Multi-Symbol (100)   |
+| **History [D]**  | 1yr (D) / 3d (I)      | 3yr (D) / 7d (I)     | 5yr (D) / 14d (I)       | 7yr+ (D) / 30d (I)   |
+| **Charting**     | TV (Interactive)      | TV + Persistence    | TV + Execution Mapping  | TV + Alpha Overlays  |
+| **Assets [A]**   | Equities/Crypto       | + Forex             | + Options (Greeks)      | + Multi-Leg Spreads  |
+| **Reality Gap**  | Basic (Impact %)      | Basic               | **Detailed Attribution**| **Detailed Attribution**|
+| **Execution**    | Retail (Fixed Drag)   | Retail               | **Institutional Model** | **Institutional Model**|
+| **Journaling**   | Standalone Memos      | + Rich Media / Tags  | **Contextual Linking**  | **Agentic Psychology**  |
+| **AI Agent**     | UI Insights (Limited) | UI Insights (Volume) | **Strategy Co-Drafter** | **Behavioral Mirror**   |
+
+> [!NOTE]
+> **[D] History Lookback**: (D) indicates Daily resolution; (I) indicates Intraday frequencies (15m, 1h).
+> **[A] Asset Constraints**: 5+ years historical lookback for some assets due to provider liquidity data parity.
+
+### 4.A Psychographic Persona Mapping
+Each tier is engineered to satisfy the specific risk psychology and architectural needs of our target users.
+
+| Tier      | **Persona** | **Psychographic Driver**      | **Core Need Met**                |
+| :-------- | :---------- | :---------------------------- | :------------------------------- |
+| **Free**  | **Explorer**| "Can I find alpha?"           | Low-friction testing & validation|
+| **Plus**  | **Enthusiast**| "Is my system stable?"        | Breadth of symbols & persistence |
+| **Pro**   | **Quant**| "Will this fill in reality?"  | Institutional physics & fidelity |
+| **Max**  | **Portfolio Manager**| "Can I scale this infinitely?"| Unlimited throughput & refit loops|
+
+### 4.B Resource-Aware Quota Architecture (Roadmap)
+To balance server stability with institutional power, Argus is transitioning from simple "Backtest Counts" to a hybrid resource-aware model.
+
+#### The Three Models
+1.  **The Bucket Model (Free/Plus)**: Standard consumable count (e.g., 500/mo). Simple, predictable, and fair for "Explorer" work.
+2.  **The Weighted Model (Pro)**: Complexity-weighted credits where `Cost = symbols * years`. This prevents "Quants" from overloading the engine while letting them run thousands of simple tests.
+3.  **The Slot Model (Max)**: Unlimited total volume but restricted **Concurrency Slots** (e.g., 5 parallel sims). This guarantees "Portfolio Managers" 24/7 throughput while capping peak server load (SOTA industry standard).
+
+#### Strategic Reasoning
+- **Efficiency**: Protects the engine from "Complexity DDoS" (e.g., thousands of parallel 100-symbol resets).
+- **Fairness**: Users pay for the value they extract. A massive broad-market scan correctly costs more than a single-stock experiment.
+- **Perception**: "Portfolio Managers" prioritize **Throughput over Totals**. A slot-based model feels more like a professional workstation.
+
+> [!IMPORTANT]
+> **Current State**: All tiers currently use the **Bucket Model** (1 simulation = 1 credit). Transition to Weighted/Slot logic is scheduled for future release.
+
+### 4.C Feature Definition Glossary
+Simple, relevant definitions to clarify the user experience at each mastery level.
+
+| Feature Area | **Explorer / Enthusiast (Retail)** | **Quant / Portfolio Manager (Institutional)** |
+| :--- | :--- | :--- |
+| **Charting** | **Standard**: Interactive TV candles. | **Institutional**: Logic-mapping (Executions/Overlays). |
+| **Reality Gap** | Basic "Impact %" — one total drag score. | **Detailed Attribution**: Fees vs. Slippage vs. Vol. |
+| **Execution** | **Retail Model**: Fixed-bps/tick slippage. | **Institutional Model**: Liquidity-aware physics. |
+| **Journaling** | **Memos**: Professional standalone notes. | **Deep Integration**: Asset-linked logs + AI Bias analysis. |
+| **AI Agent** (liteLLM) | **UI Insights**: Analysis hook (Tiers 1-2). | **Collaborative**: NL-to-Draft & Behavioral Insight (Tiers 3-4). |
 
 ---
 
@@ -112,9 +159,9 @@ We expose high-value AI features broadly to capture market share but cap daily v
       "sharpe_ratio": 1.8,
       "max_drawdown_pct": -0.05
     },
-    "reality_gap_metrics": { 
-      "slippage_impact_pct": 1.2, 
-      "fee_impact_pct": 0.4, 
+    "reality_gap_metrics": {
+      "slippage_impact_pct": 1.2,
+      "fee_impact_pct": 0.4,
       "vol_hazard_pct": 0.8,      // Cost of volatility/liquidity drag
       "fidelity_score": 94.5      // Aggregated confidence/realism score
     },
