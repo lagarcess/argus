@@ -7,6 +7,7 @@ import { EquityChart } from "@/components/EquityChart";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { getBacktestsByIdOptions } from "@/lib/api/@tanstack/react-query.gen";
+import { BacktestRequest } from "@/lib/api/types.gen";
 
 export default function BacktestResultsPage() {
   const params = useParams();
@@ -30,22 +31,22 @@ export default function BacktestResultsPage() {
   if (!backtest) return <div className="text-center py-20 text-slate-400 uppercase tracking-widest font-bold">Forge Entry Not Found</div>;
 
   const stats = backtest.results;
-  const config = backtest.config_snapshot;
-  const capital = (config as { capital?: number })?.capital || 100000;
+  const config = backtest.config_snapshot as BacktestRequest & { capital?: number };
+  const capital = config.capital || 100000;
 
   const metrics = [
-    { label: "Net Return", value: `${stats.total_return_pct.toFixed(2)}%`, icon: Percent, color: "text-emerald-400" },
-    { label: "Absolute Profit", value: `$${((stats.total_return_pct / 100) * capital).toLocaleString()}`, icon: DollarSign, color: "text-slate-100" },
-    { label: "Fidelity Score", value: `${Math.round(stats.reality_gap_metrics.fidelity_score * 100)}%`, icon: ShieldCheck, color: "text-cyan-400" },
-    { label: "Win Rate", value: `${stats.win_rate.toFixed(1)}%`, icon: TrendingUp, color: "text-slate-100" },
-    { label: "Max Drawdown", value: `${stats.max_drawdown_pct.toFixed(2)}%`, icon: TrendingDown, color: "text-red-400" },
-    { label: "Sharpe Ratio", value: stats.sharpe_ratio.toFixed(2), icon: Activity, color: "text-purple-400" },
+    { label: "Net Return", value: `${(stats.total_return_pct ?? 0).toFixed(2)}%`, icon: Percent, color: "text-emerald-400" },
+    { label: "Absolute Profit", value: `$${(((stats.total_return_pct ?? 0) / 100) * capital).toLocaleString()}`, icon: DollarSign, color: "text-slate-100" },
+    { label: "Fidelity Score", value: `${Math.round((stats.reality_gap_metrics?.fidelity_score ?? 0) * 100)}%`, icon: ShieldCheck, color: "text-cyan-400" },
+    { label: "Win Rate", value: `${(stats.win_rate ?? 0).toFixed(1)}%`, icon: TrendingUp, color: "text-slate-100" },
+    { label: "Max Drawdown", value: `${(stats.max_drawdown_pct ?? 0).toFixed(2)}%`, icon: TrendingDown, color: "text-red-400" },
+    { label: "Sharpe Ratio", value: (stats.sharpe_ratio ?? 0).toFixed(2), icon: Activity, color: "text-purple-400" },
   ];
 
   const chartSeries = [
     {
       label: "Execution Forge (Realistic)",
-      data: stats.equity_curve.map((v: number, i: number) => ({
+      data: (stats.equity_curve || []).map((v: number, i: number) => ({
         time: new Date(Date.now() - (100 - i) * 86400000).toISOString(),
         value: typeof v === 'object' ? (v as { equity?: number; value?: number }).equity || (v as { equity?: number; value?: number }).value || 0 : v
       })),
@@ -53,7 +54,7 @@ export default function BacktestResultsPage() {
       type: "area" as const
     },
     {
-      label: `Benchmark (${config.benchmark_symbol || "SPY"})`,
+      label: `Benchmark (${stats.benchmark_symbol || "SPY"})`,
       data: (stats.benchmark_equity_curve || []).map((v: number, i: number) => ({
         time: new Date(Date.now() - (100 - i) * 86400000).toISOString(),
         value: typeof v === 'object' ? (v as { equity?: number; value?: number }).equity || (v as { equity?: number; value?: number }).value || 0 : v
@@ -80,10 +81,10 @@ export default function BacktestResultsPage() {
               <div className="h-px w-12 bg-slate-800" />
             </div>
             <h1 className="text-4xl font-bold tracking-tight text-slate-100 mb-1">
-              {String(config.symbol || "Strategy")} <span className="text-slate-700 font-light">vs</span> {String(config.benchmark_symbol || "Benchmark")}
+              {String(config.symbols?.[0] || "Strategy")} <span className="text-slate-700 font-light">vs</span> {String(stats.benchmark_symbol || "Benchmark")}
             </h1>
             <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">
-              Execution Physics: Institutional (POV {config.participation_rate ? config.participation_rate * 100 : 10}% | VA-Sens {config.va_sensitivity || 1.0}x)
+              Execution Physics: Institutional (POV {(config.participation_rate ?? 0) * 100}% | VA-Sens {config.va_sensitivity || 1.0}x)
             </p>
          </div>
 
@@ -91,12 +92,12 @@ export default function BacktestResultsPage() {
             <div className="text-right">
               <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1">Fidelity Grade</p>
               <div className="flex items-center gap-3">
-                <span className={cn("text-3xl font-black font-mono", stats.fidelity_score > 90 ? "text-cyan-400" : "text-amber-400")}>
-                  {stats.fidelity_score}%
-                </span>
-                <div className="w-12 h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                  <div className="h-full bg-cyan-400" style={{ width: `${stats.fidelity_score}%` }} />
-                </div>
+                <span className={cn("text-3xl font-black font-mono", (stats.reality_gap_metrics?.fidelity_score ?? 0) > 0.9 ? "text-cyan-400" : "text-amber-400")}>
+                   {Math.round((stats.reality_gap_metrics?.fidelity_score ?? 0) * 100)}%
+                 </span>
+                 <div className="w-12 h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                   <div className="h-full bg-cyan-400" style={{ width: `${(stats.reality_gap_metrics?.fidelity_score ?? 0) * 100}%` }} />
+                 </div>
               </div>
             </div>
             <div className="w-px h-10 bg-slate-800" />
@@ -130,7 +131,7 @@ export default function BacktestResultsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-slate-500" />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{config.benchmark_symbol || "Benchmark"}</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stats.benchmark_symbol || "Benchmark"}</span>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg">
@@ -161,10 +162,10 @@ export default function BacktestResultsPage() {
            <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Slippage Drag</p>
-                <p className="text-lg font-bold text-orange-400 font-mono">-{stats.reality_gap_metrics.slippage_drag_bps.toFixed(1)} <span className="text-[10px]">BPS</span></p>
+                <p className="text-lg font-bold text-orange-400 font-mono">-{((stats.reality_gap_metrics?.slippage_impact_pct ?? 0) * 10000).toFixed(1)} <span className="text-[10px]">BPS</span></p>
               </div>
               <div className="h-1 w-full bg-slate-900 rounded-full overflow-hidden">
-                <div className="h-full bg-orange-400" style={{ width: '45%' }} />
+                <div className="h-full bg-orange-400" style={{ width: `${Math.min((stats.reality_gap_metrics?.slippage_impact_pct ?? 0) * 1000, 100)}%` }} />
               </div>
               <p className="text-[10px] text-slate-600 italic">Realistic latency & VA-Slippage execution impact.</p>
            </div>
@@ -172,10 +173,10 @@ export default function BacktestResultsPage() {
            <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Fee Attrition</p>
-                <p className="text-lg font-bold text-red-400 font-mono">-{stats.reality_gap_metrics.fee_impact_pct.toFixed(2)}%</p>
+                <p className="text-lg font-bold text-red-400 font-mono">-{((stats.reality_gap_metrics?.fee_impact_pct ?? 0) * 100).toFixed(2)}%</p>
               </div>
               <div className="h-1 w-full bg-slate-900 rounded-full overflow-hidden">
-                <div className="h-full bg-red-400" style={{ width: '30%' }} />
+                <div className="h-full bg-red-400" style={{ width: `${Math.min((stats.reality_gap_metrics?.fee_impact_pct ?? 0) * 1000, 100)}%` }} />
               </div>
               <p className="text-[10px] text-slate-600 italic">Cumulative impact of exchange & broker commissions.</p>
            </div>
@@ -183,10 +184,10 @@ export default function BacktestResultsPage() {
            <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Vol Hazard</p>
-                <p className="text-lg font-bold text-amber-500 font-mono">-{stats.reality_gap_metrics.volatility_penalty_pct.toFixed(2)}%</p>
+                <p className="text-lg font-bold text-amber-500 font-mono">-{((stats.reality_gap_metrics?.vol_hazard_pct ?? 0) * 100).toFixed(2)}%</p>
               </div>
               <div className="h-1 w-full bg-slate-900 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500" style={{ width: '20%' }} />
+                <div className="h-full bg-amber-500" style={{ width: `${Math.min((stats.reality_gap_metrics?.vol_hazard_pct ?? 0) * 1000, 100)}%` }} />
               </div>
               <p className="text-[10px] text-slate-600 italic">Execution difficulty during ATR standard deviation spikes.</p>
            </div>
