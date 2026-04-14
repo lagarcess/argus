@@ -198,6 +198,30 @@ class TechnicalIndicators:
         return df
 
     @staticmethod
+    def get_vol_drag_series(df: pd.DataFrame) -> pd.Series:
+        """
+        Calculate a volatility-based drag multiplier.
+        Returns a series where 1.0 is 'normal' volatility, and values > 1.0
+        represent higher drag during volatility spikes.
+        
+        Formula: Current ATR / SMA(ATR, 20)
+        """
+        # Ensure ATR is present
+        if "ATRr_14" not in df.columns and "ATR_14" not in df.columns:
+            df.ta.atr(length=14, append=True)
+            
+        atr_col = "ATRr_14" if "ATRr_14" in df.columns else "ATR_14"
+        
+        # Calculate the baseline (20-period average of volatility)
+        baseline_vol = df[atr_col].rolling(window=20).mean()
+        
+        # Drag = Current Vol / Average Vol
+        # We fillna(1.0) for the initial warmup period
+        drag = (df[atr_col] / baseline_vol).fillna(1.0).clip(lower=0.5, upper=5.0)
+        
+        return drag
+
+    @staticmethod
     def validate_columns(df: pd.DataFrame) -> bool:
         """Check if required base columns exist."""
         required = {"open", "high", "low", "close", "volume"}

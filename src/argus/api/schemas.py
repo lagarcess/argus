@@ -51,6 +51,12 @@ class BacktestRequest(BaseModel):
     patterns: Optional[List[str]] = None
     slippage: float = Field(default=0.001, ge=0.0, le=0.05)
     fees: float = Field(default=0.001, ge=0.0, le=0.02)
+    
+    # Execution Forge (Institutional Physics)
+    participation_rate: float = Field(default=0.1, ge=0.001, le=1.0)
+    execution_priority: float = Field(default=1.0, ge=0.0, le=1.0)
+    va_sensitivity: float = Field(default=1.0, ge=0.0, le=5.0)
+    slippage_model: Literal["fixed", "vol_adjusted"] = Field(default="vol_adjusted")
 
     @model_validator(mode="after")
     def validate_xor(self):
@@ -90,7 +96,8 @@ class TradeSnippet(BaseModel):
 class RealityGapMetrics(BaseModel):
     slippage_impact_pct: float
     fee_impact_pct: float
-    fidelity_score: float
+    vol_hazard_pct: float = Field(default=0.0)
+    fidelity_score: float = Field(default=1.0)
     assets: Optional[Dict[str, float]] = None
 
 
@@ -104,6 +111,9 @@ class BacktestResults(BaseModel):
     expectancy: float
     max_drawdown_pct: float
     equity_curve: List[float]
+    ideal_equity_curve: List[float] = Field(default_factory=list)
+    benchmark_equity_curve: List[float] = Field(default_factory=list)
+    benchmark_symbol: Optional[str] = None
     trades: List[TradeSnippet]
     reality_gap_metrics: RealityGapMetrics
     pattern_breakdown: Dict[str, int]

@@ -356,6 +356,10 @@ def run_backtest(
                 patterns=strat_record.get("patterns", []),
                 slippage=request.slippage,
                 fees=request.fees,
+                participation_rate=request.participation_rate,
+                execution_priority=request.execution_priority,
+                va_sensitivity=request.va_sensitivity,
+                slippage_model=request.slippage_model,
             )
             timeframe = strat_record["timeframe"]
             start_dt = strat_record.get("start_date")
@@ -376,6 +380,10 @@ def run_backtest(
                 patterns=request.patterns or [],
                 slippage=request.slippage,
                 fees=request.fees,
+                participation_rate=request.participation_rate,
+                execution_priority=request.execution_priority,
+                va_sensitivity=request.va_sensitivity,
+                slippage_model=request.slippage_model,
             )
             timeframe = request.timeframe
             start_dt = request.start_date
@@ -413,6 +421,12 @@ def run_backtest(
                         status_code=403,
                         detail=f"Tier '{tier}' is limited to {limits['daily_lookback_days']} days for daily data.",
                     )
+
+            # 3. Execution Forge (Tier Sanitization)
+            if tier == "free":
+                config.participation_rate = 1.0 # Infinite liquidity
+                config.execution_priority = 1.0 # Full spread cross
+                config.slippage_model = "fixed"
             # ------------------------------------------------
 
             # Save inline strategies as "drafts" for persistence
@@ -527,6 +541,9 @@ def run_backtest(
                 equity_curve=[float(x) for x in result.equity_curve]
                 if result.equity_curve
                 else [],
+                ideal_equity_curve=[float(x) for x in result.ideal_equity_curve]
+                if result.ideal_equity_curve
+                else [],
                 trades=[
                     TradeSnippet(
                         entry_time=str(t["entry_time"]),
@@ -542,6 +559,9 @@ def run_backtest(
                     ),
                     fee_impact_pct=sanitize_metric(
                         result.reality_gap_metrics.get("fee_impact_pct", 0.0)
+                    ),
+                    vol_hazard_pct=sanitize_metric(
+                        result.reality_gap_metrics.get("vol_hazard_pct", 0.0)
                     ),
                     fidelity_score=sanitize_metric(
                         result.reality_gap_metrics.get("fidelity_score", 1.0)
@@ -598,6 +618,7 @@ def get_backtest_detail(
             expectancy=summary.get("expectancy", 0.0),
             max_drawdown_pct=summary.get("max_drawdown_pct", 0.0),
             equity_curve=full_result.get("equity_curve", []),
+            ideal_equity_curve=full_result.get("ideal_equity_curve", []),
             trades=[
                 TradeSnippet(
                     entry_time=t.get("entry_time"),
@@ -613,6 +634,9 @@ def get_backtest_detail(
                 ),
                 fee_impact_pct=sim_data.get("reality_gap_metrics", {}).get(
                     "fee_impact_pct", 0.0
+                ),
+                vol_hazard_pct=sim_data.get("reality_gap_metrics", {}).get(
+                    "vol_hazard_pct", 0.0
                 ),
                 fidelity_score=sim_data.get("reality_gap_metrics", {}).get(
                     "fidelity_score", 1.0

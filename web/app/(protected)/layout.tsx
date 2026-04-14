@@ -10,7 +10,7 @@ import { getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
 function QuotaBadge({ remaining, isAdmin }: { remaining: number; isAdmin: boolean }) {
   if (isAdmin) {
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-emerald-400 text-xs font-semibold shadow-[0_0_10px_rgba(0,255,157,0.2)]">
+      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-400/30 text-violet-400 text-xs font-semibold shadow-[0_0_10px_rgba(139,92,246,0.2)]">
         <Crown size={12} />
         Admin
       </div>
@@ -20,7 +20,7 @@ function QuotaBadge({ remaining, isAdmin }: { remaining: number; isAdmin: boolea
   const isLow = remaining < 5;
   return (
     <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${
-       isLow ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-slate-800 border-slate-700 text-slate-300"
+       isLow ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-cyan-500/10 border-cyan-400/30 text-cyan-400"
     }`}>
       {remaining} / 50 Quota
     </div>
@@ -33,10 +33,6 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   // Middleware handles the secure boundary check, preventing screen flashing.
 
   const { data: sessionData } = useQuery(getAuthSessionOptions());
-  // const { data: sessionData } = useQuery({
-    // queryKey
-    // queryFn // Stubbed to mockApi for building UI
-  // });
 
   const navLinks = [
     { name: "Builder", href: "/builder", icon: LayoutDashboard },
@@ -81,22 +77,22 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           />
           <Link href="/profile" className="relative group cursor-pointer">
             <div className={`absolute -inset-1 rounded-full blur-md opacity-30 group-hover:opacity-60 transition duration-500 ${
-              sessionData?.subscription_tier === 'max' ? "bg-purple-500" :
-              sessionData?.subscription_tier === 'pro' ? "bg-cyan-400" :
+              sessionData?.subscription_tier === 'max' ? "bg-violet-500" :
+              sessionData?.subscription_tier === 'pro' ? "bg-amber-500" :
               sessionData?.subscription_tier === 'plus' ? "bg-emerald-400" :
-              "bg-slate-600"
+              "bg-cyan-400"
             }`} />
             <div className={`relative w-8 h-8 rounded-full flex items-center justify-center bg-slate-900 border ${
-               sessionData?.subscription_tier === 'max' ? "border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]" :
-               sessionData?.subscription_tier === 'pro' ? "border-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.3)]" :
+               sessionData?.subscription_tier === 'max' ? "border-violet-500/50 shadow-[0_0_15px_rgba(139,92,246,0.3)]" :
+               sessionData?.subscription_tier === 'pro' ? "border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]" :
                sessionData?.subscription_tier === 'plus' ? "border-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.3)]" :
-               "border-slate-700"
+               "border-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.3)]"
             }`}>
                <User size={16} className={
-                 sessionData?.subscription_tier === 'max' ? "text-purple-400" :
-                 sessionData?.subscription_tier === 'pro' ? "text-cyan-400" :
+                 sessionData?.subscription_tier === 'max' ? "text-violet-400" :
+                 sessionData?.subscription_tier === 'pro' ? "text-amber-400" :
                  sessionData?.subscription_tier === 'plus' ? "text-emerald-400" :
-                 "text-slate-400"
+                 "text-cyan-400"
                } />
             </div>
           </Link>

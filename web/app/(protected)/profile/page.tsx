@@ -50,18 +50,18 @@ function PricingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Free */}
-          <div className="border border-slate-800 rounded-2xl p-6 relative bg-slate-900/50">
-            <h3 className="text-xl font-bold text-slate-100 text-center">Free</h3>
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 text-center mt-1">Try Argus</p>
+          <div className="border border-cyan-400/20 rounded-2xl p-6 relative bg-slate-900/50 transition-all hover:border-cyan-400/40 hover:bg-cyan-950/5">
+            <h3 className="text-xl font-bold text-cyan-400 text-center">Free</h3>
+            <p className="text-[10px] uppercase tracking-widest text-cyan-500/70 text-center mt-1">Try Argus</p>
             <div className="my-4 h-[60px] text-center">
               <p className="text-3xl font-black text-slate-100">$0 <span className="text-sm font-normal text-slate-400">/mo</span></p>
               <p className="text-[10px] text-slate-500 lowercase tracking-widest mt-1">Free for everyone</p>
             </div>
             <ul className="space-y-3 mb-8 text-sm text-slate-300">
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-emerald-400" /> 50 executions/mo</li>
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-emerald-400" /> Single-asset testing</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-cyan-400" /> 50 executions/mo</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-cyan-400" /> Single-asset testing</li>
             </ul>
-            <button className="w-full btn-secondary py-2" onClick={onClose}>Current Plan</button>
+            <button className="w-full btn-secondary text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/10 py-2" onClick={onClose}>Current Plan</button>
           </div>
 
           {/* Plus */}
@@ -81,36 +81,36 @@ function PricingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
           </div>
 
           {/* Pro */}
-          <div className="border border-cyan-400/50 rounded-2xl p-6 relative bg-cyan-950/20 shadow-[0_0_30px_rgba(0,240,255,0.1)]">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-cyan-400 text-slate-950 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Recommended</div>
-            <h3 className="text-xl font-bold text-cyan-400 text-center">Pro</h3>
-            <p className="text-[10px] uppercase tracking-widest text-cyan-500/70 text-center mt-1">For Advanced Traders</p>
+          <div className="border border-amber-500/50 rounded-2xl p-6 relative bg-amber-950/20 shadow-[0_0_30px_rgba(245,158,11,0.1)] transition-all hover:border-amber-400/70">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-slate-950 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Recommended</div>
+            <h3 className="text-xl font-bold text-amber-500 text-center">Pro</h3>
+            <p className="text-[10px] uppercase tracking-widest text-amber-500/70 text-center mt-1">For Advanced Traders</p>
             <div className="my-4 h-[60px] text-center">
               <p className="text-3xl font-black text-slate-100">${isAnnual ? "49" : "59"} <span className="text-sm font-normal text-slate-400">/mo</span></p>
               {isAnnual && <p className="text-[10px] text-slate-500 lowercase tracking-widest mt-1">Billed $588 annually</p>}
             </div>
             <ul className="space-y-3 mb-8 text-sm text-slate-300">
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-cyan-400" /> Unlimited executions</li>
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-cyan-400" /> API Access</li>
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-cyan-400" /> Premium Indicators</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-amber-500" /> Unlimited executions</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-amber-500" /> API Access</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-amber-500" /> Premium Indicators</li>
             </ul>
-            <button className="w-full btn-primary py-2" onClick={onClose}>Upgrade to Pro</button>
+            <button className="w-full btn-primary bg-amber-500 hover:bg-amber-400 text-slate-900 py-2" onClick={onClose}>Upgrade to Pro</button>
           </div>
 
           {/* Max */}
-          <div className="border border-purple-500/30 rounded-2xl p-6 relative bg-slate-900/50 shadow-[0_0_15px_rgba(168,85,247,0.05)] transition-all hover:bg-purple-950/10 hover:border-purple-500/50">
-            <h3 className="text-xl font-bold text-purple-400 text-center">Max</h3>
-            <p className="text-[10px] uppercase tracking-widest text-purple-500/70 text-center mt-1">For Institutional Traders</p>
+          <div className="border border-violet-500/30 rounded-2xl p-6 relative bg-slate-900/50 shadow-[0_0_15px_rgba(139,92,246,0.05)] transition-all hover:bg-violet-950/10 hover:border-violet-500/50">
+            <h3 className="text-xl font-bold text-violet-400 text-center">Max</h3>
+            <p className="text-[10px] uppercase tracking-widest text-violet-500/70 text-center mt-1">For Institutional Traders</p>
             <div className="my-4 h-[60px] text-center">
               <p className="text-3xl font-black text-slate-100">${isAnnual ? "149" : "199"} <span className="text-sm font-normal text-slate-400">/mo</span></p>
               {isAnnual && <p className="text-[10px] text-slate-500 lowercase tracking-widest mt-1">Billed $1,788 annually</p>}
             </div>
             <ul className="space-y-3 mb-8 text-sm text-slate-300">
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-purple-400" /> Dedicated clustered IP</li>
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-purple-400" /> Walk-forward optimization</li>
-              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-purple-400" /> White-glove support</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-violet-400" /> Dedicated clustered IP</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-violet-400" /> Walk-forward optimization</li>
+              <li className="flex gap-2 items-center"><Check className="w-4 h-4 text-violet-400" /> White-glove support</li>
             </ul>
-            <button className="w-full btn-secondary text-purple-400 border-purple-500/30 hover:bg-purple-500/10 py-2" onClick={onClose}>Upgrade to Max</button>
+            <button className="w-full btn-secondary text-violet-400 border-violet-500/30 hover:bg-violet-500/10 py-2" onClick={onClose}>Upgrade to Max</button>
           </div>
         </div>
       </div>
