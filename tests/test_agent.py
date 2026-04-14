@@ -86,16 +86,9 @@ def test_draft_strategy_quota_exhausted(mock_retry, mock_supabase):
 
     mock_retry.side_effect = bypass_retry
 
-    # We also need to reload argus.api.agent so it uses the bypassed retry_with_backoff
-    # But simpler: just use quota in the text!
     rpc_mock = MagicMock()
     rpc_mock.execute.side_effect = Exception("P0001: quota exhausted")
     mock_supabase.rpc.return_value = rpc_mock
-
-    # It doesn't use our mocked decorator because the decorator is applied at import time
-    # But wait, we define `_call_rpc` inside `create_agent_draft` at runtime!
-    # So `mock_retry` WILL work because it evaluates `retry_with_backoff` during request!
-    # Let's verify `bypass_retry` matches the signature
 
     response = client.post("/api/v1/agent/draft", json={"prompt": "YOLO on TSLA"})
     assert response.status_code == 402
