@@ -29,6 +29,8 @@ python-multipart = "^0.0.12"
 supabase = "^2.10.0"
 pyjwt = {version = "^2.9.0", extras = ["crypto"]}
 psutil = "^7.2.2"
+litellm = "^1.83.7"
+langchain = "^1.2.15"
 
 [build-system]
 requires = ["poetry-core"]
