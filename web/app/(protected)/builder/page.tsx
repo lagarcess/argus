@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { showErrorToast } from "@/components/ErrorToast";
 import { cn } from "@/lib/utils";
 import { checkProfanity } from "glin-profanity";
-import { Controller, Control } from "react-hook-form";
+import { Controller, Control, Path } from "react-hook-form";
 
 // New Sentinel Shell Components
 import { CriteriaBuilder } from "@/components/builder/CriteriaBuilder";
@@ -50,9 +50,11 @@ type StrategyCreate = {
   execution_priority: number;
   va_sensitivity: number;
   slippage_model: "fixed" | "vol_adjusted";
+  stop_loss_pct?: number;
+  take_profit_pct?: number;
 };
 
-function CurrencyInput({ control, name, label, error }: { control: Control<StrategyCreate>; name: string; label: string; error?: { message?: string } }) {
+function CurrencyInput({ control, name, label, error }: { control: Control<StrategyCreate>; name: Path<StrategyCreate>; label: string; error?: { message?: string } }) {
   const MAX_CAPITAL = 100000000;
   const format = (val: number | string) => {
     if (val === undefined || val === null || val === "" || val === 0) return "";
@@ -79,7 +81,7 @@ function CurrencyInput({ control, name, label, error }: { control: Control<Strat
           max: { value: MAX_CAPITAL, message: "Max $100M" }
         }}
         render={({ field: { onChange, value } }) => {
-          const displayValue = format(value);
+          const displayValue = format(value as any);
           return (
             <input
               type="text"
@@ -300,6 +302,8 @@ export default function BuilderPage() {
       execution_priority: data.execution_priority,
       va_sensitivity: data.va_sensitivity,
       slippage_model: data.slippage_model,
+      stop_loss_pct: data.stop_loss_pct,
+      take_profit_pct: data.take_profit_pct,
     };
 
     await mutateAsync({ body: apiPayload as Parameters<typeof mutateAsync>[0]['body'] });

@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponses, GetAssetsData, GetAssetsResponses, GetAuthSessionData, GetAuthSessionResponses, GetHealthData, GetHealthResponses, GetHistoryData, GetHistoryResponses, GetMarketBarsData, GetMarketBarsResponses, GetScreenersData, GetScreenersResponses, GetStrategiesData, GetStrategiesResponses, PatchAuthProfileData, PatchAuthProfileResponses, PostAgentDraftData, PostAgentDraftResponses, PostBacktestsData, PostBacktestsErrors, PostBacktestsResponses, PostBillingCheckoutData, PostBillingCheckoutResponses, PostFeedbackData, PostFeedbackResponses, PostMocksBacktestData, PostMocksBacktestResponses, PostShareData, PostShareResponses, PostStrategiesData, PostStrategiesResponses, PostWebhookBillingData, PostWebhookBillingResponses, PutStrategiesByIdData, PutStrategiesByIdResponses } from './types.gen';
+import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponses, GetAssetsData, GetAssetsResponses, GetAuthSessionData, GetAuthSessionResponses, GetBacktestsByIdData, GetBacktestsByIdErrors, GetBacktestsByIdResponses, GetHealthData, GetHealthResponses, GetHistoryData, GetHistoryResponses, GetMarketBarsData, GetMarketBarsResponses, GetScreenersData, GetScreenersResponses, GetStrategiesData, GetStrategiesResponses, PatchAuthProfileData, PatchAuthProfileResponses, PostAgentDraftData, PostAgentDraftResponses, PostBacktestsData, PostBacktestsErrors, PostBacktestsResponses, PostBillingCheckoutData, PostBillingCheckoutResponses, PostFeedbackData, PostFeedbackResponses, PostMocksBacktestData, PostMocksBacktestResponses, PostShareData, PostShareResponses, PostStrategiesData, PostStrategiesResponses, PostWebhookBillingData, PostWebhookBillingResponses, PutStrategiesByIdData, PutStrategiesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -136,6 +136,19 @@ export const postBacktests = <ThrowOnError extends boolean = false>(options: Opt
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Get detailed backtest results
+ */
+export const getBacktestsById = <ThrowOnError extends boolean = false>(options: Options<GetBacktestsByIdData, ThrowOnError>) => (options.client ?? client).get<GetBacktestsByIdResponses, GetBacktestsByIdErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sb-access-token',
+            type: 'apiKey'
+        }],
+    url: '/backtests/{id}',
+    ...options
 });
 
 /**

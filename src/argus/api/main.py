@@ -351,7 +351,7 @@ def run_backtest(
                 start_date=strat_record.get("start_date"),
                 end_date=strat_record.get("end_date"),
                 entry_criteria=strat_record.get("entry_criteria", []),
-                exit_criteria=strat_record.get("exit_criteria", {}),
+                exit_criteria=strat_record.get("exit_criteria", []),
                 indicators_config=strat_record.get("indicators_config", {}),
                 patterns=strat_record.get("patterns", []),
                 slippage=request.slippage,
@@ -374,10 +374,16 @@ def run_backtest(
                 timeframe=request.timeframe or "",
                 start_date=request.start_date,
                 end_date=request.end_date,
-                entry_criteria=request.entry_criteria or [],
-                exit_criteria=request.exit_criteria or {},
-                indicators_config=request.indicators_config or {},
-                patterns=request.patterns or [],
+                entry_criteria=request.entry_criteria
+                if request.entry_criteria is not None
+                else [],
+                exit_criteria=request.exit_criteria
+                if request.exit_criteria is not None
+                else [],
+                indicators_config=request.indicators_config
+                if request.indicators_config is not None
+                else {},
+                patterns=request.patterns if request.patterns is not None else [],
                 slippage=request.slippage,
                 fees=request.fees,
                 participation_rate=request.participation_rate,
@@ -424,8 +430,8 @@ def run_backtest(
 
             # 3. Execution Forge (Tier Sanitization)
             if tier == "free":
-                config.participation_rate = 1.0 # Infinite liquidity
-                config.execution_priority = 1.0 # Full spread cross
+                config.participation_rate = 1.0  # Infinite liquidity
+                config.execution_priority = 1.0  # Full spread cross
                 config.slippage_model = "fixed"
             # ------------------------------------------------
 

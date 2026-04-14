@@ -4,37 +4,19 @@ import { ArrowLeft, TrendingUp, TrendingDown, Percent, DollarSign, Activity, Shi
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { EquityChart } from "@/components/EquityChart";
+import { useQuery } from "@tanstack/react-query";
+import { useParams } from "next/navigation";
+import { getBacktestsByIdOptions } from "@/lib/api/@tanstack/react-query.gen";
 
 export default function BacktestResultsPage() {
-  const { data: backtest, isLoading } = {
-    data: {
-      id: "demo-backtest",
-      config_snapshot: {
-        symbol: "AAPL",
-        benchmark_symbol: "SPY",
-        capital: 100000,
-        timeframe: "1D",
-        participation_rate: 0.1,
-        va_sensitivity: 1.0,
-      },
-      results: {
-        total_return_pct: 24.5,
-        win_rate: 62.1,
-        max_drawdown_pct: 8.4,
-        sharpe_ratio: 1.85,
-        fidelity_score: 94,
-        reality_gap_metrics: {
-          slippage_drag_bps: 42.1,
-          fee_impact_pct: 0.85,
-          volatility_penalty_pct: 1.2
-        },
-        equity_curve: Array.from({ length: 100 }, (_, i) => 100000 * (1 + (i * 0.002) + (Math.random() * 0.01))),
-        benchmark_equity_curve: Array.from({ length: 100 }, (_, i) => 100000 * (1 + (i * 0.001) + (Math.random() * 0.005))),
-        trades: Array.from({ length: 45 })
-      }
-    },
-    isLoading: false
-  };
+  const params = useParams();
+  const id = params.id as string;
+
+  const { data: backtest, isLoading } = useQuery(
+    getBacktestsByIdOptions({
+      path: { id }
+    })
+  );
 
   if (isLoading) {
     return (
@@ -49,12 +31,12 @@ export default function BacktestResultsPage() {
 
   const stats = backtest.results;
   const config = backtest.config_snapshot;
-  const capital = config?.capital || 100000;
+  const capital = (config as any)?.capital || 100000;
 
   const metrics = [
     { label: "Net Return", value: `${stats.total_return_pct.toFixed(2)}%`, icon: Percent, color: "text-emerald-400" },
     { label: "Absolute Profit", value: `$${((stats.total_return_pct / 100) * capital).toLocaleString()}`, icon: DollarSign, color: "text-slate-100" },
-    { label: "Fidelity Score", value: `${stats.fidelity_score}%`, icon: ShieldCheck, color: "text-cyan-400" },
+    { label: "Fidelity Score", value: `${Math.round(stats.reality_gap_metrics.fidelity_score * 100)}%`, icon: ShieldCheck, color: "text-cyan-400" },
     { label: "Win Rate", value: `${stats.win_rate.toFixed(1)}%`, icon: TrendingUp, color: "text-slate-100" },
     { label: "Max Drawdown", value: `${stats.max_drawdown_pct.toFixed(2)}%`, icon: TrendingDown, color: "text-red-400" },
     { label: "Sharpe Ratio", value: stats.sharpe_ratio.toFixed(2), icon: Activity, color: "text-purple-400" },

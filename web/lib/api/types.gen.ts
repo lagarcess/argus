@@ -37,9 +37,11 @@ export type StrategySchema = {
     entry_criteria?: Array<{
         [key: string]: unknown;
     }>;
-    exit_criteria?: {
+    exit_criteria?: Array<{
         [key: string]: unknown;
-    };
+    }>;
+    stop_loss_pct?: number;
+    take_profit_pct?: number;
     ai_explanation?: string;
 };
 
@@ -49,11 +51,38 @@ export type BacktestRequest = {
     timeframe?: string;
     slippage?: number;
     fees?: number;
+    side?: 'long' | 'short';
+    participation_rate?: number;
+    execution_priority?: number;
+    va_sensitivity?: number;
+    slippage_model?: 'fixed' | 'vol_adjusted';
     entry_criteria?: Array<{
         [key: string]: unknown;
     }>;
-    exit_criteria?: {
+    exit_criteria?: Array<{
         [key: string]: unknown;
+    }>;
+    stop_loss_pct?: number;
+    take_profit_pct?: number;
+};
+
+export type BacktestResults = {
+    total_return_pct?: number;
+    win_rate?: number;
+    sharpe_ratio?: number;
+    sortino_ratio?: number;
+    calmar_ratio?: number;
+    profit_factor?: number;
+    expectancy?: number;
+    max_drawdown_pct?: number;
+    equity_curve?: Array<number>;
+    ideal_equity_curve?: Array<number>;
+    benchmark_equity_curve?: Array<number>;
+    benchmark_symbol?: string;
+    trades?: Array<TradeSnippet>;
+    reality_gap_metrics?: RealityGapMetrics;
+    pattern_breakdown?: {
+        [key: string]: number;
     };
 };
 
@@ -62,19 +91,36 @@ export type BacktestResponse = {
     config_snapshot: {
         [key: string]: unknown;
     };
-    summary: {
-        total_return_pct?: number;
-        win_rate?: number;
-        sharpe_ratio?: number;
-        max_drawdown_pct?: number;
-    };
-    reality_gap_metrics: {
-        slippage_impact_pct?: number;
-        fee_impact_pct?: number;
-    };
-    full_result: {
-        [key: string]: unknown;
-    };
+    results: BacktestResults;
+};
+
+export type RealityGapMetrics = {
+    slippage_impact_pct?: number;
+    fee_impact_pct?: number;
+    vol_hazard_pct?: number;
+    fidelity_score?: number;
+};
+
+export type TradeSnippet = {
+    entry_time?: string;
+    entry_price?: number;
+    exit_price?: number;
+    pnl_pct?: number;
+};
+
+export type SimulationLogEntry = {
+    id?: string;
+    strategy_name?: string;
+    symbols?: Array<string>;
+    timeframe?: string;
+    status?: 'pending' | 'completed' | 'failed' | 'processing';
+    total_return_pct?: number;
+    sharpe_ratio?: number;
+    max_drawdown_pct?: number;
+    win_rate?: number;
+    total_trades?: number;
+    created_at?: string;
+    completed_at?: string;
 };
 
 export type ShareResponse = {
@@ -203,7 +249,8 @@ export type GetHistoryResponses = {
      * Paginated run history
      */
     200: {
-        data?: Array<BacktestResponse>;
+        simulations?: Array<SimulationLogEntry>;
+        total?: number;
         next_cursor?: string;
     };
 };
@@ -234,6 +281,31 @@ export type PostBacktestsResponses = {
 };
 
 export type PostBacktestsResponse = PostBacktestsResponses[keyof PostBacktestsResponses];
+
+export type GetBacktestsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/backtests/{id}';
+};
+
+export type GetBacktestsByIdErrors = {
+    /**
+     * Backtest not found
+     */
+    404: unknown;
+};
+
+export type GetBacktestsByIdResponses = {
+    /**
+     * Detailed backtest results
+     */
+    200: BacktestResponse;
+};
+
+export type GetBacktestsByIdResponse = GetBacktestsByIdResponses[keyof GetBacktestsByIdResponses];
 
 export type PostAgentDraftData = {
     body: {
@@ -275,7 +347,7 @@ export type GetMarketBarsData = {
     body?: never;
     path?: never;
     query: {
-        symbols: Array<string>;
+        symbol: string;
         from: number;
         to: number;
         resolution: string;

@@ -85,7 +85,13 @@ components:
           items:
             type: object
         exit_criteria:
-          type: object
+          type: array
+          items:
+            type: object
+        stop_loss_pct:
+          type: number
+        take_profit_pct:
+          type: number
         ai_explanation:
           type: string
       required: [name, symbols, timeframe]
@@ -106,12 +112,79 @@ components:
           type: number
         fees:
           type: number
+        side:
+          type: string
+          enum: [long, short]
+          default: long
+        participation_rate:
+          type: number
+          default: 0.1
+        execution_priority:
+          type: number
+          default: 1.0
+        va_sensitivity:
+          type: number
+          default: 1.0
+        slippage_model:
+          type: string
+          enum: [fixed, vol_adjusted]
+          default: vol_adjusted
         entry_criteria:
           type: array
           items:
             type: object
         exit_criteria:
+          type: array
+          items:
+            type: object
+        stop_loss_pct:
+          type: number
+        take_profit_pct:
+          type: number
+
+    BacktestResults:
+      type: object
+      properties:
+        total_return_pct:
+          type: number
+        win_rate:
+          type: number
+        sharpe_ratio:
+          type: number
+        sortino_ratio:
+          type: number
+        calmar_ratio:
+          type: number
+        profit_factor:
+          type: number
+        expectancy:
+          type: number
+        max_drawdown_pct:
+          type: number
+        equity_curve:
+          type: array
+          items:
+            type: number
+        ideal_equity_curve:
+          type: array
+          items:
+            type: number
+        benchmark_equity_curve:
+          type: array
+          items:
+            type: number
+        benchmark_symbol:
+          type: string
+        trades:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeSnippet'
+        reality_gap_metrics:
+          $ref: '#/components/schemas/RealityGapMetrics'
+        pattern_breakdown:
           type: object
+          additionalProperties:
+            type: integer
 
     BacktestResponse:
       type: object
@@ -121,27 +194,67 @@ components:
           format: uuid
         config_snapshot:
           type: object
-        summary:
-          type: object
-          properties:
-            total_return_pct:
-              type: number
-            win_rate:
-              type: number
-            sharpe_ratio:
-              type: number
-            max_drawdown_pct:
-              type: number
-        reality_gap_metrics:
-          type: object
-          properties:
-            slippage_impact_pct:
-              type: number
-            fee_impact_pct:
-              type: number
-        full_result:
-          type: object
-      required: [id, config_snapshot, summary, reality_gap_metrics, full_result]
+        results:
+          $ref: '#/components/schemas/BacktestResults'
+      required: [id, config_snapshot, results]
+
+    RealityGapMetrics:
+      type: object
+      properties:
+        slippage_impact_pct:
+          type: number
+        fee_impact_pct:
+          type: number
+        vol_hazard_pct:
+          type: number
+        fidelity_score:
+          type: number
+
+    TradeSnippet:
+      type: object
+      properties:
+        entry_time:
+          type: string
+        entry_price:
+          type: number
+        exit_price:
+          type: number
+        pnl_pct:
+          type: number
+
+    SimulationLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        strategy_name:
+          type: string
+        symbols:
+          type: array
+          items:
+            type: string
+        timeframe:
+          type: string
+        status:
+          type: string
+          enum: [pending, completed, failed, processing]
+        total_return_pct:
+          type: number
+        sharpe_ratio:
+          type: number
+        max_drawdown_pct:
+          type: number
+        win_rate:
+          type: number
+        total_trades:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
 
     ShareResponse:
       type: object
@@ -289,10 +402,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  data:
+                  simulations:
                     type: array
                     items:
-                      $ref: '#/components/schemas/BacktestResponse'
+                      $ref: '#/components/schemas/SimulationLogEntry'
+                  total:
+                    type: integer
                   next_cursor:
                     type: string
 
@@ -320,6 +435,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /backtests/{id}:
+    get:
+      summary: Get detailed backtest results
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detailed backtest results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestResponse'
+        '404':
+          description: Backtest not found
 
   /agent/draft:
     post:

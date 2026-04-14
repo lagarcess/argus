@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { deleteStrategiesById, getAssets, getAuthSession, getHealth, getHistory, getMarketBars, getScreeners, getStrategies, type Options, patchAuthProfile, postAgentDraft, postBacktests, postBillingCheckout, postFeedback, postMocksBacktest, postShare, postStrategies, postWebhookBilling, putStrategiesById } from '../sdk.gen';
-import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetMarketBarsData, GetMarketBarsResponse, GetScreenersData, GetStrategiesData, GetStrategiesResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostBillingCheckoutData, PostFeedbackData, PostMocksBacktestData, PostMocksBacktestResponse, PostShareData, PostShareResponse, PostStrategiesData, PostStrategiesResponse, PostWebhookBillingData, PutStrategiesByIdData } from '../types.gen';
+import { deleteStrategiesById, getAssets, getAuthSession, getBacktestsById, getHealth, getHistory, getMarketBars, getScreeners, getStrategies, type Options, patchAuthProfile, postAgentDraft, postBacktests, postBillingCheckout, postFeedback, postMocksBacktest, postShare, postStrategies, postWebhookBilling, putStrategiesById } from '../sdk.gen';
+import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetBacktestsByIdData, GetBacktestsByIdResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetMarketBarsData, GetMarketBarsResponse, GetScreenersData, GetStrategiesData, GetStrategiesResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostBillingCheckoutData, PostFeedbackData, PostMocksBacktestData, PostMocksBacktestResponse, PostShareData, PostShareResponse, PostStrategiesData, PostStrategiesResponse, PostWebhookBillingData, PutStrategiesByIdData } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -260,6 +260,24 @@ export const postBacktestsMutation = (options?: Partial<Options<PostBacktestsDat
     };
     return mutationOptions;
 };
+
+export const getBacktestsByIdQueryKey = (options: Options<GetBacktestsByIdData>) => createQueryKey('getBacktestsById', options);
+
+/**
+ * Get detailed backtest results
+ */
+export const getBacktestsByIdOptions = (options: Options<GetBacktestsByIdData>) => queryOptions<GetBacktestsByIdResponse, DefaultError, GetBacktestsByIdResponse, ReturnType<typeof getBacktestsByIdQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBacktestsById({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBacktestsByIdQueryKey(options)
+});
 
 /**
  * Draft a strategy using AI Natural Language input

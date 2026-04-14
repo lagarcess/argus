@@ -11,6 +11,7 @@
 ## 1. Overview & Scope
 - **Purpose**: Argus is a mobile-first PWA for high-fidelity retail trading backtesting. It closes the "Reality Gap" by providing high-performance simulations that account for slippage, fees, multi-symbol iteration, and Walk-Forward Analysis (WFA).
 - **In Scope (MVP North Star)**: Historical backtesting (Equities, Crypto, Options, Forex), Agentic Strategy Drafting (NL2D), Agentic Journaling (Memos API), Social Sharing (OpenGraph), Discovery Screeners, Portfolio-Level Testing, Monetization (Lemon Squeezy), and early TradingView Charting Datafeeds.
+- **Architectural Philosophy: Signal-First Execution**: Unlike generic retail tools, Argus prioritizes **Pure Signal Fidelity**. Risk parameters (Stop Loss/Take Profit) are currently reserved in the schema (`null` by default) to encourage traders to build high-fidelity exit signals (e.g., indicator-based stops) before relying on fixed-percentage risk logic.
 - **Out of Scope (V1.x Future Bets)**: Real-time competitive battles (Training Ground), Broker configuration exports (MT5, TradeStation).
 
 ---
@@ -145,7 +146,9 @@ Simple, relevant definitions to clarify the user experience at each mastery leve
     "va_sensitivity": 1.0,       // [PRO] Volatility sensitivity scaling
     "slippage_model": "vol_adjusted", // [PRO] "fixed" | "vol_adjusted"
     "entry_criteria": [{"indicator": "RSI", "operator": "<", "value": 30}],
-    "exit_criteria": {"take_profit_pct": 5.0}
+    "exit_criteria": [{"indicator": "EMA", "operator": "cross_below", "indicator_b": "Price"}],
+    "stop_loss_pct": null,    // [FUTURE] Reserved for fixed percentage-based risk
+    "take_profit_pct": null   // [FUTURE] Reserved for fixed percentage-based risk
   }
   ```
   **Response Schema** (`BacktestResponse`):

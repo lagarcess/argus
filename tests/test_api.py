@@ -482,7 +482,7 @@ def test_backtest(monkeypatch, mock_user):
         "entry_criteria": [
             {"indicator": "rsi", "period": 14, "condition": "is_below", "target": 30}
         ],
-        "exit_criteria": {"stop_loss_pct": 0.02, "take_profit_pct": 0.05},
+        "exit_criteria": [],
         "indicators_config": {"rsi": {"period": 14}},
         "slippage": 0.001,
         "fees": 0.001,

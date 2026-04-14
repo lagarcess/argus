@@ -108,7 +108,17 @@ def test_pro_tier_bypass(mock_user_pro, monkeypatch, make_engine_results):
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_strategy",
         MagicMock(
-            return_value={"id": "123", "name": "X", "symbols": ["BTC"], "timeframe": "1h"}
+            return_value={
+                "id": "123",
+                "name": "X",
+                "symbols": ["BTC"],
+                "timeframe": "1h",
+                "entry_criteria": [],
+                "exit_criteria": [],
+                "indicators_config": {},
+                "fees": 0.001,
+                "slippage": 0.001,
+            }
         ),
     )
     monkeypatch.setattr(
@@ -169,7 +179,17 @@ def test_admin_bypass(mock_user_admin, monkeypatch, make_engine_results):
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_strategy",
         MagicMock(
-            return_value={"id": "123", "name": "X", "symbols": ["BTC"], "timeframe": "1h"}
+            return_value={
+                "id": "123",
+                "name": "X",
+                "symbols": ["BTC"],
+                "timeframe": "1h",
+                "entry_criteria": [],
+                "exit_criteria": [],
+                "indicators_config": {},
+                "fees": 0.001,
+                "slippage": 0.001,
+            }
         ),
     )
     monkeypatch.setattr("argus.api.main.persistence_service.save_simulation", MagicMock())
@@ -259,6 +279,8 @@ def test_tier_gating_symbol_count_violation(monkeypatch, make_engine_results):
         "strategy_id": None,
         "name": "E2E Strategy",
         "entry_criteria": [],
+        "exit_criteria": [],
+        "indicators_config": {},
     }
 
     response = client.post("/api/v1/backtests", json=payload)
@@ -310,6 +332,8 @@ def test_tier_gating_daily_lookback_violation(monkeypatch, make_engine_results):
         "strategy_id": None,
         "name": "E2E Strategy",
         "entry_criteria": [],
+        "exit_criteria": [],
+        "indicators_config": {},
     }
 
     response = client.post("/api/v1/backtests", json=payload)
@@ -361,6 +385,8 @@ def test_tier_gating_intraday_lookback_violation(monkeypatch, make_engine_result
         "strategy_id": None,
         "name": "E2E Strategy",
         "entry_criteria": [],
+        "exit_criteria": [],
+        "indicators_config": {},
     }
 
     response = client.post("/api/v1/backtests", json=payload)

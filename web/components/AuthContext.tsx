@@ -22,15 +22,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 1. Initial session check
     const initAuth = async () => {
       const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-      
+
       if (isMock) {
         console.log("🛡️ Mock Auth Active: Bypassing Supabase");
         setUser({
           id: "mock-dev-id",
           email: "sentinel@argus.ai",
           user_metadata: { full_name: "Sentinel Developer" },
+          app_metadata: { provider: "email" },
           aud: "authenticated",
           role: "authenticated",
+          created_at: new Date().toISOString(),
         } as User);
         setToken("mock-access-token");
         setLoading(false);
@@ -50,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 2. Listen for auth changes (SSO, Logout, Session refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (process.env.NEXT_PUBLIC_MOCK_AUTH === "true") return;
-      
+
       if (session) {
         setUser(session.user);
         setToken(session.access_token);
