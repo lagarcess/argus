@@ -6,8 +6,7 @@ import { cn } from "@/lib/utils";
 import { EquityChart } from "@/components/EquityChart";
 
 export default function BacktestResultsPage() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: backtest, isLoading } = { 
+  const { data: backtest, isLoading } = {
     data: {
       id: "demo-backtest",
       config_snapshot: {
@@ -33,8 +32,8 @@ export default function BacktestResultsPage() {
         benchmark_equity_curve: Array.from({ length: 100 }, (_, i) => 100000 * (1 + (i * 0.001) + (Math.random() * 0.005))),
         trades: Array.from({ length: 45 })
       }
-    } as any, 
-    isLoading: false 
+    },
+    isLoading: false
   };
 
   if (isLoading) {
@@ -51,7 +50,7 @@ export default function BacktestResultsPage() {
   const stats = backtest.results;
   const config = backtest.config_snapshot;
   const capital = config?.capital || 100000;
-  
+
   const metrics = [
     { label: "Net Return", value: `${stats.total_return_pct.toFixed(2)}%`, icon: Percent, color: "text-emerald-400" },
     { label: "Absolute Profit", value: `$${((stats.total_return_pct / 100) * capital).toLocaleString()}`, icon: DollarSign, color: "text-slate-100" },
@@ -66,7 +65,7 @@ export default function BacktestResultsPage() {
       label: "Execution Forge (Realistic)",
       data: stats.equity_curve.map((v: number, i: number) => ({
         time: new Date(Date.now() - (100 - i) * 86400000).toISOString(),
-        value: typeof v === 'object' ? (v as any).equity || (v as any).value : v
+        value: typeof v === 'object' ? (v as { equity?: number; value?: number }).equity || (v as { equity?: number; value?: number }).value || 0 : v
       })),
       color: "#00f0ff",
       type: "area" as const
@@ -75,7 +74,7 @@ export default function BacktestResultsPage() {
       label: `Benchmark (${config.benchmark_symbol || "SPY"})`,
       data: (stats.benchmark_equity_curve || []).map((v: number, i: number) => ({
         time: new Date(Date.now() - (100 - i) * 86400000).toISOString(),
-        value: typeof v === 'object' ? (v as any).equity || (v as any).value : v
+        value: typeof v === 'object' ? (v as { equity?: number; value?: number }).equity || (v as { equity?: number; value?: number }).value || 0 : v
       })),
       color: "#94a3b8",
       type: "line" as const,
@@ -92,7 +91,7 @@ export default function BacktestResultsPage() {
       {/* Fidelity Audit Header */}
       <div className="flex flex-col md:flex-row items-end justify-between gap-6 bg-slate-950/40 p-8 rounded-3xl border border-slate-800/50 relative overflow-hidden">
          <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
-         
+
          <div className="relative z-10">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-[0.3em]">Simulation Audit</span>
@@ -157,7 +156,7 @@ export default function BacktestResultsPage() {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Dual-Pass Sim</span>
               </div>
            </div>
-           
+
            <div className="h-[350px]">
              <EquityChart series={chartSeries} />
            </div>

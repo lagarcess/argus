@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Trash2, Search, Zap } from 'lucide-react';
+import { Trash2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export interface CriteriaItemData {
   indicator_a: string;
@@ -21,18 +21,16 @@ const OPERATORS = [
 ];
 
 interface CriteriaItemProps {
-  idx: number;
   item: CriteriaItemData;
   type: 'entry' | 'exit';
   canRemove: boolean;
   onRemove: () => void;
-  onChange: (field: keyof CriteriaItemData, value: any) => void;
+  onChange: (field: keyof CriteriaItemData, value: string | number | undefined) => void;
   onFocus: (field: 'indicator_a' | 'indicator_b') => void;
   onOpenSelector: (field: 'indicator_a' | 'indicator_b') => void;
 }
 
 export const CriteriaItem: React.FC<CriteriaItemProps> = ({
-  idx,
   item,
   type,
   canRemove,
@@ -50,7 +48,7 @@ export const CriteriaItem: React.FC<CriteriaItemProps> = ({
     const param = !isGhost ? value.split('_')[1] : '';
 
     return (
-      <div 
+      <div
         className={cn(
           "flex items-center h-8 rounded-full bg-slate-900 border border-slate-800 transition-all overflow-hidden shrink-0 group/slot cursor-pointer relative",
           isGhost ? "border-dashed opacity-80 hover:opacity-100" : "border-solid",
@@ -71,7 +69,7 @@ export const CriteriaItem: React.FC<CriteriaItemProps> = ({
           {isGhost && <Search size={10} className="text-slate-600" />}
           {displayValue}
         </button>
-        
+
         {!isGhost && (
           <div className="flex items-center px-2 gap-1 h-full bg-slate-950/40 border-l border-slate-800" onClick={(e) => e.stopPropagation()}>
             <input
@@ -88,7 +86,7 @@ export const CriteriaItem: React.FC<CriteriaItemProps> = ({
         )}
 
         {isGhost && (
-          <motion.div 
+          <motion.div
             animate={{ opacity: [0.4, 0.8, 0.4] }}
             transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
             className={cn(
@@ -102,7 +100,7 @@ export const CriteriaItem: React.FC<CriteriaItemProps> = ({
   };
 
   return (
-    <motion.div 
+    <motion.div
       layout
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
@@ -113,7 +111,7 @@ export const CriteriaItem: React.FC<CriteriaItemProps> = ({
         themeGlow,
         type === 'entry' ? "hover:border-blue-500/20" : "hover:border-rose-500/20"
       )}>
-        
+
         {/* Indicator A */}
         {renderSlot('indicator_a', item.indicator_a)}
 
@@ -177,8 +175,8 @@ export const CriteriaItem: React.FC<CriteriaItemProps> = ({
         disabled={!canRemove}
         className={cn(
           "w-8 h-8 flex items-center justify-center rounded-full transition-all shrink-0",
-          !canRemove 
-            ? "text-slate-800 opacity-10 cursor-not-allowed" 
+          !canRemove
+            ? "text-slate-800 opacity-10 cursor-not-allowed"
             : "text-slate-600 hover:text-red-400 hover:bg-red-400/5 opacity-0 group-hover:opacity-100"
         )}
       >

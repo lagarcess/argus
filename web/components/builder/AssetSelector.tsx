@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Globe, Coins, LineChart, Plus } from 'lucide-react';
 import { ASSET_REGISTRY, AssetRegistryItem } from '@/lib/assets';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface AssetSelectorProps {
   onSelect: (symbol: string) => void;
@@ -32,7 +32,7 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
   const categories: ('All' | AssetRegistryItem['category'])[] = ['All', 'EQUITY', 'CRYPTO', 'ETF'];
 
   const filtered = ASSET_REGISTRY.filter(asset => {
-    const matchesSearch = asset.symbol.toLowerCase().includes(search.toLowerCase()) || 
+    const matchesSearch = asset.symbol.toLowerCase().includes(search.toLowerCase()) ||
                           asset.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = activeCategory === 'All' || asset.category === activeCategory;
     return matchesSearch && matchesCategory;
@@ -51,7 +51,7 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -68,7 +68,7 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
               <p className="text-xs text-slate-400">Select Institutional Equities or Crypto Pairs</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-slate-300 transition-colors"
           >
@@ -99,8 +99,8 @@ export const AssetSelector: React.FC<AssetSelectorProps> = ({
               onClick={() => setActiveCategory(cat)}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all flex items-center gap-2 whitespace-nowrap",
-                activeCategory === cat 
-                  ? "bg-slate-100 border-slate-100 text-slate-900" 
+                activeCategory === cat
+                  ? "bg-slate-100 border-slate-100 text-slate-900"
                   : "bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300"
               )}
             >

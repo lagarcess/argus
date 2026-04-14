@@ -11,7 +11,7 @@ interface CriteriaBuilderProps {
   type: 'entry' | 'exit';
   onAdd: () => void;
   onRemove: (idx: number) => void;
-  onChange: (idx: number, field: keyof CriteriaItemData, value: any) => void;
+  onChange: (idx: number, field: keyof CriteriaItemData, value: string | number | undefined) => void;
   onFocus: (idx: number, field: 'indicator_a' | 'indicator_b') => void;
   onOpenSelector: (idx: number, field: 'indicator_a' | 'indicator_b') => void;
 }
@@ -59,7 +59,6 @@ export const CriteriaBuilder: React.FC<CriteriaBuilderProps> = ({
         {items.map((item, idx) => (
           <CriteriaItem
             key={`${idx}-${item.indicator_a}-${item.indicator_b}`}
-            idx={idx}
             item={item}
             type={type}
             canRemove={items.length > 1}

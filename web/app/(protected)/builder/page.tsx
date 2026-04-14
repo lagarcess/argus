@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { showErrorToast } from "@/components/ErrorToast";
 import { cn } from "@/lib/utils";
 import { checkProfanity } from "glin-profanity";
-import { Controller } from "react-hook-form";
+import { Controller, Control } from "react-hook-form";
 
 // New Sentinel Shell Components
 import { CriteriaBuilder } from "@/components/builder/CriteriaBuilder";
@@ -52,7 +52,7 @@ type StrategyCreate = {
   slippage_model: "fixed" | "vol_adjusted";
 };
 
-function CurrencyInput({ control, name, label, error }: { control: any; name: string; label: string; error?: { message?: string } }) {
+function CurrencyInput({ control, name, label, error }: { control: Control<StrategyCreate>; name: string; label: string; error?: { message?: string } }) {
   const MAX_CAPITAL = 100000000;
   const format = (val: number | string) => {
     if (val === undefined || val === null || val === "" || val === 0) return "";
@@ -117,10 +117,10 @@ const parseYMD = (s: string) => {
 };
 
 const formatDisplayDate = (s: string) => {
-  return parseYMD(s).toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: '2-digit', 
-    year: 'numeric' 
+  return parseYMD(s).toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric'
   });
 };
 
@@ -146,7 +146,7 @@ export default function BuilderPage() {
   const { data: sessionData } = useQuery(getAuthSessionOptions());
   const tier = sessionData?.subscription_tier || 'free';
   const today = new Date();
-  
+
   const form = useForm<StrategyCreate>({
     defaultValues: {
       name: "",
@@ -177,12 +177,12 @@ export default function BuilderPage() {
   const getMinDate = () => {
     // If we're still loading the session, allow full access to avoid flickering lockout
     if (!sessionData) return new Date(2016, 0, 1);
-    
+
     const isIntraday = timeframe !== "1D";
     if (tier === 'max') return new Date(2016, 0, 1);
     if (tier === 'pro') return new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
     if (tier === 'plus') return new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
-    
+
     // Free / Basic
     if (isIntraday) return new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
     return new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
@@ -207,7 +207,7 @@ export default function BuilderPage() {
     const path = type === 'entry' ? 'entry_criteria' : 'exit_criteria';
     const currentRules = [...form.getValues(path)];
     const rule = { ...currentRules[index] };
-    
+
     // Check Institutional Physics (physics guard)
     const entryRules = form.getValues("entry_criteria");
     const exitRules = form.getValues("exit_criteria");
@@ -217,7 +217,7 @@ export default function BuilderPage() {
       ...exitRules.map(r => r.indicator_a.split('_')[0]),
       ...exitRules.map(r => r.indicator_b?.split('_')[0]).filter(Boolean),
     ];
-    
+
     // Is this a NEW indicator or just re-assigning?
     const currentIndicatorId = field === 'indicator_a' ? rule.indicator_a.split('_')[0] : rule.indicator_b?.split('_')[0];
     const isNew = !allUsed.includes(indicatorId) && indicatorId !== currentIndicatorId;
@@ -240,10 +240,10 @@ export default function BuilderPage() {
       rule.indicator_b = `${indicatorId}_${period}`;
       rule.value = undefined;
     }
-    
+
     currentRules[index] = rule;
     form.setValue(path, currentRules);
-    
+
     // Update Recent Slot logic
     if (!PINNED_INDICATORS.includes(indicatorId)) {
       setRecentIndicator(indicatorId);
@@ -268,7 +268,7 @@ export default function BuilderPage() {
 
     const allRules = [...data.entry_criteria, ...data.exit_criteria];
     const hasGhost = allRules.some(r => !r.indicator_a || r.indicator_a.trim() === "" || (r.indicator_b === ""));
-    
+
     if (hasGhost) {
       toast.error("Complete Your Rules", {
         description: "Some rules are missing indicators. Please select an indicator for all pulsing slots.",
@@ -302,7 +302,7 @@ export default function BuilderPage() {
       slippage_model: data.slippage_model,
     };
 
-    await mutateAsync({ body: apiPayload as any });
+    await mutateAsync({ body: apiPayload as Parameters<typeof mutateAsync>[0]['body'] });
   };
 
   const generateCalendarDays = () => {
@@ -310,7 +310,7 @@ export default function BuilderPage() {
     const month = calendarView.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
+
     const days = [];
     for (let i = 0; i < firstDay; i++) days.push(null);
     for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
@@ -359,7 +359,7 @@ export default function BuilderPage() {
                 Asset Symbol
                 {form.formState.errors.asset_symbol && <span className="text-red-400 text-[10px]">{form.formState.errors.asset_symbol.message}</span>}
               </label>
-              <div 
+              <div
                 onClick={() => setIsAssetSelectorOpen(true)}
                 className={cn(
                   "w-full bg-slate-950 border rounded-lg px-4 py-2 flex items-center justify-between cursor-pointer group transition-all",
@@ -381,7 +381,7 @@ export default function BuilderPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
               <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Timeframe</label>
-              <div 
+              <div
                 onClick={() => setIsTimeframeOpen(true)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 flex items-center justify-between cursor-pointer group hover:border-slate-700 transition-all"
               >
@@ -396,7 +396,7 @@ export default function BuilderPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Start Date</label>
-              <div 
+              <div
                 onClick={() => {
                   setDatePickerTarget('start');
                   setCalendarView(new Date(form.getValues('period_start')));
@@ -416,7 +416,7 @@ export default function BuilderPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase">End Date</label>
-              <div 
+              <div
                 onClick={() => {
                   setDatePickerTarget('end');
                   setCalendarView(new Date(form.getValues('period_end')));
@@ -477,10 +477,10 @@ export default function BuilderPage() {
                           key={ind}
                           className={cn(
                             "px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider transition-all duration-300 relative overflow-hidden group/pill",
-                            isActive 
+                            isActive
                               ? (usedInEntry && usedInExit)
                                 ? "border-indigo-500/50 bg-indigo-500/10 text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.2)]"
-                                : usedInEntry 
+                                : usedInEntry
                                   ? "border-blue-500/50 bg-blue-500/10 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.2)]"
                                   : "border-rose-500/50 bg-rose-500/10 text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.2)]"
                               : "border-slate-800 bg-slate-950 hover:border-slate-700 text-slate-500 hover:text-slate-300"
@@ -494,7 +494,7 @@ export default function BuilderPage() {
                         </button>
                       );
                     })}
-                    
+
                     <button
                       type="button"
                       onClick={() => setIsSelectorOpen(true)}
@@ -524,7 +524,7 @@ export default function BuilderPage() {
                     }}
                     onChange={(idx, field, value) => {
                       const current = [...form.getValues("entry_criteria")];
-                      (current[idx] as any)[field] = value;
+                      current[idx] = { ...current[idx], [field]: value };
                       form.setValue("entry_criteria", current);
                     }}
                   />
@@ -546,7 +546,7 @@ export default function BuilderPage() {
                     }}
                     onChange={(idx, field, value) => {
                       const current = [...form.getValues("exit_criteria")];
-                      (current[idx] as any)[field] = value;
+                      current[idx] = { ...current[idx], [field]: value };
                       form.setValue("exit_criteria", current);
                     }}
                   />
@@ -569,7 +569,7 @@ export default function BuilderPage() {
                 </span>
               )}
             </div>
-            <div 
+            <div
               className={`w-8 h-8 rounded-full flex items-center justify-center bg-slate-950 border border-slate-800 transition-transform cursor-pointer hover:border-slate-600 ${showRealityGap ? 'rotate-180' : ''}`}
               onClick={() => setShowRealityGap(!showRealityGap)}
             >
@@ -586,7 +586,7 @@ export default function BuilderPage() {
                 className="overflow-hidden space-y-8 relative"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 items-start">
-                  <div 
+                  <div
                     className="space-y-4 relative group"
                     onMouseEnter={() => setActiveTooltip("participation")}
                     onMouseLeave={() => setActiveTooltip(null)}
@@ -595,10 +595,10 @@ export default function BuilderPage() {
                       <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Participation (POV)</label>
                       <span className="text-cyan-400 font-mono text-sm">{(form.watch("participation_rate") * 100).toFixed(0)}%</span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0.01" 
-                      max="0.5" 
+                    <input
+                      type="range"
+                      min="0.01"
+                      max="0.5"
                       step="0.01"
                       disabled={tier === 'free'}
                       {...form.register("participation_rate", { valueAsNumber: true })}
@@ -631,7 +631,7 @@ export default function BuilderPage() {
                     </AnimatePresence>
                   </div>
 
-                  <div 
+                  <div
                     className="space-y-4 relative group"
                     onMouseEnter={() => setActiveTooltip("aggressiveness")}
                     onMouseLeave={() => setActiveTooltip(null)}
@@ -644,14 +644,14 @@ export default function BuilderPage() {
                         form.watch("execution_priority") > 0.3 ? "text-amber-400 border-amber-400/20 bg-amber-400/5" :
                         "text-emerald-400 border-emerald-400/20 bg-emerald-400/5"
                       )}>
-                         {form.watch("execution_priority") > 0.7 ? "Aggressive (Taker)" : 
+                         {form.watch("execution_priority") > 0.7 ? "Aggressive (Taker)" :
                           form.watch("execution_priority") > 0.3 ? "Balanced" : "Passive (Maker)"}
                       </span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="1" 
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
                       step="0.1"
                       disabled={tier === 'free'}
                       {...form.register("execution_priority", { valueAsNumber: true })}
@@ -696,7 +696,7 @@ export default function BuilderPage() {
                         onClick={() => form.setValue("slippage_model", "fixed")}
                         className={cn(
                           "px-4 py-3 rounded-xl border text-[10px] font-bold tracking-[0.2em] uppercase transition-all",
-                          form.watch("slippage_model") === "fixed" 
+                          form.watch("slippage_model") === "fixed"
                             ? "bg-slate-100 border-slate-100 text-slate-950 shadow-xl"
                             : "bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700",
                           tier === 'free' && "opacity-30 grayscale cursor-not-allowed"
@@ -710,7 +710,7 @@ export default function BuilderPage() {
                         onClick={() => form.setValue("slippage_model", "vol_adjusted")}
                         className={cn(
                           "px-4 py-3 rounded-xl border text-[10px] font-bold tracking-[0.2em] uppercase transition-all",
-                          form.watch("slippage_model") === "vol_adjusted" 
+                          form.watch("slippage_model") === "vol_adjusted"
                             ? "bg-cyan-500 border-cyan-500 text-white shadow-xl shadow-cyan-500/20"
                             : "bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700",
                           tier === 'free' && "opacity-30 grayscale cursor-not-allowed"
@@ -728,10 +728,10 @@ export default function BuilderPage() {
                         {form.watch("va_sensitivity")}x
                       </span>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0.5" 
-                      max="3" 
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="3"
                       step="0.1"
                       disabled={tier === 'free'}
                       {...form.register("va_sensitivity", { valueAsNumber: true })}
@@ -804,7 +804,7 @@ export default function BuilderPage() {
         </div>
       </form>
 
-      <IndicatorSelector 
+      <IndicatorSelector
         isOpen={isSelectorOpen}
         type={lastFocusedSlot.type}
         onClose={() => setIsSelectorOpen(false)}
@@ -826,7 +826,7 @@ export default function BuilderPage() {
       <AnimatePresence>
         {isDatePickerOpen && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -846,8 +846,8 @@ export default function BuilderPage() {
 
               <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center px-2">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setCalendarView(new Date(calendarView.getFullYear(), calendarView.getMonth() - 1, 1))}
                     className="p-1 hover:text-cyan-400 transition-colors"
                   >
@@ -856,7 +856,7 @@ export default function BuilderPage() {
                   <span className="text-xs font-bold text-slate-100 uppercase tracking-[0.2em]">
                     {calendarView.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </span>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setCalendarView(new Date(calendarView.getFullYear(), calendarView.getMonth() + 1, 1))}
                     className="p-1 hover:text-cyan-400 transition-colors"
@@ -871,11 +871,11 @@ export default function BuilderPage() {
                   ))}
                   {generateCalendarDays().map((date, idx) => {
                     if (!date) return <div key={`empty-${idx}`} />;
-                    
+
                     const dateStr = formatYMD(date);
                     const isSelected = form.watch(datePickerTarget === 'start' ? 'period_start' : 'period_end') === dateStr;
                     const isToday = formatYMD(today) === dateStr;
-                    
+
                     // Boundary enforcement
                     const isFuture = date > maxDate;
                     const isTooOld = date < minDate;
@@ -892,10 +892,10 @@ export default function BuilderPage() {
                         }}
                         className={cn(
                           "aspect-square flex items-center justify-center rounded-lg text-[10px] font-mono transition-all relative overflow-hidden",
-                          isSelected 
-                            ? "bg-cyan-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20" 
-                            : isToday 
-                              ? "text-cyan-400 border border-cyan-400/20" 
+                          isSelected
+                            ? "bg-cyan-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20"
+                            : isToday
+                              ? "text-cyan-400 border border-cyan-400/20"
                               : "text-slate-400 hover:bg-slate-800 hover:text-slate-100",
                           isDisabled && "opacity-20 cursor-not-allowed grayscale bg-slate-950/50"
                         )}
@@ -914,7 +914,7 @@ export default function BuilderPage() {
       <AnimatePresence>
         {isTimeframeOpen && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -942,7 +942,7 @@ export default function BuilderPage() {
                     key={tf.id}
                     type="button"
                     onClick={() => {
-                      form.setValue("timeframe", tf.id as any);
+                      form.setValue("timeframe", tf.id as StrategyCreate['timeframe']);
                       setIsTimeframeOpen(false);
                     }}
                     className={cn(

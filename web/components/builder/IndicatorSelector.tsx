@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Star, TrendingUp, Activity, BarChart3, Zap, Plus } from 'lucide-react';
 import { INDICATOR_REGISTRY, IndicatorMetadata } from '@/lib/indicators';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface IndicatorSelectorProps {
   type: 'entry' | 'exit';
@@ -34,7 +34,7 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
   const categories = ['All', 'Trend', 'Momentum', 'Volatility', 'Volume'];
 
   const filtered = INDICATOR_REGISTRY.filter(ind => {
-    const matchesSearch = ind.name.toLowerCase().includes(search.toLowerCase()) || 
+    const matchesSearch = ind.name.toLowerCase().includes(search.toLowerCase()) ||
                          ind.id.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = activeCategory === 'All' || ind.category === activeCategory;
     return matchesSearch && matchesCategory;
@@ -54,7 +54,7 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
@@ -74,7 +74,7 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
               <p className="text-xs text-slate-400">Search 100+ Institutional Signal Sources</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-slate-300 transition-colors"
           >
@@ -102,11 +102,11 @@ export const IndicatorSelector: React.FC<IndicatorSelectorProps> = ({
           {categories.map(cat => (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat as any)}
+              onClick={() => setActiveCategory(cat as IndicatorMetadata['category'] | 'All')}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-2 whitespace-nowrap",
-                activeCategory === cat 
-                  ? "bg-slate-100 border-slate-100 text-slate-900" 
+                activeCategory === cat
+                  ? "bg-slate-100 border-slate-100 text-slate-900"
                   : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
               )}
             >
