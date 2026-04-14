@@ -95,7 +95,9 @@ def calculate(
 
     # ── Rule of 40 ────────────────────────────────────────────────────────────
     if r.get("MoM_Growth_Pct") and profit_margin is not None:
-        r["Rule_of_40"] = round(r["MoM_Growth_Pct"] * 12 + profit_margin, 1)
+        # Annualized Growth using CAGR: (1 + MoM_Growth)^12 - 1
+        annual_growth = ((1 + r["MoM_Growth_Pct"] / 100) ** 12 - 1) * 100
+        r["Rule_of_40"] = round(annual_growth + profit_margin, 1)
 
     r["_missing"] = missing
     r["_gross_margin"] = gross_margin

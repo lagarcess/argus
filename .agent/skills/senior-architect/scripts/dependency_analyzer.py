@@ -338,7 +338,7 @@ class DependencyAnalyzer:
 
             # Python imports
             for match in re.finditer(
-                r"^(?:from|import)\s+([\w.]+)", content, re.MULTILINE
+                r"^\s*(?:from|import)\s+([\w.]+)", content, re.MULTILINE
             ):
                 imports.add(match.group(1).split(".")[0])
 

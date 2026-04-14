@@ -614,6 +614,7 @@ def scan_file_code(filepath: Path, report: AuditReport):
     if ext in {".js", ".ts", ".mjs", ".cjs"}:
         patterns.extend(JS_PATTERNS)
 
+    # 1. Line-by-line scan
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
         # Skip comments
@@ -635,6 +636,30 @@ def scan_file_code(filepath: Path, report: AuditReport):
                         fix=pat["fix"],
                     )
                 )
+
+    # 2. Full-file scan (to detect multi-line evasion)
+    # Focus on non-MD files for critical patterns
+    if ext not in MD_EXTENSIONS:
+        for pat in patterns:
+            # We specifically look for occurrences that span lines
+            # and may have been missed by the line-by-line loop
+            if re.search(pat["regex"], content, re.MULTILINE | re.DOTALL):
+                # Check if it was already caught by line-by-line (simple de-duplication)
+                if not any(
+                    f.file == str(filepath) and f.category == pat["category"]
+                    for f in report.findings
+                ):
+                    report.findings.append(
+                        Finding(
+                            severity=pat["severity"],
+                            category=pat["category"],
+                            file=str(filepath),
+                            line=0,
+                            pattern="[Multi-line pattern detected]",
+                            risk=f"{pat['risk']} (Multi-line evasion detected)",
+                            fix=pat["fix"],
+                        )
+                    )
 
 
 def scan_file_prompt_injection(filepath: Path, report: AuditReport):
@@ -667,51 +692,17 @@ def scan_dependencies(skill_path: Path, report: AuditReport):
     # Check requirements.txt
     req_file = skill_path / "requirements.txt"
     if req_file.exists():
-        try:
-            lines = req_file.read_text().split("\n")
-        except Exception:
-            return
+        _scan_pip_file(req_file, report)
 
-        all_typosquats = {}
-        for real_pkg, fakes in TYPOSQUAT_TARGETS.items():
-            for fake in fakes:
-                all_typosquats[fake.lower()] = real_pkg
+    # Check pyproject.toml (Poetry)
+    pyproject_file = skill_path / "pyproject.toml"
+    if pyproject_file.exists():
+        _scan_poetry_file(pyproject_file, report)
 
-        for i, line in enumerate(lines, 1):
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-
-            # Extract package name
-            pkg_name = re.split(r"[>=<!\[;]", line)[0].strip().lower()
-
-            # Typosquatting check
-            if pkg_name in all_typosquats:
-                report.findings.append(
-                    Finding(
-                        severity=Severity.HIGH,
-                        category="DEPS-TYPOSQUAT",
-                        file=str(req_file),
-                        line=i,
-                        pattern=line,
-                        risk=f"Possible typosquatting — did you mean '{all_typosquats[pkg_name]}'?",
-                        fix=f"Verify package name. Likely should be '{all_typosquats[pkg_name]}'",
-                    )
-                )
-
-            # Unpinned version check
-            if pkg_name and "==" not in line and pkg_name not in (".", "-e", "-r"):
-                report.findings.append(
-                    Finding(
-                        severity=Severity.INFO,
-                        category="DEPS-UNPIN",
-                        file=str(req_file),
-                        line=i,
-                        pattern=line,
-                        risk="Unpinned dependency — may pull vulnerable versions",
-                        fix=f"Pin to specific version: {pkg_name}==<version>",
-                    )
-                )
+    # Check package.json (NPM/Bun)
+    package_json = skill_path / "package.json"
+    if package_json.exists():
+        _scan_npm_file(package_json, report)
 
     # Check for pip/npm install in code
     for code_file in skill_path.rglob("*"):
@@ -731,11 +722,11 @@ def scan_dependencies(skill_path: Path, report: AuditReport):
                         file=str(code_file),
                         line=i,
                         pattern=line.strip()[:120],
-                        risk="Runtime package installation — may install untrusted code",
-                        fix="Move dependencies to requirements.txt for pre-install review",
+                        risk="Runtime dependency installation with pip",
+                        fix="Remove runtime dependency management. Use requirements.txt",
                     )
                 )
-            if re.search(r"\bnpm\s+install\b|\byarn\s+add\b|\bpnpm\s+add\b", line):
+            if re.search(r"\bnpm\s+install\b", line):
                 report.findings.append(
                     Finding(
                         severity=Severity.HIGH,
@@ -743,10 +734,116 @@ def scan_dependencies(skill_path: Path, report: AuditReport):
                         file=str(code_file),
                         line=i,
                         pattern=line.strip()[:120],
-                        risk="Runtime package installation — may install untrusted code",
-                        fix="Move dependencies to package.json for pre-install review",
+                        risk="Runtime dependency installation with npm",
+                        fix="Remove runtime dependency management. Use package.json",
                     )
                 )
+
+
+def _scan_pip_file(filepath: Path, report: AuditReport):
+    """Scan requirements.txt for typosquatting and unpinned deps."""
+    try:
+        lines = filepath.read_text().split("\n")
+    except Exception:
+        return
+
+    all_typosquats = {}
+    for real_pkg, fakes in TYPOSQUAT_TARGETS.items():
+        for fake in fakes:
+            all_typosquats[fake.lower()] = real_pkg
+
+    for i, line in enumerate(lines, 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        pkg_name = re.split(r"[>=<!\[;]", line)[0].strip().lower()
+        if pkg_name in all_typosquats:
+            report.findings.append(
+                Finding(
+                    severity=Severity.HIGH,
+                    category="DEPS-TYPOSQUAT",
+                    file=str(filepath),
+                    line=i,
+                    pattern=line,
+                    risk=f"Possible typosquatting — did you mean '{all_typosquats[pkg_name]}'?",
+                    fix=f"Verify package name. Likely should be '{all_typosquats[pkg_name]}'",
+                )
+            )
+        if pkg_name and "==" not in line and pkg_name not in (".", "-e", "-r"):
+            report.findings.append(
+                Finding(
+                    severity=Severity.INFO,
+                    category="DEPS-UNPIN",
+                    file=str(filepath),
+                    line=i,
+                    pattern=line,
+                    risk="Unpinned dependency — may pull vulnerable versions",
+                    fix=f"Pin to specific version: {pkg_name}==<version>",
+                )
+            )
+
+
+def _scan_poetry_file(filepath: Path, report: AuditReport):
+    """Scan pyproject.toml for Poetry dependencies."""
+    try:
+        content = filepath.read_text()
+        # Simple extraction of dependency keys
+        matches = re.findall(
+            r'^([a-zA-Z0-9_-]+)\s*=\s*["\']?([^"\']+)', content, re.MULTILINE
+        )
+        for name, _ in matches:
+            name = name.lower()
+            if name == "python":
+                continue
+            # Check typosquat
+            for real, fakes in TYPOSQUAT_TARGETS.items():
+                if name in fakes:
+                    report.findings.append(
+                        Finding(
+                            severity=Severity.HIGH,
+                            category="DEPS-TYPOSQUAT",
+                            file=str(filepath),
+                            line=0,
+                            pattern=name,
+                            risk=f"Possible typosquatting in pyproject.toml — '{name}'",
+                            fix=f"Verify package name. Likely should be '{real}'",
+                        )
+                    )
+    except Exception:
+        pass
+
+
+def _scan_npm_file(filepath: Path, report: AuditReport):
+    """Scan package.json for NPM dependencies."""
+    try:
+        data = json.loads(filepath.read_text())
+        deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
+
+        # Extended JS typosquat list
+        js_typos = {
+            "react": ["reac", "reackt"],
+            "express": ["exprees", "exrpess"],
+            "lodash": ["lodesh"],
+        }
+
+        for name in deps:
+            name = name.lower()
+            for real, fakes in js_typos.items():
+                if name in fakes:
+                    report.findings.append(
+                        Finding(
+                            severity=Severity.HIGH,
+                            category="DEPS-TYPOSQUAT",
+                            file=str(filepath),
+                            line=0,
+                            pattern=name,
+                            risk=f"Possible typosquatting in package.json — '{name}'",
+                            fix=f"Verify package name. Likely should be '{real}'",
+                        )
+                    )
+    except Exception:
+        pass
 
 
 def scan_filesystem(skill_path: Path, report: AuditReport):

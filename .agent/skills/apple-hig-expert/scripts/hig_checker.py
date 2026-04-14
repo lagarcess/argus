@@ -81,14 +81,14 @@ def main():
                 data = json.load(f)
                 # Sample batch processing
                 for item in data.get("checks", []):
-                    if item["type"] == "contrast":
+                    if item.get("type") == "contrast" and "fg" in item and "bg" in item:
                         r = check_contrast(item["fg"], item["bg"])
                         if r < 4.5:
                             results["violations"].append(
                                 f"Contrast {r} fails for {item.get('name', 'element')}"
                             )
                             results["score"] -= 10
-                    elif item["type"] == "target":
+                    elif item.get("type") == "target" and "w" in item and "h" in item:
                         if item["w"] < 44 or item["h"] < 44:
                             results["violations"].append(
                                 f"Target {item['w']}x{item['h']} small for {item.get('name', 'element')}"

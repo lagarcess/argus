@@ -154,7 +154,7 @@ async function seed() {
     id: createId(),
     organizationId: org.id,
     ownerId: adminUser.id,
-    name: "fakercompanycatchphrase"
+    name: "fakercompanycatchphrase",
     description: faker.lorem.paragraph(),
     status: 'active' as const,
   }))
