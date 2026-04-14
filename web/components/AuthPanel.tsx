@@ -231,14 +231,28 @@ export const AuthPanel = forwardRef<AuthPanelHandle>((_, ref) => {
               </>
             )}
 
-            <div className="mt-8 text-center border-t border-slate-800 pt-6">
+            <div className="mt-8 text-center border-t border-slate-800 pt-6 space-y-4">
               <button
                 onClick={() => { setAuthMode(authMode === "login" ? "signup" : "login"); setError(null); }}
-                className="text-[10px] text-slate-400 hover:text-cyan-400 uppercase tracking-widest font-bold transition-colors"
+                className="text-[10px] text-slate-400 hover:text-cyan-400 uppercase tracking-widest font-bold transition-colors w-full"
                 style={{ letterSpacing: '0.2em' }}
               >
                 {authMode === "login" ? "Don't have an account? Sign up" : "Already have an account? Log in"}
               </button>
+
+              {process.env.NODE_ENV === "development" && (
+                <button
+                  onClick={() => {
+                    const url = new URL(window.location.origin);
+                    url.searchParams.set("bypass_auth", "true");
+                    window.location.href = url.toString();
+                  }}
+                  className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-emerald-400 text-[9px] uppercase tracking-[0.2em] font-black hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all group"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse group-hover:shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                  Sentinel Developer Bypass
+                </button>
+              )}
             </div>
           </div>
         )}

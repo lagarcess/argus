@@ -31,7 +31,14 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isMockMode = process.env.NEXT_PUBLIC_MOCK_API === "true"
+  const url = request.nextUrl.clone()
+  const bypassParam = url.searchParams.get('bypass_auth')
+  const bypassCookie = request.cookies.get('sb-mock-bypass')?.value
+
+  const isBypassActive = bypassParam === 'true' || bypassCookie === 'true'
+  const isMockMode = process.env.NEXT_PUBLIC_MOCK_API === "true" ||
+                     (process.env.NODE_ENV === "development" && isBypassActive)
+
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/builder') ||
                            request.nextUrl.pathname.startsWith('/strategies') ||
                            request.nextUrl.pathname.startsWith('/history') ||
@@ -39,9 +46,20 @@ export async function proxy(request: NextRequest) {
 
   // Zero-trust boundary: If trying to access protected route without user OR mock override
   if (isProtectedRoute && !user && !isMockMode) {
-    const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  // Persist bypass via cookie if parameter is present
+  if (bypassParam === 'true') {
+    supabaseResponse.cookies.set('sb-mock-bypass', 'true', {
+      path: '/',
+      maxAge: 60 * 60 * 24, // 1 day
+      httpOnly: true,
+      sameSite: 'lax',
+    })
+  } else if (bypassParam === 'false') {
+    supabaseResponse.cookies.delete('sb-mock-bypass')
   }
 
   return supabaseResponse
