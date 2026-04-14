@@ -39,6 +39,13 @@ AI agent configuration registry for the Argus backtesting engine. This file serv
 | `stitch-design/`                     | Stitch MCP orchestration, prompt enhancement, screen generation             |
 | `stitch-design-taste/`               | Semantic design system enforcement, premium aesthetics                      |
 | `stitch-loop/`                       | Iterative Baton-Passing loop for rapid UI development                       |
+| `rag-architect/`                    | RAG/LLM agent architecture, DeepSeek R1/Qwen integration                    |
+| `database-schema-designer/`         | Precision SQL migrations, RLS policies, and Phase C accounting              |
+| `apple-hig-expert/`                  | Premium UI/UX aesthetics, Apple/Robinhood-grade physics                     |
+| `skill-security-auditor/`           | Automated security gating for agent skills and external plugins               |
+| `playwright-pro/`                   | Advanced E2E testing framework, target 63% coverage                          |
+| `senior-architect/`                 | Principal-level system guidance and Institutional-grade reliability         |
+| `saas-metrics-coach/`               | Fintech quota throughput and monetization logic                              |
 
 ---
 
