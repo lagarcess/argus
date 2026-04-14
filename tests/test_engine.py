@@ -63,7 +63,9 @@ def test_engine_adapter_v1_full_flow():
                 "target": 70.0,  # Indicator vs Value
             },
         ],
-        exit_criteria={"stop_loss_pct": 0.05, "take_profit_pct": 0.15},
+        exit_criteria=[],
+        stop_loss_pct=0.05,
+        take_profit_pct=0.15,
         slippage=0.001,
         fees=0.001,
     )

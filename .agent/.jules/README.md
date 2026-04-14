@@ -11,11 +11,6 @@ This directory contains reference documentation and mandatory logic for the Jule
 **Mandatory Rule**: This file defines the "Branch Sync & Goal Realignment" logic. Every Jules session must execute these steps (rebase main, re-verify mission, validate regressions) before concluding.
 
 ---
-
-## ◼️ What is Jules?
-
-Jules is the **Antigravity AI scheduling framework**. It orchestrates background tasks (formerly stored in `scheduled_tasks/`) that report findings.
-
 **Key principles:**
 - **Goal Realignment**: Jules must always stay aligned with the `main` branch and the original mission.
 - **Shared Skills**: Jules uses the global repository at `.agent/skills/`.
@@ -75,10 +70,10 @@ Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent
 
 ## 🚫 Anti-Patterns
 
-❌ Ignore `main` branch updates during long-running tasks.
-❌ Proceed with stale mission goals after API contract shifts.
-❌ Skip `/verify` before declaring a task complete.
-❌ Create new localized skills (always use `.agent/skills/`).
+- ❌ Ignore `main` branch updates during long-running tasks.
+- ❌ Proceed with stale mission goals after API contract shifts.
+- ❌ Skip `/verify` before declaring a task complete.
+- ❌ Create new localized skills (always use `.agent/skills/`).
 
 ---
 

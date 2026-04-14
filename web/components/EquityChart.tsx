@@ -1,37 +1,42 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart, ColorType } from "lightweight-charts";
+import { createChart, ColorType, IChartApi, AreaSeries, LineSeries } from "lightweight-charts";
 
 export interface DataPoint {
   time: string;
   value: number;
 }
 
-interface EquityChartProps {
+export interface ChartSeries {
+  label: string;
   data: DataPoint[];
-  colors?: {
-    backgroundColor?: string;
-    lineColor?: string;
-    textColor?: string;
-  };
+  color: string;
+  type: 'area' | 'line';
+  lineWidth?: number;
+}
+
+interface EquityChartProps {
+  series: ChartSeries[];
+  backgroundColor?: string;
+  textColor?: string;
 }
 
 export function EquityChart({
-  data,
-  colors: {
-    backgroundColor = "transparent",
-    lineColor = "#00f0ff", // accent-cyan
-    textColor = "#94a3b8", // slate-400
-  } = {}
+  series,
+  backgroundColor = "transparent",
+  textColor = "#94a3b8", // slate-400
 }: EquityChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
 
   useEffect(() => {
-    if (!chartContainerRef.current || !data.length) return;
+    if (!chartContainerRef.current || !series.length) return;
 
     const handleResize = () => {
-      chart.applyOptions({ width: chartContainerRef.current?.clientWidth });
+      if (chartRef.current && chartContainerRef.current) {
+        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+      }
     };
 
     const chart = createChart(chartContainerRef.current, {
@@ -52,38 +57,46 @@ export function EquityChart({
         timeVisible: true,
       },
       width: chartContainerRef.current.clientWidth,
-      height: 300,
+      height: 350,
+    });
+
+    chartRef.current = chart;
+
+    series.forEach((s) => {
+      const formattedData = s.data.map(d => ({
+        time: d.time.split('T')[0] as string,
+        value: d.value
+      })).sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+      if (s.type === 'area') {
+        const areaSeries = chart.addSeries(AreaSeries, {
+          lineColor: s.color,
+          topColor: `${s.color}33`, // 20% opacity
+          bottomColor: `${s.color}00`, // 0% opacity
+          lineWidth: (s.lineWidth || 2) as 1 | 2 | 3 | 4,
+          title: s.label,
+        });
+        areaSeries.setData(formattedData);
+      } else {
+        const lineSeries = chart.addSeries(LineSeries, {
+          color: s.color,
+          lineWidth: (s.lineWidth || 2) as 1 | 2 | 3 | 4,
+          title: s.label,
+        });
+        lineSeries.setData(formattedData);
+      }
     });
 
     chart.timeScale().fitContent();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const newSeries = (chart as any).addAreaSeries({
-      lineColor,
-      topColor: 'rgba(0, 240, 255, 0.2)',
-      bottomColor: 'rgba(0, 240, 255, 0.0)',
-      lineWidth: 2,
-    });
-
-    // Lightweight charts requires time to be a string formatted specifically or unix timestamp
-    const formattedData = data.map(d => ({
-        // We ensure data strings are formatted correctly for TV
-        time: d.time.split('T')[0] as string,
-        value: d.value
-    }));
-
-    // Data must be sorted for TV to render
-    formattedData.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-
-    newSeries.setData(formattedData);
 
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
       chart.remove();
+      chartRef.current = null;
     };
-  }, [data, backgroundColor, lineColor, textColor]);
+  }, [series, backgroundColor, textColor]);
 
   return <div ref={chartContainerRef} className="w-full h-full" />;
 }

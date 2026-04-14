@@ -46,11 +46,20 @@ class BacktestRequest(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     entry_criteria: Optional[List[Dict[str, Any]]] = None
-    exit_criteria: Optional[Dict[str, Any]] = None
+    exit_criteria: Optional[List[Dict[str, Any]]] = None
+    stop_loss_pct: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    take_profit_pct: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     indicators_config: Optional[Dict[str, Any]] = None
     patterns: Optional[List[str]] = None
     slippage: float = Field(default=0.001, ge=0.0, le=0.05)
     fees: float = Field(default=0.001, ge=0.0, le=0.02)
+
+    # Execution Forge (Institutional Physics)
+    side: Literal["long", "short"] = Field(default="long", description="Trade direction")
+    participation_rate: float = Field(default=0.1, ge=0.001, le=1.0)
+    execution_priority: float = Field(default=1.0, ge=0.0, le=1.0)
+    va_sensitivity: float = Field(default=1.0, ge=0.0, le=5.0)
+    slippage_model: Literal["fixed", "vol_adjusted"] = Field(default="vol_adjusted")
 
     @model_validator(mode="after")
     def validate_xor(self):
@@ -90,7 +99,8 @@ class TradeSnippet(BaseModel):
 class RealityGapMetrics(BaseModel):
     slippage_impact_pct: float
     fee_impact_pct: float
-    fidelity_score: float
+    vol_hazard_pct: float = Field(default=0.0)
+    fidelity_score: float = Field(default=1.0)
     assets: Optional[Dict[str, float]] = None
 
 
@@ -104,6 +114,9 @@ class BacktestResults(BaseModel):
     expectancy: float
     max_drawdown_pct: float
     equity_curve: List[float]
+    ideal_equity_curve: List[float] = Field(default_factory=list)
+    benchmark_equity_curve: List[float] = Field(default_factory=list)
+    benchmark_symbol: Optional[str] = None
     trades: List[TradeSnippet]
     reality_gap_metrics: RealityGapMetrics
     pattern_breakdown: Dict[str, int]
@@ -186,7 +199,9 @@ class StrategyCreate(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     entry_criteria: List[Dict[str, Any]] = Field(default_factory=list)
-    exit_criteria: Dict[str, Any] = Field(default_factory=dict)
+    exit_criteria: List[Dict[str, Any]] = Field(default_factory=list)
+    stop_loss_pct: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    take_profit_pct: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     indicators_config: Dict[str, Any] = Field(default_factory=dict)
     patterns: List[str] = Field(default_factory=list)
     slippage: float = Field(
