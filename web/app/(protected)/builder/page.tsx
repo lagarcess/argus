@@ -81,7 +81,7 @@ function CurrencyInput({ control, name, label, error }: { control: Control<Strat
           max: { value: MAX_CAPITAL, message: "Max $100M" }
         }}
         render={({ field: { onChange, value } }) => {
-          const displayValue = format(value as any);
+          const displayValue = format(value as string | number);
           return (
             <input
               type="text"

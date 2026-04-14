@@ -31,7 +31,7 @@ export default function BacktestResultsPage() {
 
   const stats = backtest.results;
   const config = backtest.config_snapshot;
-  const capital = (config as any)?.capital || 100000;
+  const capital = (config as { capital?: number })?.capital || 100000;
 
   const metrics = [
     { label: "Net Return", value: `${stats.total_return_pct.toFixed(2)}%`, icon: Percent, color: "text-emerald-400" },
