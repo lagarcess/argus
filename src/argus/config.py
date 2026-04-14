@@ -10,7 +10,7 @@ from typing import Any
 
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from alpaca.trading.client import TradingClient
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from supabase import Client, create_client
@@ -88,6 +88,13 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str | None = Field(default=None)
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default=None)
     SUPABASE_JWT_SECRET: str | None = Field(default=None)
+
+    # Agent LLM Configuration
+    OPENROUTER_API_KEY: SecretStr | None = Field(default=None)
+    AGENT_MODEL: str = Field(default="openrouter/deepseek/deepseek-v3")
+    AGENT_FALLBACK_MODEL: str = Field(
+        default="openrouter/meta-llama/llama-3.1-8b-instruct"
+    )
 
     # Rate Limiting Configuration
     RATE_LIMIT_DELAY: float = Field(
