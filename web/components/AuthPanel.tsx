@@ -250,7 +250,7 @@ export const AuthPanel = forwardRef<AuthPanelHandle>((_, ref) => {
                   className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-emerald-400 text-[9px] uppercase tracking-[0.2em] font-black hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all group"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse group-hover:shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                  Sentinel Developer Bypass
+                  Mock Auth Bypass
                 </button>
               )}
             </div>

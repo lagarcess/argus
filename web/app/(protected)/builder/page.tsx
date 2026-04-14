@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { checkProfanity } from "glin-profanity";
 import { Controller, Control, Path } from "react-hook-form";
 
-// New Sentinel Shell Components
+// Core Shell Components
 import { CriteriaBuilder } from "@/components/builder/CriteriaBuilder";
 import { IndicatorSelector } from "@/components/builder/IndicatorSelector";
 import { AssetSelector } from "@/components/builder/AssetSelector";
@@ -465,7 +465,7 @@ export default function BuilderPage() {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden space-y-8"
               >
-                {/* Sentinel Filter/Browse Shell */}
+                {/* Indicator Filter/Browse Shell */}
                 <div className="pt-2">
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
                     {[...PINNED_INDICATORS, ...(recentIndicator ? [recentIndicator] : [])].map(ind => {
@@ -763,7 +763,7 @@ export default function BuilderPage() {
                       <Lock className="text-white w-7 h-7" />
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2 tracking-tight group-hover/forge:scale-105 transition-transform duration-500">
-                      Sentinel Execution Forge
+                      Execution Forge
                     </h3>
                     <p className="text-[10px] text-slate-400 max-w-[320px] mb-8 leading-relaxed font-medium">
                       Unlock high-fidelity institutional physics including <span className="text-cyan-400">POV Gating</span>, <span className="text-amber-400">Maker/Taker Priority</span>, and <span className="text-pink-400">Vol-Adjusted Cost Physics</span>.
