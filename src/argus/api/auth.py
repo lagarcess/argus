@@ -155,6 +155,8 @@ def auth_required(
     lang = "en"
     backtest_quota = 50
     remaining_quota = 50
+    ai_draft_quota = 5
+    remaining_ai_draft_quota = 5
     last_quota_reset = None
     feature_flags = {}
 
@@ -189,6 +191,10 @@ def auth_required(
                 lang = str(data.get("lang", "en"))
                 backtest_quota = int(data.get("backtest_quota", 50))
                 remaining_quota = int(data.get("remaining_quota", backtest_quota))
+                ai_draft_quota = int(data.get("ai_draft_quota", 5))
+                remaining_ai_draft_quota = int(
+                    data.get("remaining_ai_draft_quota", ai_draft_quota)
+                )
                 last_quota_reset_str = data.get("last_quota_reset")
                 feature_flags = data.get("feature_flags", {})
 
@@ -215,6 +221,8 @@ def auth_required(
         lang=lang,
         backtest_quota=backtest_quota,
         remaining_quota=remaining_quota,
+        ai_draft_quota=ai_draft_quota,
+        remaining_ai_draft_quota=remaining_ai_draft_quota,
         last_quota_reset=last_quota_reset,
         feature_flags=feature_flags,
     )

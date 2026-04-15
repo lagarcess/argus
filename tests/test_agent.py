@@ -2,12 +2,15 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
+from argus.api import auth as auth_module
 from argus.api.auth import check_ai_quota
 from argus.api.drafter import _StrategyDraftOutput
 from argus.api.main import app
 from argus.api.schemas import StrategyCreate
+from argus.config import Settings
 from argus.domain.schemas import UserResponse
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 client = TestClient(app)
 
@@ -174,3 +177,35 @@ def test_drafter_fallback_model_success(mock_completion):
         # Verify second call
         _, kwargs_fallback = mock_completion.call_args_list[1]
         assert kwargs_fallback["model"] == "fallback_model"
+
+
+def test_auth_required_hydrates_ai_quota_fields():
+    auth_module._user_cache.cache.clear()
+    mock_supabase = MagicMock()
+    mock_response = MagicMock()
+    mock_response.data = {
+        "subscription_tier": "plus",
+        "is_admin": False,
+        "theme": "dark",
+        "lang": "en",
+        "backtest_quota": 100,
+        "remaining_quota": 80,
+        "ai_draft_quota": 12,
+        "remaining_ai_draft_quota": 3,
+        "feature_flags": {"multi_asset_beta": True},
+    }
+    mock_supabase.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_response
+
+    with patch("argus.api.auth.supabase_client", mock_supabase):
+        user = auth_module.auth_required({"sub": str(uuid.uuid4()), "email": "u@x.com"})
+
+    assert user.ai_draft_quota == 12
+    assert user.remaining_ai_draft_quota == 3
+
+
+def test_settings_requires_agent_model_envs(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("AGENT_MODEL", raising=False)
+    monkeypatch.delenv("AGENT_FALLBACK_MODEL", raising=False)
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

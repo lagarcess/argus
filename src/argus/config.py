@@ -91,10 +91,8 @@ class Settings(BaseSettings):
 
     # Agent LLM Configuration
     OPENROUTER_API_KEY: SecretStr | None = Field(default=None)
-    AGENT_MODEL: str = Field(default="openrouter/deepseek/deepseek-v3")
-    AGENT_FALLBACK_MODEL: str = Field(
-        default="openrouter/meta-llama/llama-3.1-8b-instruct"
-    )
+    AGENT_MODEL: str
+    AGENT_FALLBACK_MODEL: str
 
     # Rate Limiting Configuration
     RATE_LIMIT_DELAY: float = Field(
