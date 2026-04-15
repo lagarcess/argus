@@ -18,6 +18,7 @@ export function AiExplanationCard({ explanation, onClose }: AiExplanationCardPro
           animate={{ opacity: 1, x: 0, y: 0 }}
           exit={{ opacity: 0, x: 20, y: -20 }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          data-testid="ai-explanation-card"
           className="absolute top-24 right-4 md:right-8 z-40 w-[90%] md:max-w-sm"
         >
           <div className="relative p-4 rounded-[1.5rem] bg-[#262528]/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
@@ -29,7 +30,7 @@ export function AiExplanationCard({ explanation, onClose }: AiExplanationCardPro
                 <h4 className="font-mono text-[10px] text-white/50 uppercase tracking-widest mb-1">
                   AI Drafter Reasoning
                 </h4>
-                <p className="font-body text-sm text-slate-200 leading-relaxed italic">
+                <p data-testid="ai-explanation-text" className="font-body text-sm text-slate-200 leading-relaxed italic">
                   "{explanation}"
                 </p>
               </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
-import { Lightning, Sparkle } from "@phosphor-icons/react";
+import { Lightning, Sparkle, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 interface CoDrafterBarProps {
@@ -53,8 +53,7 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
     e.preventDefault();
     if (prompt.trim() && !isDrafting && quotaRemaining > 0) {
       onDraft(prompt);
-      // Wait for draft to start before clearing
-      setTimeout(() => setPrompt(""), 100);
+      setPrompt("");
     }
   };
 
@@ -92,7 +91,7 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
               animate={{ opacity: [0.4, 0.8, 0.4] }}
               exit={{ opacity: 0 }}
               transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-              className="absolute inset-0 rounded-[2.5rem] pointer-events-none -z-10 bg-[linear-gradient(135deg,rgba(153,247,255,0.2)_0%,rgba(172,137,255,0.2)_50%,rgba(153,247,255,0.2)_100%)] bg-[length:200%_200%]"
+              className="absolute inset-0 rounded-[2.5rem] pointer-events-none -z-10 bg-[linear-gradient(135deg,rgba(34,211,238,0.18)_0%,rgba(16,185,129,0.18)_50%,rgba(34,211,238,0.18)_100%)] bg-[length:200%_200%]"
             />
           )}
         </AnimatePresence>
@@ -139,15 +138,25 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
         <div className="flex items-center gap-4 flex-shrink-0">
           <div className="hidden md:flex flex-col items-end mr-2">
             <span className="font-mono text-[10px] text-white/40 uppercase tracking-widest leading-tight">
-              Drafting Quota
+              {isDrafting ? "Groq is thinking..." : "Parsing Quant Logic..."}
             </span>
             <span className={cn(
               "font-mono text-[11px] font-bold tracking-wider leading-tight",
               quotaRemaining > 0 ? "text-[#99f7ff]" : "text-[#ff716c]"
             )}>
-              {quotaRemaining}/5 Remaining
+              Mock Draft Quota: {quotaRemaining}/5
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setPrompt("")}
+            disabled={isDrafting || prompt.length === 0}
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Clear draft prompt"
+          >
+            <X size={16} />
+          </button>
 
           <button
             type="submit"
@@ -155,7 +164,7 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
             className={cn(
               "flex items-center justify-center min-h-[44px] min-w-[44px] md:px-6 rounded-[2.5rem] font-headline font-bold text-sm text-[#0e0e10]",
               "transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
-              "bg-[linear-gradient(135deg,#99f7ff_0%,#ac89ff_150%)] hover:shadow-[0_0_20px_rgba(153,247,255,0.4)]"
+              "bg-[linear-gradient(135deg,#67e8f9_0%,#34d399_150%)] hover:shadow-[0_0_20px_rgba(52,211,153,0.35)]"
             )}
             aria-label="Submit Draft"
           >

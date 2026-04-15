@@ -8,6 +8,8 @@ export interface StrategyDraft extends StrategyCreate {
 
 export function useDraftStrategy() {
   const [isDrafting, setIsDrafting] = useState(false);
+  // Frontend-local quota for mock drafting only. This is intentionally independent
+  // from global backtest/session quotas until backend draft quota sync lands.
   const [quotaRemaining, setQuotaRemaining] = useState(5);
 
   const draftStrategy = async (prompt: string): Promise<StrategyDraft | null> => {
@@ -16,8 +18,7 @@ export function useDraftStrategy() {
     // Check quota
     if (quotaRemaining <= 0) {
       toast.error("Drafting Quota Exceeded", {
-        description: "Upgrade to Pro to unlock unlimited AI drafting.",
-        action: { label: "Upgrade", onClick: () => console.log("Upgrade clicked") }
+        description: "Mock draft quota reached for this session."
       });
       setIsDrafting(false);
       return null;
@@ -27,7 +28,7 @@ export function useDraftStrategy() {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
-      const isMockApi = process.env.NEXT_PUBLIC_MOCK_API === "true";
+      const isMockApi = process.env.NEXT_PUBLIC_MOCK_API === "true" || process.env.NODE_ENV !== "production";
 
       if (isMockApi) {
         setQuotaRemaining((prev) => prev - 1);

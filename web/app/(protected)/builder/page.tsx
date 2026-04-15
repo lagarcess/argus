@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { Plus, Play, Save, Activity, Search, Clock, Calendar, Info, ChevronDown, X, Zap, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { postBacktestsMutation, getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
@@ -18,8 +18,11 @@ import { Controller, Control, Path } from "react-hook-form";
 import { CriteriaBuilder } from "@/components/builder/CriteriaBuilder";
 import { IndicatorSelector } from "@/components/builder/IndicatorSelector";
 import { AssetSelector } from "@/components/builder/AssetSelector";
+import { CoDrafterBar } from "@/components/builder/CoDrafterBar";
+import { AiExplanationCard } from "@/components/builder/AiExplanationCard";
 import { INDICATOR_REGISTRY } from "@/lib/indicators";
 import { ASSET_REGISTRY } from "@/lib/assets";
+import { useDraftStrategy, type StrategyDraft } from "@/lib/hooks/useDraftStrategy";
 
 const PINNED_INDICATORS = ["SMA", "RSI", "MACD", "EMA"];
 
@@ -128,6 +131,7 @@ const formatDisplayDate = (s: string) => {
 
 export default function BuilderPage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [showRealityGap, setShowRealityGap] = useState(false);
   const [showRules, setShowRules] = useState(true);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -138,16 +142,29 @@ export default function BuilderPage() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [datePickerTarget, setDatePickerTarget] = useState<'start' | 'end'>('start');
   const [calendarView, setCalendarView] = useState(new Date());
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [yellowFlash, setYellowFlash] = useState({
+    assetSymbol: 0,
+    timeframe: 0,
+    entryCriteria: 0,
+    exitCriteria: 0
+  });
 
   const [lastFocusedSlot, setLastFocusedSlot] = useState<{
     type: 'entry' | 'exit';
     index: number;
     field: 'indicator_a' | 'indicator_b';
   }>({ type: 'entry', index: 0, field: 'indicator_a' });
+  const { draftStrategy, isDrafting, quotaRemaining } = useDraftStrategy();
 
   const { data: sessionData } = useQuery(getAuthSessionOptions());
   const tier = sessionData?.subscription_tier || 'free';
+  const resolvedTier = mounted ? tier : 'free';
   const today = new Date();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const form = useForm<StrategyCreate>({
     defaultValues: {
@@ -181,9 +198,9 @@ export default function BuilderPage() {
     if (!sessionData) return new Date(2016, 0, 1);
 
     const isIntraday = timeframe !== "1D";
-    if (tier === 'max') return new Date(2016, 0, 1);
-    if (tier === 'pro') return new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
-    if (tier === 'plus') return new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
+    if (resolvedTier === 'max') return new Date(2016, 0, 1);
+    if (resolvedTier === 'pro') return new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
+    if (resolvedTier === 'plus') return new Date(today.getFullYear() - 3, today.getMonth(), today.getDate());
 
     // Free / Basic
     if (isIntraday) return new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
@@ -309,6 +326,32 @@ export default function BuilderPage() {
     await mutateAsync({ body: apiPayload as Parameters<typeof mutateAsync>[0]['body'] });
   };
 
+  const applyStrategyDraft = (draft: StrategyDraft) => {
+    const current = form.getValues();
+    const next: StrategyCreate = {
+      ...current,
+      ...draft,
+      entry_criteria: draft.entry_criteria?.length ? draft.entry_criteria : current.entry_criteria,
+      exit_criteria: draft.exit_criteria?.length ? draft.exit_criteria : current.exit_criteria,
+    };
+
+    form.reset(next);
+    setAiExplanation(draft.ai_explanation ?? null);
+
+    setYellowFlash((prev) => ({
+      assetSymbol: current.asset_symbol !== next.asset_symbol ? prev.assetSymbol + 1 : prev.assetSymbol,
+      timeframe: current.timeframe !== next.timeframe ? prev.timeframe + 1 : prev.timeframe,
+      entryCriteria: JSON.stringify(current.entry_criteria) !== JSON.stringify(next.entry_criteria) ? prev.entryCriteria + 1 : prev.entryCriteria,
+      exitCriteria: JSON.stringify(current.exit_criteria) !== JSON.stringify(next.exit_criteria) ? prev.exitCriteria + 1 : prev.exitCriteria,
+    }));
+  };
+
+  const handleDraftRequest = async (prompt: string) => {
+    const draft = await draftStrategy(prompt);
+    if (!draft) return;
+    applyStrategyDraft(draft);
+  };
+
   const generateCalendarDays = () => {
     const year = calendarView.getFullYear();
     const month = calendarView.getMonth();
@@ -322,7 +365,7 @@ export default function BuilderPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20 px-4 sm:px-0">
+    <div className="relative max-w-4xl mx-auto space-y-6 pb-20 px-4 sm:px-0">
       <div className="flex flex-col gap-1 mb-10 mt-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center">
@@ -331,7 +374,14 @@ export default function BuilderPage() {
           <h1 className="text-lg font-bold uppercase tracking-[0.3em] text-slate-100">The Recipe Forge</h1>
         </div>
         <p className="text-slate-500 text-[10px] uppercase tracking-widest pl-11">Design and calibrate your market execution logic</p>
+        {aiExplanation && (
+          <p className="pl-11 mt-2 text-xs text-slate-400 italic">
+            {aiExplanation}
+          </p>
+        )}
       </div>
+
+      <AiExplanationCard explanation={aiExplanation} onClose={() => setAiExplanation(null)} />
 
       <form className="space-y-6">
         {/* Core Strategy Configuration */}
@@ -358,7 +408,11 @@ export default function BuilderPage() {
                 placeholder="e.g. SMA Crossover"
               />
             </div>
-            <div className="space-y-2">
+            <motion.div
+              className="space-y-2 rounded-xl"
+              animate={yellowFlash.assetSymbol > 0 ? { backgroundColor: ["#FDE047", "rgba(2,6,23,0)"] } : undefined}
+              transition={{ duration: 0.8, ease: "circOut" }}
+            >
               <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase flex justify-between">
                 Asset Symbol
                 {form.formState.errors.asset_symbol && <span className="text-red-400 text-[10px]">{form.formState.errors.asset_symbol.message}</span>}
@@ -379,11 +433,15 @@ export default function BuilderPage() {
                 <Search size={14} className="text-slate-600 group-hover:text-cyan-400 transition-colors" />
               </div>
               <input type="hidden" {...form.register("asset_symbol", { required: "Required" })} />
-            </div>
+            </motion.div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
+            <motion.div
+              className="space-y-2 rounded-xl"
+              animate={yellowFlash.timeframe > 0 ? { backgroundColor: ["#FDE047", "rgba(2,6,23,0)"] } : undefined}
+              transition={{ duration: 0.8, ease: "circOut" }}
+            >
               <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Timeframe</label>
               <div
                 onClick={() => setIsTimeframeOpen(true)}
@@ -396,7 +454,7 @@ export default function BuilderPage() {
                 <ChevronDown size={14} className="text-slate-600" />
               </div>
               <input type="hidden" {...form.register("timeframe")} />
-            </div>
+            </motion.div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Start Date</label>
@@ -511,49 +569,61 @@ export default function BuilderPage() {
                 </div>
 
                 <div className="space-y-8 border-t border-slate-800/50 pt-6">
-                  <CriteriaBuilder
-                    label="Entry Conditions"
-                    type="entry"
-                    items={form.watch("entry_criteria")}
-                    onFocus={(idx, field) => setLastFocusedSlot({ type: 'entry', index: idx, field })}
-                    onOpenSelector={() => setIsSelectorOpen(true)}
-                    onAdd={() => {
-                      const current = form.getValues("entry_criteria");
-                      form.setValue("entry_criteria", [...current, { indicator_a: "", operator: "gt", value: 50 }]);
-                      setLastFocusedSlot({ type: 'entry', index: current.length, field: 'indicator_a' });
-                    }}
-                    onRemove={(idx) => {
-                      const current = form.getValues("entry_criteria");
-                      form.setValue("entry_criteria", current.filter((_, i) => i !== idx));
-                    }}
-                    onChange={(idx, field, value) => {
-                      const current = [...form.getValues("entry_criteria")];
-                      current[idx] = { ...current[idx], [field]: value };
-                      form.setValue("entry_criteria", current);
-                    }}
-                  />
+                  <motion.div
+                    className="rounded-xl"
+                    animate={yellowFlash.entryCriteria > 0 ? { backgroundColor: ["#FDE047", "rgba(2,6,23,0)"] } : undefined}
+                    transition={{ duration: 0.8, ease: "circOut" }}
+                  >
+                    <CriteriaBuilder
+                      label="Entry Conditions"
+                      type="entry"
+                      items={form.watch("entry_criteria")}
+                      onFocus={(idx, field) => setLastFocusedSlot({ type: 'entry', index: idx, field })}
+                      onOpenSelector={() => setIsSelectorOpen(true)}
+                      onAdd={() => {
+                        const current = form.getValues("entry_criteria");
+                        form.setValue("entry_criteria", [...current, { indicator_a: "", operator: "gt", value: 50 }]);
+                        setLastFocusedSlot({ type: 'entry', index: current.length, field: 'indicator_a' });
+                      }}
+                      onRemove={(idx) => {
+                        const current = form.getValues("entry_criteria");
+                        form.setValue("entry_criteria", current.filter((_, i) => i !== idx));
+                      }}
+                      onChange={(idx, field, value) => {
+                        const current = [...form.getValues("entry_criteria")];
+                        current[idx] = { ...current[idx], [field]: value };
+                        form.setValue("entry_criteria", current);
+                      }}
+                    />
+                  </motion.div>
 
-                  <CriteriaBuilder
-                    label="Exit Conditions"
-                    type="exit"
-                    items={form.watch("exit_criteria")}
-                    onFocus={(idx, field) => setLastFocusedSlot({ type: 'exit', index: idx, field })}
-                    onOpenSelector={() => setIsSelectorOpen(true)}
-                    onAdd={() => {
-                      const current = form.getValues("exit_criteria");
-                      form.setValue("exit_criteria", [...current, { indicator_a: "", operator: "lt", value: 30 }]);
-                      setLastFocusedSlot({ type: 'exit', index: current.length, field: 'indicator_a' });
-                    }}
-                    onRemove={(idx) => {
-                      const current = form.getValues("exit_criteria");
-                      form.setValue("exit_criteria", current.filter((_, i) => i !== idx));
-                    }}
-                    onChange={(idx, field, value) => {
-                      const current = [...form.getValues("exit_criteria")];
-                      current[idx] = { ...current[idx], [field]: value };
-                      form.setValue("exit_criteria", current);
-                    }}
-                  />
+                  <motion.div
+                    className="rounded-xl"
+                    animate={yellowFlash.exitCriteria > 0 ? { backgroundColor: ["#FDE047", "rgba(2,6,23,0)"] } : undefined}
+                    transition={{ duration: 0.8, ease: "circOut" }}
+                  >
+                    <CriteriaBuilder
+                      label="Exit Conditions"
+                      type="exit"
+                      items={form.watch("exit_criteria")}
+                      onFocus={(idx, field) => setLastFocusedSlot({ type: 'exit', index: idx, field })}
+                      onOpenSelector={() => setIsSelectorOpen(true)}
+                      onAdd={() => {
+                        const current = form.getValues("exit_criteria");
+                        form.setValue("exit_criteria", [...current, { indicator_a: "", operator: "lt", value: 30 }]);
+                        setLastFocusedSlot({ type: 'exit', index: current.length, field: 'indicator_a' });
+                      }}
+                      onRemove={(idx) => {
+                        const current = form.getValues("exit_criteria");
+                        form.setValue("exit_criteria", current.filter((_, i) => i !== idx));
+                      }}
+                      onChange={(idx, field, value) => {
+                        const current = [...form.getValues("exit_criteria")];
+                        current[idx] = { ...current[idx], [field]: value };
+                        form.setValue("exit_criteria", current);
+                      }}
+                    />
+                  </motion.div>
                 </div>
               </motion.div>
             )}
@@ -567,7 +637,7 @@ export default function BuilderPage() {
               <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-100">
                 Execution Forge
               </h2>
-              {tier === 'free' && (
+              {resolvedTier === 'free' && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-[8px] font-bold text-amber-500 uppercase tracking-tighter">
                   <Lock size={8} /> Pro
                 </span>
@@ -604,11 +674,11 @@ export default function BuilderPage() {
                       min="0.01"
                       max="0.5"
                       step="0.01"
-                      disabled={tier === 'free'}
+                      disabled={resolvedTier === 'free'}
                       {...form.register("participation_rate", { valueAsNumber: true })}
                       className={cn(
                         "w-full h-1.5 bg-slate-900 rounded-lg appearance-none transition-all",
-                        tier !== 'free' ? "accent-cyan-400 cursor-pointer" : "accent-slate-700 cursor-not-allowed grayscale opacity-30"
+                        resolvedTier !== 'free' ? "accent-cyan-400 cursor-pointer" : "accent-slate-700 cursor-not-allowed grayscale opacity-30"
                       )}
                     />
                     <AnimatePresence>
@@ -657,11 +727,11 @@ export default function BuilderPage() {
                       min="0"
                       max="1"
                       step="0.1"
-                      disabled={tier === 'free'}
+                      disabled={resolvedTier === 'free'}
                       {...form.register("execution_priority", { valueAsNumber: true })}
                       className={cn(
                         "w-full h-1.5 bg-slate-900 rounded-lg appearance-none transition-all",
-                        tier !== 'free' ? "accent-amber-500 cursor-pointer" : "accent-slate-700 cursor-not-allowed grayscale opacity-30"
+                        resolvedTier !== 'free' ? "accent-amber-500 cursor-pointer" : "accent-slate-700 cursor-not-allowed grayscale opacity-30"
                       )}
                     />
                     <AnimatePresence>
@@ -696,28 +766,28 @@ export default function BuilderPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        disabled={tier === 'free'}
+                        disabled={resolvedTier === 'free'}
                         onClick={() => form.setValue("slippage_model", "fixed")}
                         className={cn(
                           "px-4 py-3 rounded-xl border text-[10px] font-bold tracking-[0.2em] uppercase transition-all",
                           form.watch("slippage_model") === "fixed"
                             ? "bg-slate-100 border-slate-100 text-slate-950 shadow-xl"
                             : "bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700",
-                          tier === 'free' && "opacity-30 grayscale cursor-not-allowed"
+                          resolvedTier === 'free' && "opacity-30 grayscale cursor-not-allowed"
                         )}
                       >
                         Fixed Drag
                       </button>
                       <button
                         type="button"
-                        disabled={tier === 'free'}
+                        disabled={resolvedTier === 'free'}
                         onClick={() => form.setValue("slippage_model", "vol_adjusted")}
                         className={cn(
                           "px-4 py-3 rounded-xl border text-[10px] font-bold tracking-[0.2em] uppercase transition-all",
                           form.watch("slippage_model") === "vol_adjusted"
                             ? "bg-cyan-500 border-cyan-500 text-white shadow-xl shadow-cyan-500/20"
                             : "bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700",
-                          tier === 'free' && "opacity-30 grayscale cursor-not-allowed"
+                          resolvedTier === 'free' && "opacity-30 grayscale cursor-not-allowed"
                         )}
                       >
                         Vol Adjusted
@@ -728,7 +798,7 @@ export default function BuilderPage() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <label className="text-xs font-semibold tracking-wider text-slate-400 uppercase">Impact Sensitivity</label>
-                      <span className={cn("font-mono text-sm", tier !== 'free' ? "text-pink-500" : "text-slate-500")}>
+                      <span className={cn("font-mono text-sm", resolvedTier !== 'free' ? "text-pink-500" : "text-slate-500")}>
                         {form.watch("va_sensitivity")}x
                       </span>
                     </div>
@@ -737,11 +807,11 @@ export default function BuilderPage() {
                       min="0.5"
                       max="3"
                       step="0.1"
-                      disabled={tier === 'free'}
+                      disabled={resolvedTier === 'free'}
                       {...form.register("va_sensitivity", { valueAsNumber: true })}
                       className={cn(
                         "w-full h-1.5 bg-slate-900 rounded-lg appearance-none transition-all",
-                        tier !== 'free' ? "accent-pink-500 cursor-pointer" : "accent-slate-700 cursor-not-allowed grayscale opacity-30"
+                        resolvedTier !== 'free' ? "accent-pink-500 cursor-pointer" : "accent-slate-700 cursor-not-allowed grayscale opacity-30"
                       )}
                     />
                   </div>
@@ -757,7 +827,7 @@ export default function BuilderPage() {
                 </div>
 
                 {/* Premium Lock Overlay */}
-                {mounted && tier === 'free' && (
+                {mounted && resolvedTier === 'free' && (
                   <div className="absolute inset-x-0 bottom-0 top-[60px] bg-slate-950/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center p-8 text-center border-t border-white/5 shadow-2xl rounded-b-xl">
                     <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center mb-5 shadow-2xl shadow-orange-500/20 animate-pulse">
                       <Lock className="text-white w-7 h-7" />
@@ -965,6 +1035,12 @@ export default function BuilderPage() {
           </div>
         )}
       </AnimatePresence>
+
+      <CoDrafterBar
+        onDraft={handleDraftRequest}
+        isDrafting={isDrafting}
+        quotaRemaining={quotaRemaining}
+      />
     </div>
   );
 }
