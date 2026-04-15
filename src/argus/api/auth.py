@@ -20,7 +20,7 @@ from argus.supabase import supabase_client
 # Supabase signs JWTs with the project JWT secret
 _settings = get_settings()
 _SUPABASE_JWT_SECRET: Optional[str] = _settings.SUPABASE_JWT_SECRET
-_DEV_MODE = _settings.APP_ENV != "PROD"
+_DEV_MODE = _settings.APP_ENV != "production"
 
 
 class UserCache:
@@ -155,6 +155,8 @@ def auth_required(
     lang = "en"
     backtest_quota = 50
     remaining_quota = 50
+    ai_draft_quota = 5
+    remaining_ai_draft_quota = 5
     last_quota_reset = None
     feature_flags = {}
 
@@ -168,6 +170,8 @@ def auth_required(
             subscription_tier="max",
             backtest_quota=999999,
             remaining_quota=999999,
+            ai_draft_quota=999999,
+            remaining_ai_draft_quota=999999,
             feature_flags={"multi_asset_beta": True},
         )
     if supabase_client:
@@ -187,6 +191,10 @@ def auth_required(
                 lang = str(data.get("lang", "en"))
                 backtest_quota = int(data.get("backtest_quota", 50))
                 remaining_quota = int(data.get("remaining_quota", backtest_quota))
+                ai_draft_quota = int(data.get("ai_draft_quota", 5))
+                remaining_ai_draft_quota = int(
+                    data.get("remaining_ai_draft_quota", ai_draft_quota)
+                )
                 last_quota_reset_str = data.get("last_quota_reset")
                 feature_flags = data.get("feature_flags", {})
 
@@ -213,6 +221,8 @@ def auth_required(
         lang=lang,
         backtest_quota=backtest_quota,
         remaining_quota=remaining_quota,
+        ai_draft_quota=ai_draft_quota,
+        remaining_ai_draft_quota=remaining_ai_draft_quota,
         last_quota_reset=last_quota_reset,
         feature_flags=feature_flags,
     )
@@ -222,7 +232,7 @@ def auth_required(
 
 
 def check_rate_limit(
-    user: UserResponse = Depends(auth_required),  # noqa: B008
+    user: UserResponse = Depends(auth_required),  # noqa: B008,  # noqa: B008
 ) -> UserResponse:
     """
     FastAPI dependency: checks if user has exceeded their monthly usage limit.
@@ -263,7 +273,7 @@ def check_rate_limit(
 
 
 def check_asset_search_rate_limit(
-    user: UserResponse = Depends(auth_required),  # noqa: B008
+    user: UserResponse = Depends(auth_required),  # noqa: B008,  # noqa: B008
 ) -> Dict[str, Any]:
     """
     FastAPI dependency: Mock rate limiter for asset searches.
@@ -276,3 +286,20 @@ def check_asset_search_rate_limit(
         "X-RateLimit-Remaining": "99",
         "X-RateLimit-Reset": str(int(time.time() + 60)),
     }
+
+
+def check_ai_quota(user: UserResponse = Depends(auth_required)) -> UserResponse:  # noqa: B008
+    if user.is_admin:
+        return user
+
+    if user.remaining_ai_draft_quota <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "QUOTA_EXCEEDED",
+                "message": "You have exhausted your AI draft quota.",
+                "upgrade_url": "/settings",
+            },
+        )
+
+    return user

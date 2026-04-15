@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { GoogleIcon, DiscordIcon } from "@/components/Icons";
 import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isDevelopmentEnv } from "@/lib/app-env";
 
 export interface AuthPanelHandle {
   setMode: (mode: "login" | "signup" | "forgot_password") => void;
@@ -240,7 +241,7 @@ export const AuthPanel = forwardRef<AuthPanelHandle>((_, ref) => {
                 {authMode === "login" ? "Don't have an account? Sign up" : "Already have an account? Log in"}
               </button>
 
-              {process.env.NODE_ENV === "development" && (
+              {isDevelopmentEnv() && (
                 <button
                   onClick={() => {
                     const url = new URL(window.location.origin);

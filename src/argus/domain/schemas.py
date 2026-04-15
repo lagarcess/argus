@@ -54,6 +54,8 @@ class UserResponse(BaseModel):
     lang: str = "en"
     backtest_quota: int = 50
     remaining_quota: int = 50
+    ai_draft_quota: int = 5
+    remaining_ai_draft_quota: int = 5
     last_quota_reset: Optional[datetime] = None
     feature_flags: Dict[str, Any] = Field(default_factory=dict)
 

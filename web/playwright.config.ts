@@ -49,7 +49,13 @@ export default defineConfig({
   webServer: {
     command: 'npx next dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 60000,
+    env: {
+      NEXT_PUBLIC_MOCK_AUTH: 'true',
+      NEXT_PUBLIC_MOCK_API: 'true',
+      NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-key',
+    },
   },
 });

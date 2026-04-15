@@ -1,10 +1,37 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isDevelopmentEnv } from '@/lib/app-env'
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
+
+  const url = request.nextUrl.clone()
+  const bypassParam = url.searchParams.get('bypass_auth')
+  const bypassCookie = request.cookies.get('sb-mock-bypass')?.value
+  const isBypassActive = bypassParam === 'true' || bypassCookie === 'true'
+  const isMockMode =
+    process.env.NEXT_PUBLIC_MOCK_AUTH === "true" ||
+    (isDevelopmentEnv() && isBypassActive)
+
+  // In mock mode, skip Supabase client creation entirely so local/dev and VRT
+  // can run without injecting secrets.
+  if (isMockMode) {
+    if (isDevelopmentEnv()) {
+      if (bypassParam === 'true') {
+        supabaseResponse.cookies.set('sb-mock-bypass', 'true', {
+          path: '/',
+          maxAge: 60 * 60 * 24,
+          httpOnly: false,
+          sameSite: 'lax',
+        })
+      } else if (bypassParam === 'false') {
+        supabaseResponse.cookies.delete('sb-mock-bypass')
+      }
+    }
+    return supabaseResponse
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,14 +58,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const url = request.nextUrl.clone()
-  const bypassParam = url.searchParams.get('bypass_auth')
-  const bypassCookie = request.cookies.get('sb-mock-bypass')?.value
-
-  const isBypassActive = bypassParam === 'true' || bypassCookie === 'true'
-  const isMockMode = process.env.NEXT_PUBLIC_MOCK_AUTH === "true" ||
-                     (process.env.NODE_ENV === "development" && isBypassActive)
-
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/builder') ||
                            request.nextUrl.pathname.startsWith('/strategies') ||
                            request.nextUrl.pathname.startsWith('/history') ||
@@ -51,7 +70,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Persist bypass via cookie if parameter is present (development only)
-  if (process.env.NODE_ENV === "development") {
+  if (isDevelopmentEnv()) {
     if (bypassParam === 'true') {
       supabaseResponse.cookies.set('sb-mock-bypass', 'true', {
         path: '/',

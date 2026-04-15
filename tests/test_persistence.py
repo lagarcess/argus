@@ -13,6 +13,22 @@ def test_persistence_service_init_no_supabase(monkeypatch):
 
 @patch("argus.domain.persistence.create_client")
 @patch("argus.domain.persistence.get_settings")
+def test_persistence_service_init_invalid_url_does_not_raise(
+    mock_get_settings, mock_create_client
+):
+    mock_settings = MagicMock()
+    mock_settings.SUPABASE_URL = "not-a-valid-url"
+    mock_settings.SUPABASE_SERVICE_ROLE_KEY = "service-role-key"
+    mock_get_settings.return_value = mock_settings
+    mock_create_client.side_effect = Exception("Invalid URL")
+
+    service = PersistenceService()
+
+    assert service.client is None
+
+
+@patch("argus.domain.persistence.create_client")
+@patch("argus.domain.persistence.get_settings")
 def test_save_strategy_success(mock_get_settings, mock_supabase):
     mock_settings = MagicMock()
     mock_settings.SUPABASE_URL = "test"

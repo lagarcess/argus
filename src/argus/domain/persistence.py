@@ -22,7 +22,14 @@ class PersistenceService:
         supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY
 
         if supabase_url and supabase_key:
-            self.client: Optional[Client] = create_client(supabase_url, supabase_key)
+            try:
+                self.client: Optional[Client] = create_client(supabase_url, supabase_key)
+            except Exception as e:
+                logger.error(
+                    "Failed to initialize PersistenceService Supabase client. "
+                    f"url={supabase_url!r} error={e}"
+                )
+                self.client = None
         else:
             logger.warning("Supabase credentials missing. Persistence Service disabled.")
             self.client = None

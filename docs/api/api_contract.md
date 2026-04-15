@@ -27,6 +27,7 @@ This section aligns the aspirational Master Contract against our *current* codeb
 - [x] **Strategy Persistence (CRUD)**: `GET/POST/PUT/DELETE /strategies` fully implemented with PersistenceService sync.
 - [x] **Simulation History / Listing**: `/api/v1/history` supports cursor-based pagination and summary retrieval.
 - [x] **Institutional Execution Model**: High-fidelity 2-pass simulation (Ideal vs. Realistic) implemented. Engine decomposes total drag into priority-scaled slippage, fees, and volatility hazards as required by the institutional schema.
+- [x] **Agentic AI Drafting (`POST /agent/draft`)**: Endpoint implemented and returns unexecuted strategy drafts via liteLLM/OpenRouter-backed drafting flow.
 
 **What We Lack (Critical Gaps to Build for Ecosystem Loop)**:
 - [ ] **Hybrid Resource-Aware Quotas**: Evolving from simple "one-way" counts to an execution-weighted model (Pro) and concurrency-slot model (Max) to handle high-complexity portfolio simulations.
@@ -35,7 +36,6 @@ This section aligns the aspirational Master Contract against our *current* codeb
 - [ ] **Persistence: usememos Integration**: Bridging the journaling layer with the simulation history for a complete trader's loop.
 - [ ] **Datafeed Compliance**: `/market/bars` must implement full TradingView UDF (gated by `advanced_charting`).
 - [ ] **Quota Reset Mechanics**: `reset_monthly_quotas` function exists but missing Supabase Edge Function cron job/trigger.
-- [ ] **Agentic AI Drafting (`POST /agent/draft`)**: Missing LangChain endpoint returning unexecuted `StrategySchema` drafts.
 - [ ] **Social Sharing & Storage (`POST /share`)**: Implementing Lightweight Text Card MVP.
 - [ ] **Monetization Architecture**: Missing protected `/billing/checkout` endpoint and Supabase Edge Function webhook (`/webhook/billing`).
 - [ ] **Agentic Journaling Auth**: Missing `USEMEMOS_API_KEY` configuration and secure background push logic.

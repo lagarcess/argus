@@ -1,13 +1,25 @@
 /**
- * Argus Feature Flag Management
- * Enforces NEXT_PUBLIC_<NAME> convention from AGENTS.md
+ * Argus feature flags keyed off a single environment variable.
+ * Set NEXT_PUBLIC_APP_ENV to "development" or "production".
  */
+import { APP_ENV } from "@/lib/app-env";
 
-export const Features = {
-  SOCIAL_AUTH: process.env.NEXT_PUBLIC_FEATURE_SOCIAL_AUTH !== "false", // Default ON
-  STRATEGY_SIMULATION: process.env.NEXT_PUBLIC_FEATURE_STRATEGY_SIMULATION !== "false", // Default ON
-  EXPERIMENTAL_THREE_JS: process.env.NEXT_PUBLIC_FEATURE_THREE_JS === "true",
+const featureProfiles = {
+  development: {
+    MULTI_RULES: true,
+    SOCIAL_AUTH: true,
+    STRATEGY_SIMULATION: true,
+    EXPERIMENTAL_THREE_JS: true,
+  },
+  production: {
+    MULTI_RULES: false,
+    SOCIAL_AUTH: true,
+    STRATEGY_SIMULATION: true,
+    EXPERIMENTAL_THREE_JS: false,
+  },
 } as const;
+
+export const Features = featureProfiles[APP_ENV];
 
 export type FeatureKey = keyof typeof Features;
 

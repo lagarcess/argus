@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, ReactNode } from "react";
 
 import { getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
+import { isDevelopmentEnv } from "@/lib/app-env";
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => {
@@ -18,7 +19,7 @@ export default function Providers({ children }: { children: ReactNode }) {
 
     const isMock = typeof window !== "undefined" && (
       process.env.NEXT_PUBLIC_MOCK_AUTH === "true" ||
-      (process.env.NODE_ENV === "development" && (
+      (isDevelopmentEnv() && (
         new URLSearchParams(window.location.search).get("bypass_auth") === "true" ||
         document.cookie.includes("sb-mock-bypass=true")
       ))

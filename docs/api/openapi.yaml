@@ -31,6 +31,10 @@ components:
           type: integer
         remaining_quota:
           type: integer
+        ai_draft_quota:
+          type: integer
+        remaining_ai_draft_quota:
+          type: integer
         feature_flags:
           type: object
           properties:
