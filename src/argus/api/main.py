@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from argus.analysis.structural import warmup_jit
+from argus.api.agent import router as agent_router
 from argus.api.auth import (
     _user_cache,
     auth_required,
@@ -145,6 +146,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(strategies_router)
+app.include_router(agent_router)
 
 
 @app.get("/health")

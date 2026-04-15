@@ -237,3 +237,20 @@ class StrategyResponse(StrategyCreate):
 class PaginatedStrategiesResponse(BaseModel):
     strategies: List[StrategyResponse]
     next_cursor: Optional[str] = None
+
+
+class AgentDraftRequest(BaseModel):
+    """Request payload for generating a strategy draft via agent."""
+
+    prompt: str = Field(
+        ...,
+        max_length=1000,
+        description="Natural language prompt describing the strategy",
+    )
+
+
+class AgentDraftResponse(BaseModel):
+    """Response containing the generated strategy draft and explanation."""
+
+    draft: StrategyCreate
+    ai_explanation: str

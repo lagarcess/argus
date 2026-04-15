@@ -17,12 +17,12 @@ export const ASSET_REGISTRY: AssetRegistryItem[] = [
   { symbol: 'AMD', name: 'Advanced Micro Devices', category: 'EQUITY', exchange: 'NASDAQ' },
   { symbol: 'NFLX', name: 'Netflix Inc.', category: 'EQUITY', exchange: 'NASDAQ' },
   { symbol: 'BRK.B', name: 'Berkshire Hathaway', category: 'EQUITY', exchange: 'NYSE' },
-  
+
   // ETFs
   { symbol: 'SPY', name: 'SPDR S&P 500 ETF', category: 'ETF', exchange: 'NYSE' },
   { symbol: 'QQQ', name: 'Invesco QQQ Trust', category: 'ETF', exchange: 'NASDAQ' },
   { symbol: 'IWM', name: 'iShares Russell 2000', category: 'ETF', exchange: 'NYSE' },
-  
+
   // Crypto
   { symbol: 'BTC/USD', name: 'Bitcoin', category: 'CRYPTO', exchange: 'CBSE' },
   { symbol: 'ETH/USD', name: 'Ethereum', category: 'CRYPTO', exchange: 'CBSE' },
