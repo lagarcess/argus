@@ -4,10 +4,20 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Activity, LayoutDashboard, Search, History, User, Crown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
 // In a real app we'd fetch the generated OpenAPI via lib/api
 import { getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
 
 function QuotaBadge({ remaining, isAdmin }: { remaining: number; isAdmin: boolean }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return (
+      <div className="w-[84px] h-[24px] rounded-full bg-slate-800/50 animate-pulse border border-slate-700/50" />
+    );
+  }
+
   if (isAdmin) {
     return (
       <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-400/30 text-violet-400 text-xs font-semibold shadow-[0_0_10px_rgba(139,92,246,0.2)]">
@@ -28,6 +38,8 @@ function QuotaBadge({ remaining, isAdmin }: { remaining: number; isAdmin: boolea
 }
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const pathname = usePathname();
 
   // Middleware handles the secure boundary check, preventing screen flashing.
@@ -75,6 +87,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
              remaining={sessionData?.remaining_quota ?? 0}
              isAdmin={sessionData?.is_admin ?? false}
           />
+          {mounted ? (
           <Link href="/profile" className="relative group cursor-pointer">
             <div className={`absolute -inset-1 rounded-full blur-md opacity-30 group-hover:opacity-60 transition duration-500 ${
               sessionData?.subscription_tier === 'max' ? "bg-violet-500" :
@@ -96,6 +109,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                } />
             </div>
           </Link>
+          ) : (
+            <div className="relative w-8 h-8 rounded-full bg-slate-800/50 animate-pulse border border-slate-700/50" />
+          )}
         </div>
       </header>
 
