@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
+import { isDevelopmentEnv } from "@/lib/app-env";
 
 interface AuthContextType {
   user: User | null;
@@ -27,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isExplicitDisable = bypassParam === "false";
       const hasBypassCookie = typeof document !== "undefined" && document.cookie.includes("sb-mock-bypass=true");
 
-      const isMock = !isExplicitDisable && (process.env.NEXT_PUBLIC_MOCK_AUTH === "true" || (process.env.NODE_ENV === "development" && (hasBypassParam || hasBypassCookie)));
+      const isMock = !isExplicitDisable && (process.env.NEXT_PUBLIC_MOCK_AUTH === "true" || (isDevelopmentEnv() && (hasBypassParam || hasBypassCookie)));
 
       if (isMock) {
         console.log("🛡️ Mock Auth Active: Bypassing Supabase");
@@ -66,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const searchParams = new URLSearchParams(window.location.search);
       const hasBypassCookie = typeof document !== "undefined" && document.cookie.includes("sb-mock-bypass=true");
-      const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true" || (process.env.NODE_ENV === "development" && (searchParams.get("bypass_auth") === "true" || hasBypassCookie));
+      const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true" || (isDevelopmentEnv() && (searchParams.get("bypass_auth") === "true" || hasBypassCookie));
       if (isMock) return;
 
       if (session) {

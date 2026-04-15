@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { StrategyCreate } from "@/app/(protected)/builder/page";
+import { isDevelopmentEnv } from "@/lib/app-env";
 
 export interface StrategyDraft extends StrategyCreate {
   ai_explanation?: string;
@@ -28,7 +29,8 @@ export function useDraftStrategy() {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
-      const isMockApi = process.env.NEXT_PUBLIC_MOCK_API === "true" || process.env.NODE_ENV !== "production";
+      const isMockApi =
+        process.env.NEXT_PUBLIC_MOCK_API === "true" || isDevelopmentEnv();
 
       if (isMockApi) {
         setQuotaRemaining((prev) => prev - 1);

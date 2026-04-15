@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isDevelopmentEnv } from '@/lib/app-env'
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -12,12 +13,12 @@ export async function proxy(request: NextRequest) {
   const isBypassActive = bypassParam === 'true' || bypassCookie === 'true'
   const isMockMode =
     process.env.NEXT_PUBLIC_MOCK_AUTH === "true" ||
-    (process.env.NODE_ENV === "development" && isBypassActive)
+    (isDevelopmentEnv() && isBypassActive)
 
   // In mock mode, skip Supabase client creation entirely so local/dev and VRT
   // can run without injecting secrets.
   if (isMockMode) {
-    if (process.env.NODE_ENV === "development") {
+    if (isDevelopmentEnv()) {
       if (bypassParam === 'true') {
         supabaseResponse.cookies.set('sb-mock-bypass', 'true', {
           path: '/',
@@ -69,7 +70,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Persist bypass via cookie if parameter is present (development only)
-  if (process.env.NODE_ENV === "development") {
+  if (isDevelopmentEnv()) {
     if (bypassParam === 'true') {
       supabaseResponse.cookies.set('sb-mock-bypass', 'true', {
         path: '/',

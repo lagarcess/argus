@@ -3,6 +3,7 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isFeatureEnabled } from '@/lib/features';
 import { CriteriaItem, CriteriaItemData } from './CriteriaItem';
 
 interface CriteriaBuilderProps {
@@ -26,7 +27,7 @@ export const CriteriaBuilder: React.FC<CriteriaBuilderProps> = ({
   onFocus,
   onOpenSelector
 }) => {
-  const canAddRule = items.length < 1 || process.env.NEXT_PUBLIC_FEATURE_MULTI_RULES === "true";
+  const canAddRule = items.length < 1 || isFeatureEnabled("MULTI_RULES");
   const themeColor = type === 'entry' ? 'text-blue-400' : 'text-rose-400';
   const themeBg = type === 'entry' ? 'bg-blue-500/5' : 'bg-rose-500/5';
   const themeBorder = type === 'entry' ? 'border-blue-500/10' : 'border-rose-500/10';
