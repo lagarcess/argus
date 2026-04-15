@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Info, X } from "@phosphor-icons/react";
+import { Info, X } from "lucide-react";
 
 interface AiExplanationCardProps {
   explanation?: string | null;
@@ -24,7 +24,7 @@ export function AiExplanationCard({ explanation, onClose }: AiExplanationCardPro
           <div className="relative p-4 rounded-[1.5rem] bg-[#262528]/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 text-[#99f7ff]">
-                <Info size={18} weight="duotone" />
+                <Info size={18} />
               </div>
               <div className="flex-1">
                 <h4 className="font-mono text-[10px] text-white/50 uppercase tracking-widest mb-1">

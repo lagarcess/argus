@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
-import { Lightning, Sparkle, X } from "@phosphor-icons/react";
+import { Sparkles, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CoDrafterBarProps {
@@ -100,10 +100,9 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
         <div className="mr-4 flex-shrink-0 flex items-center justify-center">
           <div className="relative flex items-center justify-center w-[44px] h-[44px]">
              {isDrafting ? (
-               <Sparkle weight="fill" className="text-[#99f7ff] animate-spin-slow" size={24} />
+               <Sparkles className="text-[#99f7ff] animate-spin-slow" size={24} />
              ) : (
-               <Sparkle
-                 weight="fill"
+               <Sparkles
                  className={cn(
                    "transition-all duration-500",
                    isFocused || prompt.length > 0 ? "text-[#99f7ff] scale-110 drop-shadow-[0_0_10px_rgba(153,247,255,0.6)]" : "text-white/40"
@@ -169,8 +168,8 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
             aria-label="Submit Draft"
           >
             <span className="hidden md:inline">{isDrafting ? "Drafting..." : "Draft"}</span>
-            {!isDrafting && <Lightning weight="fill" className="md:ml-2" size={16} />}
-            {isDrafting && <Sparkle weight="fill" className="md:hidden animate-spin-slow" size={16} />}
+            {!isDrafting && <Zap className="md:ml-2" size={16} />}
+            {isDrafting && <Sparkles className="md:hidden animate-spin-slow" size={16} />}
           </button>
         </div>
       </motion.div>
