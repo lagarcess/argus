@@ -168,6 +168,8 @@ def auth_required(
             subscription_tier="max",
             backtest_quota=999999,
             remaining_quota=999999,
+            ai_draft_quota=999999,
+            remaining_ai_draft_quota=999999,
             feature_flags={"multi_asset_beta": True},
         )
     if supabase_client:
