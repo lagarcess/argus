@@ -89,6 +89,46 @@ def test_draft_strategy_quota_exhausted_real(mock_supabase):
     assert data["detail"]["error"] == "QUOTA_EXCEEDED"
 
 
+@patch("argus.api.agent.get_supabase_client")
+@patch("argus.api.agent.draft_strategy")
+def test_draft_strategy_does_not_consume_quota_when_drafter_fails(
+    mock_draft_strategy, mock_get_supabase_client
+):
+    mock_draft_strategy.side_effect = Exception("provider timeout")
+    mock_get_supabase_client.return_value = MagicMock()
+
+    response = client.post("/api/v1/agent/draft", json={"prompt": "YOLO on TSLA"})
+
+    assert response.status_code == 500
+    mock_get_supabase_client.return_value.rpc.assert_not_called()
+
+
+@patch("argus.api.agent.get_supabase_client")
+@patch("argus.api.agent.draft_strategy")
+def test_draft_strategy_handles_supabase_client_value_error(
+    mock_draft_strategy, mock_get_supabase_client
+):
+    strategy_create = StrategyCreate(
+        name="TSLA YOLO",
+        symbols=["TSLA"],
+        timeframe="1Day",
+        entry_criteria=[{"indicator": "Momentum", "operator": ">", "value": 0}],
+        exit_criteria=[],
+        slippage=0.001,
+        fees=0.005,
+    )
+    mock_draft_strategy.return_value = _StrategyDraftOutput(
+        strategy=strategy_create,
+        ai_explanation="Aggressive long momentum bias on TSLA.",
+    )
+    mock_get_supabase_client.side_effect = ValueError("Missing SUPABASE_URL")
+
+    response = client.post("/api/v1/agent/draft", json={"prompt": "YOLO on TSLA"})
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Unable to verify AI draft quota."
+
+
 @patch("argus.api.drafter.litellm.completion")
 def test_drafter_primary_model_success(mock_completion):
     import json

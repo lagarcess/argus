@@ -36,37 +36,49 @@ def create_agent_draft(
         prompt_length=len(request.prompt),
     )
 
-    supabase = get_supabase_client()
-
     try:
-        supabase.rpc("decrement_ai_draft_quota", {"user_uuid": user.id}).execute()
-    except Exception as exc:
-        if _is_quota_exhausted_error(exc):
-            logger.warning(
-                "User AI draft quota exhausted during RPC",
+        # Call the Drafter
+        draft_output = draft_strategy(request.prompt)
+
+        # Decrement quota only after a successful draft generation.
+        try:
+            supabase = get_supabase_client()
+            supabase.rpc("decrement_ai_draft_quota", {"user_uuid": user.id}).execute()
+        except ValueError as exc:
+            logger.exception(
+                "Supabase client misconfigured during AI draft quota decrement",
                 request_id=request_id,
                 user_id=user.id,
             )
             raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail={
-                    "error": "QUOTA_EXCEEDED",
-                    "message": "You have exhausted your AI draft quota.",
-                    "upgrade_url": "/settings",
-                },
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to verify AI draft quota.",
             ) from exc
+        except Exception as exc:
+            if _is_quota_exhausted_error(exc):
+                logger.warning(
+                    "User AI draft quota exhausted during RPC",
+                    request_id=request_id,
+                    user_id=user.id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail={
+                        "error": "QUOTA_EXCEEDED",
+                        "message": "You have exhausted your AI draft quota.",
+                        "upgrade_url": "/settings",
+                    },
+                ) from exc
 
-        logger.exception(
-            "Failed to decrement AI draft quota", request_id=request_id, user_id=user.id
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to verify AI draft quota.",
-        ) from exc
-
-    try:
-        # Call the Drafter
-        draft_output = draft_strategy(request.prompt)
+            logger.exception(
+                "Failed to decrement AI draft quota",
+                request_id=request_id,
+                user_id=user.id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to verify AI draft quota.",
+            ) from exc
 
         logger.info(
             "Successfully generated AI draft",
