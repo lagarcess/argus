@@ -23,7 +23,7 @@ import { ASSET_REGISTRY } from "@/lib/assets";
 
 const PINNED_INDICATORS = ["SMA", "RSI", "MACD", "EMA"];
 
-type StrategyCreate = {
+export type StrategyCreate = {
   name: string;
   asset_symbol: string;
   timeframe: "15Min" | "1H" | "2H" | "4H" | "12H" | "1D";
@@ -757,12 +757,12 @@ export default function BuilderPage() {
                 </div>
 
                 {/* Premium Lock Overlay */}
-                {tier === 'free' && (
+                {mounted && tier === 'free' && (
                   <div className="absolute inset-x-0 bottom-0 top-[60px] bg-slate-950/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center p-8 text-center border-t border-white/5 shadow-2xl rounded-b-xl">
                     <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center mb-5 shadow-2xl shadow-orange-500/20 animate-pulse">
                       <Lock className="text-white w-7 h-7" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2 tracking-tight group-hover/forge:scale-105 transition-transform duration-500">
+                    <h3 className="text-xl font-bold text-white mb-2 tracking-tight group-hover/forge:scale-105 transition-transform duration-300">
                       Execution Forge
                     </h3>
                     <p className="text-[10px] text-slate-400 max-w-[320px] mb-8 leading-relaxed font-medium">
