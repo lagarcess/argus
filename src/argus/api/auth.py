@@ -1,4 +1,3 @@
-from fastapi import status
 """
 Supabase JWT authentication middleware for FastAPI.
 
@@ -223,7 +222,7 @@ def auth_required(
 
 
 def check_rate_limit(
-    user: UserResponse = Depends(auth_required),  # noqa: B008
+    user: UserResponse = Depends(auth_required),  # noqa: B008,  # noqa: B008
 ) -> UserResponse:
     """
     FastAPI dependency: checks if user has exceeded their monthly usage limit.
@@ -264,7 +263,7 @@ def check_rate_limit(
 
 
 def check_asset_search_rate_limit(
-    user: UserResponse = Depends(auth_required),  # noqa: B008
+    user: UserResponse = Depends(auth_required),  # noqa: B008,  # noqa: B008
 ) -> Dict[str, Any]:
     """
     FastAPI dependency: Mock rate limiter for asset searches.
@@ -279,7 +278,7 @@ def check_asset_search_rate_limit(
     }
 
 
-def check_ai_quota(user: UserResponse = Depends(auth_required)) -> UserResponse:
+def check_ai_quota(user: UserResponse = Depends(auth_required)) -> UserResponse:  # noqa: B008
     if user.is_admin:
         return user
 

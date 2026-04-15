@@ -1,4 +1,4 @@
-from langchain_openai import ChatOpenAI
+import litellm
 from loguru import logger
 from pydantic import BaseModel
 
@@ -8,13 +8,13 @@ from argus.config import Settings, get_settings
 
 
 class _StrategyDraftOutput(BaseModel):
-    """Internal schema for LangChain structured output."""
+    """Internal schema for litellm structured output."""
 
     strategy: StrategyCreate
     ai_explanation: str
 
 
-SYSTEM_PROMPT = """You are the Argus Senior Quant Strategist.
+SYSTEM_PROMPT = """You are a Conservative Quant Research Assistant.
 Your job is to translate user natural language (which may include retail/WSB slang) into a high-fidelity, backtestable `StrategyCreate` JSON object.
 
 CRITICAL RULES:
@@ -39,27 +39,48 @@ Assistant: {"strategy": {"name": "SPY Golden Cross", "symbols": ["SPY"], "timefr
 """
 
 
-def _call_model(model: str, prompt: str, settings: Settings) -> _StrategyDraftOutput | None:
+def _call_model(
+    model: str, prompt: str, settings: Settings, temperature: float = 0.1
+) -> _StrategyDraftOutput | None:
     try:
-        llm = ChatOpenAI(
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ]
+
+        # Convert Pydantic schema to JSON schema manually for broader compatibility if needed,
+        # but litellm handles Pydantic BaseModel via instructor/direct formatting in recent versions.
+        response = litellm.completion(
+            model=model,
+            messages=messages,
             api_key=settings.OPENROUTER_API_KEY.get_secret_value(),
             base_url="https://openrouter.ai/api/v1",
-            model=model,
-            temperature=0.1,
-            max_retries=0,
+            temperature=temperature,
+            response_format=_StrategyDraftOutput,
         )
-        structured_llm = llm.with_structured_output(_StrategyDraftOutput)
-        messages = [("system", SYSTEM_PROMPT), ("human", prompt)]
 
-        res = structured_llm.invoke(messages)
-        if not res:
+        content = response.choices[0].message.content
+        if not content:
+            return None
+
+        # Litellm handles JSON mode. We validate it manually just in case the provider missed.
+        try:
+            # If the response_format wasn't fully supported as a Pydantic object by the provider,
+            # litellm will usually return JSON text.
+            if isinstance(content, str):
+                res = _StrategyDraftOutput.model_validate_json(content)
+            else:
+                # Some litellm paths return the object directly if structured output works natively
+                res = _StrategyDraftOutput.model_validate(content)
+        except Exception as e:
+            logger.warning(f"Failed to parse structured output from {model}: {e}")
             return None
 
         # Canonicalize symbols
         res.strategy.symbols = [s.upper() for s in res.strategy.symbols]
         return res
-    except Exception as e:
-        logger.warning(f"Model {model} failed: {e}")
+    except Exception:
+        logger.warning(f"Model {model} failed.")
         return None
 
 
@@ -75,14 +96,17 @@ def draft_strategy(prompt: str) -> _StrategyDraftOutput:
         model=settings.AGENT_MODEL,
         prompt=prompt,
         settings=settings,
+        temperature=0.1,
     )
     if primary:
         return primary
 
+    logger.warning("Primary draft model failed, trying fallback model.")
     fallback = _call_model(
         model=settings.AGENT_FALLBACK_MODEL,
         prompt=prompt,
         settings=settings,
+        temperature=0.1,
     )
     if fallback:
         return fallback

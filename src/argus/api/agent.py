@@ -16,14 +16,12 @@ router = APIRouter(
 )
 
 
-def _is_p0001_quota_error(exc: Exception) -> bool:
+def _is_quota_exhausted_error(exc: Exception) -> bool:
     """Helper to detect PostgreSQL P0001 quota exception from Supabase."""
     return "P0001" in str(exc) or "quota" in str(exc).lower()
 
 
-@router.post(
-    "/draft", response_model=AgentDraftResponse, status_code=status.HTTP_200_OK
-)
+@router.post("/draft", response_model=AgentDraftResponse, status_code=status.HTTP_200_OK)
 def create_agent_draft(
     request: AgentDraftRequest,
     response: Response,
@@ -41,11 +39,9 @@ def create_agent_draft(
     supabase = get_supabase_client()
 
     try:
-        supabase.rpc(
-            "decrement_ai_draft_quota", {"user_uuid": user.id}
-        ).execute()
+        supabase.rpc("decrement_ai_draft_quota", {"user_uuid": user.id}).execute()
     except Exception as exc:
-        if _is_p0001_quota_error(exc):
+        if _is_quota_exhausted_error(exc):
             logger.warning(
                 "User AI draft quota exhausted during RPC",
                 request_id=request_id,
@@ -60,7 +56,9 @@ def create_agent_draft(
                 },
             ) from exc
 
-        logger.exception("Failed to decrement AI draft quota", request_id=request_id, user_id=user.id)
+        logger.exception(
+            "Failed to decrement AI draft quota", request_id=request_id, user_id=user.id
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to verify AI draft quota.",
@@ -87,10 +85,11 @@ def create_agent_draft(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate strategy draft due to reasoning engine error.",
         ) from de
-    except HTTPException:
-        raise
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
         logger.exception("Unexpected error in draft generation", request_id=request_id)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred.",
         ) from e

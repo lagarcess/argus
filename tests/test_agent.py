@@ -15,11 +15,13 @@ fake_user = UserResponse(
     id=str(uuid.uuid4()),
     email="test@example.com",
     is_admin=False,
-    remaining_ai_draft_quota=5
+    remaining_ai_draft_quota=5,
 )
+
 
 def override_auth():
     return fake_user
+
 
 @pytest.fixture(autouse=True)
 def setup_teardown():
@@ -39,6 +41,7 @@ def mock_supabase():
         client_mock.rpc.return_value = rpc_mock
         yield client_mock
 
+
 @pytest.fixture
 def mock_drafter():
     with patch("argus.api.agent.draft_strategy") as mock:
@@ -49,13 +52,14 @@ def mock_drafter():
             entry_criteria=[{"indicator": "Momentum", "operator": ">", "value": 0}],
             exit_criteria=[],
             slippage=0.001,
-            fees=0.005
+            fees=0.005,
         )
         mock.return_value = _StrategyDraftOutput(
             strategy=strategy_create,
-            ai_explanation="Aggressive long momentum bias on TSLA."
+            ai_explanation="Aggressive long momentum bias on TSLA.",
         )
         yield mock
+
 
 def test_draft_strategy_success(mock_supabase, mock_drafter):
     response = client.post("/api/v1/agent/draft", json={"prompt": "YOLO on TSLA"})
@@ -65,8 +69,11 @@ def test_draft_strategy_success(mock_supabase, mock_drafter):
     assert data["draft"]["symbols"] == ["TSLA"]
     assert data["ai_explanation"] == "Aggressive long momentum bias on TSLA."
 
-    mock_supabase.rpc.assert_called_once_with("decrement_ai_draft_quota", {"user_uuid": fake_user.id})
+    mock_supabase.rpc.assert_called_once_with(
+        "decrement_ai_draft_quota", {"user_uuid": fake_user.id}
+    )
     mock_drafter.assert_called_once_with("YOLO on TSLA")
+
 
 def test_draft_strategy_quota_exhausted_real(mock_supabase):
     rpc_mock = MagicMock()
@@ -78,64 +85,92 @@ def test_draft_strategy_quota_exhausted_real(mock_supabase):
     data = response.json()
     assert data["detail"]["error"] == "QUOTA_EXCEEDED"
 
-@patch("argus.api.drafter.ChatOpenAI")
-def test_drafter_primary_model_success(mock_chat_openai):
+
+@patch("argus.api.drafter.litellm.completion")
+def test_drafter_primary_model_success(mock_completion):
+    import json
+
     from argus.api.drafter import draft_strategy
 
-    mock_llm = MagicMock()
-    mock_chat_openai.return_value = mock_llm
-
-    mock_structured = MagicMock()
-    mock_llm.with_structured_output.return_value = mock_structured
-
-    expected_output = _StrategyDraftOutput(
-        strategy=StrategyCreate(
-            name="Test", symbols=["AAPL"], timeframe="1Day",
-            entry_criteria=[], exit_criteria=[], slippage=0.001, fees=0.005
-        ),
-        ai_explanation="Explanation"
+    mock_response = MagicMock()
+    # Provide the JSON string in the mock structure
+    mock_response.choices[0].message.content = json.dumps(
+        {
+            "strategy": {
+                "name": "Test",
+                "symbols": ["aapl"],
+                "timeframe": "1Day",
+                "entry_criteria": [],
+                "exit_criteria": [],
+                "slippage": 0.001,
+                "fees": 0.005,
+            },
+            "ai_explanation": "Explanation",
+        }
     )
-    mock_structured.invoke.return_value = expected_output
+    mock_completion.return_value = mock_response
 
     with patch("argus.api.drafter.get_settings") as mock_settings:
         settings_mock = MagicMock()
         settings_mock.OPENROUTER_API_KEY.get_secret_value.return_value = "sk-test"
+        settings_mock.AGENT_MODEL = "test_model"
         mock_settings.return_value = settings_mock
 
         result = draft_strategy("Buy AAPL")
+        # Ensure it was canonicalized
         assert result.strategy.symbols == ["AAPL"]
         assert result.ai_explanation == "Explanation"
-        assert mock_chat_openai.call_count == 1
+        assert mock_completion.call_count == 1
+        # assert temperature 0.1
+        _, kwargs = mock_completion.call_args
+        assert kwargs["temperature"] == 0.1
+        assert kwargs["model"] == "test_model"
 
-@patch("argus.api.drafter.ChatOpenAI")
-def test_drafter_fallback_model_success(mock_chat_openai):
+
+@patch("argus.api.drafter.litellm.completion")
+def test_drafter_fallback_model_success(mock_completion):
+    import json
+
     from argus.api.drafter import draft_strategy
 
-    mock_llm_primary = MagicMock()
-    mock_llm_fallback = MagicMock()
-    mock_chat_openai.side_effect = [mock_llm_primary, mock_llm_fallback]
+    mock_response_fail = MagicMock()
+    mock_response_fail.choices[0].message.content = "Invalid JSON"
 
-    mock_structured_primary = MagicMock()
-    mock_structured_primary.invoke.side_effect = Exception("Primary failed")
-    mock_llm_primary.with_structured_output.return_value = mock_structured_primary
-
-    mock_structured_fallback = MagicMock()
-    expected_output = _StrategyDraftOutput(
-        strategy=StrategyCreate(
-            name="Fallback", symbols=["MSFT"], timeframe="1Day",
-            entry_criteria=[], exit_criteria=[], slippage=0.001, fees=0.005
-        ),
-        ai_explanation="Fallback explanation"
+    mock_response_success = MagicMock()
+    mock_response_success.choices[0].message.content = json.dumps(
+        {
+            "strategy": {
+                "name": "Fallback",
+                "symbols": ["msft"],
+                "timeframe": "1Day",
+                "entry_criteria": [],
+                "exit_criteria": [],
+                "slippage": 0.001,
+                "fees": 0.005,
+            },
+            "ai_explanation": "Fallback explanation",
+        }
     )
-    mock_structured_fallback.invoke.return_value = expected_output
-    mock_llm_fallback.with_structured_output.return_value = mock_structured_fallback
+
+    # First call fails parsing (Invalid JSON), second call succeeds
+    mock_completion.side_effect = [mock_response_fail, mock_response_success]
 
     with patch("argus.api.drafter.get_settings") as mock_settings:
         settings_mock = MagicMock()
         settings_mock.OPENROUTER_API_KEY.get_secret_value.return_value = "sk-test"
+        settings_mock.AGENT_MODEL = "primary_model"
+        settings_mock.AGENT_FALLBACK_MODEL = "fallback_model"
         mock_settings.return_value = settings_mock
 
         result = draft_strategy("Buy MSFT")
         assert result.strategy.symbols == ["MSFT"]
         assert result.ai_explanation == "Fallback explanation"
-        assert mock_chat_openai.call_count == 2
+        assert mock_completion.call_count == 2
+
+        # Verify first call
+        _, kwargs_primary = mock_completion.call_args_list[0]
+        assert kwargs_primary["model"] == "primary_model"
+
+        # Verify second call
+        _, kwargs_fallback = mock_completion.call_args_list[1]
+        assert kwargs_fallback["model"] == "fallback_model"
