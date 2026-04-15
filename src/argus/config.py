@@ -10,10 +10,21 @@ from typing import Any
 
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from alpaca.trading.client import TradingClient
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from supabase import Client, create_client
+
+_DEV_ENV_VALUES = {"dev", "development", "local", "test"}
+_PROD_ENV_VALUES = {"prod", "production"}
+
+
+def _is_placeholder(value: str | None) -> bool:
+    """Return True for unresolved env-style placeholders like ${VAR_NAME}."""
+    if not value:
+        return False
+    stripped = value.strip()
+    return stripped.startswith("${") and stripped.endswith("}")
 
 
 class Settings(BaseSettings):
@@ -79,13 +90,17 @@ class Settings(BaseSettings):
 
     # Core Application Settings
     APP_ENV: str = Field(
-        default="DEV",
-        description="Application environment flag (DEV, PROD, etc.)",
+        default="development",
+        description="Application environment flag (development or production).",
     )
 
     # Supabase Configuration
+    SUPABASE_PROJECT_URL: str | None = Field(default=None)
+    SUPABASE_ANON_PUBLIC_KEY: str | None = Field(default=None)
     SUPABASE_URL: str | None = Field(default=None)
     SUPABASE_ANON_KEY: str | None = Field(default=None)
+    NEXT_PUBLIC_SUPABASE_URL: str | None = Field(default=None)
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: str | None = Field(default=None)
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default=None)
     SUPABASE_JWT_SECRET: str | None = Field(default=None)
 
@@ -114,6 +129,51 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
+
+    @field_validator("APP_ENV", mode="before")
+    @classmethod
+    def normalize_app_env(cls, v: Any) -> str:
+        """Normalize APP_ENV so legacy DEV/PROD values still work."""
+        if v is None:
+            return "development"
+
+        normalized = str(v).strip().lower()
+        if normalized in _DEV_ENV_VALUES:
+            return "development"
+        if normalized in _PROD_ENV_VALUES:
+            return "production"
+
+        raise ValueError(
+            "APP_ENV must be one of: development, production, dev, prod, local, test"
+        )
+
+    @model_validator(mode="after")
+    def resolve_supabase_aliases(self) -> "Settings":
+        """Resolve canonical Supabase values into runtime fields when needed."""
+        if (not self.SUPABASE_URL or _is_placeholder(self.SUPABASE_URL)) and (
+            self.SUPABASE_PROJECT_URL and not _is_placeholder(self.SUPABASE_PROJECT_URL)
+        ):
+            self.SUPABASE_URL = self.SUPABASE_PROJECT_URL
+
+        if (not self.SUPABASE_ANON_KEY or _is_placeholder(self.SUPABASE_ANON_KEY)) and (
+            self.SUPABASE_ANON_PUBLIC_KEY
+            and not _is_placeholder(self.SUPABASE_ANON_PUBLIC_KEY)
+        ):
+            self.SUPABASE_ANON_KEY = self.SUPABASE_ANON_PUBLIC_KEY
+
+        if (
+            not self.NEXT_PUBLIC_SUPABASE_URL
+            or _is_placeholder(self.NEXT_PUBLIC_SUPABASE_URL)
+        ) and (self.SUPABASE_URL and not _is_placeholder(self.SUPABASE_URL)):
+            self.NEXT_PUBLIC_SUPABASE_URL = self.SUPABASE_URL
+
+        if (
+            not self.NEXT_PUBLIC_SUPABASE_ANON_KEY
+            or _is_placeholder(self.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+        ) and (self.SUPABASE_ANON_KEY and not _is_placeholder(self.SUPABASE_ANON_KEY)):
+            self.NEXT_PUBLIC_SUPABASE_ANON_KEY = self.SUPABASE_ANON_KEY
+
+        return self
 
 
 @lru_cache()

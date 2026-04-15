@@ -20,7 +20,7 @@ from argus.supabase import supabase_client
 # Supabase signs JWTs with the project JWT secret
 _settings = get_settings()
 _SUPABASE_JWT_SECRET: Optional[str] = _settings.SUPABASE_JWT_SECRET
-_DEV_MODE = _settings.APP_ENV != "PROD"
+_DEV_MODE = _settings.APP_ENV != "production"
 
 
 class UserCache:
