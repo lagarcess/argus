@@ -77,7 +77,7 @@ def test_draft_strategy_success(mock_supabase, mock_drafter):
     mock_drafter.assert_called_once_with("YOLO on TSLA")
 
 
-def test_draft_strategy_quota_exhausted_real(mock_supabase):
+def test_draft_strategy_quota_exhausted_real(mock_supabase, mock_drafter):
     rpc_mock = MagicMock()
     rpc_mock.execute.side_effect = Exception("P0001: user quota is gone")
     mock_supabase.rpc.return_value = rpc_mock
