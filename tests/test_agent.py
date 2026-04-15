@@ -10,7 +10,6 @@ from argus.api.schemas import StrategyCreate
 from argus.config import Settings
 from argus.domain.schemas import UserResponse
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
 client = TestClient(app)
 
@@ -243,9 +242,12 @@ def test_auth_required_hydrates_ai_quota_fields():
     assert user.remaining_ai_draft_quota == 3
 
 
-def test_settings_requires_agent_model_envs(monkeypatch: pytest.MonkeyPatch):
+def test_settings_uses_default_agent_models_when_env_missing(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.delenv("AGENT_MODEL", raising=False)
     monkeypatch.delenv("AGENT_FALLBACK_MODEL", raising=False)
 
-    with pytest.raises(ValidationError):
-        Settings(_env_file=None)
+    settings = Settings(_env_file=None)
+    assert settings.AGENT_MODEL == "openrouter/deepseek/deepseek-v3"
+    assert settings.AGENT_FALLBACK_MODEL == "openrouter/meta-llama/llama-3.1-8b-instruct"

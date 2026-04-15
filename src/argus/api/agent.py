@@ -1,7 +1,8 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
+from postgrest import APIError
 
 from argus.api.auth import check_ai_quota
 from argus.api.drafter import draft_strategy
@@ -18,13 +19,14 @@ router = APIRouter(
 
 def _is_quota_exhausted_error(exc: Exception) -> bool:
     """Helper to detect PostgreSQL P0001 quota exception from Supabase."""
+    if isinstance(exc, APIError):
+        return exc.code == "P0001"
     return "P0001" in str(exc) or "quota" in str(exc).lower()
 
 
 @router.post("/draft", response_model=AgentDraftResponse, status_code=status.HTTP_200_OK)
 def create_agent_draft(
     request: AgentDraftRequest,
-    response: Response,
     user: UserResponse = Depends(check_ai_quota),  # noqa: B008
 ):
     """Generates a strategy draft from natural language."""

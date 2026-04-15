@@ -80,7 +80,7 @@ def _call_model(
         res.strategy.symbols = [s.upper() for s in res.strategy.symbols]
         return res
     except Exception:
-        logger.warning(f"Model {model} failed.")
+        logger.exception(f"Model {model} failed.")
         return None
 
 
