@@ -3,13 +3,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from loguru import logger
 
-from argus.api.auth import check_rate_limit
+from argus.api.auth import check_ai_quota
 from argus.api.drafter import draft_strategy
 from argus.api.exceptions import DraftingError
 from argus.api.schemas import AgentDraftRequest, AgentDraftResponse
 from argus.config import get_supabase_client
 from argus.domain.schemas import UserResponse
-from argus.market.data_provider import retry_with_backoff
 
 router = APIRouter(
     prefix="/api/v1/agent",
@@ -17,11 +16,18 @@ router = APIRouter(
 )
 
 
-@router.post("/draft", response_model=AgentDraftResponse, status_code=status.HTTP_200_OK)
+def _is_p0001_quota_error(exc: Exception) -> bool:
+    """Helper to detect PostgreSQL P0001 quota exception from Supabase."""
+    return "P0001" in str(exc) or "quota" in str(exc).lower()
+
+
+@router.post(
+    "/draft", response_model=AgentDraftResponse, status_code=status.HTTP_200_OK
+)
 def create_agent_draft(
     request: AgentDraftRequest,
     response: Response,
-    user: UserResponse = Depends(check_rate_limit),  # noqa: B008
+    user: UserResponse = Depends(check_ai_quota),  # noqa: B008
 ):
     """Generates a strategy draft from natural language."""
     request_id = str(uuid.uuid4())
@@ -32,32 +38,35 @@ def create_agent_draft(
         prompt_length=len(request.prompt),
     )
 
+    supabase = get_supabase_client()
+
     try:
-        # Check quota and decrement
-        supabase = get_supabase_client()
-
-        try:
-            retry_with_backoff(max_retries=3)(
-                lambda: supabase.rpc(
-                    "decrement_ai_draft_quota", {"user_uuid": user.id}
-                ).execute()
-            )()
-        except Exception as e:
-            error_msg = str(e)
-            if "P0001" in error_msg or "quota" in error_msg.lower():
-                logger.warning(
-                    "User AI draft quota exhausted",
-                    request_id=request_id,
-                    user_id=user.id,
-                )
-                raise HTTPException(
-                    status_code=402, detail="Payment Required: AI draft quota exhausted."
-                ) from e
-            logger.error(f"Failed to decrement quota: {e}", request_id=request_id)
+        supabase.rpc(
+            "decrement_ai_draft_quota", {"user_uuid": user.id}
+        ).execute()
+    except Exception as exc:
+        if _is_p0001_quota_error(exc):
+            logger.warning(
+                "User AI draft quota exhausted during RPC",
+                request_id=request_id,
+                user_id=user.id,
+            )
             raise HTTPException(
-                status_code=500, detail="Internal server error while verifying quota."
-            ) from e
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "QUOTA_EXCEEDED",
+                    "message": "You have exhausted your AI draft quota.",
+                    "upgrade_url": "/settings",
+                },
+            ) from exc
 
+        logger.exception("Failed to decrement AI draft quota", request_id=request_id, user_id=user.id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to verify AI draft quota.",
+        ) from exc
+
+    try:
         # Call the Drafter
         draft_output = draft_strategy(request.prompt)
 
@@ -75,13 +84,13 @@ def create_agent_draft(
     except DraftingError as de:
         logger.error(f"Drafting error: {de}", request_id=request_id)
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate strategy draft due to reasoning engine error.",
         ) from de
+    except HTTPException:
+        raise
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise
         logger.exception("Unexpected error in draft generation", request_id=request_id)
         raise HTTPException(
-            status_code=500, detail="An unexpected error occurred."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred."
         ) from e

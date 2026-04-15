@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from argus.api.exceptions import DraftingError
 from argus.api.schemas import StrategyCreate
 from argus.config import Settings, get_settings
-from argus.market.data_provider import retry_with_backoff
 
 
 class _StrategyDraftOutput(BaseModel):
@@ -40,59 +39,28 @@ Assistant: {"strategy": {"name": "SPY Golden Cross", "symbols": ["SPY"], "timefr
 """
 
 
-@retry_with_backoff(max_retries=3)
-def _call_llm_with_fallback(prompt: str, settings: Settings) -> _StrategyDraftOutput:
-    """Calls OpenRouter LLM using Langchain's with_structured_output. Implements fallback."""
+def _call_model(model: str, prompt: str, settings: Settings) -> _StrategyDraftOutput | None:
     try:
-        if not settings.OPENROUTER_API_KEY:
-            raise DraftingError("OPENROUTER_API_KEY is not configured.")
-
-        # Primary Model
         llm = ChatOpenAI(
             api_key=settings.OPENROUTER_API_KEY.get_secret_value(),
             base_url="https://openrouter.ai/api/v1",
-            model=settings.AGENT_MODEL,
-            max_retries=0,  # handled by our own decorator
+            model=model,
+            temperature=0.1,
+            max_retries=0,
         )
         structured_llm = llm.with_structured_output(_StrategyDraftOutput)
-
         messages = [("system", SYSTEM_PROMPT), ("human", prompt)]
 
         res = structured_llm.invoke(messages)
         if not res:
-            raise ValueError("Empty structured output")
+            return None
+
         # Canonicalize symbols
         res.strategy.symbols = [s.upper() for s in res.strategy.symbols]
         return res
     except Exception as e:
-        logger.warning(
-            f"Primary model failed ({e}), attempting fallback model: {settings.AGENT_FALLBACK_MODEL}"
-        )
-        try:
-            # Fallback Model
-            llm_fallback = ChatOpenAI(
-                api_key=settings.OPENROUTER_API_KEY.get_secret_value(),
-                base_url="https://openrouter.ai/api/v1",
-                model=settings.AGENT_FALLBACK_MODEL,
-                max_retries=0,
-            )
-            structured_llm_fallback = llm_fallback.with_structured_output(
-                _StrategyDraftOutput
-            )
-
-            messages = [("system", SYSTEM_PROMPT), ("human", prompt)]
-
-            res_fallback = structured_llm_fallback.invoke(messages)
-            if not res_fallback:
-                raise ValueError("Empty structured output from fallback")
-            # Canonicalize symbols
-            res_fallback.strategy.symbols = [
-                s.upper() for s in res_fallback.strategy.symbols
-            ]
-            return res_fallback
-        except Exception as e_fallback:
-            logger.error("Fallback model also failed.")
-            raise DraftingError(f"Drafting failed: {e_fallback}") from e_fallback
+        logger.warning(f"Model {model} failed: {e}")
+        return None
 
 
 def draft_strategy(prompt: str) -> _StrategyDraftOutput:
@@ -100,4 +68,23 @@ def draft_strategy(prompt: str) -> _StrategyDraftOutput:
     Translates a natural language prompt into a valid StrategyCreate schema.
     """
     settings = get_settings()
-    return _call_llm_with_fallback(prompt, settings)
+    if not settings.OPENROUTER_API_KEY:
+        raise DraftingError("OPENROUTER_API_KEY is not configured.")
+
+    primary = _call_model(
+        model=settings.AGENT_MODEL,
+        prompt=prompt,
+        settings=settings,
+    )
+    if primary:
+        return primary
+
+    fallback = _call_model(
+        model=settings.AGENT_FALLBACK_MODEL,
+        prompt=prompt,
+        settings=settings,
+    )
+    if fallback:
+        return fallback
+
+    raise DraftingError("Drafting failed on both primary and fallback models.")

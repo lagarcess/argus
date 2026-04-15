@@ -1,3 +1,4 @@
+from fastapi import status
 """
 Supabase JWT authentication middleware for FastAPI.
 
@@ -276,3 +277,20 @@ def check_asset_search_rate_limit(
         "X-RateLimit-Remaining": "99",
         "X-RateLimit-Reset": str(int(time.time() + 60)),
     }
+
+
+def check_ai_quota(user: UserResponse = Depends(auth_required)) -> UserResponse:
+    if user.is_admin:
+        return user
+
+    if user.remaining_ai_draft_quota <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "QUOTA_EXCEEDED",
+                "message": "You have exhausted your AI draft quota.",
+                "upgrade_url": "/settings",
+            },
+        )
+
+    return user
