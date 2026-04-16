@@ -5,15 +5,7 @@
  * auto-generated types from the backend FastAPI schema.
  */
 
-import {
-  UserResponse as GeneratedUserResponse,
-  BacktestRequest,
-  SimulationLogEntry,
-  GetHistoryResponse as PaginatedHistory,
-  SsoRequest,
-  SsoResponse,
-  BacktestResponse,
-} from "./api/types.gen";
+import { UserResponse as GeneratedUserResponse, BacktestRequest, SimulationLogEntry, GetHistoryResponse as PaginatedHistory, SsoRequest, SsoResponse, BacktestResponse } from "./api/types.gen";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
