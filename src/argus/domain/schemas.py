@@ -56,6 +56,9 @@ class UserResponse(BaseModel):
     remaining_quota: int = 50
     ai_draft_quota: int = 5
     remaining_ai_draft_quota: int = 5
+    onboarding_completed: bool = False
+    onboarding_step: str = "profile"
+    onboarding_intent: Optional[str] = None
     last_quota_reset: Optional[datetime] = None
     feature_flags: Dict[str, Any] = Field(default_factory=dict)
 

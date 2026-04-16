@@ -163,6 +163,9 @@ class ProfileUpdate(BaseModel):
 
     theme: Optional[str] = None
     lang: Optional[str] = None
+    onboarding_completed: Optional[bool] = None
+    onboarding_step: Optional[str] = None
+    onboarding_intent: Optional[str] = None
 
 
 class SSORequest(BaseModel):

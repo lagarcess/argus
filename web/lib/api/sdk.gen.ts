@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponses, GetAssetsData, GetAssetsResponses, GetAuthSessionData, GetAuthSessionResponses, GetBacktestsByIdData, GetBacktestsByIdErrors, GetBacktestsByIdResponses, GetHealthData, GetHealthResponses, GetHistoryData, GetHistoryResponses, GetMarketBarsData, GetMarketBarsResponses, GetScreenersData, GetScreenersResponses, GetStrategiesData, GetStrategiesResponses, PatchAuthProfileData, PatchAuthProfileResponses, PostAgentDraftData, PostAgentDraftResponses, PostBacktestsData, PostBacktestsErrors, PostBacktestsResponses, PostBillingCheckoutData, PostBillingCheckoutResponses, PostFeedbackData, PostFeedbackResponses, PostMocksBacktestData, PostMocksBacktestResponses, PostShareData, PostShareResponses, PostStrategiesData, PostStrategiesResponses, PostWebhookBillingData, PostWebhookBillingResponses, PutStrategiesByIdData, PutStrategiesByIdResponses } from './types.gen';
+import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponses, GetAssetsData, GetAssetsResponses, GetAuthSessionData, GetAuthSessionResponses, GetBacktestsByIdData, GetBacktestsByIdErrors, GetBacktestsByIdResponses, GetHealthData, GetHealthResponses, GetHistoryData, GetHistoryResponses, GetMarketBarsData, GetMarketBarsResponses, GetScreenersData, GetScreenersResponses, GetStrategiesByIdData, GetStrategiesByIdResponses, GetStrategiesData, GetStrategiesResponses, PatchAuthProfileData, PatchAuthProfileResponses, PostAgentDraftData, PostAgentDraftResponses, PostAuthLogoutData, PostAuthLogoutResponses, PostBacktestsData, PostBacktestsErrors, PostBacktestsResponses, PostBillingCheckoutData, PostBillingCheckoutResponses, PostFeedbackData, PostFeedbackResponses, PostMocksBacktestData, PostMocksBacktestResponses, PostShareData, PostShareResponses, PostStrategiesData, PostStrategiesResponses, PostWebhookBillingData, PostWebhookBillingResponses, PutStrategiesByIdData, PutStrategiesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -92,6 +92,19 @@ export const deleteStrategiesById = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
+ * Get strategy by id
+ */
+export const getStrategiesById = <ThrowOnError extends boolean = false>(options: Options<GetStrategiesByIdData, ThrowOnError>) => (options.client ?? client).get<GetStrategiesByIdResponses, unknown, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sb-access-token',
+            type: 'apiKey'
+        }],
+    url: '/strategies/{id}',
+    ...options
+});
+
+/**
  * Update a strategy
  */
 export const putStrategiesById = <ThrowOnError extends boolean = false>(options: Options<PutStrategiesByIdData, ThrowOnError>) => (options.client ?? client).put<PutStrategiesByIdResponses, unknown, ThrowOnError>({
@@ -166,6 +179,19 @@ export const postAgentDraft = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Revoke upstream session and clear local auth cookies
+ */
+export const postAuthLogout = <ThrowOnError extends boolean = false>(options?: Options<PostAuthLogoutData, ThrowOnError>) => (options?.client ?? client).post<PostAuthLogoutResponses, unknown, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sb-access-token',
+            type: 'apiKey'
+        }],
+    url: '/auth/logout',
+    ...options
 });
 
 /**

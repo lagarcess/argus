@@ -48,7 +48,7 @@ export default function StrategiesPage() {
              </div>
              <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-4 animate-pulse">Loading Strategies...</p>
            </div>
-        ) : strategies?.data?.length === 0 ? (
+        ) : (strategies?.strategies?.length ?? 0) === 0 ? (
            <div className="col-span-full py-20 text-center glass-card border-slate-800 border-dashed flex flex-col items-center justify-center">
              <Copy className="w-8 h-8 text-slate-600 mb-4" />
              <h3 className="text-lg font-semibold text-slate-300">No Strategies Found</h3>
@@ -56,8 +56,7 @@ export default function StrategiesPage() {
              <Link href="/builder" className="btn-secondary text-sm">Create Strategy</Link>
            </div>
         ) : (
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          strategies?.data?.map((strat: StrategyListItem | any) => (
+          strategies?.strategies?.map((strat: StrategyListItem) => (
             <div key={strat.id} className="glass-card p-5 border-slate-800 hover:border-emerald-400/30 transition-colors flex flex-col justify-between group h-40">
                <div>
                   <div className="flex items-start justify-between mb-2">
