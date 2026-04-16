@@ -37,8 +37,20 @@ export type StrategySchema = {
     name: string;
     symbols: Array<string>;
     timeframe: string;
+    start_date?: string;
+    end_date?: string;
     slippage?: number;
     fees?: number;
+    indicators_config?: {
+        [key: string]: number | boolean | string;
+    };
+    patterns?: Array<string>;
+    capital?: number;
+    trade_direction?: 'LONG' | 'SHORT' | 'BOTH';
+    participation_rate?: number;
+    execution_priority?: number;
+    va_sensitivity?: number;
+    slippage_model?: 'fixed' | 'vol_adjusted';
     entry_criteria?: Array<{
         [key: string]: unknown;
     }>;

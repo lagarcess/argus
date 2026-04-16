@@ -45,6 +45,18 @@ class PersistenceService:
             return None
 
         try:
+            indicators_config = dict(strategy_data.get("indicators_config", {}) or {})
+            for field in (
+                "capital",
+                "trade_direction",
+                "participation_rate",
+                "execution_priority",
+                "va_sensitivity",
+                "slippage_model",
+            ):
+                if strategy_data.get(field) is not None:
+                    indicators_config[field] = strategy_data[field]
+
             data: Dict[str, Any] = {
                 "user_id": user_id,
                 "name": strategy_data.get("name"),
@@ -58,7 +70,7 @@ class PersistenceService:
                 else None,
                 "entry_criteria": strategy_data.get("entry_criteria", []),
                 "exit_criteria": strategy_data.get("exit_criteria", {}),
-                "indicators_config": strategy_data.get("indicators_config", {}),
+                "indicators_config": indicators_config,
                 "patterns": strategy_data.get("patterns", []),
                 "executed_at": strategy_data.get("executed_at"),
             }

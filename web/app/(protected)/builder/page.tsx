@@ -247,12 +247,12 @@ export default function BuilderPage() {
   });
 
   useEffect(() => {
-    if (!existingStrategy || !strategyId) return;
+    if (!existingStrategy || !strategyId || form.formState.isDirty) return;
     form.reset({
       ...form.getValues(),
       ...strategyToBuilderForm(existingStrategy),
     });
-  }, [existingStrategy, form, strategyId]);
+  }, [existingStrategy, form, form.formState.isDirty, strategyId]);
 
   const handleIndicatorSelect = (indicatorId: string) => {
     const { type, index, field } = lastFocusedSlot;

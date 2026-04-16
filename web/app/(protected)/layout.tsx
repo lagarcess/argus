@@ -52,7 +52,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       router.replace("/onboarding");
     }
     if (sessionData.onboarding_completed && pathname === "/onboarding") {
-      router.replace("/builder");
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      router.replace(`/builder${search}`);
     }
   }, [pathname, router, sessionData]);
 

@@ -87,10 +87,41 @@ components:
             type: string
         timeframe:
           type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
         slippage:
           type: number
         fees:
           type: number
+        indicators_config:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: number
+              - type: boolean
+              - type: string
+        patterns:
+          type: array
+          items:
+            type: string
+        capital:
+          type: number
+        trade_direction:
+          type: string
+          enum: [LONG, SHORT, BOTH]
+        participation_rate:
+          type: number
+        execution_priority:
+          type: number
+        va_sensitivity:
+          type: number
+        slippage_model:
+          type: string
+          enum: [fixed, vol_adjusted]
         entry_criteria:
           type: array
           items:
