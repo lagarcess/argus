@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Activity, LayoutDashboard, Search, History, User, Crown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -41,10 +41,21 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const pathname = usePathname();
+  const router = useRouter();
 
   // Middleware handles the secure boundary check, preventing screen flashing.
 
   const { data: sessionData } = useQuery(getAuthSessionOptions());
+  useEffect(() => {
+    if (!sessionData) return;
+    if (!sessionData.onboarding_completed && pathname !== "/onboarding") {
+      router.replace("/onboarding");
+    }
+    if (sessionData.onboarding_completed && pathname === "/onboarding") {
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      router.replace(`/builder${search}`);
+    }
+  }, [pathname, router, sessionData]);
 
   const navLinks = [
     { name: "Builder", href: "/builder", icon: LayoutDashboard },

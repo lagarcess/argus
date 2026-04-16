@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { deleteStrategiesById, getAssets, getAuthSession, getBacktestsById, getHealth, getHistory, getMarketBars, getScreeners, getStrategies, type Options, patchAuthProfile, postAgentDraft, postBacktests, postBillingCheckout, postFeedback, postMocksBacktest, postShare, postStrategies, postWebhookBilling, putStrategiesById } from '../sdk.gen';
-import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetBacktestsByIdData, GetBacktestsByIdResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetMarketBarsData, GetMarketBarsResponse, GetScreenersData, GetStrategiesData, GetStrategiesResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostBillingCheckoutData, PostFeedbackData, PostMocksBacktestData, PostMocksBacktestResponse, PostShareData, PostShareResponse, PostStrategiesData, PostStrategiesResponse, PostWebhookBillingData, PutStrategiesByIdData } from '../types.gen';
+import { deleteStrategiesById, getAssets, getAuthSession, getBacktestsById, getHealth, getHistory, getMarketBars, getScreeners, getStrategies, getStrategiesById, type Options, patchAuthProfile, postAgentDraft, postAuthLogout, postBacktests, postBillingCheckout, postFeedback, postMocksBacktest, postShare, postStrategies, postWebhookBilling, putStrategiesById } from '../sdk.gen';
+import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetBacktestsByIdData, GetBacktestsByIdResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetMarketBarsData, GetMarketBarsResponse, GetScreenersData, GetStrategiesByIdData, GetStrategiesByIdResponse, GetStrategiesData, GetStrategiesResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostAuthLogoutData, PostAuthLogoutResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostBillingCheckoutData, PostFeedbackData, PostMocksBacktestData, PostMocksBacktestResponse, PostShareData, PostShareResponse, PostStrategiesData, PostStrategiesResponse, PostWebhookBillingData, PutStrategiesByIdData } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -182,6 +182,24 @@ export const deleteStrategiesByIdMutation = (options?: Partial<Options<DeleteStr
     return mutationOptions;
 };
 
+export const getStrategiesByIdQueryKey = (options: Options<GetStrategiesByIdData>) => createQueryKey('getStrategiesById', options);
+
+/**
+ * Get strategy by id
+ */
+export const getStrategiesByIdOptions = (options: Options<GetStrategiesByIdData>) => queryOptions<GetStrategiesByIdResponse, DefaultError, GetStrategiesByIdResponse, ReturnType<typeof getStrategiesByIdQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getStrategiesById({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getStrategiesByIdQueryKey(options)
+});
+
 /**
  * Update a strategy
  */
@@ -286,6 +304,23 @@ export const postAgentDraftMutation = (options?: Partial<Options<PostAgentDraftD
     const mutationOptions: UseMutationOptions<PostAgentDraftResponse, DefaultError, Options<PostAgentDraftData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await postAgentDraft({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Revoke upstream session and clear local auth cookies
+ */
+export const postAuthLogoutMutation = (options?: Partial<Options<PostAuthLogoutData>>): UseMutationOptions<PostAuthLogoutResponse, DefaultError, Options<PostAuthLogoutData>> => {
+    const mutationOptions: UseMutationOptions<PostAuthLogoutResponse, DefaultError, Options<PostAuthLogoutData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await postAuthLogout({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

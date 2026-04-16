@@ -10,12 +10,17 @@ export type UserResponse = {
     subscription_tier: 'free' | 'plus' | 'pro' | 'max';
     backtest_quota: number;
     remaining_quota: number;
+    ai_draft_quota?: number;
+    remaining_ai_draft_quota?: number;
     feature_flags: {
         advanced_charting?: boolean;
         options_enabled?: boolean;
         memos_sync?: boolean;
     };
     theme: 'light' | 'dark' | 'system';
+    onboarding_completed: boolean;
+    onboarding_step: string;
+    onboarding_intent?: string;
 };
 
 export type ErrorResponse = {
@@ -32,8 +37,20 @@ export type StrategySchema = {
     name: string;
     symbols: Array<string>;
     timeframe: string;
+    start_date?: string;
+    end_date?: string;
     slippage?: number;
     fees?: number;
+    indicators_config?: {
+        [key: string]: number | boolean | string;
+    };
+    patterns?: Array<string>;
+    capital?: number;
+    trade_direction?: 'LONG' | 'SHORT' | 'BOTH';
+    participation_rate?: number;
+    execution_priority?: number;
+    va_sensitivity?: number;
+    slippage_model?: 'fixed' | 'vol_adjusted';
     entry_criteria?: Array<{
         [key: string]: unknown;
     }>;
@@ -148,6 +165,9 @@ export type GetAuthSessionResponse = GetAuthSessionResponses[keyof GetAuthSessio
 export type PatchAuthProfileData = {
     body?: {
         theme?: 'light' | 'dark' | 'system';
+        onboarding_completed?: boolean;
+        onboarding_step?: string;
+        onboarding_intent?: string;
     };
     path?: never;
     query?: never;
@@ -178,7 +198,7 @@ export type GetStrategiesResponses = {
      * Paginated strategies
      */
     200: {
-        data?: Array<StrategySchema>;
+        strategies?: Array<StrategySchema>;
         next_cursor?: string;
     };
 };
@@ -218,6 +238,24 @@ export type DeleteStrategiesByIdResponses = {
 };
 
 export type DeleteStrategiesByIdResponse = DeleteStrategiesByIdResponses[keyof DeleteStrategiesByIdResponses];
+
+export type GetStrategiesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/strategies/{id}';
+};
+
+export type GetStrategiesByIdResponses = {
+    /**
+     * Strategy response
+     */
+    200: StrategySchema;
+};
+
+export type GetStrategiesByIdResponse = GetStrategiesByIdResponses[keyof GetStrategiesByIdResponses];
 
 export type PutStrategiesByIdData = {
     body?: StrategySchema;
@@ -318,12 +356,31 @@ export type PostAgentDraftData = {
 
 export type PostAgentDraftResponses = {
     /**
-     * Returns an unexecuted draft StrategySchema
+     * Returns an unexecuted draft StrategySchema plus AI explanation
      */
-    200: StrategySchema;
+    200: {
+        draft: StrategySchema;
+        ai_explanation: string;
+    };
 };
 
 export type PostAgentDraftResponse = PostAgentDraftResponses[keyof PostAgentDraftResponses];
+
+export type PostAuthLogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/logout';
+};
+
+export type PostAuthLogoutResponses = {
+    /**
+     * Logged out
+     */
+    204: void;
+};
+
+export type PostAuthLogoutResponse = PostAuthLogoutResponses[keyof PostAuthLogoutResponses];
 
 export type GetAssetsData = {
     body?: never;

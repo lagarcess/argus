@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { isDevelopmentEnv } from "@/lib/app-env";
+import { postAuthLogout } from "@/lib/api/sdk.gen";
 
 interface AuthContextType {
   user: User | null;
@@ -86,6 +87,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = async () => {
+    try {
+      await postAuthLogout();
+    } catch {
+      // noop: local session still must be cleared
+    }
     await supabase.auth.signOut();
     setUser(null);
     setToken(null);

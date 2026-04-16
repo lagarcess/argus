@@ -163,6 +163,9 @@ class ProfileUpdate(BaseModel):
 
     theme: Optional[str] = None
     lang: Optional[str] = None
+    onboarding_completed: Optional[bool] = None
+    onboarding_step: Optional[str] = None
+    onboarding_intent: Optional[str] = None
 
 
 class SSORequest(BaseModel):
@@ -216,6 +219,33 @@ class StrategyCreate(BaseModel):
         le=0.02,
         description="Trading fees percentage (e.g., 0.001 = 0.1%)",
     )
+    capital: float = Field(default=100000.0, ge=100.0)
+    trade_direction: Literal["LONG", "SHORT", "BOTH"] = Field(default="LONG")
+    participation_rate: float = Field(default=0.1, ge=0.001, le=1.0)
+    execution_priority: float = Field(default=1.0, ge=0.0, le=1.0)
+    va_sensitivity: float = Field(default=1.0, ge=0.0, le=5.0)
+    slippage_model: Literal["fixed", "vol_adjusted"] = Field(default="vol_adjusted")
+
+    @model_validator(mode="before")
+    @classmethod
+    def hydrate_execution_fields_from_indicators(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        indicators_config = data.get("indicators_config")
+        if not isinstance(indicators_config, dict):
+            return data
+
+        for field in (
+            "capital",
+            "trade_direction",
+            "participation_rate",
+            "execution_priority",
+            "va_sensitivity",
+            "slippage_model",
+        ):
+            if data.get(field) is None and field in indicators_config:
+                data[field] = indicators_config[field]
+        return data
 
     @field_validator("timeframe")
     @classmethod

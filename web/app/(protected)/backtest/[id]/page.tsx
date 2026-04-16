@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { getBacktestsByIdOptions } from "@/lib/api/@tanstack/react-query.gen";
 import { BacktestRequest } from "@/lib/api/types.gen";
+import { formatWinRatePercent, normalizeFidelityScore } from "@/lib/metrics";
 
 export default function BacktestResultsPage() {
   const params = useParams();
@@ -37,8 +38,8 @@ export default function BacktestResultsPage() {
   const metrics = [
     { label: "Net Return", value: `${(stats.total_return_pct ?? 0).toFixed(2)}%`, icon: Percent, color: "text-emerald-400" },
     { label: "Absolute Profit", value: `$${(((stats.total_return_pct ?? 0) / 100) * capital).toLocaleString()}`, icon: DollarSign, color: "text-slate-100" },
-    { label: "Fidelity Score", value: `${Math.round((stats.reality_gap_metrics?.fidelity_score ?? 0) * 100)}%`, icon: ShieldCheck, color: "text-cyan-400" },
-    { label: "Win Rate", value: `${(stats.win_rate ?? 0).toFixed(1)}%`, icon: TrendingUp, color: "text-slate-100" },
+    { label: "Fidelity Score", value: `${Math.round(normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) * 100)}%`, icon: ShieldCheck, color: "text-cyan-400" },
+    { label: "Win Rate", value: formatWinRatePercent(stats.win_rate), icon: TrendingUp, color: "text-slate-100" },
     { label: "Max Drawdown", value: `${(stats.max_drawdown_pct ?? 0).toFixed(2)}%`, icon: TrendingDown, color: "text-red-400" },
     { label: "Sharpe Ratio", value: (stats.sharpe_ratio ?? 0).toFixed(2), icon: Activity, color: "text-purple-400" },
   ];
@@ -92,11 +93,11 @@ export default function BacktestResultsPage() {
             <div className="text-right">
               <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1">Fidelity Grade</p>
               <div className="flex items-center gap-3">
-                <span className={cn("text-3xl font-black font-mono", (stats.reality_gap_metrics?.fidelity_score ?? 0) > 0.9 ? "text-cyan-400" : "text-amber-400")}>
-                   {Math.round((stats.reality_gap_metrics?.fidelity_score ?? 0) * 100)}%
+                <span className={cn("text-3xl font-black font-mono", normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) > 0.9 ? "text-cyan-400" : "text-amber-400")}>
+                   {Math.round(normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) * 100)}%
                  </span>
                  <div className="w-12 h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                   <div className="h-full bg-cyan-400" style={{ width: `${(stats.reality_gap_metrics?.fidelity_score ?? 0) * 100}%` }} />
+                   <div className="h-full bg-cyan-400" style={{ width: `${normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) * 100}%` }} />
                  </div>
               </div>
             </div>
