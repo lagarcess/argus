@@ -1,3 +1,4 @@
+import asyncio
 import math
 import time
 from contextlib import asynccontextmanager
@@ -20,7 +21,6 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.analysis.structural import warmup_jit
 from argus.api.agent import router as agent_router
 from argus.api.auth import (
     _user_cache,
@@ -106,21 +106,22 @@ asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
 async def lifespan(app: FastAPI):
     """Lifecycle events."""
     logger.info("Initializing Argus API...")
-    try:
-        # Pre-compile Numba logic to prevent first-request cold-start latency
-        logger.info("Triggering Numba JIT warmup...")
-        warmup_jit()
-        logger.info("Numba JIT warmup complete.")
-    except Exception as e:
-        logger.warning(f"Could not complete Numba JIT warmup: {e}")
+    settings = get_settings()
 
-    try:
-        # Prime the asset cache to avoid latency on first request
-        fetcher = get_alpaca_fetcher()
-        fetcher.get_active_assets()
-        logger.info("Asset registry primed.")
-    except Exception as e:
-        logger.warning(f"Could not prime asset registry: {e}")
+    async def prime_asset_registry() -> None:
+        try:
+            # Best-effort warm path for asset discovery without blocking startup.
+            fetcher = get_alpaca_fetcher()
+            assets = await asyncio.to_thread(fetcher.get_active_assets)
+            asset_cache.set(assets)
+            logger.info("Asset registry primed.")
+        except Exception as e:
+            logger.warning(f"Could not prime asset registry: {e}")
+
+    if settings.APP_ENV == "production":
+        app.state.asset_prime_task = asyncio.create_task(prime_asset_registry())
+    else:
+        logger.debug("Skipping asset registry priming outside production.")
     yield
     logger.info("Shutting down Argus API...")
 
@@ -691,7 +692,7 @@ def get_user_history(
     try:
         user_id_str = str(user.id)
         # Fetch from persistence with cursor support
-        summaries, total = persistence_service.get_user_simulations(
+        summaries, total, next_cursor = persistence_service.get_user_simulations(
             user_id_str, limit=limit, cursor=cursor
         )
 
@@ -699,16 +700,38 @@ def get_user_history(
         formatted_simulations = []
         for s in summaries:
             s_copy = s.copy()
-            if s_copy.get("win_rate") is not None and s_copy["win_rate"] > 1.0:
-                s_copy["win_rate"] = s_copy["win_rate"] / 100.0
+
+            raw_win_rate = s_copy.get("win_rate")
+            if raw_win_rate is not None:
+                try:
+                    win_rate_val = float(raw_win_rate)
+                    s_copy["win_rate"] = (
+                        win_rate_val / 100.0 if win_rate_val > 1.0 else win_rate_val
+                    )
+                except (ValueError, TypeError):
+                    s_copy["win_rate"] = 0.0
+
+            # Map fidelity_score securely to 0..1
+            raw_fidelity = s_copy.get("fidelity_score")
+            if raw_fidelity is not None:
+                try:
+                    fidelity_val = float(raw_fidelity)
+                    s_copy["fidelity_score"] = max(
+                        0.0,
+                        min(
+                            1.0,
+                            fidelity_val / 100.0 if fidelity_val > 1.0 else fidelity_val,
+                        ),
+                    )
+                except (ValueError, TypeError):
+                    s_copy["fidelity_score"] = 1.0
+
             formatted_simulations.append(SimulationLogEntry(**s_copy))
 
         return PaginatedHistory(
             simulations=formatted_simulations,
             total=total,
-            next_cursor=summaries[-1].get("id")
-            if (summaries and len(summaries) >= limit)
-            else None,
+            next_cursor=next_cursor,
         )
 
     except Exception as e:
@@ -729,7 +752,7 @@ def get_simulation_detail(sim_id: str, user: UserResponse = Depends(auth_require
         if not simulation:
             # Fallback for "latest"
             if sim_id == "latest":
-                summaries, _ = persistence_service.get_user_simulations(
+                summaries, _, _ = persistence_service.get_user_simulations(
                     user_id_str, limit=1
                 )
                 if summaries:
