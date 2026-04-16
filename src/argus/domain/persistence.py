@@ -256,14 +256,16 @@ class PersistenceService:
             return None
 
     def get_user_simulations(
-        self, user_id: str, limit: int = 10, offset: int = 0
-    ) -> tuple[List[Dict[str, Any]], int]:
+        self, user_id: str, limit: int = 10, cursor: Optional[str] = None
+    ) -> tuple[List[Dict[str, Any]], int, Optional[str]]:
         """
-        Fetches a paginated list of summarized simulations for a user.
+        Fetches a paginated list of summarized simulations for a user using cursor pagination.
         Joins with the strategies table to get the strategy name.
         """
+        import base64
+
         if not self.client:
-            return [], 0
+            return [], 0, None
 
         try:
             # Get total count
@@ -276,14 +278,29 @@ class PersistenceService:
             total = count_res.count if count_res.count else 0
 
             # Fetch paginated data joined with strategy name
-            res = (
+            query = (
                 self.client.table("simulations")
-                .select("id, symbols, timeframe, created_at, summary, strategies(name)")
+                .select(
+                    "id, symbols, timeframe, created_at, summary, reality_gap_metrics, strategies(name)"
+                )
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
-                .range(offset, offset + limit - 1)
-                .execute()
+                .order("id", desc=True)
+                .limit(limit)
             )
+
+            if cursor:
+                try:
+                    decoded = base64.b64decode(cursor).decode("utf-8")
+                    if "+" in decoded:
+                        timestamp_str, id_str = decoded.split("+", 1)
+                        query = query.or_(
+                            f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
+                        )
+                except Exception as e:
+                    logger.warning(f"Invalid cursor format: {cursor}, {e}")
+
+            res = query.execute()
 
             summaries: List[Dict[str, Any]] = []
             for row in res.data:
@@ -311,11 +328,31 @@ class PersistenceService:
                 entry_data.update(metrics)
 
                 # Validate against schema and dump for response
+                # Make sure to pass reality_gap_metrics to entry_data
+                metrics = cast(Dict[str, Any], row).get("summary", {})
+                entry_data.update(metrics)
+                if isinstance(row, dict) and "reality_gap_metrics" in row:
+                    entry_data["reality_gap_metrics"] = cast(Dict[str, Any], row)[
+                        "reality_gap_metrics"
+                    ]
+
                 summary = SimulationLogEntry.model_validate(entry_data).model_dump()
                 summaries.append(summary)
 
-            return summaries, total
+            next_cursor = None
+            if summaries and len(summaries) >= limit:
+                last_row = res.data[-1]
+                last_row_dict = cast(Dict[str, Any], last_row)
+                last_timestamp = last_row_dict.get("created_at")
+                last_id = last_row_dict.get("id")
+                if last_timestamp and last_id:
+                    cursor_str = f"{last_timestamp}+{last_id}"
+                    next_cursor = base64.b64encode(cursor_str.encode("utf-8")).decode(
+                        "utf-8"
+                    )
+
+            return summaries, total, next_cursor
 
         except Exception as e:
             logger.error(f"Failed to fetch user simulations: {e}")
-            return [], 0
+            return [], 0, None

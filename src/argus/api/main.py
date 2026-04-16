@@ -691,24 +691,38 @@ def get_user_history(
     try:
         user_id_str = str(user.id)
         # Fetch from persistence with cursor support
-        summaries, total = persistence_service.get_user_simulations(
+        summaries, total, next_cursor = persistence_service.get_user_simulations(
             user_id_str, limit=limit, cursor=cursor
         )
 
-        # Map to SimulationLogEntry, ensuring win_rate is decimal
+        # Map to SimulationLogEntry, ensuring win_rate and fidelity_score are decimals
         formatted_simulations = []
         for s in summaries:
             s_copy = s.copy()
+
+            # Normalize win_rate
             if s_copy.get("win_rate") is not None and s_copy["win_rate"] > 1.0:
                 s_copy["win_rate"] = s_copy["win_rate"] / 100.0
+
+            # Extract and normalize fidelity_score from reality_gap_metrics if present
+            # persistence service now includes reality_gap_metrics directly in entry_data
+            if "reality_gap_metrics" in s_copy and isinstance(
+                s_copy["reality_gap_metrics"], dict
+            ):
+                fidelity = s_copy["reality_gap_metrics"].get("fidelity_score", 1.0)
+                # Ensure it's not a percentage > 1
+                if fidelity > 1.0:
+                    fidelity = fidelity / 100.0
+                s_copy["fidelity_score"] = fidelity
+            else:
+                s_copy["fidelity_score"] = 1.0
+
             formatted_simulations.append(SimulationLogEntry(**s_copy))
 
         return PaginatedHistory(
             simulations=formatted_simulations,
             total=total,
-            next_cursor=summaries[-1].get("id")
-            if (summaries and len(summaries) >= limit)
-            else None,
+            next_cursor=next_cursor,
         )
 
     except Exception as e:
@@ -729,9 +743,10 @@ def get_simulation_detail(sim_id: str, user: UserResponse = Depends(auth_require
         if not simulation:
             # Fallback for "latest"
             if sim_id == "latest":
-                summaries, _ = persistence_service.get_user_simulations(
+                simulations_res = persistence_service.get_user_simulations(
                     user_id_str, limit=1
                 )
+                summaries = simulations_res[0] if len(simulations_res) >= 1 else []
                 if summaries:
                     simulation = persistence_service.get_simulation(
                         str(summaries[0]["id"]), user_id_str

@@ -310,6 +310,18 @@ components:
       required: [vanity_url, og_image]
 
 paths:
+  /api/v1/usage:
+    get:
+      summary: Get Usage
+      operationId: get_usage_api_v1_usage_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
   /auth/session:
     get:
       summary: Get current authenticated user session
@@ -582,155 +594,9 @@ paths:
                 items:
                   type: string
 
-  /market/bars:
-    get:
-      summary: TradingView Universal Datafeed Proxy
-      security:
-        - cookieAuth: []
-      parameters:
-        - in: query
-          name: symbol
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: from
-          required: true
-          schema:
-            type: integer
-        - in: query
-          name: to
-          required: true
-          schema:
-            type: integer
-        - in: query
-          name: resolution
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: UDF formatted arrays
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  t:
-                    type: array
-                    items:
-                      type: integer
-                  o:
-                    type: array
-                    items:
-                      type: number
-                  h:
-                    type: array
-                    items:
-                      type: number
-                  l:
-                    type: array
-                    items:
-                      type: number
-                  c:
-                    type: array
-                    items:
-                      type: number
-                  v:
-                    type: array
-                    items:
-                      type: integer
-                  s:
-                    type: string
-                    example: "ok"
-
-  /screeners:
-    get:
-      summary: Alpaca Movers / Most-Actives proxy
-      parameters:
-        - in: query
-          name: type
-          schema:
-            type: string
-            enum: [movers, active]
-      responses:
-        '200':
-          description: Assets list
-
-  /billing/checkout:
-    post:
-      summary: Initialize payment gateway session
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Checkout URL
-
-  /webhook/billing:
-    post:
-      summary: Supabase Edge Function to intercept gateway updates
-      responses:
-        '200':
-          description: Billing updated
-
-  /share:
-    post:
-      summary: Create OpenGraph shareable link from simulation
-      security:
-        - cookieAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                simulation_id:
-                  type: string
-                  format: uuid
-      responses:
-        '200':
-          description: Vanity URL configured
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ShareResponse'
-
-  /feedback:
-    post:
-      summary: Submit user feedback
-      security:
-        - cookieAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                type:
-                  type: string
-                  enum: [bug, feature_request, general]
-                message:
-                  type: string
-                simulation_id:
-                  type: string
-      responses:
-        '201':
-          description: Feedback received
-
   /health:
     get:
       summary: API health and uptime check
       responses:
         '200':
           description: OK
-
-  /_mocks/backtest:
-    post:
-      summary: Dev-only endpoint for Prism mocking
-      responses:
-        '200':
-          description: Mocked BacktestResponse return
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BacktestResponse'
