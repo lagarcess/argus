@@ -627,13 +627,15 @@ def get_backtest_detail(
     summary = sim_data.get("summary", {})
     full_result = sim_data.get("full_result", {})
     config_snapshot = sim_data.get("config_snapshot", {})
+    raw_win_rate = summary.get("win_rate", 0.0)
+    normalized_win_rate = raw_win_rate / 100.0 if raw_win_rate > 1.0 else raw_win_rate
 
     return BacktestResponse(
         id=id,
         config_snapshot=config_snapshot,
         results=BacktestResults(
             total_return_pct=summary.get("total_return_pct", 0.0),
-            win_rate=summary.get("win_rate", 0.0) / 100.0,
+            win_rate=normalized_win_rate,
             sharpe_ratio=summary.get("sharpe_ratio", 0.0),
             sortino_ratio=summary.get("sortino_ratio", 0.0),
             calmar_ratio=summary.get("calmar_ratio", 0.0),

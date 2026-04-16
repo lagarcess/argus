@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { patchAuthProfileMutation, getAuthSessionQueryKey } from "@/lib/api/@tanstack/react-query.gen";
 import { toast } from "sonner";
+import { FUNNEL_EVENTS, trackFunnelEvent } from "@/lib/telemetry";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function OnboardingPage() {
         },
       });
       await queryClient.invalidateQueries({ queryKey: getAuthSessionQueryKey() });
+      trackFunnelEvent(FUNNEL_EVENTS.ONBOARDING_COMPLETE, { intent });
       router.push(`/builder?intent=${encodeURIComponent(intent)}`);
     } catch {
       toast.error("Failed to complete onboarding", {
