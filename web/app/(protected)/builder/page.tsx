@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { Plus, Play, Save, Activity, Search, Clock, Calendar, Info, ChevronDown, X, Zap, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -136,7 +136,7 @@ const formatDisplayDate = (s: string) => {
   });
 };
 
-export default function BuilderPage() {
+function BuilderPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const strategyId = searchParams.get("id");
@@ -1100,5 +1100,13 @@ export default function BuilderPage() {
         quotaRemaining={quotaRemaining}
       />
     </div>
+  );
+}
+
+export default function BuilderPage() {
+  return (
+    <Suspense fallback={<div className="relative max-w-4xl mx-auto space-y-6 pb-20 px-4 sm:px-0" />}>
+      <BuilderPageContent />
+    </Suspense>
   );
 }
