@@ -106,13 +106,18 @@ asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
 async def lifespan(app: FastAPI):
     """Lifecycle events."""
     logger.info("Initializing Argus API...")
-    try:
-        # Pre-compile Numba logic to prevent first-request cold-start latency
-        logger.info("Triggering Numba JIT warmup...")
-        warmup_jit()
-        logger.info("Numba JIT warmup complete.")
-    except Exception as e:
-        logger.warning(f"Could not complete Numba JIT warmup: {e}")
+    # Run warmup asynchronously so it doesn't block server port binding on Render
+    import asyncio
+
+    def run_warmup():
+        try:
+            logger.info("Triggering Numba JIT warmup...")
+            warmup_jit()
+            logger.info("Numba JIT warmup complete.")
+        except Exception as e:
+            logger.warning(f"Could not complete Numba JIT warmup: {e}")
+
+    asyncio.get_event_loop().run_in_executor(None, run_warmup)
 
     try:
         # Prime the asset cache to avoid latency on first request
