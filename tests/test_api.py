@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timezone
 from unittest.mock import MagicMock
 
@@ -60,6 +61,73 @@ def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "healthy", "version": "1.0.0"}
+
+
+def test_startup_skips_jit_warmup():
+    from argus.api import main as api_main
+
+    assert not hasattr(api_main, "warmup_jit")
+
+
+def test_lifespan_primes_assets_only_in_production(monkeypatch):
+    from types import SimpleNamespace
+
+    from argus.api import main as api_main
+
+    captured_task = None
+    set_mock = MagicMock()
+
+    def fake_create_task(coro):
+        nonlocal captured_task
+        captured_task = asyncio.get_running_loop().create_task(coro)
+        return captured_task
+
+    monkeypatch.setattr(api_main.asyncio, "create_task", fake_create_task)
+    monkeypatch.setattr(
+        api_main,
+        "get_settings",
+        lambda: SimpleNamespace(APP_ENV="production"),
+    )
+    mock_fetcher = MagicMock()
+    mock_fetcher.get_active_assets.return_value = []
+    monkeypatch.setattr(api_main, "get_alpaca_fetcher", lambda: mock_fetcher)
+    monkeypatch.setattr(api_main.asset_cache, "set", set_mock)
+
+    async def run_lifespan():
+        async with api_main.lifespan(api_main.app):
+            pass
+        assert captured_task is not None
+        await captured_task
+
+    asyncio.run(run_lifespan())
+
+    assert captured_task is not None
+    assert api_main.app.state.asset_prime_task is captured_task
+    assert set_mock.call_count == 1
+
+
+def test_lifespan_skips_asset_priming_outside_production(monkeypatch):
+    from types import SimpleNamespace
+
+    from argus.api import main as api_main
+
+    create_task_mock = MagicMock()
+    monkeypatch.setattr(api_main.asyncio, "create_task", create_task_mock)
+    monkeypatch.setattr(
+        api_main,
+        "get_settings",
+        lambda: SimpleNamespace(APP_ENV="development"),
+    )
+    if hasattr(api_main.app.state, "asset_prime_task"):
+        delattr(api_main.app.state, "asset_prime_task")
+
+    async def run_lifespan():
+        async with api_main.lifespan(api_main.app):
+            pass
+
+    asyncio.run(run_lifespan())
+
+    assert create_task_mock.call_count == 0
 
 
 def test_get_history(monkeypatch, mock_user):

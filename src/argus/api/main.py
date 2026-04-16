@@ -1,3 +1,4 @@
+import asyncio
 import math
 import time
 from contextlib import asynccontextmanager
@@ -20,7 +21,6 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from argus.analysis.structural import warmup_jit
 from argus.api.agent import router as agent_router
 from argus.api.auth import (
     _user_cache,
@@ -106,21 +106,22 @@ asset_cache = AssetCache(ttl_seconds=3600)  # 1 hour
 async def lifespan(app: FastAPI):
     """Lifecycle events."""
     logger.info("Initializing Argus API...")
-    try:
-        # Pre-compile Numba logic to prevent first-request cold-start latency
-        logger.info("Triggering Numba JIT warmup...")
-        warmup_jit()
-        logger.info("Numba JIT warmup complete.")
-    except Exception as e:
-        logger.warning(f"Could not complete Numba JIT warmup: {e}")
+    settings = get_settings()
 
-    try:
-        # Prime the asset cache to avoid latency on first request
-        fetcher = get_alpaca_fetcher()
-        fetcher.get_active_assets()
-        logger.info("Asset registry primed.")
-    except Exception as e:
-        logger.warning(f"Could not prime asset registry: {e}")
+    async def prime_asset_registry() -> None:
+        try:
+            # Best-effort warm path for asset discovery without blocking startup.
+            fetcher = get_alpaca_fetcher()
+            assets = await asyncio.to_thread(fetcher.get_active_assets)
+            asset_cache.set(assets)
+            logger.info("Asset registry primed.")
+        except Exception as e:
+            logger.warning(f"Could not prime asset registry: {e}")
+
+    if settings.APP_ENV == "production":
+        app.state.asset_prime_task = asyncio.create_task(prime_asset_registry())
+    else:
+        logger.debug("Skipping asset registry priming outside production.")
     yield
     logger.info("Shutting down Argus API...")
 
