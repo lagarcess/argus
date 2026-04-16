@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timezone
 from unittest.mock import MagicMock
 
@@ -60,6 +61,64 @@ def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "healthy", "version": "1.0.0"}
+
+
+def test_startup_skips_jit_warmup():
+    from argus.api import main as api_main
+
+    assert not hasattr(api_main, "warmup_jit")
+
+
+def test_lifespan_primes_assets_only_in_production(monkeypatch):
+    from types import SimpleNamespace
+
+    from argus.api import main as api_main
+
+    create_task_mock = MagicMock()
+
+    def fake_create_task(coro):
+        coro.close()
+        return create_task_mock(coro)
+
+    monkeypatch.setattr(api_main.asyncio, "create_task", fake_create_task)
+    monkeypatch.setattr(
+        api_main,
+        "get_settings",
+        lambda: SimpleNamespace(APP_ENV="production"),
+    )
+    mock_fetcher = MagicMock()
+    mock_fetcher.get_active_assets.return_value = []
+    monkeypatch.setattr(api_main, "get_alpaca_fetcher", lambda: mock_fetcher)
+
+    async def run_lifespan():
+        async with api_main.lifespan(api_main.app):
+            pass
+
+    asyncio.run(run_lifespan())
+
+    assert create_task_mock.call_count == 1
+
+
+def test_lifespan_skips_asset_priming_outside_production(monkeypatch):
+    from types import SimpleNamespace
+
+    from argus.api import main as api_main
+
+    create_task_mock = MagicMock()
+    monkeypatch.setattr(api_main.asyncio, "create_task", create_task_mock)
+    monkeypatch.setattr(
+        api_main,
+        "get_settings",
+        lambda: SimpleNamespace(APP_ENV="development"),
+    )
+
+    async def run_lifespan():
+        async with api_main.lifespan(api_main.app):
+            pass
+
+    asyncio.run(run_lifespan())
+
+    assert create_task_mock.call_count == 0
 
 
 def test_get_history(monkeypatch, mock_user):
