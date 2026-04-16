@@ -27,15 +27,27 @@ declare global {
 const TELEMETRY_INGEST_ENABLED =
   process.env.NEXT_PUBLIC_TELEMETRY_INGEST_ENABLED !== "false";
 
+function enqueueTelemetryEvent(payload: FunnelEventPayload): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.__argusTelemetryQueue = window.__argusTelemetryQueue ?? [];
+  window.__argusTelemetryQueue.push(payload);
+}
+
 function sendTelemetryEvent(payload: FunnelEventPayload): void {
   if (!TELEMETRY_INGEST_ENABLED) {
+    enqueueTelemetryEvent(payload);
     return;
   }
 
   void postTelemetryEvents({
     body: payload,
+    throwOnError: true,
   }).catch(() => {
     // Keep local queue as fallback when network/backend is unavailable.
+    enqueueTelemetryEvent(payload);
   });
 }
 
@@ -48,11 +60,6 @@ export function trackFunnelEvent(
     timestamp: new Date().toISOString(),
     properties,
   };
-
-  if (typeof window !== "undefined") {
-    window.__argusTelemetryQueue = window.__argusTelemetryQueue ?? [];
-    window.__argusTelemetryQueue.push(payload);
-  }
 
   sendTelemetryEvent(payload);
 

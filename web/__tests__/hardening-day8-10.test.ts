@@ -170,6 +170,7 @@ describe("minimal funnel telemetry checkpoints", () => {
     expect(postTelemetryEvents).toHaveBeenCalledTimes(1);
     expect(postTelemetryEvents).toHaveBeenCalledWith({
       body: payload,
+      throwOnError: true,
     });
   });
 
