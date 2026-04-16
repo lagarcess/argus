@@ -46,6 +46,9 @@ class PersistenceService:
 
         try:
             indicators_config = dict(strategy_data.get("indicators_config", {}) or {})
+            # Keep execution fields mirrored inside indicators_config until a dedicated
+            # execution_config column is introduced; this preserves compatibility for
+            # existing reads that hydrate execution settings from indicators_config.
             for field in (
                 "capital",
                 "trade_direction",

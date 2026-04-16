@@ -34,11 +34,14 @@ export default function BacktestResultsPage() {
   const stats = backtest.results;
   const config = backtest.config_snapshot as BacktestRequest & { capital?: number };
   const capital = config.capital || 100000;
+  const fidelityScore = normalizeFidelityScore(
+    stats.reality_gap_metrics?.fidelity_score,
+  );
 
   const metrics = [
     { label: "Net Return", value: `${(stats.total_return_pct ?? 0).toFixed(2)}%`, icon: Percent, color: "text-emerald-400" },
     { label: "Absolute Profit", value: `$${(((stats.total_return_pct ?? 0) / 100) * capital).toLocaleString()}`, icon: DollarSign, color: "text-slate-100" },
-    { label: "Fidelity Score", value: `${Math.round(normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) * 100)}%`, icon: ShieldCheck, color: "text-cyan-400" },
+    { label: "Fidelity Score", value: `${Math.round(fidelityScore * 100)}%`, icon: ShieldCheck, color: "text-cyan-400" },
     { label: "Win Rate", value: formatWinRatePercent(stats.win_rate), icon: TrendingUp, color: "text-slate-100" },
     { label: "Max Drawdown", value: `${(stats.max_drawdown_pct ?? 0).toFixed(2)}%`, icon: TrendingDown, color: "text-red-400" },
     { label: "Sharpe Ratio", value: (stats.sharpe_ratio ?? 0).toFixed(2), icon: Activity, color: "text-purple-400" },
@@ -93,11 +96,11 @@ export default function BacktestResultsPage() {
             <div className="text-right">
               <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-1">Fidelity Grade</p>
               <div className="flex items-center gap-3">
-                <span className={cn("text-3xl font-black font-mono", normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) > 0.9 ? "text-cyan-400" : "text-amber-400")}>
-                   {Math.round(normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) * 100)}%
+                <span className={cn("text-3xl font-black font-mono", fidelityScore > 0.9 ? "text-cyan-400" : "text-amber-400")}>
+                   {Math.round(fidelityScore * 100)}%
                  </span>
                  <div className="w-12 h-1.5 bg-slate-900 rounded-full overflow-hidden">
-                   <div className="h-full bg-cyan-400" style={{ width: `${normalizeFidelityScore(stats.reality_gap_metrics?.fidelity_score) * 100}%` }} />
+                   <div className="h-full bg-cyan-400" style={{ width: `${fidelityScore * 100}%` }} />
                  </div>
               </div>
             </div>
