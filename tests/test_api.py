@@ -557,3 +557,33 @@ def test_metrics_parity_history_vs_detail_same_simulation(monkeypatch, mock_user
 
     assert history_win_rate == 0.62
     assert detail_win_rate == 0.62
+
+
+def test_backtest_detail_handles_null_win_rate(monkeypatch, mock_user):
+    from argus.api.auth import auth_required
+
+    monkeypatch.setitem(app.dependency_overrides, auth_required, lambda: mock_user)
+
+    simulation_id = "sim_null_win_rate_001"
+    persistence_service.get_simulation = MagicMock(
+        return_value={
+            "id": simulation_id,
+            "summary": {
+                "total_return_pct": 3.0,
+                "win_rate": None,
+                "sharpe_ratio": 1.1,
+                "sortino_ratio": 1.2,
+                "calmar_ratio": 0.9,
+                "profit_factor": 1.0,
+                "expectancy": 0.01,
+                "max_drawdown_pct": 2.0,
+            },
+            "full_result": {"equity_curve": [100.0, 103.0], "trades": []},
+            "config_snapshot": {"symbols": ["AAPL"], "timeframe": "1h"},
+            "reality_gap_metrics": {"fidelity_score": 0.95},
+        }
+    )
+
+    response = client.get(f"/api/v1/backtests/{simulation_id}")
+    assert response.status_code == 200
+    assert response.json()["results"]["win_rate"] == 0.0

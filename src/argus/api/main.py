@@ -627,7 +627,11 @@ def get_backtest_detail(
     summary = sim_data.get("summary", {})
     full_result = sim_data.get("full_result", {})
     config_snapshot = sim_data.get("config_snapshot", {})
-    raw_win_rate = summary.get("win_rate", 0.0)
+    raw_win_rate = summary.get("win_rate")
+    try:
+        raw_win_rate = float(raw_win_rate) if raw_win_rate is not None else 0.0
+    except (TypeError, ValueError):
+        raw_win_rate = 0.0
     normalized_win_rate = raw_win_rate / 100.0 if raw_win_rate > 1.0 else raw_win_rate
 
     return BacktestResponse(
