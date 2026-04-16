@@ -140,6 +140,7 @@ export default function BuilderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const strategyId = searchParams.get("id");
+  const onboardingIntent = searchParams.get("intent");
   const [mounted, setMounted] = useState(false);
   const [showRealityGap, setShowRealityGap] = useState(false);
   const [showRules, setShowRules] = useState(true);
@@ -152,6 +153,7 @@ export default function BuilderPage() {
   const [datePickerTarget, setDatePickerTarget] = useState<'start' | 'end'>('start');
   const [calendarView, setCalendarView] = useState(new Date());
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [intentDraftApplied, setIntentDraftApplied] = useState(false);
   const [yellowFlash, setYellowFlash] = useState({
     assetSymbol: 0,
     timeframe: 0,
@@ -235,12 +237,14 @@ export default function BuilderPage() {
     },
     onError: showErrorToast
   });
-  const { mutateAsync: createStrategy, isPending: isSavingCreate } = useMutation(
-    postStrategiesMutation()
-  );
-  const { mutateAsync: updateStrategy, isPending: isSavingUpdate } = useMutation(
-    putStrategiesByIdMutation()
-  );
+  const { mutateAsync: createStrategy, isPending: isSavingCreate } = useMutation({
+    ...postStrategiesMutation(),
+    onError: showErrorToast
+  });
+  const { mutateAsync: updateStrategy, isPending: isSavingUpdate } = useMutation({
+    ...putStrategiesByIdMutation(),
+    onError: showErrorToast
+  });
 
   useEffect(() => {
     if (!existingStrategy || !strategyId) return;
@@ -389,6 +393,22 @@ export default function BuilderPage() {
     if (!draft) return;
     applyStrategyDraft(draft);
   };
+
+  useEffect(() => {
+    if (!onboardingIntent || strategyId || intentDraftApplied) return;
+
+    const promptByIntent: Record<string, string> = {
+      momentum: "Create a momentum strategy for large cap equities with clear entry and exit criteria.",
+      mean_reversion: "Create a mean reversion strategy with RSI-driven entries and trend-aware exits.",
+      breakout: "Create a breakout strategy using volatility expansion and confirmation exits.",
+    };
+
+    const prompt = promptByIntent[onboardingIntent];
+    if (!prompt) return;
+
+    setIntentDraftApplied(true);
+    void handleDraftRequest(prompt);
+  }, [intentDraftApplied, onboardingIntent, strategyId]);
 
   const generateCalendarDays = () => {
     const year = calendarView.getFullYear();

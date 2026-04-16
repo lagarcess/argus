@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { patchAuthProfileMutation, getAuthSessionQueryKey } from "@/lib/api/@tanstack/react-query.gen";
+import { toast } from "sonner";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -10,15 +11,21 @@ export default function OnboardingPage() {
   const { mutateAsync, isPending } = useMutation(patchAuthProfileMutation());
 
   const completeOnboarding = async (intent: string) => {
-    await mutateAsync({
-      body: {
-        onboarding_completed: true,
-        onboarding_step: "completed",
-        onboarding_intent: intent,
-      },
-    });
-    await queryClient.invalidateQueries({ queryKey: getAuthSessionQueryKey() });
-    router.push(`/builder?intent=${encodeURIComponent(intent)}`);
+    try {
+      await mutateAsync({
+        body: {
+          onboarding_completed: true,
+          onboarding_step: "completed",
+          onboarding_intent: intent,
+        },
+      });
+      await queryClient.invalidateQueries({ queryKey: getAuthSessionQueryKey() });
+      router.push(`/builder?intent=${encodeURIComponent(intent)}`);
+    } catch {
+      toast.error("Failed to complete onboarding", {
+        description: "Please try again or contact support."
+      });
+    }
   };
 
   return (
