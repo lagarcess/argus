@@ -5,6 +5,7 @@
 **Last Updated**: 2026-04-16
 **Base URL**: `https://api.argus.app/api/v1/`
 **OpenAPI Spec**: [openapi.yaml](openapi.yaml)
+- Private beta ops runbook: [../private_beta_runbook.md](../private_beta_runbook.md)
 **Full Vision Archive**: [api_contract_full_vision.md](api_contract_full_vision.md)
 
 ## Scope (10-day private beta loop)

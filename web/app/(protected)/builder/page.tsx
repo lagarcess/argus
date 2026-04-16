@@ -30,6 +30,7 @@ import { INDICATOR_REGISTRY } from "@/lib/indicators";
 import { ASSET_REGISTRY } from "@/lib/assets";
 import { useDraftStrategy, type StrategyDraft } from "@/lib/hooks/useDraftStrategy";
 import { builderToStrategyCreatePayload, strategyToBuilderForm } from "@/lib/strategy-mapper";
+import { FUNNEL_EVENTS, trackFunnelEvent } from "@/lib/telemetry";
 
 const PINNED_INDICATORS = ["SMA", "RSI", "MACD", "EMA"];
 
@@ -230,12 +231,18 @@ function BuilderPageContent() {
   const { isPending, mutateAsync } = useMutation({
     ...postBacktestsMutation(),
     onSuccess: (data) => {
+      trackFunnelEvent(FUNNEL_EVENTS.BACKTEST_SUCCESS, {
+        timeframe: form.getValues("timeframe"),
+      });
       toast.success("Backtest Completed", {
         className: "bg-emerald-950 border-emerald-500/50 text-emerald-100"
       });
       router.push(`/backtest/${data.id}`);
     },
-    onError: showErrorToast
+    onError: (error) => {
+      trackFunnelEvent(FUNNEL_EVENTS.BACKTEST_FAIL);
+      showErrorToast(error);
+    }
   });
   const { mutateAsync: createStrategy, isPending: isSavingCreate } = useMutation({
     ...postStrategiesMutation(),
@@ -322,6 +329,9 @@ function BuilderPageContent() {
       } else {
         await createStrategy({ body: strategyPayload });
       }
+      trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SAVED, {
+        mode: strategyId ? "update" : "create",
+      });
       toast.success("Draft saved successfully");
       router.push("/strategies");
       return;

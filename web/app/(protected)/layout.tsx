@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import React, { useState, useEffect } from "react";
 // In a real app we'd fetch the generated OpenAPI via lib/api
 import { getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
+import { resolveOnboardingRedirect } from "@/lib/onboarding-guard";
 
 function QuotaBadge({ remaining, isAdmin }: { remaining: number; isAdmin: boolean }) {
   const [mounted, setMounted] = useState(false);
@@ -48,12 +49,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const { data: sessionData } = useQuery(getAuthSessionOptions());
   useEffect(() => {
     if (!sessionData) return;
-    if (!sessionData.onboarding_completed && pathname !== "/onboarding") {
-      router.replace("/onboarding");
-    }
-    if (sessionData.onboarding_completed && pathname === "/onboarding") {
-      const search = typeof window !== "undefined" ? window.location.search : "";
-      router.replace(`/builder${search}`);
+
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    const redirectPath = resolveOnboardingRedirect({
+      onboardingCompleted: sessionData.onboarding_completed,
+      pathname,
+      search,
+    });
+
+    if (redirectPath) {
+      router.replace(redirectPath);
     }
   }, [pathname, router, sessionData]);
 
