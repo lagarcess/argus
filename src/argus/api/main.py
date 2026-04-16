@@ -112,13 +112,14 @@ async def lifespan(app: FastAPI):
         try:
             # Best-effort warm path for asset discovery without blocking startup.
             fetcher = get_alpaca_fetcher()
-            await asyncio.to_thread(fetcher.get_active_assets)
+            assets = await asyncio.to_thread(fetcher.get_active_assets)
+            asset_cache.set(assets)
             logger.info("Asset registry primed.")
         except Exception as e:
             logger.warning(f"Could not prime asset registry: {e}")
 
     if settings.APP_ENV == "production":
-        asyncio.create_task(prime_asset_registry())
+        app.state.asset_prime_task = asyncio.create_task(prime_asset_registry())
     else:
         logger.debug("Skipping asset registry priming outside production.")
     yield
