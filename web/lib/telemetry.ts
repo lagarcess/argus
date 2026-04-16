@@ -1,3 +1,5 @@
+import { postTelemetryEvents } from "@/lib/api/sdk.gen";
+
 export const FUNNEL_EVENTS = {
   ONBOARDING_COMPLETE: "onboarding_complete",
   DRAFT_SUCCESS: "draft_success",
@@ -22,9 +24,24 @@ declare global {
   }
 }
 
+const TELEMETRY_INGEST_ENABLED =
+  process.env.NEXT_PUBLIC_TELEMETRY_INGEST_ENABLED !== "false";
+
+function sendTelemetryEvent(payload: FunnelEventPayload): void {
+  if (!TELEMETRY_INGEST_ENABLED) {
+    return;
+  }
+
+  void postTelemetryEvents({
+    body: payload,
+  }).catch(() => {
+    // Keep local queue as fallback when network/backend is unavailable.
+  });
+}
+
 export function trackFunnelEvent(
   event: FunnelEventName,
-  properties?: FunnelEventPayload["properties"]
+  properties?: FunnelEventPayload["properties"],
 ): FunnelEventPayload {
   const payload: FunnelEventPayload = {
     event,
@@ -37,6 +54,7 @@ export function trackFunnelEvent(
     window.__argusTelemetryQueue.push(payload);
   }
 
-  // TODO: Implement backend telemetry push
+  sendTelemetryEvent(payload);
+
   return payload;
 }

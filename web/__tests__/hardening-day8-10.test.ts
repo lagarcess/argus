@@ -4,7 +4,6 @@ import {
   strategyToBuilderForm,
 } from "../lib/strategy-mapper";
 import { resolveOnboardingRedirect } from "../lib/onboarding-guard";
-import { FUNNEL_EVENTS, trackFunnelEvent } from "../lib/telemetry";
 
 describe("onboarding gate + redirect", () => {
   it("redirects incomplete onboarding users to onboarding", () => {
@@ -102,6 +101,7 @@ describe("logout backend-first with local fallback", () => {
       postAuthLogout: mock(async () => {
         throw new Error("network down");
       }),
+      postTelemetryEvents: mock(async () => ({ response: {} })),
     }));
 
     mock.module("../lib/supabase", () => ({
@@ -120,7 +120,17 @@ describe("logout backend-first with local fallback", () => {
 });
 
 describe("minimal funnel telemetry checkpoints", () => {
-  it("defines all release-critical events", () => {
+  beforeEach(() => {
+    mock.restore();
+  });
+
+  afterEach(() => {
+    mock.restore();
+  });
+
+  it("defines all release-critical events", async () => {
+    const { FUNNEL_EVENTS } = await import("../lib/telemetry");
+
     expect(Object.values(FUNNEL_EVENTS)).toEqual(
       expect.arrayContaining([
         "onboarding_complete",
@@ -134,11 +144,33 @@ describe("minimal funnel telemetry checkpoints", () => {
     );
   });
 
-  it("records checkpoint payloads", () => {
+  it("records checkpoint payloads", async () => {
+    const { FUNNEL_EVENTS, trackFunnelEvent } = await import("../lib/telemetry");
+
     const payload = trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SUCCESS, {
       source: "test",
     });
     expect(payload.event).toBe("draft_success");
     expect(payload.properties?.source).toBe("test");
   });
+
+  it("sends checkpoint payloads to backend ingest", async () => {
+    const postTelemetryEvents = mock(async () => ({ response: {} }));
+
+    mock.module("../lib/api/sdk.gen", () => ({
+      postTelemetryEvents,
+    }));
+
+    const { FUNNEL_EVENTS, trackFunnelEvent } = await import("../lib/telemetry");
+
+    const payload = trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SAVED, {
+      source: "builder",
+    });
+
+    expect(postTelemetryEvents).toHaveBeenCalledTimes(1);
+    expect(postTelemetryEvents).toHaveBeenCalledWith({
+      body: payload,
+    });
+  });
+
 });
