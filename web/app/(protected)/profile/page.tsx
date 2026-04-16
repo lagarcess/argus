@@ -2,13 +2,13 @@
 
 
 import { User, Shield, LogOut, Zap, Globe, Moon, Sun, Monitor, Check } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 // In real app, import from lib/api
 import { getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/AuthContext";
 
 const NEUTRAL_AVATARS = [
   "bg-gradient-to-br from-cyan-400 to-blue-600",
@@ -120,6 +120,7 @@ function PricingModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [activeAvatar, setActiveAvatar] = useState(0);
   const [theme, setTheme] = useState("system");
   const [lang, setLang] = useState("EN");
@@ -133,7 +134,7 @@ export default function ProfilePage() {
   // });
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await logout();
     // Explicitly disable the Mock Auth bypass on sign out to prevent redirect loops
     router.push("/?bypass_auth=false");
   };

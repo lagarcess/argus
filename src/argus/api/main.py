@@ -226,6 +226,12 @@ def update_profile(
         update_dict["theme"] = updates.theme
     if updates.lang is not None:
         update_dict["lang"] = updates.lang
+    if updates.onboarding_completed is not None:
+        update_dict["onboarding_completed"] = updates.onboarding_completed
+    if updates.onboarding_step is not None:
+        update_dict["onboarding_step"] = updates.onboarding_step
+    if updates.onboarding_intent is not None:
+        update_dict["onboarding_intent"] = updates.onboarding_intent
 
     if not update_dict:
         return user  # No changes
@@ -242,6 +248,15 @@ def update_profile(
             updated_data = res.data[0]
             user.theme = str(updated_data.get("theme", user.theme))
             user.lang = str(updated_data.get("lang", user.lang))
+            user.onboarding_completed = bool(
+                updated_data.get("onboarding_completed", user.onboarding_completed)
+            )
+            user.onboarding_step = str(
+                updated_data.get("onboarding_step", user.onboarding_step)
+            )
+            user.onboarding_intent = updated_data.get(
+                "onboarding_intent", user.onboarding_intent
+            )
 
             # Invalidate cache so subsequent requests load new theme/lang
             _user_cache.invalidate(user.id)

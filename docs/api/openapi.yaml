@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Argus Observatory API
-  description: High-fidelity retail trading backtesting with walk-forward analysis and AI.
-  version: 1.0.0
+  description: Narrow-MVP private beta API for onboarding, drafting, strategy CRUD, backtests, history, and logout.
+  version: 1.1.0-narrow
 servers:
   - url: http://localhost:8000/api/v1
     description: Local Development (FastAPI)
@@ -47,7 +47,14 @@ components:
         theme:
           type: string
           enum: [light, dark, system]
-      required: [id, is_admin, subscription_tier, backtest_quota, remaining_quota, feature_flags, theme]
+        onboarding_completed:
+          type: boolean
+        onboarding_step:
+          type: string
+        onboarding_intent:
+          type: string
+          nullable: true
+      required: [id, is_admin, subscription_tier, backtest_quota, remaining_quota, feature_flags, theme, onboarding_completed, onboarding_step]
 
     ErrorResponse:
       type: object
@@ -299,6 +306,13 @@ paths:
                 theme:
                   type: string
                   enum: [light, dark, system]
+                onboarding_completed:
+                  type: boolean
+                onboarding_step:
+                  type: string
+                onboarding_intent:
+                  type: string
+                  nullable: true
       responses:
         '200':
           description: Profile updated
@@ -330,12 +344,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  data:
+                  strategies:
                     type: array
                     items:
                       $ref: '#/components/schemas/StrategySchema'
                   next_cursor:
                     type: string
+                    nullable: true
     post:
       summary: Save a new strategy
       security:
@@ -354,6 +369,24 @@ paths:
                 $ref: '#/components/schemas/StrategySchema'
 
   /strategies/{id}:
+    get:
+      summary: Get strategy by id
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Strategy response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategySchema'
     put:
       summary: Update a strategy
       security:
@@ -478,11 +511,26 @@ paths:
                   type: string
       responses:
         '200':
-          description: Returns an unexecuted draft StrategySchema
+          description: Returns an unexecuted draft StrategySchema plus AI explanation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StrategySchema'
+                type: object
+                required: [draft, ai_explanation]
+                properties:
+                  draft:
+                    $ref: '#/components/schemas/StrategySchema'
+                  ai_explanation:
+                    type: string
+
+  /auth/logout:
+    post:
+      summary: Revoke upstream session and clear local auth cookies
+      security:
+        - cookieAuth: []
+      responses:
+        '204':
+          description: Logged out
 
   /assets:
     get:

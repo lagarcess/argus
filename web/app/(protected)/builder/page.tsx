@@ -4,9 +4,15 @@ import { useForm } from "react-hook-form";
 import { Plus, Play, Save, Activity, Search, Clock, Calendar, Info, ChevronDown, X, Zap, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { postBacktestsMutation, getAuthSessionOptions } from "@/lib/api/@tanstack/react-query.gen";
+import {
+  postBacktestsMutation,
+  getAuthSessionOptions,
+  getStrategiesByIdOptions,
+  postStrategiesMutation,
+  putStrategiesByIdMutation,
+} from "@/lib/api/@tanstack/react-query.gen";
 
 import { toast } from "sonner";
 import { showErrorToast } from "@/components/ErrorToast";
@@ -23,6 +29,7 @@ import { AiExplanationCard } from "@/components/builder/AiExplanationCard";
 import { INDICATOR_REGISTRY } from "@/lib/indicators";
 import { ASSET_REGISTRY } from "@/lib/assets";
 import { useDraftStrategy, type StrategyDraft } from "@/lib/hooks/useDraftStrategy";
+import { builderToStrategyCreatePayload, strategyToBuilderForm } from "@/lib/strategy-mapper";
 
 const PINNED_INDICATORS = ["SMA", "RSI", "MACD", "EMA"];
 
@@ -131,6 +138,9 @@ const formatDisplayDate = (s: string) => {
 
 export default function BuilderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const strategyId = searchParams.get("id");
+  const onboardingIntent = searchParams.get("intent");
   const [mounted, setMounted] = useState(false);
   const [showRealityGap, setShowRealityGap] = useState(false);
   const [showRules, setShowRules] = useState(true);
@@ -143,6 +153,7 @@ export default function BuilderPage() {
   const [datePickerTarget, setDatePickerTarget] = useState<'start' | 'end'>('start');
   const [calendarView, setCalendarView] = useState(new Date());
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [intentDraftApplied, setIntentDraftApplied] = useState(false);
   const [yellowFlash, setYellowFlash] = useState({
     assetSymbol: 0,
     timeframe: 0,
@@ -158,6 +169,12 @@ export default function BuilderPage() {
   const { draftStrategy, isDrafting, quotaRemaining } = useDraftStrategy();
 
   const { data: sessionData } = useQuery(getAuthSessionOptions());
+  const { data: existingStrategy } = useQuery({
+    ...getStrategiesByIdOptions({
+      path: { id: strategyId ?? "" },
+    }),
+    enabled: Boolean(strategyId),
+  });
   const tier = sessionData?.subscription_tier || 'free';
   const resolvedTier = mounted ? tier : 'free';
   const today = new Date();
@@ -220,6 +237,22 @@ export default function BuilderPage() {
     },
     onError: showErrorToast
   });
+  const { mutateAsync: createStrategy, isPending: isSavingCreate } = useMutation({
+    ...postStrategiesMutation(),
+    onError: showErrorToast
+  });
+  const { mutateAsync: updateStrategy, isPending: isSavingUpdate } = useMutation({
+    ...putStrategiesByIdMutation(),
+    onError: showErrorToast
+  });
+
+  useEffect(() => {
+    if (!existingStrategy || !strategyId) return;
+    form.reset({
+      ...form.getValues(),
+      ...strategyToBuilderForm(existingStrategy),
+    });
+  }, [existingStrategy, form, strategyId]);
 
   const handleIndicatorSelect = (indicatorId: string) => {
     const { type, index, field } = lastFocusedSlot;
@@ -280,6 +313,15 @@ export default function BuilderPage() {
 
   const onSubmit = async (data: StrategyCreate, isDraft: boolean) => {
     if (isDraft) {
+      const strategyPayload = builderToStrategyCreatePayload(data);
+      if (strategyId) {
+        await updateStrategy({
+          path: { id: strategyId },
+          body: strategyPayload,
+        });
+      } else {
+        await createStrategy({ body: strategyPayload });
+      }
       toast.success("Draft saved successfully");
       router.push("/strategies");
       return;
@@ -351,6 +393,22 @@ export default function BuilderPage() {
     if (!draft) return;
     applyStrategyDraft(draft);
   };
+
+  useEffect(() => {
+    if (!onboardingIntent || strategyId || intentDraftApplied) return;
+
+    const promptByIntent: Record<string, string> = {
+      momentum: "Create a momentum strategy for large cap equities with clear entry and exit criteria.",
+      mean_reversion: "Create a mean reversion strategy with RSI-driven entries and trend-aware exits.",
+      breakout: "Create a breakout strategy using volatility expansion and confirmation exits.",
+    };
+
+    const prompt = promptByIntent[onboardingIntent];
+    if (!prompt) return;
+
+    setIntentDraftApplied(true);
+    void handleDraftRequest(prompt);
+  }, [intentDraftApplied, onboardingIntent, strategyId]);
 
   const generateCalendarDays = () => {
     const year = calendarView.getFullYear();
@@ -858,7 +916,7 @@ export default function BuilderPage() {
           <button
             type="button"
             onClick={form.handleSubmit((d) => onSubmit(d, true))}
-            disabled={isPending}
+            disabled={isPending || isSavingCreate || isSavingUpdate}
             className="w-full sm:w-auto btn-secondary flex items-center justify-center gap-2"
           >
             <Save className="w-4 h-4" /> Save Draft
@@ -866,7 +924,7 @@ export default function BuilderPage() {
           <button
             type="button"
             onClick={form.handleSubmit((d) => onSubmit(d, false))}
-            disabled={isPending}
+            disabled={isPending || isSavingCreate || isSavingUpdate}
             className="w-full sm:w-auto btn-primary flex items-center justify-center gap-2"
           >
             {isPending ? (

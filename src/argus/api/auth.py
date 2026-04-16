@@ -157,6 +157,9 @@ def auth_required(
     remaining_quota = 50
     ai_draft_quota = 5
     remaining_ai_draft_quota = 5
+    onboarding_completed = False
+    onboarding_step = "profile"
+    onboarding_intent = None
     last_quota_reset = None
     feature_flags = {}
 
@@ -172,6 +175,8 @@ def auth_required(
             remaining_quota=999999,
             ai_draft_quota=999999,
             remaining_ai_draft_quota=999999,
+            onboarding_completed=True,
+            onboarding_step="completed",
             feature_flags={"multi_asset_beta": True},
         )
     if supabase_client:
@@ -195,6 +200,9 @@ def auth_required(
                 remaining_ai_draft_quota = int(
                     data.get("remaining_ai_draft_quota", ai_draft_quota)
                 )
+                onboarding_completed = bool(data.get("onboarding_completed", False))
+                onboarding_step = str(data.get("onboarding_step", "profile"))
+                onboarding_intent = data.get("onboarding_intent")
                 last_quota_reset_str = data.get("last_quota_reset")
                 feature_flags = data.get("feature_flags", {})
 
@@ -223,6 +231,9 @@ def auth_required(
         remaining_quota=remaining_quota,
         ai_draft_quota=ai_draft_quota,
         remaining_ai_draft_quota=remaining_ai_draft_quota,
+        onboarding_completed=onboarding_completed,
+        onboarding_step=onboarding_step,
+        onboarding_intent=onboarding_intent,
         last_quota_reset=last_quota_reset,
         feature_flags=feature_flags,
     )
