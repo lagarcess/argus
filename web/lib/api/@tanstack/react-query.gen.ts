@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { deleteStrategiesById, getAssets, getAuthSession, getBacktestsById, getHealth, getHistory, getMarketBars, getScreeners, getStrategies, getStrategiesById, type Options, patchAuthProfile, postAgentDraft, postAuthLogout, postBacktests, postBillingCheckout, postFeedback, postMocksBacktest, postShare, postStrategies, postWebhookBilling, putStrategiesById } from '../sdk.gen';
-import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetBacktestsByIdData, GetBacktestsByIdResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetMarketBarsData, GetMarketBarsResponse, GetScreenersData, GetStrategiesByIdData, GetStrategiesByIdResponse, GetStrategiesData, GetStrategiesResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostAuthLogoutData, PostAuthLogoutResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostBillingCheckoutData, PostFeedbackData, PostMocksBacktestData, PostMocksBacktestResponse, PostShareData, PostShareResponse, PostStrategiesData, PostStrategiesResponse, PostWebhookBillingData, PutStrategiesByIdData } from '../types.gen';
+import { deleteStrategiesById, getAssets, getAuthSession, getBacktestsById, getHealth, getHistory, getStrategies, getStrategiesById, getUsage, type Options, patchAuthProfile, postAgentDraft, postAuthLogout, postAuthSso, postBacktests, postStrategies, postTelemetryEvents, putStrategiesById } from '../sdk.gen';
+import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetBacktestsByIdData, GetBacktestsByIdResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetStrategiesByIdData, GetStrategiesByIdResponse, GetStrategiesData, GetStrategiesResponse, GetUsageData, GetUsageResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostAuthLogoutData, PostAuthLogoutResponse, PostAuthSsoData, PostAuthSsoResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostStrategiesData, PostStrategiesResponse, PostTelemetryEventsData, PutStrategiesByIdData } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -349,14 +349,14 @@ export const getAssetsOptions = (options: Options<GetAssetsData>) => queryOption
     queryKey: getAssetsQueryKey(options)
 });
 
-export const getMarketBarsQueryKey = (options: Options<GetMarketBarsData>) => createQueryKey('getMarketBars', options);
+export const getUsageQueryKey = (options?: Options<GetUsageData>) => createQueryKey('getUsage', options);
 
 /**
- * TradingView Universal Datafeed Proxy
+ * Get user usage and quota
  */
-export const getMarketBarsOptions = (options: Options<GetMarketBarsData>) => queryOptions<GetMarketBarsResponse, DefaultError, GetMarketBarsResponse, ReturnType<typeof getMarketBarsQueryKey>>({
+export const getUsageOptions = (options?: Options<GetUsageData>) => queryOptions<GetUsageResponse, DefaultError, GetUsageResponse, ReturnType<typeof getUsageQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getMarketBars({
+        const { data } = await getUsage({
             ...options,
             ...queryKey[0],
             signal,
@@ -364,94 +364,8 @@ export const getMarketBarsOptions = (options: Options<GetMarketBarsData>) => que
         });
         return data;
     },
-    queryKey: getMarketBarsQueryKey(options)
+    queryKey: getUsageQueryKey(options)
 });
-
-export const getScreenersQueryKey = (options?: Options<GetScreenersData>) => createQueryKey('getScreeners', options);
-
-/**
- * Alpaca Movers / Most-Actives proxy
- */
-export const getScreenersOptions = (options?: Options<GetScreenersData>) => queryOptions<unknown, DefaultError, unknown, ReturnType<typeof getScreenersQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getScreeners({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getScreenersQueryKey(options)
-});
-
-/**
- * Initialize payment gateway session
- */
-export const postBillingCheckoutMutation = (options?: Partial<Options<PostBillingCheckoutData>>): UseMutationOptions<unknown, DefaultError, Options<PostBillingCheckoutData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<PostBillingCheckoutData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await postBillingCheckout({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-/**
- * Supabase Edge Function to intercept gateway updates
- */
-export const postWebhookBillingMutation = (options?: Partial<Options<PostWebhookBillingData>>): UseMutationOptions<unknown, DefaultError, Options<PostWebhookBillingData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<PostWebhookBillingData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await postWebhookBilling({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-/**
- * Create OpenGraph shareable link from simulation
- */
-export const postShareMutation = (options?: Partial<Options<PostShareData>>): UseMutationOptions<PostShareResponse, DefaultError, Options<PostShareData>> => {
-    const mutationOptions: UseMutationOptions<PostShareResponse, DefaultError, Options<PostShareData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await postShare({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-/**
- * Submit user feedback
- */
-export const postFeedbackMutation = (options?: Partial<Options<PostFeedbackData>>): UseMutationOptions<unknown, DefaultError, Options<PostFeedbackData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<PostFeedbackData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await postFeedback({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
 
 export const getHealthQueryKey = (options?: Options<GetHealthData>) => createQueryKey('getHealth', options);
 
@@ -472,12 +386,29 @@ export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptio
 });
 
 /**
- * Dev-only endpoint for Prism mocking
+ * Initiate an SSO login flow
  */
-export const postMocksBacktestMutation = (options?: Partial<Options<PostMocksBacktestData>>): UseMutationOptions<PostMocksBacktestResponse, DefaultError, Options<PostMocksBacktestData>> => {
-    const mutationOptions: UseMutationOptions<PostMocksBacktestResponse, DefaultError, Options<PostMocksBacktestData>> = {
+export const postAuthSsoMutation = (options?: Partial<Options<PostAuthSsoData>>): UseMutationOptions<PostAuthSsoResponse, DefaultError, Options<PostAuthSsoData>> => {
+    const mutationOptions: UseMutationOptions<PostAuthSsoResponse, DefaultError, Options<PostAuthSsoData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await postMocksBacktest({
+            const { data } = await postAuthSso({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Ingest frontend telemetry events
+ */
+export const postTelemetryEventsMutation = (options?: Partial<Options<PostTelemetryEventsData>>): UseMutationOptions<unknown, DefaultError, Options<PostTelemetryEventsData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<PostTelemetryEventsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await postTelemetryEvents({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

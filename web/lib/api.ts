@@ -5,7 +5,7 @@
  * auto-generated types from the backend FastAPI schema.
  */
 
-import { UserResponse as GeneratedUserResponse, BacktestRequest, SimulationLogEntry, PaginatedHistory, ProfileUpdate, SsoRequest, SsoResponse, BacktestResponse } from "./generated";
+import { UserResponse as GeneratedUserResponse, BacktestRequest, SimulationLogEntry, GetHistoryResponse as PaginatedHistory, SsoRequest, SsoResponse, BacktestResponse } from "./api/types.gen";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -64,7 +64,7 @@ export async function fetchApi<T>(
 
 export type UserResponse = GeneratedUserResponse;
 export type HistoryResponse = PaginatedHistory;
-export type { BacktestRequest, SimulationLogEntry, ProfileUpdate, SsoRequest, SsoResponse, BacktestResponse };
+export type { BacktestRequest, SimulationLogEntry, SsoRequest, SsoResponse, BacktestResponse };
 
 /* ==========================================================================
    MANUALLY MAINTAINED TYPES (Internal Simulation Data Structures)

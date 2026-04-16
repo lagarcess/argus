@@ -1,14 +1,14 @@
 openapi: 3.1.0
 info:
   title: Argus Observatory API
-  description: Narrow-MVP private beta API for onboarding, drafting, strategy CRUD, backtests, history, and logout.
+  description: Narrow-MVP private beta API for onboarding, drafting, strategy CRUD,
+    backtests, history, and logout.
   version: 1.1.0-narrow
 servers:
-  - url: http://localhost:8000/api/v1
-    description: Local Development (FastAPI)
-  - url: https://argus-app-suz5.onrender.com/api/v1
-    description: Production & Staging (Render)
-
+- url: http://localhost:8000/api/v1
+  description: Local Development (FastAPI)
+- url: https://argus-app-suz5.onrender.com/api/v1
+  description: Production & Staging (Render)
 components:
   securitySchemes:
     cookieAuth:
@@ -26,7 +26,11 @@ components:
           type: boolean
         subscription_tier:
           type: string
-          enum: [free, plus, pro, max]
+          enum:
+          - free
+          - plus
+          - pro
+          - max
         backtest_quota:
           type: integer
         remaining_quota:
@@ -46,7 +50,10 @@ components:
               type: boolean
         theme:
           type: string
-          enum: [light, dark, system]
+          enum:
+          - light
+          - dark
+          - system
         onboarding_completed:
           type: boolean
         onboarding_step:
@@ -54,8 +61,16 @@ components:
         onboarding_intent:
           type: string
           nullable: true
-      required: [id, is_admin, subscription_tier, backtest_quota, remaining_quota, feature_flags, theme, onboarding_completed, onboarding_step]
-
+      required:
+      - id
+      - is_admin
+      - subscription_tier
+      - backtest_quota
+      - remaining_quota
+      - feature_flags
+      - theme
+      - onboarding_completed
+      - onboarding_step
     ErrorResponse:
       type: object
       properties:
@@ -71,8 +86,12 @@ components:
           type: string
         error_code:
           type: string
-      required: [type, title, status, detail, error_code]
-
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - error_code
     StrategySchema:
       type: object
       properties:
@@ -101,9 +120,9 @@ components:
           type: object
           additionalProperties:
             oneOf:
-              - type: number
-              - type: boolean
-              - type: string
+            - type: number
+            - type: boolean
+            - type: string
         patterns:
           type: array
           items:
@@ -112,7 +131,10 @@ components:
           type: number
         trade_direction:
           type: string
-          enum: [LONG, SHORT, BOTH]
+          enum:
+          - LONG
+          - SHORT
+          - BOTH
         participation_rate:
           type: number
         execution_priority:
@@ -121,7 +143,9 @@ components:
           type: number
         slippage_model:
           type: string
-          enum: [fixed, vol_adjusted]
+          enum:
+          - fixed
+          - vol_adjusted
         entry_criteria:
           type: array
           items:
@@ -136,8 +160,10 @@ components:
           type: number
         ai_explanation:
           type: string
-      required: [name, symbols, timeframe]
-
+      required:
+      - name
+      - symbols
+      - timeframe
     BacktestRequest:
       type: object
       properties:
@@ -156,7 +182,9 @@ components:
           type: number
         side:
           type: string
-          enum: [long, short]
+          enum:
+          - long
+          - short
           default: long
         participation_rate:
           type: number
@@ -169,7 +197,9 @@ components:
           default: 1.0
         slippage_model:
           type: string
-          enum: [fixed, vol_adjusted]
+          enum:
+          - fixed
+          - vol_adjusted
           default: vol_adjusted
         entry_criteria:
           type: array
@@ -183,7 +213,6 @@ components:
           type: number
         take_profit_pct:
           type: number
-
     BacktestResults:
       type: object
       properties:
@@ -227,7 +256,6 @@ components:
           type: object
           additionalProperties:
             type: integer
-
     BacktestResponse:
       type: object
       properties:
@@ -238,8 +266,10 @@ components:
           type: object
         results:
           $ref: '#/components/schemas/BacktestResults'
-      required: [id, config_snapshot, results]
-
+      required:
+      - id
+      - config_snapshot
+      - results
     RealityGapMetrics:
       type: object
       properties:
@@ -251,7 +281,6 @@ components:
           type: number
         fidelity_score:
           type: number
-
     TradeSnippet:
       type: object
       properties:
@@ -263,7 +292,6 @@ components:
           type: number
         pnl_pct:
           type: number
-
     SimulationLogEntry:
       type: object
       properties:
@@ -280,7 +308,11 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, completed, failed, processing]
+          enum:
+          - pending
+          - completed
+          - failed
+          - processing
         total_return_pct:
           type: number
         sharpe_ratio:
@@ -297,7 +329,6 @@ components:
         completed_at:
           type: string
           format: date-time
-
     ShareResponse:
       type: object
       properties:
@@ -307,14 +338,49 @@ components:
           type: string
         og_title:
           type: string
-      required: [vanity_url, og_image]
-
+      required:
+      - vanity_url
+      - og_image
+    SSORequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum:
+          - google
+          - discord
+        redirect_to:
+          type: string
+      required:
+      - provider
+      - redirect_to
+    SSOResponse:
+      type: object
+      properties:
+        auth_url:
+          type: string
+      required:
+      - auth_url
+    TelemetryEventPayload:
+      type: object
+      properties:
+        event:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        properties:
+          type: object
+          additionalProperties: true
+      required:
+      - event
+      - timestamp
 paths:
   /auth/session:
     get:
       summary: Get current authenticated user session
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Session details
@@ -322,12 +388,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
-
   /auth/profile:
     patch:
       summary: Update user profile settings
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         content:
           application/json:
@@ -336,7 +401,10 @@ paths:
               properties:
                 theme:
                   type: string
-                  enum: [light, dark, system]
+                  enum:
+                  - light
+                  - dark
+                  - system
                 onboarding_completed:
                   type: boolean
                 onboarding_step:
@@ -351,22 +419,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
-
   /strategies:
     get:
       summary: List user strategies
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - in: query
-          name: cursor
-          schema:
-            type: string
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 10
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          default: 10
       responses:
         '200':
           description: Paginated strategies
@@ -385,7 +452,7 @@ paths:
     post:
       summary: Save a new strategy
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         content:
           application/json:
@@ -398,19 +465,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StrategySchema'
-
   /strategies/{id}:
     get:
       summary: Get strategy by id
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         '200':
           description: Strategy response
@@ -421,14 +487,14 @@ paths:
     put:
       summary: Update a strategy
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           application/json:
@@ -440,28 +506,27 @@ paths:
     delete:
       summary: Delete a strategy
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         '204':
           description: Strategy deleted
-
   /history:
     get:
       summary: Get user run history
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - in: query
-          name: cursor
-          schema:
-            type: string
+      - in: query
+        name: cursor
+        schema:
+          type: string
       responses:
         '200':
           description: Paginated run history
@@ -478,12 +543,11 @@ paths:
                     type: integer
                   next_cursor:
                     type: string
-
   /backtests:
     post:
       summary: Execute a backtest simulation
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -503,19 +567,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
   /backtests/{id}:
     get:
       summary: Get detailed backtest results
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         '200':
           description: Detailed backtest results
@@ -525,12 +588,11 @@ paths:
                 $ref: '#/components/schemas/BacktestResponse'
         '404':
           description: Backtest not found
-
   /agent/draft:
     post:
       summary: Draft a strategy using AI Natural Language input
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -547,31 +609,31 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [draft, ai_explanation]
+                required:
+                - draft
+                - ai_explanation
                 properties:
                   draft:
                     $ref: '#/components/schemas/StrategySchema'
                   ai_explanation:
                     type: string
-
   /auth/logout:
     post:
       summary: Revoke upstream session and clear local auth cookies
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
         '204':
           description: Logged out
-
   /assets:
     get:
       summary: Search available market assets
       parameters:
-        - in: query
-          name: search
-          required: true
-          schema:
-            type: string
+      - in: query
+        name: search
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: List of matched tickers
@@ -581,12 +643,11 @@ paths:
                 type: array
                 items:
                   type: string
-
   /usage:
     get:
       summary: Get user usage and quota
       security:
-        - cookieAuth: []
+      - cookieAuth: []
       responses:
         '200':
           description: Usage info
@@ -601,10 +662,39 @@ paths:
                     type: integer
                   tier:
                     type: string
-
   /health:
     get:
       summary: API health and uptime check
       responses:
         '200':
           description: OK
+  /auth/sso:
+    post:
+      summary: Initiate an SSO login flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SSORequest'
+      responses:
+        '200':
+          description: SSO authorization URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SSOResponse'
+  /telemetry/events:
+    post:
+      summary: Ingest frontend telemetry events
+      security:
+      - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryEventPayload'
+      responses:
+        '202':
+          description: Event accepted
