@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, cast
 
 from loguru import logger
 
-from argus.api.schemas import SimulationLogEntry
 from argus.config import get_settings
 from argus.engine import EngineBacktestResults
 from supabase import Client, create_client
@@ -256,14 +255,16 @@ class PersistenceService:
             return None
 
     def get_user_simulations(
-        self, user_id: str, limit: int = 10, offset: int = 0
-    ) -> tuple[List[Dict[str, Any]], int]:
+        self, user_id: str, limit: int = 10, cursor: Optional[str] = None
+    ) -> tuple[List[Dict[str, Any]], int, Optional[str]]:
         """
         Fetches a paginated list of summarized simulations for a user.
         Joins with the strategies table to get the strategy name.
         """
+        import base64
+
         if not self.client:
-            return [], 0
+            return [], 0, None
 
         try:
             # Get total count
@@ -276,14 +277,31 @@ class PersistenceService:
             total = count_res.count if count_res.count else 0
 
             # Fetch paginated data joined with strategy name
-            res = (
+            query = (
                 self.client.table("simulations")
-                .select("id, symbols, timeframe, created_at, summary, strategies(name)")
+                .select(
+                    "id, symbols, timeframe, created_at, summary, reality_gap_metrics, strategies(name)"
+                )
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
-                .range(offset, offset + limit - 1)
-                .execute()
+                .order("id", desc=True)
+                .limit(limit)
             )
+
+            if cursor:
+                try:
+                    decoded = base64.b64decode(cursor).decode("utf-8")
+                    # format: timestamp_iso+id
+                    if "+" in decoded:
+                        timestamp_str, id_str = decoded.split("+", 1)
+                        # Use complex filter for tie-breaking
+                        query = query.or_(
+                            f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
+                        )
+                except Exception as e:
+                    logger.warning(f"Invalid cursor format: {cursor}, {e}")
+
+            res = query.execute()
 
             summaries: List[Dict[str, Any]] = []
             for row in res.data:
@@ -308,14 +326,47 @@ class PersistenceService:
 
                 # Mix in the summary metrics
                 metrics = cast(Dict[str, Any], row).get("summary", {})
+                if isinstance(metrics, str):
+                    import json
+
+                    try:
+                        metrics = json.loads(metrics)
+                    except Exception:
+                        metrics = {}
                 entry_data.update(metrics)
 
-                # Validate against schema and dump for response
-                summary = SimulationLogEntry.model_validate(entry_data).model_dump()
-                summaries.append(summary)
+                # fidelity_score from reality_gap_metrics
+                reality_gap_metrics = (
+                    cast(Dict[str, Any], row).get("reality_gap_metrics", {}) or {}
+                )
+                if isinstance(reality_gap_metrics, str):
+                    import json
 
-            return summaries, total
+                    try:
+                        reality_gap_metrics = json.loads(reality_gap_metrics)
+                    except Exception:
+                        reality_gap_metrics = {}
+
+                fidelity_score = reality_gap_metrics.get("fidelity_score", 1.0)
+                entry_data["fidelity_score"] = fidelity_score
+
+                # The schema might need update before this, but we'll return entry_data first then validate in main.py or update schema now.
+                # Let's bypass model_validate here so we don't crash if schema isn't updated yet. We'll return entry_data dictionary.
+                summaries.append(entry_data)
+
+            next_cursor = None
+            if len(res.data) == limit:
+                last_row: Any = res.data[-1]
+                last_ts = cast(Dict[str, Any], last_row).get("created_at")
+                last_id = cast(Dict[str, Any], last_row).get("id")
+                if last_ts and last_id:
+                    cursor_str = f"{last_ts}+{last_id}"
+                    next_cursor = base64.b64encode(cursor_str.encode("utf-8")).decode(
+                        "utf-8"
+                    )
+
+            return summaries, total, next_cursor
 
         except Exception as e:
             logger.error(f"Failed to fetch user simulations: {e}")
-            return [], 0
+            return [], 0, None

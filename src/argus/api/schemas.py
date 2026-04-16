@@ -148,6 +148,7 @@ class SimulationLogEntry(BaseModel):
     beta: Optional[float] = None
     calmar_ratio: Optional[float] = None
     avg_trade_duration: Optional[str] = None
+    fidelity_score: Optional[float] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
 

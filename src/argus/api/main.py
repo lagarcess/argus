@@ -691,7 +691,7 @@ def get_user_history(
     try:
         user_id_str = str(user.id)
         # Fetch from persistence with cursor support
-        summaries, total = persistence_service.get_user_simulations(
+        summaries, total, next_cursor = persistence_service.get_user_simulations(
             user_id_str, limit=limit, cursor=cursor
         )
 
@@ -699,16 +699,38 @@ def get_user_history(
         formatted_simulations = []
         for s in summaries:
             s_copy = s.copy()
-            if s_copy.get("win_rate") is not None and s_copy["win_rate"] > 1.0:
-                s_copy["win_rate"] = s_copy["win_rate"] / 100.0
+
+            raw_win_rate = s_copy.get("win_rate")
+            if raw_win_rate is not None:
+                try:
+                    win_rate_val = float(raw_win_rate)
+                    s_copy["win_rate"] = (
+                        win_rate_val / 100.0 if win_rate_val > 1.0 else win_rate_val
+                    )
+                except (ValueError, TypeError):
+                    s_copy["win_rate"] = 0.0
+
+            # Map fidelity_score securely to 0..1
+            raw_fidelity = s_copy.get("fidelity_score")
+            if raw_fidelity is not None:
+                try:
+                    fidelity_val = float(raw_fidelity)
+                    s_copy["fidelity_score"] = max(
+                        0.0,
+                        min(
+                            1.0,
+                            fidelity_val / 100.0 if fidelity_val > 1.0 else fidelity_val,
+                        ),
+                    )
+                except (ValueError, TypeError):
+                    s_copy["fidelity_score"] = 1.0
+
             formatted_simulations.append(SimulationLogEntry(**s_copy))
 
         return PaginatedHistory(
             simulations=formatted_simulations,
             total=total,
-            next_cursor=summaries[-1].get("id")
-            if (summaries and len(summaries) >= limit)
-            else None,
+            next_cursor=next_cursor,
         )
 
     except Exception as e:

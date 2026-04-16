@@ -86,6 +86,7 @@ def test_get_history(monkeypatch, mock_user):
                 }
             ],
             100,
+            None,
         )
     )
 
@@ -524,6 +525,7 @@ def test_metrics_parity_history_vs_detail_same_simulation(monkeypatch, mock_user
                 }
             ],
             1,
+            None,
         )
     )
 

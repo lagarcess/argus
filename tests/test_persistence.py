@@ -216,10 +216,23 @@ def test_get_user_simulations(mock_get_settings, mock_supabase):
             "strategies": {"name": "Test Strat"},
         }
     ]
-    mock_order = MagicMock()
-    mock_order.range.return_value = mock_range
+    mock_limit = MagicMock()
+    mock_limit.execute.return_value.data = [
+        {
+            "id": "sim1",
+            "symbols": ["BTC/USD"],
+            "timeframe": "1h",
+            "created_at": "2025-01-01T00:00:00Z",
+            "summary": {"total_return_pct": 5.0},
+            "strategies": {"name": "Test Strat"},
+        }
+    ]
+    mock_order2 = MagicMock()
+    mock_order2.limit.return_value = mock_limit
+    mock_order1 = MagicMock()
+    mock_order1.order.return_value = mock_order2
     mock_eq2 = MagicMock()
-    mock_eq2.order.return_value = mock_order
+    mock_eq2.order.return_value = mock_order1
     mock_select2 = MagicMock()
     mock_select2.eq.return_value = mock_eq2
 
@@ -240,7 +253,7 @@ def test_get_user_simulations(mock_get_settings, mock_supabase):
 
     mock_supabase.return_value.table.side_effect = table_side_effect
 
-    summaries, total = service.get_user_simulations("user1")
+    summaries, total, next_cursor = service.get_user_simulations("user1")
     assert total == 10
     assert len(summaries) == 1
     assert summaries[0]["id"] == "sim1"
