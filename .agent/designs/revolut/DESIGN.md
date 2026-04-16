@@ -49,7 +49,7 @@ What distinguishes Revolut is its pill-everything button system. Every button us
 ## 3. Typography Rules
 
 ### Font Families
-- **Display**: `Aeonik Pro` — geometric grotesque, no detected fallbacks
+- **Display**: `Aeonik Pro` — geometric grotesque, fallback stack: `Aeonik Pro`, `Inter`, `Arial`, `sans-serif`
 - **Body / UI**: `Inter` — standard system sans
 - **Fallback**: `Arial` for specific button contexts
 
@@ -125,7 +125,7 @@ What distinguishes Revolut is its pill-everything button system. Every button us
 - Large section spacing: 80px–120px
 
 ### Border Radius Scale
-- Standard (12px): Navigation, small buttons
+- Standard (12px): Navigation, containers
 - Card (20px): Feature cards
 - Pill (9999px): All buttons
 
@@ -156,6 +156,7 @@ What distinguishes Revolut is its pill-everything button system. Every button us
 ## 8. Responsive Behavior
 
 ### Breakpoints
+_Design targets below are intentional for this system; if implementation keeps Tailwind defaults, map these ranges explicitly in component specs._
 | Name | Width | Key Changes |
 |------|-------|-------------|
 | Mobile Small | <400px | Compact, single column |
