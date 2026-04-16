@@ -36,7 +36,7 @@ def create_strategy(
         response.headers["X-RateLimit-Remaining"] = "29"
         response.headers["X-RateLimit-Reset"] = str(int(time.time() + 3600))
 
-        strategy_data = strategy.model_dump()
+        strategy_data = strategy.model_dump(exclude_unset=True)
         db_strategy = persistence_service.save_strategy(user_id_str, strategy_data)
 
         if not db_strategy:
@@ -105,7 +105,7 @@ def update_strategy(
         raise HTTPException(status_code=403, detail="Cannot modify an executed strategy.")
 
     # 2. Update
-    strategy_data = strategy.model_dump()
+    strategy_data = strategy.model_dump(exclude_unset=True)
     updated_strategy = persistence_service.save_strategy(
         user_id_str, strategy_data, strategy_id
     )

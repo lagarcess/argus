@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 interface CoDrafterBarProps {
   onDraft: (prompt: string) => void;
   isDrafting: boolean;
-  quotaRemaining: number;
+  quotaRemaining: number | null;
 }
 
 export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterBarProps) {
@@ -49,9 +49,11 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
     mouseY.set(0);
   };
 
+  const hasQuota = quotaRemaining === null || quotaRemaining > 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (prompt.trim() && !isDrafting && quotaRemaining > 0) {
+    if (prompt.trim() && !isDrafting && hasQuota) {
       onDraft(prompt);
       setPrompt("");
     }
@@ -141,9 +143,11 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
             </span>
             <span className={cn(
               "font-mono text-[11px] font-bold tracking-wider leading-tight",
-              quotaRemaining > 0 ? "text-[#99f7ff]" : "text-[#ff716c]"
+              hasQuota ? "text-[#99f7ff]" : "text-[#ff716c]"
             )}>
-              Mock Draft Quota: {quotaRemaining}/5
+              {quotaRemaining === null
+                ? "Draft Quota: Live"
+                : `Mock Draft Quota: ${quotaRemaining}/5`}
             </span>
           </div>
 
@@ -159,7 +163,7 @@ export function CoDrafterBar({ onDraft, isDrafting, quotaRemaining }: CoDrafterB
 
           <button
             type="submit"
-            disabled={isDrafting || !prompt.trim() || quotaRemaining <= 0}
+            disabled={isDrafting || !prompt.trim() || !hasQuota}
             className={cn(
               "flex items-center justify-center min-h-[44px] min-w-[44px] md:px-6 rounded-[2.5rem] font-headline font-bold text-sm text-[#0e0e10]",
               "transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
