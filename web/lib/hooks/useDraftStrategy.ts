@@ -19,6 +19,9 @@ export function useDraftStrategy() {
       const { data } = await postAgentDraft({
         body: { prompt },
       });
+      if (!data) {
+        throw new Error("Missing draft response payload");
+      }
       setQuotaRemaining(null);
       toast.success("Strategy Drafted Successfully");
       return {
