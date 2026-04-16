@@ -5,6 +5,7 @@ import { Copy, Trash2, ArrowRight, Clock } from "lucide-react";
 import Link from "next/link";
 // In real app, import from lib/api
 import { getStrategiesOptions } from "@/lib/api/@tanstack/react-query.gen";
+import type { StrategySchema } from "@/lib/api/types.gen";
 
 type StrategyListItem = {
   id: string;
@@ -16,6 +17,25 @@ type StrategyListItem = {
 
 export default function StrategiesPage() {
   const { data: strategies, isLoading } = useQuery(getStrategiesOptions());
+  const strategyItems: StrategyListItem[] = (strategies?.strategies ?? []).map(
+    (strategy: StrategySchema, index: number) => {
+      const rawStrategy = strategy as unknown as Record<string, unknown>;
+
+      return {
+        id:
+          typeof strategy.id === "string" && strategy.id.length > 0
+            ? strategy.id
+            : `strategy-${index}`,
+        name: strategy.name,
+        timeframe: strategy.timeframe,
+        is_executed: rawStrategy.is_executed === true,
+        created_at:
+          typeof rawStrategy.created_at === "string"
+            ? rawStrategy.created_at
+            : new Date(0).toISOString(),
+      };
+    },
+  );
   // const { data: strategies, isLoading } = useQuery({
     // queryKey
     // queryFn
@@ -48,7 +68,7 @@ export default function StrategiesPage() {
              </div>
              <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-4 animate-pulse">Loading Strategies...</p>
            </div>
-        ) : (strategies?.strategies?.length ?? 0) === 0 ? (
+        ) : strategyItems.length === 0 ? (
            <div className="col-span-full py-20 text-center glass-card border-slate-800 border-dashed flex flex-col items-center justify-center">
              <Copy className="w-8 h-8 text-slate-600 mb-4" />
              <h3 className="text-lg font-semibold text-slate-300">No Strategies Found</h3>
@@ -56,7 +76,7 @@ export default function StrategiesPage() {
              <Link href="/builder" className="btn-secondary text-sm">Create Strategy</Link>
            </div>
         ) : (
-          strategies?.strategies?.map((strat: StrategyListItem) => (
+          strategyItems.map((strat: StrategyListItem) => (
             <div key={strat.id} className="glass-card p-5 border-slate-800 hover:border-emerald-400/30 transition-colors flex flex-col justify-between group h-40">
                <div>
                   <div className="flex items-start justify-between mb-2">

@@ -34,6 +34,8 @@ export default function Providers({ children }: { children: ReactNode }) {
         remaining_quota: 100,
         feature_flags: { advanced_charting: true },
         theme: "dark",
+        onboarding_completed: true,
+        onboarding_step: "completed",
       });
     }
 
