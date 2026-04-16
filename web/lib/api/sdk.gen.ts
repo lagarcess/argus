@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponses, GetAssetsData, GetAssetsResponses, GetAuthSessionData, GetAuthSessionResponses, GetBacktestsByIdData, GetBacktestsByIdErrors, GetBacktestsByIdResponses, GetHealthData, GetHealthResponses, GetHistoryData, GetHistoryResponses, GetMarketBarsData, GetMarketBarsResponses, GetScreenersData, GetScreenersResponses, GetStrategiesByIdData, GetStrategiesByIdResponses, GetStrategiesData, GetStrategiesResponses, PatchAuthProfileData, PatchAuthProfileResponses, PostAgentDraftData, PostAgentDraftResponses, PostAuthLogoutData, PostAuthLogoutResponses, PostBacktestsData, PostBacktestsErrors, PostBacktestsResponses, PostBillingCheckoutData, PostBillingCheckoutResponses, PostFeedbackData, PostFeedbackResponses, PostMocksBacktestData, PostMocksBacktestResponses, PostShareData, PostShareResponses, PostStrategiesData, PostStrategiesResponses, PostWebhookBillingData, PostWebhookBillingResponses, PutStrategiesByIdData, PutStrategiesByIdResponses } from './types.gen';
+import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponses, GetAssetsData, GetAssetsResponses, GetAuthSessionData, GetAuthSessionResponses, GetBacktestsByIdData, GetBacktestsByIdErrors, GetBacktestsByIdResponses, GetHealthData, GetHealthResponses, GetHistoryData, GetHistoryResponses, GetStrategiesByIdData, GetStrategiesByIdResponses, GetStrategiesData, GetStrategiesResponses, GetUsageData, GetUsageResponses, PatchAuthProfileData, PatchAuthProfileResponses, PostAgentDraftData, PostAgentDraftResponses, PostAuthLogoutData, PostAuthLogoutResponses, PostAuthSsoData, PostAuthSsoResponses, PostBacktestsData, PostBacktestsErrors, PostBacktestsResponses, PostStrategiesData, PostStrategiesResponses, PostTelemetryEventsData, PostTelemetryEventsResponses, PutStrategiesByIdData, PutStrategiesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -200,73 +200,16 @@ export const postAuthLogout = <ThrowOnError extends boolean = false>(options?: O
 export const getAssets = <ThrowOnError extends boolean = false>(options: Options<GetAssetsData, ThrowOnError>) => (options.client ?? client).get<GetAssetsResponses, unknown, ThrowOnError>({ url: '/assets', ...options });
 
 /**
- * TradingView Universal Datafeed Proxy
+ * Get user usage and quota
  */
-export const getMarketBars = <ThrowOnError extends boolean = false>(options: Options<GetMarketBarsData, ThrowOnError>) => (options.client ?? client).get<GetMarketBarsResponses, unknown, ThrowOnError>({
+export const getUsage = <ThrowOnError extends boolean = false>(options?: Options<GetUsageData, ThrowOnError>) => (options?.client ?? client).get<GetUsageResponses, unknown, ThrowOnError>({
     security: [{
             in: 'cookie',
             name: 'sb-access-token',
             type: 'apiKey'
         }],
-    url: '/market/bars',
+    url: '/usage',
     ...options
-});
-
-/**
- * Alpaca Movers / Most-Actives proxy
- */
-export const getScreeners = <ThrowOnError extends boolean = false>(options?: Options<GetScreenersData, ThrowOnError>) => (options?.client ?? client).get<GetScreenersResponses, unknown, ThrowOnError>({ url: '/screeners', ...options });
-
-/**
- * Initialize payment gateway session
- */
-export const postBillingCheckout = <ThrowOnError extends boolean = false>(options?: Options<PostBillingCheckoutData, ThrowOnError>) => (options?.client ?? client).post<PostBillingCheckoutResponses, unknown, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'sb-access-token',
-            type: 'apiKey'
-        }],
-    url: '/billing/checkout',
-    ...options
-});
-
-/**
- * Supabase Edge Function to intercept gateway updates
- */
-export const postWebhookBilling = <ThrowOnError extends boolean = false>(options?: Options<PostWebhookBillingData, ThrowOnError>) => (options?.client ?? client).post<PostWebhookBillingResponses, unknown, ThrowOnError>({ url: '/webhook/billing', ...options });
-
-/**
- * Create OpenGraph shareable link from simulation
- */
-export const postShare = <ThrowOnError extends boolean = false>(options?: Options<PostShareData, ThrowOnError>) => (options?.client ?? client).post<PostShareResponses, unknown, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'sb-access-token',
-            type: 'apiKey'
-        }],
-    url: '/share',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-    }
-});
-
-/**
- * Submit user feedback
- */
-export const postFeedback = <ThrowOnError extends boolean = false>(options?: Options<PostFeedbackData, ThrowOnError>) => (options?.client ?? client).post<PostFeedbackResponses, unknown, ThrowOnError>({
-    security: [{
-            in: 'cookie',
-            name: 'sb-access-token',
-            type: 'apiKey'
-        }],
-    url: '/feedback',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers
-    }
 });
 
 /**
@@ -275,6 +218,30 @@ export const postFeedback = <ThrowOnError extends boolean = false>(options?: Opt
 export const getHealth = <ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>) => (options?.client ?? client).get<GetHealthResponses, unknown, ThrowOnError>({ url: '/health', ...options });
 
 /**
- * Dev-only endpoint for Prism mocking
+ * Initiate an SSO login flow
  */
-export const postMocksBacktest = <ThrowOnError extends boolean = false>(options?: Options<PostMocksBacktestData, ThrowOnError>) => (options?.client ?? client).post<PostMocksBacktestResponses, unknown, ThrowOnError>({ url: '/_mocks/backtest', ...options });
+export const postAuthSso = <ThrowOnError extends boolean = false>(options: Options<PostAuthSsoData, ThrowOnError>) => (options.client ?? client).post<PostAuthSsoResponses, unknown, ThrowOnError>({
+    url: '/auth/sso',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Ingest frontend telemetry events
+ */
+export const postTelemetryEvents = <ThrowOnError extends boolean = false>(options: Options<PostTelemetryEventsData, ThrowOnError>) => (options.client ?? client).post<PostTelemetryEventsResponses, unknown, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'sb-access-token',
+            type: 'apiKey'
+        }],
+    url: '/telemetry/events',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});

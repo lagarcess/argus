@@ -37,5 +37,6 @@ export function trackFunnelEvent(
     window.__argusTelemetryQueue.push(payload);
   }
 
+  // TODO: Implement backend telemetry push
   return payload;
 }

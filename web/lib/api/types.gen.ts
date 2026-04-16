@@ -146,6 +146,23 @@ export type ShareResponse = {
     og_title?: string;
 };
 
+export type SsoRequest = {
+    provider: 'google' | 'discord';
+    redirect_to: string;
+};
+
+export type SsoResponse = {
+    auth_url: string;
+};
+
+export type TelemetryEventPayload = {
+    event: string;
+    timestamp: string;
+    properties?: {
+        [key: string]: unknown;
+    };
+};
+
 export type GetAuthSessionData = {
     body?: never;
     path?: never;
@@ -400,114 +417,25 @@ export type GetAssetsResponses = {
 
 export type GetAssetsResponse = GetAssetsResponses[keyof GetAssetsResponses];
 
-export type GetMarketBarsData = {
+export type GetUsageData = {
     body?: never;
     path?: never;
-    query: {
-        symbol: string;
-        from: number;
-        to: number;
-        resolution: string;
-    };
-    url: '/market/bars';
+    query?: never;
+    url: '/usage';
 };
 
-export type GetMarketBarsResponses = {
+export type GetUsageResponses = {
     /**
-     * UDF formatted arrays
+     * Usage info
      */
     200: {
-        t?: Array<number>;
-        o?: Array<number>;
-        h?: Array<number>;
-        l?: Array<number>;
-        c?: Array<number>;
-        v?: Array<number>;
-        s?: string;
+        count?: number;
+        limit?: number;
+        tier?: string;
     };
 };
 
-export type GetMarketBarsResponse = GetMarketBarsResponses[keyof GetMarketBarsResponses];
-
-export type GetScreenersData = {
-    body?: never;
-    path?: never;
-    query?: {
-        type?: 'movers' | 'active';
-    };
-    url: '/screeners';
-};
-
-export type GetScreenersResponses = {
-    /**
-     * Assets list
-     */
-    200: unknown;
-};
-
-export type PostBillingCheckoutData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/billing/checkout';
-};
-
-export type PostBillingCheckoutResponses = {
-    /**
-     * Checkout URL
-     */
-    200: unknown;
-};
-
-export type PostWebhookBillingData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/webhook/billing';
-};
-
-export type PostWebhookBillingResponses = {
-    /**
-     * Billing updated
-     */
-    200: unknown;
-};
-
-export type PostShareData = {
-    body?: {
-        simulation_id?: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/share';
-};
-
-export type PostShareResponses = {
-    /**
-     * Vanity URL configured
-     */
-    200: ShareResponse;
-};
-
-export type PostShareResponse = PostShareResponses[keyof PostShareResponses];
-
-export type PostFeedbackData = {
-    body?: {
-        type?: 'bug' | 'feature_request' | 'general';
-        message?: string;
-        simulation_id?: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/feedback';
-};
-
-export type PostFeedbackResponses = {
-    /**
-     * Feedback received
-     */
-    201: unknown;
-};
+export type GetUsageResponse = GetUsageResponses[keyof GetUsageResponses];
 
 export type GetHealthData = {
     body?: never;
@@ -523,18 +451,32 @@ export type GetHealthResponses = {
     200: unknown;
 };
 
-export type PostMocksBacktestData = {
-    body?: never;
+export type PostAuthSsoData = {
+    body: SsoRequest;
     path?: never;
     query?: never;
-    url: '/_mocks/backtest';
+    url: '/auth/sso';
 };
 
-export type PostMocksBacktestResponses = {
+export type PostAuthSsoResponses = {
     /**
-     * Mocked BacktestResponse return
+     * SSO authorization URL
      */
-    200: BacktestResponse;
+    200: SsoResponse;
 };
 
-export type PostMocksBacktestResponse = PostMocksBacktestResponses[keyof PostMocksBacktestResponses];
+export type PostAuthSsoResponse = PostAuthSsoResponses[keyof PostAuthSsoResponses];
+
+export type PostTelemetryEventsData = {
+    body: TelemetryEventPayload;
+    path?: never;
+    query?: never;
+    url: '/telemetry/events';
+};
+
+export type PostTelemetryEventsResponses = {
+    /**
+     * Event accepted
+     */
+    202: unknown;
+};
