@@ -261,24 +261,38 @@ function BuilderPageContent() {
     });
   }, [existingStrategy, form, form.formState.isDirty, strategyId]);
 
+  const getIndicatorBaseId = (value?: string) => value?.split('_')[0] ?? '';
+
   const handleIndicatorSelect = (indicatorId: string) => {
     const { type, index, field } = lastFocusedSlot;
     const path = type === 'entry' ? 'entry_criteria' : 'exit_criteria';
     const currentRules = [...form.getValues(path)];
-    const rule = { ...currentRules[index] };
+    const currentRule = currentRules[index];
+
+    if (!currentRule) {
+      toast.error("Select a Rule First", {
+        description: "The focused rule is no longer available. Open the rule again and retry the indicator selection.",
+        className: "bg-slate-950 border-slate-800 text-slate-200"
+      });
+      return;
+    }
+
+    const rule = { ...currentRule };
 
     // Check Institutional Physics (physics guard)
     const entryRules = form.getValues("entry_criteria");
     const exitRules = form.getValues("exit_criteria");
     const allUsed = [
-      ...entryRules.map(r => r.indicator_a.split('_')[0]),
-      ...entryRules.map(r => r.indicator_b?.split('_')[0]).filter(Boolean),
-      ...exitRules.map(r => r.indicator_a.split('_')[0]),
-      ...exitRules.map(r => r.indicator_b?.split('_')[0]).filter(Boolean),
+      ...entryRules.map(r => getIndicatorBaseId(r.indicator_a)).filter(Boolean),
+      ...entryRules.map(r => getIndicatorBaseId(r.indicator_b)).filter(Boolean),
+      ...exitRules.map(r => getIndicatorBaseId(r.indicator_a)).filter(Boolean),
+      ...exitRules.map(r => getIndicatorBaseId(r.indicator_b)).filter(Boolean),
     ];
 
     // Is this a NEW indicator or just re-assigning?
-    const currentIndicatorId = field === 'indicator_a' ? rule.indicator_a.split('_')[0] : rule.indicator_b?.split('_')[0];
+    const currentIndicatorId = field === 'indicator_a'
+      ? getIndicatorBaseId(rule.indicator_a)
+      : getIndicatorBaseId(rule.indicator_b);
     const isNew = !allUsed.includes(indicatorId) && indicatorId !== currentIndicatorId;
     const uniqueCount = new Set(allUsed).size;
 
