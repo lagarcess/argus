@@ -1,3 +1,5 @@
+import base64
+import json
 from unittest.mock import MagicMock, patch
 
 from argus.domain.persistence import PersistenceService
@@ -217,6 +219,7 @@ def test_get_user_simulations(mock_get_settings, mock_supabase):
         }
     ]
     mock_limit = MagicMock()
+    mock_limit.or_.return_value = mock_limit
     mock_limit.execute.return_value.data = [
         {
             "id": "sim1",
@@ -253,7 +256,72 @@ def test_get_user_simulations(mock_get_settings, mock_supabase):
 
     mock_supabase.return_value.table.side_effect = table_side_effect
 
-    summaries, total, next_cursor = service.get_user_simulations("user1")
+    summaries, total, next_cursor = service.get_user_simulations("user1", limit=1)
     assert total == 10
     assert len(summaries) == 1
     assert summaries[0]["id"] == "sim1"
+    assert next_cursor is not None
+
+
+@patch("argus.domain.persistence.create_client")
+@patch("argus.domain.persistence.get_settings")
+def test_get_user_simulations_accepts_json_cursor(mock_get_settings, mock_supabase):
+    mock_settings = MagicMock()
+    mock_settings.SUPABASE_URL = "test"
+    mock_settings.SUPABASE_SERVICE_ROLE_KEY = "test"
+    mock_get_settings.return_value = mock_settings
+    service = PersistenceService()
+
+    mock_count = MagicMock()
+    mock_count.execute.return_value.count = 1
+
+    mock_limit = MagicMock()
+    mock_limit.or_.return_value = mock_limit
+    mock_limit.execute.return_value.data = [
+        {
+            "id": "sim2",
+            "symbols": ["BTC/USD"],
+            "timeframe": "1h",
+            "created_at": "2026-04-07T13:15:00+00:00",
+            "summary": {"total_return_pct": 5.0},
+            "strategies": {"name": "Test Strat"},
+        }
+    ]
+    mock_order2 = MagicMock()
+    mock_order2.limit.return_value = mock_limit
+    mock_order1 = MagicMock()
+    mock_order1.order.return_value = mock_order2
+    mock_eq2 = MagicMock()
+    mock_eq2.order.return_value = mock_order1
+    mock_select2 = MagicMock()
+    mock_select2.eq.return_value = mock_eq2
+
+    def table_side_effect(name):
+        mock = MagicMock()
+        if name == "simulations":
+
+            def select_side_effect(*args, **kwargs):
+                if kwargs.get("count") == "exact":
+                    mock_eq1 = MagicMock()
+                    mock_eq1.eq.return_value = mock_count
+                    return mock_eq1
+                return mock_select2
+
+            mock.select.side_effect = select_side_effect
+        return mock
+
+    mock_supabase.return_value.table.side_effect = table_side_effect
+    cursor = base64.b64encode(
+        json.dumps(
+            {"created_at": "2026-04-07T13:15:00+00:00", "id": "sim1"},
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).decode("utf-8")
+
+    summaries, total, next_cursor = service.get_user_simulations(
+        "user1", limit=1, cursor=cursor
+    )
+
+    assert total == 1
+    assert len(summaries) == 1
+    assert next_cursor is not None

@@ -751,7 +751,7 @@ def get_simulation_detail(sim_id: str, user: UserResponse = Depends(auth_require
         if not simulation:
             # Fallback for "latest"
             if sim_id == "latest":
-                summaries, _ = persistence_service.get_user_simulations(
+                summaries, _, _ = persistence_service.get_user_simulations(
                     user_id_str, limit=1
                 )
                 if summaries:

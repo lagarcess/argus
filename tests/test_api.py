@@ -402,9 +402,10 @@ def test_get_simulation_detail(monkeypatch, mock_user):
     # Test "latest" fallback
     monkeypatch.setattr(
         "argus.api.main.persistence_service.get_user_simulations",
-        lambda user_id, limit: (
+        lambda user_id, limit, cursor=None: (
             [{"id": "sim_latest"}],
             1,
+            None,
         ),
     )
     monkeypatch.setattr(

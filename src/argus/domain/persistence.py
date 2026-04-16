@@ -262,6 +262,7 @@ class PersistenceService:
         Joins with the strategies table to get the strategy name.
         """
         import base64
+        import json
 
         if not self.client:
             return [], 0, None
@@ -290,11 +291,18 @@ class PersistenceService:
 
             if cursor:
                 try:
-                    decoded = base64.b64decode(cursor).decode("utf-8")
-                    # format: timestamp_iso+id
-                    if "+" in decoded:
+                    decoded = base64.urlsafe_b64decode(cursor).decode("utf-8")
+                    cursor_data = json.loads(decoded)
+                    if isinstance(cursor_data, dict):
+                        timestamp_str = cursor_data.get("created_at")
+                        id_str = cursor_data.get("id")
+                        if timestamp_str and id_str:
+                            query = query.or_(
+                                f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
+                            )
+                    elif "+" in decoded:
+                        # Backward compatibility for older cursors.
                         timestamp_str, id_str = decoded.split("+", 1)
-                        # Use complex filter for tie-breaking
                         query = query.or_(
                             f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
                         )
@@ -360,10 +368,12 @@ class PersistenceService:
                 last_ts = cast(Dict[str, Any], last_row).get("created_at")
                 last_id = cast(Dict[str, Any], last_row).get("id")
                 if last_ts and last_id:
-                    cursor_str = f"{last_ts}+{last_id}"
-                    next_cursor = base64.b64encode(cursor_str.encode("utf-8")).decode(
-                        "utf-8"
+                    cursor_payload = json.dumps(
+                        {"created_at": last_ts, "id": last_id}, separators=(",", ":")
                     )
+                    next_cursor = base64.urlsafe_b64encode(
+                        cursor_payload.encode("utf-8")
+                    ).decode("utf-8")
 
             return summaries, total, next_cursor
 
