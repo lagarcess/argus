@@ -31,6 +31,7 @@ import { ASSET_REGISTRY } from "@/lib/assets";
 import { useDraftStrategy, type StrategyDraft } from "@/lib/hooks/useDraftStrategy";
 import { builderToStrategyCreatePayload, strategyToBuilderForm } from "@/lib/strategy-mapper";
 import { FUNNEL_EVENTS, trackFunnelEvent } from "@/lib/telemetry";
+import { normalizeApiError } from "@/lib/api-errors";
 
 const PINNED_INDICATORS = ["SMA", "RSI", "MACD", "EMA"];
 
