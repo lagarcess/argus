@@ -75,3 +75,36 @@ def test_sso_login_phishing_attempt():
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid redirect URL"
+
+
+def test_sso_login_rejects_querystring_redirect():
+    response = client.post(
+        "/api/v1/auth/sso",
+        json={
+            "provider": "google",
+            "redirect_to": (
+                "http://localhost:3000/auth/callback"
+                "?next=https://malicious-site.com"
+            ),
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid redirect URL"
+
+
+def test_sso_login_rejects_empty_redirect():
+    response = client.post(
+        "/api/v1/auth/sso",
+        json={"provider": "google", "redirect_to": ""},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid redirect URL"
+
+
+def test_sso_login_rejects_malformed_redirect():
+    response = client.post(
+        "/api/v1/auth/sso",
+        json={"provider": "google", "redirect_to": "not-a-url"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid redirect URL"

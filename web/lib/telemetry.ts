@@ -26,14 +26,39 @@ declare global {
   }
 }
 
+type ApiCallResult = {
+  response?: Response;
+  error?: { detail?: unknown };
+};
+
+function isApiCallResult(value: unknown): value is ApiCallResult {
+  return typeof value === "object" && value !== null;
+}
+
+function formatTelemetryError(result: ApiCallResult): string {
+  const detail = result.error?.detail;
+  if (typeof detail === "string" && detail.length > 0) {
+    return detail;
+  }
+  return "Telemetry event request failed.";
+}
+
 async function sendTelemetryEvent(payload: FunnelEventPayload): Promise<boolean> {
-  const result = await postTelemetryEvents({
+  const rawResult = await postTelemetryEvents({
     baseUrl: API_URL,
     credentials: "include",
     body: payload,
   });
 
-  return Boolean(result.response?.ok);
+  if (!isApiCallResult(rawResult)) {
+    throw new Error("Telemetry client returned an unexpected response shape.");
+  }
+
+  if (!rawResult.response?.ok) {
+    throw new Error(formatTelemetryError(rawResult));
+  }
+
+  return true;
 }
 
 async function flushTelemetryQueue(): Promise<void> {

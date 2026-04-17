@@ -11,6 +11,7 @@
     "test:watch": "bun test --watch",
     "test:vrt": "playwright test",
     "test:vrt-update": "playwright test --update-snapshots",
+    "codegen:api": "openapi-ts",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\""
   },
   "dependencies": {

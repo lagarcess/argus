@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from argus.api.main import app, persistence_service
+from argus.domain.persistence import PersistenceError
 from argus.domain.schemas import UserResponse
 from fastapi.testclient import TestClient
 
@@ -371,6 +372,56 @@ def test_ingest_telemetry_event_returns_500_on_persist_failure(monkeypatch, mock
     assert response.status_code == 500
 
 
+def test_ingest_telemetry_event_returns_500_on_persist_exception(monkeypatch, mock_user):
+    from argus.api.auth import auth_required
+
+    monkeypatch.setitem(app.dependency_overrides, auth_required, lambda: mock_user)
+    persistence_service.save_telemetry_event = MagicMock(
+        side_effect=PersistenceError("db down")
+    )
+
+    response = client.post(
+        "/api/v1/telemetry/events",
+        json={
+            "event": "draft_fail",
+            "timestamp": "2026-04-16T00:00:00Z",
+            "properties": {"reason": "db_down"},
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to persist telemetry event."
+
+
+def test_get_history_returns_500_on_persistence_exception(monkeypatch, mock_user):
+    from argus.api.auth import auth_required
+
+    app.dependency_overrides[auth_required] = lambda: mock_user
+    persistence_service.get_user_simulations = MagicMock(
+        side_effect=PersistenceError("db unavailable")
+    )
+
+    response = client.get("/api/v1/history")
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to fetch simulation history."
+
+
+def test_get_strategies_returns_500_on_persistence_exception(monkeypatch, mock_user):
+    from argus.api.auth import auth_required
+    from argus.domain.persistence import PersistenceError
+
+    app.dependency_overrides[auth_required] = lambda: mock_user
+    monkeypatch.setattr(
+        "argus.api.strategies.persistence_service.list_strategies",
+        MagicMock(side_effect=PersistenceError("db unavailable")),
+    )
+
+    response = client.get("/api/v1/strategies")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to fetch strategies from database."
+
+
 def test_sso_login(monkeypatch):
     import faker
 
@@ -419,6 +470,58 @@ def test_sso_login(monkeypatch):
         json={"provider": "google", "redirect_to": "http://localhost:3000/auth/callback"},
     )
     assert response_missing.status_code == 500
+
+
+def test_auth_required_bootstraps_only_for_dev_mock_payload(monkeypatch):
+    from argus.api import auth as auth_module
+
+    bootstrap_mock = MagicMock()
+    monkeypatch.setattr(auth_module, "_bootstrap_dev_profile", bootstrap_mock)
+    monkeypatch.setattr(auth_module, "supabase_client", None)
+
+    user = auth_module.auth_required(
+        payload={
+            "sub": "00000000-0000-4000-8000-000000000001",
+            "email": "dev@argus.local",
+            "is_dev_mock_auth": True,
+        }
+    )
+
+    assert user.id == "00000000-0000-4000-8000-000000000001"
+    bootstrap_mock.assert_called_once()
+
+
+def test_auth_required_skips_bootstrap_for_non_mock_payload(monkeypatch):
+    from argus.api import auth as auth_module
+
+    bootstrap_mock = MagicMock()
+    monkeypatch.setattr(auth_module, "_bootstrap_dev_profile", bootstrap_mock)
+    monkeypatch.setattr(auth_module, "supabase_client", None)
+
+    user = auth_module.auth_required(
+        payload={
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "email": "prod@example.com",
+        }
+    )
+
+    assert user.id == "550e8400-e29b-41d4-a716-446655440000"
+    bootstrap_mock.assert_not_called()
+
+
+def test_sso_rejects_callback_path_drift(monkeypatch):
+    mock_auth_res = MagicMock()
+    mock_auth_res.url = "https://mock.auth.url"
+    mock_supabase = MagicMock()
+    mock_supabase.auth.sign_in_with_oauth.return_value = mock_auth_res
+    monkeypatch.setattr("argus.api.main.supabase_client", mock_supabase)
+
+    response = client.post(
+        "/api/v1/auth/sso",
+        json={"provider": "google", "redirect_to": "http://localhost:3000/"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid redirect URL"
 
 
 def test_update_profile(monkeypatch, mock_user):
@@ -565,7 +668,7 @@ def test_backtest(monkeypatch, mock_user):
     )
     monkeypatch.setattr(
         "argus.api.main.persistence_service.save_strategy",
-        lambda user_id, data: {"id": "mock-strat-id"},
+        lambda user_id, data, strict=False: {"id": "mock-strat-id"},
     )
     monkeypatch.setattr("argus.api.main.supabase_client", MagicMock())
 

@@ -1,20 +1,39 @@
-from argus.config import Settings
+from pydantic import ValidationError
+
+from argus.config import get_settings
 
 
-def test_supabase_alias_resolution_from_canonical_values():
-    settings = Settings(
-        _env_file=None,
-        AGENT_MODEL="openrouter/model-primary",
-        AGENT_FALLBACK_MODEL="openrouter/model-fallback",
-        SUPABASE_PROJECT_URL="https://example.supabase.co",
-        SUPABASE_ANON_PUBLIC_KEY="anon-public-key",
-        SUPABASE_URL="${SUPABASE_PROJECT_URL}",
-        SUPABASE_ANON_KEY="${SUPABASE_ANON_PUBLIC_KEY}",
-        NEXT_PUBLIC_SUPABASE_URL="${SUPABASE_PROJECT_URL}",
-        NEXT_PUBLIC_SUPABASE_ANON_KEY="${SUPABASE_ANON_PUBLIC_KEY}",
-    )
+def test_get_settings_is_cached_singleton(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "development")
 
+    first = get_settings()
+    second = get_settings()
+
+    assert first is second
+
+
+def test_get_settings_loads_environment_values(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "prod")
+    monkeypatch.setenv("SUPABASE_PROJECT_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_PUBLIC_KEY", "anon-key")
+
+    settings = get_settings()
+
+    assert settings.APP_ENV == "production"
     assert settings.SUPABASE_URL == "https://example.supabase.co"
-    assert settings.SUPABASE_ANON_KEY == "anon-public-key"
-    assert settings.NEXT_PUBLIC_SUPABASE_URL == "https://example.supabase.co"
-    assert settings.NEXT_PUBLIC_SUPABASE_ANON_KEY == "anon-public-key"
+    assert settings.SUPABASE_ANON_KEY == "anon-key"
+
+
+def test_get_settings_rejects_invalid_app_env(monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("APP_ENV", "staging")
+
+    try:
+        get_settings()
+        assert False, "Expected ValidationError for invalid APP_ENV"
+    except ValidationError as exc:
+        assert "APP_ENV must be one of" in str(exc)
+    finally:
+        get_settings.cache_clear()

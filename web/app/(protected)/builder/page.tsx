@@ -31,6 +31,7 @@ import { ASSET_REGISTRY } from "@/lib/assets";
 import { useDraftStrategy, type StrategyDraft } from "@/lib/hooks/useDraftStrategy";
 import { builderToStrategyCreatePayload, strategyToBuilderForm } from "@/lib/strategy-mapper";
 import { FUNNEL_EVENTS, trackFunnelEvent } from "@/lib/telemetry";
+import { saveDraftStrategy } from "@/lib/builder-draft-save";
 
 const PINNED_INDICATORS = ["SMA", "RSI", "MACD", "EMA"];
 
@@ -246,11 +247,23 @@ function BuilderPageContent() {
   });
   const { mutateAsync: createStrategy, isPending: isSavingCreate } = useMutation({
     ...postStrategiesMutation(),
-    onError: showErrorToast
+    onError: (error) => {
+      trackFunnelEvent(FUNNEL_EVENTS.DRAFT_FAIL, {
+        stage: "draft_save",
+        mode: "create",
+      });
+      showErrorToast(error);
+    }
   });
   const { mutateAsync: updateStrategy, isPending: isSavingUpdate } = useMutation({
     ...putStrategiesByIdMutation(),
-    onError: showErrorToast
+    onError: (error) => {
+      trackFunnelEvent(FUNNEL_EVENTS.DRAFT_FAIL, {
+        stage: "draft_save",
+        mode: "update",
+      });
+      showErrorToast(error);
+    }
   });
 
   useEffect(() => {
@@ -335,19 +348,18 @@ function BuilderPageContent() {
   const onSubmit = async (data: StrategyCreate, isDraft: boolean) => {
     if (isDraft) {
       const strategyPayload = builderToStrategyCreatePayload(data);
-      if (strategyId) {
-        await updateStrategy({
-          path: { id: strategyId },
-          body: strategyPayload,
-        });
-      } else {
-        await createStrategy({ body: strategyPayload });
-      }
-      trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SAVED, {
-        mode: strategyId ? "update" : "create",
+      await saveDraftStrategy({
+        strategyId,
+        strategyPayload,
+        createStrategy,
+        updateStrategy,
+        onSaved: (mode) =>
+          trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SAVED, {
+            mode,
+          }),
+        onSuccessToast: () => toast.success("Draft saved successfully"),
+        onRedirectToStrategies: () => router.push("/strategies"),
       });
-      toast.success("Draft saved successfully");
-      router.push("/strategies");
       return;
     }
 

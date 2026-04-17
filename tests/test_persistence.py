@@ -226,6 +226,35 @@ def test_save_telemetry_event(mock_get_settings, mock_supabase):
 
 @patch("argus.domain.persistence.create_client")
 @patch("argus.domain.persistence.get_settings")
+def test_telemetry_row_persists_via_insert_execute(mock_get_settings, mock_supabase):
+    mock_settings = MagicMock()
+    mock_settings.SUPABASE_URL = "test"
+    mock_settings.SUPABASE_SERVICE_ROLE_KEY = "test"
+    mock_get_settings.return_value = mock_settings
+    service = PersistenceService()
+
+    mock_insert = MagicMock()
+    mock_insert.execute.return_value.data = [{"id": "evt_321"}]
+    mock_table = MagicMock()
+    mock_table.insert.return_value = mock_insert
+    mock_supabase.return_value.table.return_value = mock_table
+
+    payload_ts = datetime(2026, 4, 17, 12, 0, tzinfo=timezone.utc)
+    saved = service.save_telemetry_event(
+        user_id="550e8400-e29b-41d4-a716-446655440000",
+        event="backtest_success",
+        event_ts=payload_ts,
+        properties={"source": "telemetry-test"},
+        strict=True,
+    )
+
+    assert saved is True
+    mock_table.insert.assert_called_once()
+    mock_insert.execute.assert_called_once()
+
+
+@patch("argus.domain.persistence.create_client")
+@patch("argus.domain.persistence.get_settings")
 def test_get_user_simulations(mock_get_settings, mock_supabase):
     mock_settings = MagicMock()
     mock_settings.SUPABASE_URL = "test"
@@ -421,3 +450,159 @@ def test_get_user_simulations_falls_back_to_legacy_symbol_column(
     assert total == 1
     assert len(summaries) == 1
     assert summaries[0]["symbols"] == ["AAPL"]
+
+
+def _build_fake_persistence_service() -> PersistenceService:
+    class FakeResponse:
+        def __init__(self, data=None, count=None):
+            self.data = data or []
+            self.count = count
+
+    class FakeQuery:
+        def __init__(self, table_name, storage):
+            self.table_name = table_name
+            self.storage = storage
+            self._limit = None
+            self._count_mode = None
+
+        def upsert(self, payload):
+            existing = next(
+                (
+                    row
+                    for row in self.storage[self.table_name]
+                    if row.get("id") == payload.get("id")
+                ),
+                None,
+            )
+            if existing:
+                existing.update(payload)
+                self._result = [existing]
+            else:
+                self.storage[self.table_name].append(payload)
+                self._result = [payload]
+            return self
+
+        def insert(self, payload):
+            if isinstance(payload, dict):
+                self.storage[self.table_name].append(payload)
+                self._result = [payload]
+            else:
+                self.storage[self.table_name].extend(payload)
+                self._result = payload
+            return self
+
+        def select(self, *args, **kwargs):
+            self._count_mode = kwargs.get("count")
+            return self
+
+        def eq(self, *_args, **_kwargs):
+            return self
+
+        def order(self, *_args, **_kwargs):
+            return self
+
+        def limit(self, n):
+            self._limit = n
+            return self
+
+        def or_(self, *_args, **_kwargs):
+            return self
+
+        def execute(self):
+            if hasattr(self, "_result"):
+                return FakeResponse(self._result)
+
+            rows = list(self.storage[self.table_name])
+            if self._count_mode == "exact":
+                return FakeResponse(rows, count=len(rows))
+            if self._limit is not None:
+                rows = rows[: self._limit]
+            if self.table_name == "simulations":
+                rows = [{**row, "strategies": {"name": "Golden Flow Strategy"}} for row in rows]
+            return FakeResponse(rows)
+
+    class FakeClient:
+        def __init__(self):
+            self.storage = {
+                "strategies": [],
+                "simulations": [],
+                "telemetry_events": [],
+            }
+
+        def table(self, table_name):
+            return FakeQuery(table_name, self.storage)
+
+    service = PersistenceService()
+    service.client = FakeClient()
+    return service
+
+
+def test_golden_flow_draft_save_persists_strategy_record():
+    service = _build_fake_persistence_service()
+    user_id = "00000000-0000-4000-8000-000000000001"
+    strategy = service.save_strategy(
+        user_id,
+        {
+            "name": "Golden Flow Strategy",
+            "symbols": ["AAPL"],
+            "timeframe": "1Hour",
+            "entry_criteria": [{"indicator_a": "SMA_10", "operator": "gt", "value": 1}],
+            "exit_criteria": [{"indicator_a": "SMA_10", "operator": "lt", "value": 1}],
+            "indicators_config": {},
+            "patterns": [],
+        },
+        strategy_id="strategy-1",
+        strict=True,
+    )
+
+    assert strategy is not None
+    assert strategy["id"] == "strategy-1"
+    assert service.client.storage["strategies"][0]["user_id"] == user_id
+
+
+def test_golden_flow_saved_simulation_is_returned_in_history(make_engine_results):
+    service = _build_fake_persistence_service()
+    user_id = "00000000-0000-4000-8000-000000000001"
+    service.save_strategy(
+        user_id,
+        {
+            "name": "Golden Flow Strategy",
+            "symbols": ["AAPL"],
+            "timeframe": "1Hour",
+            "entry_criteria": [{"indicator_a": "SMA_10", "operator": "gt", "value": 1}],
+            "exit_criteria": [{"indicator_a": "SMA_10", "operator": "lt", "value": 1}],
+            "indicators_config": {},
+            "patterns": [],
+        },
+        strategy_id="strategy-1",
+        strict=True,
+    )
+
+    simulation_id = service.save_simulation(
+        user_id=user_id,
+        strategy_id="strategy-1",
+        symbols=["AAPL"],
+        timeframe="1Hour",
+        result=make_engine_results(),
+        config_snapshot={"name": "Golden Flow Strategy"},
+        simulation_id="simulation-1",
+    )
+    assert simulation_id == "simulation-1"
+
+    summaries, total, _ = service.get_user_simulations(user_id, strict=True)
+    assert total == 1
+    assert summaries[0]["id"] == "simulation-1"
+
+
+def test_golden_flow_telemetry_event_persists_row():
+    service = _build_fake_persistence_service()
+    user_id = "00000000-0000-4000-8000-000000000001"
+    saved = service.save_telemetry_event(
+        user_id=user_id,
+        event="draft_saved",
+        event_ts=datetime(2026, 4, 17, tzinfo=timezone.utc),
+        properties={"flow": "golden"},
+        strict=True,
+    )
+    assert saved is True
+    assert service.client.storage["telemetry_events"][0]["event"] == "draft_saved"
