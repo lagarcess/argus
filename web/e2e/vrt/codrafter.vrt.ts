@@ -61,7 +61,13 @@ test.describe('Co-Drafter AI Strategy Builder', () => {
     await drafterInput.press('Enter');
     await expect(page.getByRole('button', { name: 'Submit Draft' }).first()).toBeVisible();
     await expect(drafterInput).toHaveValue('');
-    await expect(page.locator('input[name="name"]')).toBeVisible();
+    await expect(page.getByTestId('ai-explanation-card')).toBeVisible();
+    await expect(page.getByTestId('ai-explanation-text')).toContainText(
+      /Parsed 'Tendies on NVDA' as a mean reversion strategy/i
+    );
+    await expect(page.locator('input[name="name"]')).toHaveValue('Mock Draft Strategy');
+    await expect(page.locator('input[name="asset_symbol"]')).toHaveValue('AAPL');
+    await expect(page.locator('input[name="timeframe"]')).toHaveValue('15Min');
     await expect(page.getByRole('heading', { name: 'The Recipe Forge' }).first()).toBeVisible();
 
     // Temporarily disabled to unblock functional CI checks; visual baseline can be re-enabled once snapshot flow is stable.
