@@ -156,11 +156,15 @@ export type SsoResponse = {
 };
 
 export type TelemetryEventPayload = {
-    event: string;
+    event: 'onboarding_complete' | 'draft_success' | 'draft_fail' | 'draft_saved' | 'backtest_success' | 'backtest_fail' | 'logout';
     timestamp: string;
     properties?: {
         [key: string]: unknown;
     };
+};
+
+export type TelemetryAcceptedResponse = {
+    status: string;
 };
 
 export type GetAuthSessionData = {
@@ -478,5 +482,7 @@ export type PostTelemetryEventsResponses = {
     /**
      * Event accepted
      */
-    202: unknown;
+    202: TelemetryAcceptedResponse;
 };
+
+export type PostTelemetryEventsResponse = PostTelemetryEventsResponses[keyof PostTelemetryEventsResponses];

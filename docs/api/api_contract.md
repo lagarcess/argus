@@ -26,6 +26,7 @@ This contract covers only the release-critical loop:
 
 ## Narrow endpoint surface
 - `GET /health`
+- `POST /auth/sso`
 - `GET /auth/session`
 - `PATCH /auth/profile`
 - `POST /auth/logout`
@@ -40,6 +41,7 @@ This contract covers only the release-critical loop:
 - `POST /backtests`
 - `GET /backtests/{id}`
 - `GET /history`
+- `POST /telemetry/events`
 
 ## Delta to Full Vision
 | Area | Full Vision | Narrow MVP Decision |
@@ -55,3 +57,4 @@ This contract covers only the release-critical loop:
 - History and backtest detail must agree on metric units.
 - Manual builder must remain functional when AI draft fails or quota is exhausted.
 - Logout clears local UX session even if remote revoke fails.
+- Funnel telemetry events must be persisted through backend ingestion (not browser queue only).

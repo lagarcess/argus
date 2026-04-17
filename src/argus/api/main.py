@@ -38,6 +38,8 @@ from argus.api.schemas import (
     SimulationLogEntry,
     SSORequest,
     SSOResponse,
+    TelemetryAcceptedResponse,
+    TelemetryEventPayload,
     TradeSnippet,
 )
 from argus.api.strategies import router as strategies_router
@@ -75,6 +77,16 @@ def sanitize_metric(v: Any) -> Any:
     elif isinstance(v, list):
         return [sanitize_metric(x) for x in v]
     return v
+
+
+def normalize_ratio(value: Any, *, default: float) -> float:
+    """Normalize metrics that can be encoded as percent (0..100) or ratio (0..1)."""
+    try:
+        parsed = float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+    normalized = parsed / 100.0 if parsed > 1.0 else parsed
+    return max(0.0, min(1.0, normalized))
 
 
 class AssetCache:
@@ -208,6 +220,43 @@ def sso_login(request: SSORequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to initiate SSO: {str(e)}",
         ) from e
+
+
+@app.post(
+    "/api/v1/telemetry/events",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TelemetryAcceptedResponse,
+)
+def ingest_telemetry_event(
+    payload: TelemetryEventPayload,
+    background_tasks: BackgroundTasks,
+    user: UserResponse = Depends(auth_required),  # noqa: B008
+):
+    """Persist client-side funnel telemetry for private-beta observability."""
+    persisted = persistence_service.save_telemetry_event(
+        user_id=str(user.id),
+        event=payload.event,
+        event_ts=payload.timestamp,
+        properties=payload.properties,
+    )
+    if not persisted:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist telemetry event.",
+        )
+
+    settings = get_settings()
+    if settings.ENABLE_POSTHOG_FORWARDING:
+        background_tasks.add_task(
+            emit_posthog_event,
+            payload.event,
+            {
+                "user_id": str(user.id),
+                "event_ts": payload.timestamp.isoformat(),
+                **payload.properties,
+            },
+        )
+    return TelemetryAcceptedResponse(status="accepted")
 
 
 @app.patch("/api/v1/auth/profile", response_model=UserResponse)
@@ -628,12 +677,10 @@ def get_backtest_detail(
     summary = sim_data.get("summary", {})
     full_result = sim_data.get("full_result", {})
     config_snapshot = sim_data.get("config_snapshot", {})
-    raw_win_rate = summary.get("win_rate")
-    try:
-        raw_win_rate = float(raw_win_rate) if raw_win_rate is not None else 0.0
-    except (TypeError, ValueError):
-        raw_win_rate = 0.0
-    normalized_win_rate = raw_win_rate / 100.0 if raw_win_rate > 1.0 else raw_win_rate
+    normalized_win_rate = normalize_ratio(summary.get("win_rate"), default=0.0)
+    normalized_fidelity = normalize_ratio(
+        sim_data.get("reality_gap_metrics", {}).get("fidelity_score"), default=1.0
+    )
 
     return BacktestResponse(
         id=id,
@@ -668,9 +715,7 @@ def get_backtest_detail(
                 vol_hazard_pct=sim_data.get("reality_gap_metrics", {}).get(
                     "vol_hazard_pct", 0.0
                 ),
-                fidelity_score=sim_data.get("reality_gap_metrics", {}).get(
-                    "fidelity_score", 1.0
-                ),
+                fidelity_score=normalized_fidelity,
             ),
             pattern_breakdown=full_result.get("pattern_breakdown", {}),
         ),
@@ -701,30 +746,12 @@ def get_user_history(
         for s in summaries:
             s_copy = s.copy()
 
-            raw_win_rate = s_copy.get("win_rate")
-            if raw_win_rate is not None:
-                try:
-                    win_rate_val = float(raw_win_rate)
-                    s_copy["win_rate"] = (
-                        win_rate_val / 100.0 if win_rate_val > 1.0 else win_rate_val
-                    )
-                except (ValueError, TypeError):
-                    s_copy["win_rate"] = 0.0
+            s_copy["win_rate"] = normalize_ratio(s_copy.get("win_rate"), default=0.0)
 
             # Map fidelity_score securely to 0..1
-            raw_fidelity = s_copy.get("fidelity_score")
-            if raw_fidelity is not None:
-                try:
-                    fidelity_val = float(raw_fidelity)
-                    s_copy["fidelity_score"] = max(
-                        0.0,
-                        min(
-                            1.0,
-                            fidelity_val / 100.0 if fidelity_val > 1.0 else fidelity_val,
-                        ),
-                    )
-                except (ValueError, TypeError):
-                    s_copy["fidelity_score"] = 1.0
+            s_copy["fidelity_score"] = normalize_ratio(
+                s_copy.get("fidelity_score"), default=1.0
+            )
 
             formatted_simulations.append(SimulationLogEntry(**s_copy))
 

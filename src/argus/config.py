@@ -93,6 +93,10 @@ class Settings(BaseSettings):
         default="development",
         description="Application environment flag (development or production).",
     )
+    ENABLE_POSTHOG_FORWARDING: bool = Field(
+        default=False,
+        description="Forward internal telemetry events to PostHog when enabled.",
+    )
 
     # Supabase Configuration
     SUPABASE_PROJECT_URL: str | None = Field(default=None)

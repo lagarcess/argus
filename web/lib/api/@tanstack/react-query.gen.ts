@@ -4,7 +4,7 @@ import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOption
 
 import { client } from '../client.gen';
 import { deleteStrategiesById, getAssets, getAuthSession, getBacktestsById, getHealth, getHistory, getStrategies, getStrategiesById, getUsage, type Options, patchAuthProfile, postAgentDraft, postAuthLogout, postAuthSso, postBacktests, postStrategies, postTelemetryEvents, putStrategiesById } from '../sdk.gen';
-import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetBacktestsByIdData, GetBacktestsByIdResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetStrategiesByIdData, GetStrategiesByIdResponse, GetStrategiesData, GetStrategiesResponse, GetUsageData, GetUsageResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostAuthLogoutData, PostAuthLogoutResponse, PostAuthSsoData, PostAuthSsoResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostStrategiesData, PostStrategiesResponse, PostTelemetryEventsData, PutStrategiesByIdData } from '../types.gen';
+import type { DeleteStrategiesByIdData, DeleteStrategiesByIdResponse, GetAssetsData, GetAssetsResponse, GetAuthSessionData, GetAuthSessionResponse, GetBacktestsByIdData, GetBacktestsByIdResponse, GetHealthData, GetHistoryData, GetHistoryResponse, GetStrategiesByIdData, GetStrategiesByIdResponse, GetStrategiesData, GetStrategiesResponse, GetUsageData, GetUsageResponse, PatchAuthProfileData, PatchAuthProfileResponse, PostAgentDraftData, PostAgentDraftResponse, PostAuthLogoutData, PostAuthLogoutResponse, PostAuthSsoData, PostAuthSsoResponse, PostBacktestsData, PostBacktestsError, PostBacktestsResponse, PostStrategiesData, PostStrategiesResponse, PostTelemetryEventsData, PostTelemetryEventsResponse, PutStrategiesByIdData } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -405,8 +405,8 @@ export const postAuthSsoMutation = (options?: Partial<Options<PostAuthSsoData>>)
 /**
  * Ingest frontend telemetry events
  */
-export const postTelemetryEventsMutation = (options?: Partial<Options<PostTelemetryEventsData>>): UseMutationOptions<unknown, DefaultError, Options<PostTelemetryEventsData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<PostTelemetryEventsData>> = {
+export const postTelemetryEventsMutation = (options?: Partial<Options<PostTelemetryEventsData>>): UseMutationOptions<PostTelemetryEventsResponse, DefaultError, Options<PostTelemetryEventsData>> => {
+    const mutationOptions: UseMutationOptions<PostTelemetryEventsResponse, DefaultError, Options<PostTelemetryEventsData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await postTelemetryEvents({
                 ...options,

@@ -54,6 +54,7 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_MOCK_AUTH: 'true',
       NEXT_PUBLIC_MOCK_API: 'true',
+      NEXT_PUBLIC_API_URL: 'http://localhost:3000/api/v1',
       NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co',
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-key',
     },
