@@ -333,6 +333,44 @@ def test_get_usage(monkeypatch, mock_user):
     assert data["tier"] == "free"
 
 
+def test_ingest_telemetry_event(monkeypatch, mock_user):
+    from argus.api.auth import auth_required
+
+    monkeypatch.setitem(app.dependency_overrides, auth_required, lambda: mock_user)
+    persistence_service.save_telemetry_event = MagicMock(return_value=True)
+
+    response = client.post(
+        "/api/v1/telemetry/events",
+        json={
+            "event": "draft_success",
+            "timestamp": "2026-04-16T00:00:00Z",
+            "properties": {"timeframe": "1H"},
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {"status": "accepted"}
+    persistence_service.save_telemetry_event.assert_called_once()
+
+
+def test_ingest_telemetry_event_returns_500_on_persist_failure(monkeypatch, mock_user):
+    from argus.api.auth import auth_required
+
+    monkeypatch.setitem(app.dependency_overrides, auth_required, lambda: mock_user)
+    persistence_service.save_telemetry_event = MagicMock(return_value=False)
+
+    response = client.post(
+        "/api/v1/telemetry/events",
+        json={
+            "event": "draft_fail",
+            "timestamp": "2026-04-16T00:00:00Z",
+            "properties": {"reason": "network_error"},
+        },
+    )
+
+    assert response.status_code == 500
+
+
 def test_sso_login(monkeypatch):
     import faker
 
@@ -589,6 +627,7 @@ def test_metrics_parity_history_vs_detail_same_simulation(monkeypatch, mock_user
                     "sharpe_ratio": 1.2,
                     "max_drawdown_pct": 4.1,
                     "win_rate": 0.62,
+                    "fidelity_score": 0.91,
                     "total_trades": 12,
                     "created_at": "2026-04-15T13:15:00Z",
                 }
@@ -625,9 +664,15 @@ def test_metrics_parity_history_vs_detail_same_simulation(monkeypatch, mock_user
 
     history_win_rate = history_response.json()["simulations"][0]["win_rate"]
     detail_win_rate = detail_response.json()["results"]["win_rate"]
+    history_fidelity = history_response.json()["simulations"][0]["fidelity_score"]
+    detail_fidelity = detail_response.json()["results"]["reality_gap_metrics"][
+        "fidelity_score"
+    ]
 
     assert history_win_rate == 0.62
     assert detail_win_rate == 0.62
+    assert history_fidelity == 0.91
+    assert detail_fidelity == 0.91
 
 
 def test_backtest_detail_handles_null_win_rate(monkeypatch, mock_user):

@@ -1,3 +1,5 @@
+import { API_URL } from "@/lib/api";
+
 export const FUNNEL_EVENTS = {
   ONBOARDING_COMPLETE: "onboarding_complete",
   DRAFT_SUCCESS: "draft_success",
@@ -19,6 +21,53 @@ export type FunnelEventPayload = {
 declare global {
   interface Window {
     __argusTelemetryQueue?: FunnelEventPayload[];
+    __argusTelemetryFlushing?: boolean;
+  }
+}
+
+async function sendTelemetryEvent(payload: FunnelEventPayload): Promise<boolean> {
+  const response = await fetch(`${API_URL}/telemetry/events`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return response.ok;
+}
+
+async function flushTelemetryQueue(): Promise<void> {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.__argusTelemetryQueue = window.__argusTelemetryQueue ?? [];
+
+  if (window.__argusTelemetryFlushing) {
+    return;
+  }
+  window.__argusTelemetryFlushing = true;
+
+  try {
+    while (window.__argusTelemetryQueue.length > 0) {
+      const next = window.__argusTelemetryQueue[0];
+      if (!next) {
+        break;
+      }
+      try {
+        const sent = await sendTelemetryEvent(next);
+        if (!sent) {
+          break;
+        }
+        window.__argusTelemetryQueue.shift();
+      } catch {
+        // Keep queue in memory as fallback when network/backend are unavailable.
+        break;
+      }
+    }
+  } finally {
+    window.__argusTelemetryFlushing = false;
   }
 }
 
@@ -35,8 +84,8 @@ export function trackFunnelEvent(
   if (typeof window !== "undefined") {
     window.__argusTelemetryQueue = window.__argusTelemetryQueue ?? [];
     window.__argusTelemetryQueue.push(payload);
+    void flushTelemetryQueue();
   }
 
-  // TODO: Implement backend telemetry push
   return payload;
 }

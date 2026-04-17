@@ -5,6 +5,7 @@ Handles saving and retrieving strategies and simulation results
 from the Supabase PostgreSQL database.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
 
 from loguru import logger
@@ -211,6 +212,7 @@ class PersistenceService:
             data: Dict[str, Any] = {
                 "user_id": user_id,
                 "strategy_id": strategy_id,
+                "symbol": symbols[0] if symbols else "UNKNOWN",
                 "symbols": symbols,
                 "timeframe": timeframe,
                 "config_snapshot": config_snapshot,
@@ -232,6 +234,30 @@ class PersistenceService:
         except Exception as e:
             logger.error(f"Failed to save simulation: {e}")
             return None
+
+    def save_telemetry_event(
+        self,
+        user_id: str,
+        event: str,
+        event_ts: datetime,
+        properties: Dict[str, Any],
+    ) -> bool:
+        """Persist a telemetry funnel event for private-beta observability."""
+        if not self.client:
+            return False
+
+        try:
+            data = {
+                "user_id": user_id,
+                "event": event,
+                "event_ts": event_ts.isoformat(),
+                "properties": properties,
+            }
+            self.client.table("telemetry_events").insert(data).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save telemetry event: {e}")
+            return False
 
     def get_simulation(
         self, simulation_id: str, user_id: str
@@ -277,39 +303,51 @@ class PersistenceService:
             )
             total = count_res.count if count_res.count else 0
 
-            # Fetch paginated data joined with strategy name
-            query = (
-                self.client.table("simulations")
-                .select(
-                    "id, symbols, timeframe, created_at, summary, reality_gap_metrics, strategies(name)"
+            def _execute_simulations_query(select_clause: str) -> Any:
+                query = (
+                    self.client.table("simulations")
+                    .select(select_clause)
+                    .eq("user_id", user_id)
+                    .order("created_at", desc=True)
+                    .order("id", desc=True)
+                    .limit(limit)
                 )
-                .eq("user_id", user_id)
-                .order("created_at", desc=True)
-                .order("id", desc=True)
-                .limit(limit)
-            )
 
-            if cursor:
-                try:
-                    decoded = base64.urlsafe_b64decode(cursor).decode("utf-8")
-                    cursor_data = json.loads(decoded)
-                    if isinstance(cursor_data, dict):
-                        timestamp_str = cursor_data.get("created_at")
-                        id_str = cursor_data.get("id")
-                        if timestamp_str and id_str:
+                if cursor:
+                    try:
+                        decoded = base64.urlsafe_b64decode(cursor).decode("utf-8")
+                        cursor_data = json.loads(decoded)
+                        if isinstance(cursor_data, dict):
+                            timestamp_str = cursor_data.get("created_at")
+                            id_str = cursor_data.get("id")
+                            if timestamp_str and id_str:
+                                query = query.or_(
+                                    f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
+                                )
+                        elif "+" in decoded:
+                            # Backward compatibility for older cursors.
+                            timestamp_str, id_str = decoded.split("+", 1)
                             query = query.or_(
                                 f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
                             )
-                    elif "+" in decoded:
-                        # Backward compatibility for older cursors.
-                        timestamp_str, id_str = decoded.split("+", 1)
-                        query = query.or_(
-                            f"created_at.lt.{timestamp_str},and(created_at.eq.{timestamp_str},id.lt.{id_str})"
-                        )
-                except Exception as e:
-                    logger.warning(f"Invalid cursor format: {cursor}, {e}")
+                    except Exception as e:
+                        logger.warning(f"Invalid cursor format: {cursor}, {e}")
 
-            res = query.execute()
+                return query.execute()
+
+            uses_symbols_array = True
+            try:
+                res = _execute_simulations_query(
+                    "id, symbols, timeframe, created_at, summary, reality_gap_metrics, strategies(name)"
+                )
+            except Exception as e:
+                # Backward compatibility for databases still on legacy `symbol` column.
+                if "symbols" not in str(e).lower():
+                    raise
+                uses_symbols_array = False
+                res = _execute_simulations_query(
+                    "id, symbol, timeframe, created_at, summary, reality_gap_metrics, strategies(name)"
+                )
 
             summaries: List[Dict[str, Any]] = []
             for row in res.data:
@@ -326,7 +364,15 @@ class PersistenceService:
                 entry_data = {
                     "id": cast(Dict[str, Any], row).get("id"),
                     "strategy_name": strategy_name,
-                    "symbols": cast(Dict[str, Any], row).get("symbols") or [],
+                    "symbols": (
+                        cast(Dict[str, Any], row).get("symbols") or []
+                        if uses_symbols_array
+                        else (
+                            [cast(Dict[str, Any], row).get("symbol")]
+                            if cast(Dict[str, Any], row).get("symbol")
+                            else []
+                        )
+                    ),
                     "timeframe": cast(Dict[str, Any], row).get("timeframe"),
                     "status": "completed",
                     "created_at": cast(Dict[str, Any], row).get("created_at"),

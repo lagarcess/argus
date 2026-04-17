@@ -182,6 +182,25 @@ class SSOResponse(BaseModel):
     auth_url: str
 
 
+TelemetryEventName = Literal[
+    "onboarding_complete",
+    "draft_success",
+    "draft_fail",
+    "draft_saved",
+    "backtest_success",
+    "backtest_fail",
+    "logout",
+]
+
+
+class TelemetryEventPayload(BaseModel):
+    """Schema for frontend telemetry event ingestion."""
+
+    event: TelemetryEventName
+    timestamp: datetime
+    properties: Dict[str, Any] = Field(default_factory=dict)
+
+
 class PaginatedHistoryResponse(BaseModel):
     simulations: List[SimulationLogEntry]
     total: int

@@ -366,6 +366,14 @@ components:
       properties:
         event:
           type: string
+          enum:
+          - onboarding_complete
+          - draft_success
+          - draft_fail
+          - draft_saved
+          - backtest_success
+          - backtest_fail
+          - logout
         timestamp:
           type: string
           format: date-time
@@ -375,6 +383,13 @@ components:
       required:
       - event
       - timestamp
+    TelemetryAcceptedResponse:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+      - status
 paths:
   /auth/session:
     get:
@@ -698,3 +713,7 @@ paths:
       responses:
         '202':
           description: Event accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryAcceptedResponse'

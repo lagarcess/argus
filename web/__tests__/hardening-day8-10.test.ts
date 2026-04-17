@@ -120,6 +120,12 @@ describe("logout backend-first with local fallback", () => {
 });
 
 describe("minimal funnel telemetry checkpoints", () => {
+  beforeEach(() => {
+    (globalThis as unknown as { window?: Window }).window = globalThis as unknown as Window;
+    (globalThis as unknown as { __argusTelemetryQueue?: unknown[] }).__argusTelemetryQueue = [];
+    (globalThis as unknown as { __argusTelemetryFlushing?: boolean }).__argusTelemetryFlushing = false;
+  });
+
   it("defines all release-critical events", () => {
     expect(Object.values(FUNNEL_EVENTS)).toEqual(
       expect.arrayContaining([
@@ -140,5 +146,35 @@ describe("minimal funnel telemetry checkpoints", () => {
     });
     expect(payload.event).toBe("draft_success");
     expect(payload.properties?.source).toBe("test");
+  });
+
+  it("sends telemetry events to backend sink", async () => {
+    const fetchMock = mock(() =>
+      Promise.resolve(new Response(null, { status: 202 })),
+    );
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = fetchMock;
+
+    trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SUCCESS, { source: "unit-test" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/telemetry/events");
+    expect(init.method).toBe("POST");
+  });
+
+  it("keeps event queued when telemetry sink is unavailable", async () => {
+    const fetchMock = mock(() => Promise.reject(new Error("network down")));
+    (globalThis as unknown as { fetch: typeof fetch }).fetch = fetchMock;
+
+    trackFunnelEvent(FUNNEL_EVENTS.DRAFT_FAIL, { reason: "network_error" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const queue = (globalThis as unknown as { __argusTelemetryQueue?: unknown[] })
+      .__argusTelemetryQueue;
+    expect(Array.isArray(queue)).toBe(true);
+    expect(queue?.length).toBe(1);
   });
 });

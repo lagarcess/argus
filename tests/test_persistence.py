@@ -1,5 +1,6 @@
 import base64
 import json
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from argus.domain.persistence import PersistenceService
@@ -194,6 +195,34 @@ def test_save_simulation(mock_get_settings, mock_supabase):
     sim_id = service.save_simulation("user1", "strat1", ["BTC"], "1h", mock_result, {})
     assert sim_id == "sim_123"
 
+    inserted_payload = mock_table.insert.call_args[0][0]
+    assert inserted_payload["symbol"] == "BTC"
+    assert inserted_payload["symbols"] == ["BTC"]
+
+
+@patch("argus.domain.persistence.create_client")
+@patch("argus.domain.persistence.get_settings")
+def test_save_telemetry_event(mock_get_settings, mock_supabase):
+    mock_settings = MagicMock()
+    mock_settings.SUPABASE_URL = "test"
+    mock_settings.SUPABASE_SERVICE_ROLE_KEY = "test"
+    mock_get_settings.return_value = mock_settings
+    service = PersistenceService()
+
+    mock_insert = MagicMock()
+    mock_insert.execute.return_value.data = [{"id": "evt_123"}]
+    mock_table = MagicMock()
+    mock_table.insert.return_value = mock_insert
+    mock_supabase.return_value.table.return_value = mock_table
+
+    saved = service.save_telemetry_event(
+        user_id="user1",
+        event="draft_success",
+        event_ts=datetime.now(timezone.utc),
+        properties={"source": "unit-test"},
+    )
+    assert saved is True
+
 
 @patch("argus.domain.persistence.create_client")
 @patch("argus.domain.persistence.get_settings")
@@ -325,3 +354,70 @@ def test_get_user_simulations_accepts_json_cursor(mock_get_settings, mock_supaba
     assert total == 1
     assert len(summaries) == 1
     assert next_cursor is not None
+
+
+@patch("argus.domain.persistence.create_client")
+@patch("argus.domain.persistence.get_settings")
+def test_get_user_simulations_falls_back_to_legacy_symbol_column(
+    mock_get_settings, mock_supabase
+):
+    mock_settings = MagicMock()
+    mock_settings.SUPABASE_URL = "test"
+    mock_settings.SUPABASE_SERVICE_ROLE_KEY = "test"
+    mock_get_settings.return_value = mock_settings
+    service = PersistenceService()
+
+    mock_count = MagicMock()
+    mock_count.execute.return_value.count = 1
+
+    # First query (symbols) fails, second query (symbol) succeeds.
+
+    symbols_query = MagicMock()
+    symbols_query.eq.return_value = symbols_query
+    symbols_query.order.return_value = symbols_query
+    symbols_query.limit.return_value = symbols_query
+    symbols_query.execute.side_effect = Exception(
+        "column simulations.symbols does not exist"
+    )
+
+    symbol_query = MagicMock()
+    symbol_query.eq.return_value = symbol_query
+    symbol_query.order.return_value = symbol_query
+    symbol_query.limit.return_value = symbol_query
+    symbol_query.execute.return_value.data = [
+        {
+            "id": "sim_legacy",
+            "symbol": "AAPL",
+            "timeframe": "1h",
+            "created_at": "2026-04-07T13:15:00+00:00",
+            "summary": {"total_return_pct": 5.0},
+            "reality_gap_metrics": {"fidelity_score": 0.9},
+            "strategies": {"name": "Legacy Strat"},
+        }
+    ]
+
+    def table_side_effect(name):
+        if name != "simulations":
+            return MagicMock()
+        table_instance = MagicMock()
+
+        def select_side_effect(*args, **kwargs):
+            if kwargs.get("count") == "exact":
+                count_select = MagicMock()
+                count_select.eq.return_value = mock_count
+                return count_select
+            select_clause = args[0]
+            if " symbols," in select_clause:
+                return symbols_query
+            return symbol_query
+
+        table_instance.select.side_effect = select_side_effect
+        return table_instance
+
+    mock_supabase.return_value.table.side_effect = table_side_effect
+
+    summaries, total, _ = service.get_user_simulations("user1", limit=1)
+
+    assert total == 1
+    assert len(summaries) == 1
+    assert summaries[0]["symbols"] == ["AAPL"]
