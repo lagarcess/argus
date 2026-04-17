@@ -10,7 +10,7 @@ from argus.api.schemas import (
     StrategyCreate,
     StrategyResponse,
 )
-from argus.domain.persistence import PersistenceService
+from argus.domain.persistence import PersistenceError, PersistenceService
 from argus.domain.schemas import UserResponse
 
 router = APIRouter(
@@ -37,7 +37,11 @@ def create_strategy(
         response.headers["X-RateLimit-Reset"] = str(int(time.time() + 3600))
 
         strategy_data = strategy.model_dump(exclude_unset=True)
-        db_strategy = persistence_service.save_strategy(user_id_str, strategy_data)
+        db_strategy = persistence_service.save_strategy(
+            user_id_str,
+            strategy_data,
+            strict=True,
+        )
 
         if not db_strategy:
             raise HTTPException(
@@ -48,6 +52,12 @@ def create_strategy(
 
     except HTTPException:
         raise
+    except PersistenceError as e:
+        logger.error(f"Persistence error creating strategy: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create strategy in database.",
+        ) from e
     except Exception as e:
         logger.error(f"Error creating strategy: {e}")
         raise HTTPException(status_code=500, detail="Internal server error") from e
@@ -62,14 +72,26 @@ def list_strategies(
     """List all strategies for the current user."""
     try:
         user_id_str = str(user.id)
-        strategies, next_cursor = persistence_service.list_strategies(
-            user_id_str, limit, cursor
+        result = persistence_service.list_strategies(
+            user_id_str, limit, cursor, strict=True
         )
+        if result is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to fetch strategies from database.",
+            )
+        strategies, next_cursor = result
 
         return PaginatedStrategiesResponse(
             strategies=[StrategyResponse(**s) for s in strategies],
             next_cursor=next_cursor,
         )
+    except PersistenceError as e:
+        logger.error(f"Persistence error listing strategies: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch strategies from database.",
+        ) from e
     except Exception as e:
         logger.error(f"Error listing strategies: {e}")
         raise HTTPException(status_code=500, detail="Internal server error") from e
@@ -107,7 +129,7 @@ def update_strategy(
     # 2. Update
     strategy_data = strategy.model_dump(exclude_unset=True)
     updated_strategy = persistence_service.save_strategy(
-        user_id_str, strategy_data, strategy_id
+        user_id_str, strategy_data, strategy_id, strict=True
     )
 
     if not updated_strategy:

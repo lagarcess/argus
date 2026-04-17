@@ -15,6 +15,10 @@ from argus.engine import EngineBacktestResults
 from supabase import Client, create_client
 
 
+class PersistenceError(RuntimeError):
+    """Raised when persistence operations fail in strict mode."""
+
+
 class PersistenceService:
     def __init__(self):
         settings = get_settings()
@@ -39,9 +43,13 @@ class PersistenceService:
         user_id: str,
         strategy_data: Dict[str, Any],
         strategy_id: Optional[str] = None,
+        *,
+        strict: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Saves a strategy using the new schema and returns the full record."""
         if not self.client:
+            if strict:
+                raise PersistenceError("Supabase persistence client is not configured.")
             return None
 
         try:
@@ -90,6 +98,8 @@ class PersistenceService:
             return None
         except Exception as e:
             logger.error(f"Failed to save strategy: {e}")
+            if strict:
+                raise PersistenceError("Failed to save strategy.") from e
             return None
 
     def get_strategy(self, strategy_id: str, user_id: str) -> Optional[Dict[str, Any]]:
@@ -129,13 +139,20 @@ class PersistenceService:
             return False
 
     def list_strategies(
-        self, user_id: str, limit: int = 10, cursor: Optional[str] = None
-    ) -> tuple[List[Dict[str, Any]], Optional[str]]:
+        self,
+        user_id: str,
+        limit: int = 10,
+        cursor: Optional[str] = None,
+        *,
+        strict: bool = False,
+    ) -> Optional[tuple[List[Dict[str, Any]], Optional[str]]]:
         """Fetches a paginated list of strategies for a user using cursor pagination."""
         import base64
 
         if not self.client:
-            return [], None
+            if strict:
+                raise PersistenceError("Supabase persistence client is not configured.")
+            return None
 
         try:
             query = (
@@ -177,7 +194,9 @@ class PersistenceService:
             return cast(List[Dict[str, Any]], strategies), next_cursor
         except Exception as e:
             logger.error(f"Failed to list strategies: {e}")
-            return [], None
+            if strict:
+                raise PersistenceError("Failed to list strategies.") from e
+            return None
 
     def save_simulation(
         self,
@@ -241,9 +260,13 @@ class PersistenceService:
         event: str,
         event_ts: datetime,
         properties: Dict[str, Any],
+        *,
+        strict: bool = False,
     ) -> bool:
         """Persist a telemetry funnel event for private-beta observability."""
         if not self.client:
+            if strict:
+                raise PersistenceError("Supabase persistence client is not configured.")
             return False
 
         try:
@@ -257,6 +280,8 @@ class PersistenceService:
             return True
         except Exception as e:
             logger.error(f"Failed to save telemetry event: {e}")
+            if strict:
+                raise PersistenceError("Failed to save telemetry event.") from e
             return False
 
     def get_simulation(
@@ -281,8 +306,13 @@ class PersistenceService:
             return None
 
     def get_user_simulations(
-        self, user_id: str, limit: int = 10, cursor: Optional[str] = None
-    ) -> tuple[List[Dict[str, Any]], int, Optional[str]]:
+        self,
+        user_id: str,
+        limit: int = 10,
+        cursor: Optional[str] = None,
+        *,
+        strict: bool = False,
+    ) -> Optional[tuple[List[Dict[str, Any]], int, Optional[str]]]:
         """
         Fetches a paginated list of summarized simulations for a user.
         Joins with the strategies table to get the strategy name.
@@ -291,7 +321,9 @@ class PersistenceService:
         import json
 
         if not self.client:
-            return [], 0, None
+            if strict:
+                raise PersistenceError("Supabase persistence client is not configured.")
+            return None
 
         try:
             # Get total count
@@ -425,4 +457,6 @@ class PersistenceService:
 
         except Exception as e:
             logger.error(f"Failed to fetch user simulations: {e}")
-            return [], 0, None
+            if strict:
+                raise PersistenceError("Failed to fetch simulation history.") from e
+            return None

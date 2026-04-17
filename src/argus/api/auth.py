@@ -8,6 +8,7 @@ Falls back to a dev-mode mock when SUPABASE_JWT_SECRET is not set.
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
@@ -21,6 +22,7 @@ from argus.supabase import supabase_client
 _settings = get_settings()
 _SUPABASE_JWT_SECRET: Optional[str] = _settings.SUPABASE_JWT_SECRET
 _DEV_MODE = _settings.APP_ENV != "production"
+_DEV_MOCK_USER_ID = "00000000-0000-4000-8000-000000000001"
 
 
 class UserCache:
@@ -89,9 +91,10 @@ def get_current_user(
                 "Set SUPABASE_JWT_SECRET to enforce auth."
             )
             return {
-                "sub": "dev-anon-user",
+                "sub": _DEV_MOCK_USER_ID,
                 "email": "dev@argus.local",
                 "role": "authenticated",
+                "is_dev_mock_auth": True,
             }
         logger.warning(
             "DEV MODE: Skipping JWT signature verification. "
@@ -107,15 +110,74 @@ def get_current_user(
             return payload
         except Exception:  # noqa: BLE001
             return {
-                "sub": "dev-anon-user",
+                "sub": _DEV_MOCK_USER_ID,
                 "email": "dev@argus.local",
                 "role": "authenticated",
+                "is_dev_mock_auth": True,
             }
 
     if not token:
         return None
 
     return _decode_supabase_jwt(token)
+
+
+def _normalize_user_id(raw_user_id: Any) -> str:
+    """Validate and normalize user IDs to canonical UUID strings."""
+    try:
+        return str(UUID(str(raw_user_id)))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload: sub must be a UUID.",
+        ) from exc
+
+
+def _bootstrap_dev_profile(user_id: str, email: str) -> None:
+    """Ensure the deterministic dev user profile exists for persistence-backed flows."""
+    if not _DEV_MODE:
+        return
+
+    if not supabase_client:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Supabase service-role client is not configured in development; "
+                "cannot bootstrap dev profile."
+            ),
+        )
+
+    profile_payload = {
+        "id": user_id,
+        "email": email,
+        "is_admin": True,
+        "subscription_tier": "max",
+        "backtest_quota": 999999,
+        "remaining_quota": 999999,
+        "ai_draft_quota": 999999,
+        "remaining_ai_draft_quota": 999999,
+        "onboarding_completed": True,
+        "onboarding_step": "completed",
+        "feature_flags": {"multi_asset_beta": True},
+    }
+
+    try:
+        supabase_client.table("profiles").upsert(profile_payload).execute()
+    except Exception as exc:
+        logger.error(f"Failed to bootstrap dev profile for {user_id}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to bootstrap development profile: {str(exc)}",
+        ) from exc
+
+
+def _should_bootstrap_dev_profile(payload: Dict[str, Any], user_id: str) -> bool:
+    """Bootstrap only for explicit dev mock-auth identity in non-production."""
+    return bool(
+        _DEV_MODE
+        and payload.get("is_dev_mock_auth") is True
+        and user_id == _DEV_MOCK_USER_ID
+    )
 
 
 def auth_required(
@@ -141,13 +203,18 @@ def auth_required(
             detail="Invalid token payload: missing sub",
         )
 
+    normalized_user_id = _normalize_user_id(user_id)
+
     # 1. Check cache first to avoid DB calls on every request
-    cached_user = _user_cache.get(user_id)
+    cached_user = _user_cache.get(normalized_user_id)
     if cached_user:
-        logger.debug(f"UserCache hit for user_id: {user_id}")
+        logger.debug(f"UserCache hit for user_id: {normalized_user_id}")
         return cached_user
 
-    logger.debug(f"UserCache miss for user_id: {user_id}")
+    if _should_bootstrap_dev_profile(payload, normalized_user_id):
+        _bootstrap_dev_profile(normalized_user_id, email)
+
+    logger.debug(f"UserCache miss for user_id: {normalized_user_id}")
 
     is_admin = False
     subscription_tier = "free"
@@ -163,28 +230,12 @@ def auth_required(
     last_quota_reset = None
     feature_flags = {}
 
-    # For dev-anon-user
-    if user_id == "dev-anon-user":
-        return UserResponse(
-            user_id=user_id,
-            id=user_id,
-            email=email,
-            is_admin=True,
-            subscription_tier="max",
-            backtest_quota=999999,
-            remaining_quota=999999,
-            ai_draft_quota=999999,
-            remaining_ai_draft_quota=999999,
-            onboarding_completed=True,
-            onboarding_step="completed",
-            feature_flags={"multi_asset_beta": True},
-        )
     if supabase_client:
         try:
             res = (
                 supabase_client.table("profiles")
                 .select("*")
-                .eq("id", user_id)
+                .eq("id", normalized_user_id)
                 .single()
                 .execute()
             )
@@ -216,12 +267,13 @@ def auth_required(
                         pass
         except Exception as e:
             logger.info(
-                f"Failed to fetch full profile for user {user_id}, using defaults: {e}"
+                "Failed to fetch full profile for user "
+                f"{normalized_user_id}, using defaults: {e}"
             )
 
     user = UserResponse(
-        user_id=user_id,
-        id=user_id,
+        user_id=normalized_user_id,
+        id=normalized_user_id,
         email=email,
         is_admin=is_admin,
         subscription_tier=subscription_tier,
@@ -238,7 +290,7 @@ def auth_required(
         feature_flags=feature_flags,
     )
 
-    _user_cache.set(user_id, user)
+    _user_cache.set(normalized_user_id, user)
     return user
 
 

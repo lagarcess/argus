@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
@@ -49,7 +50,7 @@ from argus.config import (
     get_stock_data_client,
 )
 from argus.core.alpaca_fetcher import AlpacaDataFetcher
-from argus.domain.persistence import PersistenceService
+from argus.domain.persistence import PersistenceError, PersistenceService
 from argus.domain.schemas import AssetClass, UserResponse
 from argus.engine import ArgusEngine, StrategyInput
 from argus.market.data_provider import MarketDataProvider
@@ -87,6 +88,41 @@ def normalize_ratio(value: Any, *, default: float) -> float:
         return default
     normalized = parsed / 100.0 if parsed > 1.0 else parsed
     return max(0.0, min(1.0, normalized))
+
+
+@lru_cache(maxsize=32)
+def _normalize_allowed_sso_redirects(allowed_urls: tuple[str, ...]) -> frozenset[str]:
+    """Cache canonical callback allowlist by concrete allowlist values."""
+    normalized = {
+        f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
+        for raw in allowed_urls
+        if (parsed := urlparse(raw)).scheme and parsed.netloc
+    }
+    return frozenset(normalized)
+
+
+def is_allowed_sso_redirect(redirect_to: str, allowed_urls: list[str]) -> bool:
+    """Strictly validate redirect targets against an explicit callback allowlist."""
+    try:
+        candidate = urlparse(redirect_to)
+    except Exception:
+        return False
+
+    if not candidate.scheme or not candidate.netloc:
+        return False
+    if candidate.query:
+        return False
+    if candidate.fragment:
+        return False
+    if candidate.username or candidate.password:
+        return False
+
+    normalized_candidate = f"{candidate.scheme.lower()}://{candidate.netloc.lower()}{candidate.path.rstrip('/')}"
+    if not candidate.path.startswith("/auth/callback"):
+        return False
+
+    normalized_allowed = _normalize_allowed_sso_redirects(tuple(allowed_urls))
+    return normalized_candidate in normalized_allowed
 
 
 class AssetCache:
@@ -196,7 +232,7 @@ def sso_login(request: SSORequest):
         )
 
     settings = get_settings()
-    if request.redirect_to not in settings.ALLOWED_REDIRECT_URLS:
+    if not is_allowed_sso_redirect(request.redirect_to, settings.ALLOWED_REDIRECT_URLS):
         raise HTTPException(status_code=400, detail="Invalid redirect URL")
 
     try:
@@ -233,12 +269,20 @@ def ingest_telemetry_event(
     user: UserResponse = Depends(auth_required),  # noqa: B008
 ):
     """Persist client-side funnel telemetry for private-beta observability."""
-    persisted = persistence_service.save_telemetry_event(
-        user_id=str(user.id),
-        event=payload.event,
-        event_ts=payload.timestamp,
-        properties=payload.properties,
-    )
+    try:
+        persisted = persistence_service.save_telemetry_event(
+            user_id=str(user.id),
+            event=payload.event,
+            event_ts=payload.timestamp,
+            properties=payload.properties,
+            strict=True,
+        )
+    except PersistenceError as e:
+        logger.error(f"Telemetry persistence error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist telemetry event.",
+        ) from e
     if not persisted:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -515,7 +559,16 @@ def run_backtest(
                 "patterns": config.patterns,
                 "executed_at": datetime.now(timezone.utc).isoformat(),
             }
-            strat_record = persistence_service.save_strategy(user_id_str, strategy_data)
+            strat_record = persistence_service.save_strategy(
+                user_id_str,
+                strategy_data,
+                strict=True,
+            )
+            if not strat_record:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to persist strategy draft before backtest.",
+                )
             strategy_id = strat_record["id"]
 
         # 2. Run Engine
@@ -737,9 +790,18 @@ def get_user_history(
     try:
         user_id_str = str(user.id)
         # Fetch from persistence with cursor support
-        summaries, total, next_cursor = persistence_service.get_user_simulations(
-            user_id_str, limit=limit, cursor=cursor
+        result = persistence_service.get_user_simulations(
+            user_id_str,
+            limit=limit,
+            cursor=cursor,
+            strict=True,
         )
+        if result is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to fetch simulation history.",
+            )
+        summaries, total, next_cursor = result
 
         # Map to SimulationLogEntry, ensuring win_rate is decimal
         formatted_simulations = []
@@ -761,6 +823,12 @@ def get_user_history(
             next_cursor=next_cursor,
         )
 
+    except PersistenceError as e:
+        logger.error(f"Failed to fetch history due to persistence error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch simulation history.",
+        ) from e
     except Exception as e:
         logger.error(f"Failed to fetch history: {e}")
         raise HTTPException(
@@ -779,9 +847,13 @@ def get_simulation_detail(sim_id: str, user: UserResponse = Depends(auth_require
         if not simulation:
             # Fallback for "latest"
             if sim_id == "latest":
-                summaries, _, _ = persistence_service.get_user_simulations(
+                summaries_result = persistence_service.get_user_simulations(
                     user_id_str, limit=1
                 )
+                if summaries_result:
+                    summaries, _, _ = summaries_result
+                else:
+                    summaries = []
                 if summaries:
                     simulation = persistence_service.get_simulation(
                         str(summaries[0]["id"]), user_id_str

@@ -5,6 +5,7 @@ import {
 } from "../lib/strategy-mapper";
 import { resolveOnboardingRedirect } from "../lib/onboarding-guard";
 import { FUNNEL_EVENTS, trackFunnelEvent } from "../lib/telemetry";
+import { saveDraftStrategy } from "../lib/builder-draft-save";
 
 describe("onboarding gate + redirect", () => {
   it("redirects incomplete onboarding users to onboarding", () => {
@@ -83,6 +84,34 @@ describe("save draft persistence + edit hydration", () => {
     expect(hydrated.timeframe).toBe("4H");
     expect(hydrated.period_start).toBe("2026-01-01");
     expect(hydrated.period_end).toBe("2026-01-31");
+  });
+
+  it("does not show success toast or redirect when draft save fails", async () => {
+    const createStrategy = mock(async () => {
+      throw new Error("DB write failed");
+    });
+    const updateStrategy = mock(async () => ({}));
+    const onSaved = mock(() => {});
+    const onSuccessToast = mock(() => {});
+    const onRedirectToStrategies = mock(() => {});
+
+    await expect(
+      saveDraftStrategy({
+        strategyId: null,
+        strategyPayload: { name: "Broken Draft" },
+        createStrategy,
+        updateStrategy,
+        onSaved,
+        onSuccessToast,
+        onRedirectToStrategies,
+      }).then((mode) => {
+        onSaved(mode);
+      }),
+    ).rejects.toThrow("DB write failed");
+
+    expect(onSaved).toHaveBeenCalledTimes(0);
+    expect(onSuccessToast).toHaveBeenCalledTimes(0);
+    expect(onRedirectToStrategies).toHaveBeenCalledTimes(0);
   });
 });
 
