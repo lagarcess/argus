@@ -89,8 +89,8 @@ def get_current_user(
                 "Set SUPABASE_JWT_SECRET to enforce auth."
             )
             return {
-                "sub": "dev-anon-user",
-                "email": "dev@argus.local",
+                "sub": "668d486d-558d-4d08-98e0-952cdaf00492",
+                "email": "dev@argus.io",
                 "role": "authenticated",
             }
         logger.warning(
@@ -107,8 +107,8 @@ def get_current_user(
             return payload
         except Exception:  # noqa: BLE001
             return {
-                "sub": "dev-anon-user",
-                "email": "dev@argus.local",
+                "sub": "668d486d-558d-4d08-98e0-952cdaf00492",
+                "email": "dev@argus.io",
                 "role": "authenticated",
             }
 
@@ -164,7 +164,7 @@ def auth_required(
     feature_flags = {}
 
     # For dev-anon-user
-    if user_id == "dev-anon-user":
+    if user_id == "668d486d-558d-4d08-98e0-952cdaf00492":
         return UserResponse(
             user_id=user_id,
             id=user_id,

@@ -65,6 +65,8 @@ def list_strategies(
         strategies, next_cursor = persistence_service.list_strategies(
             user_id_str, limit, cursor
         )
+        if strategies is None:
+            raise Exception("Persistence layer returned None")
 
         return PaginatedStrategiesResponse(
             strategies=[StrategyResponse(**s) for s in strategies],

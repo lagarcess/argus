@@ -196,6 +196,9 @@ def sso_login(request: SSORequest):
         )
 
     settings = get_settings()
+    if not request.redirect_to or request.redirect_to.strip() == "":
+        raise HTTPException(status_code=400, detail="redirect_to is required")
+
     if request.redirect_to not in settings.ALLOWED_REDIRECT_URLS:
         raise HTTPException(status_code=400, detail="Invalid redirect URL")
 

@@ -703,3 +703,101 @@ def test_backtest_detail_handles_null_win_rate(monkeypatch, mock_user):
     response = client.get(f"/api/v1/backtests/{simulation_id}")
     assert response.status_code == 200
     assert response.json()["results"]["win_rate"] == 0.0
+
+
+def test_history_raises_500_on_persistence_failure():
+    from unittest.mock import MagicMock, patch
+
+    from argus.api.main import app
+    from fastapi.testclient import TestClient
+
+    with (
+        TestClient(app) as client,
+        patch("argus.api.main.auth_required") as mock_auth,
+        patch(
+            "argus.api.main.persistence_service.get_user_simulations",
+            side_effect=Exception("DB connection dropped"),
+        ),
+    ):
+        mock_user = MagicMock()
+        mock_user.id = "user123"
+        app.dependency_overrides[mock_auth] = lambda: mock_user
+
+        from argus.api.auth import auth_required
+
+        app.dependency_overrides[auth_required] = lambda: mock_user
+        response = client.get("/api/v1/history")
+        assert response.status_code == 500
+        assert (
+            "server error" in response.json()["detail"].lower()
+            or "failed to fetch" in response.json()["detail"].lower()
+        )
+
+
+def test_strategies_list_raises_500_on_persistence_failure():
+    from unittest.mock import MagicMock, patch
+
+    from argus.api.main import app
+    from fastapi.testclient import TestClient
+
+    with (
+        TestClient(app) as client,
+        patch("argus.api.strategies.auth_required") as mock_auth,
+        patch(
+            "argus.api.strategies.persistence_service.list_strategies",
+            side_effect=Exception("DB connection dropped"),
+        ),
+    ):
+        mock_user = MagicMock()
+        mock_user.id = "user123"
+        app.dependency_overrides[mock_auth] = lambda: mock_user
+
+        from argus.api.auth import auth_required
+
+        app.dependency_overrides[auth_required] = lambda: mock_user
+        response = client.get("/api/v1/strategies")
+        assert response.status_code == 500
+        assert "server error" in response.json()["detail"].lower()
+
+
+def test_sso_login_allowlist_enforcement():
+    from unittest.mock import MagicMock, patch
+
+    from argus.api.main import app
+    from fastapi.testclient import TestClient
+
+    with TestClient(app) as client:
+        # 1. Exact match passes
+        with patch("argus.api.main.supabase_client") as mock_sc:
+            mock_sc.auth.sign_in_with_oauth.return_value = MagicMock(
+                url="http://auth_url"
+            )
+            response = client.post(
+                "/api/v1/auth/sso",
+                json={
+                    "provider": "google",
+                    "redirect_to": "http://localhost:3000/auth/callback",
+                },
+            )
+            assert response.status_code == 200
+            assert "auth_url" in response.json()
+
+        # 2. Disallowed URL fails 400
+        with patch("argus.api.main.supabase_client") as mock_sc:
+            response = client.post(
+                "/api/v1/auth/sso",
+                json={
+                    "provider": "google",
+                    "redirect_to": "https://evil.com/auth/callback",
+                },
+            )
+            assert response.status_code == 400
+            assert response.json()["detail"] == "Invalid redirect URL"
+
+        # 3. Malformed/empty fails 400
+        with patch("argus.api.main.supabase_client") as mock_sc:
+            response = client.post(
+                "/api/v1/auth/sso", json={"provider": "google", "redirect_to": ""}
+            )
+            assert response.status_code == 400
+            assert "required" in response.json()["detail"].lower()

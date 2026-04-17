@@ -135,7 +135,7 @@ class PersistenceService:
         import base64
 
         if not self.client:
-            return [], None
+            raise RuntimeError("Persistence Service is disabled (no client).")
 
         try:
             query = (
@@ -177,7 +177,7 @@ class PersistenceService:
             return cast(List[Dict[str, Any]], strategies), next_cursor
         except Exception as e:
             logger.error(f"Failed to list strategies: {e}")
-            return [], None
+            raise
 
     def save_simulation(
         self,
@@ -291,7 +291,7 @@ class PersistenceService:
         import json
 
         if not self.client:
-            return [], 0, None
+            raise RuntimeError("Persistence Service is disabled (no client).")
 
         try:
             # Get total count
@@ -425,4 +425,4 @@ class PersistenceService:
 
         except Exception as e:
             logger.error(f"Failed to fetch user simulations: {e}")
-            return [], 0, None
+            raise

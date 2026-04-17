@@ -334,20 +334,28 @@ function BuilderPageContent() {
 
   const onSubmit = async (data: StrategyCreate, isDraft: boolean) => {
     if (isDraft) {
-      const strategyPayload = builderToStrategyCreatePayload(data);
-      if (strategyId) {
-        await updateStrategy({
-          path: { id: strategyId },
-          body: strategyPayload,
+      try {
+        const strategyPayload = builderToStrategyCreatePayload(data);
+        if (strategyId) {
+          await updateStrategy({
+            path: { id: strategyId },
+            body: strategyPayload,
+          });
+        } else {
+          await createStrategy({ body: strategyPayload });
+        }
+        trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SAVED, {
+          mode: strategyId ? "update" : "create",
         });
-      } else {
-        await createStrategy({ body: strategyPayload });
+        toast.success("Draft saved successfully");
+        router.push("/strategies");
+      } catch (err) {
+        const normalized = normalizeApiError(err);
+        toast.error("Failed to save draft", {
+          description: normalized.message,
+          className: "bg-red-950 border-red-500/50 text-red-100"
+        });
       }
-      trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SAVED, {
-        mode: strategyId ? "update" : "create",
-      });
-      toast.success("Draft saved successfully");
-      router.push("/strategies");
       return;
     }
 
