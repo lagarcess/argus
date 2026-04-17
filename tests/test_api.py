@@ -475,6 +475,7 @@ def test_sso_login(monkeypatch):
 def test_auth_required_bootstraps_only_for_dev_mock_payload(monkeypatch):
     from argus.api import auth as auth_module
 
+    auth_module._user_cache.cache.clear()
     bootstrap_mock = MagicMock()
     monkeypatch.setattr(auth_module, "_bootstrap_dev_profile", bootstrap_mock)
     monkeypatch.setattr(auth_module, "supabase_client", None)
@@ -494,6 +495,7 @@ def test_auth_required_bootstraps_only_for_dev_mock_payload(monkeypatch):
 def test_auth_required_skips_bootstrap_for_non_mock_payload(monkeypatch):
     from argus.api import auth as auth_module
 
+    auth_module._user_cache.cache.clear()
     bootstrap_mock = MagicMock()
     monkeypatch.setattr(auth_module, "_bootstrap_dev_profile", bootstrap_mock)
     monkeypatch.setattr(auth_module, "supabase_client", None)

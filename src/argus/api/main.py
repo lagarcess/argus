@@ -90,10 +90,9 @@ def normalize_ratio(value: Any, *, default: float) -> float:
     return max(0.0, min(1.0, normalized))
 
 
-@lru_cache(maxsize=1)
-def get_normalized_allowed_sso_redirects() -> frozenset[str]:
-    """Cached canonical callback allowlist from static settings."""
-    allowed_urls = get_settings().ALLOWED_REDIRECT_URLS
+@lru_cache(maxsize=32)
+def _normalize_allowed_sso_redirects(allowed_urls: tuple[str, ...]) -> frozenset[str]:
+    """Cache canonical callback allowlist by concrete allowlist values."""
     normalized = {
         f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
         for raw in allowed_urls
@@ -122,14 +121,7 @@ def is_allowed_sso_redirect(redirect_to: str, allowed_urls: list[str]) -> bool:
     if not candidate.path.startswith("/auth/callback"):
         return False
 
-    if allowed_urls == get_settings().ALLOWED_REDIRECT_URLS:
-        normalized_allowed = get_normalized_allowed_sso_redirects()
-    else:
-        normalized_allowed = {
-            f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
-            for raw in allowed_urls
-            if (parsed := urlparse(raw)).scheme and parsed.netloc
-        }
+    normalized_allowed = _normalize_allowed_sso_redirects(tuple(allowed_urls))
     return normalized_candidate in normalized_allowed
 
 
