@@ -1,6 +1,5 @@
-from pydantic import ValidationError
-
 from argus.config import get_settings
+from pydantic import ValidationError
 
 
 def test_get_settings_is_cached_singleton(monkeypatch):
@@ -32,7 +31,7 @@ def test_get_settings_rejects_invalid_app_env(monkeypatch):
 
     try:
         get_settings()
-        assert False, "Expected ValidationError for invalid APP_ENV"
+        raise AssertionError("Expected ValidationError for invalid APP_ENV")
     except ValidationError as exc:
         assert "APP_ENV must be one of" in str(exc)
     finally:

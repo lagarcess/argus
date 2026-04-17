@@ -204,14 +204,15 @@ def auth_required(
         )
 
     normalized_user_id = _normalize_user_id(user_id)
-    if _should_bootstrap_dev_profile(payload, normalized_user_id):
-        _bootstrap_dev_profile(normalized_user_id, email)
 
     # 1. Check cache first to avoid DB calls on every request
     cached_user = _user_cache.get(normalized_user_id)
     if cached_user:
         logger.debug(f"UserCache hit for user_id: {normalized_user_id}")
         return cached_user
+
+    if _should_bootstrap_dev_profile(payload, normalized_user_id):
+        _bootstrap_dev_profile(normalized_user_id, email)
 
     logger.debug(f"UserCache miss for user_id: {normalized_user_id}")
 

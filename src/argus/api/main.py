@@ -90,6 +90,18 @@ def normalize_ratio(value: Any, *, default: float) -> float:
     return max(0.0, min(1.0, normalized))
 
 
+@lru_cache(maxsize=1)
+def get_normalized_allowed_sso_redirects() -> frozenset[str]:
+    """Cached canonical callback allowlist from static settings."""
+    allowed_urls = get_settings().ALLOWED_REDIRECT_URLS
+    normalized = {
+        f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
+        for raw in allowed_urls
+        if (parsed := urlparse(raw)).scheme and parsed.netloc
+    }
+    return frozenset(normalized)
+
+
 def is_allowed_sso_redirect(redirect_to: str, allowed_urls: list[str]) -> bool:
     """Strictly validate redirect targets against an explicit callback allowlist."""
     try:
@@ -106,17 +118,18 @@ def is_allowed_sso_redirect(redirect_to: str, allowed_urls: list[str]) -> bool:
     if candidate.username or candidate.password:
         return False
 
-    normalized_candidate = (
-        f"{candidate.scheme.lower()}://{candidate.netloc.lower()}{candidate.path.rstrip('/')}"
-    )
+    normalized_candidate = f"{candidate.scheme.lower()}://{candidate.netloc.lower()}{candidate.path.rstrip('/')}"
     if not candidate.path.startswith("/auth/callback"):
         return False
 
-    normalized_allowed = {
-        f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
-        for raw in allowed_urls
-        if (parsed := urlparse(raw)).scheme and parsed.netloc
-    }
+    if allowed_urls == get_settings().ALLOWED_REDIRECT_URLS:
+        normalized_allowed = get_normalized_allowed_sso_redirects()
+    else:
+        normalized_allowed = {
+            f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path.rstrip('/')}"
+            for raw in allowed_urls
+            if (parsed := urlparse(raw)).scheme and parsed.netloc
+        }
     return normalized_candidate in normalized_allowed
 
 
@@ -227,9 +240,7 @@ def sso_login(request: SSORequest):
         )
 
     settings = get_settings()
-    if not is_allowed_sso_redirect(
-        request.redirect_to, settings.ALLOWED_REDIRECT_URLS
-    ):
+    if not is_allowed_sso_redirect(request.redirect_to, settings.ALLOWED_REDIRECT_URLS):
         raise HTTPException(status_code=400, detail="Invalid redirect URL")
 
     try:
