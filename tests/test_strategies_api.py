@@ -100,7 +100,7 @@ def test_list_strategies_success(mock_user, mock_strategy_db, monkeypatch):
     assert len(data["strategies"]) == 1
     assert data["strategies"][0]["id"] == mock_strategy_db["id"]
     assert data["next_cursor"] == "next_cursor_123"
-    mock_list.assert_called_once_with(str(mock_user.id), 10, None)
+    mock_list.assert_called_once_with(str(mock_user.id), 10, None, strict=True)
 
 
 def test_list_strategies_error(monkeypatch):
@@ -162,7 +162,7 @@ def test_update_strategy_success(
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Name"
     mock_get.assert_called_once_with(strategy_id, user_id)
-    mock_save.assert_called_once_with(user_id, payload, strategy_id)
+    mock_save.assert_called_once_with(user_id, payload, strategy_id, strict=True)
 
 
 def test_update_strategy_not_found(valid_strategy_payload, mock_strategy_db, monkeypatch):
@@ -283,7 +283,9 @@ def test_create_strategy_success(
     assert response.headers["x-ratelimit-limit"] == "30"
 
     # Assert Correct Params
-    mock_save.assert_called_once_with(str(mock_user.id), valid_strategy_payload)
+    mock_save.assert_called_once_with(
+        str(mock_user.id), valid_strategy_payload, strict=True
+    )
 
     # Assert Efficiency
     mock_get.assert_not_called()

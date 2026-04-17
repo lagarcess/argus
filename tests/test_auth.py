@@ -18,7 +18,7 @@ def test_user_cache_utilized(mock_supabase_client):
     """
     Test that the UserCache prevents redundant Supabase DB queries.
     """
-    user_id = "test-db-user"
+    user_id = "550e8400-e29b-41d4-a716-446655440000"
     email = "test@example.com"
     payload = {"sub": user_id, "email": email}
 

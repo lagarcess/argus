@@ -7,16 +7,14 @@ client = TestClient(app)
 
 
 @patch("argus.api.main.get_alpaca_fetcher")
-@patch("argus.api.main.check_asset_search_rate_limit")
-@patch("argus.api.auth._decode_supabase_jwt")
-def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_fetcher):
+def test_get_assets_success_and_caching(mock_get_fetcher):
+    from argus.api.auth import check_asset_search_rate_limit
+
     # Mock the fetcher returned by the function
     mock_fetcher = MagicMock()
     mock_get_fetcher.return_value = mock_fetcher
     mock_get_assets = mock_fetcher.get_active_assets
-    # Setup mocks
-    mock_decode.return_value = {"sub": "user123", "email": "test@test.com"}
-    mock_rate_limit.return_value = {
+    app.dependency_overrides[check_asset_search_rate_limit] = lambda: {
         "X-RateLimit-Limit": "100",
         "X-RateLimit-Remaining": "99",
         "X-RateLimit-Reset": "1000",
@@ -40,10 +38,7 @@ def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_f
         asset_cache._timestamp = 0
 
     # 1. First call - should hit Alpaca Proxy
-    response1 = client.get(
-        "/api/v1/assets?search=a&timeframe=15m",
-        headers={"Authorization": "Bearer fake_token"},
-    )
+    response1 = client.get("/api/v1/assets?search=a&timeframe=15m")
 
     assert response1.status_code == 200
     assert response1.json() == ["AAPL"]
@@ -51,10 +46,7 @@ def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_f
     assert mock_get_assets.call_count == 1
 
     # 2. Second call - should hit cache
-    response2 = client.get(
-        "/api/v1/assets?search=b",  # Testing optional timeframe parameter
-        headers={"Authorization": "Bearer fake_token"},
-    )
+    response2 = client.get("/api/v1/assets?search=b")
 
     assert response2.status_code == 200
     assert response2.json() == ["BTC/USD"]
@@ -62,23 +54,25 @@ def test_get_assets_success_and_caching(mock_decode, mock_rate_limit, mock_get_f
     assert mock_get_assets.call_count == 1
 
     # 3. Search by name
-    response3 = client.get(
-        "/api/v1/assets?search=Micros",
-        headers={"Authorization": "Bearer fake_token"},
-    )
+    response3 = client.get("/api/v1/assets?search=Micros")
     assert response3.status_code == 200
     assert response3.json() == ["MSFT"]
+    app.dependency_overrides.clear()
 
 
-@patch("argus.api.auth._decode_supabase_jwt")
-def test_get_assets_invalid_timeframe(mock_decode):
-    mock_decode.return_value = {"sub": "user123", "email": "test@test.com"}
+def test_get_assets_invalid_timeframe():
+    from argus.api.auth import check_asset_search_rate_limit
+
+    app.dependency_overrides[check_asset_search_rate_limit] = lambda: {
+        "X-RateLimit-Limit": "100",
+        "X-RateLimit-Remaining": "99",
+        "X-RateLimit-Reset": "1000",
+        "Retry-After": "0",
+    }
 
     # Test invalid timeframe
-    response = client.get(
-        "/api/v1/assets?search=apple&timeframe=5m",
-        headers={"Authorization": "Bearer fake_token"},
-    )
+    response = client.get("/api/v1/assets?search=apple&timeframe=5m")
 
     assert response.status_code == 422
     assert "timeframe must be one of" in response.json()["detail"]
+    app.dependency_overrides.clear()
