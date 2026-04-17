@@ -155,13 +155,14 @@ describe("minimal funnel telemetry checkpoints", () => {
     (globalThis as unknown as { fetch: typeof fetch }).fetch = fetchMock;
 
     trackFunnelEvent(FUNNEL_EVENTS.DRAFT_SUCCESS, { source: "unit-test" });
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let i = 0; i < 20 && fetchMock.mock.calls.length === 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/telemetry/events");
-    expect(init.method).toBe("POST");
+    const [request] = fetchMock.mock.calls[0] as [Request];
+    expect(request.url).toContain("/telemetry/events");
+    expect(request.method).toBe("POST");
   });
 
   it("keeps event queued when telemetry sink is unavailable", async () => {

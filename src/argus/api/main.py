@@ -38,6 +38,7 @@ from argus.api.schemas import (
     SimulationLogEntry,
     SSORequest,
     SSOResponse,
+    TelemetryAcceptedResponse,
     TelemetryEventPayload,
     TradeSnippet,
 )
@@ -221,9 +222,14 @@ def sso_login(request: SSORequest):
         ) from e
 
 
-@app.post("/api/v1/telemetry/events", status_code=status.HTTP_202_ACCEPTED)
+@app.post(
+    "/api/v1/telemetry/events",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TelemetryAcceptedResponse,
+)
 def ingest_telemetry_event(
     payload: TelemetryEventPayload,
+    background_tasks: BackgroundTasks,
     user: UserResponse = Depends(auth_required),  # noqa: B008
 ):
     """Persist client-side funnel telemetry for private-beta observability."""
@@ -241,7 +247,8 @@ def ingest_telemetry_event(
 
     settings = get_settings()
     if settings.ENABLE_POSTHOG_FORWARDING:
-        emit_posthog_event(
+        background_tasks.add_task(
+            emit_posthog_event,
             payload.event,
             {
                 "user_id": str(user.id),
@@ -249,7 +256,7 @@ def ingest_telemetry_event(
                 **payload.properties,
             },
         )
-    return {"status": "accepted"}
+    return TelemetryAcceptedResponse(status="accepted")
 
 
 @app.patch("/api/v1/auth/profile", response_model=UserResponse)

@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/api";
+import { postTelemetryEvents } from "@/lib/api/sdk.gen";
 
 export const FUNNEL_EVENTS = {
   ONBOARDING_COMPLETE: "onboarding_complete",
@@ -26,16 +27,13 @@ declare global {
 }
 
 async function sendTelemetryEvent(payload: FunnelEventPayload): Promise<boolean> {
-  const response = await fetch(`${API_URL}/telemetry/events`, {
-    method: "POST",
+  const result = await postTelemetryEvents({
+    baseUrl: API_URL,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
+    body: payload,
   });
 
-  return response.ok;
+  return Boolean(result.response?.ok);
 }
 
 async function flushTelemetryQueue(): Promise<void> {

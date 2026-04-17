@@ -201,6 +201,12 @@ class TelemetryEventPayload(BaseModel):
     properties: Dict[str, Any] = Field(default_factory=dict)
 
 
+class TelemetryAcceptedResponse(BaseModel):
+    """Response schema for successful telemetry ingestion."""
+
+    status: str
+
+
 class PaginatedHistoryResponse(BaseModel):
     simulations: List[SimulationLogEntry]
     total: int
