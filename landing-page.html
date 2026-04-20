@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Argus Landing Page</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style data-purpose="typography">
+    /* Import fonts based on instructions, using reasonable fallbacks */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #191c1f;
+      color: #ffffff;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .font-aeonik {
+      /* Assuming Aeonik Pro is a custom font, fallback to sans-serif for demo */
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-weight: 500;
+      letter-spacing: -2.72px;
+    }
+    
+    .tracking-positive {
+      letter-spacing: 0.2px;
+    }
+  </style>
+<style data-purpose="custom-layout">
+    /* Subtle curve graphic implementation using SVG */
+    .curve-container {
+      width: 100%;
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      z-index: 0;
+    }
+    
+    .content-wrapper {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: space-between;
+      padding: 2rem 1.5rem;
+    }
+  </style>
+</head>
+<body>
+<!-- BEGIN: MainContent -->
+<main class="content-wrapper">
+<!-- Top section spacer to push content down slightly -->
+<div class="flex-grow flex items-center justify-center pt-24">
+<!-- Logo Container -->
+<h1 class="text-6xl text-white font-aeonik" data-purpose="logo">Argus</h1>
+</div>
+<!-- Background Curve Graphic -->
+<div class="curve-container pointer-events-none flex justify-center w-full px-8" data-purpose="background-graphic">
+<svg fill="none" height="100" preserveaspectratio="none" viewbox="0 0 300 100" width="100%" xmlns="http://www.w3.org/2000/svg">
+<path d="M0 80 Q 150 20 300 80" stroke="rgba(255,255,255,0.3)" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+</svg>
+</div>
+<!-- Bottom Action Section -->
+<div class="w-full flex flex-col items-center gap-6 pb-8">
+<!-- Primary Action Button -->
+<button class="w-full max-w-sm bg-white text-black py-[14px] px-[32px] rounded-full text-base font-medium hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#191c1f]" data-purpose="signup-button">
+        Sign up with Email
+      </button>
+<!-- Secondary Action Link -->
+<p class="text-sm text-gray-400 tracking-positive" data-purpose="signin-prompt">
+        already have an account? <a class="text-white hover:text-gray-200 transition-colors" href="#">sign in</a>
+</p>
+</div>
+</main>
+<!-- END: MainContent -->
+</body></html>
