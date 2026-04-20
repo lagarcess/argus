@@ -22,7 +22,7 @@ numba = {version = ">=0.60.0", python = ">=3.10"}
 joblib = "^1.5.3"
 vectorbt = "^0.28.5"
 # API Server
-fastapi = "^0.115.0"
+fastapi = {version = "^0.115.0", extras = ["standard"]}
 uvicorn = {version = "^0.32.0", extras = ["standard"]}
 python-multipart = "^0.0.12"
 # Supabase Auth
