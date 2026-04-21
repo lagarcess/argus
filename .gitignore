@@ -51,8 +51,9 @@ temp/*
 # Joblib cache (market data)
 .gemini/cache/
 
-# Supabase temp
+# Supabase temp (contains live project ref, org ID, pooler URL — never commit)
 supabase/.temp/
+archive-v0.1/supabase/.temp/
 
 # OS files
 .DS_Store

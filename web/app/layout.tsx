@@ -1,21 +1,20 @@
-import { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
+import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider } from "@/components/AuthContext";
-import Providers from "./Providers";
-import { Toaster } from "sonner";
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
-  title: "ARGUS | Argus Observatory",
-  description: "Retail trading simulation SaaS. Backtest with reality gaps applied.",
+  title: "Argus",
+  description: "Next Generation Platform",
   manifest: "/manifest.json",
-  icons: {
-    apple: "/icon-192x192.png",
-  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0e0e10",
+  themeColor: "#191c1f",
 };
 
 export default function RootLayout({
@@ -24,15 +23,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="bg-slate-950 text-slate-100 font-body antialiased selection:bg-cyan-500/30 min-h-screen">
-        <ThemeProvider defaultTheme="system">
-          <AuthProvider>
-            <Providers>
-              {children}
-              <Toaster position="top-right" theme="dark" richColors />
-            </Providers>
-          </AuthProvider>
+    <html lang="en" suppressHydrationWarning className={`${spaceGrotesk.variable} antialiased h-full`}>
+      <body className="min-h-full flex flex-col font-sans transition-colors duration-200">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          storageKey="argus-theme"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
         </ThemeProvider>
       </body>
     </html>

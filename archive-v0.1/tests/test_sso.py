@@ -83,8 +83,7 @@ def test_sso_login_rejects_querystring_redirect():
         json={
             "provider": "google",
             "redirect_to": (
-                "http://localhost:3000/auth/callback"
-                "?next=https://malicious-site.com"
+                "http://localhost:3000/auth/callback" "?next=https://malicious-site.com"
             ),
         },
     )

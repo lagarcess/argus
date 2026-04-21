@@ -518,7 +518,10 @@ def _build_fake_persistence_service() -> PersistenceService:
             if self._limit is not None:
                 rows = rows[: self._limit]
             if self.table_name == "simulations":
-                rows = [{**row, "strategies": {"name": "Golden Flow Strategy"}} for row in rows]
+                rows = [
+                    {**row, "strategies": {"name": "Golden Flow Strategy"}}
+                    for row in rows
+                ]
             return FakeResponse(rows)
 
     class FakeClient:
