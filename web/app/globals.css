@@ -114,6 +114,15 @@ body {
   background-color: var(--argus-scrollbar-thumb);
 }
 
+.argus-scrollbar[data-scrolling="true"] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--argus-scrollbar-thumb) transparent;
+}
+
 .dark .argus-scrollbar[data-scrolling="true"]::-webkit-scrollbar-thumb {
   background-color: var(--argus-scrollbar-thumb-dark);
+}
+
+.dark .argus-scrollbar[data-scrolling="true"] {
+  scrollbar-color: var(--argus-scrollbar-thumb-dark) transparent;
 }
