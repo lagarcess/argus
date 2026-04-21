@@ -91,11 +91,12 @@ export default function PortfoliosView({ onMenuClick, onSettingsClick }: Portfol
   const [expandedId, setExpandedId] = useState<string | null>("1");
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [scrollIndicator, setScrollIndicator] = useState({ top: 0, height: 0, visible: false });
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleScrollActivity = () => {
+  const handleScrollActivity = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolling(true);
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
@@ -103,6 +104,15 @@ export default function PortfoliosView({ onMenuClick, onSettingsClick }: Portfol
     scrollTimeoutRef.current = setTimeout(() => {
       setIsScrolling(false);
     }, 220);
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight > clientHeight) {
+      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 28);
+      const maxTop = clientHeight - thumbHeight;
+      const top = (scrollTop / Math.max(scrollHeight - clientHeight, 1)) * maxTop;
+      setScrollIndicator({ top, height: thumbHeight, visible: true });
+    } else {
+      setScrollIndicator({ top: 0, height: 0, visible: false });
+    }
   };
 
   useEffect(() => {
@@ -184,10 +194,10 @@ export default function PortfoliosView({ onMenuClick, onSettingsClick }: Portfol
       )}
 
       {/* List Content */}
+      <div className="relative flex-1 min-h-0">
       <div
         onScroll={handleScrollActivity}
-        data-scrolling={isScrolling ? "true" : "false"}
-        className="argus-scrollbar flex-1 overflow-y-auto px-6 pt-24 pb-32"
+        className="argus-scrollbar h-full overflow-y-auto px-6 pt-24 pb-32"
       >
         <div className="flex flex-col gap-4">
           {sortedPortfolios.map((portfolio) => {
@@ -315,6 +325,14 @@ export default function PortfoliosView({ onMenuClick, onSettingsClick }: Portfol
             );
           })}
         </div>
+      </div>
+      {scrollIndicator.visible && (
+        <div
+          className={`absolute right-[2px] top-0 w-px rounded-full argus-scroll-indicator pointer-events-none ${isScrolling ? "opacity-100" : "opacity-0"}`}
+          style={{ height: `${scrollIndicator.height}px`, transform: `translateY(${scrollIndicator.top}px)` }}
+          aria-hidden="true"
+        />
+      )}
       </div>
       
       {/* Progressive Bottom Glass Blur Layer */}

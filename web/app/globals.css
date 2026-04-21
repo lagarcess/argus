@@ -11,8 +11,8 @@
 :root {
   --bg: #ffffff;
   --fg: #000000;
-  --argus-scrollbar-thumb: rgba(0, 0, 0, 0.1);
-  --argus-scrollbar-thumb-dark: rgba(255, 255, 255, 0.16);
+  --argus-scroll-indicator: rgba(0, 0, 0, 0.12);
+  --argus-scroll-indicator-dark: rgba(255, 255, 255, 0.16);
 }
 
 .dark {
@@ -91,29 +91,21 @@ body {
 
 .argus-scrollbar {
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .argus-scrollbar::-webkit-scrollbar {
-  width: 1px;
-  height: 1px;
+  width: 0;
+  height: 0;
+  display: none;
 }
 
-.argus-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.argus-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.06);
+.argus-scroll-indicator {
+  background-color: var(--argus-scroll-indicator);
   opacity: 0;
-  border-radius: 9999px;
-  transition: opacity 90ms ease;
+  transition: opacity 150ms ease;
 }
 
-.argus-scrollbar[data-scrolling="true"]::-webkit-scrollbar-thumb {
-  opacity: 1;
-  background-color: var(--argus-scrollbar-thumb);
-}
-
-.dark .argus-scrollbar[data-scrolling="true"]::-webkit-scrollbar-thumb {
-  background-color: var(--argus-scrollbar-thumb-dark);
+.dark .argus-scroll-indicator {
+  background-color: var(--argus-scroll-indicator-dark);
 }

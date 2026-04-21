@@ -263,6 +263,7 @@ export default function ChatInterface() {
   const [searchText, setSearchText] = useState("");
   const [isScrolledUp, setIsScrolledUp] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [scrollIndicator, setScrollIndicator] = useState({ top: 0, height: 0, visible: false });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [currentView, setCurrentView] = useState<'chat' | 'strategies' | 'portfolios' | 'settings'>('chat');
@@ -286,10 +287,29 @@ export default function ChatInterface() {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     const distanceToBottom = scrollHeight - Math.ceil(scrollTop) - clientHeight;
     setIsScrolledUp(distanceToBottom > 200);
+    if (scrollHeight > clientHeight) {
+      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 28);
+      const maxTop = clientHeight - thumbHeight;
+      const top = (scrollTop / Math.max(scrollHeight - clientHeight, 1)) * maxTop;
+      setScrollIndicator({ top, height: thumbHeight, visible: true });
+    } else {
+      setScrollIndicator({ top: 0, height: 0, visible: false });
+    }
   };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    if (scrollHeight > clientHeight) {
+      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 28);
+      const maxTop = clientHeight - thumbHeight;
+      const top = (scrollTop / Math.max(scrollHeight - clientHeight, 1)) * maxTop;
+      setScrollIndicator({ top, height: thumbHeight, visible: true });
+    } else {
+      setScrollIndicator({ top: 0, height: 0, visible: false });
+    }
   }, [messages.length]);
 
   const startWelcomeFlow = () => {
@@ -828,22 +848,30 @@ export default function ChatInterface() {
       </div>
 
       {/* Messages Scroll Area */}
-      <div 
-        ref={scrollContainerRef}
-        onScroll={handleScrollEvent}
-        data-scrolling={isScrolling ? "true" : "false"}
-        className="argus-scrollbar flex-1 overflow-y-auto px-4 pt-[86px] pb-[120px] space-y-8 scroll-smooth transition-colors duration-300"
-      >
-        <div
-          className={`transition-[height,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            messages.length <= 1 ? "h-[26vh] opacity-100" : messages.length <= 2 ? "h-[14vh] opacity-70" : "h-0 opacity-0"
-          }`}
-          aria-hidden="true"
-        />
-        {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} onAction={handleAction} />
-        ))}
-        <div ref={bottomRef} className="h-1 text-transparent font-medium" />
+      <div className="relative flex-1 min-h-0">
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScrollEvent}
+          className="argus-scrollbar h-full overflow-y-auto px-4 pt-[86px] pb-[120px] space-y-8 scroll-smooth transition-colors duration-300"
+        >
+          <div
+            className={`transition-[height,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              messages.length <= 1 ? "h-[26vh] opacity-100" : messages.length <= 2 ? "h-[14vh] opacity-70" : "h-0 opacity-0"
+            }`}
+            aria-hidden="true"
+          />
+          {messages.map((msg) => (
+            <ChatMessage key={msg.id} message={msg} onAction={handleAction} />
+          ))}
+          <div ref={bottomRef} className="h-1 text-transparent font-medium" />
+        </div>
+        {scrollIndicator.visible && (
+          <div
+            className={`absolute right-[2px] top-0 w-px rounded-full argus-scroll-indicator pointer-events-none ${isScrolling ? "opacity-100" : "opacity-0"}`}
+            style={{ height: `${scrollIndicator.height}px`, transform: `translateY(${scrollIndicator.top}px)` }}
+            aria-hidden="true"
+          />
+        )}
       </div>
 
       {/* Floating Scroll to Bottom Button */}
