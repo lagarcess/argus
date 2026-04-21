@@ -1,0 +1,110 @@
+[tool.poetry]
+name = "argus"
+version = "0.1.0"
+description = "Argus - Pattern Analysis & Backtesting Engine"
+authors = ["Admin <admin@example.com>"]
+packages = [{include = "argus", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+# Configuration Management
+pydantic-settings = "^2.7.0"
+python-dotenv = "^1.0.0"
+# Alpaca Market Data
+alpaca-py = "^0.38.0"
+# Logging
+loguru = "^0.7.3"
+# Data Analysis
+pandas = "^2.2.0"
+pandas-ta-classic = {git = "https://github.com/xgboosted/pandas-ta-classic.git", rev = "6e4cb10"}
+# High-Performance Computing
+numba = {version = ">=0.60.0", python = ">=3.10"}
+joblib = "^1.5.3"
+vectorbt = "^0.28.5"
+# API Server
+fastapi = {version = "^0.115.0", extras = ["standard"]}
+uvicorn = {version = "^0.32.0", extras = ["standard"]}
+python-multipart = "^0.0.12"
+# Supabase Auth
+supabase = "^2.10.0"
+pyjwt = {version = "^2.9.0", extras = ["crypto"]}
+psutil = "^7.2.2"
+litellm = "^1.83.7"
+langchain = "^1.2.15"
+langchain-openai = "^1.1.12"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0,<9.0"
+pytest-mock = ">=3.15.1,<4.0.0"
+pytest-cov = ">=4.0.0"
+pytest-asyncio = "^0.23.6"
+httpx = "^0.28.1"
+faker = "^30.0.0"
+pre-commit = "<4.0"
+ruff = ">=0.4.0,<0.5.0"
+icdiff = ">=2.0.7,<3.0.0"
+mypy = "^1.10.0"
+respx = "^0.23.1"
+hypothesis = "^6.151.12"
+pytest-benchmark = "^5.2.3"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_any_generics = true
+
+[[tool.mypy.overrides]]
+module = [
+    "argus.analysis.structural",
+    "argus.analysis.patterns",
+    "argus.analysis.indicators",
+    "argus.analysis.harmonics",
+]
+ignore_errors = true
+
+[tool.coverage.run]
+data_file = "temp/coverage/.coverage"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+addopts = "-v --cov=src --cov-report=term-missing --cov-report=html:temp/coverage/html --cov-report=xml:temp/coverage/coverage.xml"
+filterwarnings = [
+    "ignore::DeprecationWarning:postgrest.*",
+    "ignore::DeprecationWarning:supabase.*",
+]
+markers = [
+    "slow: marks tests as slow (performance benchmarks requiring large datasets)",
+]
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long, handled by ruff-format
+]
+
+[tool.ruff.lint.isort]
+# profile = "black" is implied by Ruff's defaults and other settings
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
