@@ -1,6 +1,13 @@
 "use client";
 
-import { X, ChevronRight, User, LogOut } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useTheme } from "next-themes";
+import { X, ChevronRight, User, LogOut, Sun, Moon, Monitor, Search, Check } from "lucide-react";
+
+const LANGUAGES = [
+  { code: "en", name: "English", translation: "English" },
+  { code: "es-LA", name: "Español", translation: "Spanish" },
+];
 
 type SettingsViewProps = {
   onClose: () => void;
@@ -8,6 +15,41 @@ type SettingsViewProps = {
 };
 
 export default function SettingsView({ onClose, onLogout }: SettingsViewProps) {
+  const { theme, setTheme } = useTheme();
+  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
+  const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [lang, setLang] = useState<string>(() => {
+    if (typeof window === "undefined") return "en";
+    return localStorage.getItem("argus-language") ?? "en";
+  });
+
+  const currentLangLabel = useMemo(
+    () => LANGUAGES.find((entry) => entry.code === lang)?.name ?? "English",
+    [lang],
+  );
+
+  const filteredLanguages = useMemo(
+    () =>
+      LANGUAGES.filter(
+        (entry) =>
+          entry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          entry.translation.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
+    [searchQuery],
+  );
+
+  const setLanguage = (nextLanguage: string) => {
+    setLang(nextLanguage);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("argus-language", nextLanguage);
+    }
+    setIsLanguageModalOpen(false);
+    setSearchQuery("");
+  };
+
+  const appearanceLabel = theme === "light" ? "Light" : theme === "dark" ? "Dark" : "System";
+
   return (
     <div className="flex flex-col w-full h-[100dvh] max-w-3xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
       {/* Header */}
@@ -56,14 +98,23 @@ export default function SettingsView({ onClose, onLogout }: SettingsViewProps) {
           <div className="flex flex-col gap-2">
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">App</span>
             <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
-              <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5">
-                <span className="text-[15px] text-black dark:text-white font-medium">app language</span>
-                <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
-              </button>
-              <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                <span className="text-[15px] text-black dark:text-white font-medium">appearance</span>
+              <button
+                onClick={() => setIsLanguageModalOpen(true)}
+                className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
+              >
+                <span className="text-[15px] text-black dark:text-white font-medium">App language</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[14px] text-black/40 dark:text-white/40">&lt;system&gt;</span>
+                  <span className="text-[14px] text-black/40 dark:text-white/40">{currentLangLabel}</span>
+                  <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
+                </div>
+              </button>
+              <button
+                onClick={() => setIsAppearanceModalOpen(true)}
+                className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
+                <span className="text-[15px] text-black dark:text-white font-medium">Appearance</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px] text-black/40 dark:text-white/40">{appearanceLabel}</span>
                   <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
                 </div>
               </button>
@@ -75,15 +126,15 @@ export default function SettingsView({ onClose, onLogout }: SettingsViewProps) {
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">Data & Information</span>
             <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
               <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5">
-                <span className="text-[15px] text-black dark:text-white font-medium">archived chats</span>
+                <span className="text-[15px] text-black dark:text-white font-medium">Archived chats</span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
               <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5">
-                <span className="text-[15px] text-black dark:text-white font-medium">recently deleted</span>
+                <span className="text-[15px] text-black dark:text-white font-medium">Recently deleted</span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
               <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                <span className="text-[15px] text-black dark:text-white font-medium">security</span>
+                <span className="text-[15px] text-black dark:text-white font-medium">Security</span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
             </div>
@@ -94,15 +145,15 @@ export default function SettingsView({ onClose, onLogout }: SettingsViewProps) {
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">About</span>
             <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
               <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5">
-                <span className="text-[15px] text-black dark:text-white font-medium">report a bug</span>
+                <span className="text-[15px] text-black dark:text-white font-medium">Report a bug</span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
               <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5">
-                <span className="text-[15px] text-black dark:text-white font-medium">request a feature</span>
+                <span className="text-[15px] text-black dark:text-white font-medium">Request a feature</span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
               <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                <span className="text-[15px] text-black dark:text-white font-medium">general feedback</span>
+                <span className="text-[15px] text-black dark:text-white font-medium">General feedback</span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
             </div>
@@ -119,6 +170,89 @@ export default function SettingsView({ onClose, onLogout }: SettingsViewProps) {
           
         </div>
       </div>
+
+      {isLanguageModalOpen && (
+        <div className="absolute inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
+          <button
+            className="absolute inset-0"
+            aria-label="Close language modal"
+            onClick={() => {
+              setIsLanguageModalOpen(false);
+              setSearchQuery("");
+            }}
+          />
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden shadow-2xl">
+            <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
+              <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search language"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="w-full bg-transparent border-none outline-none text-[15px] text-black dark:text-white placeholder:text-black/35 dark:placeholder:text-white/35"
+              />
+            </div>
+            <div className="max-h-[340px] overflow-y-auto py-1">
+              {filteredLanguages.length === 0 ? (
+                <div className="px-4 py-8 text-center text-[14px] text-black/45 dark:text-white/45">
+                  No languages found.
+                </div>
+              ) : (
+                filteredLanguages.map((entry) => (
+                  <button
+                    key={entry.code}
+                    onClick={() => setLanguage(entry.code)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <span className="text-[15px] font-medium text-black dark:text-white">{entry.name}</span>
+                    {entry.code === lang ? (
+                      <Check className="w-4 h-4 text-black dark:text-white" />
+                    ) : (
+                      <span className="text-[14px] text-black/45 dark:text-white/45">{entry.translation}</span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAppearanceModalOpen && (
+        <div className="absolute inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center">
+          <button
+            className="absolute inset-0"
+            aria-label="Close appearance modal"
+            onClick={() => setIsAppearanceModalOpen(false)}
+          />
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden shadow-2xl p-3">
+            <div className="flex items-center justify-between p-1 bg-black/5 dark:bg-black/35 rounded-2xl">
+              <button
+                onClick={() => { setTheme("light"); setIsAppearanceModalOpen(false); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "light" ? "bg-white text-black shadow-sm" : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
+              >
+                <Sun className="w-[16px] h-[16px]" />
+                <span className="text-[14px] font-medium">Light</span>
+              </button>
+              <button
+                onClick={() => { setTheme("dark"); setIsAppearanceModalOpen(false); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "dark" ? "bg-white dark:bg-[#32363d] text-black dark:text-white shadow-sm" : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
+              >
+                <Moon className="w-[16px] h-[16px]" />
+                <span className="text-[14px] font-medium">Dark</span>
+              </button>
+              <button
+                onClick={() => { setTheme("system"); setIsAppearanceModalOpen(false); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "system" ? "bg-white dark:bg-[#32363d] text-black dark:text-white shadow-sm" : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
+              >
+                <Monitor className="w-[16px] h-[16px]" />
+                <span className="text-[14px] font-medium">System</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
