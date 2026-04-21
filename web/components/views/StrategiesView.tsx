@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Menu, Plus, ChevronDown, Trash2, Pin, Edit2, Search, Settings, X } from "lucide-react";
+import { Menu, Plus, ChevronDown, ChevronUp, Trash2, Pin, Edit2, TrendingUp, TrendingDown, LayoutDashboard, Search, Settings, X } from "lucide-react";
 
 type Strategy = {
   id: string;
