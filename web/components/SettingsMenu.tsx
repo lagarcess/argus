@@ -15,14 +15,14 @@ export function SettingsMenu() {
   const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { theme, setTheme } = useTheme();
-  
+
   const [lang, setLang] = useState("en");
 
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
-    
+
     function handleClickOutside(event: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -44,15 +44,15 @@ export function SettingsMenu() {
   if (!mounted) return null;
 
   const currentLangLabel = LANGUAGES.find(l => l.code === lang)?.name || "English";
-  const filteredLanguages = LANGUAGES.filter(l => 
-    l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredLanguages = LANGUAGES.filter(l =>
+    l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     l.translation.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <>
       <div className="hidden md:block absolute top-6 right-6 md:top-8 md:right-12 z-40 text-[var(--color-argus-fg)]" ref={popoverRef}>
-        <button 
+        <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white"
           aria-label="Settings"
@@ -62,7 +62,7 @@ export function SettingsMenu() {
 
         {isOpen && (
           <div className="absolute right-0 mt-2 w-64 p-3 rounded-[24px] bg-[#f5f5f5] dark:bg-[#1c1f24] border border-black/5 dark:border-white/5 shadow-2xl overflow-hidden text-sm animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-            
+
             {/* Theme Row */}
             <div className="flex items-center justify-between p-1 bg-black/5 dark:bg-black/40 rounded-2xl mb-3 relative">
               <button
@@ -102,10 +102,10 @@ export function SettingsMenu() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           {/* Modal Backdrop overlay to click outside */}
           <div className="absolute inset-0" onClick={() => setIsLanguageModalOpen(false)} />
-          
+
           {/* Modal Content */}
           <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            
+
             {/* Search Input */}
             <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
               <Search className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-3" />

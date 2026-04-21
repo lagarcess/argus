@@ -1,10 +1,12 @@
+import Image from "next/image";
+import Link from "next/link";
 import { SettingsMenu } from "@/components/SettingsMenu";
 
 export default function LandingPage() {
   return (
     <main className="relative flex min-h-[100dvh] w-full flex-col justify-between overflow-hidden px-6 py-8 md:px-12">
       <SettingsMenu />
-      {/* 
+      {/*
         We have removed the glowing Card Bezel entirely.
         This provides the edge-to-edge minimalist aesthetic seen in Grok and Revolut.
       */}
@@ -16,7 +18,7 @@ export default function LandingPage() {
           argus
         </h1>
       </div>
-      
+
       {/* Subtle Curve SVG Background Graphic - Toggled Off */}
       {process.env.NEXT_PUBLIC_SHOW_BACKGROUND_CURVE === 'true' && (
         <div className="pointer-events-none absolute left-0 top-[46%] md:top-[53%] flex -translate-y-1/2 w-full justify-center z-0 overflow-hidden h-[150px]">
@@ -42,9 +44,9 @@ export default function LandingPage() {
       {/* Bottom Action Section */}
       {/* Normalized font sizes and button padding per DESIGN.md */}
       <div className="relative z-10 flex w-full flex-col items-center gap-6 pb-2 md:pb-4">
-        <button className="w-full max-w-sm rounded-[9999px] bg-black text-white dark:bg-white dark:text-black px-[32px] py-[14px] text-[16px] font-medium transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black dark:focus-visible:ring-white">
+        <Link href="/chat" className="w-full max-w-sm rounded-[9999px] bg-black text-white dark:bg-white dark:text-black px-[32px] py-[14px] text-[16px] font-medium transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black dark:focus-visible:ring-white flex items-center justify-center">
           Sign up with Email
-        </button>
+        </Link>
         <p className="text-[16px] tracking-wide text-gray-500 dark:text-gray-400">
           already have an account?{" "}
           <a
