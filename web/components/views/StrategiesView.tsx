@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Menu, Plus, ChevronDown, ChevronUp, Trash2, Pin, Edit2, TrendingUp, TrendingDown, LayoutDashboard, Search, Settings, X } from "lucide-react";
+import { Menu, Plus, ChevronDown, Trash2, Pin, Edit2, Search, Settings, X } from "lucide-react";
 
 type Strategy = {
   id: string;
@@ -94,9 +94,39 @@ export default function StrategiesView({ onMenuClick, onSettingsClick }: Strateg
   const [strategies, setStrategies] = useState<Strategy[]>(MOCK_STRATEGIES);
   const [expandedId, setExpandedId] = useState<string | null>("1");
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [scrollIndicator, setScrollIndicator] = useState({ top: 0, height: 0, visible: false });
 
   // Simple Long Press logic
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleScrollActivity = (e: React.UIEvent<HTMLDivElement>) => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 220);
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight > clientHeight) {
+      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 28);
+      const maxTop = clientHeight - thumbHeight;
+      const top = (scrollTop / Math.max(scrollHeight - clientHeight, 1)) * maxTop;
+      setScrollIndicator({ top, height: thumbHeight, visible: true });
+    } else {
+      setScrollIndicator({ top: 0, height: 0, visible: false });
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const handlePointerDown = (id: string, e: React.PointerEvent) => {
     // Only trigger long press if not clicking the chevron directly
@@ -171,7 +201,11 @@ export default function StrategiesView({ onMenuClick, onSettingsClick }: Strateg
       )}
 
       {/* List Content */}
-      <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32">
+      <div className="relative flex-1 min-h-0">
+      <div
+        onScroll={handleScrollActivity}
+        className="argus-scrollbar h-full overflow-y-auto px-6 pt-24 pb-32"
+      >
         <div className="flex flex-col gap-4">
           {sortedStrategies.map((strategy) => {
             const isExpanded = expandedId === strategy.id;
@@ -241,7 +275,9 @@ export default function StrategiesView({ onMenuClick, onSettingsClick }: Strateg
                   )}
 
                   {/* Expanded Content Grid */}
-                  <div className={`overflow-y-auto scrollbar-hide transition-all duration-300 ease-in-out relative ${isExpanded ? 'max-h-[220px] border-t border-black/5 dark:border-white/5' : 'max-h-0'}`}>
+                  <div
+                    className={`argus-scrollbar overflow-y-auto transition-all duration-300 ease-in-out relative ${isExpanded ? 'max-h-[220px] border-t border-black/5 dark:border-white/5' : 'max-h-0'}`}
+                  >
                     <div className="flex flex-col px-5 py-4 gap-4">
                       
                       {/* Header Row (Sticky) */}
@@ -302,6 +338,14 @@ export default function StrategiesView({ onMenuClick, onSettingsClick }: Strateg
             );
           })}
         </div>
+      </div>
+      {scrollIndicator.visible && (
+        <div
+          className={`absolute right-[2px] top-0 w-px rounded-full argus-scroll-indicator pointer-events-none ${isScrolling ? "opacity-100" : "opacity-0"}`}
+          style={{ height: `${scrollIndicator.height}px`, transform: `translateY(${scrollIndicator.top}px)` }}
+          aria-hidden="true"
+        />
+      )}
       </div>
       
       {/* Progressive Bottom Glass Blur Layer */}

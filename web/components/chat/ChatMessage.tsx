@@ -2,14 +2,15 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning } from "lucide-react";
+import StrategyResultCard from "./StrategyResultCard";
+import { Message } from "./types";
 
-type Message = {
-  id: string;
-  role: "user" | "ai";
-  content: string;
+type ChatMessageProps = {
+  message: Message;
+  onAction?: (value: string) => void;
 };
 
-export default function ChatMessage({ message }: { message: Message }) {
+export default function ChatMessage({ message, onAction }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [showOptions, setShowOptions] = useState(false);
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
@@ -52,11 +53,21 @@ export default function ChatMessage({ message }: { message: Message }) {
     };
   }, [showOptions]);
 
+  const getCopyText = () => {
+    if (message.kind === "strategy_result" && message.result) {
+      const rows = message.result.metrics.map((metric) => `${metric.label}: ${metric.value}`);
+      const header = `${message.result.strategyName} (${message.result.period})`;
+      const note = message.result.benchmarkNote ? `\n${message.result.benchmarkNote}` : "";
+      return `${header}\n${rows.join("\n")}${note}`;
+    }
+    return message.content ?? "";
+  };
+
   if (isUser) {
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal shadow-sm">
-          {message.content}
+          {message.content ?? ""}
         </div>
       </div>
     );
@@ -72,52 +83,77 @@ export default function ChatMessage({ message }: { message: Message }) {
         
         {/* Elevated Raw Text & Actions */}
         <div className="flex flex-col mt-1.5">
-          <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] whitespace-pre-wrap">
-            {message.content}
-          </div>
+          {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
+            <div className="w-full max-w-[min(100%,660px)]">
+              <StrategyResultCard result={message.result} />
+            </div>
+          ) : (
+            <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] whitespace-pre-wrap">
+              {message.content ?? ""}
+            </div>
+          )}
           
-          {/* Feedback Icon Row (Tiny & Subtle) */}
-          <div className="relative flex items-center gap-1.5 mt-2 opacity-50 hover:opacity-100 transition-opacity" ref={optionsRef}>
-            <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title="Good response">
-              <ThumbsUp className="w-3.5 h-3.5" />
-            </button>
-            <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title="Poor response">
-              <ThumbsDown className="w-3.5 h-3.5" />
-            </button>
-            <button 
-              onClick={toggleOptions}
-              className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" 
-              title="More Actions"
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Popover Menu */}
-            {showOptions && (
-              <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} left-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] shadow-xl dark:shadow-black/50 border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
-                <button 
-                  className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                  onClick={() => { navigator.clipboard.writeText(message.content); setShowOptions(false); }}
-                >
-                  <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
-                  Copy Plaintext
-                </button>
-                <button 
-                  className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                  onClick={() => { navigator.clipboard.writeText(message.id); setShowOptions(false); }}
-                >
-                  <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
-                  Copy ID
-                </button>
-                <button 
-                  className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                  onClick={() => setShowOptions(false)}
-                >
-                  <MessageSquareWarning className="w-4 h-4 text-black/60 dark:text-white/60" />
-                  Report Issue
-                </button>
+          <div className="flex items-start justify-between gap-4 mt-2">
+            {message.actions && message.actions.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {message.actions.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => onAction?.(action.value)}
+                    className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
+                  >
+                    {action.label}
+                  </button>
+                ))}
               </div>
+            ) : (
+              <div />
             )}
+
+            {/* Feedback Icon Row (Right-aligned) */}
+            <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
+              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title="Good response">
+                <ThumbsUp className="w-3.5 h-3.5" />
+              </button>
+              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title="Poor response">
+                <ThumbsDown className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={toggleOptions}
+                className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" 
+                title="More Actions"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Popover Menu */}
+              {showOptions && (
+                <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] shadow-xl dark:shadow-black/50 border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
+                  <button 
+                    className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                    onClick={() => { navigator.clipboard.writeText(getCopyText()); setShowOptions(false); }}
+                  >
+                    <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
+                    Copy Plaintext
+                  </button>
+                  <button 
+                    className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                    onClick={() => { navigator.clipboard.writeText(message.id); setShowOptions(false); }}
+                  >
+                    <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
+                    Copy ID
+                  </button>
+                  <button 
+                    className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                    onClick={() => setShowOptions(false)}
+                  >
+                    <MessageSquareWarning className="w-4 h-4 text-black/60 dark:text-white/60" />
+                    Report Issue
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
