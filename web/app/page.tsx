@@ -49,12 +49,12 @@ export default function LandingPage() {
         </Link>
         <p className="text-[16px] tracking-wide text-gray-500 dark:text-gray-400">
           already have an account?{" "}
-          <a
+          <Link
             className="font-medium text-black dark:text-white transition-opacity hover:opacity-80"
-            href="#"
+            href="/login"
           >
             sign in
-          </a>
+          </Link>
         </p>
 
         {/* Legal Footer */}

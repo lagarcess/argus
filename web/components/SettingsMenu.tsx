@@ -39,6 +39,9 @@ export function SettingsMenu() {
     } else {
       document.body.style.overflow = 'unset';
     }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isLanguageModalOpen]);
 
   if (!mounted) return null;
@@ -104,7 +107,7 @@ export function SettingsMenu() {
           <div className="absolute inset-0" onClick={() => setIsLanguageModalOpen(false)} />
 
           {/* Modal Content */}
-          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" role="dialog" aria-modal="true" aria-label="Select Language">
 
             {/* Search Input */}
             <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">

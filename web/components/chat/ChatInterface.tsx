@@ -91,7 +91,7 @@ export default function ChatInterface() {
     <div className="relative w-full h-[100dvh] bg-[#f9f9f9] dark:bg-[#141517] overflow-hidden flex">
       <div className="absolute inset-y-0 left-0 w-full md:w-[320px] h-full flex flex-col pt-12 pb-8 px-6 z-0">
         <div className="flex items-center justify-between w-full mb-10">
-           <h1 className="text-[26px] font-semibold tracking-tight text-black dark:text-white" style={{ fontFamily: 'var(--font-space-grotesk)' }}>argus</h1>
+           <h1 className="text-[26px] font-medium tracking-tight text-black dark:text-white" style={{ fontFamily: 'var(--font-space-grotesk)' }}>argus</h1>
            <button 
              className="flex items-center justify-center p-2 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white" 
              onClick={() => { setIsSidebarOpen(false); setCurrentView('chat'); setMessages(MOCK_CONVERSATION); }}
@@ -125,7 +125,7 @@ export default function ChatInterface() {
              <ChevronDown className={`w-4 h-4 text-black/40 dark:text-white/40 transition-transform duration-200 mt-1 ${isRecentsExpanded ? 'rotate-0' : '-rotate-90'}`} />
            </button>
            
-           <div className={`flex flex-col gap-1 -mx-3 px-3 overflow-y-auto scrollbar-hide transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isRecentsExpanded ? 'max-h-[40vh] opacity-100' : 'max-h-0 opacity-0'}`}>
+           <div className={`flex flex-col gap-1 -mx-3 px-3 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isRecentsExpanded ? 'max-h-[40vh] opacity-100' : 'max-h-0 opacity-0'}`}>
              <button className="flex flex-col items-start w-full py-3 px-4 rounded-[16px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0" onClick={() => setIsSidebarOpen(false)}>
                <span className="text-[15px] font-medium text-black dark:text-white truncate w-full text-left">Short BTC Volatility</span>
                <span className="text-[12px] text-black/40 dark:text-white/40 mt-0.5">today • Strategy</span>
