@@ -94,9 +94,29 @@ export default function StrategiesView({ onMenuClick, onSettingsClick }: Strateg
   const [strategies, setStrategies] = useState<Strategy[]>(MOCK_STRATEGIES);
   const [expandedId, setExpandedId] = useState<string | null>("1");
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
 
   // Simple Long Press logic
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleScrollActivity = () => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 220);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const handlePointerDown = (id: string, e: React.PointerEvent) => {
     // Only trigger long press if not clicking the chevron directly
@@ -171,7 +191,11 @@ export default function StrategiesView({ onMenuClick, onSettingsClick }: Strateg
       )}
 
       {/* List Content */}
-      <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32">
+      <div
+        onScroll={handleScrollActivity}
+        data-scrolling={isScrolling ? "true" : "false"}
+        className="argus-scrollbar flex-1 overflow-y-auto px-6 pt-24 pb-32"
+      >
         <div className="flex flex-col gap-4">
           {sortedStrategies.map((strategy) => {
             const isExpanded = expandedId === strategy.id;
@@ -241,7 +265,11 @@ export default function StrategiesView({ onMenuClick, onSettingsClick }: Strateg
                   )}
 
                   {/* Expanded Content Grid */}
-                  <div className={`overflow-y-auto scrollbar-hide transition-all duration-300 ease-in-out relative ${isExpanded ? 'max-h-[220px] border-t border-black/5 dark:border-white/5' : 'max-h-0'}`}>
+                  <div
+                    onScroll={handleScrollActivity}
+                    data-scrolling={isScrolling ? "true" : "false"}
+                    className={`argus-scrollbar overflow-y-auto transition-all duration-300 ease-in-out relative ${isExpanded ? 'max-h-[220px] border-t border-black/5 dark:border-white/5' : 'max-h-0'}`}
+                  >
                     <div className="flex flex-col px-5 py-4 gap-4">
                       
                       {/* Header Row (Sticky) */}

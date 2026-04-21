@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Menu, Plus, ChevronDown, Trash2, Pin, Edit2, Briefcase, Search, Settings, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Menu, Plus, ChevronDown, Trash2, Pin, Edit2, Search, Settings, X } from "lucide-react";
 
 type Portfolio = {
   id: string;
@@ -90,8 +90,28 @@ export default function PortfoliosView({ onMenuClick, onSettingsClick }: Portfol
   const [portfolios, setPortfolios] = useState<Portfolio[]>(MOCK_PORTFOLIOS);
   const [expandedId, setExpandedId] = useState<string | null>("1");
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleScrollActivity = () => {
+    setIsScrolling(true);
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 220);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const handlePointerDown = (id: string, e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('.ignore-long-press')) return;
@@ -164,7 +184,11 @@ export default function PortfoliosView({ onMenuClick, onSettingsClick }: Portfol
       )}
 
       {/* List Content */}
-      <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32">
+      <div
+        onScroll={handleScrollActivity}
+        data-scrolling={isScrolling ? "true" : "false"}
+        className="argus-scrollbar flex-1 overflow-y-auto px-6 pt-24 pb-32"
+      >
         <div className="flex flex-col gap-4">
           {sortedPortfolios.map((portfolio) => {
             const isExpanded = expandedId === portfolio.id;
