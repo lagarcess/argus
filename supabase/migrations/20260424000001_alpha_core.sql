@@ -16,7 +16,7 @@ create table if not exists public.profiles (
   email text not null,
   username text unique,
   display_name text,
-  language text not null default 'en' check (language in ('en', 'es')),
+  language text not null default 'en' check (language in ('en', 'es-419')),
   locale text not null default 'en-US' check (locale in ('en-US', 'es-419')),
   theme text not null default 'dark' check (theme in ('dark', 'light', 'system')),
   is_admin boolean not null default false,
@@ -30,7 +30,7 @@ create table if not exists public.conversations (
   user_id uuid not null references public.profiles(id) on delete cascade,
   title text not null,
   title_source text not null default 'system_default' check (title_source in ('system_default', 'ai_generated', 'user_renamed')),
-  language text check (language in ('en', 'es')),
+  language text check (language in ('en', 'es-419')),
   pinned boolean not null default false,
   archived boolean not null default false,
   deleted_at timestamptz,
@@ -184,3 +184,8 @@ drop policy if exists feedback_owner_all on public.feedback;
 create policy feedback_owner_all on public.feedback for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 drop policy if exists usage_counters_owner_all on public.usage_counters;
 create policy usage_counters_owner_all on public.usage_counters for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+grant usage on schema public to anon, authenticated, service_role;
+grant all privileges on all tables in schema public to service_role;
+grant all privileges on all sequences in schema public to service_role;
+grant all privileges on all functions in schema public to service_role;

@@ -54,7 +54,11 @@ def extract_strategy_request(message: str) -> dict[str, Any]:
         if alias in lower:
             template = candidate
             break
-    asset_class = "crypto" if any(symbol in {"BTC", "ETH", "SOL"} for symbol in symbols) else "equity"
+    asset_class = (
+        "crypto"
+        if any(symbol in {"BTC", "ETH", "SOL"} for symbol in symbols)
+        else "equity"
+    )
     return {
         "template": template,
         "asset_class": asset_class,

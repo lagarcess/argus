@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterable
 from typing import Any
 
@@ -51,6 +52,7 @@ from argus.domain.engine import (
 )
 from argus.domain.orchestrator import assistant_copy_for_result, extract_strategy_request
 from argus.domain.store import AlphaStore, utcnow
+from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 
 app = FastAPI(title="Argus Alpha API", version="1.0.0-alpha")
 app.add_middleware(
@@ -61,6 +63,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 store = AlphaStore()
+PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
+supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
 
 
 @app.middleware("http")
@@ -152,12 +156,17 @@ def logout() -> SuccessResponse:
 
 @app.get("/api/v1/me", response_model=UserResponse)
 def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
+    if supabase_gateway is not None:
+        prof = supabase_gateway.get_user(user_id=user.id)
+        if prof:
+            return UserResponse(user=prof)
     return UserResponse(user=user)
 
 
 @app.patch("/api/v1/me", response_model=UserResponse)
 def patch_me(
-    patch: ProfilePatch, user: User = Depends(current_user)  # noqa: B008
+    patch: ProfilePatch,
+    user: User = Depends(current_user),  # noqa: B008
 ) -> UserResponse:
     data = user.model_dump()
     updates = patch.model_dump(exclude_unset=True)
@@ -175,7 +184,8 @@ def patch_me(
 
 @app.post("/api/v1/conversations", response_model=ConversationResponse)
 def create_conversation(
-    payload: ConversationCreate, user: User = Depends(current_user)  # noqa: B008
+    payload: ConversationCreate,
+    user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
     now = utcnow()
     title = payload.title or "New idea"
@@ -207,9 +217,18 @@ def list_conversations(
 
 @app.patch("/api/v1/conversations/{conversation_id}", response_model=ConversationResponse)
 def patch_conversation(
-    conversation_id: str, payload: ConversationPatch, request: Request
-) -> ConversationResponse:
-    conversation = store.conversations.get(conversation_id)
+    conversation_id: str,
+    payload: ConversationPatch,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+):
+    conversation = (
+        supabase_gateway.get_conversation(
+            user_id=user.id, conversation_id=conversation_id
+        )
+        if supabase_gateway
+        else store.conversations.get(conversation_id)
+    )
     if not conversation:
         raise problem(
             request,
@@ -222,15 +241,32 @@ def patch_conversation(
     patch = payload.model_dump(exclude_unset=True)
     if "title" in patch and patch["title"]:
         patch["title_source"] = "user_renamed"
-    data.update(patch)
-    data["updated_at"] = utcnow()
-    updated = Conversation.model_validate(data)
-    store.conversations[conversation_id] = updated
+    if supabase_gateway is not None:
+        updated = supabase_gateway.patch_conversation(
+            user_id=user.id, conversation_id=conversation_id, patch=patch
+        )
+        if not updated:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Conversation not found.",
+            )
+    else:
+        data.update(patch)
+        data["updated_at"] = utcnow()
+        updated = Conversation.model_validate(data)
+        store.conversations[conversation_id] = updated
     return ConversationResponse(conversation=updated)
 
 
 @app.delete("/api/v1/conversations/{conversation_id}", response_model=SuccessResponse)
-def delete_conversation(conversation_id: str, request: Request) -> SuccessResponse:
+def delete_conversation(
+    conversation_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+):
     conversation = store.conversations.get(conversation_id)
     if not conversation:
         raise problem(
@@ -240,13 +276,20 @@ def delete_conversation(conversation_id: str, request: Request) -> SuccessRespon
             title="Not Found",
             detail="Conversation not found.",
         )
-    store.conversations[conversation_id] = conversation.model_copy(
-        update={"deleted_at": utcnow(), "updated_at": utcnow()}
-    )
+    if supabase_gateway is not None:
+        supabase_gateway.soft_delete_conversation(
+            user_id=user.id, conversation_id=conversation_id
+        )
+    else:
+        store.conversations[conversation_id] = conversation.model_copy(
+            update={"deleted_at": utcnow(), "updated_at": utcnow()}
+        )
     return SuccessResponse(success=True)
 
 
-@app.get("/api/v1/conversations/{conversation_id}/messages", response_model=PaginatedMessages)
+@app.get(
+    "/api/v1/conversations/{conversation_id}/messages", response_model=PaginatedMessages
+)
 def list_messages(conversation_id: str, limit: int = Query(50, ge=1, le=100)):
     return PaginatedMessages(items=store.messages.get(conversation_id, [])[:limit])
 
@@ -321,7 +364,13 @@ def create_run_from_payload(
         config_snapshot=config,
         conversation_result_card=build_result_card(config, metrics),
         created_at=now,
-        chart={"equity_curve": [config["starting_capital"], config["starting_capital"] + metrics["aggregate"]["performance"]["profit"]]},
+        chart={
+            "equity_curve": [
+                config["starting_capital"],
+                config["starting_capital"]
+                + metrics["aggregate"]["performance"]["profit"],
+            ]
+        },
         trades=[],
     )
     store.backtest_runs[run.id] = run
@@ -340,6 +389,24 @@ def run_backtest(
         cached = store.idempotency.get((user.id, endpoint, idempotency_key))
         if cached:
             return BacktestRunResponse(run=cached)
+
+    if supabase_gateway is not None:
+        try:
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id, resource="backtest_runs", period="day", limit_count=50
+            )
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id, resource="backtest_runs", period="hour", limit_count=10
+            )
+        except QuotaExceededError as e:
+            raise problem(
+                request,
+                status_code=429,
+                code="too_many_requests",
+                title="Quota Exceeded",
+                detail=str(e),
+            ) from e
+
     data = payload.model_dump(exclude_none=True)
     if payload.strategy_id:
         strategy = store.strategies.get(payload.strategy_id)
@@ -384,31 +451,42 @@ def get_backtest(run_id: str, request: Request) -> BacktestRunResponse:
 
 
 @app.post("/api/v1/strategies", response_model=StrategyResponse)
-def create_strategy(payload: StrategyCreate) -> StrategyResponse:
-    now = utcnow()
-    benchmark = payload.benchmark_symbol or default_benchmark(payload.asset_class)
-    strategy = Strategy(
-        id=store.new_id(),
-        name=payload.name or f"{', '.join(payload.symbols)} idea",
-        name_source="user_renamed" if payload.name else "ai_generated",
-        template=payload.template,
-        asset_class=payload.asset_class,
-        symbols=[classify_symbol(symbol).symbol for symbol in payload.symbols],
-        parameters=payload.parameters,
-        metrics_preferences=payload.metrics_preferences,
-        benchmark_symbol=benchmark,
-        created_at=now,
-        updated_at=now,
-    )
-    store.strategies[strategy.id] = strategy
+def create_strategy(
+    payload: StrategyCreate, user: User = Depends(current_user)
+) -> StrategyResponse:
+    if supabase_gateway is not None:
+        strategy = supabase_gateway.create_strategy(user_id=user.id, payload=payload)
+    else:
+        now = utcnow()
+        benchmark = payload.benchmark_symbol or default_benchmark(payload.asset_class)
+        strategy = Strategy(
+            id=store.new_id(),
+            name=payload.name or f"{', '.join(payload.symbols)} idea",
+            name_source="user_renamed" if payload.name else "ai_generated",
+            template=payload.template,
+            asset_class=payload.asset_class,
+            symbols=[classify_symbol(symbol).symbol for symbol in payload.symbols],
+            parameters=payload.parameters,
+            metrics_preferences=payload.metrics_preferences,
+            benchmark_symbol=benchmark,
+            created_at=now,
+            updated_at=now,
+        )
+        store.strategies[strategy.id] = strategy
     return StrategyResponse(strategy=strategy)
 
 
 @app.get("/api/v1/strategies", response_model=PaginatedStrategies)
-def list_strategies(limit: int = Query(20, ge=1, le=100)) -> PaginatedStrategies:
-    items = [item for item in store.strategies.values() if item.deleted_at is None]
-    items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
-    return PaginatedStrategies(items=items[:limit])
+def list_strategies(
+    limit: int = Query(20, ge=1, le=100), user: User = Depends(current_user)
+) -> PaginatedStrategies:
+    if supabase_gateway is not None:
+        items = supabase_gateway.list_strategies(user_id=user.id, limit=limit)
+    else:
+        items = [item for item in store.strategies.values() if item.deleted_at is None]
+        items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
+        items = items[:limit]
+    return PaginatedStrategies(items=items)
 
 
 @app.patch("/api/v1/strategies/{strategy_id}", response_model=StrategyResponse)
@@ -511,7 +589,9 @@ def delete_collection(collection_id: str, request: Request) -> SuccessResponse:
     return SuccessResponse(success=True)
 
 
-@app.post("/api/v1/collections/{collection_id}/strategies", response_model=CollectionResponse)
+@app.post(
+    "/api/v1/collections/{collection_id}/strategies", response_model=CollectionResponse
+)
 def attach_strategies(
     collection_id: str, payload: CollectionAttach, request: Request
 ) -> CollectionResponse:
@@ -657,8 +737,32 @@ def chat_stream(
     payload: ChatStreamRequest,
     request: Request,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    user: User = Depends(current_user),
 ):
-    conversation = store.conversations.get(payload.conversation_id)
+    if supabase_gateway is not None:
+        try:
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id, resource="chat_messages", period="day", limit_count=200
+            )
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id, resource="chat_messages", period="minute", limit_count=10
+            )
+        except QuotaExceededError as e:
+            raise problem(
+                request,
+                status_code=429,
+                code="too_many_requests",
+                title="Quota Exceeded",
+                detail=str(e),
+            ) from e
+
+    conversation = (
+        supabase_gateway.get_conversation(
+            user_id=user.id, conversation_id=payload.conversation_id
+        )
+        if supabase_gateway
+        else store.conversations.get(payload.conversation_id)
+    )
     if not conversation:
         raise problem(
             request,

@@ -68,9 +68,7 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
         raise ValueError("invalid_symbol_count")
     if config["timeframe"] not in {"1D", "1H"}:
         raise ValueError("unsupported_timeframe")
-    if date.fromisoformat(config["start_date"]) >= date.fromisoformat(
-        config["end_date"]
-    ):
+    if date.fromisoformat(config["start_date"]) >= date.fromisoformat(config["end_date"]):
         raise ValueError("invalid_date_range")
     if any(symbol in STABLECOINS for symbol in config["symbols"]):
         raise ValueError("stablecoin_not_supported")
