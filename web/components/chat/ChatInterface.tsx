@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   createConversation,
+  formatRelativeDate,
   getConversationMessages,
   listHistory,
   resultCardFromRun,
@@ -77,6 +78,7 @@ export default function ChatInterface() {
     assetClass: "equity" | "crypto";
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -97,8 +99,41 @@ export default function ChatInterface() {
   };
 
   useEffect(() => {
+    const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
     listHistory(30)
-      .then(({ items }) => setHistoryItems(items))
+      .then(({ items }) => {
+        if (items.length === 0 && isMock) {
+          // Inject high-fidelity mocks for design verification
+          setHistoryItems([
+            {
+              id: "mock-1",
+              type: "chat",
+              title: "Tesla Mean Reversion",
+              subtitle: "today",
+              pinned: true,
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: "mock-2",
+              type: "strategy",
+              title: "BTC Halving Play",
+              subtitle: "yesterday",
+              pinned: false,
+              created_at: new Date(Date.now() - 86400000).toISOString(),
+            },
+            {
+              id: "mock-3",
+              type: "collection",
+              title: "Dividend Aristocrats",
+              subtitle: "Apr 20, 2026",
+              pinned: false,
+              created_at: new Date(Date.now() - 400000000).toISOString(),
+            },
+          ]);
+        } else {
+          setHistoryItems(items);
+        }
+      })
       .catch(() => undefined);
   }, []);
 
@@ -328,9 +363,12 @@ export default function ChatInterface() {
     setActiveChatOptionsPanel("none");
   };
 
-  // ── Recent chats (chat-type history items only) ───────────────────────────
-
-  const recentChats = historyItems.filter((h) => h.type === "chat").slice(0, 8);
+  // ── Recent items grouped by type ───────────────────────────────────────────
+  const groupedHistory = useMemo(() => ({
+    chat: historyItems.filter((h) => h.type === "chat").slice(0, 10),
+    strategy: historyItems.filter((h) => h.type === "strategy").slice(0, 10),
+    collection: historyItems.filter((h) => h.type === "collection").slice(0, 10),
+  }), [historyItems]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -367,35 +405,48 @@ export default function ChatInterface() {
           </button>
         </nav>
 
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-3 flex items-center gap-2 text-[13px] font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
-            <History className="h-4 w-4" />
-            {t('common.recents')}
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
+            className="group mb-2 flex items-center justify-between pr-2 text-[13px] font-medium uppercase tracking-wide text-black/45 transition-colors hover:text-black dark:text-white/45 dark:hover:text-white"
+          >
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              {t('common.recents')}
+            </div>
+            <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isRecentsExpanded ? "rotate-90" : ""}`} />
+          </button>
 
-          <div className="flex flex-col gap-0.5 overflow-y-auto">
-            {recentChats.length === 0 ? (
-              <p className="px-4 py-3 text-[13px] text-black/35 dark:text-white/35">
-                {t('chat.empty_history')}
-              </p>
-            ) : (
-              recentChats.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                  onClick={() => void loadConversation(item.id, item.title)}
-                >
-                  <span className="block truncate text-[15px] font-medium">
-                    {item.title}
-                  </span>
-                  <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40 capitalize">
-                    {item.subtitle}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
+          {isRecentsExpanded && (
+            <div className="argus-scrollbar flex flex-1 flex-col gap-0.5 overflow-y-auto pr-2">
+              {historyItems.length === 0 ? (
+                <p className="px-4 py-3 text-[13px] text-black/35 dark:text-white/35">
+                  {t('chat.empty_history')}
+                </p>
+              ) : (
+                historyItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="group rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                    onClick={() => {
+                      if (item.type === "chat") void loadConversation(item.id, item.title);
+                      if (item.type === "strategies") setCurrentView("strategies");
+                      if (item.type === "collections") setCurrentView("collections");
+                    }}
+                  >
+                    <span className="block truncate text-[15px] font-medium">
+                      {item.title}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
+                      {formatRelativeDate(item.created_at)} · {t(`common.${item.type}`, item.type)}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-auto flex items-center gap-4 pt-4">
@@ -512,12 +563,12 @@ export default function ChatInterface() {
                             {t('chat.past_sessions')}
                             <ChevronRight className="h-4 w-4 -rotate-90" />
                           </button>
-                          {recentChats.length === 0 ? (
+                          {groupedHistory.chat.length === 0 ? (
                             <p className="px-6 py-4 text-[14px] text-black/40 dark:text-white/40 md:px-5">
                               {t('chat.no_past_sessions')}
                             </p>
                           ) : (
-                            recentChats.map((item) => (
+                            groupedHistory.chat.map((item) => (
                               <button
                                 key={item.id}
                                 type="button"

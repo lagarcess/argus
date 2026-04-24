@@ -691,44 +691,73 @@ def history(limit: int = Query(20, ge=1, le=100)) -> PaginatedHistory:
 @app.get("/api/v1/search", response_model=PaginatedSearch)
 def search(q: str, limit: int = Query(20, ge=1, le=100)) -> PaginatedSearch:
     query = q.lower()
-    items: list[SearchItem] = []
+    scored_items: list[tuple[int, SearchItem]] = []
+
+    # Helper to calculate score
+    def get_score(title: str, matched: str, pinned: bool) -> int:
+        score = 0
+        if pinned:
+            score += 1000
+        if query == title.lower():
+            score += 500
+        elif query in title.lower():
+            score += 100
+        if query in matched.lower():
+            score += 50
+        return score
+
     for conversation in store.conversations.values():
+        if conversation.deleted_at:
+            continue
         haystack = f"{conversation.title} {conversation.last_message_preview or ''}"
         if query in haystack.lower():
-            items.append(
-                SearchItem(
-                    type="chat",
-                    id=conversation.id,
-                    title=conversation.title,
-                    matched_text=conversation.last_message_preview or conversation.title,
-                    updated_at=conversation.updated_at,
-                )
+            item = SearchItem(
+                type="chat",
+                id=conversation.id,
+                title=conversation.title,
+                matched_text=conversation.last_message_preview or conversation.title,
+                updated_at=conversation.updated_at,
             )
+            score = get_score(conversation.title, item.matched_text, conversation.pinned)
+            scored_items.append((score, item))
+
     for strategy in store.strategies.values():
+        if strategy.deleted_at:
+            continue
         haystack = f"{strategy.name} {' '.join(strategy.symbols)} {strategy.template}"
         if query in haystack.lower():
-            items.append(
-                SearchItem(
-                    type="strategy",
-                    id=strategy.id,
-                    title=strategy.name,
-                    matched_text=", ".join(strategy.symbols),
-                    updated_at=strategy.updated_at,
-                )
+            item = SearchItem(
+                type="strategy",
+                id=strategy.id,
+                title=strategy.name,
+                matched_text=", ".join(strategy.symbols),
+                updated_at=strategy.updated_at,
             )
+            # Symbol exact match boost
+            symbol_boost = 200 if any(query == s.lower() for s in strategy.symbols) else 0
+            score = (
+                get_score(strategy.name, item.matched_text, strategy.pinned)
+                + symbol_boost
+            )
+            scored_items.append((score, item))
+
     for collection in store.collections.values():
+        if collection.deleted_at:
+            continue
         if query in collection.name.lower():
-            items.append(
-                SearchItem(
-                    type="collection",
-                    id=collection.id,
-                    title=collection.name,
-                    matched_text=collection.name,
-                    updated_at=collection.updated_at,
-                )
+            item = SearchItem(
+                type="collection",
+                id=collection.id,
+                title=collection.name,
+                matched_text=collection.name,
+                updated_at=collection.updated_at,
             )
-    items.sort(key=lambda item: item.updated_at, reverse=True)
-    return PaginatedSearch(items=items[:limit])
+            score = get_score(collection.name, item.matched_text, collection.pinned)
+            scored_items.append((score, item))
+
+    # Sort by score (desc), then updated_at (desc)
+    scored_items.sort(key=lambda x: (x[0], x[1].updated_at), reverse=True)
+    return PaginatedSearch(items=[item for _, item in scored_items[:limit]])
 
 
 def sse(event: str, payload: dict[str, Any]) -> str:
@@ -742,6 +771,14 @@ def chat_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),
 ):
+    # Streaming response headers for contract compliance
+    headers = {
+        "X-Request-Id": request.state.request_id,
+        "X-RateLimit-Limit": "200",
+        "X-RateLimit-Remaining": "199",
+        "X-RateLimit-Reset": "3600",
+        "X-Accel-Buffering": "no",  # Recommended in API contract section 12
+    }
     if supabase_gateway is not None:
         try:
             supabase_gateway.check_and_increment_usage(
@@ -828,7 +865,7 @@ def chat_stream(
     return StreamingResponse(
         events(),
         media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no"},
+        headers=headers,
     )
 
 

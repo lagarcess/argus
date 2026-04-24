@@ -159,10 +159,11 @@ export function formatRelativeDate(isoString: string): string {
 
   if (date >= todayStart) return "today";
   if (date >= yesterdayStart) return "yesterday";
+
   return date.toLocaleDateString("en-US", {
-    month: "short",
+    month: "long",
     day: "numeric",
-    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    year: "numeric",
   });
 }
 
