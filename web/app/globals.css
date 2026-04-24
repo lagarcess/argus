@@ -89,6 +89,57 @@ body {
   }
 }
 
+@keyframes argus_welcome_type {
+  from {
+    width: 0;
+  }
+  to {
+    width: 23ch;
+  }
+}
+
+@keyframes argus_welcome_caret {
+  0%,
+  49% {
+    border-color: var(--fg);
+  }
+  50%,
+  100% {
+    border-color: transparent;
+  }
+}
+
+.argus-welcome-typed {
+  display: inline-block;
+  width: 23ch;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 1px solid var(--fg);
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  background-size: 220% 100%;
+  background-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.7),
+    rgba(0, 0, 0, 1),
+    rgba(0, 0, 0, 0.7)
+  );
+  animation:
+    argus_welcome_sweep 3.2s ease-in-out infinite,
+    argus_welcome_type 2s steps(23, end) both,
+    argus_welcome_caret 750ms step-end infinite;
+}
+
+.dark .argus-welcome-typed {
+  background-image: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.7),
+    rgba(255, 255, 255, 1),
+    rgba(255, 255, 255, 0.7)
+  );
+}
+
 .argus-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;

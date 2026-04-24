@@ -1,6 +1,73 @@
 # Project Agents & Tools: Argus
 
-AI agent configuration registry for the Argus backtesting engine. This file serves as the primary index for skills, rules, and workflows used by all AI agents (both interactive and autonomous) working on the project.
+Argus is a chat-first AI investing idea validation platform.
+
+Users describe investing or trading ideas in natural language and Argus helps them understand, structure, simulate, and review how those ideas would have performed historically — without risking real capital.
+
+The conversation is the primary product surface.
+The backtesting engine is critical infrastructure.
+
+This file is the primary orientation guide for AI coding agents working in the repository.
+
+# 🛡️ Read These First (Mandatory)
+
+Before making code changes, agents must review these source-of-truth docs in this order:
+
+1. `docs/PRODUCT.md`
+   - Product truth, scope boundaries, user priorities, and the "Golden Path."
+2. `docs/ARCHITECTURE.md`
+   - System boundaries, stateful vs stateless responsibilities, service ownership, and deployment model.
+3. `docs/API_CONTRACT.md`
+   - Frontend/backend contract, endpoint shapes, request/response truth, and auth/profile behavior.
+4. `docs/DATA_MODEL.md`
+   - Persistence truth, entities, ownership rules, and RLS expectations.
+5. `.agent/designs/argus/DESIGN.md`
+   - Visual system, product UX rules, chat-first interaction design, and anti-patterns.
+
+> [!IMPORTANT]
+> If code contradicts these docs, assume the docs represent intended Alpha direction unless implementation constraints prove otherwise.
+
+# 🎯 Alpha Product Truth
+
+**Argus Alpha Priorities:**
+- Chat-first UX & AI-first onboarding
+- Strategy drafting through conversation
+- Simple, trustworthy backtests
+- Recents/history retrieval
+- Collections (organizational, not portfolios)
+- English + Spanish support
+- Fast iteration over feature breadth
+
+**Out of Scope for Alpha:**
+- Brokerage integrations & real money trading
+- Social feeds & institutional tools
+- Advanced portfolio analytics
+- Mixed-asset backtests (Equity + Crypto in one run)
+- Native mobile apps (PWA/Mobile-web only)
+
+# ⚙️ Canonical Current Constraints
+
+- **Same-Asset Simulations Only**: Runs must be either 100% Equity or 100% Crypto.
+- **Default Benchmarks**: Equity -> `SPY`, Crypto -> `BTC`.
+- **Logic**: Long-only, equal-weight multi-symbol runs.
+- **Limits**: Max 5 symbols per run.
+- **Localization**: Static UI must support English (`en`) and Spanish (`es-419`).
+- **Organization**: Collections may mix themes/assets; runs may not mix asset classes.
+
+# 🚀 Implementation Priority Order
+
+1. Happy-path user experience (The "Golden Path")
+2. API contract correctness
+3. Reliability / Trust (Accurate metrics & benchmarks)
+4. Mobile-friendly chat UX
+5. Performance (<3s backtests)
+6. Nice-to-have polish
+7. Future complexity
+
+> [!TIP]
+> If unsure, optimize for: *"Does this help a normal person test an investing idea faster?"*
+
+---
 
 ---
 
@@ -24,7 +91,7 @@ AI agent configuration registry for the Argus backtesting engine. This file serv
 | `numba-patterns/`                    | JIT compilation, warmup, pure-math constraints                              |
 | `backend-patterns/`                  | API-first design, sync execution, error responses, caching                  |
 | `testing-patterns/`                  | pytest, TDD workflow, coverage strategy, rate-limit tests                   |
-| `frontend-patterns/`                 | React/Next.js, Robinhood design system, component patterns, form validation |
+| `frontend-patterns/`                 | React/Next.js, Argus design system, component patterns, form validation    |
 | `security-review/`                   | RLS policies, JWT handling, Supabase auth, Alpaca secrets                   |
 | `supabase/`                          | Supabase CLI, Auth, Edge Functions, and migration workflows                 |
 | `supabase-postgres-best-practices/`  | Performance optimization, GIN indexing, and RLS bottlenecks                 |
@@ -41,7 +108,7 @@ AI agent configuration registry for the Argus backtesting engine. This file serv
 | `stitch-loop/`                       | Iterative Baton-Passing loop for rapid UI development                       |
 | `rag-architect/`                    | RAG/LLM agent architecture, DeepSeek R1/Qwen integration                    |
 | `database-schema-designer/`         | Precision SQL migrations, RLS policies, and Phase C accounting              |
-| `apple-hig-expert/`                  | Premium UI/UX aesthetics, Apple/Robinhood-grade physics                     |
+| `apple-hig-expert/`                  | Premium UI/UX aesthetics, Argus/Apple-grade physics                         |
 | `skill-security-auditor/`           | Automated security gating for agent skills and external plugins               |
 | `playwright-pro/`                   | Advanced E2E testing framework, target 63% coverage                          |
 | `senior-architect/`                 | Principal-level system guidance and Institutional-grade reliability         |
@@ -104,9 +171,13 @@ Usage:
 
 ## 📖 Documentation
 
-**API Contract:** [`docs/api/api_contract.md`](./docs/api/api_contract.md)
-**OpenAPI Spec:** [`docs/api/openapi.yaml`](./docs/api/openapi.yaml)
-**Scheduled Framework:** [`.agent/.jules/README.md`](./.agent/.jules/README.md)
+- **Product Truth**: [`docs/PRODUCT.md`](./docs/PRODUCT.md)
+- **Architecture**: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+- **API Contract**: [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md)
+- **Data Model**: [`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md)
+- **Design System**: [`.agent/designs/argus/DESIGN.md`](./.agent/designs/argus/DESIGN.md)
+- **OpenAPI Spec**: [`docs/api/openapi.yaml`](./docs/api/openapi.yaml)
+- **Scheduled Framework**: [`.agent/.jules/README.md`](./.agent/.jules/README.md)
 
 ### 🛡️ Developer Identity: Mock Auth Mode
 To bypass the Supabase OAuth wall in development environments (e.g., remote VMs), set the following environment variable:
@@ -134,3 +205,40 @@ To bypass the Supabase OAuth wall in development environments (e.g., remote VMs)
 9. **Critical Findings Only**: Only PR/Journal critical improvements (security bugs, >20% perf gain).
 10. **Postgres Performance**: All SQL/RLS must be audited against `postgres-best-practices`.
 11. **Branch Sync & Goal Realignment**: Every agent session must fetch/rebase `main` and re-verify original mission against any architectural drift before completion.
+
+---
+
+# 🧠 Agent Decision Rules
+
+Before implementing any feature, ask:
+1. Is this aligned with `PRODUCT.md`?
+2. Is this compatible with `API_CONTRACT.md`?
+3. Does `DATA_MODEL.md` already define the source of truth?
+4. Does this preserve `ARCHITECTURE.md` boundaries?
+5. Does this fit `DESIGN.md` chat-first UX?
+6. Is this simpler than the alternative?
+
+*If the answer to any of these is "No," pause and redesign.*
+
+# 🎨 Frontend Guidance
+- Prioritize mobile-friendly responsive chat UX.
+- Use progressive disclosure to handle complexity.
+- Avoid cluttered dashboards and dense data tables by default.
+- Ensure all static UI strings are translatable (i18next).
+
+# 🛠️ Backend Guidance
+- Keep request handling stateless and reproducible.
+- Treat Supabase as the canonical persistence layer.
+- Enforce contract-first changes and strict rate limits.
+- Provide graceful, RFC 9457-compliant error responses.
+
+# ⚖️ If Docs Conflict
+Priority order of authority:
+1. `PRODUCT.md`
+2. `API_CONTRACT.md`
+3. `DATA_MODEL.md`
+4. `ARCHITECTURE.md`
+5. `DESIGN.md`
+6. Existing code
+
+*Argus should feel modern, intelligent, simple, trustworthy, and fast — never intimidating.*

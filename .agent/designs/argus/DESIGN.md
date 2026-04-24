@@ -2,7 +2,7 @@
 
 ## 1. Visual Theme & Atmosphere
 
-Argus's website is fintech confidence distilled into pixels — a design system that communicates "your money is in capable hands" through massive typography, generous whitespace, and a disciplined neutral palette. The visual language is built on Space Grotesk, a geometric grotesque that creates billboard-scale headlines at 136px with weight 500 and aggressive negative tracking (-2.72px). This isn't subtle branding; it's fintech at stadium scale.
+Argus's design system communicates that investing ideas are handled with clarity, care, and confidence through massive typography, generous whitespace, and a disciplined neutral palette. This system is designed for risk-free idea testing, ensuring the user feels empowered rather than intimidated. The visual language is built on Space Grotesk, a geometric grotesque that creates billboard-scale headlines at 136px with weight 500 and aggressive negative tracking (-2.72px). This isn't subtle branding; it's clarity at stadium scale.
 
 The color system is built on a comprehensive `--rui-*` (Argus UI) token architecture with semantic naming for every state: danger (`#e23b4a`), warning (`#ec7e00`), teal (`#00a87e`), blue (`#494fdf`), deep-pink (`#e61e49`), and more. But the marketing surface itself is remarkably restrained — near-black (`#191c1f`) and pure white (`#ffffff`) dominate, with the colorful semantic tokens reserved for the product interface, not the marketing page.
 
@@ -29,17 +29,16 @@ What distinguishes Argus is its pill-everything button system. Every button uses
 - **Action Blue** (`#4f55f1`): `--rui-color-action-photo-header-text`, header accent
 - **Blue Text** (`#376cd5`): `--website-color-blue-text`, link blue
 
-### Semantic
-- **Danger Red** (`#e23b4a`): `--rui-color-danger`, error/destructive
-- **Deep Pink** (`#e61e49`): `--rui-color-deep-pink`, critical accent
-- **Warning Orange** (`#ec7e00`): `--rui-color-warning`, warning states
-- **Yellow** (`#b09000`): `--rui-color-yellow`, attention
-- **Teal** (`#00a87e`): `--rui-color-teal`, success/positive
-- **Light Green** (`#428619`): `--rui-color-light-green`, secondary success
-- **Green Text** (`#006400`): `--website-color-green-text`, green text
-- **Light Blue** (`#007bc2`): `--rui-color-light-blue`, informational
-- **Brown** (`#936d62`): `--rui-color-brown`, warm neutral accent
-- **Red Text** (`#8b0000`): `--website-color-red-text`, dark red text
+### Semantic (Muted Alpha Palette)
+Argus avoids "casino-terminal" vibrancy. Semantic tones are desaturated to feel educational and premium.
+
+- **Muted Rose** (`#d66d75`): `--rui-color-danger`, negative states
+- **Clay Red** (`#b85c5c`): `--rui-color-clay`, alternate negative
+- **Muted Teal** (`#5ba897`): `--rui-color-teal`, positive states
+- **Emerald Mist** (`#70a38d`): `--rui-color-success`, secondary positive
+- **Soft Blue** (`#7da0ca`): `--rui-color-info`, informational/neutral
+- **Slate Indigo** (`#5a677d`): `--rui-color-neutral`, baseline/neutral
+- **Dusty Gold** (`#c2a44d`): `--rui-color-warning`, attention/warning
 
 ### Neutral Scale
 - **Mid Slate** (`#505a63`): Secondary text
@@ -171,16 +170,117 @@ _Design targets below are intentional for this system; if implementation keeps T
 - Dark: Argus Dark (`#191c1f`)
 - Light: White (`#ffffff`)
 - Surface: Light (`#f4f4f4`)
-- Blue: Argus Blue (`#494fdf`)
-- Danger: Red (`#e23b4a`)
-- Success: Teal (`#00a87e`)
+- Positive: Muted Teal (`#5ba897`)
+- Negative: Muted Rose (`#d66d75`)
+- Neutral: Slate Indigo (`#5a677d`)
 
 ### Example Component Prompts
 - "Create a hero: white background. Headline at 136px Space Grotesk weight 500, line-height 1.00, letter-spacing -2.72px, #191c1f text. Dark pill CTA (#191c1f, 9999px, 14px 32px). Outlined pill secondary (transparent, 2px solid #191c1f)."
 - "Build a pill button: #191c1f background, white text, 9999px radius, 14px 32px padding, 20px Space Grotesk weight 500. Hover: opacity 0.85."
 
 ### Iteration Guide
-1. Space Grotesk 500 for headings — never bold
-2. All buttons are pills (9999px) with generous padding
-3. Zero shadows — flat is the Argus identity
-4. Near-black + white for marketing, semantic colors for product
+1. Space Grotesk 500 for headings — never bold.
+2. All buttons are pills (9999px) with visible labels.
+3. Zero shadows — flat is the Argus identity.
+4. Muted semantic colors — never terminal neon.
+5. Calm motion and status language for trust.
+
+## 10. Alpha Product UX Principles
+
+- **Chat is the primary surface**: The product lives in the conversation.
+- **Not a Dashboard**: Argus should never feel like a dashboard-first backtesting tool.
+- **Conversational Progressive Disclosure**: Use AI to guide the user through complexity rather than presenting dense configuration screens.
+- **Trust Through Honesty**: Result cards must be simple, trustworthy, and explanation-ready.
+- **Frictionless Revisit**: Every screen should reduce the distance between a user and their next (or prior) idea.
+- **Anti-Clutter**: Avoid dense tables, multi-tab parameter overload, and "trading terminal" noise.
+
+## 11. Primary Chat Interface
+
+- **Persistent Input**: The chat input must remain highly visible and ergonomic (especially on mobile).
+- **Starter Prompts**: Displayed as polished, high-contrast chips or cards to reduce "blank page" friction.
+- **Streaming States**: AI responses support real-time token streaming to feel alive.
+- **Calm Progress States**: When simulating, use human-centric status language and subtle motion (pulse dots, progress shimmers).
+  - *Treatments*: "Understanding your idea" → "Fetching market data" → "Running simulation" → "Preparing results".
+- **Inline Results**: Backtest result cards appear directly in the flow of conversation.
+- **Minimal Actions**: Follow-up actions should be clear but few (e.g., "Save Strategy", "Add to Collection").
+
+## 12. Result Card Design
+
+Result cards are the primary unit of "validation." They must be glanceable and honest.
+- **No Charts (Alpha)**: Avoid embedded charts in conversation cards to maintain speed and mobile readability.
+- **Fixed Metrics**: Show beginner-friendly metrics by default (e.g., Total Return, Win Rate).
+- **Structure**: Title, date range display, status pill, metrics rows, assumptions footer, and CTAs.
+- **Assumptions Footer**: Must be visible but secondary.
+  - *Example*: `Long-only • Equal weight • No fees/slippage • Benchmark: SPY`
+- **Visual Distinction**: Assumptions should be styled with muted slate typography to distinguish them from the "Result" without feeling like a warning.
+
+## 13. Strategy Surface Design
+
+The strategies surface is for rapid comparison and organization.
+- **Expandable Cards**: Use a "glance-first" card that expands to show symbol-level rows.
+- **Glanceable Metrics**: Support user-selected metrics from supported presets (Configurable rows).
+- **Headline Hints**: Use simple text labels like "Best performer" or "Needs review" to guide the eye.
+- **Binary Winners/Losers**: Use muted teal/rose for symbol rows to identify performers without terminal-style glare.
+
+## 14. Recents, Collections, and Search
+
+- **Recents Feed**: A mixed chronological feed (Chats, Strategies, Collections, Runs) that serves as the "Global Context."
+- **Collections**: Lightweight organizational theme groupings (e.g., "Crypto Dips", "Dividend Ideas"). Not for batch execution or aggregate performance in Alpha.
+- **Fuzzy Search UI**: Global omni-search should support "Fuzzy Human Memory" with suggestion chips:
+  - *Suggestions*: `Last week`, `Tesla ideas`, `Crypto`, `Pinned`, `Recent chats`.
+
+## 15. Settings and Feedback UX
+
+- **Core Settings**: Visible support for Language, Theme, Feedback, Account, Recently Deleted, and Archived Chats.
+- **Feature Guarding**: Notifications and Subscriptions are hidden/flagged for Alpha.
+- **Accessible Feedback**: Simple conversational or form-based entry accessible from the settings surface.
+
+## 16. Language & Localization UX
+
+- **Supported Languages**: English (`en`) and Spanish (`es-419`).
+- **Standardized i18n**: All static UI strings must be translatable.
+- **Language Selection**: Should feel premium and be accessible from the onboarding flow and settings.
+- **Consistency**: The AI response language must always mirror the UI language preference.
+- **Locale Logic**: Date, number, and currency formatting must adapt to the `locale` token.
+
+## 17. Mobile & Web Behavior
+
+- **Accidental Zoom Prevention**: All input fields (text, select, textarea) must use a **Minimum 16px Font Size** to prevent iOS auto-zoom.
+- **Generous Tap Targets**: All interactive elements (buttons, chips, nav) must meet the **44px minimum** hit area.
+- **Web/PWA Focus**: Avoid "Desktop-only" dashboard patterns. Layouts should stack gracefully for narrow screens.
+
+## 18. Product Anti-Patterns
+
+Argus is **NOT**:
+- **Spreadsheet Software**: No dense data grids or cell-based parameter inputs.
+- **Broker Terminal**: No aggressive red/green neon or complex multi-pane layouts.
+- **Toy Trading Game**: No "gamified" badges or misleading profit claims.
+- **Multi-form Wizard**: No rigid, step-by-step forms. Prefer conversational gathering of intent.
+
+## 19. Accessibility Baseline
+
+- **Visible Focus States**: `0 0 0 0.125rem` rings for all keyboard navigability.
+- **Non-Color Meaning**: Positive/Negative metrics must be paired with labels, icons, or clear +/- text signs.
+- **Accessible Labels**: All icon-only controls (e.g., Close X, Search) must have visible or ARIA labels.
+
+## 20. Metrics Visual Language
+
+- **Muted Tones**: Use the Semantic Muted Palette (`#5ba897`, `#d66d75`, etc.).
+- **Educational Intent**: Metrics should feel like data to learn from, not an alarm to react to.
+- **No Alarmist Motion**: Avoid flashing or rapid updates. Use calm shimmers for loading states.
+
+## 21. Motion & Continuity
+
+- **Motion Principle**: Argus motion should feel **calm, informative, and never frantic**.
+- **Transitions**: Use simple fades and slide-ups for cards to maintain the "Flat" identity.
+- **Premium Loading**: The "Simulation" state is a trust-building moment. Use the defined status language carefully.
+
+---
+
+## 22. Design Decision Filter
+
+When designing any Argus surface, ask:
+
+> *Does this make it easier for a normal person to understand, test, or revisit an investing idea through conversation?*
+
+If not, it likely should wait.
