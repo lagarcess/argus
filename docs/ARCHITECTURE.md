@@ -477,7 +477,7 @@ Simple, scalable, and practical Alpha hosting.
 - **Database/Auth**: Supabase (Postgres + Auth).
 - **Workers**: Initially bundled with backend service; split into dedicated Execution Workers later.
 
-# 18. Failure Handling Standards
+# 19. Failure Handling Standards
 
 ## AI Failure
 
@@ -495,7 +495,7 @@ Retry or explain temporary issue.
 
 Never leave user confused.
 
-# 19. Implementation Dependency Order
+# 20. Implementation Dependency Order
 
 ### Layer 1: Truth Layer
 - `PRODUCT.md`
@@ -526,7 +526,7 @@ Never leave user confused.
 - Feedback
 - Feature flags
 
-# 20. Architecture Decision Filter
+# 21. Architecture Decision Filter
 
 When choosing any technical path, ask:
 

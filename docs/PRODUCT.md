@@ -436,8 +436,6 @@ Every user session should feel:
 - helpful
 - confidence-building
 
-- deceptive
-
 # 18. Product Anti-Patterns
 
 Argus should avoid:
@@ -459,7 +457,7 @@ Example: *Long-only • Equal weight • No fees/slippage • Benchmark: SPY*
 
 ---
 
-# 18. Golden Path (Alpha)
+# 20. Golden Path (Alpha)
 
 A user opens Argus and says:
 
@@ -478,7 +476,7 @@ If this feels magical and trustworthy, the MVP is working.
 
 ---
 
-# 19. Product Decision Filter
+# 21. Product Decision Filter
 
 When evaluating any feature, ask:
 
@@ -488,7 +486,7 @@ If no, it likely should wait.
 
 ---
 
-# 20. Current Strategic Focus
+# 22. Current Strategic Focus
 
 We are moving from prototype polish to real product utility.
 
