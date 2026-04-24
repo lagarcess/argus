@@ -1,11 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Argus",
@@ -23,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${spaceGrotesk.variable} antialiased h-full`}>
+    <html lang="en" suppressHydrationWarning className="antialiased h-full">
       <body className="min-h-full flex flex-col font-sans transition-colors duration-200">
         <ThemeProvider
           attribute="class"

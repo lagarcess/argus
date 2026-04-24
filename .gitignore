@@ -67,6 +67,7 @@ node_modules/
 .next/
 tsconfig.tsbuildinfo
 web/out/
+web/temp-next-build*/
 
 # Playwright / Testing
 playwright-report/

@@ -6,7 +6,7 @@ import { Settings, Sun, Moon, Monitor, Search, Check } from "lucide-react";
 
 const LANGUAGES = [
   { code: "en", name: "English", translation: "English" },
-  { code: "es-LA", name: "Español", translation: "Spanish" }
+  { code: "es-419", name: "Espanol", translation: "Spanish" }
 ];
 
 export function SettingsMenu() {
@@ -21,7 +21,7 @@ export function SettingsMenu() {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
 
     function handleClickOutside(event: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
@@ -29,7 +29,10 @@ export function SettingsMenu() {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   // Prevent background scrolling when modal is open
