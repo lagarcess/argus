@@ -1,4 +1,0 @@
-# file: /app/src/argus/analysis/indicators.py
-# hypothesis_version: 6.151.12
-
-[0.0, 1.0, 2.0, 3.0, 100.0, 'ATR', 'ATR_14', 'ATRr_14', 'CHANDELIER_EXIT_LONG', 'MFI_14', 'VOL', 'close', 'ema', 'high', 'low', 'open', 'volume']

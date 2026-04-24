@@ -1,4 +1,0 @@
-# file: /app/src/argus/market/data_provider.py
-# hypothesis_version: 6.151.12
-
-[1.0, 2.0, 365, 900, '.gemini/cache', 'Day', 'Hour', 'Min', 'Month', 'Week', 'adjustment', 'asof', 'crypto_client', 'd', 'day', 'end', 'feed', 'h', 'hour', 'limit', 'm', 'min', 'minute', 'mo', 'month', 'page_token', 'sort', 'start', 'stock_client', 'symbol_or_symbols', 'timeframe', 'w', 'week']

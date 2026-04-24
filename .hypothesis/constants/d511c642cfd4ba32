@@ -1,4 +1,0 @@
-# file: /app/src/argus/analysis/structural.py
-# hypothesis_version: 6.151.12
-
-[0.0, 0.05, 1.0, 4.0, 95.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 105.0, 106.0, 108.0, 'PEAK', 'VALLEY', 'close', 'high', 'index', 'low', 'pivot_type', 'price', 'timestamp']

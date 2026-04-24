@@ -1,4 +1,0 @@
-# file: /app/src/argus/domain/quotas.py
-# hypothesis_version: 6.151.12
-
-[100, 365, 1095, 1825, 2555, 'daily_lookback', 'free', 'intraday_lookback', 'max', 'max_symbols', 'plus', 'pro']

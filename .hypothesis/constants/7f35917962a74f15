@@ -1,4 +1,0 @@
-# file: /app/src/argus/domain/persistence.py
-# hypothesis_version: 6.151.12
-
-['*', '+', 'Unknown Strategy', 'calmar_ratio', 'completed', 'config_snapshot', 'created_at', 'end_date', 'entry_criteria', 'equity_curve', 'exact', 'executed_at', 'exit_criteria', 'expectancy', 'full_result', 'id', 'indicators_config', 'max_drawdown_pct', 'name', 'null', 'pattern_breakdown', 'patterns', 'profit_factor', 'reality_gap_metrics', 'sharpe_ratio', 'simulations', 'sortino_ratio', 'start_date', 'status', 'strategies', 'strategy_id', 'strategy_name', 'summary', 'symbols', 'timeframe', 'total_return_pct', 'trades', 'user_id', 'utf-8', 'win_rate']

@@ -1,4 +1,0 @@
-# file: /app/src/argus/api/auth.py
-# hypothesis_version: 6.151.12
-
-[300, 999999, '*', '+00:00', '/settings', '100', '99', 'HS256', 'PROD', 'QUOTA_EXCEEDED', 'Token has expired', 'X-RateLimit-Limit', 'X-RateLimit-Reset', 'Z', 'authenticated', 'backtest_quota', 'dark', 'details', 'dev-anon-user', 'dev@argus.local', 'email', 'en', 'error', 'feature_flags', 'free', 'id', 'is_admin', 'lang', 'last_quota_reset', 'max', 'message', 'multi_asset_beta', 'next_reset', 'profiles', 'remaining_quota', 'role', 'sb-access-token', 'sub', 'subscription_tier', 'theme', 'timestamp', 'upgrade_url', 'user', 'verify_aud', 'verify_signature']
