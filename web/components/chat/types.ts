@@ -14,6 +14,8 @@ export type StrategyResultPayload = {
   period: string;
   benchmarkNote?: string;
   metrics: StrategyResultMetric[];
+  runId?: string;
+  strategyId?: string | null;
 };
 
 export type Message = {

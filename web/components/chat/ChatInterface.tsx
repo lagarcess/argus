@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
-  FolderPlus,
   History,
   Menu,
   MessageSquarePlus,
@@ -13,13 +12,24 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { createConversation, resultCardFromRun, streamChatMessage } from "@/lib/argus-api";
+import {
+  createConversation,
+  getConversationMessages,
+  listHistory,
+  resultCardFromRun,
+  streamChatMessage,
+  type HistoryItem,
+  type BacktestRun,
+} from "@/lib/argus-api";
+import CollectionPicker from "./CollectionPicker";
 import CollectionsView from "../views/CollectionsView";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
-import { ChatActionOption, Message } from "./types";
+import { type ChatActionOption, type Message } from "./types";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 type View = "chat" | "strategies" | "collections" | "settings";
 
@@ -41,6 +51,13 @@ const STARTER_ACTIONS: ChatActionOption[] = [
   },
 ];
 
+const STATUS_LABELS: Record<string, string> = {
+  extracting_strategy: "Understanding your idea",
+  running_backtest: "Running simulation",
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -52,7 +69,42 @@ export default function ChatInterface() {
   >("none");
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
+    runId: string;
+    strategyId: string | null;
+    strategyName: string;
+    symbols: string[];
+    template: string;
+    assetClass: "equity" | "crypto";
+  } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // ── Toast helper ───────────────────────────────────────────────────────────
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // ── History ────────────────────────────────────────────────────────────────
+
+  /** Imperative refresh — safe to call from event handlers */
+  const refreshHistory = () => {
+    listHistory(30)
+      .then(({ items }) => setHistoryItems(items))
+      .catch(() => undefined);
+  };
+
+  useEffect(() => {
+    listHistory(30)
+      .then(({ items }) => setHistoryItems(items))
+      .catch(() => undefined);
+  }, []);
+
+  // ── Init conversation ──────────────────────────────────────────────────────
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +124,7 @@ export default function ChatInterface() {
         ]);
       })
       .catch(() => {
+        if (cancelled) return;
         setMessages([
           {
             id: "offline",
@@ -91,6 +144,52 @@ export default function ChatInterface() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, streamStatus]);
 
+  // ── Load existing conversation ─────────────────────────────────────────────
+
+  const loadConversation = async (convId: string, convTitle: string) => {
+    setIsSidebarOpen(false);
+    closeChatOptions();
+    setCurrentView("chat");
+    setConversationId(convId);
+    setMessages([]);
+    setStreamStatus("Loading conversation…");
+    try {
+      const { items } = await getConversationMessages(convId, 50);
+      const loaded: Message[] = items.map((m) => ({
+        id: m.id,
+        role: m.role === "user" ? "user" : "ai",
+        kind: "text",
+        content: m.content,
+      }));
+      setMessages(
+        loaded.length > 0
+          ? loaded
+          : [
+              {
+                id: "resume-empty",
+                role: "ai",
+                kind: "text",
+                content: `Resuming "${convTitle}". What would you like to explore next?`,
+                actions: STARTER_ACTIONS,
+              },
+            ],
+      );
+    } catch {
+      setMessages([
+        {
+          id: "resume-error",
+          role: "ai",
+          kind: "text",
+          content: "Could not load that conversation. Try again.",
+        },
+      ]);
+    } finally {
+      setStreamStatus(null);
+    }
+  };
+
+  // ── Start new chat ─────────────────────────────────────────────────────────
+
   const startNewChat = async () => {
     const { conversation } = await createConversation();
     setConversationId(conversation.id);
@@ -104,66 +203,60 @@ export default function ChatInterface() {
         actions: STARTER_ACTIONS,
       },
     ]);
+    void fetchHistory();
   };
+
+  // ── Send message ───────────────────────────────────────────────────────────
 
   const handleSend = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || !conversationId) return;
 
-    const userMessage: Message = {
+    const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
       kind: "text",
       content: trimmed,
     };
     const assistantId = crypto.randomUUID();
-    setMessages((previous) => [
-      ...previous.map((message) => ({ ...message, actions: undefined })),
-      userMessage,
-      {
-        id: assistantId,
-        role: "ai",
-        kind: "text",
-        content: "",
-      },
+
+    setMessages((prev) => [
+      ...prev.map((m) => ({ ...m, actions: undefined })),
+      userMsg,
+      { id: assistantId, role: "ai", kind: "text", content: "" },
     ]);
     setStreamStatus("Understanding your idea");
 
     try {
       await streamChatMessage(conversationId, trimmed, (event) => {
         if (event.event === "status") {
-          const labels: Record<string, string> = {
-            extracting_strategy: "Understanding your idea",
-            running_backtest: "Running simulation",
-          };
-          setStreamStatus(labels[event.data.status] ?? "Preparing results");
+          setStreamStatus(STATUS_LABELS[event.data.status] ?? "Preparing results");
         }
         if (event.event === "token") {
-          setMessages((previous) =>
-            previous.map((message) =>
-              message.id === assistantId
-                ? {
-                    ...message,
-                    content: `${message.content ?? ""}${event.data.text}`,
-                  }
-                : message,
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+                : m,
             ),
           );
         }
         if (event.event === "result") {
-          setMessages((previous) =>
-            previous.map((message) =>
-              message.id === assistantId
+          const run = event.data.run as BacktestRun;
+          const card = resultCardFromRun(run);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
                 ? {
-                    ...message,
+                    ...m,
                     kind: "strategy_result",
                     content: undefined,
-                    result: resultCardFromRun(event.data.run),
+                    result: card,
                     actions: [
                       {
                         id: "add-to-collection",
-                        label: "Add strategy to collection",
-                        value: "/action:add-to-collection",
+                        label: "Add to collection",
+                        value: `/action:add-to-collection:${run.id}:${run.strategy_id ?? ""}:${run.symbols.join(",")}:${run.asset_class}`,
                       },
                       {
                         id: "try-new",
@@ -172,59 +265,82 @@ export default function ChatInterface() {
                       },
                     ],
                   }
-                : message,
+                : m,
             ),
           );
         }
         if (event.event === "done") {
           setStreamStatus(null);
+          refreshHistory();
         }
       });
-    } catch {
+    } catch (err: unknown) {
       setStreamStatus(null);
-      setMessages((previous) =>
-        previous.map((message) =>
-          message.id === assistantId
+      const status = (err as { status?: number }).status;
+      const isRateLimit = status === 429;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
             ? {
-                ...message,
-                content:
-                  "I could not complete that simulation. Check that the API is running and try again.",
+                ...m,
+                content: isRateLimit
+                  ? "You've reached your request limit. Please wait a moment and try again."
+                  : "I could not complete that simulation. Check that the API is running and try again.",
               }
-            : message,
+            : m,
         ),
       );
     }
   };
+
+  // ── Action routing ─────────────────────────────────────────────────────────
 
   const handleAction = (value: string) => {
     if (value === "/action:new-chat") {
       void startNewChat();
       return;
     }
-    if (value === "/action:add-to-collection") {
-      setCurrentView("collections");
+    if (value.startsWith("/action:add-to-collection:")) {
+      // Format: /action:add-to-collection:<runId>:<strategyId>:<symbols>:<assetClass>
+      const parts = value.split(":");
+      const runId = parts[2];
+      const strategyId = parts[3] || null;
+      const symbols = (parts[4] ?? "").split(",").filter(Boolean);
+      const assetClass = (parts[5] ?? "equity") as "equity" | "crypto";
+      // Find the result card title from messages for strategy name
+      const resultMsg = messages.find(
+        (m) => m.kind === "strategy_result" && m.result,
+      );
+      const strategyName = resultMsg?.result?.strategyName ?? "My strategy";
+      setCollectionPickerTarget({
+        runId,
+        strategyId,
+        strategyName,
+        symbols,
+        template: "rsi_mean_reversion",
+        assetClass,
+      });
       return;
     }
     void handleSend(value);
   };
+
+  // ── Chat options helpers ───────────────────────────────────────────────────
 
   const closeChatOptions = () => {
     setShowChatOptions(false);
     setActiveChatOptionsPanel("none");
   };
 
-  const openNewChatFromOptions = () => {
-    closeChatOptions();
-    void startNewChat();
-  };
+  // ── Recent chats (chat-type history items only) ───────────────────────────
 
-  const openCollectionsFromOptions = () => {
-    closeChatOptions();
-    setCurrentView("collections");
-  };
+  const recentChats = historyItems.filter((h) => h.type === "chat").slice(0, 8);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white">
+      {/* ── Desktop sidebar ── */}
       <aside className="absolute inset-y-0 left-0 z-0 flex w-full flex-col px-6 pb-8 pt-12 md:w-[320px]">
         <div className="mb-10 flex items-center justify-between">
           <h1 className="text-[26px] font-medium tracking-tight">argus</h1>
@@ -241,20 +357,14 @@ export default function ChatInterface() {
         <nav className="mb-8 flex flex-col gap-3">
           <button
             type="button"
-            onClick={() => {
-              setCurrentView("collections");
-              setIsSidebarOpen(false);
-            }}
+            onClick={() => { setCurrentView("collections"); setIsSidebarOpen(false); }}
             className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
           >
             Collections
           </button>
           <button
             type="button"
-            onClick={() => {
-              setCurrentView("strategies");
-              setIsSidebarOpen(false);
-            }}
+            onClick={() => { setCurrentView("strategies"); setIsSidebarOpen(false); }}
             className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
           >
             Strategies
@@ -266,39 +376,36 @@ export default function ChatInterface() {
             <History className="h-4 w-4" />
             Recents
           </div>
-          <button
-            type="button"
-            className="rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <span className="block truncate text-[15px] font-medium">
-              Tesla dip idea
-            </span>
-            <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
-              today - Chat
-            </span>
-          </button>
-          <button
-            type="button"
-            className="rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <span className="block truncate text-[15px] font-medium">
-              Crypto momentum
-            </span>
-            <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
-              yesterday - Run
-            </span>
-          </button>
+
+          <div className="flex flex-col gap-0.5 overflow-y-auto">
+            {recentChats.length === 0 ? (
+              <p className="px-4 py-3 text-[13px] text-black/35 dark:text-white/35">
+                Your past chats will appear here.
+              </p>
+            ) : (
+              recentChats.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                  onClick={() => void loadConversation(item.id, item.title)}
+                >
+                  <span className="block truncate text-[15px] font-medium">
+                    {item.title}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40 capitalize">
+                    {item.subtitle}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="mt-auto flex items-center gap-4 pt-4">
           <button
             type="button"
-            onClick={() => {
-              setCurrentView("settings");
-              setIsSidebarOpen(false);
-            }}
+            onClick={() => { setCurrentView("settings"); setIsSidebarOpen(false); }}
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
             aria-label="Settings"
           >
@@ -309,7 +416,7 @@ export default function ChatInterface() {
             <input
               type="text"
               value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
+              onChange={(e) => setSearchText(e.target.value)}
               placeholder="Search"
               className="h-[52px] w-full rounded-full border border-black/10 bg-white/50 pl-12 pr-4 text-[16px] outline-none focus:bg-white focus:ring-2 focus:ring-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:focus:bg-[#1f2225] dark:focus:ring-white/5"
             />
@@ -317,36 +424,36 @@ export default function ChatInterface() {
         </div>
       </aside>
 
+      {/* ── Main panel ── */}
       <section
         className={`absolute inset-0 z-10 flex h-full w-full flex-col overflow-hidden bg-[#f9f9f9] transition-all duration-500 dark:bg-[#141517] ${
           isSidebarOpen
             ? "translate-x-[75%] scale-[0.93] rounded-[32px] md:translate-x-[320px]"
             : "translate-x-0 scale-100 rounded-none"
         }`}
-        onClick={() => {
-          if (isSidebarOpen) setIsSidebarOpen(false);
-        }}
+        onClick={() => { if (isSidebarOpen) setIsSidebarOpen(false); }}
       >
+        {/* ── Chat view ── */}
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-3xl flex-col">
+            {/* Header */}
             <header className="absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between px-4 backdrop-blur-[8px]">
               <button
                 type="button"
-                onClick={() => setIsSidebarOpen((open) => !open)}
+                onClick={() => setIsSidebarOpen((o) => !o)}
                 className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
                 aria-label="Open menu"
               >
                 <Menu className="h-5 w-5" />
               </button>
               <h1 className="text-[16px] font-medium tracking-tight">argus</h1>
+
+              {/* Chat options menu */}
               <div className="relative z-30">
                 <button
                   type="button"
                   onClick={() => {
-                    if (showChatOptions) {
-                      closeChatOptions();
-                      return;
-                    }
+                    if (showChatOptions) { closeChatOptions(); return; }
                     setShowChatOptions(true);
                   }}
                   className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
@@ -370,7 +477,7 @@ export default function ChatInterface() {
                         <div>
                           <button
                             type="button"
-                            onClick={openNewChatFromOptions}
+                            onClick={() => { closeChatOptions(); void startNewChat(); }}
                             className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                           >
                             <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
@@ -378,29 +485,12 @@ export default function ChatInterface() {
                           </button>
                           <button
                             type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setActiveChatOptionsPanel("history");
-                            }}
+                            onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
                             className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                           >
                             <span className="flex items-center gap-4">
                               <History className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
                               View history
-                            </span>
-                            <ChevronRight className="h-5 w-5 text-black/40 transition-transform group-hover:translate-x-0.5 dark:text-white/40 md:h-4 md:w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setActiveChatOptionsPanel("collection");
-                            }}
-                            className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <span className="flex items-center gap-4">
-                              <FolderPlus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                              Add to collection
                             </span>
                             <ChevronRight className="h-5 w-5 text-black/40 transition-transform group-hover:translate-x-0.5 dark:text-white/40 md:h-4 md:w-4" />
                           </button>
@@ -426,51 +516,27 @@ export default function ChatInterface() {
                             Past sessions
                             <ChevronRight className="h-4 w-4 -rotate-90" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={closeChatOptions}
-                            className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
-                          >
-                            <span className="truncate text-[15px] font-medium">
-                              Tesla dip idea
-                            </span>
-                            <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">
-                              Today - Chat
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={closeChatOptions}
-                            className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
-                          >
-                            <span className="truncate text-[15px] font-medium">
-                              Crypto momentum
-                            </span>
-                            <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">
-                              Yesterday - Run
-                            </span>
-                          </button>
-                        </div>
-                      )}
-
-                      {activeChatOptionsPanel === "collection" && (
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => setActiveChatOptionsPanel("none")}
-                            className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium uppercase text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
-                          >
-                            Collections
-                            <ChevronRight className="h-4 w-4 -rotate-90" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={openCollectionsFromOptions}
-                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <FolderPlus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            Open collections
-                          </button>
+                          {recentChats.length === 0 ? (
+                            <p className="px-6 py-4 text-[14px] text-black/40 dark:text-white/40 md:px-5">
+                              No past sessions yet.
+                            </p>
+                          ) : (
+                            recentChats.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => { closeChatOptions(); void loadConversation(item.id, item.title); }}
+                                className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
+                              >
+                                <span className="truncate text-[15px] font-medium">
+                                  {item.title}
+                                </span>
+                                <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45 capitalize">
+                                  {item.subtitle}
+                                </span>
+                              </button>
+                            ))
+                          )}
                         </div>
                       )}
                     </div>
@@ -479,14 +545,11 @@ export default function ChatInterface() {
               </div>
             </header>
 
+            {/* Messages */}
             <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
               <div className="space-y-8">
-                {messages.map((message) => (
-                  <ChatMessage
-                    key={message.id}
-                    message={message}
-                    onAction={handleAction}
-                  />
+                {messages.map((msg) => (
+                  <ChatMessage key={msg.id} message={msg} onAction={handleAction} />
                 ))}
                 {streamStatus && (
                   <div className="ml-12 text-[13px] text-black/45 dark:text-white/45">
@@ -497,6 +560,7 @@ export default function ChatInterface() {
               </div>
             </div>
 
+            {/* Input fade + bar */}
             <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
             <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 px-4">
               <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
@@ -508,27 +572,48 @@ export default function ChatInterface() {
 
         {currentView === "strategies" && (
           <StrategiesView
-            onMenuClick={() => setIsSidebarOpen((open) => !open)}
+            onMenuClick={() => setIsSidebarOpen((o) => !o)}
             onSettingsClick={() => setCurrentView("settings")}
           />
         )}
-
         {currentView === "collections" && (
           <CollectionsView
-            onMenuClick={() => setIsSidebarOpen((open) => !open)}
+            onMenuClick={() => setIsSidebarOpen((o) => !o)}
             onSettingsClick={() => setCurrentView("settings")}
           />
         )}
-
         {currentView === "settings" && (
           <SettingsView
             onClose={() => setCurrentView("chat")}
-            onLogout={() => {
-              window.location.href = "/";
-            }}
+            onLogout={() => { window.location.href = "/"; }}
           />
         )}
       </section>
+
+      {/* ── Collection picker sheet ── */}
+      {collectionPickerTarget && (
+        <CollectionPicker
+          strategyId={collectionPickerTarget.strategyId}
+          strategyFallback={{
+            name: collectionPickerTarget.strategyName,
+            template: collectionPickerTarget.template,
+            asset_class: collectionPickerTarget.assetClass,
+            symbols: collectionPickerTarget.symbols,
+          }}
+          onClose={() => setCollectionPickerTarget(null)}
+          onSuccess={(collectionName) => {
+            setCollectionPickerTarget(null);
+            showToast(`Added to "${collectionName}"`);
+          }}
+        />
+      )}
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-full bg-black dark:bg-white px-5 py-2.5 text-[14px] font-medium text-white dark:text-black shadow-xl">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

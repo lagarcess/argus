@@ -1,3 +1,12 @@
+// ─── Shared primitive types ──────────────────────────────────────────────────
+
+export type AssetClass = "equity" | "crypto";
+export type BacktestStatus = "queued" | "running" | "completed" | "failed";
+export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
+export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
+
+// ─── Metric / result card types ──────────────────────────────────────────────
+
 export type ApiMetricRow = {
   key: string;
   label: string;
@@ -17,12 +26,14 @@ export type ConversationResultCard = {
   actions: Array<{ type: string; label: string }>;
 };
 
+// ─── Domain objects ──────────────────────────────────────────────────────────
+
 export type BacktestRun = {
   id: string;
   conversation_id?: string | null;
   strategy_id?: string | null;
-  status: "queued" | "running" | "completed" | "failed";
-  asset_class: "equity" | "crypto";
+  status: BacktestStatus;
+  asset_class: AssetClass;
   symbols: string[];
   allocation_method: "equal_weight";
   benchmark_symbol: string;
@@ -38,7 +49,7 @@ export type BacktestRun = {
 export type Conversation = {
   id: string;
   title: string;
-  title_source: "system_default" | "ai_generated" | "user_renamed";
+  title_source: TitleSource;
   pinned: boolean;
   archived: boolean;
   created_at: string;
@@ -47,6 +58,68 @@ export type Conversation = {
   language?: "en" | "es-419" | null;
 };
 
+/** Backend message shape (distinct from the frontend chat Message type) */
+export type ApiMessage = {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  created_at: string;
+};
+
+export type StrategySurfaceMetricRow = {
+  symbol: string;
+  asset_name: string;
+  values: Record<string, string>;
+};
+
+export type StrategySurfaceMetrics = {
+  display_mode: string;
+  as_of_run_id: string | null;
+  columns: Array<{ key: string; label: string }>;
+  rows: StrategySurfaceMetricRow[];
+  headline?: { label: string; value: string } | null;
+};
+
+export type Strategy = {
+  id: string;
+  name: string;
+  name_source: TitleSource;
+  template: string;
+  asset_class: AssetClass;
+  symbols: string[];
+  parameters: Record<string, unknown>;
+  metrics_preferences: string[];
+  benchmark_symbol: string;
+  pinned: boolean;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  strategy_surface_metrics?: StrategySurfaceMetrics | null;
+};
+
+export type Collection = {
+  id: string;
+  name: string;
+  name_source: TitleSource;
+  pinned: boolean;
+  strategy_count: number;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type HistoryItem = {
+  type: HistoryItemType;
+  id: string;
+  title: string;
+  subtitle: string;
+  pinned: boolean;
+  created_at: string;
+};
+
+// ─── Chat stream event types ──────────────────────────────────────────────────
+
 export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
@@ -54,7 +127,12 @@ export type ChatStreamEvent =
   | { event: "result"; data: { run: BacktestRun } }
   | { event: "done"; data: { message_id: string } };
 
-const API_BASE = process.env.NEXT_PUBLIC_ARGUS_API_URL ?? "http://localhost:8000/api/v1";
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_ARGUS_API_URL ?? "http://localhost:8000/api/v1";
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 export function resultCardFromRun(run: BacktestRun) {
   const card = run.conversation_result_card;
@@ -63,38 +141,209 @@ export function resultCardFromRun(run: BacktestRun) {
     period: card.date_range.display,
     metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
     benchmarkNote: card.assumptions.join(" "),
+    runId: run.id,
+    strategyId: run.strategy_id ?? null,
   };
 }
 
-export async function createConversation(language: "en" | "es-419" = "en") {
-  const response = await fetch(`${API_BASE}/conversations`, {
-    method: "POST",
+/**
+ * Formats an ISO timestamp as a human-readable relative date string.
+ * Returns "today", "yesterday", or a short locale date string.
+ */
+export function formatRelativeDate(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+  if (date >= todayStart) return "today";
+  if (date >= yesterdayStart) return "yesterday";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
+}
+
+// ─── Generic fetch helper ─────────────────────────────────────────────────────
+
+async function apiFetch<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: null, language }),
+    ...options,
   });
   if (!response.ok) {
-    throw new Error("Failed to create conversation");
+    const body = await response.json().catch(() => ({}));
+    const error = new Error(
+      (body as Record<string, unknown>).detail as string ??
+        `API error ${response.status}`,
+    ) as Error & { status: number; code: string };
+    (error as Error & { status: number }).status = response.status;
+    (error as Error & { code: string }).code =
+      (body as Record<string, unknown>).code as string ?? "unknown";
+    throw error;
   }
-  return (await response.json()) as { conversation: Conversation };
+  return response.json() as Promise<T>;
 }
 
-export async function listHistory() {
-  const response = await fetch(`${API_BASE}/history`);
-  if (!response.ok) {
-    throw new Error("Failed to load history");
-  }
-  return (await response.json()) as {
-    items: Array<{
-      type: "chat" | "strategy" | "collection" | "run";
-      id: string;
-      title: string;
-      subtitle: string;
-      pinned: boolean;
-      created_at: string;
-    }>;
-    next_cursor: string | null;
-  };
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export async function createConversation(language: "en" | "es-419" = "en") {
+  return apiFetch<{ conversation: Conversation }>("/conversations", {
+    method: "POST",
+    body: JSON.stringify({ title: null, language }),
+  });
 }
+
+// ─── Conversations ────────────────────────────────────────────────────────────
+
+export async function listConversations(limit = 20) {
+  return apiFetch<{ items: Conversation[]; next_cursor: string | null }>(
+    `/conversations?limit=${limit}`,
+  );
+}
+
+export async function getConversationMessages(
+  conversationId: string,
+  limit = 50,
+) {
+  return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
+    `/conversations/${conversationId}/messages?limit=${limit}`,
+  );
+}
+
+export async function patchConversation(
+  conversationId: string,
+  patch: { title?: string; pinned?: boolean; archived?: boolean },
+) {
+  return apiFetch<{ conversation: Conversation }>(
+    `/conversations/${conversationId}`,
+    { method: "PATCH", body: JSON.stringify(patch) },
+  );
+}
+
+export async function deleteConversation(conversationId: string) {
+  return apiFetch<{ success: boolean }>(`/conversations/${conversationId}`, {
+    method: "DELETE",
+  });
+}
+
+// ─── History ──────────────────────────────────────────────────────────────────
+
+export async function listHistory(limit = 20) {
+  return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(
+    `/history?limit=${limit}`,
+  );
+}
+
+// ─── Strategies ───────────────────────────────────────────────────────────────
+
+export async function listStrategies(limit = 50) {
+  return apiFetch<{ items: Strategy[]; next_cursor: string | null }>(
+    `/strategies?limit=${limit}`,
+  );
+}
+
+export async function createStrategy(payload: {
+  name?: string | null;
+  template: string;
+  asset_class: AssetClass;
+  symbols: string[];
+  parameters?: Record<string, unknown>;
+  metrics_preferences?: string[];
+  benchmark_symbol?: string | null;
+}) {
+  return apiFetch<{ strategy: Strategy }>("/strategies", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function patchStrategy(
+  strategyId: string,
+  patch: { name?: string; pinned?: boolean; deleted_at?: string | null },
+) {
+  return apiFetch<{ strategy: Strategy }>(`/strategies/${strategyId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteStrategy(strategyId: string) {
+  return apiFetch<{ success: boolean }>(`/strategies/${strategyId}`, {
+    method: "DELETE",
+  });
+}
+
+// ─── Collections ──────────────────────────────────────────────────────────────
+
+export async function listCollections(limit = 50) {
+  return apiFetch<{ items: Collection[]; next_cursor: string | null }>(
+    `/collections?limit=${limit}`,
+  );
+}
+
+export async function createCollection(name?: string) {
+  return apiFetch<{ collection: Collection }>("/collections", {
+    method: "POST",
+    body: JSON.stringify({ name: name ?? null }),
+  });
+}
+
+export async function patchCollection(
+  collectionId: string,
+  patch: { name?: string; pinned?: boolean },
+) {
+  return apiFetch<{ collection: Collection }>(`/collections/${collectionId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteCollection(collectionId: string) {
+  return apiFetch<{ success: boolean }>(`/collections/${collectionId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function attachStrategyToCollection(
+  collectionId: string,
+  strategyId: string,
+) {
+  return apiFetch<{ collection: Collection }>(
+    `/collections/${collectionId}/strategies`,
+    { method: "POST", body: JSON.stringify({ strategy_ids: [strategyId] }) },
+  );
+}
+
+// ─── Backtests ────────────────────────────────────────────────────────────────
+
+export async function runBacktest(payload: {
+  template?: string;
+  asset_class?: AssetClass;
+  symbols: string[];
+  strategy_id?: string;
+  conversation_id?: string;
+  timeframe?: string;
+  start_date?: string;
+  end_date?: string;
+  starting_capital?: number;
+}) {
+  return apiFetch<{ run: BacktestRun }>("/backtests/run", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": crypto.randomUUID(),
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+// ─── Chat stream ──────────────────────────────────────────────────────────────
 
 export async function streamChatMessage(
   conversationId: string,
@@ -128,8 +377,12 @@ export async function streamChatMessage(
     const parts = buffer.split("\n\n");
     buffer = parts.pop() ?? "";
     for (const part of parts) {
-      const eventLine = part.split("\n").find((line) => line.startsWith("event: "));
-      const dataLine = part.split("\n").find((line) => line.startsWith("data: "));
+      const eventLine = part
+        .split("\n")
+        .find((line) => line.startsWith("event: "));
+      const dataLine = part
+        .split("\n")
+        .find((line) => line.startsWith("data: "));
       if (!eventLine || !dataLine) continue;
       onEvent({
         event: eventLine.replace("event: ", "") as ChatStreamEvent["event"],
