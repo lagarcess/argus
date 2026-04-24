@@ -1,0 +1,136 @@
+{
+  "common": {
+    "backtest": "Simulación",
+    "strategy": "Estrategia",
+    "collection": "Colección",
+    "chat": "Chat",
+    "history": "Historial",
+    "settings": "Ajustes",
+    "strategies": "Estrategias",
+    "collections": "Colecciones",
+    "recents": "Recientes",
+    "run_simulation": "Ejecutar simulación",
+    "add_to_collection": "Añadir a colección",
+    "rename": "Renombrar",
+    "delete": "Eliminar",
+    "pin": "Anclar",
+    "unpin": "Desanclar",
+    "loading": "Cargando...",
+    "retry": "Reintentar",
+    "error_occurred": "Ha ocurrido un error",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "search": "Buscar"
+  },
+  "chat": {
+    "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
+    "input_placeholder": "Describe una idea de inversión...",
+    "view_history": "Ver historial",
+    "chat_options": "Opciones de chat",
+    "starter_actions": {
+      "tsla": {
+        "label": "Prueba caídas de Tesla",
+        "value": "¿Qué pasaría si comprara Tesla cada vez que cae fuerte?"
+      },
+      "btc": {
+        "label": "Prueba momentum de Bitcoin",
+        "value": "Prueba una idea de ruptura de impulso en Bitcoin"
+      },
+      "dca": {
+        "label": "Explora DCA",
+        "value": "Muéstrame una estrategia de acumulación DCA para Apple"
+      }
+    },
+    "rate_limit_error": "Has alcanzado tu límite de solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
+    "error_offline": "Argus aún no ha podido conectarse a la API. Inicia el servicio FastAPI y envía tu idea de nuevo.",
+    "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
+    "error_backtest": "No pude completar esa simulación. Verifica que la API esté funcionando e inténtalo de nuevo.",
+    "new_chat_ready": "Nuevo chat listo. ¿Qué idea deberíamos probar?",
+    "resume_prompt": "Reanudando \"{{title}}\". ¿Qué te gustaría explorar ahora?",
+    "try_new_strategy": "Probar una nueva estrategia",
+    "empty_history": "Tus chats pasados aparecerán aquí.",
+    "new_chat": "Nuevo chat",
+    "delete_chat": "Eliminar chat",
+    "past_sessions": "Sesiones pasadas",
+    "no_past_sessions": "No hay sesiones pasadas aún.",
+    "added_to_collection": "Añadido a \"{{name}}\"",
+    "good_response": "Buena respuesta",
+    "poor_response": "Mala respuesta",
+    "more_actions": "Más acciones",
+    "copy_plaintext": "Copiar texto",
+    "copy_id": "Copiar ID",
+    "report_issue": "Reportar problema",
+    "simulation_complete": "Simulación completa",
+    "status": {
+      "understanding": "Comprendiendo tu idea",
+      "running": "Ejecutando simulación",
+      "preparing": "Preparando resultados"
+    }
+  },
+  "strategies": {
+    "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",
+    "no_match": "No hay estrategias que coincidan con tu búsqueda.",
+    "error_load": "No se pudieron cargar las estrategias. Asegúrate de que la API esté funcionando.",
+    "search_placeholder": "Buscar estrategias...",
+    "metrics": {
+      "overall_profit": "ganancia total",
+      "max_drawdown": "caída máxima",
+      "win_rate": "tasa de éxito"
+    },
+    "unexecuted_hint": "Ejecuta esta estrategia para ver el rendimiento",
+    "best_performer": "Mejor rendimiento"
+  },
+  "collections": {
+    "empty_state": "Añade una estrategia a una colección o guárdala del chat para verlas aquí.",
+    "no_match": "No hay colecciones que coincidan con tu búsqueda.",
+    "error_load": "No se pudieron cargar las colecciones. Asegúrate de que la API esté funcionando.",
+    "search_placeholder": "Buscar colecciones",
+    "new_collection": "Nueva colección",
+    "no_strategies": "Sin estrategias aún",
+    "strategy_count_one": "{{count}} estrategia",
+    "strategy_count_other": "{{count}} estrategias"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "profile": {
+      "display_name": "Nombre de usuario"
+    },
+    "subscription": {
+      "title": "Suscripción",
+      "upgrade_pro": "Prueba Pro gratis"
+    },
+    "app": {
+      "title": "App",
+      "language": "Idioma de la app",
+      "appearance": "Apariencia",
+      "appearance_options": {
+        "light": "Claro",
+        "dark": "Oscuro",
+        "system": "Sistema"
+      }
+    },
+    "data": {
+      "title": "Datos e información",
+      "archived_chats": "Chats archivados",
+      "recently_deleted": "Borrados recientemente",
+      "security": "Seguridad"
+    },
+    "about": {
+      "title": "Acerca de",
+      "report_bug": "Reportar un error",
+      "request_feature": "Sugerir función",
+      "feedback": "Comentarios generales"
+    },
+    "logout": "Cerrar sesión",
+    "search_language": "Buscar idioma",
+    "no_languages": "No se encontraron idiomas."
+  },
+  "landing": {
+    "sign_up_email": "Registrarse con Email",
+    "already_account": "¿ya tienes una cuenta?",
+    "sign_in": "inicia sesión",
+    "legal_prefix": "Al registrarte, aceptas nuestros",
+    "terms": "Términos",
+    "privacy": "Política de Privacidad"
+  }
+}

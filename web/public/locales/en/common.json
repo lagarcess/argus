@@ -1,0 +1,136 @@
+{
+  "common": {
+    "backtest": "Backtest",
+    "strategy": "Strategy",
+    "collection": "Collection",
+    "chat": "Chat",
+    "history": "History",
+    "settings": "Settings",
+    "strategies": "Strategies",
+    "collections": "Collections",
+    "recents": "Recents",
+    "run_simulation": "Run simulation",
+    "add_to_collection": "Add to collection",
+    "rename": "Rename",
+    "delete": "Delete",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "error_occurred": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search"
+  },
+  "chat": {
+    "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
+    "input_placeholder": "Describe an investing idea...",
+    "view_history": "View history",
+    "chat_options": "Chat options",
+    "starter_actions": {
+      "tsla": {
+        "label": "Test Tesla dips",
+        "value": "What if I bought Tesla whenever it dipped hard?"
+      },
+      "btc": {
+        "label": "Try Bitcoin momentum",
+        "value": "Test a momentum breakout idea on Bitcoin"
+      },
+      "dca": {
+        "label": "Explore DCA",
+        "value": "Show me a DCA accumulation strategy for Apple"
+      }
+    },
+    "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
+    "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
+    "error_load": "Could not load that conversation. Try again.",
+    "error_backtest": "I could not complete that simulation. Check that the API is running and try again.",
+    "new_chat_ready": "New chat ready. What idea should we test?",
+    "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
+    "try_new_strategy": "Try a new strategy",
+    "empty_history": "Your past chats will appear here.",
+    "new_chat": "New chat",
+    "delete_chat": "Delete chat",
+    "past_sessions": "Past sessions",
+    "no_past_sessions": "No past sessions yet.",
+    "added_to_collection": "Added to \"{{name}}\"",
+    "good_response": "Good response",
+    "poor_response": "Poor response",
+    "more_actions": "More Actions",
+    "copy_plaintext": "Copy Plaintext",
+    "copy_id": "Copy ID",
+    "report_issue": "Report Issue",
+    "simulation_complete": "Simulation Complete",
+    "status": {
+      "understanding": "Understanding your idea",
+      "running": "Running simulation",
+      "preparing": "Preparing results"
+    }
+  },
+  "strategies": {
+    "empty_state": "Strategies you save from chat will appear here.",
+    "no_match": "No strategies match your search.",
+    "error_load": "Could not load strategies. Make sure the API is running.",
+    "search_placeholder": "Search strategies...",
+    "metrics": {
+      "overall_profit": "overall profit",
+      "max_drawdown": "max drawdown",
+      "win_rate": "win rate"
+    },
+    "unexecuted_hint": "Run this strategy to see performance",
+    "best_performer": "Best performer"
+  },
+  "collections": {
+    "empty_state": "Add strategy to collection or save from chat to see them here.",
+    "no_match": "No collections match your search.",
+    "error_load": "Could not load collections. Make sure the API is running.",
+    "search_placeholder": "Search collections",
+    "new_collection": "New collection",
+    "no_strategies": "No strategies yet",
+    "strategy_count_one": "{{count}} strategy",
+    "strategy_count_other": "{{count}} strategies"
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": {
+      "display_name": "Display Name"
+    },
+    "subscription": {
+      "title": "Subscription",
+      "upgrade_pro": "Try upgrading to Pro for Free"
+    },
+    "app": {
+      "title": "App",
+      "language": "App language",
+      "appearance": "Appearance",
+      "appearance_options": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      }
+    },
+    "data": {
+      "title": "Data & Information",
+      "archived_chats": "Archived chats",
+      "recently_deleted": "Recently deleted",
+      "security": "Security"
+    },
+    "about": {
+      "title": "About",
+      "report_bug": "Report a bug",
+      "request_feature": "Request a feature",
+      "feedback": "General feedback"
+    },
+    "logout": "Log out",
+    "search_language": "Search language",
+    "no_languages": "No languages found."
+  },
+  "landing": {
+    "sign_up_email": "Sign up with Email",
+    "already_account": "already have an account?",
+    "sign_in": "sign in",
+    "legal_prefix": "By signing up, you agree to our",
+    "terms": "Terms",
+    "privacy": "Privacy Policy"
+  }
+}

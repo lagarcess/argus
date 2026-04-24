@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import { Message } from "./types";
 
@@ -11,6 +12,7 @@ type ChatMessageProps = {
 };
 
 export default function ChatMessage({ message, onAction }: ChatMessageProps) {
+  const { t } = useTranslation();
   const isUser = message.role === "user";
   const [showOptions, setShowOptions] = useState(false);
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
@@ -113,16 +115,16 @@ export default function ChatMessage({ message, onAction }: ChatMessageProps) {
 
             {/* Feedback Icon Row (Right-aligned) */}
             <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
-              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title="Good response">
+              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title={t('chat.good_response')}>
                 <ThumbsUp className="w-3.5 h-3.5" />
               </button>
-              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title="Poor response">
+              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title={t('chat.poor_response')}>
                 <ThumbsDown className="w-3.5 h-3.5" />
               </button>
               <button 
                 onClick={toggleOptions}
                 className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" 
-                title="More Actions"
+                title={t('chat.more_actions')}
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </button>
@@ -135,21 +137,21 @@ export default function ChatMessage({ message, onAction }: ChatMessageProps) {
                     onClick={() => { navigator.clipboard.writeText(getCopyText()); setShowOptions(false); }}
                   >
                     <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
-                    Copy Plaintext
+                    {t('chat.copy_plaintext')}
                   </button>
                   <button 
                     className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                     onClick={() => { navigator.clipboard.writeText(message.id); setShowOptions(false); }}
                   >
                     <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
-                    Copy ID
+                    {t('chat.copy_id')}
                   </button>
                   <button 
                     className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                     onClick={() => setShowOptions(false)}
                   >
                     <MessageSquareWarning className="w-4 h-4 text-black/60 dark:text-white/60" />
-                    Report Issue
+                    {t('chat.report_issue')}
                   </button>
                 </div>
               )}

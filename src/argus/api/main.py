@@ -8,6 +8,9 @@ from typing import Any
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from argus.api.schemas import (
     BacktestRun,

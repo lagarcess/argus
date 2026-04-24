@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { ArrowUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 type ChatInputProps = {
   onSend: (text: string) => void;
 };
 
 export default function ChatInput({ onSend }: ChatInputProps) {
+  const { t } = useTranslation();
   const [text, setText] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -26,7 +28,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
         type="text"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Ask argus"
+        placeholder={t('chat.input_placeholder')}
         className="flex-1 bg-transparent border-none outline-none py-4 pl-6 text-[16px] text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-500 font-medium tracking-tight h-14"
       />
 

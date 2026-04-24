@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
   History,
@@ -11,6 +11,7 @@ import {
   Settings,
   Trash2,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   createConversation,
@@ -33,32 +34,29 @@ import { type ChatActionOption, type Message } from "./types";
 
 type View = "chat" | "strategies" | "collections" | "settings";
 
-const STARTER_ACTIONS: ChatActionOption[] = [
-  {
-    id: "starter-tsla",
-    label: "Test Tesla dips",
-    value: "What if I bought Tesla whenever it dipped hard?",
-  },
-  {
-    id: "starter-btc",
-    label: "Try Bitcoin momentum",
-    value: "Test a momentum breakout idea on Bitcoin",
-  },
-  {
-    id: "starter-dca",
-    label: "Explore DCA",
-    value: "Show me a DCA accumulation strategy for Apple",
-  },
-];
-
-const STATUS_LABELS: Record<string, string> = {
-  extracting_strategy: "Understanding your idea",
-  running_backtest: "Running simulation",
-};
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
+  const { t } = useTranslation();
+
+  const starterActions = useMemo<ChatActionOption[]>(() => [
+    {
+      id: "starter-tsla",
+      label: t('chat.starter_actions.tsla.label'),
+      value: t('chat.starter_actions.tsla.value'),
+    },
+    {
+      id: "starter-btc",
+      label: t('chat.starter_actions.btc.label'),
+      value: t('chat.starter_actions.btc.value'),
+    },
+    {
+      id: "starter-dca",
+      label: t('chat.starter_actions.dca.label'),
+      value: t('chat.starter_actions.dca.value'),
+    },
+  ], [t]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
@@ -117,9 +115,8 @@ export default function ChatInterface() {
             id: "welcome",
             role: "ai",
             kind: "text",
-            content:
-              "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
-            actions: STARTER_ACTIONS,
+            content: t('chat.welcome'),
+            actions: starterActions,
           },
         ]);
       })
@@ -130,8 +127,7 @@ export default function ChatInterface() {
             id: "offline",
             role: "ai",
             kind: "text",
-            content:
-              "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
+            content: t('chat.error_offline'),
           },
         ]);
       });
@@ -152,7 +148,7 @@ export default function ChatInterface() {
     setCurrentView("chat");
     setConversationId(convId);
     setMessages([]);
-    setStreamStatus("Loading conversation…");
+    setStreamStatus(t('common.loading'));
     try {
       const { items } = await getConversationMessages(convId, 50);
       const loaded: Message[] = items.map((m) => ({
@@ -169,8 +165,8 @@ export default function ChatInterface() {
                 id: "resume-empty",
                 role: "ai",
                 kind: "text",
-                content: `Resuming "${convTitle}". What would you like to explore next?`,
-                actions: STARTER_ACTIONS,
+                content: t('chat.resume_prompt', { title: convTitle }),
+                actions: starterActions,
               },
             ],
       );
@@ -180,7 +176,7 @@ export default function ChatInterface() {
           id: "resume-error",
           role: "ai",
           kind: "text",
-          content: "Could not load that conversation. Try again.",
+          content: t('chat.error_load'),
         },
       ]);
     } finally {
@@ -199,11 +195,11 @@ export default function ChatInterface() {
         id: `welcome-${conversation.id}`,
         role: "ai",
         kind: "text",
-        content: "New chat ready. What idea should we test?",
-        actions: STARTER_ACTIONS,
+        content: t('chat.new_chat_ready'),
+        actions: starterActions,
       },
     ]);
-    void fetchHistory();
+    void refreshHistory();
   };
 
   // ── Send message ───────────────────────────────────────────────────────────
@@ -225,12 +221,12 @@ export default function ChatInterface() {
       userMsg,
       { id: assistantId, role: "ai", kind: "text", content: "" },
     ]);
-    setStreamStatus("Understanding your idea");
+    setStreamStatus(t('chat.status.understanding'));
 
     try {
       await streamChatMessage(conversationId, trimmed, (event) => {
         if (event.event === "status") {
-          setStreamStatus(STATUS_LABELS[event.data.status] ?? "Preparing results");
+          setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
         }
         if (event.event === "token") {
           setMessages((prev) =>
@@ -255,12 +251,12 @@ export default function ChatInterface() {
                     actions: [
                       {
                         id: "add-to-collection",
-                        label: "Add to collection",
+                        label: t('common.add_to_collection'),
                         value: `/action:add-to-collection:${run.id}:${run.strategy_id ?? ""}:${run.symbols.join(",")}:${run.asset_class}`,
                       },
                       {
                         id: "try-new",
-                        label: "Try a new strategy",
+                        label: t('chat.try_new_strategy'),
                         value: "/action:new-chat",
                       },
                     ],
@@ -284,8 +280,8 @@ export default function ChatInterface() {
             ? {
                 ...m,
                 content: isRateLimit
-                  ? "You've reached your request limit. Please wait a moment and try again."
-                  : "I could not complete that simulation. Check that the API is running and try again.",
+                  ? t('chat.rate_limit_error')
+                  : t('chat.error_backtest'),
               }
             : m,
         ),
@@ -347,8 +343,8 @@ export default function ChatInterface() {
           <button
             type="button"
             onClick={() => void startNewChat()}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
-            aria-label="New chat"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+            aria-label={t('chat.new_chat')}
           >
             <MessageSquarePlus className="h-5 w-5" />
           </button>
@@ -358,29 +354,29 @@ export default function ChatInterface() {
           <button
             type="button"
             onClick={() => { setCurrentView("collections"); setIsSidebarOpen(false); }}
-            className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+            className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
           >
-            Collections
+            {t('common.collections')}
           </button>
           <button
             type="button"
             onClick={() => { setCurrentView("strategies"); setIsSidebarOpen(false); }}
-            className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+            className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
           >
-            Strategies
+            {t('common.strategies')}
           </button>
         </nav>
 
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-3 flex items-center gap-2 text-[13px] font-medium uppercase tracking-wide text-black/45 dark:text-white/45">
             <History className="h-4 w-4" />
-            Recents
+            {t('common.recents')}
           </div>
 
           <div className="flex flex-col gap-0.5 overflow-y-auto">
             {recentChats.length === 0 ? (
               <p className="px-4 py-3 text-[13px] text-black/35 dark:text-white/35">
-                Your past chats will appear here.
+                {t('chat.empty_history')}
               </p>
             ) : (
               recentChats.map((item) => (
@@ -407,7 +403,7 @@ export default function ChatInterface() {
             type="button"
             onClick={() => { setCurrentView("settings"); setIsSidebarOpen(false); }}
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
-            aria-label="Settings"
+            aria-label={t('common.settings')}
           >
             <Settings className="h-5 w-5" />
           </button>
@@ -417,7 +413,7 @@ export default function ChatInterface() {
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search"
+              placeholder={t('common.search')}
               className="h-[52px] w-full rounded-full border border-black/10 bg-white/50 pl-12 pr-4 text-[16px] outline-none focus:bg-white focus:ring-2 focus:ring-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:focus:bg-[#1f2225] dark:focus:ring-white/5"
             />
           </div>
@@ -481,7 +477,7 @@ export default function ChatInterface() {
                             className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                           >
                             <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            New chat
+                            {t('chat.new_chat')}
                           </button>
                           <button
                             type="button"
@@ -490,7 +486,7 @@ export default function ChatInterface() {
                           >
                             <span className="flex items-center gap-4">
                               <History className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                              View history
+                              {t('chat.view_history')}
                             </span>
                             <ChevronRight className="h-5 w-5 text-black/40 transition-transform group-hover:translate-x-0.5 dark:text-white/40 md:h-4 md:w-4" />
                           </button>
@@ -501,7 +497,7 @@ export default function ChatInterface() {
                             className="flex w-full cursor-not-allowed items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-black/35 dark:text-white/35 md:px-5 md:py-3 md:text-[15px]"
                           >
                             <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
-                            Delete chat
+                            {t('chat.delete_chat')}
                           </button>
                         </div>
                       )}
@@ -513,12 +509,12 @@ export default function ChatInterface() {
                             onClick={() => setActiveChatOptionsPanel("none")}
                             className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium uppercase text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
                           >
-                            Past sessions
+                            {t('chat.past_sessions')}
                             <ChevronRight className="h-4 w-4 -rotate-90" />
                           </button>
                           {recentChats.length === 0 ? (
                             <p className="px-6 py-4 text-[14px] text-black/40 dark:text-white/40 md:px-5">
-                              No past sessions yet.
+                              {t('chat.no_past_sessions')}
                             </p>
                           ) : (
                             recentChats.map((item) => (
@@ -603,7 +599,7 @@ export default function ChatInterface() {
           onClose={() => setCollectionPickerTarget(null)}
           onSuccess={(collectionName) => {
             setCollectionPickerTarget(null);
-            showToast(`Added to "${collectionName}"`);
+            showToast(t('chat.added_to_collection', { name: collectionName }));
           }}
         />
       )}

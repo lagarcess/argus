@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { SettingsMenu } from "@/components/SettingsMenu";
+import { useTranslation } from "react-i18next";
 
 export default function LandingPage() {
+  const { t } = useTranslation();
+
   return (
     <main className="relative flex min-h-[100dvh] w-full flex-col justify-between overflow-hidden px-6 py-8 md:px-12">
       <SettingsMenu />
@@ -44,27 +49,27 @@ export default function LandingPage() {
       {/* Normalized font sizes and button padding per DESIGN.md */}
       <div className="relative z-10 flex w-full flex-col items-center gap-6 pb-2 md:pb-4">
         <Link href="/chat" className="w-full max-w-sm rounded-[9999px] bg-black text-white dark:bg-white dark:text-black px-[32px] py-[14px] text-[16px] font-medium transition-opacity hover:opacity-85 focus:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black dark:focus-visible:ring-white flex items-center justify-center">
-          Sign up with Email
+          {t('landing.sign_up_email')}
         </Link>
         <p className="text-[16px] tracking-wide text-gray-500 dark:text-gray-400">
-          already have an account?{" "}
+          {t('landing.already_account')}{" "}
           <Link
             className="font-medium text-black dark:text-white transition-opacity hover:opacity-80"
             href="/login"
           >
-            sign in
+            {t('landing.sign_in')}
           </Link>
         </p>
 
         {/* Legal Footer */}
         <p className="mt-4 w-full px-4 text-center text-[11px] md:text-[12px] text-zinc-500 tracking-tight">
-          By signing up, you agree to our{" "}
+          {t('landing.legal_prefix')}{" "}
           <a href="#" className="font-semibold text-zinc-800 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
-            Terms
+            {t('landing.terms')}
           </a>{" "}
-          and{" "}
+          {t('common.and', 'and')}{" "}
           <a href="#" className="font-semibold text-zinc-800 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
-            Privacy Policy
+            {t('landing.privacy')}
           </a>.
         </p>
       </div>

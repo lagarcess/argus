@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   listCollections,
@@ -40,8 +41,8 @@ function mapCollection(c: Collection): DisplayCollection {
     title: c.name,
     subtitle:
       c.strategy_count === 0
-        ? "No strategies yet"
-        : `${c.strategy_count} ${c.strategy_count === 1 ? "strategy" : "strategies"}`,
+        ? "no_strategies"
+        : "strategy_count",
     pinned: c.pinned,
     strategyCount: c.strategy_count,
     dateStr: formatRelativeDate(c.updated_at),
@@ -61,6 +62,7 @@ export default function CollectionsView({
   onMenuClick,
   onSettingsClick,
 }: CollectionsViewProps) {
+  const { t } = useTranslation();
   const [collections, setCollections] = useState<DisplayCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export default function CollectionsView({
   const refreshCollections = () => {
     listCollections(50)
       .then(({ items }) => setCollections(items.map(mapCollection)))
-      .catch(() => setError("Could not load collections. Make sure the API is running."));
+      .catch(() => setError(t('collections.error_load')));
   };
 
   useEffect(() => {
@@ -87,9 +89,9 @@ export default function CollectionsView({
         setCollections(items.map(mapCollection));
         setError(null);
       })
-      .catch(() => setError("Could not load collections. Make sure the API is running."))
+      .catch(() => setError(t('collections.error_load')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   // ── Long press ─────────────────────────────────────────────────────────────
 
@@ -200,7 +202,7 @@ export default function CollectionsView({
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h1 className="text-[18px] font-medium tracking-tight">Collections</h1>
+        <h1 className="text-[18px] font-medium tracking-tight">{t('common.collections')}</h1>
         <button
           type="button"
           onClick={() => void handleCreate()}
@@ -220,7 +222,7 @@ export default function CollectionsView({
             type="text"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Search collections"
+            placeholder={t('collections.search_placeholder')}
             className="h-[52px] w-full rounded-full border border-black/10 bg-white pl-12 pr-12 text-[16px] outline-none transition-colors focus:ring-2 focus:ring-black/10 dark:border-white/10 dark:bg-[#1f2225] dark:focus:ring-white/10"
           />
           {searchText && (
@@ -249,20 +251,20 @@ export default function CollectionsView({
           <div className="mt-16 flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
             <AlertCircle className="h-8 w-8" />
             <p className="max-w-sm text-[15px] leading-6">{error}</p>
-            <button
-              onClick={() => refreshCollections()}
-              className="mt-2 rounded-full border border-black/10 dark:border-white/10 px-4 py-2 text-[14px] font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            >
-              Retry
-            </button>
+              <button
+                onClick={() => refreshCollections()}
+                className="mt-2 rounded-full border border-black/10 dark:border-white/10 px-4 py-2 text-[14px] font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
+                {t('common.retry')}
+              </button>
           </div>
         ) : sorted.length === 0 ? (
           <div className="mt-16 flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
             <Folder className="h-8 w-8" />
             <p className="max-w-sm text-[15px] leading-6">
               {searchText
-                ? "No collections match your search."
-                : "Add strategy to collection or save from chat to see them here."}
+                ? t('collections.no_match')
+                : t('collections.empty_state')}
             </p>
           </div>
         ) : (
@@ -283,7 +285,7 @@ export default function CollectionsView({
                           <Pin className="w-4 h-4" />
                         </div>
                         <span className="text-[11px] font-medium tracking-tight">
-                          {collection.pinned ? "Unpin" : "Pin"}
+                          {collection.pinned ? t('common.unpin') : t('common.pin')}
                         </span>
                       </button>
                       <button
@@ -297,7 +299,7 @@ export default function CollectionsView({
                           <Edit2 className="w-4 h-4" />
                         </div>
                         <span className="text-[11px] font-medium tracking-tight">
-                          Rename
+                          {t('common.rename')}
                         </span>
                       </button>
                       <button
@@ -308,7 +310,7 @@ export default function CollectionsView({
                           <Trash2 className="w-4 h-4" />
                         </div>
                         <span className="text-[11px] font-medium tracking-tight">
-                          Delete
+                          {t('common.delete')}
                         </span>
                       </button>
                     </div>
@@ -358,8 +360,10 @@ export default function CollectionsView({
                         )}
                       </h2>
                     )}
-                    <p className="mt-1 text-[13px] text-black/50 dark:text-white/50">
-                      {collection.subtitle} · {collection.dateStr}
+                     <p className="mt-1 text-[13px] text-black/50 dark:text-white/50">
+                      {collection.subtitle === "no_strategies" 
+                        ? t('collections.no_strategies') 
+                        : t('collections.strategy_count', { count: collection.strategyCount })} · {collection.dateStr}
                     </p>
                   </article>
                 </div>

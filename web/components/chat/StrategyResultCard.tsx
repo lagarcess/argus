@@ -1,10 +1,12 @@
 import { StrategyResultPayload } from "./types";
+import { useTranslation } from "react-i18next";
 
 type StrategyResultCardProps = {
   result: StrategyResultPayload;
 };
 
 export default function StrategyResultCard({ result }: StrategyResultCardProps) {
+  const { t } = useTranslation();
   return (
     <section className="w-full rounded-[20px] border border-black/12 dark:border-white/12 bg-white dark:bg-[#1d2023] overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-black/8 dark:border-white/8">
@@ -15,7 +17,7 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
           <p className="text-[12px] text-black/45 dark:text-white/45">{result.period}</p>
         </div>
         <span className="shrink-0 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:text-white/70">
-          Simulation Complete
+          {t('chat.simulation_complete')}
         </span>
       </div>
 

@@ -178,9 +178,13 @@ async function apiFetch<T>(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
+    const detail = (body as any).detail;
+    const errorMsg = typeof detail === 'object' && detail !== null 
+      ? detail.title 
+      : detail;
+
     const error = new Error(
-      (body as Record<string, unknown>).detail as string ??
-        `API error ${response.status}`,
+      errorMsg ?? `API error ${response.status}`,
     ) as Error & { status: number; code: string };
     (error as Error & { status: number }).status = response.status;
     (error as Error & { code: string }).code =
@@ -188,6 +192,22 @@ async function apiFetch<T>(
     throw error;
   }
   return response.json() as Promise<T>;
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+export type ProfilePatch = {
+  language?: "en" | "es-419";
+  locale?: string;
+  theme?: string;
+  display_name?: string;
+};
+
+export async function patchMe(patch: ProfilePatch) {
+  return apiFetch<{ user: any }>("/me", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────

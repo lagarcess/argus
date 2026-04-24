@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Folder, Loader2, Plus, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   listCollections,
   createCollection,
@@ -31,6 +32,7 @@ export default function CollectionPicker({
   onClose,
   onSuccess,
 }: CollectionPickerProps) {
+  const { t } = useTranslation();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [attaching, setAttaching] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export default function CollectionPicker({
 
         <div className="flex items-center justify-between px-6 pb-4">
           <h2 className="text-[17px] font-semibold tracking-tight">
-            Add to collection
+            {t('common.add_to_collection')}
           </h2>
           <button
             type="button"
@@ -135,7 +137,7 @@ export default function CollectionPicker({
                     <Plus className="h-4 w-4" />
                   )}
                 </div>
-                <span className="text-[16px] font-medium">New collection</span>
+                <span className="text-[16px] font-medium">{t('collections.new_collection')}</span>
               </button>
 
               {collections.length > 0 && (
@@ -169,8 +171,7 @@ export default function CollectionPicker({
                         {col.name}
                       </span>
                       <span className="block text-[12px] text-black/45 dark:text-white/45">
-                        {col.strategy_count}{" "}
-                        {col.strategy_count === 1 ? "strategy" : "strategies"}
+                        {t('collections.strategy_count', { count: col.strategy_count })}
                       </span>
                     </div>
                   </button>

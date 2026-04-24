@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   listStrategies,
@@ -110,6 +111,7 @@ export default function StrategiesView({
   onMenuClick,
   onSettingsClick,
 }: StrategiesViewProps) {
+  const { t } = useTranslation();
   const [strategies, setStrategies] = useState<DisplayStrategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,10 +134,13 @@ export default function StrategiesView({
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
-  const refreshStrategies = () => {
-    listStrategies(50)
-      .then(({ items }) => setStrategies(items.map(mapStrategyToDisplay)))
-      .catch(() => setError("Could not load strategies. Make sure the API is running."));
+  const refreshStrategies = async () => {
+    try {
+      const { items } = await listStrategies(50);
+      setStrategies(items.map(mapStrategyToDisplay));
+    } catch {
+      setError(t('strategies.error_load'));
+    }
   };
 
   useEffect(() => {
@@ -145,10 +150,10 @@ export default function StrategiesView({
         setError(null);
       })
       .catch(() => {
-        setError("Could not load strategies. Make sure the API is running.");
+        setError(t('strategies.error_load'));
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     return () => {
@@ -251,7 +256,7 @@ export default function StrategiesView({
         strategy_id: strategy.id,
       });
       // Refetch to get populated metrics
-      await fetchStrategies();
+      await refreshStrategies();
       setExpandedId(strategy.id);
     } catch {
       // Surface error inline — non-blocking
@@ -291,7 +296,7 @@ export default function StrategiesView({
 
       <div className="absolute top-6 inset-x-0 w-full flex justify-center z-[35] pointer-events-none">
         <h1 className="text-[18px] font-medium tracking-tight pointer-events-auto">
-          Strategies
+          {t('common.strategies')}
         </h1>
       </div>
 
@@ -336,15 +341,15 @@ export default function StrategiesView({
                 onClick={() => refreshStrategies()}
                 className="mt-2 rounded-full border border-black/10 dark:border-white/10 px-4 py-2 text-[14px] font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
-                Retry
+                {t('common.retry')}
               </button>
             </div>
           ) : sortedStrategies.length === 0 ? (
             <div className="mt-16 flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
               <p className="max-w-sm text-[15px] leading-6">
                 {searchText
-                  ? "No strategies match your search."
-                  : "Strategies you save from chat will appear here."}
+                  ? t('strategies.no_match')
+                  : t('strategies.empty_state')}
               </p>
             </div>
           ) : (
@@ -431,7 +436,7 @@ export default function StrategiesView({
                               <Pin className="w-4 h-4" />
                             </div>
                             <span className="text-[11px] font-medium tracking-tight">
-                              {strategy.isPinned ? "Unpin" : "Pin"}
+                              {strategy.isPinned ? t('common.unpin') : t('common.pin')}
                             </span>
                           </button>
                           <button
@@ -445,7 +450,7 @@ export default function StrategiesView({
                               <Edit2 className="w-4 h-4" />
                             </div>
                             <span className="text-[11px] font-medium tracking-tight">
-                              Rename
+                              {t('common.rename')}
                             </span>
                           </button>
                           <button
@@ -456,7 +461,7 @@ export default function StrategiesView({
                               <Trash2 className="w-4 h-4" />
                             </div>
                             <span className="text-[11px] font-medium tracking-tight">
-                              Delete
+                              {t('common.delete')}
                             </span>
                           </button>
                           <div className="absolute inset-x-0 bottom-[-16px] h-4 flex justify-center items-center opacity-50 text-[9px] tracking-widest uppercase pointer-events-none drop-shadow-sm">
@@ -480,17 +485,17 @@ export default function StrategiesView({
                               <div className="col-span-1" />
                               <div className="col-span-1 flex flex-col items-center justify-center">
                                 <span className="text-[10px] lowercase font-medium text-black/40 dark:text-white/40 tracking-normal text-center leading-tight">
-                                  overall profit
+                                  {t('strategies.metrics.overall_profit')}
                                 </span>
                               </div>
                               <div className="col-span-1 flex flex-col items-center justify-center">
                                 <span className="text-[10px] lowercase font-medium text-black/40 dark:text-white/40 tracking-normal text-center leading-tight">
-                                  max drawdown
+                                  {t('strategies.metrics.max_drawdown')}
                                 </span>
                               </div>
                               <div className="col-span-1 flex flex-col items-center justify-center">
                                 <span className="text-[10px] lowercase font-medium text-black/40 dark:text-white/40 tracking-normal text-center leading-tight">
-                                  win rate
+                                  {t('strategies.metrics.win_rate')}
                                 </span>
                               </div>
                             </div>
@@ -553,7 +558,7 @@ export default function StrategiesView({
                               ) : (
                                 <Play className="w-4 h-4" />
                               )}
-                              {isRunning ? "Running…" : "Run simulation"}
+                              {isRunning ? t('common.loading') : t('common.run_simulation')}
                             </button>
                           </div>
                         )}
@@ -603,7 +608,7 @@ export default function StrategiesView({
             <Search className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search strategies..."
+              placeholder={t('strategies.search_placeholder')}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 dark:border-white/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] shadow-lg text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
