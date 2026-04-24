@@ -1,4 +1,0 @@
-# file: /app/src/argus/config.py
-# hypothesis_version: 6.151.12
-
-[0.0, 0.5, 10.0, 900, ',', '.env', 'BTC/USD', 'CRYPTO_SYMBOLS', 'DEV', 'EQUITY_SYMBOLS', 'ETH/USD', 'XRP/USD', 'before', 'ignore', 'utf-8']

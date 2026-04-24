@@ -1,4 +1,0 @@
-# file: /app/src/argus/api/strategies.py
-# hypothesis_version: 6.151.12
-
-[100, 403, 404, 500, 3600, '/api/v1/strategies', '/{strategy_id}', '29', '30', 'Strategies', 'Strategy not found', 'X-RateLimit-Limit', 'X-RateLimit-Reset', 'executed_at']
