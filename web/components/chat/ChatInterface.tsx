@@ -659,31 +659,10 @@ export default function ChatInterface() {
         <div className="absolute inset-0 z-[15] pointer-events-none flex items-center justify-center">
           <div className="flex flex-col items-center gap-5 px-6 animate-in fade-in duration-700">
             <p className="text-[22px] sm:text-[28px] font-medium tracking-tight text-black/80 dark:text-white/85">
-              <span className="inline-block text-transparent bg-clip-text bg-[length:220%_100%] bg-gradient-to-r from-black/70 via-black to-black/70 dark:from-white/70 dark:via-white dark:to-white/70 animate-[argus_welcome_sweep_3.2s_ease-in-out_infinite] [filter:drop-shadow(0_0_0_rgba(255,255,255,0))] dark:[filter:drop-shadow(0_0_0_rgba(255,255,255,0))]">
-                Welcome to argus
+              <span className="argus-welcome-typed [filter:drop-shadow(0_0_0_rgba(255,255,255,0))] dark:[filter:drop-shadow(0_0_0_rgba(255,255,255,0))]">
+                Welcome to argus, user.
               </span>
-              <span className="text-black/75 dark:text-white/82">, user.</span>
             </p>
-            <svg
-              viewBox="0 0 260 80"
-              className="w-[220px] h-[54px] opacity-80 dark:opacity-95 animate-[argus_infinity_pulse_3.2s_ease-in-out_infinite]"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="argusInfinityGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="currentColor" stopOpacity="0.18" />
-                  <stop offset="50%" stopColor="currentColor" stopOpacity="0.95" />
-                  <stop offset="100%" stopColor="currentColor" stopOpacity="0.18" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M20 40 C40 10, 80 10, 120 40 C160 70, 200 70, 240 40 C200 10, 160 10, 120 40 C80 70, 40 70, 20 40 Z"
-                fill="none"
-                stroke="url(#argusInfinityGradient)"
-                strokeWidth="2.25"
-                className="text-black dark:text-white [filter:drop-shadow(0_0_7px_rgba(255,255,255,0.25))] dark:[filter:drop-shadow(0_0_9px_rgba(255,255,255,0.45))] [stroke-dasharray:330] animate-[argus_infinity_flow_4.2s_linear_infinite]"
-              />
-            </svg>
           </div>
         </div>
       )}

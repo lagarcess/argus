@@ -54,7 +54,7 @@ Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent
 
 ## 📖 Documentation References
 
-- **API contract:** `docs/api/api_contract.md`
+- **API contract:** `docs/API_CONTRACT.md`
 - **Master Registry:** `AGENTS.md` (overall agent structure, skills, rules)
 
 ---
@@ -62,7 +62,7 @@ Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent
 ## 📝 Realignment Checklist (Mandatory)
 
 1. **Synchronize**: Force rebase of `main`, prioritize upstream.
-2. **Realignment**: Re-verify mission against current `docs/api/api_contract.md`.
+2. **Realignment**: Re-verify mission against current `docs/API_CONTRACT.md`.
 3. **Validation**: Enforce `/verify` and iterate failures with `/fix`.
 4. **Reporting**: Summarize shifts necessitated by drift.
 
@@ -80,5 +80,5 @@ Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent
 ## Resources
 
 - **Antigravity Docs:** https://antigravity.google/docs/
-- **API reference:** `docs/api/api_contract.md`
+- **API reference:** `docs/API_CONTRACT.md`
 - **Project agents:** `AGENTS.md`
