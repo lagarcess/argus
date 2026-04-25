@@ -193,7 +193,7 @@ export default function CollectionsView({
       )}
 
       {/* Header */}
-      <div className="flex h-16 shrink-0 items-center justify-between px-4">
+      <div className="flex h-16 shrink-0 items-center justify-between px-4 z-40">
         <button
           type="button"
           onClick={onMenuClick}
@@ -214,30 +214,11 @@ export default function CollectionsView({
         </button>
       </div>
 
-      {/* Search */}
-      <div className="px-5 pb-4">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-black/40 dark:text-white/40" />
-          <input
-            type="text"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder={t('collections.search_placeholder')}
-            className="h-[52px] w-full rounded-full border border-black/10 bg-white pl-12 pr-12 text-[16px] outline-none transition-colors focus:ring-2 focus:ring-black/10 dark:border-white/10 dark:bg-[#1f2225] dark:focus:ring-white/10"
-          />
-          {searchText && (
-            <button
-              onClick={() => setSearchText("")}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-black/60 dark:text-white/60 hover:bg-black/20 dark:hover:bg-white/20 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Header blur */}
+      <div className="absolute top-0 inset-x-0 h-28 z-30 pointer-events-none backdrop-blur-[8px] bg-[#f5f5f5]/10 dark:bg-[#191c1f]/20 [mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)]" />
 
       {/* List */}
-      <div className="argus-scrollbar flex-1 overflow-y-auto px-5 pb-28">
+      <div className="argus-scrollbar flex-1 overflow-y-auto px-5 pt-8 pb-32">
         {loading ? (
           <div className="flex flex-col gap-3 animate-pulse">
             {[1, 2, 3].map((i) => (
@@ -373,16 +354,37 @@ export default function CollectionsView({
         )}
       </div>
 
-      {/* Bottom settings button */}
-      <div className="pointer-events-none absolute bottom-6 inset-x-0 px-4">
-        <button
-          type="button"
-          onClick={onSettingsClick}
-          className="pointer-events-auto flex h-[52px] w-[52px] items-center justify-center rounded-full border border-black/10 bg-white/70 backdrop-blur-xl transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/70 dark:hover:bg-white/5"
-          aria-label="Open settings"
-        >
-          <Settings className="h-5 w-5" />
-        </button>
+      {/* Bottom bar */}
+      <div className="absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none">
+        <div className="pointer-events-auto max-w-3xl mx-auto flex items-center gap-4 transition-all duration-300 opacity-50 hover:opacity-100 focus-within:opacity-100 group">
+          <button
+            type="button"
+            onClick={onSettingsClick}
+            className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-black/10 bg-white/50 backdrop-blur-xl transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:hover:bg-white/5 shadow-lg shrink-0"
+            aria-label="Open settings"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
+
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-black/40 dark:text-white/40" />
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder={t('collections.search_placeholder')}
+              className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] shadow-lg text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
+            />
+            {searchText && (
+              <button
+                onClick={() => setSearchText("")}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-black/60 dark:text-white/60 hover:bg-black/20 dark:hover:bg-white/20 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

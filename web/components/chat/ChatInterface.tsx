@@ -699,7 +699,7 @@ export default function ChatInterface() {
                           <button
                             type="button"
                             onClick={() => setActiveChatOptionsPanel("none")}
-                            className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium uppercase text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
+                            className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
                           >
                             {t('chat.past_sessions')}
                             <ChevronRight className="h-4 w-4 -rotate-90" />
