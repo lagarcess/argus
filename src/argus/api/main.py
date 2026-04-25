@@ -358,6 +358,7 @@ def create_run_from_payload(
     *,
     strategy_id: str | None = None,
     conversation_id: str | None = None,
+    persist_in_memory: bool = True,
 ) -> BacktestRun:
     symbols = payload.get("symbols") or []
     if not symbols:
@@ -371,7 +372,18 @@ def create_run_from_payload(
     inferred_asset_class = ensure_same_asset_or_raise(symbols, request)
     payload["asset_class"] = payload.get("asset_class") or inferred_asset_class
     if payload["asset_class"] != inferred_asset_class:
-        ensure_same_asset_or_raise(symbols, request)
+        raise problem(
+            request,
+            status_code=422,
+            code="asset_class_conflict",
+            title="Asset Class Conflict",
+            detail="Requested asset_class does not match inferred symbol asset class.",
+            context={
+                "requested_asset_class": payload["asset_class"],
+                "inferred_asset_class": inferred_asset_class,
+                "symbols": [classify_symbol(symbol).symbol for symbol in symbols],
+            },
+        )
     payload["benchmark_symbol"] = payload.get("benchmark_symbol") or default_benchmark(
         payload["asset_class"]
     )
@@ -411,7 +423,8 @@ def create_run_from_payload(
         },
         trades=[],
     )
-    store.backtest_runs[run.id] = run
+    if persist_in_memory:
+        store.backtest_runs[run.id] = run
     return run
 
 
@@ -468,15 +481,27 @@ def run_backtest(
         }
     if not data.get("template"):
         data["template"] = "rsi_mean_reversion"
-    run = create_run_from_payload(data, request)
+    run = create_run_from_payload(
+        data,
+        request,
+        persist_in_memory=supabase_gateway is None,
+    )
+    if supabase_gateway is not None:
+        run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
     if idempotency_key:
         store.idempotency[(user.id, endpoint, idempotency_key)] = run
     return BacktestRunResponse(run=run)
 
 
 @app.get("/api/v1/backtests/{run_id}", response_model=BacktestRunResponse)
-def get_backtest(run_id: str, request: Request) -> BacktestRunResponse:
-    run = store.backtest_runs.get(run_id)
+def get_backtest(
+    run_id: str, request: Request, user: User = Depends(current_user)
+) -> BacktestRunResponse:
+    run = (
+        supabase_gateway.get_backtest_run(user_id=user.id, run_id=run_id)
+        if supabase_gateway is not None
+        else store.backtest_runs.get(run_id)
+    )
     if not run:
         raise problem(
             request,
@@ -933,7 +958,10 @@ def chat_stream(
             },
             request,
             conversation_id=conversation.id,
+            persist_in_memory=supabase_gateway is None,
         )
+        if supabase_gateway is not None:
+            run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
         assistant_text = assistant_copy_for_result(
             run.symbols, payload.language or conversation.language or "en"
         )
@@ -945,7 +973,8 @@ def chat_stream(
             created_at=utcnow(),
         )
         store.messages[conversation.id].append(assistant_message)
-        new_title = f"{run.symbols[0]} {run.template.replace('_', ' ')} idea"
+        template_name = str(run.config_snapshot.get("template", "strategy"))
+        new_title = f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
         if conversation.title_source == "system_default":
             patch = {
                 "title": new_title,
@@ -1010,4 +1039,3 @@ def feedback(
     )
 
     return SuccessResponse(success=True)
-
