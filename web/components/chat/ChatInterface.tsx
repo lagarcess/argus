@@ -484,7 +484,7 @@ export default function ChatInterface() {
           <button
             type="button"
             onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
-            className="group mb-2 flex items-center justify-between pr-2 text-[13px] font-medium uppercase tracking-wide text-black/45 transition-colors hover:text-black dark:text-white/45 dark:hover:text-white"
+            className="group mb-2 flex items-center justify-between pr-2 text-[13px] font-medium text-black/45 transition-colors hover:text-black dark:text-white/45 dark:hover:text-white"
           >
             <div className="flex items-center gap-2">
               <History className="h-4 w-4" />
