@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from argus.api.main import app
+from argus.api.schemas import BacktestRun
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from fastapi.testclient import TestClient
 
@@ -56,7 +57,47 @@ def test_create_message_ownership_failure(mock_gateway):
     pass
 
 
-def test_attach_strategies_ownership_failure(mock_gateway):
-    # This could test the ValueError being raised in attach_strategies
-    # But attach_strategies is tested in the Real/Mock Gateway.
-    pass
+def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock_gateway):
+    mock_gateway.create_backtest_run.side_effect = (
+        lambda *, user_id, run: run
+    )
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["TSLA"]},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    run = response.json()["run"]
+    assert run["config_snapshot"]["side"] == "long"
+    assert run["config_snapshot"]["starting_capital"] == 10000
+    assert run["config_snapshot"]["benchmark_symbol"] == "SPY"
+    assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY."
+    mock_gateway.create_backtest_run.assert_called_once()
+    called_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
+    assert isinstance(called_run, BacktestRun)
+    assert called_run.config_snapshot["starting_capital"] == 10000
+
+
+def test_get_backtest_supabase_reads_from_gateway(mock_gateway):
+    mock_gateway.create_backtest_run.side_effect = (
+        lambda *, user_id, run: run
+    )
+    create = client.post(
+        "/api/v1/backtests/run",
+        json={"template": "rsi_mean_reversion", "symbols": ["AAPL"]},
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert create.status_code == 200
+    created_run = create.json()["run"]
+    mock_gateway.get_backtest_run.return_value = BacktestRun.model_validate(created_run)
+
+    response = client.get(
+        f"/api/v1/backtests/{created_run['id']}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.get_backtest_run.assert_called_once()
+    assert response.json()["run"]["id"] == created_run["id"]

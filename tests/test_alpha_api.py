@@ -78,6 +78,28 @@ def test_backtest_rejects_mixed_asset_symbols_with_problem_details() -> None:
     ]
 
 
+def test_backtest_rejects_explicit_asset_class_conflict() -> None:
+    client = _client()
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "rsi_mean_reversion",
+            "asset_class": "crypto",
+            "symbols": ["AAPL"],
+        },
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["code"] == "asset_class_conflict"
+    assert payload["context"] == {
+        "requested_asset_class": "crypto",
+        "inferred_asset_class": "equity",
+        "symbols": ["AAPL"],
+    }
+
+
 def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
