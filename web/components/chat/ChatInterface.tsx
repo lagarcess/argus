@@ -100,6 +100,7 @@ export default function ChatInterface() {
   }>({ isOpen: false, type: "general" });
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const chatOptionsRef = useRef<HTMLDivElement>(null);
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
@@ -386,6 +387,20 @@ export default function ChatInterface() {
     setActiveChatOptionsPanel("none");
   };
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (chatOptionsRef.current && !chatOptionsRef.current.contains(event.target as Node)) {
+        closeChatOptions();
+      }
+    }
+    if (showChatOptions) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showChatOptions]);
+
   const handleArchiveChat = async () => {
     if (!conversationId) return;
     try {
@@ -619,7 +634,7 @@ export default function ChatInterface() {
               <h1 className="text-[16px] font-medium tracking-tight">argus</h1>
 
               {/* Chat options menu */}
-              <div className="relative z-30">
+              <div className="relative z-30" ref={chatOptionsRef}>
                 <button
                   type="button"
                   onClick={() => {
@@ -633,15 +648,8 @@ export default function ChatInterface() {
                 </button>
 
                 {showChatOptions && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Close chat options"
-                      className="fixed inset-0 z-40 cursor-default bg-black/15 md:bg-transparent dark:bg-black/50 md:dark:bg-transparent"
-                      onClick={closeChatOptions}
-                    />
-                    <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-1 md:w-[260px] md:rounded-[20px] md:border md:pb-2 md:shadow-xl">
-                      <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
+                  <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-1 md:w-[260px] md:rounded-[20px] md:border md:pb-2 md:shadow-xl">
+                    <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
 
                       {activeChatOptionsPanel === "none" && (
                         <div>
@@ -752,7 +760,6 @@ export default function ChatInterface() {
                         </div>
                       )}
                     </div>
-                  </>
                 )}
               </div>
             </header>
