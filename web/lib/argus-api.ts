@@ -150,17 +150,21 @@ export function resultCardFromRun(run: BacktestRun) {
  * Formats an ISO timestamp as a human-readable relative date string.
  * Returns "today", "yesterday", or a short locale date string.
  */
-export function formatRelativeDate(isoString: string): string {
+export function formatRelativeDate(
+  isoString: string,
+  labels: { today: string; yesterday: string },
+  locale: string = "en-US",
+): string {
   const date = new Date(isoString);
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterdayStart = new Date(todayStart);
   yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
-  if (date >= todayStart) return "today";
-  if (date >= yesterdayStart) return "yesterday";
+  if (date >= todayStart) return labels.today;
+  if (date >= yesterdayStart) return labels.yesterday;
 
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(locale, {
     month: "long",
     day: "numeric",
     year: "numeric",

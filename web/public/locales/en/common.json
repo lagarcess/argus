@@ -20,7 +20,9 @@
     "error_occurred": "An error occurred",
     "save": "Save",
     "cancel": "Cancel",
-    "search": "Search"
+    "search": "Search",
+    "today": "today",
+    "yesterday": "yesterday"
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
@@ -49,6 +51,7 @@
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
     "try_new_strategy": "Try a new strategy",
     "empty_history": "Your past chats will appear here.",
+    "no_recent_activity": "No recent activity yet. Your strategies and chats will appear here.",
     "new_chat": "New chat",
     "delete_chat": "Delete chat",
     "past_sessions": "Past sessions",

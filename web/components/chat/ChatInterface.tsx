@@ -38,7 +38,7 @@ type View = "chat" | "strategies" | "collections" | "settings";
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const starterActions = useMemo<ChatActionOption[]>(() => [
     {
@@ -94,7 +94,12 @@ export default function ChatInterface() {
   /** Imperative refresh — safe to call from event handlers */
   const refreshHistory = () => {
     listHistory(30)
-      .then(({ items }) => setHistoryItems(items))
+      .then(({ items }) => {
+        const filtered = items.filter(
+          (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
+        );
+        setHistoryItems(filtered);
+      })
       .catch(() => undefined);
   };
 
@@ -102,37 +107,10 @@ export default function ChatInterface() {
     const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
     listHistory(30)
       .then(({ items }) => {
-        if (items.length === 0 && isMock) {
-          // Inject high-fidelity mocks for design verification
-          setHistoryItems([
-            {
-              id: "mock-1",
-              type: "chat",
-              title: "Tesla Mean Reversion",
-              subtitle: "today",
-              pinned: true,
-              created_at: new Date().toISOString(),
-            },
-            {
-              id: "mock-2",
-              type: "strategy",
-              title: "BTC Halving Play",
-              subtitle: "yesterday",
-              pinned: false,
-              created_at: new Date(Date.now() - 86400000).toISOString(),
-            },
-            {
-              id: "mock-3",
-              type: "collection",
-              title: "Dividend Aristocrats",
-              subtitle: "Apr 20, 2026",
-              pinned: false,
-              created_at: new Date(Date.now() - 400000000).toISOString(),
-            },
-          ]);
-        } else {
-          setHistoryItems(items);
-        }
+        const filtered = items.filter(
+          (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
+        );
+        setHistoryItems(filtered);
       })
       .catch(() => undefined);
   }, []);
@@ -421,9 +399,11 @@ export default function ChatInterface() {
           {isRecentsExpanded && (
             <div className="argus-scrollbar flex flex-1 flex-col gap-0.5 overflow-y-auto pr-2">
               {historyItems.length === 0 ? (
-                <p className="px-4 py-3 text-[13px] text-black/35 dark:text-white/35">
-                  {t('chat.empty_history')}
-                </p>
+                <div className="px-4 py-6 text-center">
+                  <p className="text-[13px] leading-relaxed text-black/30 dark:text-white/30">
+                    {t('chat.no_recent_activity')}
+                  </p>
+                </div>
               ) : (
                 historyItems.map((item) => (
                   <button
@@ -440,7 +420,11 @@ export default function ChatInterface() {
                       {item.title}
                     </span>
                     <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
-                      {formatRelativeDate(item.created_at)} · {t(`common.${item.type}`, item.type)}
+                      {formatRelativeDate(
+                        item.created_at,
+                        { today: t('common.today'), yesterday: t('common.yesterday') },
+                        i18n.language
+                      )} · {t(`common.${item.type}`, item.type)}
                     </span>
                   </button>
                 ))

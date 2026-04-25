@@ -122,7 +122,15 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
 
 
 def current_user() -> User:
-    return store.get_or_create_dev_user()
+    user = store.get_or_create_dev_user()
+    if supabase_gateway is not None:
+        # Ensure the mock user exists in the Supabase 'profiles' table to prevent FK violations
+        try:
+            supabase_gateway.get_or_create_mock_user()
+        except Exception:
+            # Fallback for environments where auth.admin is restricted
+            pass
+    return user
 
 
 @app.post("/api/v1/dev/reset", response_model=SuccessResponse)
