@@ -78,6 +78,28 @@ def test_backtest_rejects_mixed_asset_symbols_with_problem_details() -> None:
     ]
 
 
+def test_backtest_rejects_explicit_asset_class_conflict() -> None:
+    client = _client()
+
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "rsi_mean_reversion",
+            "asset_class": "crypto",
+            "symbols": ["AAPL"],
+        },
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["code"] == "asset_class_conflict"
+    assert payload["context"] == {
+        "requested_asset_class": "crypto",
+        "inferred_asset_class": "equity",
+        "symbols": ["AAPL"],
+    }
+
+
 def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None:
     client = _client()
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
@@ -115,6 +137,26 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     history = client.get("/api/v1/history")
     assert history.status_code == 200
     assert [item["type"] for item in history.json()["items"]] == ["run", "chat"]
+
+
+def test_get_backtest_in_memory_enforces_owner() -> None:
+    client = _client()
+    run = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["TSLA"],
+        },
+    ).json()["run"]
+
+    from argus.api.main import store
+
+    store.backtest_run_owners[run["id"]] = "00000000-0000-0000-0000-000000000099"
+    response = client.get(f"/api/v1/backtests/{run['id']}")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
 
 
 def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> None:

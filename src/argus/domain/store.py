@@ -28,6 +28,7 @@ class AlphaStore:
     collections: dict[str, Collection] = field(default_factory=dict)
     collection_strategies: dict[str, set[str]] = field(default_factory=dict)
     backtest_runs: dict[str, Any] = field(default_factory=dict)
+    backtest_run_owners: dict[str, str] = field(default_factory=dict)
     idempotency: dict[tuple[str, str, str], Any] = field(default_factory=dict)
     feedback: list[dict[str, Any]] = field(default_factory=list)
 
@@ -39,6 +40,7 @@ class AlphaStore:
         self.collections.clear()
         self.collection_strategies.clear()
         self.backtest_runs.clear()
+        self.backtest_run_owners.clear()
         self.idempotency.clear()
         self.feedback.clear()
 
