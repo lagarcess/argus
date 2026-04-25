@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import { Message } from "./types";
@@ -97,13 +97,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
 
   return (
     <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300 group">
-      <div className="flex gap-4 max-w-[90%]">
-        {/* Minimal AI Avatar/Icon */}
-        <div className="w-8 h-8 shrink-0 rounded-full bg-[#191c1f] dark:bg-white flex items-center justify-center mt-1">
-          <Sparkles className="w-4 h-4 text-white dark:text-[#191c1f]" />
-        </div>
-        
-        {/* Elevated Raw Text & Actions */}
+      <div className="flex flex-col max-w-[95%]">
         <div className="flex flex-col mt-1.5">
           {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
             <div className="w-full max-w-[min(100%,660px)]">

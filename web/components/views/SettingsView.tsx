@@ -421,7 +421,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
       </div>
 
       {isLanguageModalOpen && (
-        <div className="absolute inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
           <button
             className="absolute inset-0"
             aria-label="Close language modal"
@@ -469,7 +469,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
       )}
 
       {isAppearanceModalOpen && (
-        <div className="absolute inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center">
           <button
             className="absolute inset-0"
             aria-label="Close appearance modal"
