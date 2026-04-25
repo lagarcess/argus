@@ -2,8 +2,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from argus.api.main import app
-from argus.api.schemas import BacktestRun
+from argus.api.schemas import BacktestRun, Conversation
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -101,3 +102,33 @@ def test_get_backtest_supabase_reads_from_gateway(mock_gateway):
     assert response.status_code == 200
     mock_gateway.get_backtest_run.assert_called_once()
     assert response.json()["run"]["id"] == created_run["id"]
+
+
+def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-1",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.create_backtest_run.side_effect = (
+        lambda *, user_id, run: run
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"conversation_id": "conv-1", "message": "Test TSLA dip idea"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "event: result" in response.text
+    mock_gateway.create_backtest_run.assert_called_once()

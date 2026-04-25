@@ -356,8 +356,10 @@ def create_run_from_payload(
     payload: dict[str, Any],
     request: Request,
     *,
+    user_id: str | None = None,
     strategy_id: str | None = None,
     conversation_id: str | None = None,
+    persist_in_memory: bool = True,
 ) -> BacktestRun:
     symbols = payload.get("symbols") or []
     if not symbols:
@@ -422,7 +424,10 @@ def create_run_from_payload(
         },
         trades=[],
     )
-    store.backtest_runs[run.id] = run
+    if persist_in_memory:
+        store.backtest_runs[run.id] = run
+        if user_id is not None:
+            store.backtest_run_owners[run.id] = user_id
     return run
 
 
@@ -479,7 +484,12 @@ def run_backtest(
         }
     if not data.get("template"):
         data["template"] = "rsi_mean_reversion"
-    run = create_run_from_payload(data, request)
+    run = create_run_from_payload(
+        data,
+        request,
+        user_id=user.id,
+        persist_in_memory=supabase_gateway is None,
+    )
     if supabase_gateway is not None:
         run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
     if idempotency_key:
@@ -496,6 +506,10 @@ def get_backtest(
         if supabase_gateway is not None
         else store.backtest_runs.get(run_id)
     )
+    if supabase_gateway is None:
+        owner_id = store.backtest_run_owners.get(run_id)
+        if owner_id is not None and owner_id != user.id:
+            run = None
     if not run:
         raise problem(
             request,
@@ -951,8 +965,12 @@ def chat_stream(
                 "timeframe": "1D",
             },
             request,
+            user_id=user.id,
             conversation_id=conversation.id,
+            persist_in_memory=supabase_gateway is None,
         )
+        if supabase_gateway is not None:
+            run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
         assistant_text = assistant_copy_for_result(
             run.symbols, payload.language or conversation.language or "en"
         )
