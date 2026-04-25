@@ -180,13 +180,20 @@ class SupabaseGateway:
         created = self.client.table("conversations").insert(payload).execute()
         return Conversation.model_validate(_row_one(created))
 
-    def list_conversations(self, *, user_id: str, limit: int) -> list[Conversation]:
+    def list_conversations(
+        self, *, user_id: str, limit: int, archived: bool | None = None, deleted: bool = False
+    ) -> list[Conversation]:
+        query = self.client.table("conversations").select("*").eq("user_id", user_id)
+        if deleted:
+            query = query.not_.is_("deleted_at", "null")
+        else:
+            query = query.is_("deleted_at", "null")
+
+        if archived is not None:
+            query = query.eq("archived", archived)
+
         rows = (
-            self.client.table("conversations")
-            .select("*")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("pinned", desc=True)
+            query.order("pinned", desc=True)
             .order("updated_at", desc=True)
             .limit(limit)
             .execute()
@@ -295,51 +302,29 @@ class SupabaseGateway:
         ).eq("id", conversation_id).eq("user_id", user_id).execute()
 
     def list_history_rows(
-        self, *, user_id: str, limit: int
+        self, *, user_id: str, limit: int, deleted: bool = False
     ) -> dict[str, list[dict[str, Any]]]:
-        runs = (
-            self.client.table("backtest_runs")
-            .select("id,conversation_result_card,created_at")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-            .data
-            or []
-        )
-        chats = (
-            self.client.table("conversations")
-            .select("id,title,last_message_preview,pinned,updated_at,deleted_at")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-            .data
-            or []
-        )
-        strategies = (
-            self.client.table("strategies")
-            .select("id,name,symbols,pinned,updated_at,deleted_at")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-            .data
-            or []
-        )
-        collections = (
-            self.client.table("collections")
-            .select("id,name,pinned,updated_at,deleted_at")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-            .data
-            or []
-        )
+        query_runs = self.client.table("backtest_runs").select("id,conversation_result_card,created_at").eq("user_id", user_id)
+        query_chats = self.client.table("conversations").select("id,title,last_message_preview,pinned,updated_at,deleted_at").eq("user_id", user_id)
+        query_strategies = self.client.table("strategies").select("id,name,symbols,pinned,updated_at,deleted_at").eq("user_id", user_id)
+        query_collections = self.client.table("collections").select("id,name,pinned,updated_at,deleted_at").eq("user_id", user_id)
+
+        if deleted:
+            # We don't soft-delete backtest_runs usually, but if we did:
+            # query_runs = query_runs.not_.is_("deleted_at", "null")
+            query_chats = query_chats.not_.is_("deleted_at", "null")
+            query_strategies = query_strategies.not_.is_("deleted_at", "null")
+            query_collections = query_collections.not_.is_("deleted_at", "null")
+        else:
+            query_chats = query_chats.is_("deleted_at", "null")
+            query_strategies = query_strategies.is_("deleted_at", "null")
+            query_collections = query_collections.is_("deleted_at", "null")
+
+        runs = query_runs.order("created_at", desc=True).limit(limit).execute().data or []
+        chats = query_chats.order("updated_at", desc=True).limit(limit).execute().data or []
+        strategies = query_strategies.order("updated_at", desc=True).limit(limit).execute().data or []
+        collections = query_collections.order("updated_at", desc=True).limit(limit).execute().data or []
+
         return {
             "runs": runs,
             "conversations": chats,
@@ -413,13 +398,17 @@ class SupabaseGateway:
         )
         return Strategy.model_validate(_row_one(created))
 
-    def list_strategies(self, *, user_id: str, limit: int) -> list[Strategy]:
+    def list_strategies(
+        self, *, user_id: str, limit: int, deleted: bool = False
+    ) -> list[Strategy]:
+        query = self.client.table("strategies").select("*").eq("user_id", user_id)
+        if deleted:
+            query = query.not_.is_("deleted_at", "null")
+        else:
+            query = query.is_("deleted_at", "null")
+
         rows = (
-            self.client.table("strategies")
-            .select("*")
-            .eq("user_id", user_id)
-            .is_("deleted_at", "null")
-            .order("pinned", desc=True)
+            query.order("pinned", desc=True)
             .order("updated_at", desc=True)
             .limit(limit)
             .execute()

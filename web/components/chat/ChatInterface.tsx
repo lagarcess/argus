@@ -2,7 +2,9 @@
 
 import { useMemo, useEffect, useRef, useState } from "react";
 import {
+  Archive,
   ChevronRight,
+  FolderPlus,
   History,
   Menu,
   MessageSquarePlus,
@@ -103,7 +105,7 @@ export default function ChatInterface() {
 
   /** Imperative refresh — safe to call from event handlers */
   const refreshHistory = () => {
-    listHistory(30)
+    listHistory({ limit: 30 })
       .then(({ items }) => {
         const filtered = items.filter(
           (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
@@ -115,7 +117,7 @@ export default function ChatInterface() {
 
   useEffect(() => {
     const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-    listHistory(30)
+    listHistory({ limit: 30 })
       .then(({ items }) => {
         const filtered = items.filter(
           (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
@@ -376,6 +378,37 @@ export default function ChatInterface() {
     setActiveChatOptionsPanel("none");
   };
 
+  const handleArchiveChat = async () => {
+    if (!conversationId) return;
+    try {
+      await patchConversation(conversationId, { archived: true });
+      showToast(t("common.archived"));
+      closeChatOptions();
+      void startNewChat();
+    } catch {
+      showToast(t("common.error_occurred"));
+    }
+  };
+
+  const handleAddToCollection = () => {
+    // Find the latest strategy result in the message list
+    const lastStrategyMsg = [...messages].reverse().find(m => m.kind === "strategy_result" && m.result);
+    if (lastStrategyMsg?.result) {
+      const res = lastStrategyMsg.result;
+      setCollectionPickerTarget({
+        runId: res.runId,
+        strategyId: res.strategyId,
+        strategyName: res.strategyName,
+        symbols: [], // The result card usually has these in context but they are not strictly needed for the picker if strategyId exists
+        template: "", 
+        assetClass: "equity", // Defaulting to equity for Alpha demo
+      });
+      closeChatOptions();
+    } else {
+      showToast(t("chat.error_load"));
+    }
+  };
+
   // ── Recent items grouped by type ───────────────────────────────────────────
   const groupedHistory = useMemo(() => ({
     chat: historyItems.filter((h) => h.type === "chat").slice(0, 10),
@@ -614,6 +647,14 @@ export default function ChatInterface() {
                           </button>
                           <button
                             type="button"
+                            onClick={handleAddToCollection}
+                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                          >
+                            <FolderPlus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                            {t('common.add_to_collection')}
+                          </button>
+                          <button
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
                             className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                           >
@@ -626,8 +667,26 @@ export default function ChatInterface() {
                           <div className="my-2 h-px bg-black/5 dark:bg-white/5" />
                           <button
                             type="button"
-                            disabled
-                            className="flex w-full cursor-not-allowed items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-black/35 dark:text-white/35 md:px-5 md:py-3 md:text-[15px]"
+                            onClick={handleArchiveChat}
+                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                          >
+                            <Archive className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                            {t('chat.archive_chat')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!conversationId) return;
+                              deleteConversation(conversationId)
+                                .then(() => {
+                                  showToast(t('common.delete'));
+                                  refreshHistory();
+                                  void startNewChat();
+                                  closeChatOptions();
+                                })
+                                .catch(() => showToast(t('common.error_occurred')));
+                            }}
+                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
                           >
                             <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
                             {t('chat.delete_chat')}
@@ -650,21 +709,37 @@ export default function ChatInterface() {
                               {t('chat.no_past_sessions')}
                             </p>
                           ) : (
-                            groupedHistory.chat.map((item) => (
-                              <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => { closeChatOptions(); void loadConversation(item.id, item.title); }}
-                                className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
-                              >
-                                <span className="truncate text-[15px] font-medium">
-                                  {item.title}
-                                </span>
-                                <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45 capitalize">
-                                  {item.subtitle}
-                                </span>
-                              </button>
-                            ))
+                            <div className="max-h-[300px] overflow-y-auto">
+                              {groupedHistory.chat.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setConversationId(item.id);
+                                    getConversationMessages(item.id).then(({ items }) => {
+                                      setMessages(
+                                        items.reverse().map((m) => ({
+                                          id: m.id,
+                                          role: m.role === "user" ? "user" : "ai",
+                                          content: m.content,
+                                          kind: m.content.includes("result") ? "strategy_result" : "text", // Basic heuristic to restore kind
+                                          // Note: kind restoration is tricky without full metadata, but this is a fallback
+                                        }))
+                                      );
+                                    });
+                                    closeChatOptions();
+                                  }}
+                                  className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
+                                >
+                                  <span className="truncate text-[15px] font-medium">
+                                    {item.title}
+                                  </span>
+                                  <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">
+                                    {item.subtitle}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
                           )}
                         </div>
                       )}

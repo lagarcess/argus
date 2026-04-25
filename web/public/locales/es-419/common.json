@@ -21,8 +21,13 @@
     "save": "Guardar",
     "cancel": "Cancelar",
     "search": "Buscar",
+    "archive": "Archivar",
+    "archived": "Archivado",
     "today": "hoy",
-    "yesterday": "ayer"
+    "yesterday": "ayer",
+    "no_items": "No se encontraron elementos",
+    "restore": "Restaurar",
+    "permanently_delete": "Eliminar permanentemente"
   },
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
@@ -55,6 +60,7 @@
     "new_chat": "Nuevo chat",
     "delete_chat": "Eliminar chat",
     "past_sessions": "Sesiones pasadas",
+    "archive_chat": "Archivar chat",
     "no_past_sessions": "No hay sesiones pasadas aún.",
     "added_to_collection": "Añadido a \"{{name}}\"",
     "good_response": "Buena respuesta",

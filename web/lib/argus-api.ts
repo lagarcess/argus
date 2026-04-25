@@ -226,9 +226,14 @@ export async function createConversation(language: "en" | "es-419" = "en") {
 
 // ─── Conversations ────────────────────────────────────────────────────────────
 
-export async function listConversations(limit = 20) {
+export async function listConversations(params: { limit?: number; archived?: boolean; deleted?: boolean } = {}) {
+  const { limit = 20, archived, deleted } = params;
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (archived !== undefined) searchParams.append("archived", String(archived));
+  if (deleted !== undefined) searchParams.append("deleted", String(deleted));
+  
   return apiFetch<{ items: Conversation[]; next_cursor: string | null }>(
-    `/conversations?limit=${limit}`,
+    `/conversations?${searchParams.toString()}`,
   );
 }
 
@@ -259,17 +264,25 @@ export async function deleteConversation(conversationId: string) {
 
 // ─── History ──────────────────────────────────────────────────────────────────
 
-export async function listHistory(limit = 20) {
+export async function listHistory(params: { limit?: number; deleted?: boolean } = {}) {
+  const { limit = 20, deleted } = params;
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (deleted !== undefined) searchParams.append("deleted", String(deleted));
+  
   return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(
-    `/history?limit=${limit}`,
+    `/history?${searchParams.toString()}`,
   );
 }
 
 // ─── Strategies ───────────────────────────────────────────────────────────────
 
-export async function listStrategies(limit = 50) {
+export async function listStrategies(params: { limit?: number; deleted?: boolean } = {}) {
+  const { limit = 50, deleted } = params;
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (deleted !== undefined) searchParams.append("deleted", String(deleted));
+  
   return apiFetch<{ items: Strategy[]; next_cursor: string | null }>(
-    `/strategies?limit=${limit}`,
+    `/strategies?${searchParams.toString()}`,
   );
 }
 

@@ -136,7 +136,7 @@ export default function StrategiesView({
 
   const refreshStrategies = async () => {
     try {
-      const { items } = await listStrategies(50);
+      const { items } = await listStrategies({ limit: 50 });
       setStrategies(items.map(mapStrategyToDisplay));
     } catch {
       setError(t('strategies.error_load'));
@@ -144,7 +144,7 @@ export default function StrategiesView({
   };
 
   useEffect(() => {
-    listStrategies(50)
+    listStrategies({ limit: 50 })
       .then(({ items }) => {
         setStrategies(items.map(mapStrategyToDisplay));
         setError(null);

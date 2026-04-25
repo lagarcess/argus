@@ -217,14 +217,35 @@ def create_conversation(
 @app.get("/api/v1/conversations", response_model=PaginatedConversations)
 def list_conversations(
     limit: int = Query(20, ge=1, le=100),
+    archived: bool | None = Query(None),
+    deleted: bool = Query(False),
+    user: User = Depends(current_user),
 ) -> PaginatedConversations:
-    items = [
-        conversation
-        for conversation in store.conversations.values()
-        if conversation.deleted_at is None
-    ]
-    items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
-    return PaginatedConversations(items=items[:limit])
+    if supabase_gateway is not None:
+        items = supabase_gateway.list_conversations(
+            user_id=user.id, limit=limit, archived=archived, deleted=deleted
+        )
+    else:
+        items = []
+        for conversation in store.conversations.values():
+            # Filter by deleted status
+            if deleted:
+                if conversation.deleted_at is None:
+                    continue
+            else:
+                if conversation.deleted_at is not None:
+                    continue
+            
+            # Filter by archived status (if specified)
+            if archived is not None:
+                if conversation.archived != archived:
+                    continue
+            
+            items.append(conversation)
+            
+        items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
+        items = items[:limit]
+    return PaginatedConversations(items=items)
 
 
 @app.patch("/api/v1/conversations/{conversation_id}", response_model=ConversationResponse)
@@ -490,12 +511,23 @@ def create_strategy(
 
 @app.get("/api/v1/strategies", response_model=PaginatedStrategies)
 def list_strategies(
-    limit: int = Query(20, ge=1, le=100), user: User = Depends(current_user)
+    limit: int = Query(20, ge=1, le=100),
+    deleted: bool = Query(False),
+    user: User = Depends(current_user),
 ) -> PaginatedStrategies:
     if supabase_gateway is not None:
-        items = supabase_gateway.list_strategies(user_id=user.id, limit=limit)
+        items = supabase_gateway.list_strategies(user_id=user.id, limit=limit, deleted=deleted)
     else:
-        items = [item for item in store.strategies.values() if item.deleted_at is None]
+        items = []
+        for item in store.strategies.values():
+            if deleted:
+                if item.deleted_at is None:
+                    continue
+            else:
+                if item.deleted_at is not None:
+                    continue
+            items.append(item)
+            
         items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
         items = items[:limit]
     return PaginatedStrategies(items=items)
@@ -645,54 +677,107 @@ def detach_strategy(collection_id: str, strategy_id: str) -> SuccessResponse:
 
 
 @app.get("/api/v1/history", response_model=PaginatedHistory)
-def history(limit: int = Query(20, ge=1, le=100)) -> PaginatedHistory:
-    items: list[HistoryItem] = []
-    for run in store.backtest_runs.values():
-        items.append(
-            HistoryItem(
-                type="run",
-                id=run.id,
-                title=run.conversation_result_card["title"],
-                subtitle=run.conversation_result_card["rows"][0]["value"],
-                created_at=run.created_at,
+def history(
+    limit: int = Query(20, ge=1, le=100),
+    deleted: bool = Query(False),
+    user: User = Depends(current_user),
+) -> PaginatedHistory:
+    if supabase_gateway is not None:
+        raw = supabase_gateway.list_history_rows(user_id=user.id, limit=limit, deleted=deleted)
+        items: list[HistoryItem] = []
+        for run in raw["runs"]:
+            items.append(
+                HistoryItem(
+                    type="run",
+                    id=run["id"],
+                    title=run["conversation_result_card"]["title"],
+                    subtitle=run["conversation_result_card"]["rows"][0]["value"],
+                    created_at=run["created_at"],
+                )
             )
-        )
-    for conversation in store.conversations.values():
-        if conversation.deleted_at is None:
+        for c in raw["conversations"]:
             items.append(
                 HistoryItem(
                     type="chat",
-                    id=conversation.id,
-                    title=conversation.title,
-                    subtitle=conversation.last_message_preview or "No messages yet",
-                    pinned=conversation.pinned,
-                    created_at=conversation.updated_at,
+                    id=c["id"],
+                    title=c["title"],
+                    subtitle=c["last_message_preview"] or "No messages yet",
+                    pinned=c["pinned"],
+                    created_at=c["updated_at"],
                 )
             )
-    for strategy in store.strategies.values():
-        if strategy.deleted_at is None:
+        for s in raw["strategies"]:
             items.append(
                 HistoryItem(
                     type="strategy",
-                    id=strategy.id,
-                    title=strategy.name,
-                    subtitle=", ".join(strategy.symbols),
-                    pinned=strategy.pinned,
-                    created_at=strategy.updated_at,
+                    id=s["id"],
+                    title=s["name"],
+                    subtitle=", ".join(s["symbols"]),
+                    pinned=s["pinned"],
+                    created_at=s["updated_at"],
                 )
             )
-    for collection in store.collections.values():
-        if collection.deleted_at is None:
+        for col in raw["collections"]:
             items.append(
                 HistoryItem(
                     type="collection",
-                    id=collection.id,
-                    title=collection.name,
-                    subtitle=f"{collection.strategy_count} strategies",
-                    pinned=collection.pinned,
-                    created_at=collection.updated_at,
+                    id=col["id"],
+                    title=col["name"],
+                    subtitle=f"{col.get('strategy_count', 0)} strategies",
+                    pinned=col["pinned"],
+                    created_at=col["updated_at"],
                 )
             )
+    else:
+        items: list[HistoryItem] = []
+        for run in store.backtest_runs.values():
+            if not deleted:
+                items.append(
+                    HistoryItem(
+                        type="run",
+                        id=run.id,
+                        title=run.conversation_result_card["title"],
+                        subtitle=run.conversation_result_card["rows"][0]["value"],
+                        created_at=run.created_at,
+                    )
+                )
+        for conversation in store.conversations.values():
+            if (conversation.deleted_at is not None if deleted else conversation.deleted_at is None):
+                items.append(
+                    HistoryItem(
+                        type="chat",
+                        id=conversation.id,
+                        title=conversation.title,
+                        subtitle=conversation.last_message_preview or "No messages yet",
+                        pinned=conversation.pinned,
+                        created_at=conversation.updated_at,
+                    )
+                )
+        for strategy in store.strategies.values():
+            if (strategy.deleted_at is not None if deleted else strategy.deleted_at is None):
+                items.append(
+                    HistoryItem(
+                        type="strategy",
+                        id=strategy.id,
+                        title=strategy.name,
+                        subtitle=", ".join(strategy.symbols),
+                        pinned=strategy.pinned,
+                        created_at=strategy.updated_at,
+                    )
+                )
+        for collection in store.collections.values():
+            if (collection.deleted_at is not None if deleted else collection.deleted_at is None):
+                items.append(
+                    HistoryItem(
+                        type="collection",
+                        id=collection.id,
+                        title=collection.name,
+                        subtitle=f"{collection.strategy_count} strategies",
+                        pinned=collection.pinned,
+                        created_at=collection.updated_at,
+                    )
+                )
+
     items.sort(key=lambda item: (item.pinned, item.created_at), reverse=True)
     return PaginatedHistory(items=items[:limit])
 

@@ -21,8 +21,13 @@
     "save": "Save",
     "cancel": "Cancel",
     "search": "Search",
+    "archive": "Archive",
+    "archived": "Archived",
     "today": "today",
-    "yesterday": "yesterday"
+    "yesterday": "yesterday",
+    "no_items": "No items found",
+    "restore": "Restore",
+    "permanently_delete": "Permanently delete"
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
@@ -55,6 +60,7 @@
     "new_chat": "New chat",
     "delete_chat": "Delete chat",
     "past_sessions": "Past sessions",
+    "archive_chat": "Archive chat",
     "no_past_sessions": "No past sessions yet.",
     "added_to_collection": "Added to \"{{name}}\"",
     "good_response": "Good response",
