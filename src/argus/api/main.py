@@ -133,6 +133,7 @@ def current_user() -> User:
     return user
 
 
+
 @app.post("/api/v1/dev/reset", response_model=SuccessResponse)
 def dev_reset() -> SuccessResponse:
     store.reset()
@@ -854,18 +855,24 @@ def chat_stream(
             created_at=utcnow(),
         )
         store.messages[conversation.id].append(assistant_message)
-        title = f"{run.symbols[0]} dip idea"
+        new_title = f"{run.symbols[0]} {run.template.replace('_', ' ')} idea"
         if conversation.title_source == "system_default":
-            updated = conversation.model_copy(
-                update={
-                    "title": title,
-                    "title_source": "ai_generated",
-                    "last_message_preview": payload.message[:120],
-                    "updated_at": utcnow(),
-                }
+            patch = {
+                "title": new_title,
+                "title_source": "ai_generated",
+                "last_message_preview": payload.message[:120],
+                "updated_at": utcnow(),
+            }
+            if supabase_gateway is not None:
+                supabase_gateway.patch_conversation(
+                    user_id=user.id, conversation_id=conversation.id, patch=patch
+                )
+            else:
+                updated = conversation.model_copy(update=patch)
+                store.conversations[conversation.id] = updated
+            yield sse(
+                "title", {"conversation_id": conversation.id, "title": new_title}
             )
-            store.conversations[conversation.id] = updated
-            yield sse("title", {"conversation_id": conversation.id, "title": title})
         yield sse("token", {"text": assistant_text})
         yield sse("result", {"run": run.model_dump(mode="json")})
         yield sse("done", {"message_id": assistant_message.id})
@@ -878,11 +885,24 @@ def chat_stream(
 
 
 @app.post("/api/v1/feedback", response_model=SuccessResponse)
-def feedback(payload: FeedbackRequest, user: User = Depends(current_user)):  # noqa: B008
+def feedback(
+    payload: FeedbackRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> SuccessResponse:
+    if not payload.message_id:
+        raise problem(
+            request,
+            status_code=400,
+            code="invalid_request",
+            title="Bad Request",
+            detail="message_id is required",
+        )
     store.feedback.append(
         {
             "id": store.new_id(),
             "user_id": user.id,
+            "message_id": payload.message_id,
             "type": payload.type,
             "message": payload.message,
             "context": payload.context,

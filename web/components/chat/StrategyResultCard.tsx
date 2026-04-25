@@ -21,12 +21,23 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
         </span>
       </div>
 
-      <div className="px-4 sm:px-5 py-2.5">
-        <dl className="divide-y divide-black/8 dark:divide-white/8">
-          {result.metrics.map((metric) => (
-            <div key={metric.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-2.5">
-              <dt className="text-[13px] sm:text-[14px] text-black/65 dark:text-white/65">{metric.label}</dt>
-              <dd className="text-[13px] sm:text-[14px] font-medium tracking-tight text-black dark:text-white text-right">
+      <div className="px-4 sm:px-5 py-5">
+        {result.metrics.length > 0 && (
+          <div className="mb-6">
+            <dt className="text-[12px] uppercase tracking-wider text-black/45 dark:text-white/45 font-semibold">
+              {result.metrics[0].label}
+            </dt>
+            <dd className="text-[32px] sm:text-[40px] font-bold tracking-tight text-black dark:text-white leading-tight">
+              {result.metrics[0].value}
+            </dd>
+          </div>
+        )}
+        
+        <dl className="grid grid-cols-2 gap-4">
+          {result.metrics.slice(1).map((metric) => (
+            <div key={metric.label} className="flex flex-col gap-0.5">
+              <dt className="text-[12px] text-black/45 dark:text-white/45 truncate">{metric.label}</dt>
+              <dd className="text-[15px] font-semibold tracking-tight text-black dark:text-white">
                 {metric.value}
               </dd>
             </div>

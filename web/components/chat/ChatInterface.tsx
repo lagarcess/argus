@@ -6,6 +6,7 @@ import {
   History,
   Menu,
   MessageSquarePlus,
+  MoreHorizontal,
   Plus,
   Search,
   Settings,
@@ -15,9 +16,15 @@ import { useTranslation } from "react-i18next";
 
 import {
   createConversation,
+  deleteCollection,
+  deleteConversation,
+  deleteStrategy,
   formatRelativeDate,
   getConversationMessages,
   listHistory,
+  patchCollection,
+  patchConversation,
+  patchStrategy,
   resultCardFromRun,
   streamChatMessage,
   type HistoryItem,
@@ -79,6 +86,9 @@ export default function ChatInterface() {
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -278,6 +288,15 @@ export default function ChatInterface() {
             ),
           );
         }
+        if (event.event === "title") {
+          setHistoryItems((prev) =>
+            prev.map((item) =>
+              item.id === event.data.conversation_id
+                ? { ...item, title: event.data.title }
+                : item
+            )
+          );
+        }
         if (event.event === "done") {
           setStreamStatus(null);
           refreshHistory();
@@ -303,6 +322,22 @@ export default function ChatInterface() {
   };
 
   // ── Action routing ─────────────────────────────────────────────────────────
+
+  const handleRename = async (id: string, newTitle: string, type: string) => {
+    try {
+      if (type === 'chat') await patchConversation(id, { title: newTitle });
+      else if (type === 'strategies') await patchStrategy(id, { name: newTitle });
+      else if (type === 'collections') await patchCollection(id, { name: newTitle });
+      
+      setHistoryItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, title: newTitle } : item)),
+      );
+      setEditingId(null);
+    } catch (err) {
+      console.error("Failed to rename:", err);
+      showToast(t('chat.error_generic'));
+    }
+  };
 
   const handleAction = (value: string) => {
     if (value === "/action:new-chat") {
@@ -406,27 +441,90 @@ export default function ChatInterface() {
                 </div>
               ) : (
                 historyItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="group rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                    onClick={() => {
-                      if (item.type === "chat") void loadConversation(item.id, item.title);
-                      if (item.type === "strategies") setCurrentView("strategies");
-                      if (item.type === "collections") setCurrentView("collections");
-                    }}
-                  >
-                    <span className="block truncate text-[15px] font-medium">
-                      {item.title}
-                    </span>
-                    <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
-                      {formatRelativeDate(
-                        item.created_at,
-                        { today: t('common.today'), yesterday: t('common.yesterday') },
-                        i18n.language
-                      )} · {t(`common.${item.type}`, item.type)}
-                    </span>
-                  </button>
+                  <div key={item.id} className="group relative">
+                    <button
+                      type="button"
+                      className="group/btn block w-full rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      onClick={() => {
+                        if (item.type === "chat") void loadConversation(item.id, item.title);
+                        if (item.type === "strategies") setCurrentView("strategies");
+                        if (item.type === "collections") setCurrentView("collections");
+                      }}
+                    >
+                      <div className="flex flex-col pr-6">
+                        {editingId === item.id ? (
+                          <input
+                            autoFocus
+                            className="bg-transparent text-[15px] font-medium outline-none border-b border-black/20 dark:border-white/20 w-full"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void handleRename(item.id, editValue, item.type);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            onBlur={() => void handleRename(item.id, editValue, item.type)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span className="block truncate text-[15px] font-medium">
+                            {item.title}
+                          </span>
+                        )}
+                        <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
+                          {formatRelativeDate(
+                            item.created_at,
+                            { today: t('common.today'), yesterday: t('common.yesterday') },
+                            i18n.language
+                          )} · {t(`common.${item.type}`, item.type)}
+                        </span>
+                      </div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(activeMenuId === item.id ? null : item.id);
+                      }}
+                      className="absolute right-2 top-3 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/5 rounded-full dark:hover:bg-white/5"
+                    >
+                      <MoreHorizontal className="h-4 w-4 text-black/40 dark:text-white/40" />
+                    </button>
+
+                    {activeMenuId === item.id && (
+                      <div className="absolute right-2 top-11 z-[60] w-32 rounded-[12px] border border-black/10 bg-white/90 p-1 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-[#1f2225]/90">
+                        <button
+                          type="button"
+                          className="flex w-full items-center px-3 py-2 text-[13px] hover:bg-black/5 rounded-[8px] dark:hover:bg-white/5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingId(item.id);
+                            setEditValue(item.title);
+                            setActiveMenuId(null);
+                          }}
+                        >
+                          {t('common.rename')}
+                        </button>
+                        <button
+                          type="button"
+                          className="flex w-full items-center px-3 py-2 text-[13px] text-red-500 hover:bg-red-50 rounded-[8px] dark:hover:bg-red-500/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (item.type === 'chat') {
+                              void deleteConversation(item.id).then(() => refreshHistory());
+                            } else if (item.type === 'strategies') {
+                              void deleteStrategy(item.id).then(() => refreshHistory());
+                            } else if (item.type === 'collections') {
+                              void deleteCollection(item.id).then(() => refreshHistory());
+                            }
+                            setActiveMenuId(null);
+                          }}
+                        >
+                          {t('common.delete')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ))
               )}
             </div>
