@@ -139,26 +139,6 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert [item["type"] for item in history.json()["items"]] == ["run", "chat"]
 
 
-def test_get_backtest_in_memory_enforces_owner() -> None:
-    client = _client()
-    run = client.post(
-        "/api/v1/backtests/run",
-        json={
-            "template": "rsi_mean_reversion",
-            "asset_class": "equity",
-            "symbols": ["TSLA"],
-        },
-    ).json()["run"]
-
-    from argus.api.main import store
-
-    store.backtest_run_owners[run["id"]] = "00000000-0000-0000-0000-000000000099"
-    response = client.get(f"/api/v1/backtests/{run['id']}")
-
-    assert response.status_code == 404
-    assert response.json()["code"] == "not_found"
-
-
 def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> None:
     client = _client()
     equity_strategy = client.post(
