@@ -776,7 +776,7 @@ export default function ChatInterface() {
                       setFeedbackState({ isOpen: true, type, context, rating });
                       setIsSidebarOpen(false);
                     }}
-                    isLatest={msg.role === 'assistant' && messages.findLastIndex(m => m.role === 'assistant') === messages.indexOf(msg)}
+                    isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
                   />
                 ))}
                 {streamStatus && (
