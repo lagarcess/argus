@@ -4,7 +4,6 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import {
   Archive,
   ChevronRight,
-  FolderPlus,
   History,
   PanelLeft,
   MessageSquarePlus,
@@ -77,7 +76,7 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [activeChatOptionsPanel, setActiveChatOptionsPanel] = useState<
     "none" | "history" | "collection"
@@ -141,6 +140,12 @@ export default function ChatInterface() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!isSidebarOpen) {
+      setIsRecentsExpanded(false);
+    }
+  }, [isSidebarOpen]);
 
   // ── Init conversation ──────────────────────────────────────────────────────
 
@@ -221,7 +226,7 @@ export default function ChatInterface() {
     }
   };
 
-  const handleTriggerPrompt = async (type: 'strategy' | 'collection') => {
+  const handleTriggerPrompt = async (type: 'strategy' | 'collection', customPrompt?: string) => {
     // 1. Switch view
     setCurrentView("chat");
     setIsSidebarOpen(false);
@@ -230,16 +235,21 @@ export default function ChatInterface() {
     const newConvId = await startNewChat();
     if (!newConvId) return;
     
-    // 3. Define the localized prompt
-    const promptKey = type === 'strategy' 
-      ? 'chat.trigger_create_strategy' 
-      : 'chat.trigger_create_collection';
-    
-    const fallback = type === 'strategy'
-      ? 'I want to create a new strategy.'
-      : 'I want to create a new collection.';
-    
-    const prompt = t(promptKey, fallback);
+    // 3. Define the localized prompt or use custom
+    let prompt: string;
+    if (customPrompt) {
+      prompt = customPrompt;
+    } else {
+      const promptKey = type === 'strategy' 
+        ? 'chat.trigger_create_strategy' 
+        : 'chat.trigger_create_collection';
+      
+      const fallback = type === 'strategy'
+        ? 'I want to create a new strategy.'
+        : 'I want to create a new collection.';
+      
+      prompt = t(promptKey, fallback);
+    }
       
     // 4. Send it
     void handleSend(prompt);
@@ -433,13 +443,13 @@ export default function ChatInterface() {
         runId: res.runId,
         strategyId: res.strategyId,
         strategyName: res.strategyName,
-        symbols: [], // The result card usually has these in context but they are not strictly needed for the picker if strategyId exists
+        symbols: [], 
         template: "", 
-        assetClass: "equity", // Defaulting to equity for Alpha demo
+        assetClass: "equity", 
       });
       closeChatOptions();
     } else {
-      showToast(t("chat.error_load"));
+      showToast(t('chat.error_load'));
     }
   };
 
@@ -454,152 +464,151 @@ export default function ChatInterface() {
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
-      {/* ── Persistent Sidebar Toggle & Logo ── */}
-      <div className="absolute left-4 top-4 z-[60] flex items-center gap-3 md:left-6 md:top-6 pointer-events-none">
-        <button
-          type="button"
-          onClick={() => setIsSidebarOpen((o) => !o)}
-          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10 text-black dark:text-white"
-          aria-label="Toggle menu"
-        >
-          {isSidebarOpen ? (
-            <PanelLeft className="h-5 w-5" />
-          ) : (
-            <ArgusLogo className="h-5 w-5" />
-          )}
-        </button>
-        <div 
-          className={`pointer-events-auto overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-out ${
-            isSidebarOpen ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0"
-          }`}
-        >
-          <span className="text-[26px] font-medium tracking-tight text-black dark:text-white pb-1">argus</span>
-        </div>
-      </div>
 
       {/* ── Desktop sidebar ── */}
       <aside 
-        className={`absolute inset-y-0 left-0 z-20 flex h-full flex-col bg-[#f0f0f0] transition-all duration-300 overflow-hidden dark:bg-[#0a0a0b] md:relative ${
-          isSidebarOpen 
-            ? "w-full md:w-[280px] translate-x-0 border-r border-black/5 opacity-100 dark:border-white/5" 
-            : "-translate-x-full w-full opacity-0 pointer-events-none md:translate-x-0 md:w-0 md:opacity-100 md:pointer-events-auto"
+        className={`flex flex-col border-r border-black/5 bg-white transition-all duration-300 ease-in-out overflow-x-hidden dark:border-white/5 dark:bg-[#141517] ${
+          isSidebarOpen ? "w-72" : "w-14"
         }`}
       >
-        <div className="flex h-full w-full min-w-[280px] flex-col px-6 pb-8 pt-28 md:w-[280px]">
-        <div className="flex flex-col gap-1.5">
-          {/* ── New Chat ── */}
+        {/* Sidebar Header: Brand & Toggle */}
+        <div className="flex h-20 items-center px-[6px] pb-4 pt-6 overflow-hidden">
           <button
-            type="button"
-            onClick={() => void startNewChat()}
-            className={`group flex w-full items-center gap-[22px] rounded-[14px] pl-[10px] pr-3 py-2.5 transition-all duration-200 ${
-              currentView === 'chat' && !messages.length
-                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white"
-                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
-            }`}
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-300 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+            aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
           >
-            <div className="flex h-6 w-6 items-center justify-center">
-              <MessageSquarePlus className="h-[22px] w-[22px]" />
+            {isSidebarOpen ? (
+              <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
+            ) : (
+              <ArgusLogo variant="icon-only" className="h-8 w-8 text-black dark:text-white" />
+            )}
+          </button>
+          <span className={`font-display pl-3 text-[22px] font-bold tracking-tight text-black transition-all duration-300 dark:text-white ${
+            isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+          }`}>
+            argus
+          </span>
+        </div>
+
+        <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-[6px] pb-4 pt-2">
+          {/* Main Navigation */}
+          <button
+            onClick={() => {
+              void startNewChat();
+              setIsSidebarOpen(false);
+            }}
+            className="group mb-2 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Plus className="h-5 w-5 text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
             </div>
-            <span className="text-[15px] font-medium tracking-tight">
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
               {t('chat.new_chat')}
             </span>
           </button>
 
-          <div className="my-2 px-3">
-            <div className="h-px w-full bg-black/5 dark:bg-white/5" />
-          </div>
-
-          {/* ── Strategies ── */}
           <button
-            type="button"
-            onClick={() => { setCurrentView("strategies"); setIsSidebarOpen(false); }}
-            className={`group flex w-full items-center gap-[22px] rounded-[14px] pl-[10px] pr-3 py-2.5 transition-all duration-200 ${
-              currentView === 'strategies'
-                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white shadow-sm"
-                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
+            onClick={() => {
+              setCurrentView("strategies");
+              setIsSidebarOpen(false);
+            }}
+            className={`group mb-2 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${
+              currentView === "strategies" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
             }`}
           >
-            <div className="flex h-6 w-6 items-center justify-center">
-              <Compass className="h-[22px] w-[22px]" />
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Compass className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
             </div>
-            <span className="text-[15px] font-medium tracking-tight">
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
               {t('common.strategies')}
             </span>
           </button>
 
-          {/* ── Collections ── */}
           <button
-            type="button"
-            onClick={() => { setCurrentView("collections"); setIsSidebarOpen(false); }}
-            className={`group flex w-full items-center gap-[22px] rounded-[14px] pl-[10px] pr-3 py-2.5 transition-all duration-200 ${
-              currentView === 'collections'
-                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white shadow-sm"
-                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
+            onClick={() => {
+              setCurrentView("collections");
+              setIsSidebarOpen(false);
+            }}
+            className={`group mb-6 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${
+              currentView === "collections" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
             }`}
           >
-            <div className="flex h-6 w-6 items-center justify-center">
-              <Layers className="h-[22px] w-[22px]" />
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Layers className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
             </div>
-            <span className="text-[15px] font-medium tracking-tight">
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
               {t('common.collections')}
             </span>
           </button>
-        </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
-            className="group mb-2 flex w-full items-center justify-between rounded-[14px] pl-[10px] pr-3 py-2.5 text-[15px] font-medium text-black/45 transition-all duration-200 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
-          >
-            <div className="flex items-center gap-[22px]">
-              <div className="flex h-6 w-6 items-center justify-center">
-                <History className="h-[22px] w-[22px]" />
-              </div>
-              <span className="tracking-tight">{t('common.recents')}</span>
-            </div>
-            <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isRecentsExpanded ? "rotate-90" : ""}`} />
-          </button>
-
-          {isRecentsExpanded && (
-            <div className="argus-scrollbar flex flex-1 flex-col gap-0.5 overflow-y-auto pr-2">
-              {historyItems.length === 0 ? (
-                <div className="px-4 py-6 text-center">
-                  <p className="text-[13px] leading-relaxed text-black/30 dark:text-white/30">
-                    {t('chat.no_recent_activity')}
-                  </p>
+          {/* History Accordion */}
+          <div className="mb-2">
+            <button
+              onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
+              className="flex h-11 w-full items-center justify-between rounded-[14px] px-0 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center">
+                  <History className="h-[22px] w-[22px] text-black/60 dark:text-white/60" />
                 </div>
-              ) : (
-                historyItems.map((item) => (
-                  <div key={item.id} className="group relative">
+                <span className={`font-display pl-3 tracking-tight transition-all duration-300 ${
+                  isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                }`}>
+                  {t('common.recents')}
+                </span>
+              </div>
+              <div className={`pr-4 transition-opacity duration-300 ${
+                isSidebarOpen ? "block opacity-100" : "hidden opacity-0 pointer-events-none"
+              }`}>
+                <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isRecentsExpanded ? "rotate-90" : ""}`} />
+              </div>
+            </button>
+
+            {isRecentsExpanded && (
+              <div className="space-y-0.5 pb-2">
+                {historyItems.length === 0 ? (
+                  <div className="px-11 py-6">
+                    <p className={`text-[13px] leading-relaxed text-black/30 transition-all duration-300 dark:text-white/30 ${
+                      isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                    }`}>
+                      {t('chat.no_recent_activity')}
+                    </p>
+                  </div>
+                ) : (
+                  historyItems.map((item) => (
                     <button
-                      type="button"
-                      className="group/btn block w-full rounded-[16px] px-4 py-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      key={item.id}
                       onClick={() => {
-                        if (item.type === "chat") void loadConversation(item.id, item.title);
-                        if (item.type === "strategies") setCurrentView("strategies");
-                        if (item.type === "collections") setCurrentView("collections");
+                        setConversationId(item.id);
+                        getConversationMessages(item.id).then(({ items }) => {
+                          setMessages(
+                            items.reverse().map((m) => ({
+                              id: m.id,
+                              role: m.role === "user" ? "user" : "ai",
+                              content: m.content,
+                              kind: m.content.includes("result") ? "strategy_result" : "text",
+                            }))
+                          );
+                        });
                       }}
+                      className={`group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 ${
+                        conversationId === item.id ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
                     >
-                      <div className="flex flex-col pr-6">
-                        {editingId === item.id ? (
-                          <input
-                            autoFocus
-                            className="bg-transparent text-[15px] font-medium outline-none border-b border-black/20 dark:border-white/20 w-full"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void handleRename(item.id, editValue, item.type);
-                              if (e.key === "Escape") setEditingId(null);
-                            }}
-                            onBlur={() => void handleRename(item.id, editValue, item.type)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                          <span className="block truncate text-[15px] font-medium">
-                            {item.title}
-                          </span>
-                        )}
+                      <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
+                      <div className={`min-w-0 flex-1 pl-3 pr-4 transition-all duration-300 ${
+                        isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                      }`}>
+                        <span className="font-display block truncate text-[15px] font-medium tracking-tight">
+                          {item.title}
+                        </span>
                         <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
                           {formatRelativeDate(
                             item.created_at,
@@ -609,230 +618,188 @@ export default function ChatInterface() {
                         </span>
                       </div>
                     </button>
-                    
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(activeMenuId === item.id ? null : item.id);
-                      }}
-                      className="absolute right-2 top-3 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/5 rounded-full dark:hover:bg-white/5"
-                    >
-                      <MoreHorizontal className="h-4 w-4 text-black/40 dark:text-white/40" />
-                    </button>
-
-                    {activeMenuId === item.id && (
-                      <div className="absolute right-2 top-11 z-[60] w-32 rounded-[12px] border border-black/10 bg-white/90 p-1 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-[#1f2225]/90">
-                        <button
-                          type="button"
-                          className="flex w-full items-center px-3 py-2 text-[13px] hover:bg-black/5 rounded-[8px] dark:hover:bg-white/5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingId(item.id);
-                            setEditValue(item.title);
-                            setActiveMenuId(null);
-                          }}
-                        >
-                          {t('common.rename')}
-                        </button>
-                        <button
-                          type="button"
-                          className="flex w-full items-center px-3 py-2 text-[13px] text-red-500 hover:bg-red-50 rounded-[8px] dark:hover:bg-red-500/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (item.type === 'chat') {
-                              void deleteConversation(item.id).then(() => refreshHistory());
-                            } else if (item.type === 'strategies') {
-                              void deleteStrategy(item.id).then(() => refreshHistory());
-                            } else if (item.type === 'collections') {
-                              void deleteCollection(item.id).then(() => refreshHistory());
-                            }
-                            setActiveMenuId(null);
-                          }}
-                        >
-                          {t('common.delete')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="mt-auto flex items-center gap-3 pt-6">
-          <button
-            type="button"
-            onClick={() => { setCurrentView("settings"); setIsSidebarOpen(false); }}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-all duration-200 ${
-              currentView === 'settings'
-                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white shadow-sm"
-                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
-            }`}
-            aria-label={t('common.settings')}
-          >
-            <Settings className="h-5 w-5" />
-          </button>
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-[26px] top-1/2 h-5 w-5 -translate-y-1/2 text-black/30 dark:text-white/30" />
+        {/* Search & Settings */}
+        <div className="border-t border-black/5 p-[6px] dark:border-white/5">
+          <div className="relative mb-4 h-11 overflow-hidden">
+            <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center">
+              <Search className="h-4 w-4 text-black/30 dark:text-white/30" />
+            </div>
             <input
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder={t('common.search')}
-              className="h-11 w-full rounded-[14px] bg-black/[0.03] pl-[58px] pr-4 text-[15px] font-medium outline-none transition-all placeholder:text-black/30 hover:bg-black/[0.05] focus:bg-white focus:ring-1 focus:ring-black/5 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:hover:bg-white/[0.05] dark:focus:bg-[#1f2225] dark:focus:ring-white/5"
+              className={`font-display h-11 w-full rounded-[14px] bg-black/[0.03] pl-[62px] pr-4 text-[15px] font-medium outline-none transition-all placeholder:text-black/30 hover:bg-black/[0.05] focus:bg-white focus:ring-1 focus:ring-black/5 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:hover:bg-white/[0.05] dark:focus:bg-[#1f2225] dark:focus:ring-white/5 ${
+                isSidebarOpen ? "block" : "hidden"
+              }`}
             />
           </div>
-        </div>
+
+          <button
+            onClick={() => {
+              setCurrentView("settings");
+            }}
+            className={`group flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${
+              currentView === "settings" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+          >
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Settings className="h-5 w-5 text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+            </div>
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
+              {t('common.settings')}
+            </span>
+          </button>
         </div>
       </aside>
 
       {/* ── Main panel ── */}
       <section
-        className={`relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] transition-all duration-300 dark:bg-[#141517] ${
-          isSidebarOpen
-            ? "translate-x-[75%] scale-[0.93] rounded-[32px] md:translate-x-0 md:scale-100 md:rounded-none"
-            : "translate-x-0 scale-100 rounded-none"
-        }`}
-        onClick={() => { if (isSidebarOpen && window.innerWidth < 768) setIsSidebarOpen(false); }}
+        className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]"
       >
-        {/* ── Chat view ── */}
-        {currentView === "chat" && (
-          <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
-            {/* Header */}
-            <header className="absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-end px-4 backdrop-blur-[8px]">
+        {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
+        <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between px-4 pointer-events-none md:px-8">
+          {/* Empty space for sidebar toggle alignment balance */}
+          <div className="w-11 md:w-32" />
 
-              {/* Chat options menu */}
-              <div className="relative z-30" ref={chatOptionsRef}>
+          {/* Title (Always Centered relative to Content) */}
+          <h1 className="pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+            {currentView === "chat" && (messages.length > 0 ? "Conversation" : t('chat.new_chat'))}
+            {currentView === "strategies" && t('common.strategies')}
+            {currentView === "collections" && t('common.collections')}
+            {currentView === "settings" && t('common.settings')}
+          </h1>
+
+          {/* Action Button (Always Right-Anchored) */}
+          <div className="flex w-11 justify-end pointer-events-auto md:w-32">
+            {currentView === "chat" && (
+              <div className="relative" ref={chatOptionsRef}>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (showChatOptions) { closeChatOptions(); return; }
-                    setShowChatOptions(true);
-                  }}
-                  className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                  onClick={() => setShowChatOptions(!showChatOptions)}
+                  className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                   aria-label="Chat options"
                 >
                   <History className="h-5 w-5" />
                 </button>
-
                 {showChatOptions && (
-                  <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-1 md:w-[260px] md:rounded-[20px] md:border md:pb-2 md:shadow-xl">
+                  <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-2 md:w-[260px] md:rounded-[20px] md:border md:pb-2 md:shadow-xl">
                     <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
-
-                      {activeChatOptionsPanel === "none" && (
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => { closeChatOptions(); void startNewChat(); }}
-                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            {t('chat.new_chat')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleAddToCollection}
-                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <FolderPlus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            {t('common.add_to_collection')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
-                            className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <span className="flex items-center gap-4">
-                              <History className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                              {t('chat.view_history')}
-                            </span>
-                            <ChevronRight className="h-5 w-5 text-black/40 transition-transform group-hover:translate-x-0.5 dark:text-white/40 md:h-4 md:w-4" />
-                          </button>
-                          <div className="my-2 h-px bg-black/5 dark:bg-white/5" />
-                          <button
-                            type="button"
-                            onClick={handleArchiveChat}
-                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <Archive className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            {t('chat.archive_chat')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!conversationId) return;
-                              deleteConversation(conversationId)
-                                .then(() => {
-                                  showToast(t('common.delete'));
-                                  refreshHistory();
-                                  void startNewChat();
-                                  closeChatOptions();
-                                })
-                                .catch(() => showToast(t('common.error_occurred')));
-                            }}
-                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
-                            {t('chat.delete_chat')}
-                          </button>
+                    {activeChatOptionsPanel === "none" && (
+                      <div className="py-1">
+                        <button
+                          type="button"
+                          onClick={() => { closeChatOptions(); void startNewChat(); }}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('chat.new_chat')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddToCollection}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('common.add_to_collection')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
+                          className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <span className="flex items-center gap-4">
+                            <History className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                            {t('chat.view_history')}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-black/30 dark:text-white/30 transition-transform group-hover:translate-x-0.5" />
+                        </button>
+                        <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!conversationId) return;
+                            deleteConversation(conversationId)
+                              .then(() => {
+                                showToast(t('common.delete'));
+                                refreshHistory();
+                                void startNewChat();
+                                closeChatOptions();
+                              })
+                              .catch(() => showToast(t('common.error_occurred')));
+                          }}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
+                          {t('chat.delete_chat')}
+                        </button>
+                      </div>
+                    )}
+                    {activeChatOptionsPanel === "history" && (
+                      <div className="py-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveChatOptionsPanel("none")}
+                          className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
+                        >
+                          {t('chat.past_sessions')}
+                          <ChevronRight className="h-4 w-4 -rotate-90" />
+                        </button>
+                        <div className="max-h-[300px] overflow-y-auto pb-1">
+                          {groupedHistory.chat.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setConversationId(item.id);
+                                getConversationMessages(item.id).then(({ items }) => {
+                                  setMessages(
+                                    items.reverse().map((m) => ({
+                                      id: m.id,
+                                      role: m.role === "user" ? "user" : "ai",
+                                      content: m.content,
+                                      kind: m.content.includes("result") ? "strategy_result" : "text",
+                                    }))
+                                  );
+                                });
+                                closeChatOptions();
+                              }}
+                              className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
+                            >
+                              <span className="truncate text-[15px] font-medium">{item.title}</span>
+                              <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">{item.subtitle}</span>
+                            </button>
+                          ))}
                         </div>
-                      )}
-
-                      {activeChatOptionsPanel === "history" && (
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => setActiveChatOptionsPanel("none")}
-                            className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
-                          >
-                            {t('chat.past_sessions')}
-                            <ChevronRight className="h-4 w-4 -rotate-90" />
-                          </button>
-                          {groupedHistory.chat.length === 0 ? (
-                            <p className="px-6 py-4 text-[14px] text-black/40 dark:text-white/40 md:px-5">
-                              {t('chat.no_past_sessions')}
-                            </p>
-                          ) : (
-                            <div className="max-h-[300px] overflow-y-auto">
-                              {groupedHistory.chat.map((item) => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setConversationId(item.id);
-                                    getConversationMessages(item.id).then(({ items }) => {
-                                      setMessages(
-                                        items.reverse().map((m) => ({
-                                          id: m.id,
-                                          role: m.role === "user" ? "user" : "ai",
-                                          content: m.content,
-                                          kind: m.content.includes("result") ? "strategy_result" : "text", // Basic heuristic to restore kind
-                                          // Note: kind restoration is tricky without full metadata, but this is a fallback
-                                        }))
-                                      );
-                                    });
-                                    closeChatOptions();
-                                  }}
-                                  className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
-                                >
-                                  <span className="truncate text-[15px] font-medium">
-                                    {item.title}
-                                  </span>
-                                  <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">
-                                    {item.subtitle}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-            </header>
+            )}
+            {(currentView === "strategies" || currentView === "collections") && (
+              <button
+                onClick={() => handleTriggerPrompt(currentView === "strategies" ? "strategy" : "collection")}
+                className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                aria-label="New item"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </header>
+        {/* ── Chat view ── */}
+        {currentView === "chat" && (
+          <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
 
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-start px-4 pt-[35vh]">
@@ -941,6 +908,7 @@ export default function ChatInterface() {
             searchText={searchText}
             onSearchChange={setSearchText}
             isSidebarOpen={isSidebarOpen}
+            onTriggerPrompt={handleTriggerPrompt}
           />
         )}
         {currentView === "collections" && (
@@ -950,6 +918,7 @@ export default function ChatInterface() {
             searchText={searchText}
             onSearchChange={setSearchText}
             isSidebarOpen={isSidebarOpen}
+            onTriggerPrompt={handleTriggerPrompt}
           />
         )}
         {currentView === "settings" && (

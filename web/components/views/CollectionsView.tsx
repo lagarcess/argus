@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import {
   AlertCircle,
   Edit2,
-  Folder,
+  Layers,
   Menu,
   Pin,
   Plus,
@@ -57,6 +57,7 @@ type CollectionsViewProps = {
   searchText: string;
   onSearchChange: (val: string) => void;
   isSidebarOpen: boolean;
+  onTriggerPrompt?: (type: "strategy" | "collection", customPrompt?: string) => void;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ export default function CollectionsView({
   searchText,
   onSearchChange,
   isSidebarOpen,
+  onTriggerPrompt,
 }: CollectionsViewProps) {
   const { t } = useTranslation();
   const [collections, setCollections] = useState<DisplayCollection[]>([]);
@@ -198,32 +200,10 @@ export default function CollectionsView({
         />
       )}
 
-      {/* Header */}
-      <div className="flex h-16 shrink-0 items-center justify-between px-4 z-40">
-        <button
-          type="button"
-          onClick={onMenuClick}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10 md:hidden"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <h1 className="text-[18px] font-medium tracking-tight">{t('common.collections')}</h1>
-        <button
-          type="button"
-          onClick={onAddClick}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white"
-          aria-label="Create collection"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* Header blur */}
-      <div className="absolute top-0 inset-x-0 h-28 z-30 pointer-events-none backdrop-blur-[8px] bg-[#f5f5f5]/10 dark:bg-[#191c1f]/20 [mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)]" />
+      {/* Global Header handled by ChatInterface */}
 
       {/* List */}
-      <div className="argus-scrollbar flex-1 overflow-y-auto px-5 pt-8 pb-32">
+      <div className="argus-scrollbar flex-1 overflow-y-auto px-5 pt-24 pb-32">
         {loading ? (
           <div className="flex flex-col gap-3 animate-pulse">
             {[1, 2, 3].map((i) => (
@@ -245,13 +225,37 @@ export default function CollectionsView({
               </button>
           </div>
         ) : sorted.length === 0 ? (
-          <div className="mt-16 flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
-            <Folder className="h-8 w-8" />
-            <p className="max-w-sm text-[15px] leading-6">
-              {searchText
-                ? t('collections.no_match')
-                : t('collections.empty_state')}
-            </p>
+          <div className="mt-8 flex flex-col items-center gap-8">
+            <div className="flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
+              <Layers className="h-8 w-8" />
+              <p className="max-w-sm text-[15px] leading-6">
+                {searchText
+                  ? t('collections.no_match')
+                  : t('collections.empty_state')}
+              </p>
+            </div>
+
+            {!searchText && (
+                <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+                  {(t('collections.suggestions', { returnObjects: true }) as Array<{title: string, desc: string, prompt: string}>).map((recipe, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => onTriggerPrompt?.("collection", recipe.prompt)}
+                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover:shadow-md dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
+                    >
+                      <div className="rounded-full bg-black/[0.03] p-2 dark:bg-white/[0.03]">
+                        <Layers className="h-4 w-4 text-black/40 dark:text-white/40" />
+                      </div>
+                      <h3 className="text-[15px] font-semibold text-black dark:text-white">
+                        {recipe.title}
+                      </h3>
+                      <p className="text-[13px] leading-relaxed text-black/45 dark:text-white/45">
+                        {recipe.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-3">

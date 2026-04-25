@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Folder, Loader2, Plus, X } from "lucide-react";
+import { Check, Layers, Loader2, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   listCollections,
@@ -163,7 +163,7 @@ export default function CollectionPicker({
                           <Loader2 className="h-4 w-4 animate-spin" />
                         )
                       ) : (
-                        <Folder className="h-4 w-4" />
+                        <Layers className="h-4 w-4" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">

@@ -138,7 +138,24 @@
       "win_rate": "tasa de éxito"
     },
     "unexecuted_hint": "Ejecuta esta estrategia para ver el rendimiento",
-    "best_performer": "Mejor rendimiento"
+    "best_performer": "Mejor rendimiento",
+    "suggestions": [
+      {
+        "title": "Reversión a la media RSI",
+        "desc": "Compra en caídas de sobreventa y vende en picos de sobrecompra.",
+        "prompt": "Diseña una estrategia que compre la caída cada vez que el RSI caiga por debajo de 30 y venda cuando llegue a 70 para BTC."
+      },
+      {
+        "title": "Stop-Loss del 10%",
+        "desc": "Protege tu capital con una regla de salida automatizada.",
+        "prompt": "Quiero una estrategia que compre cualquier acción de mi lista y venda automáticamente si el precio cae un 10% desde mi entrada."
+      },
+      {
+        "title": "Seguidor de Tendencia",
+        "desc": "Sigue el impulso mientras el precio esté por encima de la media móvil de 50 días.",
+        "prompt": "Crea una estrategia que compre siempre que el precio esté por encima de la media móvil de 50 días en QQQ."
+      }
+    ]
   },
   "collections": {
     "empty_state": "Añade una estrategia a una colección o guárdala del chat para verlas aquí.",
@@ -148,7 +165,29 @@
     "new_collection": "Nueva colección",
     "no_strategies": "Sin estrategias aún",
     "strategy_count_one": "{{count}} estrategia",
-    "strategy_count_other": "{{count}} estrategias"
+    "strategy_count_other": "{{count}} estrategias",
+    "suggestions": [
+      {
+        "title": "Gigantes Tecnológicos",
+        "desc": "Agrupa FAANG o las mejores empresas de semiconductores en un solo lugar.",
+        "prompt": "Quiero crear una colección de los 5 gigantes tecnológicos más importantes, como AAPL, MSFT y NVDA."
+      },
+      {
+        "title": "Transición Energética",
+        "desc": "Ideas centradas en el clima y jugadas de energía limpia.",
+        "prompt": "Quiero empezar una colección para ideas de transición energética y energía solar."
+      },
+      {
+        "title": "Reyes de Dividendos",
+        "desc": "Jugadas de rendimiento seguras y consistentes para una cartera defensiva.",
+        "prompt": "¿Cómo debería estructurar una colección para acciones con crecimiento de dividendos a largo plazo?"
+      },
+      {
+        "title": "Cripto HODL",
+        "desc": "Guarda tu lógica de compra de caídas de Bitcoin y Ethereum.",
+        "prompt": "Crea una colección para mis estrategias de acumulación de criptomonedas a largo plazo."
+      }
+    ]
   },
   "settings": {
     "title": "Ajustes",

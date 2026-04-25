@@ -91,6 +91,7 @@ type StrategiesViewProps = {
   searchText: string;
   onSearchChange: (val: string) => void;
   isSidebarOpen: boolean;
+  onTriggerPrompt?: (type: "strategy" | "collection", customPrompt?: string) => void;
 };
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -116,6 +117,7 @@ export default function StrategiesView({
   searchText,
   onSearchChange,
   isSidebarOpen,
+  onTriggerPrompt,
 }: StrategiesViewProps) {
   const { t } = useTranslation();
   const [strategies, setStrategies] = useState<DisplayStrategy[]>([]);
@@ -287,34 +289,7 @@ export default function StrategiesView({
 
   return (
     <div className="flex flex-col w-full h-[100dvh] max-w-5xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative">
-      {/* Header blur */}
-      <div className="absolute top-0 inset-x-0 h-28 z-30 pointer-events-none backdrop-blur-[8px] bg-[#f5f5f5]/10 dark:bg-[#191c1f]/20 [mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)]" />
-
-      <div className="absolute top-4 left-4 z-[35] md:hidden">
-        <button
-          onClick={onMenuClick}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white border border-black/10 dark:border-white/10"
-          aria-label="Open menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="absolute top-6 inset-x-0 w-full flex justify-center z-[35] pointer-events-none">
-        <h1 className="text-[18px] font-medium tracking-tight pointer-events-auto">
-          {t('common.strategies')}
-        </h1>
-      </div>
-
-      <div className="absolute top-4 right-4 z-[35]">
-        <button
-          onClick={onAddClick}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white"
-          aria-label="New strategy"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Global Header handled by ChatInterface */}
 
       {/* Context menu backdrop */}
       {activeContextMenu && (
@@ -352,12 +327,36 @@ export default function StrategiesView({
               </button>
             </div>
           ) : sortedStrategies.length === 0 ? (
-            <div className="mt-16 flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
-              <p className="max-w-sm text-[15px] leading-6">
-                {searchText
-                  ? t('strategies.no_match')
-                  : t('strategies.empty_state')}
-              </p>
+            <div className="mt-12 flex flex-col items-center gap-8">
+              <div className="flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
+                <p className="max-w-sm text-[15px] leading-6">
+                  {searchText
+                    ? t('strategies.no_match')
+                    : t('strategies.empty_state')}
+                </p>
+              </div>
+
+              {!searchText && (
+                <div className="grid w-full grid-cols-1 md:grid-cols-2 gap-4">
+                  {(t('strategies.suggestions', { returnObjects: true }) as Array<{title: string, desc: string, prompt: string}>).map((recipe, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => onTriggerPrompt?.("strategy", recipe.prompt)}
+                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover:shadow-md dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
+                    >
+                      <div className="rounded-full bg-black/[0.03] p-2 dark:bg-white/[0.03]">
+                        <Play className="h-4 w-4 text-black/40 dark:text-white/40" />
+                      </div>
+                      <h3 className="text-[15px] font-semibold text-black dark:text-white">
+                        {recipe.title}
+                      </h3>
+                      <p className="text-[13px] leading-relaxed text-black/45 dark:text-white/45">
+                        {recipe.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4">

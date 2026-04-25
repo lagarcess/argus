@@ -138,7 +138,24 @@
       "win_rate": "win rate"
     },
     "unexecuted_hint": "Run this strategy to see performance",
-    "best_performer": "Best performer"
+    "best_performer": "Best performer",
+    "suggestions": [
+      {
+        "title": "RSI Mean Reversion",
+        "desc": "Buy oversold dips and sell overbought peaks.",
+        "prompt": "Design a strategy that buys the dip whenever the RSI falls below 30 and sells when it hits 70 for BTC."
+      },
+      {
+        "title": "10% Stop-Loss",
+        "desc": "Protect your capital with an automated exit rule.",
+        "prompt": "I want a strategy that buys any stock in my list and automatically sells if the price drops 10% from my entry."
+      },
+      {
+        "title": "Trend Follower",
+        "desc": "Ride the momentum while the price is above the 50-day MA.",
+        "prompt": "Create a strategy that buys whenever the price is above the 50-day moving average on QQQ."
+      }
+    ]
   },
   "collections": {
     "empty_state": "Add strategy to collection or save from chat to see them here.",
@@ -148,7 +165,29 @@
     "new_collection": "New collection",
     "no_strategies": "No strategies yet",
     "strategy_count_one": "{{count}} strategy",
-    "strategy_count_other": "{{count}} strategies"
+    "strategy_count_other": "{{count}} strategies",
+    "suggestions": [
+      {
+        "title": "Tech Giants",
+        "desc": "Group FAANG or top semiconductor companies in one place.",
+        "prompt": "I want to create a collection of the top 5 tech giants like AAPL, MSFT, and NVDA."
+      },
+      {
+        "title": "Energy Transition",
+        "desc": "Climate-focused ideas and clean energy plays.",
+        "prompt": "I want to start a collection for energy transition and solar power ideas."
+      },
+      {
+        "title": "Dividend Kings",
+        "desc": "Safe, consistent yield plays for a defensive portfolio.",
+        "prompt": "How should I structure a collection for long-term dividend growth stocks?"
+      },
+      {
+        "title": "Crypto HODL",
+        "desc": "Store your Bitcoin and Ethereum dip-buying logic.",
+        "prompt": "Create a collection for my long-term crypto accumulation strategies."
+      }
+    ]
   },
   "settings": {
     "title": "Settings",

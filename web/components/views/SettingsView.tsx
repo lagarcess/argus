@@ -20,7 +20,7 @@ import {
   Loader2,
   MessageSquare,
   BarChart2,
-  Folder,
+  Layers,
   MessageSquareWarning,
   Sparkles,
   MessageSquarePlus,
@@ -234,7 +234,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-4">
                     <div className="shrink-0 w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40">
-                      {item.type === "chat" ? <MessageSquare className="w-4 h-4" /> : item.type === "strategy" ? <BarChart2 className="w-4 h-4" /> : <Folder className="w-4 h-4" />}
+                      {item.type === "chat" ? <MessageSquare className="w-4 h-4" /> : item.type === "strategy" ? <BarChart2 className="w-4 h-4" /> : <Layers className="w-4 h-4" />}
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-[15px] font-medium text-black dark:text-white truncate">
