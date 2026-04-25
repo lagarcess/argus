@@ -168,7 +168,7 @@ Errors follow RFC 9457 Problem Details.
   "type": "https://api.argus.app/problems/unsupported-timeframe",
   "title": "Unsupported Timeframe",
   "status": 422,
-  "detail": "Alpha supports 1D and 1H timeframes only. Intraday lookback cannot exceed 1 year.",
+  "detail": "Supported timeframes are 1h, 2h, 4h, 6h, 12h, and 1D. Lookback cannot exceed 3 years.",
   "code": "unsupported_timeframe",
   "request_id": "uuid"
 }
@@ -594,8 +594,8 @@ The canonical backtest config used by the engine for execution and reproducibili
 - *Return 422 for violations.*
 
 ### Timeframe & Lookback
-- **Supported:** "1D", "1H"
-- **Constraints:** No timeframe lower than "1H". Intraday ("1H") lookback cannot exceed 1 year. Daily lookback defaults to 12 months.
+- **Supported:** "1h", "2h", "4h", "6h", "12h", "1D"
+- **Constraints:** No timeframe lower than "1h". Lookback cannot exceed 3 years. Daily defaults to a 12-month window when dates are omitted.
 - *Return 422 for unsupported combinations.*
 
 ### Date Range
@@ -761,7 +761,7 @@ Update profile preferences and onboarding state. Partial update semantics are su
 Argus supports English and Spanish (Latin America) in Alpha.
 
 ## Supported Values
-- **language:** `en`, `es`
+- **language:** `en`, `es-419`
 - **locale:** `en-US`, `es-419`
 
 *Note: `language` controls the AI response language and the static UI preference. `locale` controls formatting (dates, numbers, currency).*
