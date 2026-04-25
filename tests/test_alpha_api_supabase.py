@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from argus.api.main import app
-from argus.api.schemas import BacktestRun, Conversation
+from argus.api.schemas import BacktestRun, Conversation, User
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
@@ -47,6 +47,31 @@ def test_chat_stream_quota_exceeded(mock_gateway):
     data = response.json()
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for chat_messages" in data["detail"]
+
+
+def test_me_reads_profile_from_supabase_gateway(mock_gateway):
+    now = utcnow()
+    profile = User(
+        id="00000000-0000-0000-0000-000000000001",
+        email="developer@argus.local",
+        username="mock-developer",
+        display_name="Mock Developer",
+        language="es-419",
+        locale="es-419",
+        timezone="America/Chicago",
+        theme="dark",
+        is_admin=True,
+        onboarding={},
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_user.return_value = profile
+
+    response = client.get("/api/v1/me", headers={"Authorization": "Bearer test-token"})
+
+    assert response.status_code == 200
+    assert response.json()["user"]["language"] == "es-419"
+    mock_gateway.get_user.assert_called_once()
 
 
 def test_create_message_ownership_failure(mock_gateway):

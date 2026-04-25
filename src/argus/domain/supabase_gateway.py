@@ -163,6 +163,17 @@ class SupabaseGateway:
         )
         return User.model_validate(_row_one(loaded))
 
+    def get_user(self, *, user_id: str) -> User | None:
+        rows = (
+            self.client.table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        return User.model_validate(row) if row else None
+
     def create_conversation(
         self, *, user_id: str, title: str, title_source: str, language: str | None
     ) -> Conversation:
