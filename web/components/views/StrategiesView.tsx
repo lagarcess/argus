@@ -280,11 +280,11 @@ export default function StrategiesView({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col w-full h-[100dvh] max-w-3xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative">
+    <div className="flex flex-col w-full h-[100dvh] max-w-5xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative">
       {/* Header blur */}
       <div className="absolute top-0 inset-x-0 h-28 z-30 pointer-events-none backdrop-blur-[8px] bg-[#f5f5f5]/10 dark:bg-[#191c1f]/20 [mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)]" />
 
-      <div className="absolute top-4 left-4 z-[35]">
+      <div className="absolute top-4 left-4 z-[35] md:hidden">
         <button
           onClick={onMenuClick}
           className="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white border border-black/10 dark:border-white/10"
@@ -595,7 +595,7 @@ export default function StrategiesView({
 
       {/* Bottom bar */}
       <div className="absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none">
-        <div className="pointer-events-auto max-w-3xl mx-auto flex items-center gap-4 transition-all duration-300 opacity-50 hover:opacity-100 focus-within:opacity-100 group">
+        <div className="pointer-events-auto max-w-5xl mx-auto flex items-center gap-4 transition-all duration-300 opacity-50 hover:opacity-100 focus-within:opacity-100 group">
           <button
             onClick={onSettingsClick}
             className="flex items-center justify-center w-[52px] h-[52px] rounded-full border border-black/10 dark:border-white/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white shrink-0 shadow-lg"

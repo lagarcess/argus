@@ -6,15 +6,19 @@ import {
   ChevronRight,
   FolderPlus,
   History,
-  Menu,
+  PanelLeft,
   MessageSquarePlus,
   MoreHorizontal,
   Plus,
   Search,
   Settings,
   Trash2,
+  TrendingUp,
+  Bitcoin,
+  LineChart,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { ArgusLogo } from "@/components/ArgusLogo";
 
 import {
   createConversation,
@@ -79,6 +83,7 @@ export default function ChatInterface() {
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
     runId: string;
     strategyId: string | null;
@@ -143,15 +148,7 @@ export default function ChatInterface() {
       .then(({ conversation }) => {
         if (cancelled) return;
         setConversationId(conversation.id);
-        setMessages([
-          {
-            id: "welcome",
-            role: "ai",
-            kind: "text",
-            content: t('chat.welcome'),
-            actions: starterActions,
-          },
-        ]);
+        setMessages([]);
       })
       .catch(() => {
         if (cancelled) return;
@@ -190,19 +187,7 @@ export default function ChatInterface() {
         kind: "text",
         content: m.content,
       }));
-      setMessages(
-        loaded.length > 0
-          ? loaded
-          : [
-              {
-                id: "resume-empty",
-                role: "ai",
-                kind: "text",
-                content: t('chat.resume_prompt', { title: convTitle }),
-                actions: starterActions,
-              },
-            ],
-      );
+      setMessages(loaded);
     } catch {
       setMessages([
         {
@@ -224,15 +209,7 @@ export default function ChatInterface() {
     setConversationId(conversation.id);
     setIsSidebarOpen(false);
     setCurrentView("chat");
-    setMessages([
-      {
-        id: `welcome-${conversation.id}`,
-        role: "ai",
-        kind: "text",
-        content: t('chat.new_chat_ready'),
-        actions: starterActions,
-      },
-    ]);
+    setMessages([]);
     void refreshHistory();
   };
 
@@ -442,11 +419,40 @@ export default function ChatInterface() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white">
+    <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
+      {/* ── Persistent Sidebar Toggle & Logo ── */}
+      <div className="absolute left-4 top-4 z-[60] flex items-center gap-3 md:left-6 md:top-6 pointer-events-none">
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen((o) => !o)}
+          className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10 text-black dark:text-white"
+          aria-label="Toggle menu"
+        >
+          {isSidebarOpen ? (
+            <PanelLeft className="h-5 w-5" />
+          ) : (
+            <ArgusLogo className="h-5 w-5" />
+          )}
+        </button>
+        <div 
+          className={`pointer-events-auto overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-out ${
+            isSidebarOpen ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0"
+          }`}
+        >
+          <span className="text-[26px] font-medium tracking-tight text-black dark:text-white pb-1">argus</span>
+        </div>
+      </div>
+
       {/* ── Desktop sidebar ── */}
-      <aside className={`absolute inset-y-0 left-0 flex w-full flex-col px-6 pb-8 pt-12 transition-all duration-500 md:w-[320px]`}>
-        <div className="mb-10 flex items-center justify-between">
-          <h1 className="text-[26px] font-medium tracking-tight">argus</h1>
+      <aside 
+        className={`absolute inset-y-0 left-0 z-20 flex h-full flex-col bg-[#f0f0f0] transition-all duration-300 overflow-hidden dark:bg-[#0a0a0b] md:relative ${
+          isSidebarOpen 
+            ? "w-full md:w-[280px] translate-x-0 border-r border-black/5 opacity-100 dark:border-white/5" 
+            : "-translate-x-full w-full opacity-0 pointer-events-none md:translate-x-0 md:w-0 md:opacity-100 md:pointer-events-auto"
+        }`}
+      >
+        <div className="flex h-full w-full min-w-[280px] flex-col px-6 pb-8 pt-12 md:w-[280px]">
+          <div className="mb-10 flex h-11 items-center justify-end">
           <button
             type="button"
             onClick={() => void startNewChat()}
@@ -607,31 +613,23 @@ export default function ChatInterface() {
             />
           </div>
         </div>
+        </div>
       </aside>
 
       {/* ── Main panel ── */}
       <section
-        className={`absolute inset-0 z-10 flex h-full w-full flex-col overflow-hidden bg-[#f9f9f9] transition-all duration-500 dark:bg-[#141517] ${
+        className={`relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] transition-all duration-300 dark:bg-[#141517] ${
           isSidebarOpen
-            ? "translate-x-[75%] scale-[0.93] rounded-[32px] md:translate-x-[320px]"
+            ? "translate-x-[75%] scale-[0.93] rounded-[32px] md:translate-x-0 md:scale-100 md:rounded-none"
             : "translate-x-0 scale-100 rounded-none"
         }`}
-        onClick={() => { if (isSidebarOpen) setIsSidebarOpen(false); }}
+        onClick={() => { if (isSidebarOpen && window.innerWidth < 768) setIsSidebarOpen(false); }}
       >
         {/* ── Chat view ── */}
         {currentView === "chat" && (
-          <div className="relative mx-auto flex h-[100dvh] w-full max-w-3xl flex-col">
+          <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
             {/* Header */}
-            <header className="absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between px-4 backdrop-blur-[8px]">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen((o) => !o)}
-                className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                aria-label="Open menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <h1 className="text-[16px] font-medium tracking-tight">argus</h1>
+            <header className="absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-end px-4 backdrop-blur-[8px]">
 
               {/* Chat options menu */}
               <div className="relative z-30" ref={chatOptionsRef}>
@@ -764,37 +762,103 @@ export default function ChatInterface() {
               </div>
             </header>
 
-            {/* Messages */}
-            <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
-              <div className="space-y-8">
-                {messages.map((msg) => (
-                  <ChatMessage
-                    key={msg.id}
-                    message={msg}
-                    onAction={handleAction}
-                    onFeedback={(type, context, rating) => {
-                      setFeedbackState({ isOpen: true, type, context, rating });
-                      setIsSidebarOpen(false);
-                    }}
-                    isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
-                  />
-                ))}
-                {streamStatus && (
-                  <div className="ml-12 text-[13px] text-black/45 dark:text-white/45">
-                    {streamStatus}
-                  </div>
-                )}
-                <div ref={bottomRef} />
-              </div>
-            </div>
+            {messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-start px-4 pt-[35vh]">
+                <h1 className="mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
+                  argus
+                </h1>
+                
+                <div className="w-full max-w-2xl">
+                  <ChatInput onSend={handleSend} />
+                </div>
 
-            {/* Input fade + bar */}
-            <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
-            <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 px-4">
-              <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
-                <ChatInput onSend={handleSend} />
-              </div>
-            </div>
+                {/* Show/Hide Suggestions Toggle */}
+                <div className="mt-4">
+                  <button
+                    onClick={() => setShowSuggestions(!showSuggestions)}
+                    className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+                  >
+                    {showSuggestions ? t('chat.hide_suggestions') : t('chat.show_suggestions')}
+                  </button>
+                </div>
+
+                <div className={`mt-6 w-full flex flex-col items-center transition-all duration-500 ease-in-out overflow-hidden ${
+                  showSuggestions ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+                }`}>
+                  {/* Starter Actions / Chips */}
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                      <button 
+                        onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Show me TSLA analysis'))} 
+                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                      >
+                        <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
+                        TSLA Analysis
+                      </button>
+                      <button 
+                        onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Show me BTC trends'))} 
+                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                      >
+                        <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
+                        BTC Trends
+                      </button>
+                      <button 
+                        onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Explain DCA strategy'))} 
+                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                      >
+                        <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
+                        DCA Strategy
+                      </button>
+                    </div>
+
+                    {/* Example Questions */}
+                    <div className="mt-12 flex flex-col items-center gap-4 text-center">
+                      <button onClick={() => handleSend(t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                        {t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?')}
+                      </button>
+                      <button onClick={() => handleSend(t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                        {t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.')}
+                      </button>
+                      <button onClick={() => handleSend(t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                        {t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+            ) : (
+              <>
+                {/* Messages */}
+                <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
+                  <div className="space-y-8">
+                    {messages.map((msg) => (
+                      <ChatMessage
+                        key={msg.id}
+                        message={msg}
+                        onAction={handleAction}
+                        onFeedback={(type, context, rating) => {
+                          setFeedbackState({ isOpen: true, type, context, rating });
+                          setIsSidebarOpen(false);
+                        }}
+                        isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
+                      />
+                    ))}
+                    {streamStatus && (
+                      <div className="ml-12 text-[13px] text-black/45 dark:text-white/45">
+                        {streamStatus}
+                      </div>
+                    )}
+                    <div ref={bottomRef} />
+                  </div>
+                </div>
+
+                {/* Input fade + bar */}
+                <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
+                <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 px-4">
+                  <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
+                    <ChatInput onSend={handleSend} />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 

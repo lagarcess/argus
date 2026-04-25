@@ -64,6 +64,8 @@
     "input_placeholder": "Describe una idea de inversión...",
     "view_history": "Ver historial",
     "chat_options": "Opciones de chat",
+    "show_suggestions": "Mostrar sugerencias",
+    "hide_suggestions": "Ocultar sugerencias",
     "starter_actions": {
       "tsla": {
         "label": "Prueba caídas de Tesla",
@@ -77,6 +79,11 @@
         "label": "Explora DCA",
         "value": "Muéstrame una estrategia de acumulación DCA para Apple"
       }
+    },
+    "example_queries": {
+      "q1": "¿Qué pasaría si comprara Apple cada vez que cae fuerte?",
+      "q2": "Prueba una estrategia de ruptura de impulso en Bitcoin.",
+      "q3": "¿Cómo funcionaría una estrategia DCA simple en Tesla?"
     },
     "rate_limit_error": "Has alcanzado tu límite de solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
     "error_offline": "Argus aún no ha podido conectarse a la API. Inicia el servicio FastAPI y envía tu idea de nuevo.",

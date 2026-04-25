@@ -164,7 +164,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
 
   if (activeSubView === "archived") {
     return (
-      <div className="flex flex-col w-full h-[100dvh] max-w-3xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
+      <div className="flex flex-col w-full h-[100dvh] max-w-5xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
         {renderHeader(t("settings.data.archived_chats"), () => setActiveSubView("main"))}
         <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 relative z-10 w-full max-w-md mx-auto">
           {isLoading ? (
@@ -211,7 +211,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
 
   if (activeSubView === "deleted") {
     return (
-      <div className="flex flex-col w-full h-[100dvh] max-w-3xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
+      <div className="flex flex-col w-full h-[100dvh] max-w-5xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
         {renderHeader(t("settings.data.recently_deleted"), () => setActiveSubView("main"))}
         <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 relative z-10 w-full max-w-md mx-auto">
           {isLoading ? (
@@ -262,7 +262,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
   }
 
   return (
-    <div className="flex flex-col w-full h-[100dvh] max-w-3xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
+    <div className="flex flex-col w-full h-[100dvh] max-w-5xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
       {renderHeader(t("settings.title"))}
 
       <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 relative z-10 w-full max-w-md mx-auto">

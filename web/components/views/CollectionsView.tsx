@@ -179,7 +179,7 @@ export default function CollectionsView({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-[100dvh] w-full max-w-3xl mx-auto flex-col overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white relative">
+    <div className="flex h-[100dvh] w-full max-w-5xl mx-auto flex-col overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white relative">
       {/* Context menu backdrop */}
       {activeContextMenu && (
         <div
@@ -197,7 +197,7 @@ export default function CollectionsView({
         <button
           type="button"
           onClick={onMenuClick}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10 md:hidden"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
