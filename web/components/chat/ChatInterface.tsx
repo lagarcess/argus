@@ -214,6 +214,7 @@ export default function ChatInterface() {
   const startNewChat = async () => {
     const { conversation } = await createConversation();
     setConversationId(conversation.id);
+    setIsSidebarOpen(false);
     setCurrentView("chat");
     setMessages([
       {
