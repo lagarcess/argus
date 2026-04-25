@@ -87,7 +87,10 @@ function mapStrategyToDisplay(s: Strategy): DisplayStrategy {
 
 type StrategiesViewProps = {
   onMenuClick: () => void;
-  onSettingsClick?: () => void;
+  onAddClick?: () => void;
+  searchText: string;
+  onSearchChange: (val: string) => void;
+  isSidebarOpen: boolean;
 };
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -109,7 +112,10 @@ function StrategySkeleton() {
 
 export default function StrategiesView({
   onMenuClick,
-  onSettingsClick,
+  onAddClick,
+  searchText,
+  onSearchChange,
+  isSidebarOpen,
 }: StrategiesViewProps) {
   const { t } = useTranslation();
   const [strategies, setStrategies] = useState<DisplayStrategy[]>([]);
@@ -125,7 +131,7 @@ export default function StrategiesView({
     height: 0,
     visible: false,
   });
-  const [searchText, setSearchText] = useState("");
+  // Removed local searchText state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
 
@@ -302,6 +308,7 @@ export default function StrategiesView({
 
       <div className="absolute top-4 right-4 z-[35]">
         <button
+          onClick={onAddClick}
           className="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white"
           aria-label="New strategy"
         >
@@ -593,29 +600,24 @@ export default function StrategiesView({
       {/* Bottom glass blur */}
       <div className="absolute bottom-0 inset-x-0 h-40 z-10 pointer-events-none backdrop-blur-[0.8px] bg-[#f9f9f9]/10 dark:bg-[#141517]/20 [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_50%,transparent_100%)]" />
 
-      {/* Bottom bar */}
-      <div className="absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none">
-        <div className="pointer-events-auto max-w-5xl mx-auto flex items-center gap-4 transition-all duration-300 opacity-50 hover:opacity-100 focus-within:opacity-100 group">
-          <button
-            onClick={onSettingsClick}
-            className="flex items-center justify-center w-[52px] h-[52px] rounded-full border border-black/10 dark:border-white/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white shrink-0 shadow-lg"
-            title="Settings"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-
+      <div 
+        className={`absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none transition-all duration-300 ${
+          isSidebarOpen ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
+        }`}
+      >
+        <div className="pointer-events-auto max-w-3xl mx-auto flex items-center gap-4 transition-all duration-300 opacity-50 hover:opacity-100 focus-within:opacity-100 group">
           <div className="relative flex-1">
             <Search className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40 pointer-events-none" />
             <input
               type="text"
               placeholder={t('strategies.search_placeholder')}
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(e) => onSearchChange(e.target.value)}
               className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 dark:border-white/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] shadow-lg text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
             />
             {searchText && (
               <button
-                onClick={() => setSearchText("")}
+                onClick={() => onSearchChange("")}
                 className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-black/60 dark:text-white/60 hover:bg-black/20 dark:hover:bg-white/20 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />

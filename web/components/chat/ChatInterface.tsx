@@ -16,6 +16,8 @@ import {
   TrendingUp,
   Bitcoin,
   LineChart,
+  Layers,
+  Compass,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
@@ -205,12 +207,42 @@ export default function ChatInterface() {
   // ── Start new chat ─────────────────────────────────────────────────────────
 
   const startNewChat = async () => {
-    const { conversation } = await createConversation();
-    setConversationId(conversation.id);
-    setIsSidebarOpen(false);
+    try {
+      const { conversation } = await createConversation();
+      setConversationId(conversation.id);
+      setIsSidebarOpen(false);
+      setCurrentView("chat");
+      setMessages([]);
+      void refreshHistory();
+      return conversation.id;
+    } catch (err) {
+      console.error("Failed to start new chat:", err);
+      return null;
+    }
+  };
+
+  const handleTriggerPrompt = async (type: 'strategy' | 'collection') => {
+    // 1. Switch view
     setCurrentView("chat");
-    setMessages([]);
-    void refreshHistory();
+    setIsSidebarOpen(false);
+    
+    // 2. Start new chat
+    const newConvId = await startNewChat();
+    if (!newConvId) return;
+    
+    // 3. Define the localized prompt
+    const promptKey = type === 'strategy' 
+      ? 'chat.trigger_create_strategy' 
+      : 'chat.trigger_create_collection';
+    
+    const fallback = type === 'strategy'
+      ? 'I want to create a new strategy.'
+      : 'I want to create a new collection.';
+    
+    const prompt = t(promptKey, fallback);
+      
+    // 4. Send it
+    void handleSend(prompt);
   };
 
   // ── Send message ───────────────────────────────────────────────────────────
@@ -218,6 +250,8 @@ export default function ChatInterface() {
   const handleSend = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || !conversationId) return;
+
+    setIsSidebarOpen(false); // SOTA: Collapse sidebar to enter focus mode on message send
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -451,44 +485,78 @@ export default function ChatInterface() {
             : "-translate-x-full w-full opacity-0 pointer-events-none md:translate-x-0 md:w-0 md:opacity-100 md:pointer-events-auto"
         }`}
       >
-        <div className="flex h-full w-full min-w-[280px] flex-col px-6 pb-8 pt-12 md:w-[280px]">
-          <div className="mb-10 flex h-11 items-center justify-end">
+        <div className="flex h-full w-full min-w-[280px] flex-col px-6 pb-8 pt-28 md:w-[280px]">
+        <div className="flex flex-col gap-1.5">
+          {/* ── New Chat ── */}
           <button
             type="button"
             onClick={() => void startNewChat()}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
-            aria-label={t('chat.new_chat')}
+            className={`group flex w-full items-center gap-[22px] rounded-[14px] pl-[10px] pr-3 py-2.5 transition-all duration-200 ${
+              currentView === 'chat' && !messages.length
+                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white"
+                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
+            }`}
           >
-            <MessageSquarePlus className="h-5 w-5" />
+            <div className="flex h-6 w-6 items-center justify-center">
+              <MessageSquarePlus className="h-[22px] w-[22px]" />
+            </div>
+            <span className="text-[15px] font-medium tracking-tight">
+              {t('chat.new_chat')}
+            </span>
           </button>
-        </div>
 
-        <nav className="mb-8 flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={() => { setCurrentView("collections"); setIsSidebarOpen(false); }}
-            className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
-          >
-            {t('common.collections')}
-          </button>
+          <div className="my-2 px-3">
+            <div className="h-px w-full bg-black/5 dark:bg-white/5" />
+          </div>
+
+          {/* ── Strategies ── */}
           <button
             type="button"
             onClick={() => { setCurrentView("strategies"); setIsSidebarOpen(false); }}
-            className="h-12 rounded-full border border-black/10 text-[15px] font-medium transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+            className={`group flex w-full items-center gap-[22px] rounded-[14px] pl-[10px] pr-3 py-2.5 transition-all duration-200 ${
+              currentView === 'strategies'
+                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white shadow-sm"
+                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
+            }`}
           >
-            {t('common.strategies')}
+            <div className="flex h-6 w-6 items-center justify-center">
+              <Compass className="h-[22px] w-[22px]" />
+            </div>
+            <span className="text-[15px] font-medium tracking-tight">
+              {t('common.strategies')}
+            </span>
           </button>
-        </nav>
+
+          {/* ── Collections ── */}
+          <button
+            type="button"
+            onClick={() => { setCurrentView("collections"); setIsSidebarOpen(false); }}
+            className={`group flex w-full items-center gap-[22px] rounded-[14px] pl-[10px] pr-3 py-2.5 transition-all duration-200 ${
+              currentView === 'collections'
+                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white shadow-sm"
+                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
+            }`}
+          >
+            <div className="flex h-6 w-6 items-center justify-center">
+              <Layers className="h-[22px] w-[22px]" />
+            </div>
+            <span className="text-[15px] font-medium tracking-tight">
+              {t('common.collections')}
+            </span>
+          </button>
+        </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <button
             type="button"
             onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
-            className="group mb-2 flex items-center justify-between pr-2 text-[13px] font-medium text-black/45 transition-colors hover:text-black dark:text-white/45 dark:hover:text-white"
+            className="group mb-2 flex w-full items-center justify-between rounded-[14px] pl-[10px] pr-3 py-2.5 text-[15px] font-medium text-black/45 transition-all duration-200 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
           >
-            <div className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              {t('common.recents')}
+            <div className="flex items-center gap-[22px]">
+              <div className="flex h-6 w-6 items-center justify-center">
+                <History className="h-[22px] w-[22px]" />
+              </div>
+              <span className="tracking-tight">{t('common.recents')}</span>
             </div>
             <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isRecentsExpanded ? "rotate-90" : ""}`} />
           </button>
@@ -593,23 +661,27 @@ export default function ChatInterface() {
           )}
         </div>
 
-        <div className="mt-auto flex items-center gap-4 pt-4">
+        <div className="mt-auto flex items-center gap-3 pt-6">
           <button
             type="button"
             onClick={() => { setCurrentView("settings"); setIsSidebarOpen(false); }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-black/10 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-all duration-200 ${
+              currentView === 'settings'
+                ? "bg-black/5 dark:bg-white/5 text-black dark:text-white shadow-sm"
+                : "text-black/45 hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
+            }`}
             aria-label={t('common.settings')}
           >
             <Settings className="h-5 w-5" />
           </button>
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-black/40 dark:text-white/40" />
+            <Search className="pointer-events-none absolute left-[26px] top-1/2 h-5 w-5 -translate-y-1/2 text-black/30 dark:text-white/30" />
             <input
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder={t('common.search')}
-              className="h-[52px] w-full rounded-full border border-black/10 bg-white/50 pl-12 pr-4 text-[16px] outline-none focus:bg-white focus:ring-2 focus:ring-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:focus:bg-[#1f2225] dark:focus:ring-white/5"
+              className="h-11 w-full rounded-[14px] bg-black/[0.03] pl-[58px] pr-4 text-[15px] font-medium outline-none transition-all placeholder:text-black/30 hover:bg-black/[0.05] focus:bg-white focus:ring-1 focus:ring-black/5 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:hover:bg-white/[0.05] dark:focus:bg-[#1f2225] dark:focus:ring-white/5"
             />
           </div>
         </div>
@@ -865,13 +937,19 @@ export default function ChatInterface() {
         {currentView === "strategies" && (
           <StrategiesView
             onMenuClick={() => setIsSidebarOpen((o) => !o)}
-            onSettingsClick={() => setCurrentView("settings")}
+            onAddClick={() => handleTriggerPrompt('strategy')}
+            searchText={searchText}
+            onSearchChange={setSearchText}
+            isSidebarOpen={isSidebarOpen}
           />
         )}
         {currentView === "collections" && (
           <CollectionsView
             onMenuClick={() => setIsSidebarOpen((o) => !o)}
-            onSettingsClick={() => setCurrentView("settings")}
+            onAddClick={() => handleTriggerPrompt('collection')}
+            searchText={searchText}
+            onSearchChange={setSearchText}
+            isSidebarOpen={isSidebarOpen}
           />
         )}
         {currentView === "settings" && (

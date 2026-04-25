@@ -62,6 +62,20 @@
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
     "input_placeholder": "Describe an investing idea...",
+    "trigger_create_strategy": "I want to create a new strategy.",
+    "trigger_create_collection": "I want to create a new collection.",
+    "placeholder_prompts": [
+      "What if I bought Tesla on significant dips?",
+      "How would a simple DCA strategy perform on Bitcoin?",
+      "Show me how an RSI crossover works on Apple.",
+      "What happens if I hold Nvidia during high volatility?",
+      "Compare holding ETH vs BTC over the last year.",
+      "Test a moving average breakout strategy on SPY.",
+      "How does momentum trading work for tech stocks?",
+      "What if I invested in dividend stocks during a recession?",
+      "Simulate a trend following strategy on Solana.",
+      "Can you explain how mean reversion works?"
+    ],
     "view_history": "View history",
     "chat_options": "Chat options",
     "show_suggestions": "Show suggestions",
@@ -69,7 +83,7 @@
     "starter_actions": {
       "tsla": {
         "label": "Test Tesla dips",
-        "value": "What if I bought Tesla whenever it dipped hard?"
+        "value": "What if I bought Tesla on significant dips?"
       },
       "btc": {
         "label": "Try Bitcoin momentum",
@@ -81,7 +95,7 @@
       }
     },
     "example_queries": {
-      "q1": "What if I bought Apple whenever it dipped hard?",
+      "q1": "What if I bought Apple on significant dips?",
       "q2": "Test a momentum breakout strategy on Bitcoin.",
       "q3": "How would a simple DCA strategy perform on Tesla?"
     },

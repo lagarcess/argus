@@ -62,6 +62,20 @@
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
     "input_placeholder": "Describe una idea de inversión...",
+    "trigger_create_strategy": "Quiero crear una nueva estrategia.",
+    "trigger_create_collection": "Quiero crear una nueva colección.",
+    "placeholder_prompts": [
+      "¿Y si comprara Tesla en caídas importantes?",
+      "¿Cómo funcionaría una estrategia DCA en Bitcoin?",
+      "Muéstrame cómo funciona un cruce de RSI en Apple.",
+      "¿Qué pasa si mantengo Nvidia durante alta volatilidad?",
+      "Compara mantener ETH frente a BTC el último año.",
+      "Prueba una estrategia de ruptura de media móvil en SPY.",
+      "¿Cómo funciona el trading de momentum para tecnológicas?",
+      "¿Y si invirtiera en acciones de dividendos en una recesión?",
+      "Simula una estrategia de seguimiento de tendencia en Solana.",
+      "¿Puedes explicar cómo funciona la reversión a la media?"
+    ],
     "view_history": "Ver historial",
     "chat_options": "Opciones de chat",
     "show_suggestions": "Mostrar sugerencias",
@@ -69,7 +83,7 @@
     "starter_actions": {
       "tsla": {
         "label": "Prueba caídas de Tesla",
-        "value": "¿Qué pasaría si comprara Tesla cada vez que cae fuerte?"
+        "value": "¿Y si comprara Tesla en caídas importantes?"
       },
       "btc": {
         "label": "Prueba momentum de Bitcoin",
@@ -81,7 +95,7 @@
       }
     },
     "example_queries": {
-      "q1": "¿Qué pasaría si comprara Apple cada vez que cae fuerte?",
+      "q1": "¿Y si comprara Apple en caídas importantes?",
       "q2": "Prueba una estrategia de ruptura de impulso en Bitcoin.",
       "q3": "¿Cómo funcionaría una estrategia DCA simple en Tesla?"
     },
