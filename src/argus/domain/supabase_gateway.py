@@ -388,19 +388,6 @@ class SupabaseGateway:
             "collections": collections,
         }
 
-    def create_feedback(
-        self, *, user_id: str, feedback_type: str, message: str, context: dict[str, Any]
-    ) -> None:
-        self.client.table("feedback").insert(
-            {
-                "user_id": user_id,
-                "type": feedback_type,
-                "message": message,
-                "context": context,
-                "created_at": _now_iso(),
-            }
-        ).execute()
-
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:
         created = (
             self.client.table("strategies")

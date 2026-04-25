@@ -47,6 +47,28 @@
         "docs/API_CONTRACT.md",
         "docs/api/openapi.yaml"
       ]
+    },
+    "codex/section-3-phase2-engine-salvage": {
+      "description": "Section 3 Phase 2 scope: archived engine/data salvage + policy gates",
+      "allow": [
+        "src/argus/domain/engine.py",
+        "src/argus/domain/market_data/**",
+        "src/argus/api/main.py",
+        "src/argus/api/schemas.py",
+        "src/argus/domain/supabase_gateway.py",
+        "tests/section3/**",
+        "tests/perf/section3/**",
+        "tests/test_alpha_api.py",
+        "tests/test_alpha_api_supabase.py",
+        ".agent/ownership/branch_ownership.json"
+      ],
+      "deny": [
+        "supabase/migrations/**",
+        "tests/section4/**",
+        "web/**",
+        "docs/API_CONTRACT.md",
+        "docs/api/openapi.yaml"
+      ]
     }
   }
 }

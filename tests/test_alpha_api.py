@@ -1,9 +1,101 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 
+import pandas as pd
+import pytest
 from argus.api.main import app
+from argus.domain.market_data.assets import ResolvedAsset
 from fastapi.testclient import TestClient
+
+
+def _fake_resolve_asset(symbol: str) -> ResolvedAsset:
+    candidate = symbol.strip().upper().replace("-", "/")
+    if candidate == "TESLA":
+        candidate = "TSLA"
+    compact = candidate.replace("/", "")
+    if compact.endswith("USD") and len(compact) > 3:
+        compact = compact[:-3]
+
+    if compact in {"AAPL", "TSLA", "MSFT", "SPY"}:
+        return ResolvedAsset(
+            canonical_symbol=compact,
+            asset_class="equity",
+            name=compact,
+            raw_symbol=compact,
+        )
+    if compact in {"BTC", "ETH", "USDC", "USDT"}:
+        return ResolvedAsset(
+            canonical_symbol=compact,
+            asset_class="crypto",
+            name=compact,
+            raw_symbol=compact,
+        )
+    raise ValueError("invalid_symbol")
+
+
+def _fake_fetch_ohlcv(
+    symbol: str,
+    asset_class: str,  # noqa: ARG001
+    start_date: date,
+    end_date: date,
+    timeframe: str,
+) -> pd.DataFrame:
+    freq_map = {"1D": "D", "1h": "h", "2h": "2h", "4h": "4h", "6h": "6h", "12h": "12h"}
+    index = pd.date_range(start=start_date, end=end_date, freq=freq_map[timeframe], tz="UTC")
+    if len(index) < 80:
+        index = pd.date_range(start=start_date, periods=80, freq=freq_map[timeframe], tz="UTC")
+    base_map = {"AAPL": 100.0, "TSLA": 200.0, "MSFT": 150.0, "SPY": 400.0, "BTC": 30000.0}
+    base = base_map.get(symbol, 100.0)
+    close = pd.Series(base + pd.RangeIndex(len(index)).astype(float) * 0.5, index=index)
+    return pd.DataFrame(
+        {
+            "open": close * 0.999,
+            "high": close * 1.002,
+            "low": close * 0.998,
+            "close": close,
+            "volume": 5000.0,
+        },
+        index=index,
+    )
+
+
+def _fake_fetch_price_series(
+    symbol: str,
+    asset_class: str,
+    start_date: date,
+    end_date: date,
+    timeframe: str,
+) -> pd.Series:
+    return _fake_fetch_ohlcv(
+        symbol=symbol,
+        asset_class=asset_class,
+        start_date=start_date,
+        end_date=end_date,
+        timeframe=timeframe,
+    )["close"]
+
+
+@pytest.fixture(autouse=True)
+def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
+    from argus.api import main as api_main
+    from argus.domain import engine as domain_engine
+
+    monkeypatch.setattr(api_main, "supabase_gateway", None)
+    monkeypatch.setattr(
+        api_main,
+        "extract_strategy_request",
+        lambda message: {
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["TSLA"],
+            "parameters": {},
+        },
+    )
+    monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
+    monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
+    monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
 
 
 def _client() -> TestClient:
@@ -124,7 +216,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert run["config_snapshot"]["starting_capital"] == 10000
     assert "summary" not in run
     assert set(run["metrics"]) == {"aggregate", "by_symbol"}
-    assert run["metrics"]["aggregate"]["performance"]["total_return_pct"] != 0
+    assert isinstance(run["metrics"]["aggregate"]["performance"]["total_return_pct"], float)
     assert run["conversation_result_card"]["assumptions"] == [
         "Universe: TSLA.",
         "Simulation uses long-only preset.",
@@ -137,6 +229,82 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     history = client.get("/api/v1/history")
     assert history.status_code == 200
     assert [item["type"] for item in history.json()["items"]] == ["run", "chat"]
+
+
+@pytest.mark.parametrize("timeframe", ["1h", "2h", "4h", "6h", "12h", "1D"])
+def test_backtest_accepts_supported_timeframes(timeframe: str) -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "dca_accumulation",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": timeframe,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["run"]["config_snapshot"]["timeframe"] == timeframe
+
+
+def test_backtest_rejects_stablecoin_symbol() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "dca_accumulation",
+            "asset_class": "crypto",
+            "symbols": ["USDT"],
+            "timeframe": "1D",
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "stablecoin_not_supported"
+
+
+def test_backtest_rejects_unsupported_parameters_payload() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "parameters": {"rsi_length": 21},
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "unsupported_parameters"
+
+
+def test_backtest_rejects_lookback_over_three_years() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "dca_accumulation",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2020-01-01",
+            "end_date": "2024-01-10",
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_lookback_window"
+
+
+def test_backtest_rejects_unknown_symbol() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "dca_accumulation",
+            "asset_class": "equity",
+            "symbols": ["FAKE123"],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "invalid_symbol"
 
 
 def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> None:

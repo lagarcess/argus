@@ -201,7 +201,7 @@ class BacktestRunRequest(BaseModel):
     template: StrategyTemplate | None = None
     asset_class: AssetClass | None = None
     symbols: list[str] | None = None
-    timeframe: Literal["1D", "1H"] | None = None
+    timeframe: str | None = None
     start_date: date | None = None
     end_date: date | None = None
     side: Literal["long", "short", "long_short", "market_neutral"] | None = None

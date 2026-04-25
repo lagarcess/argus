@@ -1,29 +1,35 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from math import sqrt
 from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
+import vectorbt as vbt
 
-from argus.domain.market_data import fetch_price_series
+from argus.domain.market_data import fetch_ohlcv, fetch_price_series, resolve_asset
+
+try:  # noqa: SIM105
+    import pandas_ta_classic  # noqa: F401
+except Exception:  # pragma: no cover - accessor may already be available
+    pass
 
 AssetClass = Literal["equity", "crypto"]
 
-
-CRYPTO_SYMBOLS = {
-    "BTC",
-    "ETH",
-    "SOL",
-    "DOGE",
-    "ADA",
-    "AVAX",
-    "MATIC",
-    "LINK",
-    "LTC",
-    "BCH",
+ALLOWED_TEMPLATES = {
+    "buy_the_dip",
+    "rsi_mean_reversion",
+    "moving_average_crossover",
+    "dca_accumulation",
+    "momentum_breakout",
+    "trend_follow",
 }
+
+ALLOWED_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
+
 STABLECOINS = {"USDC", "USDT", "DAI", "BUSD", "TUSD"}
 
 
@@ -34,149 +40,277 @@ class SymbolAsset:
 
 
 def classify_symbol(symbol: str) -> SymbolAsset:
-    normalized = symbol.upper().replace("/USD", "").replace("-USD", "")
-    asset_class: AssetClass = "crypto" if normalized in CRYPTO_SYMBOLS else "equity"
-    return SymbolAsset(symbol=normalized, asset_class=asset_class)
+    resolved = resolve_asset(symbol)
+    return SymbolAsset(symbol=resolved.canonical_symbol, asset_class=resolved.asset_class)
 
 
 def default_benchmark(asset_class: AssetClass) -> str:
     return "SPY" if asset_class == "equity" else "BTC"
 
 
+def _normalize_timeframe(timeframe: str | None) -> str:
+    if timeframe is None:
+        return "1D"
+    normalized = timeframe.strip().lower()
+    mapping = {
+        "1d": "1D",
+        "1day": "1D",
+        "1h": "1h",
+        "1hour": "1h",
+        "2h": "2h",
+        "2hour": "2h",
+        "4h": "4h",
+        "4hour": "4h",
+        "6h": "6h",
+        "6hour": "6h",
+        "12h": "12h",
+        "12hour": "12h",
+    }
+    if normalized not in mapping:
+        raise ValueError("unsupported_timeframe")
+    return mapping[normalized]
+
+
+def _to_date(value: date | datetime) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    return value
+
+
+def _periods_per_year(timeframe: str) -> float:
+    mapping = {
+        "1D": 252.0,
+        "1h": 24.0 * 365.0,
+        "2h": 12.0 * 365.0,
+        "4h": 6.0 * 365.0,
+        "6h": 4.0 * 365.0,
+        "12h": 2.0 * 365.0,
+    }
+    return mapping[timeframe]
+
+
+def _vbt_freq(timeframe: str) -> str:
+    mapping = {
+        "1D": "1D",
+        "1h": "1h",
+        "2h": "2h",
+        "4h": "4h",
+        "6h": "6h",
+        "12h": "12h",
+    }
+    return mapping[timeframe]
+
+
 def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
-    end = payload.get("end_date") or date(2026, 4, 23)
-    start = payload.get("start_date") or (end - timedelta(days=365))
+    today = date.today()
+    end_default = today - timedelta(days=1)
+    end = _to_date(payload.get("end_date") or end_default)
+    start = _to_date(payload.get("start_date") or (end - timedelta(days=365)))
     asset_class = payload["asset_class"]
+    symbols = [classify_symbol(symbol).symbol for symbol in payload["symbols"]]
+    timeframe = _normalize_timeframe(payload.get("timeframe"))
+
+    benchmark_input = payload.get("benchmark_symbol")
+    if benchmark_input:
+        benchmark_asset = classify_symbol(benchmark_input)
+        if benchmark_asset.asset_class != asset_class:
+            raise ValueError("invalid_benchmark_symbol")
+        benchmark_symbol = benchmark_asset.symbol
+    else:
+        benchmark_symbol = default_benchmark(asset_class)
+
     return {
         "template": payload["template"],
         "asset_class": asset_class,
-        "symbols": [classify_symbol(symbol).symbol for symbol in payload["symbols"]],
-        "timeframe": payload.get("timeframe") or "1D",
+        "symbols": symbols,
+        "timeframe": timeframe,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
         "side": payload.get("side") or "long",
         "starting_capital": payload.get("starting_capital") or 10000,
         "allocation_method": payload.get("allocation_method") or "equal_weight",
-        "benchmark_symbol": payload.get("benchmark_symbol")
-        or default_benchmark(asset_class),
+        "benchmark_symbol": benchmark_symbol,
         "parameters": payload.get("parameters") or {},
+        "_execution_realism": payload.get("_execution_realism") or {"enabled": False},
     }
 
 
 def validate_backtest_config(config: dict[str, Any]) -> None:
+    if config["template"] not in ALLOWED_TEMPLATES:
+        raise ValueError("unsupported_template")
     if config["side"] != "long":
         raise ValueError("unsupported_side")
+    if config["allocation_method"] != "equal_weight":
+        raise ValueError("unsupported_allocation_method")
     if not 1000 <= float(config["starting_capital"]) <= 100000000:
         raise ValueError("invalid_starting_capital")
     if len(config["symbols"]) < 1 or len(config["symbols"]) > 5:
         raise ValueError("invalid_symbol_count")
-    if config["timeframe"] not in {"1D", "1H"}:
+    if config["timeframe"] not in ALLOWED_TIMEFRAMES:
         raise ValueError("unsupported_timeframe")
-    if date.fromisoformat(config["start_date"]) >= date.fromisoformat(config["end_date"]):
+
+    start = date.fromisoformat(config["start_date"])
+    end = date.fromisoformat(config["end_date"])
+    if start >= end:
         raise ValueError("invalid_date_range")
+    if end > date.today():
+        raise ValueError("invalid_date_range")
+    if (end - start).days > 365 * 3:
+        raise ValueError("invalid_lookback_window")
+
     if any(symbol in STABLECOINS for symbol in config["symbols"]):
         raise ValueError("stablecoin_not_supported")
 
-
-def _periods_per_year(timeframe: str) -> float:
-    return 252.0 if timeframe == "1D" else 24.0 * 365.0
-
-
-def _build_rsi(prices: pd.Series, period: int = 14) -> pd.Series:
-    delta = prices.diff()
-    gain = delta.clip(lower=0).rolling(period).mean()
-    loss = -delta.clip(upper=0).rolling(period).mean()
-    rs = gain / loss.replace(0, np.nan)
-    rsi = 100 - (100 / (1 + rs))
-    return rsi.fillna(50.0)
+    if config.get("parameters"):
+        raise ValueError("unsupported_parameters")
 
 
-def _stateful_position(entry: pd.Series, exit: pd.Series) -> pd.Series:
-    position = pd.Series(0.0, index=entry.index)
-    in_position = False
-    for idx in entry.index:
-        if not in_position and bool(entry.loc[idx]):
-            in_position = True
-        elif in_position and bool(exit.loc[idx]):
-            in_position = False
-        position.loc[idx] = 1.0 if in_position else 0.0
-    return position
+def _resolve_indicator_series(
+    data: pd.DataFrame,
+    *,
+    indicator: str,
+    period: int,
+    fallback_col: str = "close",
+) -> pd.Series:
+    if fallback_col not in data.columns:
+        raise ValueError("market_data_unavailable")
+
+    name = indicator.strip().lower()
+    ta_accessor = getattr(data, "ta", None)
+    if ta_accessor is None:
+        raise ValueError("unsupported_indicator")
+    accessor = getattr(ta_accessor, name, None)
+    if accessor is None:
+        raise ValueError("unsupported_indicator")
+
+    kwargs: dict[str, Any] = {"append": True}
+    try:
+        params = inspect.signature(accessor).parameters
+    except (TypeError, ValueError):
+        params = {}
+
+    if "length" in params:
+        kwargs["length"] = period
+    elif "window" in params:
+        kwargs["window"] = period
+    elif "period" in params:
+        kwargs["period"] = period
+
+    if "close" in params:
+        kwargs["close"] = data[fallback_col]
+
+    accessor(**kwargs)
+
+    upper = indicator.upper()
+    candidates = [
+        col
+        for col in data.columns
+        if upper in col.upper() and str(period) in col
+    ]
+    if not candidates:
+        candidates = [col for col in data.columns if upper in col.upper()]
+    if not candidates:
+        raise ValueError("unsupported_indicator")
+    return data[candidates[-1]].astype(float)
 
 
-def _build_position_series(config: dict[str, Any], prices: pd.Series) -> pd.Series:
+def _build_signals(config: dict[str, Any], data: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    close = data["close"].astype(float)
     template = config["template"]
-    parameters = config.get("parameters", {})
+    index = close.index
+
+    if template == "dca_accumulation":
+        entries = pd.Series(False, index=index, dtype=bool)
+        entries.iloc[0] = True
+        exits = pd.Series(False, index=index, dtype=bool)
+        return entries, exits
+
     if template == "rsi_mean_reversion":
-        entry_rsi = float(parameters.get("entry_rsi", 30))
-        exit_rsi = float(parameters.get("exit_rsi", 55))
-        rsi = _build_rsi(prices)
-        position = _stateful_position(rsi <= entry_rsi, rsi >= exit_rsi)
-        if float(position.sum()) == 0.0:
-            # Keep alpha flows productive even when no RSI threshold crossings occur.
-            return pd.Series(1.0, index=prices.index, dtype=float)
-        return position
+        rsi = _resolve_indicator_series(data, indicator="rsi", period=14)
+        entries = (rsi <= 30).fillna(False)
+        exits = (rsi >= 55).fillna(False)
+        return entries.astype(bool), exits.astype(bool)
+
     if template == "moving_average_crossover":
-        fast_window = int(parameters.get("fast_window", 20))
-        slow_window = int(parameters.get("slow_window", 50))
-        fast = prices.rolling(fast_window).mean()
-        slow = prices.rolling(slow_window).mean()
-        return (fast > slow).astype(float).fillna(0.0)
+        fast = _resolve_indicator_series(data, indicator="sma", period=20)
+        slow = _resolve_indicator_series(data, indicator="sma", period=50)
+        entries = (fast > slow) & (fast.shift(1) <= slow.shift(1))
+        exits = (fast < slow) & (fast.shift(1) >= slow.shift(1))
+        return entries.fillna(False).astype(bool), exits.fillna(False).astype(bool)
+
     if template == "momentum_breakout":
-        window = int(parameters.get("window", 20))
-        breakout = prices >= prices.rolling(window).max().shift(1)
-        return breakout.astype(float).fillna(0.0)
+        rolling_high = close.rolling(20).max().shift(1)
+        rolling_mid = close.rolling(20).mean()
+        entries = close >= rolling_high
+        exits = close < rolling_mid
+        return entries.fillna(False).astype(bool), exits.fillna(False).astype(bool)
+
     if template == "trend_follow":
-        window = int(parameters.get("window", 50))
-        trend = prices > prices.rolling(window).mean()
-        return trend.astype(float).fillna(0.0)
+        trend = close > close.rolling(50).mean()
+        entries = trend & ~trend.shift(1).fillna(False)
+        exits = (~trend) & trend.shift(1).fillna(False)
+        return entries.fillna(False).astype(bool), exits.fillna(False).astype(bool)
+
     if template == "buy_the_dip":
-        dip_threshold = float(parameters.get("dip_threshold_pct", 3.0)) / 100.0
-        hold_days = int(parameters.get("hold_periods", 5))
-        dips = prices.pct_change() <= (-dip_threshold)
-        return dips.rolling(window=hold_days, min_periods=1).max().astype(float).fillna(0.0)
-    # dca_accumulation and unknown templates default to always-invested long-only.
-    return pd.Series(1.0, index=prices.index, dtype=float)
+        dip = close.pct_change().fillna(0.0) <= -0.03
+        entries = dip.fillna(False)
+        exits = entries.shift(5).fillna(False)
+        return entries.astype(bool), exits.astype(bool)
+
+    raise ValueError("unsupported_template")
 
 
-def _trade_count(position: pd.Series) -> int:
-    entries = (position.diff().fillna(position) > 0).sum()
-    return int(entries)
+def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
+    raw = config.get("_execution_realism") or {}
+    enabled = bool(raw.get("enabled", False))
+    fee_bps = float(raw.get("fee_bps", 0.0))
+    slippage_bps = float(raw.get("slippage_bps", 0.0))
+    if not enabled:
+        fee_bps = 0.0
+        slippage_bps = 0.0
+    return {
+        "enabled": enabled,
+        "fees": fee_bps / 10000.0,
+        "slippage": slippage_bps / 10000.0,
+    }
 
 
-def _compute_profit_factor(strategy_returns: pd.Series) -> float:
-    gains = strategy_returns[strategy_returns > 0].sum()
-    losses = strategy_returns[strategy_returns < 0].sum()
+def _compute_profit_factor(returns: pd.Series) -> float:
+    gains = returns[returns > 0].sum()
+    losses = returns[returns < 0].sum()
     if losses == 0:
         return 10.0 if gains > 0 else 0.0
     return float(gains / abs(losses))
 
 
-def _compute_sharpe(strategy_returns: pd.Series, periods_per_year: float) -> float:
-    std = strategy_returns.std()
+def _compute_sharpe(returns: pd.Series, periods_per_year: float) -> float:
+    std = returns.std()
     if std == 0 or np.isnan(std):
         return 0.0
-    return float((strategy_returns.mean() / std) * np.sqrt(periods_per_year))
+    return float((returns.mean() / std) * sqrt(periods_per_year))
 
 
-def _compute_max_drawdown_pct(equity_curve: pd.Series) -> float:
+def _max_drawdown_pct(equity_curve: pd.Series) -> float:
     running_max = equity_curve.cummax()
     drawdown = equity_curve / running_max - 1.0
     return float(drawdown.min() * 100.0)
 
 
-def _compute_annualized_return_pct(
-    total_return_decimal: float, periods: int, periods_per_year: float
-) -> float:
+def _annualized_return_pct(total_return: float, periods: int, periods_per_year: float) -> float:
     if periods <= 1:
-        return float(total_return_decimal * 100.0)
+        return total_return * 100.0
     years = periods / periods_per_year
     if years <= 0:
-        return float(total_return_decimal * 100.0)
-    annualized = (1 + total_return_decimal) ** (1 / years) - 1
-    return float(annualized * 100.0)
+        return total_return * 100.0
+    annualized = (1 + total_return) ** (1 / years) - 1
+    return annualized * 100.0
 
 
-def _compute_symbol_metrics(
+def _trade_count(entries: pd.Series) -> int:
+    return int(entries.fillna(False).sum())
+
+
+def _compute_metrics(
     *,
     strategy_returns: pd.Series,
     benchmark_returns: pd.Series,
@@ -184,18 +318,17 @@ def _compute_symbol_metrics(
     periods_per_year: float,
     trade_count: int,
 ) -> dict[str, Any]:
-    strategy_equity = (1 + strategy_returns).cumprod()
-    benchmark_equity = (1 + benchmark_returns).cumprod()
+    strategy_equity = (1.0 + strategy_returns).cumprod()
+    benchmark_equity = (1.0 + benchmark_returns).cumprod()
 
     total_return = float(strategy_equity.iloc[-1] - 1.0)
     benchmark_return = float(benchmark_equity.iloc[-1] - 1.0)
     total_return_pct = total_return * 100.0
     benchmark_return_pct = benchmark_return * 100.0
-    max_drawdown_pct = _compute_max_drawdown_pct(strategy_equity)
-    volatility_pct = float(strategy_returns.std() * np.sqrt(periods_per_year) * 100.0)
+    volatility_pct = float(strategy_returns.std() * sqrt(periods_per_year) * 100.0)
 
-    active_periods = strategy_returns[strategy_returns != 0]
-    win_rate = float((active_periods > 0).mean()) if not active_periods.empty else 0.0
+    active = strategy_returns[strategy_returns != 0]
+    win_rate = float((active > 0).mean()) if not active.empty else 0.0
 
     return {
         "performance": {
@@ -204,14 +337,12 @@ def _compute_symbol_metrics(
             "delta_vs_benchmark_pct": round(total_return_pct - benchmark_return_pct, 2),
             "profit": round(allocation_capital * total_return, 2),
             "annualized_return_pct": round(
-                _compute_annualized_return_pct(
-                    total_return, len(strategy_returns), periods_per_year
-                ),
+                _annualized_return_pct(total_return, len(strategy_returns), periods_per_year),
                 2,
             ),
         },
         "risk": {
-            "max_drawdown_pct": round(max_drawdown_pct, 2),
+            "max_drawdown_pct": round(_max_drawdown_pct(strategy_equity), 2),
             "volatility_pct": round(abs(volatility_pct), 2),
         },
         "efficiency": {
@@ -236,7 +367,7 @@ def build_benchmark_curve(
     )
     aligned = benchmark_series.reindex(target_index).ffill().bfill()
     if aligned.empty:
-        aligned = pd.Series(1.0, index=target_index, dtype=float)
+        raise ValueError("market_data_unavailable")
     normalized = aligned / float(aligned.iloc[0])
     return {
         "symbol": benchmark_symbol,
@@ -249,89 +380,77 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
     by_symbol: dict[str, Any] = {}
     symbol_returns: list[pd.Series] = []
     benchmark_returns_aligned: list[pd.Series] = []
+    symbol_equity_curves: list[pd.Series] = []
+    benchmark_equity_curves: list[pd.Series] = []
     periods_per_year = _periods_per_year(config["timeframe"])
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
     allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
+    realism = _execution_realism_settings(config)
 
     for symbol in config["symbols"]:
-        prices = fetch_price_series(
+        bars = fetch_ohlcv(
             symbol=symbol,
             asset_class=config["asset_class"],
             start_date=start,
             end_date=end,
             timeframe=config["timeframe"],
-        ).astype(float)
-        prices = prices.sort_index()
-        position = _build_position_series(config, prices)
-        position = position.reindex(prices.index).fillna(0.0)
-        strategy_returns = prices.pct_change().fillna(0.0) * position.shift(1).fillna(0.0)
-
-        benchmark_curve = build_benchmark_curve(config, prices.index)
-        benchmark_equity = pd.Series(
-            benchmark_curve["equity_curve"], index=prices.index, dtype=float
         )
+        close = bars["close"].astype(float)
+        entries, exits = _build_signals(config, bars)
+
+        portfolio = vbt.Portfolio.from_signals(
+            close=close,
+            entries=entries,
+            exits=exits,
+            fees=float(realism["fees"]),
+            slippage=float(realism["slippage"]),
+            init_cash=allocation_capital,
+            freq=_vbt_freq(config["timeframe"]),
+        )
+
+        symbol_equity = pd.Series(portfolio.value().values, index=close.index, dtype=float)
+        strategy_returns = symbol_equity.pct_change().fillna(0.0)
+
+        benchmark_curve = build_benchmark_curve(config, close.index)
+        benchmark_normalized = pd.Series(
+            benchmark_curve["equity_curve"], index=close.index, dtype=float
+        )
+        benchmark_equity = benchmark_normalized * allocation_capital
         benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
 
         symbol_returns.append(strategy_returns)
         benchmark_returns_aligned.append(benchmark_returns)
+        symbol_equity_curves.append(symbol_equity)
+        benchmark_equity_curves.append(benchmark_equity)
 
-        by_symbol[symbol] = _compute_symbol_metrics(
+        by_symbol[symbol] = _compute_metrics(
             strategy_returns=strategy_returns,
             benchmark_returns=benchmark_returns,
             allocation_capital=allocation_capital,
             periods_per_year=periods_per_year,
-            trade_count=_trade_count(position),
+            trade_count=_trade_count(entries),
         )
 
-    aggregate_strategy_returns = pd.concat(symbol_returns, axis=1).fillna(0.0).mean(axis=1)
-    aggregate_benchmark_returns = (
-        pd.concat(benchmark_returns_aligned, axis=1).fillna(0.0).mean(axis=1)
+    aggregate_strategy_equity = (
+        pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1)
     )
-    aggregate_metrics = _compute_symbol_metrics(
+    aggregate_benchmark_equity = (
+        pd.concat(benchmark_equity_curves, axis=1).ffill().bfill().sum(axis=1)
+    )
+    aggregate_strategy_returns = aggregate_strategy_equity.pct_change().fillna(0.0)
+    aggregate_benchmark_returns = aggregate_benchmark_equity.pct_change().fillna(0.0)
+
+    aggregate_metrics = _compute_metrics(
         strategy_returns=aggregate_strategy_returns,
         benchmark_returns=aggregate_benchmark_returns,
         allocation_capital=float(config["starting_capital"]),
         periods_per_year=periods_per_year,
-        trade_count=sum(
-            row["efficiency"]["total_trades"] for row in by_symbol.values()
-        ),
+        trade_count=sum(row["efficiency"]["total_trades"] for row in by_symbol.values()),
     )
 
-    aggregate_win_rate = aggregate_metrics["efficiency"]["win_rate"]
-    aggregate_drawdown = aggregate_metrics["risk"]["max_drawdown_pct"]
-    aggregate_volatility = aggregate_metrics["risk"]["volatility_pct"]
-    aggregate_profit_factor = aggregate_metrics["efficiency"]["profit_factor"]
-    aggregate_sharpe = aggregate_metrics["efficiency"]["sharpe_ratio"]
-    aggregate_total_return = aggregate_metrics["performance"]["total_return_pct"]
-    aggregate_benchmark = aggregate_metrics["performance"]["benchmark_return_pct"]
-    aggregate_profit = aggregate_metrics["performance"]["profit"]
-    aggregate_annualized = aggregate_metrics["performance"]["annualized_return_pct"]
-
     return {
-        "aggregate": {
-            "performance": {
-                "total_return_pct": aggregate_total_return,
-                "benchmark_return_pct": aggregate_benchmark,
-                "delta_vs_benchmark_pct": round(
-                    aggregate_total_return - aggregate_benchmark, 2
-                ),
-                "profit": aggregate_profit,
-                "annualized_return_pct": aggregate_annualized,
-            },
-            "risk": {
-                "max_drawdown_pct": aggregate_drawdown,
-                "volatility_pct": aggregate_volatility,
-            },
-            "efficiency": {
-                "win_rate": aggregate_win_rate,
-                "total_trades": sum(
-                    row["efficiency"]["total_trades"] for row in by_symbol.values()
-                ),
-                "profit_factor": aggregate_profit_factor,
-                "sharpe_ratio": aggregate_sharpe,
-            },
-        },
+        "aggregate": aggregate_metrics,
         "by_symbol": by_symbol,
     }
 
@@ -345,6 +464,19 @@ def build_result_card(config: dict[str, Any], metrics: dict[str, Any]) -> dict[s
     end = date.fromisoformat(config["end_date"])
     symbols = ", ".join(config["symbols"])
     ending_capital = config["starting_capital"] + performance["profit"]
+    realism = _execution_realism_settings(config)
+
+    assumptions = [
+        f"Universe: {symbols}.",
+        "Simulation uses long-only preset.",
+        f"Starting capital: ${config['starting_capital']:,.0f}.",
+        "Allocation: equal weight.",
+        "No slippage or fees included.",
+        f"Benchmark: {config['benchmark_symbol']}.",
+    ]
+    if bool(realism["enabled"]):
+        assumptions[4] = "Execution realism enabled (fees/slippage applied)."
+
     return {
         "title": f"{symbols} {config['template'].replace('_', ' ').title()}",
         "date_range": {
@@ -381,14 +513,7 @@ def build_result_card(config: dict[str, Any], metrics: dict[str, Any]) -> dict[s
                 "value": f"{performance['delta_vs_benchmark_pct']:+.1f}% vs {config['benchmark_symbol']}",
             },
         ],
-        "assumptions": [
-            f"Universe: {symbols}.",
-            "Simulation uses long-only preset.",
-            f"Starting capital: ${config['starting_capital']:,.0f}.",
-            "Allocation: equal weight.",
-            "No slippage or fees included.",
-            f"Benchmark: {config['benchmark_symbol']}.",
-        ],
+        "assumptions": assumptions,
         "actions": [
             {"type": "add_to_collection", "label": "Add strategy to collection"},
             {"type": "try_new_strategy", "label": "Try a new strategy"},

@@ -5,12 +5,11 @@ import os
 from collections.abc import Iterable
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from dotenv import load_dotenv
-
-load_dotenv()
+from loguru import logger
 
 from argus.api.schemas import (
     BacktestRun,
@@ -56,6 +55,8 @@ from argus.domain.engine import (
 from argus.domain.orchestrator import assistant_copy_for_result, extract_strategy_request
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+
+load_dotenv()
 
 app = FastAPI(title="Argus Alpha API", version="1.0.0-alpha")
 app.add_middleware(
@@ -224,7 +225,7 @@ def list_conversations(
     limit: int = Query(20, ge=1, le=100),
     archived: bool | None = Query(None),
     deleted: bool = Query(False),
-    user: User = Depends(current_user),
+    user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedConversations:
     if supabase_gateway is not None:
         items = supabase_gateway.list_conversations(
@@ -240,14 +241,14 @@ def list_conversations(
             else:
                 if conversation.deleted_at is not None:
                     continue
-            
+
             # Filter by archived status (if specified)
             if archived is not None:
                 if conversation.archived != archived:
                     continue
-            
+
             items.append(conversation)
-            
+
         items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
         items = items[:limit]
     return PaginatedConversations(items=items)
@@ -332,16 +333,128 @@ def list_messages(conversation_id: str, limit: int = Query(50, ge=1, le=100)):
     return PaginatedMessages(items=store.messages.get(conversation_id, [])[:limit])
 
 
-def ensure_same_asset_or_raise(symbols: list[str], request: Request) -> str:
-    classified = [classify_symbol(symbol) for symbol in symbols]
+def _raise_backtest_problem(
+    request: Request, code: str, *, context: dict[str, Any] | None = None
+) -> None:
+    mapping: dict[str, tuple[int, str, str]] = {
+        "invalid_symbol": (
+            422,
+            "Invalid Symbol",
+            "One or more symbols are not supported in the active Alpaca asset universe.",
+        ),
+        "invalid_symbol_count": (
+            422,
+            "Invalid Symbol Count",
+            "Alpha supports between 1 and 5 symbols per run.",
+        ),
+        "mixed_asset_not_supported": (
+            422,
+            "Mixed Asset Simulation Not Supported",
+            "Alpha supports grouped symbols within the same asset class only.",
+        ),
+        "asset_class_conflict": (
+            422,
+            "Asset Class Conflict",
+            "Requested asset_class does not match inferred symbol asset class.",
+        ),
+        "unsupported_template": (
+            422,
+            "Unsupported Strategy Template",
+            "Template is not supported in Alpha.",
+        ),
+        "unsupported_timeframe": (
+            422,
+            "Unsupported Timeframe",
+            "Supported timeframes are 1h, 2h, 4h, 6h, 12h, and 1D.",
+        ),
+        "unsupported_side": (
+            422,
+            "Unsupported Position Side",
+            "Alpha supports long-only backtests.",
+        ),
+        "unsupported_allocation_method": (
+            422,
+            "Unsupported Allocation Method",
+            "Alpha supports equal_weight allocation only.",
+        ),
+        "unsupported_parameters": (
+            422,
+            "Unsupported Parameters",
+            "Indicator and risk parameter customization is not enabled for Alpha MVP templates.",
+        ),
+        "invalid_starting_capital": (
+            422,
+            "Invalid Starting Capital",
+            "starting_capital must be between 1,000 and 100,000,000.",
+        ),
+        "invalid_date_range": (
+            422,
+            "Invalid Date Range",
+            "start_date must be before end_date and end_date cannot be in the future.",
+        ),
+        "invalid_lookback_window": (
+            422,
+            "Invalid Lookback Window",
+            "Alpha supports lookback windows up to 3 years.",
+        ),
+        "stablecoin_not_supported": (
+            422,
+            "Stablecoin Not Supported",
+            "Stablecoins are excluded from Alpha backtesting.",
+        ),
+        "invalid_benchmark_symbol": (
+            422,
+            "Invalid Benchmark Symbol",
+            "benchmark_symbol must match the run asset class.",
+        ),
+        "asset_universe_unavailable": (
+            503,
+            "Asset Universe Unavailable",
+            "Asset validation is temporarily unavailable. Please retry shortly.",
+        ),
+        "market_data_unavailable": (
+            503,
+            "Market Data Unavailable",
+            "Market data is temporarily unavailable. Please retry shortly.",
+        ),
+    }
+    status_code, title, detail = mapping.get(
+        code,
+        (
+            422,
+            "Invalid Backtest Request",
+            f"Backtest request failed Alpha validation: {code}.",
+        ),
+    )
+    raise problem(
+        request,
+        status_code=status_code,
+        code=code,
+        title=title,
+        detail=detail,
+        context=context,
+    )
+
+
+def ensure_same_asset_or_raise(
+    symbols: list[str], request: Request
+) -> tuple[str, list[Any]]:
+    classified = []
+    for symbol in symbols:
+        try:
+            classified.append(classify_symbol(symbol))
+        except ValueError as exc:
+            code = str(exc)
+            _raise_backtest_problem(
+                request,
+                code,
+                context={"symbol": symbol.strip().upper()},
+            )
     classes = {entry.asset_class for entry in classified}
     if len(classes) > 1:
-        raise problem(
+        _raise_backtest_problem(
             request,
-            status_code=422,
-            code="mixed_asset_not_supported",
-            title="Mixed Asset Simulation Not Supported",
-            detail="Alpha supports grouped symbols within the same asset class only.",
+            "mixed_asset_not_supported",
             context={
                 "conflicting_symbols": [
                     {"symbol": entry.symbol, "asset_class": entry.asset_class}
@@ -349,7 +462,7 @@ def ensure_same_asset_or_raise(symbols: list[str], request: Request) -> str:
                 ]
             },
         )
-    return classified[0].asset_class
+    return classified[0].asset_class, classified
 
 
 def create_run_from_payload(
@@ -369,37 +482,28 @@ def create_run_from_payload(
             title="Validation Error",
             detail="Symbol is required.",
         )
-    inferred_asset_class = ensure_same_asset_or_raise(symbols, request)
+    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(symbols, request)
     payload["asset_class"] = payload.get("asset_class") or inferred_asset_class
     if payload["asset_class"] != inferred_asset_class:
-        raise problem(
+        _raise_backtest_problem(
             request,
-            status_code=422,
-            code="asset_class_conflict",
-            title="Asset Class Conflict",
-            detail="Requested asset_class does not match inferred symbol asset class.",
+            "asset_class_conflict",
             context={
                 "requested_asset_class": payload["asset_class"],
                 "inferred_asset_class": inferred_asset_class,
-                "symbols": [classify_symbol(symbol).symbol for symbol in symbols],
+                "symbols": [entry.symbol for entry in classified_symbols],
             },
         )
     payload["benchmark_symbol"] = payload.get("benchmark_symbol") or default_benchmark(
         payload["asset_class"]
     )
-    config = normalize_backtest_config(payload)
+
     try:
+        config = normalize_backtest_config(payload)
         validate_backtest_config(config)
+        metrics = compute_alpha_metrics(config)
     except ValueError as exc:
-        code = str(exc)
-        raise problem(
-            request,
-            status_code=422,
-            code=code,
-            title="Invalid Backtest Request",
-            detail=f"Backtest request failed Alpha validation: {code}.",
-        ) from exc
-    metrics = compute_alpha_metrics(config)
+        _raise_backtest_problem(request, str(exc))
     now = utcnow()
     run = BacktestRun(
         id=store.new_id(),
@@ -495,7 +599,9 @@ def run_backtest(
 
 @app.get("/api/v1/backtests/{run_id}", response_model=BacktestRunResponse)
 def get_backtest(
-    run_id: str, request: Request, user: User = Depends(current_user)
+    run_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
 ) -> BacktestRunResponse:
     run = (
         supabase_gateway.get_backtest_run(user_id=user.id, run_id=run_id)
@@ -515,7 +621,8 @@ def get_backtest(
 
 @app.post("/api/v1/strategies", response_model=StrategyResponse)
 def create_strategy(
-    payload: StrategyCreate, user: User = Depends(current_user)
+    payload: StrategyCreate,
+    user: User = Depends(current_user),  # noqa: B008
 ) -> StrategyResponse:
     if supabase_gateway is not None:
         strategy = supabase_gateway.create_strategy(user_id=user.id, payload=payload)
@@ -543,7 +650,7 @@ def create_strategy(
 def list_strategies(
     limit: int = Query(20, ge=1, le=100),
     deleted: bool = Query(False),
-    user: User = Depends(current_user),
+    user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedStrategies:
     if supabase_gateway is not None:
         items = supabase_gateway.list_strategies(user_id=user.id, limit=limit, deleted=deleted)
@@ -557,7 +664,7 @@ def list_strategies(
                 if item.deleted_at is not None:
                     continue
             items.append(item)
-            
+
         items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
         items = items[:limit]
     return PaginatedStrategies(items=items)
@@ -710,7 +817,7 @@ def detach_strategy(collection_id: str, strategy_id: str) -> SuccessResponse:
 def history(
     limit: int = Query(20, ge=1, le=100),
     deleted: bool = Query(False),
-    user: User = Depends(current_user),
+    user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedHistory:
     if supabase_gateway is not None:
         raw = supabase_gateway.list_history_rows(user_id=user.id, limit=limit, deleted=deleted)
@@ -893,7 +1000,7 @@ def chat_stream(
     payload: ChatStreamRequest,
     request: Request,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
-    user: User = Depends(current_user),
+    user: User = Depends(current_user),  # noqa: B008
 ):
     # Streaming response headers for contract compliance
     headers = {
@@ -950,18 +1057,36 @@ def chat_stream(
         yield sse("status", {"status": "extracting_strategy"})
         yield sse("token", {"text": "I can test that as a supported Alpha strategy. "})
         yield sse("status", {"status": "running_backtest"})
-        run = create_run_from_payload(
-            {
-                **extracted,
-                "conversation_id": conversation.id,
-                "timeframe": "1D",
-            },
-            request,
-            conversation_id=conversation.id,
-            persist_in_memory=supabase_gateway is None,
-        )
-        if supabase_gateway is not None:
-            run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
+        try:
+            run = create_run_from_payload(
+                {
+                    **extracted,
+                    "conversation_id": conversation.id,
+                    "timeframe": "1D",
+                },
+                request,
+                conversation_id=conversation.id,
+                persist_in_memory=supabase_gateway is None,
+            )
+            if supabase_gateway is not None:
+                run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {"detail": str(exc.detail)}
+            yield sse("error", detail)
+            yield sse("done", {"error": True})
+            return
+        except Exception:
+            err = {
+                "type": "https://api.argus.app/problems/internal-error",
+                "title": "Internal Error",
+                "status": 500,
+                "detail": "Unexpected chat stream failure.",
+                "code": "internal_error",
+                "request_id": request.state.request_id,
+            }
+            yield sse("error", err)
+            yield sse("done", {"error": True})
+            return
         assistant_text = assistant_copy_for_result(
             run.symbols, payload.language or conversation.language or "en"
         )
