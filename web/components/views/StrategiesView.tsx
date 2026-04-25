@@ -13,6 +13,7 @@ import {
   X,
   Play,
   AlertCircle,
+  Compass,
   Loader2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -329,6 +330,7 @@ export default function StrategiesView({
           ) : sortedStrategies.length === 0 ? (
             <div className="mt-12 flex flex-col items-center gap-8">
               <div className="flex flex-col items-center gap-3 text-center text-black/55 dark:text-white/55">
+                <Compass className="h-8 w-8" />
                 <p className="max-w-sm text-[15px] leading-6">
                   {searchText
                     ? t('strategies.no_match')
@@ -345,7 +347,7 @@ export default function StrategiesView({
                       className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover:shadow-md dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
                     >
                       <div className="rounded-full bg-black/[0.03] p-2 dark:bg-white/[0.03]">
-                        <Play className="h-4 w-4 text-black/40 dark:text-white/40" />
+                        <Compass className="h-4 w-4 text-black/40 dark:text-white/40" />
                       </div>
                       <h3 className="text-[15px] font-semibold text-black dark:text-white">
                         {recipe.title}

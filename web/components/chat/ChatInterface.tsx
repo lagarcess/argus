@@ -667,7 +667,8 @@ export default function ChatInterface() {
         className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]"
       >
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
-        <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between px-4 pointer-events-none md:px-8">
+        {currentView !== "settings" && (
+          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between px-4 pointer-events-none md:px-8">
           {/* Empty space for sidebar toggle alignment balance */}
           <div className="w-11 md:w-32" />
 
@@ -676,7 +677,6 @@ export default function ChatInterface() {
             {currentView === "chat" && (messages.length > 0 ? "Conversation" : t('chat.new_chat'))}
             {currentView === "strategies" && t('common.strategies')}
             {currentView === "collections" && t('common.collections')}
-            {currentView === "settings" && t('common.settings')}
           </h1>
 
           {/* Action Button (Always Right-Anchored) */}
@@ -796,7 +796,8 @@ export default function ChatInterface() {
               </button>
             )}
           </div>
-        </header>
+          </header>
+        )}
         {/* ── Chat view ── */}
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">

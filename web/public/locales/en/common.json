@@ -154,6 +154,11 @@
         "title": "Trend Follower",
         "desc": "Ride the momentum while the price is above the 50-day MA.",
         "prompt": "Create a strategy that buys whenever the price is above the 50-day moving average on QQQ."
+      },
+      {
+        "title": "Monthly DCA",
+        "desc": "Build positions steadily with fixed recurring buys.",
+        "prompt": "Create a simple monthly DCA strategy that buys SPY on the first trading day of each month."
       }
     ]
   },

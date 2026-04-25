@@ -154,6 +154,11 @@
         "title": "Seguidor de Tendencia",
         "desc": "Sigue el impulso mientras el precio esté por encima de la media móvil de 50 días.",
         "prompt": "Crea una estrategia que compre siempre que el precio esté por encima de la media móvil de 50 días en QQQ."
+      },
+      {
+        "title": "DCA Mensual",
+        "desc": "Construye posiciones con compras fijas cada mes.",
+        "prompt": "Crea una estrategia DCA mensual simple que compre SPY el primer dia habil de cada mes."
       }
     ]
   },
