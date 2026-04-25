@@ -130,7 +130,7 @@ export type ChatStreamEvent =
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_ARGUS_API_URL ?? "http://localhost:8000/api/v1";
+  process.env.NEXT_PUBLIC_ARGUS_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -177,6 +177,7 @@ async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
+  console.log(`[argus-api] Fetching ${API_BASE}${path}`, options);
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options,
@@ -428,4 +429,15 @@ export async function streamChatMessage(
       } as ChatStreamEvent);
     }
   }
+}
+
+export async function postFeedback(payload: {
+  type: "bug" | "feature" | "general";
+  message: string;
+  context?: Record<string, any>;
+}) {
+  return apiFetch<{ success: boolean }>("/feedback", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

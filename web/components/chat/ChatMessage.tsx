@@ -5,15 +5,19 @@ import { Sparkles, ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarn
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import { Message } from "./types";
+import { postFeedback } from "@/lib/argus-api";
 
 type ChatMessageProps = {
   message: Message;
   onAction?: (value: string) => void;
+  onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, any>, rating?: "positive" | "negative") => void;
+  isLatest?: boolean;
 };
 
-export default function ChatMessage({ message, onAction }: ChatMessageProps) {
+export default function ChatMessage({ message, onAction, onFeedback, isLatest }: ChatMessageProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
+  const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
   const optionsRef = useRef<HTMLDivElement>(null);
@@ -55,6 +59,22 @@ export default function ChatMessage({ message, onAction }: ChatMessageProps) {
     };
   }, [showOptions]);
 
+  const handleRating = (newRating: "positive" | "negative") => {
+    if (rating === newRating) {
+      setRating(null);
+    } else {
+      setRating(newRating);
+      // First, post the basic rating
+      postFeedback({ 
+        type: "general", 
+        message: newRating === "positive" ? "Thumbs Up" : "Thumbs Down", 
+        context: { message_id: message.id, rating: newRating } 
+      });
+      // Then, open the detailed feedback dialog
+      onFeedback?.("rating", { message_id: message.id }, newRating);
+    }
+  };
+
   const getCopyText = () => {
     if (message.kind === "strategy_result" && message.result) {
       const rows = message.result.metrics.map((metric) => `${metric.label}: ${metric.value}`);
@@ -95,68 +115,90 @@ export default function ChatMessage({ message, onAction }: ChatMessageProps) {
             </div>
           )}
           
-          <div className="flex items-start justify-between gap-4 mt-2">
-            {message.actions && message.actions.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {message.actions.map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => onAction?.(action.value)}
-                    className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div />
-            )}
-
-            {/* Feedback Icon Row (Right-aligned) */}
-            <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
-              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title={t('chat.good_response')}>
-                <ThumbsUp className="w-3.5 h-3.5" />
-              </button>
-              <button className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" title={t('chat.poor_response')}>
-                <ThumbsDown className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={toggleOptions}
-                className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" 
-                title={t('chat.more_actions')}
-              >
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Popover Menu */}
-              {showOptions && (
-                <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] shadow-xl dark:shadow-black/50 border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
-                  <button 
-                    className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                    onClick={() => { navigator.clipboard.writeText(getCopyText()); setShowOptions(false); }}
-                  >
-                    <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
-                    {t('chat.copy_plaintext')}
-                  </button>
-                  <button 
-                    className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                    onClick={() => { navigator.clipboard.writeText(message.id); setShowOptions(false); }}
-                  >
-                    <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
-                    {t('chat.copy_id')}
-                  </button>
-                  <button 
-                    className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                    onClick={() => setShowOptions(false)}
-                  >
-                    <MessageSquareWarning className="w-4 h-4 text-black/60 dark:text-white/60" />
-                    {t('chat.report_issue')}
-                  </button>
+          {isLatest && (
+            <div className="flex items-start justify-between gap-4 mt-2">
+              {message.actions && message.actions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {message.actions.map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => onAction?.(action.value)}
+                      className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
+                    >
+                      {action.label}
+                    </button>
+                  ))}
                 </div>
+              ) : (
+                <div />
               )}
+
+              {/* Feedback Icon Row (Right-aligned) */}
+              <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
+                {(rating === null || rating === "positive") && (
+                  <button 
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
+                      rating === "positive" 
+                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" 
+                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+                    }`} 
+                    title={t('chat.good_response')}
+                    onClick={() => handleRating("positive")}
+                  >
+                    <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? "fill-current" : ""}`} />
+                  </button>
+                )}
+                {(rating === null || rating === "negative") && (
+                  <button 
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
+                      rating === "negative" 
+                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" 
+                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+                    }`} 
+                    title={t('chat.poor_response')}
+                    onClick={() => handleRating("negative")}
+                  >
+                    <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? "fill-current" : ""}`} />
+                  </button>
+                )}
+                <button 
+                  onClick={toggleOptions}
+                  className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" 
+                  title={t('chat.more_actions')}
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Popover Menu */}
+                {showOptions && (
+                  <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] shadow-xl dark:shadow-black/50 border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
+                    <button 
+                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                      onClick={() => { navigator.clipboard.writeText(getCopyText()); setShowOptions(false); }}
+                    >
+                      <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
+                      {t('chat.copy_plaintext')}
+                    </button>
+                    <button 
+                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                      onClick={() => { navigator.clipboard.writeText(message.id); setShowOptions(false); }}
+                    >
+                      <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
+                      {t('chat.copy_id')}
+                    </button>
+                    <button 
+                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                      onClick={() => { setShowOptions(false); onFeedback?.("bug", { message_id: message.id }); }}
+                    >
+                      <MessageSquareWarning className="w-4 h-4 text-black/60 dark:text-white/60" />
+                      {t('chat.report_issue')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

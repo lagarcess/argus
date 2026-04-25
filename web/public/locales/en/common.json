@@ -27,7 +27,37 @@
     "yesterday": "yesterday",
     "no_items": "No items found",
     "restore": "Restore",
-    "permanently_delete": "Permanently delete"
+    "permanently_delete": "Permanently delete",
+    "submit": "Submit"
+  },
+  "feedback": {
+    "title_bug": "Report a Bug",
+    "title_feature": "Request a Feature",
+    "title_general": "General Feedback",
+    "title_rating": "Share feedback",
+    "placeholder": "Tell us more...",
+    "placeholder_details": "Share details (optional)",
+    "success": "Thank you for your feedback!",
+    "error": "Failed to send feedback. Please try again.",
+    "footer_note": "Your conversation will be included with your feedback to help improve Argus.",
+    "tags": {
+      "positive": {
+        "accurate": "Accurate and complete",
+        "exactly": "Exactly what I asked for",
+        "fast": "Fast and responsive",
+        "style": "Great style and tone",
+        "helpful": "Helpful and informative",
+        "other": "Other"
+      },
+      "negative": {
+        "incorrect": "Incorrect or incomplete",
+        "not_what_asked": "Not what I asked for",
+        "slow": "Slow or buggy",
+        "style": "Style or tone",
+        "safety": "Safety or legal concern",
+        "other": "Other"
+      }
+    }
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
@@ -126,6 +156,8 @@
     },
     "about": {
       "title": "About",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
       "report_bug": "Report a bug",
       "request_feature": "Request a feature",
       "feedback": "General feedback"

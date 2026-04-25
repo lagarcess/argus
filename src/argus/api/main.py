@@ -60,7 +60,12 @@ from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 app = FastAPI(title="Argus Alpha API", version="1.0.0-alpha")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -975,23 +980,34 @@ def feedback(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> SuccessResponse:
-    if not payload.message_id:
-        raise problem(
-            request,
-            status_code=400,
-            code="invalid_request",
-            title="Bad Request",
-            detail="message_id is required",
+    """
+    Submit user feedback, bug reports, or feature requests.
+    """
+    if supabase_gateway is not None:
+        supabase_gateway.create_feedback(
+            user_id=user.id,
+            feedback_type=payload.type,
+            message=payload.message,
+            context=payload.context,
         )
-    store.feedback.append(
-        {
-            "id": store.new_id(),
-            "user_id": user.id,
-            "message_id": payload.message_id,
-            "type": payload.type,
-            "message": payload.message,
-            "context": payload.context,
-            "created_at": utcnow(),
-        }
+    else:
+        store.feedback.append(
+            {
+                "id": store.new_id(),
+                "user_id": user.id,
+                "type": payload.type,
+                "message": payload.message,
+                "context": payload.context,
+                "created_at": utcnow(),
+            }
+        )
+
+    logger.info(
+        "Feedback received",
+        user_id=user.id,
+        type=payload.type,
+        message_len=len(payload.message),
     )
+
     return SuccessResponse(success=True)
+

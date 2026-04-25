@@ -27,7 +27,37 @@
     "yesterday": "ayer",
     "no_items": "No se encontraron elementos",
     "restore": "Restaurar",
-    "permanently_delete": "Eliminar permanentemente"
+    "permanently_delete": "Eliminar permanentemente",
+    "submit": "Enviar"
+  },
+  "feedback": {
+    "title_bug": "Reportar un error",
+    "title_feature": "Sugerir función",
+    "title_general": "Comentarios generales",
+    "title_rating": "Compartir comentarios",
+    "placeholder": "Cuéntanos más...",
+    "placeholder_details": "Compartir detalles (opcional)",
+    "success": "¡Gracias por tus comentarios!",
+    "error": "Error al enviar comentarios. Inténtalo de nuevo.",
+    "footer_note": "Tu conversación se incluirá con tus comentarios para ayudar a mejorar Argus.",
+    "tags": {
+      "positive": {
+        "accurate": "Preciso y completo",
+        "exactly": "Exactamente lo que pedí",
+        "fast": "Rápido y receptivo",
+        "style": "Buen estilo y tono",
+        "helpful": "Útil e informativo",
+        "other": "Otro"
+      },
+      "negative": {
+        "incorrect": "Incorrecto o incompleto",
+        "not_what_asked": "No es lo que pedí",
+        "slow": "Lento o con errores",
+        "style": "Estilo o tono",
+        "safety": "Preocupación de seguridad o legal",
+        "other": "Otro"
+      }
+    }
   },
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
@@ -126,6 +156,8 @@
     },
     "about": {
       "title": "Acerca de",
+      "terms": "Términos de Servicio",
+      "privacy": "Política de Privacidad",
       "report_bug": "Reportar un error",
       "request_feature": "Sugerir función",
       "feedback": "Comentarios generales"

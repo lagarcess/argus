@@ -606,3 +606,21 @@ class SupabaseGateway:
     @staticmethod
     def parse_iso(value: str) -> datetime:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    def create_feedback(
+        self,
+        user_id: str,
+        feedback_type: str,
+        message: str,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """Persists feedback to the Supabase database."""
+        self.client.table("feedback").insert(
+            {
+                "id": self.new_id(),
+                "user_id": user_id,
+                "type": feedback_type,
+                "message": message,
+                "context": context,
+                "created_at": _now_iso(),
+            }
+        ).execute()

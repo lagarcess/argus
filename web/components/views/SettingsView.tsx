@@ -21,6 +21,9 @@ import {
   MessageSquare,
   BarChart2,
   Folder,
+  MessageSquareWarning,
+  Sparkles,
+  MessageSquarePlus,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -43,11 +46,12 @@ const LANGUAGES = [
 type SettingsViewProps = {
   onClose: () => void;
   onLogout: () => void;
+  onFeedback?: (type: "bug" | "feature" | "general", context: Record<string, any>) => void;
 };
 
 type SubView = "main" | "archived" | "deleted";
 
-export default function SettingsView({ onClose, onLogout }: SettingsViewProps) {
+export default function SettingsView({ onClose, onLogout, onFeedback }: SettingsViewProps) {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [activeSubView, setActiveSubView] = useState<SubView>("main");
@@ -360,19 +364,44 @@ export default function SettingsView({ onClose, onLogout }: SettingsViewProps) {
               {t("settings.about.title")}
             </span>
             <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
-              <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5">
+              <button 
+                className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
+              >
+                <span className="text-[15px] text-black dark:text-white font-medium">
+                  {t("settings.about.terms")}
+                </span>
+                <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
+              </button>
+              <button 
+                className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
+              >
+                <span className="text-[15px] text-black dark:text-white font-medium">
+                  {t("settings.about.privacy")}
+                </span>
+                <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
+              </button>
+              <button 
+                onClick={() => onFeedback?.("bug", { surface: "settings" })}
+                className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
+              >
                 <span className="text-[15px] text-black dark:text-white font-medium">
                   {t("settings.about.report_bug")}
                 </span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
-              <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5">
+              <button 
+                onClick={() => onFeedback?.("feature", { surface: "settings" })}
+                className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
+              >
                 <span className="text-[15px] text-black dark:text-white font-medium">
                   {t("settings.about.request_feature")}
                 </span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
-              <button className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+              <button 
+                onClick={() => onFeedback?.("general", { surface: "settings" })}
+                className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
                 <span className="text-[15px] text-black dark:text-white font-medium">
                   {t("settings.about.feedback")}
                 </span>

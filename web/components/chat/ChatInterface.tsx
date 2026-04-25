@@ -38,6 +38,7 @@ import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
+import FeedbackDialog from "../feedback/FeedbackDialog";
 import { type ChatActionOption, type Message } from "./types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -91,6 +92,12 @@ export default function ChatInterface() {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [feedbackState, setFeedbackState] = useState<{
+    isOpen: boolean;
+    type: "bug" | "feature" | "general" | "rating";
+    rating?: "positive" | "negative";
+    context?: Record<string, any>;
+  }>({ isOpen: false, type: "general" });
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -422,7 +429,7 @@ export default function ChatInterface() {
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white">
       {/* ── Desktop sidebar ── */}
-      <aside className="absolute inset-y-0 left-0 z-0 flex w-full flex-col px-6 pb-8 pt-12 md:w-[320px]">
+      <aside className={`absolute inset-y-0 left-0 flex w-full flex-col px-6 pb-8 pt-12 transition-all duration-500 md:w-[320px]`}>
         <div className="mb-10 flex items-center justify-between">
           <h1 className="text-[26px] font-medium tracking-tight">argus</h1>
           <button
@@ -754,7 +761,16 @@ export default function ChatInterface() {
             <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
               <div className="space-y-8">
                 {messages.map((msg) => (
-                  <ChatMessage key={msg.id} message={msg} onAction={handleAction} />
+                  <ChatMessage
+                    key={msg.id}
+                    message={msg}
+                    onAction={handleAction}
+                    onFeedback={(type, context, rating) => {
+                      setFeedbackState({ isOpen: true, type, context, rating });
+                      setIsSidebarOpen(false);
+                    }}
+                    isLatest={msg.role === 'assistant' && messages.findLastIndex(m => m.role === 'assistant') === messages.indexOf(msg)}
+                  />
                 ))}
                 {streamStatus && (
                   <div className="ml-12 text-[13px] text-black/45 dark:text-white/45">
@@ -790,7 +806,13 @@ export default function ChatInterface() {
         {currentView === "settings" && (
           <SettingsView
             onClose={() => setCurrentView("chat")}
-            onLogout={() => { window.location.href = "/"; }}
+            onLogout={() => {
+              window.location.href = "/";
+            }}
+            onFeedback={(type, context) => {
+              setFeedbackState({ isOpen: true, type, context });
+              setIsSidebarOpen(false);
+            }}
           />
         )}
       </section>
@@ -812,6 +834,15 @@ export default function ChatInterface() {
           }}
         />
       )}
+
+      {/* ── Feedback Dialog ── */}
+      <FeedbackDialog
+        isOpen={feedbackState.isOpen}
+        onClose={() => setFeedbackState((s) => ({ ...s, isOpen: false }))}
+        type={feedbackState.type}
+        rating={feedbackState.rating}
+        context={feedbackState.context}
+      />
 
       {/* ── Toast ── */}
       {toast && (

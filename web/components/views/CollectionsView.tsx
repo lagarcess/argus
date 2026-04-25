@@ -179,7 +179,7 @@ export default function CollectionsView({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white relative">
+    <div className="flex h-[100dvh] w-full max-w-3xl mx-auto flex-col overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white relative">
       {/* Context menu backdrop */}
       {activeContextMenu && (
         <div
