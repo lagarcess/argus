@@ -46,7 +46,7 @@ const LANGUAGES = [
 type SettingsViewProps = {
   onClose: () => void;
   onLogout: () => void;
-  onFeedback?: (type: "bug" | "feature" | "general", context: Record<string, any>) => void;
+  onFeedback?: (type: "bug" | "feature" | "general", context: Record<string, unknown>) => void;
 };
 
 type SubView = "main" | "archived" | "deleted";
@@ -84,31 +84,17 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
 
   useEffect(() => {
     if (activeSubView === "archived") {
-      let isMounted = true;
-      const load = async () => {
-        setIsLoading(true);
-        try {
-          const { items } = await listConversations({ archived: true });
-          if (isMounted) setArchivedChats(items);
-        } finally {
-          if (isMounted) setIsLoading(false);
-        }
-      };
-      load();
-      return () => { isMounted = false; };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsLoading(true);
+      listConversations({ archived: true })
+        .then(({ items }) => setArchivedChats(items))
+        .finally(() => setIsLoading(false));
     } else if (activeSubView === "deleted") {
-      let isMounted = true;
-      const load = async () => {
-        setIsLoading(true);
-        try {
-          const { items } = await listHistory({ deleted: true });
-          if (isMounted) setDeletedItems(items);
-        } finally {
-          if (isMounted) setIsLoading(false);
-        }
-      };
-      load();
-      return () => { isMounted = false; };
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsLoading(true);
+      listHistory({ deleted: true })
+        .then(({ items }) => setDeletedItems(items))
+        .finally(() => setIsLoading(false));
     }
   }, [activeSubView]);
 
