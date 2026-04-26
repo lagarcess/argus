@@ -393,6 +393,7 @@ def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
+    assert "event: token" in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
@@ -415,6 +416,7 @@ def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
+    assert "event: token" in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200

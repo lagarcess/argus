@@ -228,9 +228,14 @@ export async function patchMe(patch: ProfilePatch) {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function createConversation(language?: string | null) {
+  const payload: { title: null; language?: ApiLanguage } = { title: null };
+  if (language) {
+    payload.language = normalizeApiLanguage(language);
+  }
+
   return apiFetch<{ conversation: Conversation }>("/conversations", {
     method: "POST",
-    body: JSON.stringify({ title: null, language: normalizeApiLanguage(language) }),
+    body: JSON.stringify(payload),
   });
 }
 
