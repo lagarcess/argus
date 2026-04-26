@@ -1,3 +1,5 @@
+import { getSupabaseClient } from "./supabase-client";
+
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
 export type AssetClass = "equity" | "crypto";
@@ -210,8 +212,6 @@ export function formatRelativeDate(
   });
 }
 
-import { supabase } from "./supabase-client";
-
 // ─── Generic fetch helper ─────────────────────────────────────────────────────
 
 async function apiFetch<T>(
@@ -219,9 +219,13 @@ async function apiFetch<T>(
   options?: RequestInit,
 ): Promise<T> {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  let authHeaders: Record<string, string> = {};
+  const authHeaders: Record<string, string> = {};
 
   if (!isMockAuth) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      throw new Error("Supabase auth client is unavailable in non-mock mode.");
+    }
     const { data, error } = await supabase.auth.getSession();
     if (!error && data.session) {
       authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
@@ -271,7 +275,7 @@ export async function getMe() {
 }
 
 export async function patchMe(patch: ProfilePatch) {
-  return apiFetch<{ user: any }>("/me", {
+  return apiFetch<{ user: ApiUser }>("/me", {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
@@ -457,9 +461,13 @@ export async function streamChatMessage(
   onEvent: (event: ChatStreamEvent) => void,
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  let authHeaders: Record<string, string> = {};
+  const authHeaders: Record<string, string> = {};
 
   if (!isMockAuth) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      throw new Error("Supabase auth client is unavailable in non-mock mode.");
+    }
     const { data, error } = await supabase.auth.getSession();
     if (!error && data.session) {
       authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
@@ -519,3 +527,4 @@ export async function postFeedback(payload: {
     body: JSON.stringify(payload),
   });
 }
+

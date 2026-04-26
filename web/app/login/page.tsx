@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase-client";
+import { getSupabaseClient } from "@/lib/supabase-client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +15,12 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setError("Supabase auth is not configured.");
+      setLoading(false);
+      return;
+    }
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email,
@@ -25,7 +31,8 @@ export default function LoginPage() {
       setError(authError.message);
       setLoading(false);
     } else {
-      router.push("/chat");
+      router.replace("/chat");
+      router.refresh();
     }
   };
 
