@@ -151,7 +151,7 @@ export default function ChatInterface() {
 
   useEffect(() => {
     let cancelled = false;
-    createConversation()
+    createConversation(i18n.language)
       .then(({ conversation }) => {
         if (cancelled) return;
         setConversationId(conversation.id);
@@ -213,7 +213,7 @@ export default function ChatInterface() {
 
   const startNewChat = async () => {
     try {
-      const { conversation } = await createConversation();
+      const { conversation } = await createConversation(i18n.language);
       setConversationId(conversation.id);
       setIsSidebarOpen(false);
       setCurrentView("chat");
@@ -279,7 +279,7 @@ export default function ChatInterface() {
     setStreamStatus(t('chat.status.understanding'));
 
     try {
-      await streamChatMessage(conversationId, trimmed, (event) => {
+      await streamChatMessage(conversationId, trimmed, i18n.language, (event) => {
         if (event.event === "status") {
           setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
         }
