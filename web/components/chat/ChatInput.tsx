@@ -109,6 +109,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
       <div className="relative flex-1 flex items-center min-w-0">
         <input
           ref={inputRef}
+          data-testid="chat-input"
           type="text"
           value={text}
           onFocus={() => setIsFocused(true)}
@@ -137,6 +138,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
       <div className="p-2 shrink-0">
         <button 
           type="submit"
+          data-testid="chat-send"
           disabled={!text.trim()}
           className="p-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-85 transition-opacity"
         >

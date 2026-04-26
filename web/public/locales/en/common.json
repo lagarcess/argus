@@ -228,8 +228,33 @@
       "feedback": "General feedback"
     },
     "logout": "Log out",
+    "dev": {
+      "reset_onboarding": "Reset onboarding (dev)"
+    },
     "search_language": "Search language",
     "no_languages": "No languages found."
+  },
+  "onboarding": {
+    "prompt": "What is your current primary goal? Don't worry, you can change it later.",
+    "skip": "Skip for now",
+    "goals": {
+      "learn_basics": {
+        "title": "Learn investing basics",
+        "description": "Start with simple ideas and clear explanations."
+      },
+      "build_passive_strategy": {
+        "title": "Build a passive strategy",
+        "description": "Focus on long-term, low-maintenance ideas."
+      },
+      "test_stock_idea": {
+        "title": "Test a stock idea",
+        "description": "Validate a thesis on symbols you follow."
+      },
+      "explore_crypto": {
+        "title": "Explore crypto",
+        "description": "Try crypto-focused strategy starters."
+      }
+    }
   },
   "landing": {
     "sign_up_email": "Sign up with Email",

@@ -52,7 +52,13 @@ from argus.domain.engine import (
     normalize_backtest_config,
     validate_backtest_config,
 )
-from argus.domain.orchestrator import assistant_copy_for_result, extract_strategy_request
+from argus.domain.orchestrator import (
+    assistant_copy_for_result,
+    goal_follow_up_message,
+    orchestrate_chat_turn,
+    parse_onboarding_goal,
+    suggest_entity_name,
+)
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 
@@ -74,6 +80,67 @@ app.add_middleware(
 store = AlphaStore()
 PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
+
+
+def _dev_memory_fallback_enabled() -> bool:
+    return (
+        os.getenv("NEXT_PUBLIC_MOCK_AUTH", "").strip().lower() == "true"
+        and os.getenv("ARGUS_SUPABASE_STRICT", "").strip().lower() != "true"
+    )
+
+
+def _memory_conversation(
+    *,
+    title: str,
+    title_source: str,
+    language: str | None,
+) -> Conversation:
+    now = utcnow()
+    conversation = Conversation(
+        id=store.new_id(),
+        title=title,
+        title_source=title_source,
+        language=language,
+        created_at=now,
+        updated_at=now,
+    )
+    store.conversations[conversation.id] = conversation
+    store.messages[conversation.id] = []
+    return conversation
+
+
+def _memory_message(*, conversation_id: str, role: str, content: str) -> Message:
+    message = Message(
+        id=store.new_id(),
+        conversation_id=conversation_id,
+        role=role,
+        content=content,
+        created_at=utcnow(),
+    )
+    store.messages.setdefault(conversation_id, []).append(message)
+    return message
+
+
+def _create_message(
+    *, user_id: str, conversation_id: str, role: str, content: str
+) -> Message:
+    if supabase_gateway is not None and conversation_id not in store.conversations:
+        try:
+            return supabase_gateway.create_message(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+            )
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase message write failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    return _memory_message(conversation_id=conversation_id, role=role, content=content)
 
 
 @app.middleware("http")
@@ -175,9 +242,18 @@ def logout() -> SuccessResponse:
 @app.get("/api/v1/me", response_model=UserResponse)
 def get_me(user: User = Depends(current_user)) -> UserResponse:  # noqa: B008
     if supabase_gateway is not None:
-        prof = supabase_gateway.get_user(user_id=user.id)
-        if prof:
-            return UserResponse(user=prof)
+        try:
+            prof = supabase_gateway.get_user(user_id=user.id)
+            if prof:
+                return UserResponse(user=prof)
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase profile read failed; using dev memory fallback",
+                error=str(exc),
+                user_id=user.id,
+            )
     return UserResponse(user=user)
 
 
@@ -186,16 +262,36 @@ def patch_me(
     patch: ProfilePatch,
     user: User = Depends(current_user),  # noqa: B008
 ) -> UserResponse:
-    data = user.model_dump()
+    current = (
+        supabase_gateway.get_user(user_id=user.id)
+        if supabase_gateway is not None
+        else store.users.get(user.id, user)
+    )
+    if current is None:
+        current = user
+
+    data = current.model_dump()
     updates = patch.model_dump(exclude_unset=True)
     onboarding_patch = updates.pop("onboarding", None)
     data.update(updates)
     if onboarding_patch:
-        onboarding = user.onboarding.model_dump()
+        onboarding = current.onboarding.model_dump()
         onboarding.update(onboarding_patch)
         data["onboarding"] = onboarding
     data["updated_at"] = utcnow()
     updated = User.model_validate(data)
+
+    if supabase_gateway is not None:
+        try:
+            updated = supabase_gateway.update_user(user.id, updated.model_dump(mode="json"))
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase profile patch failed; using dev memory fallback",
+                error=str(exc),
+                user_id=user.id,
+            )
     store.users[user.id] = updated
     return UserResponse(user=updated)
 
@@ -205,18 +301,33 @@ def create_conversation(
     payload: ConversationCreate,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
-    now = utcnow()
     title = payload.title or "New idea"
-    conversation = Conversation(
-        id=store.new_id(),
-        title=title,
-        title_source="user_renamed" if payload.title else "system_default",
-        language=payload.language or user.language,
-        created_at=now,
-        updated_at=now,
-    )
-    store.conversations[conversation.id] = conversation
-    store.messages[conversation.id] = []
+    if supabase_gateway is not None:
+        try:
+            conversation = supabase_gateway.create_conversation(
+                user_id=user.id,
+                title=title,
+                title_source="user_renamed" if payload.title else "system_default",
+                language=payload.language or user.language,
+            )
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase conversation create failed; using dev memory fallback",
+                error=str(exc),
+            )
+            conversation = _memory_conversation(
+                title=title,
+                title_source="user_renamed" if payload.title else "system_default",
+                language=payload.language or user.language,
+            )
+    else:
+        conversation = _memory_conversation(
+            title=title,
+            title_source="user_renamed" if payload.title else "system_default",
+            language=payload.language or user.language,
+        )
     return ConversationResponse(conversation=conversation)
 
 
@@ -329,7 +440,29 @@ def delete_conversation(
 @app.get(
     "/api/v1/conversations/{conversation_id}/messages", response_model=PaginatedMessages
 )
-def list_messages(conversation_id: str, limit: int = Query(50, ge=1, le=100)):
+def list_messages(
+    conversation_id: str,
+    limit: int = Query(50, ge=1, le=100),
+    user: User = Depends(current_user),  # noqa: B008
+):
+    if supabase_gateway is not None:
+        try:
+            items = supabase_gateway.list_messages(
+                user_id=user.id, conversation_id=conversation_id, limit=limit
+            )
+            return PaginatedMessages(items=items)
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase message list failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+
+    conversation = store.conversations.get(conversation_id)
+    if not conversation:
+        return PaginatedMessages(items=[])
     return PaginatedMessages(items=store.messages.get(conversation_id, [])[:limit])
 
 
@@ -469,6 +602,7 @@ def create_run_from_payload(
     payload: dict[str, Any],
     request: Request,
     *,
+    user_id: str | None = None,
     strategy_id: str | None = None,
     conversation_id: str | None = None,
     persist_in_memory: bool = True,
@@ -529,6 +663,8 @@ def create_run_from_payload(
     )
     if persist_in_memory:
         store.backtest_runs[run.id] = run
+        if user_id:
+            store.backtest_run_owners[run.id] = user_id
     return run
 
 
@@ -588,6 +724,7 @@ def run_backtest(
     run = create_run_from_payload(
         data,
         request,
+        user_id=user.id,
         persist_in_memory=supabase_gateway is None,
     )
     if supabase_gateway is not None:
@@ -624,14 +761,26 @@ def create_strategy(
     payload: StrategyCreate,
     user: User = Depends(current_user),  # noqa: B008
 ) -> StrategyResponse:
+    strategy_name = payload.name
+    if not strategy_name:
+        suggested = suggest_entity_name(
+            entity_type="strategy",
+            context=f"Template: {payload.template}\nSymbols: {', '.join(payload.symbols)}",
+            language=user.language,
+        )
+        strategy_name = suggested or f"{', '.join(payload.symbols)} idea"
+
     if supabase_gateway is not None:
-        strategy = supabase_gateway.create_strategy(user_id=user.id, payload=payload)
+        strategy_payload = payload.model_dump(mode="json")
+        strategy_payload["name"] = strategy_name
+        strategy_payload["name_source"] = "user_renamed" if payload.name else "ai_generated"
+        strategy = supabase_gateway.create_strategy(user_id=user.id, payload=strategy_payload)
     else:
         now = utcnow()
         benchmark = payload.benchmark_symbol or default_benchmark(payload.asset_class)
         strategy = Strategy(
             id=store.new_id(),
-            name=payload.name or f"{', '.join(payload.symbols)} idea",
+            name=strategy_name,
             name_source="user_renamed" if payload.name else "ai_generated",
             template=payload.template,
             asset_class=payload.asset_class,
@@ -710,24 +859,53 @@ def delete_strategy(strategy_id: str, request: Request) -> SuccessResponse:
 
 
 @app.post("/api/v1/collections", response_model=CollectionResponse)
-def create_collection(payload: CollectionCreate) -> CollectionResponse:
-    now = utcnow()
-    collection = Collection(
-        id=store.new_id(),
-        name=payload.name or "New collection",
-        name_source="user_renamed" if payload.name else "ai_generated",
-        created_at=now,
-        updated_at=now,
-    )
-    store.collections[collection.id] = collection
-    store.collection_strategies[collection.id] = set()
+def create_collection(
+    payload: CollectionCreate,
+    user: User = Depends(current_user),  # noqa: B008
+) -> CollectionResponse:
+    collection_name = payload.name
+    if not collection_name:
+        suggested = suggest_entity_name(
+            entity_type="collection",
+            context="User asked to create a new strategy collection.",
+            language=user.language,
+        )
+        collection_name = suggested or "New collection"
+
+    if supabase_gateway is not None:
+        collection = supabase_gateway.create_collection(
+            user_id=user.id,
+            payload={
+                "name": collection_name,
+                "name_source": "user_renamed" if payload.name else "ai_generated",
+                "created_at": utcnow().isoformat(),
+                "updated_at": utcnow().isoformat(),
+            },
+        )
+    else:
+        now = utcnow()
+        collection = Collection(
+            id=store.new_id(),
+            name=collection_name,
+            name_source="user_renamed" if payload.name else "ai_generated",
+            created_at=now,
+            updated_at=now,
+        )
+        store.collections[collection.id] = collection
+        store.collection_strategies[collection.id] = set()
     return CollectionResponse(collection=collection)
 
 
 @app.get("/api/v1/collections", response_model=PaginatedCollections)
-def list_collections(limit: int = Query(20, ge=1, le=100)) -> PaginatedCollections:
-    items = [item for item in store.collections.values() if item.deleted_at is None]
-    items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
+def list_collections(
+    limit: int = Query(20, ge=1, le=100),
+    user: User = Depends(current_user),  # noqa: B008
+) -> PaginatedCollections:
+    if supabase_gateway is not None:
+        items = supabase_gateway.list_collections(user_id=user.id, limit=limit)
+    else:
+        items = [item for item in store.collections.values() if item.deleted_at is None]
+        items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
     return PaginatedCollections(items=items[:limit])
 
 
@@ -995,6 +1173,56 @@ def sse(event: str, payload: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
+def _count_completed_runs_for_user(user_id: str) -> int:
+    if supabase_gateway is not None:
+        try:
+            return supabase_gateway.count_completed_runs(user_id=user_id)
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase completed run count failed; using dev memory fallback",
+                error=str(exc),
+                user_id=user_id,
+            )
+    return sum(
+        1
+        for run_id, run in store.backtest_runs.items()
+        if store.backtest_run_owners.get(run_id) == user_id and run.status == "completed"
+    )
+
+
+def _persist_onboarding_update(user: User, patch: dict[str, Any]) -> User:
+    current = (
+        supabase_gateway.get_user(user_id=user.id)
+        if supabase_gateway is not None
+        else store.users.get(user.id, user)
+    )
+    if current is None:
+        current = user
+
+    onboarding = current.onboarding.model_copy(update=patch)
+    updated = current.model_copy(
+        update={
+            "onboarding": onboarding,
+            "updated_at": utcnow(),
+        }
+    )
+    if supabase_gateway is not None:
+        try:
+            updated = supabase_gateway.update_user(user.id, updated.model_dump(mode="json"))
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase profile update failed; using dev memory fallback",
+                error=str(exc),
+                user_id=user.id,
+            )
+    store.users[user.id] = updated
+    return updated
+
+
 @app.post("/api/v1/chat/stream")
 def chat_stream(
     payload: ChatStreamRequest,
@@ -1027,13 +1255,30 @@ def chat_stream(
                 detail=str(e),
             ) from e
 
-    conversation = (
-        supabase_gateway.get_conversation(
-            user_id=user.id, conversation_id=payload.conversation_id
-        )
-        if supabase_gateway
-        else store.conversations.get(payload.conversation_id)
+    current_user_profile = (
+        supabase_gateway.get_user(user_id=user.id)
+        if supabase_gateway is not None
+        else store.users.get(user.id, user)
     )
+    if current_user_profile is None:
+        current_user_profile = user
+
+    onboarding_goal = parse_onboarding_goal(payload.message)
+
+    conversation = store.conversations.get(payload.conversation_id)
+    if conversation is None and supabase_gateway is not None:
+        try:
+            conversation = supabase_gateway.get_conversation(
+                user_id=user.id, conversation_id=payload.conversation_id
+            )
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase conversation read failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=payload.conversation_id,
+            )
     if not conversation:
         raise problem(
             request,
@@ -1042,18 +1287,90 @@ def chat_stream(
             title="Not Found",
             detail="Conversation not found.",
         )
-    now = utcnow()
-    user_message = Message(
-        id=store.new_id(),
-        conversation_id=conversation.id,
-        role="user",
-        content=payload.message,
-        created_at=now,
-    )
-    store.messages.setdefault(conversation.id, []).append(user_message)
-    extracted = extract_strategy_request(payload.message)
+    if onboarding_goal is None:
+        _create_message(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            role="user",
+            content=payload.message,
+        )
+
+    completed_runs = _count_completed_runs_for_user(user.id)
+    onboarding_stage = current_user_profile.onboarding.stage
+    onboarding_incomplete = onboarding_stage in {
+        "language_selection",
+        "primary_goal_selection",
+    }
+    onboarding_required = onboarding_incomplete and completed_runs == 0
 
     def events() -> Iterable[str]:
+        if onboarding_required and onboarding_goal is None:
+            decision = orchestrate_chat_turn(
+                message=payload.message,
+                language=(
+                    payload.language
+                    or conversation.language
+                    or current_user_profile.language
+                ),
+                onboarding_required=True,
+                primary_goal=current_user_profile.onboarding.primary_goal,
+            )
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=decision.assistant_message,
+            )
+            yield sse("token", {"text": decision.assistant_message})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        if onboarding_goal is not None:
+            _persist_onboarding_update(
+                current_user_profile,
+                {
+                    "stage": "ready",
+                    "language_confirmed": True,
+                    "primary_goal": onboarding_goal,
+                    "completed": False,
+                },
+            )
+            follow_up = goal_follow_up_message(
+                onboarding_goal,
+                payload.language or conversation.language or current_user_profile.language,
+            )
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=follow_up,
+            )
+            yield sse("token", {"text": follow_up})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        decision = orchestrate_chat_turn(
+            message=payload.message,
+            language=(
+                payload.language
+                or conversation.language
+                or current_user_profile.language
+            ),
+            onboarding_required=False,
+            primary_goal=current_user_profile.onboarding.primary_goal,
+        )
+        if decision.intent != "run_backtest" or decision.strategy is None:
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=decision.assistant_message,
+            )
+            yield sse("token", {"text": decision.assistant_message})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        extracted = decision.strategy.model_dump()
         yield sse("status", {"status": "extracting_strategy"})
         yield sse("token", {"text": "I can test that as a supported Alpha strategy. "})
         yield sse("status", {"status": "running_backtest"})
@@ -1065,11 +1382,22 @@ def chat_stream(
                     "timeframe": "1D",
                 },
                 request,
+                user_id=user.id,
                 conversation_id=conversation.id,
-                persist_in_memory=supabase_gateway is None,
+                persist_in_memory=supabase_gateway is None
+                or conversation.id in store.conversations,
             )
             if supabase_gateway is not None:
-                run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
+                try:
+                    run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
+                except Exception as exc:
+                    if not _dev_memory_fallback_enabled():
+                        raise
+                    logger.warning(
+                        "Supabase backtest run write failed; using dev memory fallback",
+                        error=str(exc),
+                        run_id=run.id,
+                    )
         except HTTPException as exc:
             detail = exc.detail if isinstance(exc.detail, dict) else {"detail": str(exc.detail)}
             yield sse("error", detail)
@@ -1087,19 +1415,36 @@ def chat_stream(
             yield sse("error", err)
             yield sse("done", {"error": True})
             return
-        assistant_text = assistant_copy_for_result(
-            run.symbols, payload.language or conversation.language or "en"
+        _persist_onboarding_update(
+            current_user_profile,
+            {
+                "stage": "completed",
+                "completed": True,
+                "language_confirmed": True,
+                "primary_goal": current_user_profile.onboarding.primary_goal
+                or "surprise_me",
+            },
         )
-        assistant_message = Message(
-            id=store.new_id(),
+        assistant_text = decision.assistant_message or assistant_copy_for_result(
+            run.symbols,
+            payload.language or conversation.language or current_user_profile.language,
+        )
+        assistant_message = _create_message(
+            user_id=user.id,
             conversation_id=conversation.id,
             role="assistant",
             content=assistant_text,
-            created_at=utcnow(),
         )
-        store.messages[conversation.id].append(assistant_message)
         template_name = str(run.config_snapshot.get("template", "strategy"))
-        new_title = f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
+        suggested = suggest_entity_name(
+            entity_type="conversation",
+            context=(
+                f"{payload.message}\nTemplate: {template_name}\nSymbols: "
+                f"{', '.join(run.symbols)}"
+            ),
+            language=payload.language or conversation.language or current_user_profile.language,
+        )
+        new_title = suggested or f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
         if conversation.title_source == "system_default":
             patch = {
                 "title": new_title,
@@ -1107,11 +1452,20 @@ def chat_stream(
                 "last_message_preview": payload.message[:120],
                 "updated_at": utcnow(),
             }
-            if supabase_gateway is not None:
-                supabase_gateway.patch_conversation(
-                    user_id=user.id, conversation_id=conversation.id, patch=patch
-                )
-            else:
+            if supabase_gateway is not None and conversation.id not in store.conversations:
+                try:
+                    supabase_gateway.patch_conversation(
+                        user_id=user.id, conversation_id=conversation.id, patch=patch
+                    )
+                except Exception as exc:
+                    if not _dev_memory_fallback_enabled():
+                        raise
+                    logger.warning(
+                        "Supabase conversation title patch failed; using dev memory fallback",
+                        error=str(exc),
+                        conversation_id=conversation.id,
+                    )
+            if conversation.id in store.conversations:
                 updated = conversation.model_copy(update=patch)
                 store.conversations[conversation.id] = updated
             yield sse(

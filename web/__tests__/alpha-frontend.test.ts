@@ -48,7 +48,7 @@ describe("Argus Alpha frontend contract", () => {
     ].join("\n");
 
     expect(files).toContain("CollectionsView");
-    expect(files).toContain("Add strategy to collection");
+    expect(files).toContain("common.add_to_collection");
     expect(files.toLowerCase()).not.toContain("portfolio");
   });
 
@@ -56,8 +56,17 @@ describe("Argus Alpha frontend contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
     expect(chat).toContain('aria-label="Chat options"');
-    expect(chat).toContain("View history");
-    expect(chat).toContain("Add to collection");
+    expect(chat).toContain("chat.view_history");
+    expect(chat).toContain("common.add_to_collection");
     expect(chat).not.toContain('aria-label="Archived chats"');
+  });
+
+  test("chat includes onboarding goal cards and hidden onboarding protocol", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("data-testid=\"onboarding-goal-cards\"");
+    expect(chat).toContain("data-testid=\"onboarding-skip\"");
+    expect(chat).toContain("__ONBOARDING_GOAL__:");
+    expect(chat).toContain("__ONBOARDING_SKIP__");
   });
 });

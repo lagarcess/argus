@@ -4,13 +4,35 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 from argus.api.main import app
-from argus.api.schemas import BacktestRun, Conversation, User
+from argus.api.schemas import BacktestRun, Conversation, Message, OnboardingState, User
 from argus.domain.market_data.assets import ResolvedAsset
 from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
+
+
+def _mock_profile(*, language: str = "en", stage: str = "ready") -> User:
+    now = utcnow()
+    return User(
+        id="00000000-0000-0000-0000-000000000001",
+        email="developer@argus.local",
+        username="mock-developer",
+        display_name="Mock Developer",
+        language=language,  # type: ignore[arg-type]
+        locale="es-419" if language == "es-419" else "en-US",
+        theme="dark",
+        is_admin=True,
+        onboarding=OnboardingState(
+            completed=stage == "completed",
+            stage=stage,  # type: ignore[arg-type]
+            language_confirmed=True,
+            primary_goal="test_stock_idea" if stage != "language_selection" else None,
+        ),
+        created_at=now,
+        updated_at=now,
+    )
 
 
 def _fake_resolve_asset(symbol: str) -> ResolvedAsset:
@@ -84,16 +106,38 @@ def _fake_fetch_price_series(
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.domain import engine as domain_engine
+    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
 
     monkeypatch.setattr(
         api_main,
-        "extract_strategy_request",
-        lambda message: {
-            "template": "rsi_mean_reversion",
-            "asset_class": "equity",
-            "symbols": ["TSLA"],
-            "parameters": {},
-        },
+        "orchestrate_chat_turn",
+        lambda message, language, onboarding_required, primary_goal: (
+            ChatOrchestrationDecision(
+                intent="onboarding_prompt",
+                assistant_message=(
+                    "What is your current primary goal? Don't worry, "
+                    "you can change it later in Settings."
+                ),
+                strategy=None,
+                title_suggestion=None,
+            )
+            if onboarding_required
+            else ChatOrchestrationDecision(
+                intent="run_backtest",
+                assistant_message=(
+                    "Probé la idea con TSLA."
+                    if str(language).lower().startswith("es")
+                    else "I tested that idea with TSLA."
+                ),
+                strategy=StrategyExtraction(
+                    template="rsi_mean_reversion",
+                    asset_class="equity",
+                    symbols=["TSLA"],
+                    parameters={},
+                ),
+                title_suggestion="TSLA idea",
+            )
+        ),
     )
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
@@ -103,6 +147,10 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def mock_gateway():
     gateway = MagicMock(spec=SupabaseGateway)
+    gateway.get_user.return_value = _mock_profile()
+    gateway.get_or_create_mock_user.return_value = _mock_profile()
+    gateway.count_completed_runs.return_value = 1
+    gateway.list_messages.return_value = []
     with patch("argus.api.main.supabase_gateway", gateway):
         yield gateway
 
@@ -140,21 +188,7 @@ def test_chat_stream_quota_exceeded(mock_gateway):
 
 
 def test_me_reads_profile_from_supabase_gateway(mock_gateway):
-    now = utcnow()
-    profile = User(
-        id="00000000-0000-0000-0000-000000000001",
-        email="developer@argus.local",
-        username="mock-developer",
-        display_name="Mock Developer",
-        language="es-419",
-        locale="es-419",
-        timezone="America/Chicago",
-        theme="dark",
-        is_admin=True,
-        onboarding={},
-        created_at=now,
-        updated_at=now,
-    )
+    profile = _mock_profile(language="es-419")
     mock_gateway.get_user.return_value = profile
 
     response = client.get("/api/v1/me", headers={"Authorization": "Bearer test-token"})
@@ -164,13 +198,44 @@ def test_me_reads_profile_from_supabase_gateway(mock_gateway):
     mock_gateway.get_user.assert_called_once()
 
 
-def test_create_message_ownership_failure(mock_gateway):
-    # Setup conversation missing
-    mock_gateway.get_conversation.return_value = None
+def test_patch_me_supabase_merges_onboarding_and_persists(mock_gateway):
+    before = _mock_profile(stage="language_selection")
+    mock_gateway.get_user.return_value = before
 
-    # Test method directly (unit test on method)
-    # We need a client mock to avoid real DB hit if we instantiate ActualGateway
-    pass
+    def _updated_user(_user_id: str, payload: dict) -> User:
+        return User.model_validate(payload)
+
+    mock_gateway.update_user.side_effect = _updated_user
+
+    response = client.patch(
+        "/api/v1/me",
+        json={"onboarding": {"language_confirmed": True}},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    onboarding = response.json()["user"]["onboarding"]
+    assert onboarding["stage"] == "language_selection"
+    assert onboarding["language_confirmed"] is True
+    assert onboarding["primary_goal"] is None
+    mock_gateway.update_user.assert_called_once()
+
+
+def test_create_conversation_uses_dev_memory_fallback_when_supabase_fails(
+    mock_gateway,
+):
+    mock_gateway.create_conversation.side_effect = RuntimeError("supabase unavailable")
+
+    response = client.post(
+        "/api/v1/conversations",
+        json={"language": "en"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    conversation = response.json()["conversation"]
+    assert conversation["title"] == "New idea"
+    assert conversation["title_source"] == "system_default"
 
 
 def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock_gateway):
@@ -237,6 +302,13 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     mock_gateway.create_backtest_run.side_effect = (
         lambda *, user_id, run: run
     )
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-1",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        created_at=utcnow(),
+    )
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -247,3 +319,80 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     assert response.status_code == 200
     assert "event: result" in response.text
     mock_gateway.create_backtest_run.assert_called_once()
+
+
+def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-2",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.get_user.return_value = _mock_profile(stage="language_selection")
+    mock_gateway.count_completed_runs.return_value = 0
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-2",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        created_at=utcnow(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"conversation_id": "conv-2", "message": "Test TSLA dip idea"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "event: result" not in response.text
+    assert "event: token" in response.text
+    assert "primary goal" in response.text
+    mock_gateway.create_backtest_run.assert_not_called()
+
+
+def test_chat_stream_supabase_does_not_persist_hidden_onboarding_messages(mock_gateway):
+    now = utcnow()
+    conversation = Conversation(
+        id="conv-3",
+        title="New conversation",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    mock_gateway.get_conversation.return_value = conversation
+    mock_gateway.get_user.return_value = _mock_profile(stage="language_selection")
+    mock_gateway.count_completed_runs.return_value = 0
+    mock_gateway.create_message.side_effect = lambda **kwargs: Message(
+        id="msg-3",
+        conversation_id=kwargs["conversation_id"],
+        role=kwargs["role"],  # type: ignore[arg-type]
+        content=kwargs["content"],
+        created_at=utcnow(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": "conv-3",
+            "message": "__ONBOARDING_GOAL__:test_stock_idea",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    roles = [call.kwargs["role"] for call in mock_gateway.create_message.call_args_list]
+    assert "user" not in roles

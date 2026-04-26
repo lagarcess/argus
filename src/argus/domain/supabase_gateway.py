@@ -294,6 +294,16 @@ class SupabaseGateway:
         row = _row_one(rows)
         return BacktestRun.model_validate(row) if row else None
 
+    def count_completed_runs(self, *, user_id: str) -> int:
+        rows = (
+            self.client.table("backtest_runs")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .eq("status", "completed")
+            .execute()
+        )
+        return int(rows.count or 0)
+
     def touch_conversation_title(
         self,
         *,

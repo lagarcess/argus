@@ -231,6 +231,28 @@
     "search_language": "Buscar idioma",
     "no_languages": "No se encontraron idiomas."
   },
+  "onboarding": {
+    "prompt": "Cual es tu objetivo principal ahora? Puedes cambiarlo despues.",
+    "skip": "Omitir por ahora",
+    "goals": {
+      "learn_basics": {
+        "title": "Aprender lo basico",
+        "description": "Comienza con ideas simples y explicaciones claras."
+      },
+      "build_passive_strategy": {
+        "title": "Construir una estrategia pasiva",
+        "description": "Enfocate en ideas de largo plazo y bajo mantenimiento."
+      },
+      "test_stock_idea": {
+        "title": "Probar una idea de accion",
+        "description": "Valida una tesis en los simbolos que sigues."
+      },
+      "explore_crypto": {
+        "title": "Explorar cripto",
+        "description": "Prueba ideas iniciales enfocadas en cripto."
+      }
+    }
+  },
   "landing": {
     "sign_up_email": "Registrarse con Email",
     "already_account": "¿ya tienes una cuenta?",

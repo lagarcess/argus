@@ -81,17 +81,39 @@ def _fake_fetch_price_series(
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.domain import engine as domain_engine
+    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
 
     monkeypatch.setattr(api_main, "supabase_gateway", None)
     monkeypatch.setattr(
         api_main,
-        "extract_strategy_request",
-        lambda message: {
-            "template": "rsi_mean_reversion",
-            "asset_class": "equity",
-            "symbols": ["TSLA"],
-            "parameters": {},
-        },
+        "orchestrate_chat_turn",
+        lambda message, language, onboarding_required, primary_goal: (
+            ChatOrchestrationDecision(
+                intent="onboarding_prompt",
+                assistant_message=(
+                    "What is your current primary goal? Don't worry, "
+                    "you can change it later in Settings."
+                ),
+                strategy=None,
+                title_suggestion=None,
+            )
+            if onboarding_required
+            else ChatOrchestrationDecision(
+                intent="run_backtest",
+                assistant_message=(
+                    "Probé la idea con TSLA."
+                    if str(language).lower().startswith("es")
+                    else "I tested that idea with TSLA."
+                ),
+                strategy=StrategyExtraction(
+                    template="rsi_mean_reversion",
+                    asset_class="equity",
+                    symbols=["TSLA"],
+                    parameters={},
+                ),
+                title_suggestion="TSLA idea",
+            )
+        ),
     )
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
@@ -102,6 +124,21 @@ def _client() -> TestClient:
     client = TestClient(app)
     client.post("/api/v1/dev/reset")
     return client
+
+
+def _set_onboarding_ready(client: TestClient, primary_goal: str = "surprise_me") -> None:
+    response = client.patch(
+        "/api/v1/me",
+        json={
+            "onboarding": {
+                "stage": "ready",
+                "language_confirmed": True,
+                "primary_goal": primary_goal,
+                "completed": False,
+            }
+        },
+    )
+    assert response.status_code == 200
 
 
 def test_me_returns_contract_user_profile() -> None:
@@ -119,6 +156,28 @@ def test_me_returns_contract_user_profile() -> None:
         "completed": False,
         "stage": "language_selection",
         "language_confirmed": False,
+        "primary_goal": None,
+    }
+
+
+def test_patch_me_merges_nested_onboarding_state() -> None:
+    client = _client()
+
+    response = client.patch(
+        "/api/v1/me",
+        json={
+            "language": "es-419",
+            "onboarding": {"language_confirmed": True},
+        },
+    )
+
+    assert response.status_code == 200
+    user = response.json()["user"]
+    assert user["language"] == "es-419"
+    assert user["onboarding"] == {
+        "completed": False,
+        "stage": "language_selection",
+        "language_confirmed": True,
         "primary_goal": None,
     }
 
@@ -344,6 +403,7 @@ def test_collections_are_organizational_and_can_mix_strategy_asset_classes() -> 
 
 def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
     client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -380,6 +440,7 @@ def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
 
 def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
     client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -404,6 +465,7 @@ def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
 
 def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     response = client.post(
@@ -423,3 +485,76 @@ def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     assistant_message = messages.json()["items"][-1]
     assert assistant_message["role"] == "assistant"
     assert "I tested that idea with TSLA." in assistant_message["content"]
+
+
+def test_chat_stream_prompts_for_onboarding_before_first_run() -> None:
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest Tesla when it dips",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    stream = response.text
+    assert "event: token" in stream
+    assert "event: result" not in stream
+    assert "primary goal" in stream
+
+
+def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "__ONBOARDING_GOAL__:test_stock_idea",
+            "language": "en",
+        },
+    )
+    assert response.status_code == 200
+    assert "event: token" in response.text
+
+    me = client.get("/api/v1/me")
+    onboarding = me.json()["user"]["onboarding"]
+    assert onboarding["stage"] == "ready"
+    assert onboarding["primary_goal"] == "test_stock_idea"
+    assert onboarding["completed"] is False
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    assert messages.status_code == 200
+    items = messages.json()["items"]
+    assert all(
+        not message["content"].startswith("__ONBOARDING_") for message in items
+    )
+
+
+def test_first_successful_backtest_transitions_onboarding_to_completed() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest Tesla when it dips",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "event: result" in response.text
+
+    me = client.get("/api/v1/me")
+    onboarding = me.json()["user"]["onboarding"]
+    assert onboarding["stage"] == "completed"
+    assert onboarding["completed"] is True
+    assert onboarding["primary_goal"] == "test_stock_idea"

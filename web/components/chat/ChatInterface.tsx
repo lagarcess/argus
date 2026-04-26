@@ -27,15 +27,18 @@ import {
   deleteConversation,
   deleteStrategy,
   formatRelativeDate,
+  getMe,
   getConversationMessages,
   listHistory,
   patchCollection,
   patchConversation,
+  patchMe,
   patchStrategy,
   resultCardFromRun,
   streamChatMessage,
   type HistoryItem,
   type BacktestRun,
+  type PrimaryGoal,
 } from "@/lib/argus-api";
 import CollectionPicker from "./CollectionPicker";
 import CollectionsView from "../views/CollectionsView";
@@ -49,6 +52,11 @@ import { type ChatActionOption, type Message } from "./types";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 type View = "chat" | "strategies" | "collections" | "settings";
+type OnboardingChoice = {
+  goal: PrimaryGoal;
+  title: string;
+  description: string;
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -72,6 +80,43 @@ export default function ChatInterface() {
       value: t('chat.starter_actions.dca.value'),
     },
   ], [t]);
+  const onboardingChoices = useMemo<OnboardingChoice[]>(
+    () => [
+      {
+        goal: "learn_basics",
+        title: t("onboarding.goals.learn_basics.title", "Learn investing basics"),
+        description: t(
+          "onboarding.goals.learn_basics.description",
+          "Start with simple ideas and clear explanations.",
+        ),
+      },
+      {
+        goal: "build_passive_strategy",
+        title: t("onboarding.goals.build_passive_strategy.title", "Build a passive strategy"),
+        description: t(
+          "onboarding.goals.build_passive_strategy.description",
+          "Focus on long-term, low-maintenance ideas.",
+        ),
+      },
+      {
+        goal: "test_stock_idea",
+        title: t("onboarding.goals.test_stock_idea.title", "Test a stock idea"),
+        description: t(
+          "onboarding.goals.test_stock_idea.description",
+          "Validate a thesis on symbols you follow.",
+        ),
+      },
+      {
+        goal: "explore_crypto",
+        title: t("onboarding.goals.explore_crypto.title", "Explore crypto"),
+        description: t(
+          "onboarding.goals.explore_crypto.description",
+          "Try crypto-focused strategy starters.",
+        ),
+      },
+    ],
+    [t],
+  );
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -85,6 +130,7 @@ export default function ChatInterface() {
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
   const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
     runId: string;
     strategyId: string | null;
@@ -151,11 +197,15 @@ export default function ChatInterface() {
 
   useEffect(() => {
     let cancelled = false;
-    createConversation(i18n.language)
-      .then(({ conversation }) => {
+    Promise.all([createConversation(i18n.language), getMe().catch(() => null)])
+      .then(([{ conversation }, meResponse]) => {
         if (cancelled) return;
         setConversationId(conversation.id);
         setMessages([]);
+        const stage = meResponse?.user?.onboarding?.stage;
+        setShowOnboardingGoalCards(
+          stage === "language_selection" || stage === "primary_goal_selection",
+        );
       })
       .catch(() => {
         if (cancelled) return;
@@ -218,6 +268,15 @@ export default function ChatInterface() {
       setIsSidebarOpen(false);
       setCurrentView("chat");
       setMessages([]);
+      try {
+        const me = await getMe();
+        const stage = me.user.onboarding.stage;
+        setShowOnboardingGoalCards(
+          stage === "language_selection" || stage === "primary_goal_selection",
+        );
+      } catch {
+        setShowOnboardingGoalCards(false);
+      }
       void refreshHistory();
       return conversation.id;
     } catch (err) {
@@ -347,6 +406,66 @@ export default function ChatInterface() {
                   ? t('chat.rate_limit_error')
                   : t('chat.error_backtest'),
               }
+            : m,
+        ),
+      );
+    }
+  };
+
+  const handleOnboardingGoalChoice = async (goal: PrimaryGoal) => {
+    if (!conversationId) return;
+    const isSkip = goal === "surprise_me";
+    const hiddenMessage = isSkip ? "__ONBOARDING_SKIP__" : `__ONBOARDING_GOAL__:${goal}`;
+    const userCopy = isSkip
+      ? t("onboarding.skip", "Skip for now")
+      : onboardingChoices.find((choice) => choice.goal === goal)?.title ?? goal;
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      kind: "text",
+      content: userCopy,
+    };
+    const assistantId = crypto.randomUUID();
+
+    setMessages((prev) => [
+      ...prev.map((m) => ({ ...m, actions: undefined })),
+      userMsg,
+      { id: assistantId, role: "ai", kind: "text", content: "" },
+    ]);
+    setStreamStatus(t("chat.status.understanding"));
+    setIsSidebarOpen(false);
+
+    try {
+      await streamChatMessage(conversationId, hiddenMessage, i18n.language, (event) => {
+        if (event.event === "token") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+                : m,
+            ),
+          );
+        }
+        if (event.event === "done") {
+          setStreamStatus(null);
+          setShowOnboardingGoalCards(false);
+          refreshHistory();
+        }
+      });
+      await patchMe({
+        onboarding: {
+          stage: "ready",
+          language_confirmed: true,
+          primary_goal: goal,
+          completed: false,
+        },
+      });
+    } catch {
+      setStreamStatus(null);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: t("chat.error_backtest") }
             : m,
         ),
       );
@@ -811,6 +930,48 @@ export default function ChatInterface() {
                 <div className="w-full max-w-2xl">
                   <ChatInput onSend={handleSend} />
                 </div>
+
+                {showOnboardingGoalCards && (
+                  <div
+                    className="mt-6 w-full max-w-2xl"
+                    data-testid="onboarding-goal-cards"
+                  >
+                    <p className="mb-3 text-center text-[14px] text-black/60 dark:text-white/60">
+                      {t(
+                        "onboarding.prompt",
+                        "What is your current primary goal? Don't worry, you can change it later.",
+                      )}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {onboardingChoices.map((choice) => (
+                        <button
+                          key={choice.goal}
+                          type="button"
+                          data-testid={`onboarding-goal-${choice.goal}`}
+                          onClick={() => handleOnboardingGoalChoice(choice.goal)}
+                          className="rounded-[14px] border border-black/10 bg-white/70 px-3 py-3 text-left transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/70 dark:hover:bg-white/5"
+                        >
+                          <p className="text-[14px] font-medium text-black dark:text-white">
+                            {choice.title}
+                          </p>
+                          <p className="mt-1 text-[12px] text-black/55 dark:text-white/55">
+                            {choice.description}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex justify-center">
+                      <button
+                        type="button"
+                        data-testid="onboarding-skip"
+                        onClick={() => handleOnboardingGoalChoice("surprise_me")}
+                        className="text-[13px] font-medium text-black/55 underline-offset-2 transition-colors hover:text-black hover:underline dark:text-white/55 dark:hover:text-white"
+                      >
+                        {t("onboarding.skip", "Skip for now")}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Show/Hide Suggestions Toggle */}
                 <div className="mt-4">

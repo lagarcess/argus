@@ -4,6 +4,17 @@ export type AssetClass = "equity" | "crypto";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
+export type OnboardingStage =
+  | "language_selection"
+  | "primary_goal_selection"
+  | "ready"
+  | "completed";
+export type PrimaryGoal =
+  | "learn_basics"
+  | "test_stock_idea"
+  | "build_passive_strategy"
+  | "explore_crypto"
+  | "surprise_me";
 
 // ─── Metric / result card types ──────────────────────────────────────────────
 
@@ -56,6 +67,18 @@ export type Conversation = {
   updated_at: string;
   last_message_preview?: string | null;
   language?: "en" | "es-419" | null;
+};
+
+export type ApiUser = {
+  id: string;
+  language: "en" | "es-419";
+  locale: "en-US" | "es-419";
+  onboarding: {
+    completed: boolean;
+    stage: OnboardingStage;
+    language_confirmed: boolean;
+    primary_goal: PrimaryGoal | null;
+  };
 };
 
 /** Backend message shape (distinct from the frontend chat Message type) */
@@ -129,8 +152,15 @@ export type ChatStreamEvent =
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_ARGUS_API_URL ?? "http://127.0.0.1:8000/api/v1";
+const API_BASE = (() => {
+  if (process.env.NEXT_PUBLIC_ARGUS_API_URL) {
+    return process.env.NEXT_PUBLIC_ARGUS_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000/api/v1`;
+  }
+  return "http://127.0.0.1:8000/api/v1";
+})();
 
 export type ApiLanguage = "en" | "es-419";
 
@@ -216,7 +246,17 @@ export type ProfilePatch = {
   locale?: string;
   theme?: string;
   display_name?: string;
+  onboarding?: Partial<{
+    completed: boolean;
+    stage: OnboardingStage;
+    language_confirmed: boolean;
+    primary_goal: PrimaryGoal | null;
+  }>;
 };
+
+export async function getMe() {
+  return apiFetch<{ user: ApiUser }>("/me");
+}
 
 export async function patchMe(patch: ProfilePatch) {
   return apiFetch<{ user: any }>("/me", {
