@@ -210,15 +210,27 @@ export function formatRelativeDate(
   });
 }
 
+import { supabase } from "./supabase-client";
+
 // ─── Generic fetch helper ─────────────────────────────────────────────────────
 
 async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
+  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
+  let authHeaders: Record<string, string> = {};
+
+  if (!isMockAuth) {
+    const { data, error } = await supabase.auth.getSession();
+    if (!error && data.session) {
+      authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
+    }
+  }
+
   console.log(`[argus-api] Fetching ${API_BASE}${path}`, options);
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders, ...(options?.headers || {}) },
     ...options,
   });
   if (!response.ok) {
@@ -444,11 +456,22 @@ export async function streamChatMessage(
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
 ) {
+  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
+  let authHeaders: Record<string, string> = {};
+
+  if (!isMockAuth) {
+    const { data, error } = await supabase.auth.getSession();
+    if (!error && data.session) {
+      authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
+    }
+  }
+
   const response = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Idempotency-Key": crypto.randomUUID(),
+      ...authHeaders,
     },
     body: JSON.stringify({
       conversation_id: conversationId,

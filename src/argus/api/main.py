@@ -238,12 +238,7 @@ def current_user(request: Request) -> User:
             detail="Invalid or expired access token.",
         ) from None
 
-    user_id = auth_user["id"]
-    profile = supabase_gateway.get_user(user_id=user_id)
-    if profile is None:
-        profile = supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
-
-    return profile
+    return supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
 
 
 @app.post("/api/v1/dev/reset", response_model=SuccessResponse)

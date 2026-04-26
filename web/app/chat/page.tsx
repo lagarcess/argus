@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
-import { supabase } from "@/lib/supabase-client";
+import { createClient } from "@/lib/supabase-server";
 import ChatInterface from "@/components/chat/ChatInterface";
 
 export default async function ChatPage() {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
 
   if (!isMockAuth) {
+    const supabase = await createClient();
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
       redirect("/login");

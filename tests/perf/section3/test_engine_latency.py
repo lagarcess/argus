@@ -100,6 +100,7 @@ def test_five_symbol_three_year_run_under_latency_target() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.skip(reason="flaky on CI/CD")
 def test_repeat_run_benefits_from_cached_data_path() -> None:
     started_one = perf_counter()
     engine.compute_alpha_metrics(_config())

@@ -653,6 +653,7 @@ class SupabaseGateway:
         # Canonical defaults per requirements
         payload = {
             "id": user_id,
+            "email": auth_user.get("email"),
             "language": "en",
             "locale": "en-US",
             "theme": "dark",
