@@ -165,11 +165,7 @@ class SupabaseGateway:
 
     def get_user(self, *, user_id: str) -> User | None:
         rows = (
-            self.client.table("profiles")
-            .select("*")
-            .eq("id", user_id)
-            .limit(1)
-            .execute()
+            self.client.table("profiles").select("*").eq("id", user_id).limit(1).execute()
         )
         row = _row_one(rows)
         return User.model_validate(row) if row else None
@@ -192,7 +188,12 @@ class SupabaseGateway:
         return Conversation.model_validate(_row_one(created))
 
     def list_conversations(
-        self, *, user_id: str, limit: int, archived: bool | None = None, deleted: bool = False
+        self,
+        *,
+        user_id: str,
+        limit: int,
+        archived: bool | None = None,
+        deleted: bool = False,
     ) -> list[Conversation]:
         query = self.client.table("conversations").select("*").eq("user_id", user_id)
         if deleted:
@@ -325,10 +326,26 @@ class SupabaseGateway:
     def list_history_rows(
         self, *, user_id: str, limit: int, deleted: bool = False
     ) -> dict[str, list[dict[str, Any]]]:
-        query_runs = self.client.table("backtest_runs").select("id,conversation_result_card,created_at").eq("user_id", user_id)
-        query_chats = self.client.table("conversations").select("id,title,last_message_preview,pinned,updated_at,deleted_at").eq("user_id", user_id)
-        query_strategies = self.client.table("strategies").select("id,name,symbols,pinned,updated_at,deleted_at").eq("user_id", user_id)
-        query_collections = self.client.table("collections").select("id,name,pinned,updated_at,deleted_at").eq("user_id", user_id)
+        query_runs = (
+            self.client.table("backtest_runs")
+            .select("id,conversation_result_card,created_at")
+            .eq("user_id", user_id)
+        )
+        query_chats = (
+            self.client.table("conversations")
+            .select("id,title,last_message_preview,pinned,updated_at,deleted_at")
+            .eq("user_id", user_id)
+        )
+        query_strategies = (
+            self.client.table("strategies")
+            .select("id,name,symbols,pinned,updated_at,deleted_at")
+            .eq("user_id", user_id)
+        )
+        query_collections = (
+            self.client.table("collections")
+            .select("id,name,pinned,updated_at,deleted_at")
+            .eq("user_id", user_id)
+        )
 
         if deleted:
             # We don't soft-delete backtest_runs usually, but if we did:
@@ -342,9 +359,17 @@ class SupabaseGateway:
             query_collections = query_collections.is_("deleted_at", "null")
 
         runs = query_runs.order("created_at", desc=True).limit(limit).execute().data or []
-        chats = query_chats.order("updated_at", desc=True).limit(limit).execute().data or []
-        strategies = query_strategies.order("updated_at", desc=True).limit(limit).execute().data or []
-        collections = query_collections.order("updated_at", desc=True).limit(limit).execute().data or []
+        chats = (
+            query_chats.order("updated_at", desc=True).limit(limit).execute().data or []
+        )
+        strategies = (
+            query_strategies.order("updated_at", desc=True).limit(limit).execute().data
+            or []
+        )
+        collections = (
+            query_collections.order("updated_at", desc=True).limit(limit).execute().data
+            or []
+        )
 
         return {
             "runs": runs,
@@ -611,9 +636,48 @@ class SupabaseGateway:
             "collection_id", collection_id
         ).eq("strategy_id", strategy_id).execute()
 
+    def get_auth_user_from_token(self, token: str) -> dict[str, Any]:
+        response = self.client.auth.get_user(token)
+        if not response or not response.user:
+            raise RuntimeError("Invalid or missing user in token response.")
+        return response.user.model_dump(mode="json")
+
+    def get_or_create_profile_for_auth_user(self, auth_user: dict[str, Any]) -> User:
+        user_id = auth_user["id"]
+        # Try to get existing profile
+        existing = self.get_user(user_id=user_id)
+        if existing is not None:
+            return existing
+
+        now = _now_iso()
+        # Canonical defaults per requirements
+        payload = {
+            "id": user_id,
+            "email": auth_user.get("email"),
+            "language": "en",
+            "locale": "en-US",
+            "theme": "dark",
+            "display_name": None,
+            "onboarding": {
+                "completed": False,
+                "stage": "language_selection",
+                "language_confirmed": False,
+                "primary_goal": None,
+            },
+            "created_at": now,
+            "updated_at": now,
+        }
+
+        created = self.client.table("profiles").insert(payload).execute()
+        row = _row_one(created)
+        if row is None:
+            raise RuntimeError("Failed to create user profile.")
+        return User.model_validate(row)
+
     @staticmethod
     def parse_iso(value: str) -> datetime:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
     def create_feedback(
         self,
         user_id: str,

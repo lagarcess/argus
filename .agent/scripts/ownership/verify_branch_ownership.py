@@ -163,12 +163,12 @@ def main() -> int:
 
     if args.files:
         changed_files = sorted({_normalize_path(path) for path in args.files if path})
-        base_ref = args.base_ref or policy.get("base_ref") or manifest.get(
-            "default_base_ref"
+        base_ref = (
+            args.base_ref or policy.get("base_ref") or manifest.get("default_base_ref")
         )
     else:
-        requested_base = args.base_ref or policy.get("base_ref") or manifest.get(
-            "default_base_ref"
+        requested_base = (
+            args.base_ref or policy.get("base_ref") or manifest.get("default_base_ref")
         )
         if not requested_base:
             print(

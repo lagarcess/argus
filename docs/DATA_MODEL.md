@@ -2,8 +2,8 @@
 
 ## Argus Data Model Source of Truth (Alpha MVP)
 
-**Status:** Active  
-**Audience:** Backend engineers, database agents, API agents, frontend agents  
+**Status:** Active
+**Audience:** Backend engineers, database agents, API agents, frontend agents
 **Purpose:** Define the Alpha MVP database entities, relationships, ownership rules, and persistence expectations for Argus.
 
 ---
@@ -484,7 +484,7 @@ Generous usage boundaries tracked via the `usage_counters` table.
 7. **Response**: Return result with rate-limit headers.
 
 ### Admin Bypass
-Users with `profiles.is_admin = true` may have quota and rate-limit checks bypassed by backend logic. 
+Users with `profiles.is_admin = true` may have quota and rate-limit checks bypassed by backend logic.
 - Ownership and privacy rules still apply.
 - Engine safety constraints (e.g., symbol limits) may still apply.
 

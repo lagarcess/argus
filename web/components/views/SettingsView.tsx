@@ -379,7 +379,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
               {t("settings.about.title")}
             </span>
             <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
-              <button 
+              <button
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
               >
                 <span className="text-[15px] text-black dark:text-white font-medium">
@@ -387,7 +387,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                 </span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
-              <button 
+              <button
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
               >
                 <span className="text-[15px] text-black dark:text-white font-medium">
@@ -395,7 +395,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                 </span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
-              <button 
+              <button
                 onClick={() => onFeedback?.("bug", { surface: "settings" })}
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
               >
@@ -404,7 +404,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                 </span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
-              <button 
+              <button
                 onClick={() => onFeedback?.("feature", { surface: "settings" })}
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
               >
@@ -413,7 +413,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                 </span>
                 <ChevronRight className="w-4 h-4 text-black/40 dark:text-white/40" />
               </button>
-              <button 
+              <button
                 onClick={() => onFeedback?.("general", { surface: "settings" })}
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
@@ -543,4 +543,3 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
     </div>
   );
 }
-

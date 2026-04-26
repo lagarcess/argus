@@ -30,7 +30,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
   // Idle tracking
   useEffect(() => {
     if (!isMounted) return;
-    
+
     if (text || isFocused) {
       setAnimState("idle");
       setTypedText("");
@@ -47,7 +47,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
 
     if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
     activityTimerRef.current = setTimeout(startCycle, 2000);
-    
+
     return () => {
       if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
     };
@@ -60,7 +60,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
     if (animState === "typing") {
       const prompt = prompts[currentPromptIndex];
       if (!prompt) return;
-      
+
       let i = 0;
       const interval = setInterval(() => {
         setTypedText(prompt.slice(0, i + 1));
@@ -101,7 +101,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
   };
 
   return (
-    <form 
+    <form
       onSubmit={handleSubmit}
       onClick={handleContainerClick}
       className="relative flex items-end w-full bg-white dark:bg-[#1f2227] rounded-[32px] border border-black/5 dark:border-white/5 shadow-lg shadow-black/5 dark:shadow-none focus-within:ring-2 focus-within:ring-black/20 dark:focus-within:ring-white/20 transition-all cursor-text"
@@ -118,9 +118,9 @@ export default function ChatInput({ onSend }: ChatInputProps) {
           placeholder={isMounted && animState === "idle" ? t('chat.input_placeholder') : ""}
           className="flex-1 bg-transparent border-none outline-none py-4 pl-6 text-[16px] text-black dark:text-white placeholder-gray-400 dark:placeholder-gray-500 font-medium tracking-tight h-14"
         />
-        
+
         {isMounted && animState !== "idle" && !text && (
-          <div 
+          <div
             key={`${currentPromptIndex}-${animState === "exiting"}`}
             className={`absolute left-6 pointer-events-none text-[16px] font-medium tracking-tight text-gray-400 dark:text-gray-500 flex items-center whitespace-nowrap overflow-hidden ${
               animState === "exiting" ? "animate-argus-swoosh-up" : ""
@@ -136,7 +136,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
 
       {/* Send Button */}
       <div className="p-2 shrink-0">
-        <button 
+        <button
           type="submit"
           data-testid="chat-send"
           disabled={!text.trim()}

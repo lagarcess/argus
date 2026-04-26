@@ -1,3 +1,5 @@
+import { getSupabaseClient } from "./supabase-client";
+
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
 export type AssetClass = "equity" | "crypto";
@@ -216,20 +218,34 @@ async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
+  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
+  const authHeaders: Record<string, string> = {};
+
+  if (!isMockAuth) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      throw new Error("Supabase auth client is unavailable in non-mock mode.");
+    }
+    const { data, error } = await supabase.auth.getSession();
+    if (!error && data.session) {
+      authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
+    }
+  }
+
   console.log(`[argus-api] Fetching ${API_BASE}${path}`, options);
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders, ...(options?.headers || {}) },
     ...options,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const detail = (body as any).detail;
-    const errorMsg = typeof detail === 'object' && detail !== null 
-      ? detail.title 
+    const detail = (body as { detail?: unknown }).detail;
+    const errorMsg = typeof detail === 'object' && detail !== null
+      ? (detail as { title?: unknown }).title as string
       : detail;
 
     const error = new Error(
-      errorMsg ?? `API error ${response.status}`,
+      (errorMsg as string) ?? `API error ${response.status}`,
     ) as Error & { status: number; code: string };
     (error as Error & { status: number }).status = response.status;
     (error as Error & { code: string }).code =
@@ -259,7 +275,7 @@ export async function getMe() {
 }
 
 export async function patchMe(patch: ProfilePatch) {
-  return apiFetch<{ user: any }>("/me", {
+  return apiFetch<{ user: ApiUser }>("/me", {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
@@ -286,7 +302,7 @@ export async function listConversations(params: { limit?: number; archived?: boo
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (archived !== undefined) searchParams.append("archived", String(archived));
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-  
+
   return apiFetch<{ items: Conversation[]; next_cursor: string | null }>(
     `/conversations?${searchParams.toString()}`,
   );
@@ -303,7 +319,7 @@ export async function getConversationMessages(
 
 export async function patchConversation(
   conversationId: string,
-  patch: { title?: string; pinned?: boolean; archived?: boolean },
+  patch: { title?: string; pinned?: boolean; archived?: boolean; deleted_at?: string | null },
 ) {
   return apiFetch<{ conversation: Conversation }>(
     `/conversations/${conversationId}`,
@@ -323,7 +339,7 @@ export async function listHistory(params: { limit?: number; deleted?: boolean } 
   const { limit = 20, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-  
+
   return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(
     `/history?${searchParams.toString()}`,
   );
@@ -335,7 +351,7 @@ export async function listStrategies(params: { limit?: number; deleted?: boolean
   const { limit = 50, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-  
+
   return apiFetch<{ items: Strategy[]; next_cursor: string | null }>(
     `/strategies?${searchParams.toString()}`,
   );
@@ -444,11 +460,26 @@ export async function streamChatMessage(
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
 ) {
+  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
+  const authHeaders: Record<string, string> = {};
+
+  if (!isMockAuth) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      throw new Error("Supabase auth client is unavailable in non-mock mode.");
+    }
+    const { data, error } = await supabase.auth.getSession();
+    if (!error && data.session) {
+      authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
+    }
+  }
+
   const response = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Idempotency-Key": crypto.randomUUID(),
+      ...authHeaders,
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -489,10 +520,11 @@ export async function streamChatMessage(
 export async function postFeedback(payload: {
   type: "bug" | "feature" | "general";
   message: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }) {
   return apiFetch<{ success: boolean }>("/feedback", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
+

@@ -89,7 +89,9 @@ def test_fetch_ohlcv_fail_closed_without_synthetic_fallback(
         )
 
 
-def test_resolve_asset_aliases_and_caches_universe(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_asset_aliases_and_caches_universe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls = {"count": 0}
 
     def fake_load_assets() -> dict[str, ResolvedAsset]:

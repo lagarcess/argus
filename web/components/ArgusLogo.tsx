@@ -1,18 +1,18 @@
 import React from 'react';
 
-export function ArgusLogo({ 
-  className = "w-6 h-6", 
+export function ArgusLogo({
+  className = "w-6 h-6",
   strokeWidth = 2,
   ...props
 }: React.SVGProps<SVGSVGElement> & { className?: string, strokeWidth?: number }) {
   return (
-    <svg 
-      className={className} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth={strokeWidth} 
-      strokeLinecap="round" 
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
       strokeLinejoin="round"
       {...props}
     >

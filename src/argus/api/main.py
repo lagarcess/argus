@@ -194,17 +194,51 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
     return JSONResponse(body, status_code=exc.status_code)
 
 
-def current_user() -> User:
-    user = store.get_or_create_dev_user()
-    if supabase_gateway is not None:
-        # Ensure the mock user exists in the Supabase 'profiles' table to prevent FK violations
-        try:
-            supabase_gateway.get_or_create_mock_user()
-        except Exception:
-            # Fallback for environments where auth.admin is restricted
-            pass
-    return user
+def current_user(request: Request) -> User:
+    if (
+        os.getenv("NEXT_PUBLIC_MOCK_AUTH", "").strip().lower() == "true"
+        or os.getenv("ARGUS_MOCK_AUTH", "").strip().lower() == "true"
+    ):
+        user = store.get_or_create_dev_user()
+        if supabase_gateway is not None:
+            try:
+                supabase_gateway.get_or_create_mock_user()
+            except Exception:
+                pass
+        return user
 
+    if supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for non-mock authentication.",
+        )
+
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise problem(
+            request,
+            status_code=401,
+            code="unauthorized",
+            title="Unauthorized",
+            detail="Missing or invalid Authorization header.",
+        )
+
+    token = auth_header.removeprefix("Bearer ")
+    try:
+        auth_user = supabase_gateway.get_auth_user_from_token(token)
+    except Exception:
+        raise problem(
+            request,
+            status_code=401,
+            code="unauthorized",
+            title="Unauthorized",
+            detail="Invalid or expired access token.",
+        ) from None
+
+    return supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
 
 
 @app.post("/api/v1/dev/reset", response_model=SuccessResponse)
@@ -283,7 +317,9 @@ def patch_me(
 
     if supabase_gateway is not None:
         try:
-            updated = supabase_gateway.update_user(user.id, updated.model_dump(mode="json"))
+            updated = supabase_gateway.update_user(
+                user.id, updated.model_dump(mode="json")
+            )
         except Exception as exc:
             if not _dev_memory_fallback_enabled():
                 raise
@@ -616,7 +652,9 @@ def create_run_from_payload(
             title="Validation Error",
             detail="Symbol is required.",
         )
-    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(symbols, request)
+    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(
+        symbols, request
+    )
     payload["asset_class"] = payload.get("asset_class") or inferred_asset_class
     if payload["asset_class"] != inferred_asset_class:
         _raise_backtest_problem(
@@ -773,8 +811,12 @@ def create_strategy(
     if supabase_gateway is not None:
         strategy_payload = payload.model_dump(mode="json")
         strategy_payload["name"] = strategy_name
-        strategy_payload["name_source"] = "user_renamed" if payload.name else "ai_generated"
-        strategy = supabase_gateway.create_strategy(user_id=user.id, payload=strategy_payload)
+        strategy_payload["name_source"] = (
+            "user_renamed" if payload.name else "ai_generated"
+        )
+        strategy = supabase_gateway.create_strategy(
+            user_id=user.id, payload=strategy_payload
+        )
     else:
         now = utcnow()
         benchmark = payload.benchmark_symbol or default_benchmark(payload.asset_class)
@@ -802,7 +844,9 @@ def list_strategies(
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedStrategies:
     if supabase_gateway is not None:
-        items = supabase_gateway.list_strategies(user_id=user.id, limit=limit, deleted=deleted)
+        items = supabase_gateway.list_strategies(
+            user_id=user.id, limit=limit, deleted=deleted
+        )
     else:
         items = []
         for item in store.strategies.values():
@@ -998,7 +1042,9 @@ def history(
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedHistory:
     if supabase_gateway is not None:
-        raw = supabase_gateway.list_history_rows(user_id=user.id, limit=limit, deleted=deleted)
+        raw = supabase_gateway.list_history_rows(
+            user_id=user.id, limit=limit, deleted=deleted
+        )
         items: list[HistoryItem] = []
         for run in raw["runs"]:
             items.append(
@@ -1057,7 +1103,11 @@ def history(
                     )
                 )
         for conversation in store.conversations.values():
-            if (conversation.deleted_at is not None if deleted else conversation.deleted_at is None):
+            if (
+                conversation.deleted_at is not None
+                if deleted
+                else conversation.deleted_at is None
+            ):
                 items.append(
                     HistoryItem(
                         type="chat",
@@ -1069,7 +1119,11 @@ def history(
                     )
                 )
         for strategy in store.strategies.values():
-            if (strategy.deleted_at is not None if deleted else strategy.deleted_at is None):
+            if (
+                strategy.deleted_at is not None
+                if deleted
+                else strategy.deleted_at is None
+            ):
                 items.append(
                     HistoryItem(
                         type="strategy",
@@ -1081,7 +1135,11 @@ def history(
                     )
                 )
         for collection in store.collections.values():
-            if (collection.deleted_at is not None if deleted else collection.deleted_at is None):
+            if (
+                collection.deleted_at is not None
+                if deleted
+                else collection.deleted_at is None
+            ):
                 items.append(
                     HistoryItem(
                         type="collection",
@@ -1210,7 +1268,9 @@ def _persist_onboarding_update(user: User, patch: dict[str, Any]) -> User:
     )
     if supabase_gateway is not None:
         try:
-            updated = supabase_gateway.update_user(user.id, updated.model_dump(mode="json"))
+            updated = supabase_gateway.update_user(
+                user.id, updated.model_dump(mode="json")
+            )
         except Exception as exc:
             if not _dev_memory_fallback_enabled():
                 raise
@@ -1337,7 +1397,9 @@ def chat_stream(
             )
             follow_up = goal_follow_up_message(
                 onboarding_goal,
-                payload.language or conversation.language or current_user_profile.language,
+                payload.language
+                or conversation.language
+                or current_user_profile.language,
             )
             assistant_message = _create_message(
                 user_id=user.id,
@@ -1352,9 +1414,7 @@ def chat_stream(
         decision = orchestrate_chat_turn(
             message=payload.message,
             language=(
-                payload.language
-                or conversation.language
-                or current_user_profile.language
+                payload.language or conversation.language or current_user_profile.language
             ),
             onboarding_required=False,
             primary_goal=current_user_profile.onboarding.primary_goal,
@@ -1399,7 +1459,11 @@ def chat_stream(
                         run_id=run.id,
                     )
         except HTTPException as exc:
-            detail = exc.detail if isinstance(exc.detail, dict) else {"detail": str(exc.detail)}
+            detail = (
+                exc.detail
+                if isinstance(exc.detail, dict)
+                else {"detail": str(exc.detail)}
+            )
             yield sse("error", detail)
             yield sse("done", {"error": True})
             return
@@ -1442,9 +1506,13 @@ def chat_stream(
                 f"{payload.message}\nTemplate: {template_name}\nSymbols: "
                 f"{', '.join(run.symbols)}"
             ),
-            language=payload.language or conversation.language or current_user_profile.language,
+            language=payload.language
+            or conversation.language
+            or current_user_profile.language,
         )
-        new_title = suggested or f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
+        new_title = (
+            suggested or f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
+        )
         if conversation.title_source == "system_default":
             patch = {
                 "title": new_title,
@@ -1452,7 +1520,10 @@ def chat_stream(
                 "last_message_preview": payload.message[:120],
                 "updated_at": utcnow(),
             }
-            if supabase_gateway is not None and conversation.id not in store.conversations:
+            if (
+                supabase_gateway is not None
+                and conversation.id not in store.conversations
+            ):
                 try:
                     supabase_gateway.patch_conversation(
                         user_id=user.id, conversation_id=conversation.id, patch=patch
@@ -1468,9 +1539,7 @@ def chat_stream(
             if conversation.id in store.conversations:
                 updated = conversation.model_copy(update=patch)
                 store.conversations[conversation.id] = updated
-            yield sse(
-                "title", {"conversation_id": conversation.id, "title": new_title}
-            )
+            yield sse("title", {"conversation_id": conversation.id, "title": new_title})
         yield sse("token", {"text": assistant_text})
         yield sse("result", {"run": run.model_dump(mode="json")})
         yield sse("done", {"message_id": assistant_message.id})

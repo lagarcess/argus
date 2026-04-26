@@ -32,7 +32,7 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
             </dd>
           </div>
         )}
-        
+
         <dl className="grid grid-cols-2 gap-4">
           {result.metrics.slice(1).map((metric) => (
             <div key={metric.label} className="flex flex-col gap-0.5">

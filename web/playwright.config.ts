@@ -5,7 +5,7 @@ const runId = `${Date.now()}-${process.pid}`;
 export default defineConfig({
   testDir: "./e2e",
   outputDir: `./temp/playwright-results/${runId}`,
-  lastRunFile: `./temp/playwright/${runId}.last-run.json`,
+  // lastRunFile: `./temp/playwright/${runId}.last-run.json`,
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
