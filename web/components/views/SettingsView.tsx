@@ -90,7 +90,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
         .then(({ items }) => setArchivedChats(items))
         .finally(() => setIsLoading(false));
     } else if (activeSubView === "deleted") {
-
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLoading(true);
       listHistory({ deleted: true })
         .then(({ items }) => setDeletedItems(items))
