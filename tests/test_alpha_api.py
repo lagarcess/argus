@@ -43,9 +43,13 @@ def _fake_fetch_ohlcv(
     timeframe: str,
 ) -> pd.DataFrame:
     freq_map = {"1D": "D", "1h": "h", "2h": "2h", "4h": "4h", "6h": "6h", "12h": "12h"}
-    index = pd.date_range(start=start_date, end=end_date, freq=freq_map[timeframe], tz="UTC")
+    index = pd.date_range(
+        start=start_date, end=end_date, freq=freq_map[timeframe], tz="UTC"
+    )
     if len(index) < 80:
-        index = pd.date_range(start=start_date, periods=80, freq=freq_map[timeframe], tz="UTC")
+        index = pd.date_range(
+            start=start_date, periods=80, freq=freq_map[timeframe], tz="UTC"
+        )
     base_map = {"AAPL": 100.0, "TSLA": 200.0, "MSFT": 150.0, "SPY": 400.0, "BTC": 30000.0}
     base = base_map.get(symbol, 100.0)
     close = pd.Series(base + pd.RangeIndex(len(index)).astype(float) * 0.5, index=index)
@@ -275,7 +279,9 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert run["config_snapshot"]["starting_capital"] == 10000
     assert "summary" not in run
     assert set(run["metrics"]) == {"aggregate", "by_symbol"}
-    assert isinstance(run["metrics"]["aggregate"]["performance"]["total_return_pct"], float)
+    assert isinstance(
+        run["metrics"]["aggregate"]["performance"]["total_return_pct"], float
+    )
     assert run["conversation_result_card"]["assumptions"] == [
         "Universe: TSLA.",
         "Simulation uses long-only preset.",
@@ -531,9 +537,7 @@ def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
     items = messages.json()["items"]
-    assert all(
-        not message["content"].startswith("__ONBOARDING_") for message in items
-    )
+    assert all(not message["content"].startswith("__ONBOARDING_") for message in items)
 
 
 def test_first_successful_backtest_transitions_onboarding_to_completed() -> None:

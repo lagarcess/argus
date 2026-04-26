@@ -76,7 +76,7 @@ function mapStrategyToDisplay(s: Strategy): DisplayStrategy {
   return {
     id: s.id,
     name: s.name,
-    dateStr: formatRelativeDate(s.updated_at),
+    dateStr: formatRelativeDate(s.updated_at, {today: "Today", yesterday: "Yesterday"}),
     isPinned: s.pinned,
     hasMetrics: rows.length > 0,
     assets,
@@ -601,7 +601,7 @@ export default function StrategiesView({
       {/* Bottom glass blur */}
       <div className="absolute bottom-0 inset-x-0 h-40 z-10 pointer-events-none backdrop-blur-[0.8px] bg-[#f9f9f9]/10 dark:bg-[#141517]/20 [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_50%,transparent_100%)]" />
 
-      <div 
+      <div
         className={`absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none transition-all duration-300 ${
           isSidebarOpen ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
         }`}

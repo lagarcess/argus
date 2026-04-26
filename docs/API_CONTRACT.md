@@ -928,7 +928,7 @@ AI response uses the resolved language unless the user clearly asks otherwise in
 `Content-Type: text/event-stream`
 
 **Reconnect Behavior:**
-If the stream disconnects, the client should reconnect by re-fetching the conversation messages (`GET /conversations/{id}/messages`). 
+If the stream disconnects, the client should reconnect by re-fetching the conversation messages (`GET /conversations/{id}/messages`).
 - No token-level replay is guaranteed in Alpha.
 - No `last_message_id` reconnect contract is enforced yet.
 

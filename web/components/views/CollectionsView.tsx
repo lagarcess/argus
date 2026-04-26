@@ -45,7 +45,7 @@ function mapCollection(c: Collection): DisplayCollection {
         : "strategy_count",
     pinned: c.pinned,
     strategyCount: c.strategy_count,
-    dateStr: formatRelativeDate(c.updated_at),
+    dateStr: formatRelativeDate(c.updated_at, {today: "Today", yesterday: "Yesterday"}),
   };
 }
 
@@ -351,8 +351,8 @@ export default function CollectionsView({
                       </h2>
                     )}
                      <p className="mt-1 text-[13px] text-black/50 dark:text-white/50">
-                      {collection.subtitle === "no_strategies" 
-                        ? t('collections.no_strategies') 
+                      {collection.subtitle === "no_strategies"
+                        ? t('collections.no_strategies')
                         : t('collections.strategy_count', { count: collection.strategyCount })} · {collection.dateStr}
                     </p>
                   </article>
@@ -364,7 +364,7 @@ export default function CollectionsView({
       </div>
 
       {/* Bottom bar */}
-      <div 
+      <div
         className={`absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none transition-all duration-300 ${
           isSidebarOpen ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
         }`}

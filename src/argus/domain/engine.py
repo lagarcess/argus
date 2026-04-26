@@ -203,9 +203,7 @@ def _resolve_indicator_series(
 
     upper = indicator.upper()
     candidates = [
-        col
-        for col in data.columns
-        if upper in col.upper() and str(period) in col
+        col for col in data.columns if upper in col.upper() and str(period) in col
     ]
     if not candidates:
         candidates = [col for col in data.columns if upper in col.upper()]
@@ -214,7 +212,9 @@ def _resolve_indicator_series(
     return data[candidates[-1]].astype(float)
 
 
-def _build_signals(config: dict[str, Any], data: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+def _build_signals(
+    config: dict[str, Any], data: pd.DataFrame
+) -> tuple[pd.Series, pd.Series]:
     close = data["close"].astype(float)
     template = config["template"]
     index = close.index
@@ -296,7 +296,9 @@ def _max_drawdown_pct(equity_curve: pd.Series) -> float:
     return float(drawdown.min() * 100.0)
 
 
-def _annualized_return_pct(total_return: float, periods: int, periods_per_year: float) -> float:
+def _annualized_return_pct(
+    total_return: float, periods: int, periods_per_year: float
+) -> float:
     if periods <= 1:
         return total_return * 100.0
     years = periods / periods_per_year
@@ -337,7 +339,9 @@ def _compute_metrics(
             "delta_vs_benchmark_pct": round(total_return_pct - benchmark_return_pct, 2),
             "profit": round(allocation_capital * total_return, 2),
             "annualized_return_pct": round(
-                _annualized_return_pct(total_return, len(strategy_returns), periods_per_year),
+                _annualized_return_pct(
+                    total_return, len(strategy_returns), periods_per_year
+                ),
                 2,
             ),
         },
@@ -409,7 +413,9 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
             freq=_vbt_freq(config["timeframe"]),
         )
 
-        symbol_equity = pd.Series(portfolio.value().values, index=close.index, dtype=float)
+        symbol_equity = pd.Series(
+            portfolio.value().values, index=close.index, dtype=float
+        )
         strategy_returns = symbol_equity.pct_change().fillna(0.0)
 
         benchmark_curve = build_benchmark_curve(config, close.index)

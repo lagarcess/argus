@@ -289,27 +289,27 @@ export default function ChatInterface() {
     // 1. Switch view
     setCurrentView("chat");
     setIsSidebarOpen(false);
-    
+
     // 2. Start new chat
     const newConvId = await startNewChat();
     if (!newConvId) return;
-    
+
     // 3. Define the localized prompt or use custom
     let prompt: string;
     if (customPrompt) {
       prompt = customPrompt;
     } else {
-      const promptKey = type === 'strategy' 
-        ? 'chat.trigger_create_strategy' 
+      const promptKey = type === 'strategy'
+        ? 'chat.trigger_create_strategy'
         : 'chat.trigger_create_collection';
-      
+
       const fallback = type === 'strategy'
         ? 'I want to create a new strategy.'
         : 'I want to create a new collection.';
-      
+
       prompt = t(promptKey, fallback);
     }
-      
+
     // 4. Send it
     void handleSend(prompt);
   };
@@ -479,7 +479,7 @@ export default function ChatInterface() {
       if (type === 'chat') await patchConversation(id, { title: newTitle });
       else if (type === 'strategies') await patchStrategy(id, { name: newTitle });
       else if (type === 'collections') await patchCollection(id, { name: newTitle });
-      
+
       setHistoryItems((prev) =>
         prev.map((item) => (item.id === id ? { ...item, title: newTitle } : item)),
       );
@@ -559,12 +559,12 @@ export default function ChatInterface() {
     if (lastStrategyMsg?.result) {
       const res = lastStrategyMsg.result;
       setCollectionPickerTarget({
-        runId: res.runId,
-        strategyId: res.strategyId,
+        runId: res.runId ?? "",
+        strategyId: res.strategyId ?? null,
         strategyName: res.strategyName,
-        symbols: [], 
-        template: "", 
-        assetClass: "equity", 
+        symbols: [],
+        template: "",
+        assetClass: "equity",
       });
       closeChatOptions();
     } else {
@@ -585,7 +585,7 @@ export default function ChatInterface() {
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
 
       {/* ── Desktop sidebar ── */}
-      <aside 
+      <aside
         className={`flex flex-col border-r border-black/5 bg-white transition-all duration-300 ease-in-out overflow-x-hidden dark:border-white/5 dark:bg-[#141517] ${
           isSidebarOpen ? "w-72" : "w-14"
         }`}
@@ -600,7 +600,7 @@ export default function ChatInterface() {
             {isSidebarOpen ? (
               <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
             ) : (
-              <ArgusLogo variant="icon-only" className="h-8 w-8 text-black dark:text-white" />
+              <ArgusLogo  className="h-8 w-8 text-black dark:text-white" />
             )}
           </button>
           <span className={`font-display pl-3 text-[22px] font-bold tracking-tight text-black transition-all duration-300 dark:text-white ${
@@ -926,7 +926,7 @@ export default function ChatInterface() {
                 <h1 className="mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
                   argus
                 </h1>
-                
+
                 <div className="w-full max-w-2xl">
                   <ChatInput onSend={handleSend} />
                 </div>
@@ -988,22 +988,22 @@ export default function ChatInterface() {
                 }`}>
                   {/* Starter Actions / Chips */}
                   <div className="flex flex-wrap items-center justify-center gap-3">
-                      <button 
-                        onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Show me TSLA analysis'))} 
+                      <button
+                        onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Show me TSLA analysis'))}
                         className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                       >
                         <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
                         TSLA Analysis
                       </button>
-                      <button 
-                        onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Show me BTC trends'))} 
+                      <button
+                        onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Show me BTC trends'))}
                         className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                       >
                         <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
                         BTC Trends
                       </button>
-                      <button 
-                        onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Explain DCA strategy'))} 
+                      <button
+                        onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Explain DCA strategy'))}
                         className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                       >
                         <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />

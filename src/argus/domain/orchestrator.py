@@ -196,7 +196,9 @@ def _llm_extract_decision(
     )
 
 
-def _fallback_run_decision(message: str, language: str | None) -> ChatOrchestrationDecision:
+def _fallback_run_decision(
+    message: str, language: str | None
+) -> ChatOrchestrationDecision:
     strategy = StrategyExtraction.model_validate(_heuristic_extract(message))
     return ChatOrchestrationDecision(
         intent="run_backtest",
@@ -248,7 +250,10 @@ def orchestrate_chat_turn(
                     primary_goal=primary_goal,
                     model_name=fallback_model,
                 )
-                if decision.strategy and decision.strategy.template in SUPPORTED_TEMPLATES:
+                if (
+                    decision.strategy
+                    and decision.strategy.template in SUPPORTED_TEMPLATES
+                ):
                     return decision
             except Exception:
                 pass

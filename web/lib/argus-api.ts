@@ -223,13 +223,13 @@ async function apiFetch<T>(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const detail = (body as any).detail;
-    const errorMsg = typeof detail === 'object' && detail !== null 
-      ? detail.title 
+    const detail = (body as { detail?: unknown }).detail;
+    const errorMsg = typeof detail === 'object' && detail !== null
+      ? (detail as { title?: unknown }).title as string
       : detail;
 
     const error = new Error(
-      errorMsg ?? `API error ${response.status}`,
+      (errorMsg as string) ?? `API error ${response.status}`,
     ) as Error & { status: number; code: string };
     (error as Error & { status: number }).status = response.status;
     (error as Error & { code: string }).code =
@@ -286,7 +286,7 @@ export async function listConversations(params: { limit?: number; archived?: boo
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (archived !== undefined) searchParams.append("archived", String(archived));
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-  
+
   return apiFetch<{ items: Conversation[]; next_cursor: string | null }>(
     `/conversations?${searchParams.toString()}`,
   );
@@ -303,7 +303,7 @@ export async function getConversationMessages(
 
 export async function patchConversation(
   conversationId: string,
-  patch: { title?: string; pinned?: boolean; archived?: boolean },
+  patch: { title?: string; pinned?: boolean; archived?: boolean; deleted_at?: string | null },
 ) {
   return apiFetch<{ conversation: Conversation }>(
     `/conversations/${conversationId}`,
@@ -323,7 +323,7 @@ export async function listHistory(params: { limit?: number; deleted?: boolean } 
   const { limit = 20, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-  
+
   return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(
     `/history?${searchParams.toString()}`,
   );
@@ -335,7 +335,7 @@ export async function listStrategies(params: { limit?: number; deleted?: boolean
   const { limit = 50, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-  
+
   return apiFetch<{ items: Strategy[]; next_cursor: string | null }>(
     `/strategies?${searchParams.toString()}`,
   );
@@ -489,7 +489,7 @@ export async function streamChatMessage(
 export async function postFeedback(payload: {
   type: "bug" | "feature" | "general";
   message: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }) {
   return apiFetch<{ success: boolean }>("/feedback", {
     method: "POST",

@@ -35,7 +35,7 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // For non-rating feedback, message is required. For rating, tags or message is enough.
     const isRating = type === "rating";
     if (!isRating && !message.trim()) return;
@@ -76,8 +76,8 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
 
   const getIcon = () => {
     if (type === "rating") {
-      return rating === "positive" 
-        ? <ThumbsUp className="w-5 h-5 text-green-500" /> 
+      return rating === "positive"
+        ? <ThumbsUp className="w-5 h-5 text-green-500" />
         : <ThumbsDown className="w-5 h-5 text-red-500" />;
     }
     switch (type) {
@@ -88,14 +88,14 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
   };
 
   const toggleTag = (tagKey: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tagKey) 
-        ? prev.filter(t => t !== tagKey) 
+    setSelectedTags(prev =>
+      prev.includes(tagKey)
+        ? prev.filter(t => t !== tagKey)
         : [...prev, tagKey]
     );
   };
 
-  const tags = rating === "positive" 
+  const tags = rating === "positive"
     ? [
         { key: "accurate", label: t("feedback.tags.positive.accurate") },
         { key: "exactly", label: t("feedback.tags.positive.exactly") },
@@ -116,11 +116,11 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
       />
-      
+
       {/* Dialog */}
       <div className="relative w-full max-w-lg bg-[#f5f5f5] dark:bg-[#1c1f24] border border-black/5 dark:border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-300">
         <div className="p-6 sm:p-8">
@@ -133,7 +133,7 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
                 {getTitle()}
               </h2>
             </div>
-            <button 
+            <button
               onClick={onClose}
               className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             >
@@ -184,7 +184,7 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
                     {message.length}/500
                   </div>
                 </div>
-                
+
                 {type === "rating" && (
                   <p className="px-1 text-[13px] text-black/40 dark:text-white/40 leading-relaxed">
                     {t("feedback.footer_note")}{" "}

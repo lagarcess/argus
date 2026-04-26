@@ -43,7 +43,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
         setShowOptions(false);
       }
     }
-    
+
     function handleScroll() {
       setShowOptions(false);
     }
@@ -65,10 +65,10 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
     } else {
       setRating(newRating);
       // First, post the basic rating
-      postFeedback({ 
-        type: "general", 
-        message: newRating === "positive" ? "Thumbs Up" : "Thumbs Down", 
-        context: { message_id: message.id, rating: newRating } 
+      postFeedback({
+        type: "general",
+        message: newRating === "positive" ? "Thumbs Up" : "Thumbs Down",
+        context: { message_id: message.id, rating: newRating }
       });
       // Then, open the detailed feedback dialog
       onFeedback?.("rating", { message_id: message.id }, newRating);
@@ -108,7 +108,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
               {message.content ?? ""}
             </div>
           )}
-          
+
           {isLatest && (
             <div className="flex items-start justify-between gap-4 mt-2">
               {message.actions && message.actions.length > 0 ? (
@@ -131,12 +131,12 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
               {/* Feedback Icon Row (Right-aligned) */}
               <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
                 {(rating === null || rating === "positive") && (
-                  <button 
+                  <button
                     className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
-                      rating === "positive" 
-                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" 
+                      rating === "positive"
+                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110"
                         : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                    }`} 
+                    }`}
                     title={t('chat.good_response')}
                     onClick={() => handleRating("positive")}
                   >
@@ -144,21 +144,21 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
                   </button>
                 )}
                 {(rating === null || rating === "negative") && (
-                  <button 
+                  <button
                     className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
-                      rating === "negative" 
-                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" 
+                      rating === "negative"
+                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110"
                         : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                    }`} 
+                    }`}
                     title={t('chat.poor_response')}
                     onClick={() => handleRating("negative")}
                   >
                     <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? "fill-current" : ""}`} />
                   </button>
                 )}
-                <button 
+                <button
                   onClick={toggleOptions}
-                  className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors" 
+                  className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
                   title={t('chat.more_actions')}
                 >
                   <MoreHorizontal className="w-3.5 h-3.5" />
@@ -167,21 +167,21 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
                 {/* Popover Menu */}
                 {showOptions && (
                   <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] shadow-xl dark:shadow-black/50 border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
-                    <button 
+                    <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                       onClick={() => { navigator.clipboard.writeText(getCopyText()); setShowOptions(false); }}
                     >
                       <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
                       {t('chat.copy_plaintext')}
                     </button>
-                    <button 
+                    <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                       onClick={() => { navigator.clipboard.writeText(message.id); setShowOptions(false); }}
                     >
                       <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
                       {t('chat.copy_id')}
                     </button>
-                    <button 
+                    <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                       onClick={() => { setShowOptions(false); onFeedback?.("bug", { message_id: message.id }); }}
                     >
