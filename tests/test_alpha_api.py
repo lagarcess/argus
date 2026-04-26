@@ -376,3 +376,48 @@ def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
         "user",
         "assistant",
     ]
+
+
+def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-spanish"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest Tesla when it dips",
+            "language": "es-419",
+        },
+    )
+
+    assert response.status_code == 200
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    assert messages.status_code == 200
+    assistant_message = messages.json()["items"][-1]
+    assert assistant_message["role"] == "assistant"
+    assert "Probé la idea con TSLA." in assistant_message["content"]
+
+
+def test_chat_stream_defaults_to_english_assistant_copy() -> None:
+    client = _client()
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        headers={"Idempotency-Key": "chat-default-language"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest Tesla when it dips",
+        },
+    )
+
+    assert response.status_code == 200
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    assert messages.status_code == 200
+    assistant_message = messages.json()["items"][-1]
+    assert assistant_message["role"] == "assistant"
+    assert "I tested that idea with TSLA." in assistant_message["content"]

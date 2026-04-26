@@ -132,6 +132,8 @@ export type ChatStreamEvent =
 const API_BASE =
   process.env.NEXT_PUBLIC_ARGUS_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+export type ApiLanguage = "en" | "es-419";
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 export function resultCardFromRun(run: BacktestRun) {
@@ -144,6 +146,13 @@ export function resultCardFromRun(run: BacktestRun) {
     runId: run.id,
     strategyId: run.strategy_id ?? null,
   };
+}
+
+export function normalizeApiLanguage(language?: string | null): ApiLanguage {
+  if (language?.toLowerCase().startsWith("es")) {
+    return "es-419";
+  }
+  return "en";
 }
 
 /**
@@ -218,10 +227,10 @@ export async function patchMe(patch: ProfilePatch) {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function createConversation(language: "en" | "es-419" = "en") {
+export async function createConversation(language?: string | null) {
   return apiFetch<{ conversation: Conversation }>("/conversations", {
     method: "POST",
-    body: JSON.stringify({ title: null, language }),
+    body: JSON.stringify({ title: null, language: normalizeApiLanguage(language) }),
   });
 }
 
@@ -387,6 +396,7 @@ export async function runBacktest(payload: {
 export async function streamChatMessage(
   conversationId: string,
   message: string,
+  language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
 ) {
   const response = await fetch(`${API_BASE}/chat/stream`, {
@@ -398,7 +408,7 @@ export async function streamChatMessage(
     body: JSON.stringify({
       conversation_id: conversationId,
       message,
-      language: "en",
+      language: normalizeApiLanguage(language),
     }),
   });
   if (!response.ok || !response.body) {

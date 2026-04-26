@@ -68,7 +68,7 @@ def extract_strategy_request(message: str) -> dict[str, Any]:
 
 def assistant_copy_for_result(symbols: list[str], language: str) -> str:
     joined = ", ".join(symbols)
-    if language == "es":
+    if language.lower().startswith("es"):
         return (
             f"Probé la idea con {joined}. Usé una simulación larga, ponderada por igual "
             "y sin comisiones ni deslizamiento para mantener clara la comparación."
