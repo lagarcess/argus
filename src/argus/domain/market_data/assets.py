@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from dataclasses import dataclass
 from typing import Literal
@@ -23,6 +24,7 @@ class ResolvedAsset:
 
 _ASSET_ALIAS_MAP: dict[str, ResolvedAsset] | None = None
 _ASSET_CACHE_TS: float = 0.0
+_ASSET_CACHE_LOCK = threading.Lock()
 
 
 def _cache_ttl_seconds() -> int:
@@ -122,9 +124,14 @@ def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
     now = time.time()
     ttl = _cache_ttl_seconds()
     expired = (now - _ASSET_CACHE_TS) >= ttl
-    if force or _ASSET_ALIAS_MAP is None or expired:
-        _ASSET_ALIAS_MAP = _load_assets_from_alpaca()
-        _ASSET_CACHE_TS = now
+    if not (force or _ASSET_ALIAS_MAP is None or expired):
+        return
+    with _ASSET_CACHE_LOCK:
+        now = time.time()
+        expired = (now - _ASSET_CACHE_TS) >= ttl
+        if force or _ASSET_ALIAS_MAP is None or expired:
+            _ASSET_ALIAS_MAP = _load_assets_from_alpaca()
+            _ASSET_CACHE_TS = now
 
 
 def resolve_asset(symbol: str) -> ResolvedAsset:
@@ -149,5 +156,6 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
 
 def clear_asset_cache() -> None:
     global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS
-    _ASSET_ALIAS_MAP = None
-    _ASSET_CACHE_TS = 0.0
+    with _ASSET_CACHE_LOCK:
+        _ASSET_ALIAS_MAP = None
+        _ASSET_CACHE_TS = 0.0

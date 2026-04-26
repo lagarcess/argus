@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -22,6 +23,9 @@ from supabase import Client, create_client
 
 class QuotaExceededError(Exception):
     pass
+
+
+_USAGE_COUNTER_LOCK = threading.Lock()
 
 
 def _now_iso() -> str:
@@ -662,38 +666,62 @@ class SupabaseGateway:
         start, end = _align_period(now, period)
         start_iso = start.isoformat()
         end_iso = end.isoformat()
+        with _USAGE_COUNTER_LOCK:
+            for _ in range(5):
+                rows = (
+                    self.client.table("usage_counters")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("resource", resource)
+                    .eq("period", period)
+                    .eq("period_start", start_iso)
+                    .limit(1)
+                    .execute()
+                )
+                row = _row_one(rows)
 
-        rows = (
-            self.client.table("usage_counters")
-            .select("*")
-            .eq("user_id", user_id)
-            .eq("resource", resource)
-            .eq("period", period)
-            .eq("period_start", start_iso)
-            .execute()
-        )
-        row = _row_one(rows)
+                if row is None:
+                    try:
+                        self.client.table("usage_counters").insert(
+                            {
+                                "user_id": user_id,
+                                "resource": resource,
+                                "period": period,
+                                "period_start": start_iso,
+                                "period_end": end_iso,
+                                "used_count": 0,
+                                "limit_count": limit_count,
+                                "created_at": _now_iso(),
+                                "updated_at": _now_iso(),
+                            }
+                        ).execute()
+                    except Exception:
+                        pass
+                    continue
 
-        if row:
-            if row["used_count"] >= limit_count:
-                raise QuotaExceededError(f"Quota exceeded for {resource} ({period})")
-            self.client.table("usage_counters").update(
-                {"used_count": row["used_count"] + 1, "updated_at": _now_iso()}
-            ).eq("id", row["id"]).execute()
-        else:
-            self.client.table("usage_counters").insert(
-                {
-                    "user_id": user_id,
-                    "resource": resource,
-                    "period": period,
-                    "period_start": start_iso,
-                    "period_end": end_iso,
-                    "used_count": 1,
-                    "limit_count": limit_count,
-                    "created_at": _now_iso(),
-                    "updated_at": _now_iso(),
-                }
-            ).execute()
+                current_used = int(row.get("used_count", 0))
+                if current_used >= limit_count:
+                    raise QuotaExceededError(f"Quota exceeded for {resource} ({period})")
+
+                updated = (
+                    self.client.table("usage_counters")
+                    .update(
+                        {
+                            "used_count": current_used + 1,
+                            "limit_count": limit_count,
+                            "updated_at": _now_iso(),
+                        }
+                    )
+                    .eq("id", row["id"])
+                    .eq("used_count", current_used)
+                    .execute()
+                )
+                if updated.data:
+                    return
+
+            raise RuntimeError(
+                f"Failed to increment usage counter for {resource} ({period})."
+            )
 
     def detach_strategy(
         self, *, user_id: str, collection_id: str, strategy_id: str

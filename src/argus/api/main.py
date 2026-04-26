@@ -127,7 +127,7 @@ def _memory_message(*, conversation_id: str, role: str, content: str) -> Message
 def _create_message(
     *, user_id: str, conversation_id: str, role: str, content: str
 ) -> Message:
-    if supabase_gateway is not None and conversation_id not in store.conversations:
+    if supabase_gateway is not None:
         try:
             return supabase_gateway.create_message(
                 user_id=user_id,
@@ -1820,14 +1820,30 @@ def chat_stream(
             yield sse("done", {"message_id": assistant_message.id})
             return
 
-        decision = orchestrate_chat_turn(
-            message=payload.message,
-            language=(
-                payload.language or conversation.language or current_user_profile.language
-            ),
-            onboarding_required=False,
-            primary_goal=current_user_profile.onboarding.primary_goal,
-        )
+        try:
+            decision = orchestrate_chat_turn(
+                message=payload.message,
+                language=(
+                    payload.language or conversation.language or current_user_profile.language
+                ),
+                onboarding_required=False,
+                primary_goal=current_user_profile.onboarding.primary_goal,
+            )
+        except Exception as exc:
+            logger.exception(
+                "Chat orchestration failed",
+                error=str(exc),
+                conversation_id=conversation.id,
+            )
+            yield sse(
+                "error",
+                {
+                    "code": "internal_error",
+                    "detail": "An unexpected error occurred during orchestration.",
+                },
+            )
+            yield sse("done", {"error": True})
+            return
         if decision.intent != "run_backtest" or decision.strategy is None:
             assistant_message = _create_message(
                 user_id=user.id,
