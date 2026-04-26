@@ -87,6 +87,32 @@ async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<void> {
     }),
   );
 
+  await page.route("**/api/v1/search**", async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [
+          {
+            type: "chat",
+            id: "conv-e2e",
+            title: "Tesla chat",
+            matched_text: "Discussing TSLA",
+            updated_at: "2026-04-25T00:00:00Z",
+          },
+          {
+            type: "strategy",
+            id: "strat-e2e",
+            title: "Tesla strategy",
+            matched_text: "TSLA",
+            updated_at: "2026-04-24T00:00:00Z",
+          },
+        ],
+        next_cursor: null,
+      }),
+    }),
+  );
+
   await page.route("**/api/v1/chat/stream", async (route) =>
     route.fulfill({
       status: 200,
@@ -133,4 +159,21 @@ test("does not show onboarding cards for completed users", async ({ page }) => {
   await page.goto("/chat", { waitUntil: "networkidle" });
 
   await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
+});
+
+test("shows global sidebar search results in chat view", async ({ page }) => {
+  await mockChatBoot(page, "completed");
+  await page.goto("/chat", { waitUntil: "networkidle" });
+
+  await page.getByPlaceholder("Search").fill("tesla");
+  await expect(page.getByText("Tesla strategy")).toBeVisible();
+});
+
+test("login page honors spanish i18n preference", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("i18nextLng", "es-419");
+  });
+  await page.goto("/login", { waitUntil: "networkidle" });
+
+  await expect(page.getByText("Inicia sesion para continuar")).toBeVisible();
 });

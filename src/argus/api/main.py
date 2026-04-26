@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
 from dotenv import load_dotenv
@@ -194,6 +197,66 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
     return JSONResponse(body, status_code=exc.status_code)
 
 
+def _encode_cursor(payload: dict[str, Any]) -> str:
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii")
+
+
+def _invalid_cursor_problem(request: Request) -> HTTPException:
+    return problem(
+        request,
+        status_code=400,
+        code="validation_error",
+        title="Validation Error",
+        detail="Invalid cursor.",
+    )
+
+
+def _decode_cursor(cursor: str, request: Request) -> dict[str, Any]:
+    try:
+        decoded = base64.urlsafe_b64decode(cursor.encode("ascii"))
+        payload = json.loads(decoded.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
+        raise _invalid_cursor_problem(request) from None
+    if not isinstance(payload, dict):
+        raise _invalid_cursor_problem(request)
+    return payload
+
+
+def _search_type_rank(kind: str) -> int:
+    ranks = {
+        "chat": 4,
+        "strategy": 3,
+        "collection": 2,
+        "run": 1,
+    }
+    return ranks.get(kind, 0)
+
+
+def _score_search_item(
+    *,
+    query: str,
+    title: str,
+    matched_text: str,
+    pinned: bool,
+    symbol_exact_match: bool = False,
+) -> int:
+    score = 0
+    if pinned:
+        score += 1000
+    lower_title = title.lower()
+    lower_matched = matched_text.lower()
+    if query == lower_title:
+        score += 500
+    elif query in lower_title:
+        score += 100
+    if query in lower_matched:
+        score += 50
+    if symbol_exact_match:
+        score += 200
+    return score
+
+
 def current_user(request: Request) -> User:
     if (
         os.getenv("NEXT_PUBLIC_MOCK_AUTH", "").strip().lower() == "true"
@@ -369,14 +432,16 @@ def create_conversation(
 
 @app.get("/api/v1/conversations", response_model=PaginatedConversations)
 def list_conversations(
+    request: Request,
     limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
     archived: bool | None = Query(None),
     deleted: bool = Query(False),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedConversations:
     if supabase_gateway is not None:
         items = supabase_gateway.list_conversations(
-            user_id=user.id, limit=limit, archived=archived, deleted=deleted
+            user_id=user.id, limit=None, archived=archived, deleted=deleted
         )
     else:
         items = []
@@ -396,9 +461,39 @@ def list_conversations(
 
             items.append(conversation)
 
-        items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
-        items = items[:limit]
-    return PaginatedConversations(items=items)
+    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    filtered = items
+    if cursor:
+        cursor_data = _decode_cursor(cursor, request)
+        cursor_id = cursor_data.get("id")
+        cursor_updated_at = cursor_data.get("updated_at")
+        cursor_pinned = cursor_data.get("pinned")
+        if not isinstance(cursor_id, str) or not isinstance(cursor_updated_at, str):
+            raise _invalid_cursor_problem(request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_updated_at)
+        except ValueError:
+            raise _invalid_cursor_problem(request) from None
+        cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
+        filtered = [
+            item
+            for item in items
+            if (int(item.pinned), item.updated_at, item.id) < cursor_key
+        ]
+    page = filtered[: limit + 1]
+    has_more = len(page) > limit
+    page_items = page[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        last = page_items[-1]
+        next_cursor = _encode_cursor(
+            {
+                "id": last.id,
+                "pinned": bool(last.pinned),
+                "updated_at": last.updated_at.isoformat(),
+            }
+        )
+    return PaginatedConversations(items=page_items, next_cursor=next_cursor)
 
 
 @app.patch("/api/v1/conversations/{conversation_id}", response_model=ConversationResponse)
@@ -478,15 +573,17 @@ def delete_conversation(
 )
 def list_messages(
     conversation_id: str,
+    request: Request,
     limit: int = Query(50, ge=1, le=100),
+    cursor: str | None = Query(None),
     user: User = Depends(current_user),  # noqa: B008
 ):
+    items: list[Message] | None = None
     if supabase_gateway is not None:
         try:
             items = supabase_gateway.list_messages(
-                user_id=user.id, conversation_id=conversation_id, limit=limit
+                user_id=user.id, conversation_id=conversation_id, limit=None
             )
-            return PaginatedMessages(items=items)
         except Exception as exc:
             if not _dev_memory_fallback_enabled():
                 raise
@@ -496,10 +593,41 @@ def list_messages(
                 conversation_id=conversation_id,
             )
 
-    conversation = store.conversations.get(conversation_id)
-    if not conversation:
-        return PaginatedMessages(items=[])
-    return PaginatedMessages(items=store.messages.get(conversation_id, [])[:limit])
+    if items is None:
+        conversation = store.conversations.get(conversation_id)
+        if not conversation:
+            return PaginatedMessages(items=[])
+        items = store.messages.get(conversation_id, [])
+
+    items.sort(key=lambda item: (item.created_at, item.id))
+    filtered = items
+    if cursor:
+        cursor_data = _decode_cursor(cursor, request)
+        cursor_id = cursor_data.get("id")
+        cursor_created_at = cursor_data.get("created_at")
+        if not isinstance(cursor_id, str) or not isinstance(cursor_created_at, str):
+            raise _invalid_cursor_problem(request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_created_at)
+        except ValueError:
+            raise _invalid_cursor_problem(request) from None
+        cursor_key = (cursor_dt, cursor_id)
+        filtered = [
+            item for item in items if (item.created_at, item.id) > cursor_key
+        ]
+    page = filtered[: limit + 1]
+    has_more = len(page) > limit
+    page_items = page[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        last = page_items[-1]
+        next_cursor = _encode_cursor(
+            {
+                "id": last.id,
+                "created_at": last.created_at.isoformat(),
+            }
+        )
+    return PaginatedMessages(items=page_items, next_cursor=next_cursor)
 
 
 def _raise_backtest_problem(
@@ -839,13 +967,15 @@ def create_strategy(
 
 @app.get("/api/v1/strategies", response_model=PaginatedStrategies)
 def list_strategies(
+    request: Request,
     limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
     deleted: bool = Query(False),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedStrategies:
     if supabase_gateway is not None:
         items = supabase_gateway.list_strategies(
-            user_id=user.id, limit=limit, deleted=deleted
+            user_id=user.id, limit=None, deleted=deleted
         )
     else:
         items = []
@@ -858,9 +988,39 @@ def list_strategies(
                     continue
             items.append(item)
 
-        items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
-        items = items[:limit]
-    return PaginatedStrategies(items=items)
+    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    filtered = items
+    if cursor:
+        cursor_data = _decode_cursor(cursor, request)
+        cursor_id = cursor_data.get("id")
+        cursor_updated_at = cursor_data.get("updated_at")
+        cursor_pinned = cursor_data.get("pinned")
+        if not isinstance(cursor_id, str) or not isinstance(cursor_updated_at, str):
+            raise _invalid_cursor_problem(request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_updated_at)
+        except ValueError:
+            raise _invalid_cursor_problem(request) from None
+        cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
+        filtered = [
+            item
+            for item in items
+            if (int(item.pinned), item.updated_at, item.id) < cursor_key
+        ]
+    page = filtered[: limit + 1]
+    has_more = len(page) > limit
+    page_items = page[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        last = page_items[-1]
+        next_cursor = _encode_cursor(
+            {
+                "id": last.id,
+                "pinned": bool(last.pinned),
+                "updated_at": last.updated_at.isoformat(),
+            }
+        )
+    return PaginatedStrategies(items=page_items, next_cursor=next_cursor)
 
 
 @app.patch("/api/v1/strategies/{strategy_id}", response_model=StrategyResponse)
@@ -942,15 +1102,48 @@ def create_collection(
 
 @app.get("/api/v1/collections", response_model=PaginatedCollections)
 def list_collections(
+    request: Request,
     limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedCollections:
     if supabase_gateway is not None:
-        items = supabase_gateway.list_collections(user_id=user.id, limit=limit)
+        items = supabase_gateway.list_collections(user_id=user.id, limit=None)
     else:
         items = [item for item in store.collections.values() if item.deleted_at is None]
-        items.sort(key=lambda item: (item.pinned, item.updated_at), reverse=True)
-    return PaginatedCollections(items=items[:limit])
+    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    filtered = items
+    if cursor:
+        cursor_data = _decode_cursor(cursor, request)
+        cursor_id = cursor_data.get("id")
+        cursor_updated_at = cursor_data.get("updated_at")
+        cursor_pinned = cursor_data.get("pinned")
+        if not isinstance(cursor_id, str) or not isinstance(cursor_updated_at, str):
+            raise _invalid_cursor_problem(request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_updated_at)
+        except ValueError:
+            raise _invalid_cursor_problem(request) from None
+        cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
+        filtered = [
+            item
+            for item in items
+            if (int(item.pinned), item.updated_at, item.id) < cursor_key
+        ]
+    page = filtered[: limit + 1]
+    has_more = len(page) > limit
+    page_items = page[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        last = page_items[-1]
+        next_cursor = _encode_cursor(
+            {
+                "id": last.id,
+                "pinned": bool(last.pinned),
+                "updated_at": last.updated_at.isoformat(),
+            }
+        )
+    return PaginatedCollections(items=page_items, next_cursor=next_cursor)
 
 
 @app.patch("/api/v1/collections/{collection_id}", response_model=CollectionResponse)
@@ -1037,13 +1230,15 @@ def detach_strategy(collection_id: str, strategy_id: str) -> SuccessResponse:
 
 @app.get("/api/v1/history", response_model=PaginatedHistory)
 def history(
+    request: Request,
     limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
     deleted: bool = Query(False),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedHistory:
     if supabase_gateway is not None:
         raw = supabase_gateway.list_history_rows(
-            user_id=user.id, limit=limit, deleted=deleted
+            user_id=user.id, limit=None, deleted=deleted
         )
         items: list[HistoryItem] = []
         for run in raw["runs"]:
@@ -1151,80 +1346,294 @@ def history(
                     )
                 )
 
-    items.sort(key=lambda item: (item.pinned, item.created_at), reverse=True)
-    return PaginatedHistory(items=items[:limit])
+    items.sort(
+        key=lambda item: (
+            int(item.pinned),
+            item.created_at,
+            _search_type_rank(item.type),
+            item.id,
+        ),
+        reverse=True,
+    )
+    filtered = items
+    if cursor:
+        cursor_data = _decode_cursor(cursor, request)
+        cursor_id = cursor_data.get("id")
+        cursor_type = cursor_data.get("type")
+        cursor_created_at = cursor_data.get("created_at")
+        cursor_pinned = cursor_data.get("pinned")
+        if (
+            not isinstance(cursor_id, str)
+            or not isinstance(cursor_type, str)
+            or not isinstance(cursor_created_at, str)
+        ):
+            raise _invalid_cursor_problem(request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_created_at)
+        except ValueError:
+            raise _invalid_cursor_problem(request) from None
+        cursor_key = (
+            int(bool(cursor_pinned)),
+            cursor_dt,
+            _search_type_rank(cursor_type),
+            cursor_id,
+        )
+        filtered = [
+            item
+            for item in items
+            if (
+                int(item.pinned),
+                item.created_at,
+                _search_type_rank(item.type),
+                item.id,
+            )
+            < cursor_key
+        ]
+    page = filtered[: limit + 1]
+    has_more = len(page) > limit
+    page_items = page[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        last = page_items[-1]
+        next_cursor = _encode_cursor(
+            {
+                "id": last.id,
+                "type": last.type,
+                "pinned": bool(last.pinned),
+                "created_at": last.created_at.isoformat(),
+            }
+        )
+    return PaginatedHistory(items=page_items, next_cursor=next_cursor)
 
 
 @app.get("/api/v1/search", response_model=PaginatedSearch)
-def search(q: str, limit: int = Query(20, ge=1, le=100)) -> PaginatedSearch:
-    query = q.lower()
+def search(
+    q: str,
+    request: Request,
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    user: User = Depends(current_user),  # noqa: B008
+) -> PaginatedSearch:
+    query = q.strip().lower()
+    if not query:
+        return PaginatedSearch(items=[], next_cursor=None)
     scored_items: list[tuple[int, SearchItem]] = []
-
-    # Helper to calculate score
-    def get_score(title: str, matched: str, pinned: bool) -> int:
-        score = 0
-        if pinned:
-            score += 1000
-        if query == title.lower():
-            score += 500
-        elif query in title.lower():
-            score += 100
-        if query in matched.lower():
-            score += 50
-        return score
-
-    for conversation in store.conversations.values():
-        if conversation.deleted_at:
-            continue
-        haystack = f"{conversation.title} {conversation.last_message_preview or ''}"
-        if query in haystack.lower():
+    if supabase_gateway is not None:
+        raw = supabase_gateway.search_rows(user_id=user.id, query=query, limit=None)
+        conversations = raw.get("conversations", [])
+        strategies = raw.get("strategies", [])
+        collections = raw.get("collections", [])
+        runs = raw.get("runs", [])
+        for row in conversations:
             item = SearchItem(
                 type="chat",
-                id=conversation.id,
-                title=conversation.title,
-                matched_text=conversation.last_message_preview or conversation.title,
-                updated_at=conversation.updated_at,
+                id=row["id"],
+                title=row["title"],
+                matched_text=row.get("last_message_preview") or row["title"],
+                updated_at=row["updated_at"],
             )
-            score = get_score(conversation.title, item.matched_text, conversation.pinned)
+            score = _score_search_item(
+                query=query,
+                title=row["title"],
+                matched_text=item.matched_text,
+                pinned=bool(row.get("pinned", False)),
+            )
             scored_items.append((score, item))
-
-    for strategy in store.strategies.values():
-        if strategy.deleted_at:
-            continue
-        haystack = f"{strategy.name} {' '.join(strategy.symbols)} {strategy.template}"
-        if query in haystack.lower():
+        for row in strategies:
+            symbols = row.get("symbols") or []
+            matched_text = ", ".join(symbols) or row["name"]
+            symbol_exact_match = any(query == str(symbol).lower() for symbol in symbols)
             item = SearchItem(
                 type="strategy",
-                id=strategy.id,
-                title=strategy.name,
-                matched_text=", ".join(strategy.symbols),
-                updated_at=strategy.updated_at,
+                id=row["id"],
+                title=row["name"],
+                matched_text=matched_text,
+                updated_at=row["updated_at"],
             )
-            # Symbol exact match boost
-            symbol_boost = 200 if any(query == s.lower() for s in strategy.symbols) else 0
-            score = (
-                get_score(strategy.name, item.matched_text, strategy.pinned)
-                + symbol_boost
+            score = _score_search_item(
+                query=query,
+                title=row["name"],
+                matched_text=matched_text,
+                pinned=bool(row.get("pinned", False)),
+                symbol_exact_match=symbol_exact_match,
             )
             scored_items.append((score, item))
-
-    for collection in store.collections.values():
-        if collection.deleted_at:
-            continue
-        if query in collection.name.lower():
+        for row in collections:
             item = SearchItem(
                 type="collection",
-                id=collection.id,
-                title=collection.name,
-                matched_text=collection.name,
-                updated_at=collection.updated_at,
+                id=row["id"],
+                title=row["name"],
+                matched_text=row["name"],
+                updated_at=row["updated_at"],
             )
-            score = get_score(collection.name, item.matched_text, collection.pinned)
+            score = _score_search_item(
+                query=query,
+                title=row["name"],
+                matched_text=row["name"],
+                pinned=bool(row.get("pinned", False)),
+            )
             scored_items.append((score, item))
+        for row in runs:
+            card = row.get("conversation_result_card") or {}
+            title = card.get("title") or "Backtest run"
+            item = SearchItem(
+                type="run",
+                id=row["id"],
+                title=title,
+                matched_text=title,
+                updated_at=row["created_at"],
+            )
+            score = _score_search_item(
+                query=query,
+                title=title,
+                matched_text=title,
+                pinned=False,
+            )
+            scored_items.append((score, item))
+    else:
+        for conversation in store.conversations.values():
+            if conversation.deleted_at:
+                continue
+            haystack = f"{conversation.title} {conversation.last_message_preview or ''}"
+            if query in haystack.lower():
+                item = SearchItem(
+                    type="chat",
+                    id=conversation.id,
+                    title=conversation.title,
+                    matched_text=conversation.last_message_preview or conversation.title,
+                    updated_at=conversation.updated_at,
+                )
+                score = _score_search_item(
+                    query=query,
+                    title=conversation.title,
+                    matched_text=item.matched_text,
+                    pinned=conversation.pinned,
+                )
+                scored_items.append((score, item))
+        for strategy in store.strategies.values():
+            if strategy.deleted_at:
+                continue
+            haystack = f"{strategy.name} {' '.join(strategy.symbols)} {strategy.template}"
+            if query in haystack.lower():
+                matched_text = ", ".join(strategy.symbols) or strategy.name
+                item = SearchItem(
+                    type="strategy",
+                    id=strategy.id,
+                    title=strategy.name,
+                    matched_text=matched_text,
+                    updated_at=strategy.updated_at,
+                )
+                score = _score_search_item(
+                    query=query,
+                    title=strategy.name,
+                    matched_text=matched_text,
+                    pinned=strategy.pinned,
+                    symbol_exact_match=any(
+                        query == symbol.lower() for symbol in strategy.symbols
+                    ),
+                )
+                scored_items.append((score, item))
+        for collection in store.collections.values():
+            if collection.deleted_at:
+                continue
+            if query in collection.name.lower():
+                item = SearchItem(
+                    type="collection",
+                    id=collection.id,
+                    title=collection.name,
+                    matched_text=collection.name,
+                    updated_at=collection.updated_at,
+                )
+                score = _score_search_item(
+                    query=query,
+                    title=collection.name,
+                    matched_text=collection.name,
+                    pinned=collection.pinned,
+                )
+                scored_items.append((score, item))
+        for run in store.backtest_runs.values():
+            title = run.conversation_result_card.get("title", "Backtest run")
+            haystack = f"{title} {' '.join(run.symbols)} {run.config_snapshot.get('template', '')}"
+            if query in haystack.lower():
+                item = SearchItem(
+                    type="run",
+                    id=run.id,
+                    title=title,
+                    matched_text=title,
+                    updated_at=run.created_at,
+                )
+                score = _score_search_item(
+                    query=query,
+                    title=title,
+                    matched_text=title,
+                    pinned=False,
+                    symbol_exact_match=any(query == symbol.lower() for symbol in run.symbols),
+                )
+                scored_items.append((score, item))
 
-    # Sort by score (desc), then updated_at (desc)
-    scored_items.sort(key=lambda x: (x[0], x[1].updated_at), reverse=True)
-    return PaginatedSearch(items=[item for _, item in scored_items[:limit]])
+    scored_items.sort(
+        key=lambda pair: (
+            pair[0],
+            pair[1].updated_at,
+            _search_type_rank(pair[1].type),
+            pair[1].id,
+        ),
+        reverse=True,
+    )
+    filtered = scored_items
+    if cursor:
+        cursor_data = _decode_cursor(cursor, request)
+        cursor_id = cursor_data.get("id")
+        cursor_type = cursor_data.get("type")
+        cursor_updated_at = cursor_data.get("updated_at")
+        cursor_score = cursor_data.get("score")
+        if (
+            not isinstance(cursor_id, str)
+            or not isinstance(cursor_type, str)
+            or not isinstance(cursor_updated_at, str)
+            or not isinstance(cursor_score, int)
+        ):
+            raise _invalid_cursor_problem(request)
+        try:
+            cursor_dt = datetime.fromisoformat(cursor_updated_at)
+        except ValueError:
+            raise _invalid_cursor_problem(request) from None
+        cursor_key = (
+            cursor_score,
+            cursor_dt,
+            _search_type_rank(cursor_type),
+            cursor_id,
+        )
+        filtered = [
+            pair
+            for pair in scored_items
+            if (
+                pair[0],
+                pair[1].updated_at,
+                _search_type_rank(pair[1].type),
+                pair[1].id,
+            )
+            < cursor_key
+        ]
+
+    page = filtered[: limit + 1]
+    has_more = len(page) > limit
+    page_items = page[:limit]
+    next_cursor = None
+    if has_more and page_items:
+        last_score, last_item = page_items[-1]
+        next_cursor = _encode_cursor(
+            {
+                "id": last_item.id,
+                "type": last_item.type,
+                "updated_at": last_item.updated_at.isoformat(),
+                "score": last_score,
+            }
+        )
+    return PaginatedSearch(
+        items=[item for _, item in page_items],
+        next_cursor=next_cursor,
+    )
 
 
 def sse(event: str, payload: dict[str, Any]) -> str:

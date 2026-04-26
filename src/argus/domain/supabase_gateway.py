@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -68,6 +69,23 @@ class SupabaseGateway:
 
     def new_id(self) -> str:
         return str(uuid4())
+
+    def _fetch_all_rows(
+        self,
+        query_factory: Callable[[int, int], Any],
+        *,
+        batch_size: int = 500,
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        start = 0
+        while True:
+            response = query_factory(start, start + batch_size - 1).execute()
+            data = response.data or []
+            rows.extend(data)
+            if len(data) < batch_size:
+                break
+            start += batch_size
+        return rows
 
     def reset_dev_data(self) -> None:
         user = self.get_or_create_mock_user()
@@ -191,7 +209,7 @@ class SupabaseGateway:
         self,
         *,
         user_id: str,
-        limit: int,
+        limit: int | None,
         archived: bool | None = None,
         deleted: bool = False,
     ) -> list[Conversation]:
@@ -204,13 +222,12 @@ class SupabaseGateway:
         if archived is not None:
             query = query.eq("archived", archived)
 
-        rows = (
-            query.order("pinned", desc=True)
-            .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return [Conversation.model_validate(row) for row in (rows.data or [])]
+        ordered = query.order("pinned", desc=True).order("updated_at", desc=True)
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
+        else:
+            rows_data = ordered.limit(limit).execute().data or []
+        return [Conversation.model_validate(row) for row in rows_data]
 
     def get_conversation(
         self, *, user_id: str, conversation_id: str
@@ -246,18 +263,20 @@ class SupabaseGateway:
         return bool(result.data)
 
     def list_messages(
-        self, *, user_id: str, conversation_id: str, limit: int
+        self, *, user_id: str, conversation_id: str, limit: int | None
     ) -> list[Message]:
-        rows = (
+        query = (
             self.client.table("messages")
             .select("id,conversation_id,role,content,created_at")
             .eq("user_id", user_id)
             .eq("conversation_id", conversation_id)
             .order("created_at", desc=False)
-            .limit(limit)
-            .execute()
         )
-        return [Message.model_validate(row) for row in (rows.data or [])]
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
+        else:
+            rows_data = query.limit(limit).execute().data or []
+        return [Message.model_validate(row) for row in rows_data]
 
     def create_message(
         self, *, user_id: str, conversation_id: str, role: str, content: str
@@ -324,7 +343,7 @@ class SupabaseGateway:
         ).eq("id", conversation_id).eq("user_id", user_id).execute()
 
     def list_history_rows(
-        self, *, user_id: str, limit: int, deleted: bool = False
+        self, *, user_id: str, limit: int | None, deleted: bool = False
     ) -> dict[str, list[dict[str, Any]]]:
         query_runs = (
             self.client.table("backtest_runs")
@@ -358,18 +377,25 @@ class SupabaseGateway:
             query_strategies = query_strategies.is_("deleted_at", "null")
             query_collections = query_collections.is_("deleted_at", "null")
 
-        runs = query_runs.order("created_at", desc=True).limit(limit).execute().data or []
-        chats = (
-            query_chats.order("updated_at", desc=True).limit(limit).execute().data or []
-        )
-        strategies = (
-            query_strategies.order("updated_at", desc=True).limit(limit).execute().data
-            or []
-        )
-        collections = (
-            query_collections.order("updated_at", desc=True).limit(limit).execute().data
-            or []
-        )
+        ordered_runs = query_runs.order("created_at", desc=True)
+        ordered_chats = query_chats.order("updated_at", desc=True)
+        ordered_strategies = query_strategies.order("updated_at", desc=True)
+        ordered_collections = query_collections.order("updated_at", desc=True)
+
+        if limit is None:
+            runs = self._fetch_all_rows(lambda start, end: ordered_runs.range(start, end))
+            chats = self._fetch_all_rows(lambda start, end: ordered_chats.range(start, end))
+            strategies = self._fetch_all_rows(
+                lambda start, end: ordered_strategies.range(start, end)
+            )
+            collections = self._fetch_all_rows(
+                lambda start, end: ordered_collections.range(start, end)
+            )
+        else:
+            runs = ordered_runs.limit(limit).execute().data or []
+            chats = ordered_chats.limit(limit).execute().data or []
+            strategies = ordered_strategies.limit(limit).execute().data or []
+            collections = ordered_collections.limit(limit).execute().data or []
 
         return {
             "runs": runs,
@@ -379,48 +405,87 @@ class SupabaseGateway:
         }
 
     def search_rows(
-        self, *, user_id: str, query: str, limit: int
+        self, *, user_id: str, query: str, limit: int | None
     ) -> dict[str, list[dict[str, Any]]]:
-        conversations = (
+        normalized_query = query.strip().lower()
+        conversations_query = (
             self.client.table("conversations")
-            .select("id,title,last_message_preview,updated_at,deleted_at")
+            .select("id,title,last_message_preview,updated_at,deleted_at,pinned")
             .eq("user_id", user_id)
             .is_("deleted_at", "null")
-            .ilike("title", f"%{query}%")
             .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-            .data
-            or []
         )
-        strategies = (
+        strategies_query = (
             self.client.table("strategies")
-            .select("id,name,symbols,updated_at,deleted_at")
+            .select("id,name,symbols,template,updated_at,deleted_at,pinned")
             .eq("user_id", user_id)
             .is_("deleted_at", "null")
-            .ilike("name", f"%{query}%")
             .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-            .data
-            or []
         )
-        collections = (
+        collections_query = (
             self.client.table("collections")
-            .select("id,name,updated_at,deleted_at")
+            .select("id,name,updated_at,deleted_at,pinned")
             .eq("user_id", user_id)
             .is_("deleted_at", "null")
-            .ilike("name", f"%{query}%")
             .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-            .data
-            or []
         )
+        runs_query = (
+            self.client.table("backtest_runs")
+            .select("id,conversation_result_card,created_at,status")
+            .eq("user_id", user_id)
+            .eq("status", "completed")
+            .order("created_at", desc=True)
+        )
+
+        if limit is None:
+            conversations_raw = self._fetch_all_rows(
+                lambda start, end: conversations_query.range(start, end)
+            )
+            strategies_raw = self._fetch_all_rows(
+                lambda start, end: strategies_query.range(start, end)
+            )
+            collections_raw = self._fetch_all_rows(
+                lambda start, end: collections_query.range(start, end)
+            )
+            runs_raw = self._fetch_all_rows(lambda start, end: runs_query.range(start, end))
+        else:
+            conversations_raw = conversations_query.limit(limit).execute().data or []
+            strategies_raw = strategies_query.limit(limit).execute().data or []
+            collections_raw = collections_query.limit(limit).execute().data or []
+            runs_raw = runs_query.limit(limit).execute().data or []
+
+        conversations = [
+            row
+            for row in conversations_raw
+            if normalized_query
+            in (
+                f"{row.get('title', '')} {row.get('last_message_preview') or ''}"
+            ).lower()
+        ]
+        strategies = [
+            row
+            for row in strategies_raw
+            if normalized_query
+            in (
+                f"{row.get('name', '')} {' '.join(row.get('symbols') or [])} {row.get('template') or ''}"
+            ).lower()
+        ]
+        collections = [
+            row
+            for row in collections_raw
+            if normalized_query in str(row.get("name", "")).lower()
+        ]
+        runs = [
+            row
+            for row in runs_raw
+            if normalized_query
+            in str((row.get("conversation_result_card") or {}).get("title", "")).lower()
+        ]
         return {
             "conversations": conversations,
             "strategies": strategies,
             "collections": collections,
+            "runs": runs,
         }
 
     def create_strategy(self, *, user_id: str, payload: dict[str, Any]) -> Strategy:
@@ -432,7 +497,7 @@ class SupabaseGateway:
         return Strategy.model_validate(_row_one(created))
 
     def list_strategies(
-        self, *, user_id: str, limit: int, deleted: bool = False
+        self, *, user_id: str, limit: int | None, deleted: bool = False
     ) -> list[Strategy]:
         query = self.client.table("strategies").select("*").eq("user_id", user_id)
         if deleted:
@@ -440,13 +505,12 @@ class SupabaseGateway:
         else:
             query = query.is_("deleted_at", "null")
 
-        rows = (
-            query.order("pinned", desc=True)
-            .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return [Strategy.model_validate(row) for row in (rows.data or [])]
+        ordered = query.order("pinned", desc=True).order("updated_at", desc=True)
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
+        else:
+            rows_data = ordered.limit(limit).execute().data or []
+        return [Strategy.model_validate(row) for row in rows_data]
 
     def get_strategy(self, *, user_id: str, strategy_id: str) -> Strategy | None:
         rows = (
@@ -491,19 +555,21 @@ class SupabaseGateway:
         row["strategy_count"] = 0
         return Collection.model_validate(row)
 
-    def list_collections(self, *, user_id: str, limit: int) -> list[Collection]:
-        rows = (
+    def list_collections(self, *, user_id: str, limit: int | None) -> list[Collection]:
+        query = (
             self.client.table("collections")
             .select("*")
             .eq("user_id", user_id)
             .is_("deleted_at", "null")
             .order("pinned", desc=True)
             .order("updated_at", desc=True)
-            .limit(limit)
-            .execute()
         )
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
+        else:
+            rows_data = query.limit(limit).execute().data or []
         items: list[Collection] = []
-        for row in rows.data or []:
+        for row in rows_data:
             count = (
                 self.client.table("collection_strategies")
                 .select("id", count="exact")

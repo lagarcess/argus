@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Argus - Pattern Analysis & Backtesting Engine"
 authors = ["Admin <admin@example.com>"]
 # src/ archived to archive-v0.1/ during demo pivot; Poetry used for dep management only
-package-mode = false
+package-mode = true
+packages = [{include = "argus", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"

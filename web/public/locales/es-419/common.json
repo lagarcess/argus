@@ -253,6 +253,19 @@
       }
     }
   },
+  "auth": {
+    "login": {
+      "brand": "argus",
+      "subtitle": "Inicia sesion para continuar",
+      "email_placeholder": "Correo electronico",
+      "password_placeholder": "Contrasena",
+      "submit": "Iniciar sesion",
+      "loading": "Iniciando sesion...",
+      "errors": {
+        "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
+      }
+    }
+  },
   "landing": {
     "sign_up_email": "Registrarse con Email",
     "already_account": "¿ya tienes una cuenta?",

@@ -66,7 +66,7 @@ poetry sync
 # 7. VALIDATE PYTHON PACKAGE IMPORTS
 # ============================================================================
 echo "🔵 [Setup] Validating argus package imports..."
-poetry run python -c "import argus; print('🟢 [Setup] argus package is importable')"
+poetry run python -c "import argus; print('[Setup] argus package is importable')"
 
 # ============================================================================
 # 8. INSTALL FRONTEND DEPENDENCIES

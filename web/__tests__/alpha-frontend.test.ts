@@ -69,4 +69,22 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("__ONBOARDING_GOAL__:");
     expect(chat).toContain("__ONBOARDING_SKIP__");
   });
+
+  test("chat sidebar uses global search api and cursor pagination hooks", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(chat).toContain("searchGlobal({ q: query, limit: 20 })");
+    expect(chat).toContain("loadMoreSearch");
+    expect(api).toContain("cursor?: string");
+    expect(api).toContain("export async function searchGlobal");
+  });
+
+  test("login surface text is localized through auth.login keys", () => {
+    const login = readFileSync(join(root, "app/login/page.tsx"), "utf-8");
+    expect(login).toContain("auth.login.subtitle");
+    expect(login).toContain("auth.login.email_placeholder");
+    expect(login).toContain("auth.login.password_placeholder");
+    expect(login).toContain("t(\"auth.login.submit\"");
+  });
 });

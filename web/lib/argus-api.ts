@@ -143,6 +143,14 @@ export type HistoryItem = {
   created_at: string;
 };
 
+export type SearchItem = {
+  type: "chat" | "strategy" | "collection" | "run";
+  id: string;
+  title: string;
+  matched_text: string;
+  updated_at: string;
+};
+
 // ─── Chat stream event types ──────────────────────────────────────────────────
 
 export type ChatStreamEvent =
@@ -297,9 +305,10 @@ export async function createConversation(language?: string | null) {
 
 // ─── Conversations ────────────────────────────────────────────────────────────
 
-export async function listConversations(params: { limit?: number; archived?: boolean; deleted?: boolean } = {}) {
-  const { limit = 20, archived, deleted } = params;
+export async function listConversations(params: { limit?: number; cursor?: string; archived?: boolean; deleted?: boolean } = {}) {
+  const { limit = 20, cursor, archived, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (cursor) searchParams.append("cursor", cursor);
   if (archived !== undefined) searchParams.append("archived", String(archived));
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
 
@@ -311,9 +320,12 @@ export async function listConversations(params: { limit?: number; archived?: boo
 export async function getConversationMessages(
   conversationId: string,
   limit = 50,
+  cursor?: string,
 ) {
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (cursor) searchParams.append("cursor", cursor);
   return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
-    `/conversations/${conversationId}/messages?limit=${limit}`,
+    `/conversations/${conversationId}/messages?${searchParams.toString()}`,
   );
 }
 
@@ -335,9 +347,10 @@ export async function deleteConversation(conversationId: string) {
 
 // ─── History ──────────────────────────────────────────────────────────────────
 
-export async function listHistory(params: { limit?: number; deleted?: boolean } = {}) {
-  const { limit = 20, deleted } = params;
+export async function listHistory(params: { limit?: number; cursor?: string; deleted?: boolean } = {}) {
+  const { limit = 20, cursor, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (cursor) searchParams.append("cursor", cursor);
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
 
   return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(
@@ -347,9 +360,10 @@ export async function listHistory(params: { limit?: number; deleted?: boolean } 
 
 // ─── Strategies ───────────────────────────────────────────────────────────────
 
-export async function listStrategies(params: { limit?: number; deleted?: boolean } = {}) {
-  const { limit = 50, deleted } = params;
+export async function listStrategies(params: { limit?: number; cursor?: string; deleted?: boolean } = {}) {
+  const { limit = 50, cursor, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (cursor) searchParams.append("cursor", cursor);
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
 
   return apiFetch<{ items: Strategy[]; next_cursor: string | null }>(
@@ -390,9 +404,27 @@ export async function deleteStrategy(strategyId: string) {
 
 // ─── Collections ──────────────────────────────────────────────────────────────
 
-export async function listCollections(limit = 50) {
+export async function listCollections(
+  params: number | { limit?: number; cursor?: string } = 50,
+) {
+  const limit = typeof params === "number" ? params : (params.limit ?? 50);
+  const cursor = typeof params === "number" ? undefined : params.cursor;
+  const searchParams = new URLSearchParams({ limit: String(limit) });
+  if (cursor) searchParams.append("cursor", cursor);
   return apiFetch<{ items: Collection[]; next_cursor: string | null }>(
-    `/collections?limit=${limit}`,
+    `/collections?${searchParams.toString()}`,
+  );
+}
+
+export async function searchGlobal(params: { q: string; limit?: number; cursor?: string }) {
+  const { q, limit = 20, cursor } = params;
+  const searchParams = new URLSearchParams({
+    q,
+    limit: String(limit),
+  });
+  if (cursor) searchParams.append("cursor", cursor);
+  return apiFetch<{ items: SearchItem[]; next_cursor: string | null }>(
+    `/search?${searchParams.toString()}`,
   );
 }
 

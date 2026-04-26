@@ -256,6 +256,19 @@
       }
     }
   },
+  "auth": {
+    "login": {
+      "brand": "argus",
+      "subtitle": "Sign in to continue",
+      "email_placeholder": "Email address",
+      "password_placeholder": "Password",
+      "submit": "Sign In",
+      "loading": "Signing in...",
+      "errors": {
+        "supabase_not_configured": "Supabase auth is not configured."
+      }
+    }
+  },
   "landing": {
     "sign_up_email": "Sign up with Email",
     "already_account": "already have an account?",

@@ -562,3 +562,115 @@ def test_first_successful_backtest_transitions_onboarding_to_completed() -> None
     assert onboarding["stage"] == "completed"
     assert onboarding["completed"] is True
     assert onboarding["primary_goal"] == "test_stock_idea"
+
+
+def test_conversations_cursor_pagination_is_stable() -> None:
+    client = _client()
+    for idx in range(3):
+        created = client.post(
+            "/api/v1/conversations",
+            json={"title": f"Idea {idx + 1}"},
+        )
+        assert created.status_code == 200
+
+    first_page = client.get("/api/v1/conversations?limit=2")
+    assert first_page.status_code == 200
+    payload = first_page.json()
+    assert len(payload["items"]) == 2
+    assert payload["next_cursor"] is not None
+
+    second_page = client.get(
+        f"/api/v1/conversations?limit=2&cursor={payload['next_cursor']}"
+    )
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    assert second_payload["items"]
+    first_ids = {item["id"] for item in payload["items"]}
+    second_ids = {item["id"] for item in second_payload["items"]}
+    assert first_ids.isdisjoint(second_ids)
+
+
+def test_messages_cursor_pagination_is_stable() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    for idx in range(3):
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "conversation_id": conversation["id"],
+                "message": f"Test message {idx}",
+                "language": "en",
+            },
+        )
+        assert response.status_code == 200
+
+    first_page = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages?limit=2"
+    )
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert len(first_payload["items"]) == 2
+    assert first_payload["next_cursor"] is not None
+
+    second_page = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages?limit=2&cursor={first_payload['next_cursor']}"
+    )
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    assert second_payload["items"]
+    first_ids = {item["id"] for item in first_payload["items"]}
+    second_ids = {item["id"] for item in second_payload["items"]}
+    assert first_ids.isdisjoint(second_ids)
+
+
+def test_search_supports_cursor_and_mixed_types() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post(
+        "/api/v1/conversations", json={"title": "Tesla alpha chat"}
+    ).json()["conversation"]
+    client.post(
+        "/api/v1/strategies",
+        json={
+            "name": "Tesla strategy",
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["TSLA"],
+            "parameters": {},
+        },
+    )
+    client.post("/api/v1/collections", json={"name": "Tesla collection"})
+    run = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "conversation_id": conversation["id"],
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["TSLA"],
+        },
+    )
+    assert run.status_code == 200
+
+    first_page = client.get("/api/v1/search?q=tesla&limit=2")
+    assert first_page.status_code == 200
+    payload = first_page.json()
+    assert payload["items"]
+    assert payload["next_cursor"] is not None
+    result_types = {item["type"] for item in payload["items"]}
+    assert result_types.issubset({"chat", "strategy", "collection", "run"})
+
+    second_page = client.get(f"/api/v1/search?q=tesla&limit=2&cursor={payload['next_cursor']}")
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    first_ids = {(item["type"], item["id"]) for item in payload["items"]}
+    second_ids = {(item["type"], item["id"]) for item in second_payload["items"]}
+    assert first_ids.isdisjoint(second_ids)
+
+
+def test_invalid_cursor_returns_problem_details() -> None:
+    client = _client()
+    response = client.get("/api/v1/search?q=tesla&limit=5&cursor=not-a-valid-cursor")
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["code"] == "validation_error"

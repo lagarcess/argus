@@ -30,6 +30,7 @@ import {
   getMe,
   getConversationMessages,
   listHistory,
+  searchGlobal,
   patchCollection,
   patchConversation,
   patchMe,
@@ -39,6 +40,7 @@ import {
   type HistoryItem,
   type BacktestRun,
   type PrimaryGoal,
+  type SearchItem,
 } from "@/lib/argus-api";
 import CollectionPicker from "./CollectionPicker";
 import CollectionsView from "../views/CollectionsView";
@@ -129,6 +131,12 @@ export default function ChatInterface() {
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
+  const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
+  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
   const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
@@ -161,30 +169,48 @@ export default function ChatInterface() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
+    const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
+    const merged = [...existing];
+    for (const item of incoming) {
+      const key = `${item.type}:${item.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(item);
+      }
+    }
+    return merged;
+  };
+
+  const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
+    const { items, next_cursor } = await listHistory({
+      limit: 30,
+      cursor: nextCursor ?? undefined,
+    });
+    const filtered = items.filter(
+      (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
+    );
+    setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
+    setHistoryNextCursor(next_cursor);
+  };
+
   // ── History ────────────────────────────────────────────────────────────────
 
   /** Imperative refresh — safe to call from event handlers */
   const refreshHistory = () => {
-    listHistory({ limit: 30 })
-      .then(({ items }) => {
-        const filtered = items.filter(
-          (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
-        );
-        setHistoryItems(filtered);
-      })
-      .catch(() => undefined);
+    loadHistoryPage(null, false).catch(() => undefined);
+  };
+
+  const loadMoreHistory = () => {
+    if (!historyNextCursor || isLoadingMoreHistory) return;
+    setIsLoadingMoreHistory(true);
+    loadHistoryPage(historyNextCursor, true)
+      .catch(() => undefined)
+      .finally(() => setIsLoadingMoreHistory(false));
   };
 
   useEffect(() => {
-    const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-    listHistory({ limit: 30 })
-      .then(({ items }) => {
-        const filtered = items.filter(
-          (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
-        );
-        setHistoryItems(filtered);
-      })
-      .catch(() => undefined);
+    loadHistoryPage(null, false).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -193,12 +219,81 @@ export default function ChatInterface() {
     }
   }, [isSidebarOpen]);
 
+  useEffect(() => {
+    const query = searchText.trim();
+    if (currentView !== "chat" || query.length === 0) {
+      setSearchResults([]);
+      setSearchNextCursor(null);
+      setIsSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setIsSearching(true);
+      searchGlobal({ q: query, limit: 20 })
+        .then(({ items, next_cursor }) => {
+          if (cancelled) return;
+          setSearchResults(items);
+          setSearchNextCursor(next_cursor);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSearchResults([]);
+          setSearchNextCursor(null);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setIsSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchText, currentView]);
+
+  const loadMoreSearch = async () => {
+    const query = searchText.trim();
+    if (!searchNextCursor || !query || isLoadingMoreSearch) return;
+    setIsLoadingMoreSearch(true);
+    try {
+      const { items, next_cursor } = await searchGlobal({
+        q: query,
+        limit: 20,
+        cursor: searchNextCursor,
+      });
+      setSearchResults((prev) => {
+        const seen = new Set(prev.map((item) => `${item.type}:${item.id}`));
+        const merged = [...prev];
+        for (const item of items) {
+          const key = `${item.type}:${item.id}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      setSearchNextCursor(next_cursor);
+    } finally {
+      setIsLoadingMoreSearch(false);
+    }
+  };
+
   // ── Init conversation ──────────────────────────────────────────────────────
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([createConversation(i18n.language), getMe().catch(() => null)])
-      .then(([{ conversation }, meResponse]) => {
+    (async () => {
+      try {
+        const meResponse = await getMe().catch(() => null);
+        const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
+        if (resolvedLanguage && resolvedLanguage !== i18n.language) {
+          await i18n.changeLanguage(resolvedLanguage);
+        }
+        const { conversation } = await createConversation(resolvedLanguage);
         if (cancelled) return;
         setConversationId(conversation.id);
         setMessages([]);
@@ -206,8 +301,7 @@ export default function ChatInterface() {
         setShowOnboardingGoalCards(
           stage === "language_selection" || stage === "primary_goal_selection",
         );
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return;
         setMessages([
           {
@@ -217,7 +311,8 @@ export default function ChatInterface() {
             content: t('chat.error_offline'),
           },
         ]);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -229,7 +324,7 @@ export default function ChatInterface() {
 
   // ── Load existing conversation ─────────────────────────────────────────────
 
-  const loadConversation = async (convId: string, convTitle: string) => {
+  const loadConversation = async (convId: string) => {
     setIsSidebarOpen(false);
     closeChatOptions();
     setCurrentView("chat");
@@ -692,7 +787,72 @@ export default function ChatInterface() {
 
             {isRecentsExpanded && (
               <div className="space-y-0.5 pb-2">
-                {historyItems.length === 0 ? (
+                {currentView === "chat" && searchText.trim().length > 0 ? (
+                  <>
+                    {isSearching ? (
+                      <div className="px-11 py-4 text-[13px] text-black/45 dark:text-white/45">
+                        {t("common.loading")}
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="px-11 py-6">
+                        <p className={`text-[13px] leading-relaxed text-black/30 transition-all duration-300 dark:text-white/30 ${
+                          isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                        }`}>
+                          {t("common.no_items")}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {searchResults.map((item) => (
+                          <button
+                            key={`${item.type}:${item.id}`}
+                            onClick={() => {
+                              if (item.type === "chat") {
+                                void loadConversation(item.id);
+                                return;
+                              }
+                              if (item.type === "strategy") {
+                                setCurrentView("strategies");
+                                setIsSidebarOpen(false);
+                                return;
+                              }
+                              if (item.type === "collection") {
+                                setCurrentView("collections");
+                                setIsSidebarOpen(false);
+                                return;
+                              }
+                              setCurrentView("chat");
+                              setIsSidebarOpen(false);
+                            }}
+                            className="group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
+                          >
+                            <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
+                            <div className={`min-w-0 flex-1 pl-3 pr-4 transition-all duration-300 ${
+                              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                            }`}>
+                              <span className="font-display block truncate text-[15px] font-medium tracking-tight">
+                                {item.title}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
+                                {item.matched_text}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                        {searchNextCursor && (
+                          <button
+                            type="button"
+                            onClick={() => void loadMoreSearch()}
+                            disabled={isLoadingMoreSearch}
+                            className="mx-11 mt-2 rounded-[12px] border border-black/10 px-3 py-1.5 text-[12px] font-medium text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
+                          >
+                            {isLoadingMoreSearch ? t("common.loading") : t("common.retry")}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : historyItems.length === 0 ? (
                   <div className="px-11 py-6">
                     <p className={`text-[13px] leading-relaxed text-black/30 transition-all duration-300 dark:text-white/30 ${
                       isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
@@ -703,22 +863,29 @@ export default function ChatInterface() {
                 ) : (
                   historyItems.map((item) => (
                     <button
-                      key={item.id}
+                      key={`${item.type}:${item.id}`}
                       onClick={() => {
-                        setConversationId(item.id);
-                        getConversationMessages(item.id).then(({ items }) => {
-                          setMessages(
-                            items.reverse().map((m) => ({
-                              id: m.id,
-                              role: m.role === "user" ? "user" : "ai",
-                              content: m.content,
-                              kind: m.content.includes("result") ? "strategy_result" : "text",
-                            }))
-                          );
-                        });
+                        if (item.type === "chat") {
+                          void loadConversation(item.id);
+                          return;
+                        }
+                        if (item.type === "strategy") {
+                          setCurrentView("strategies");
+                          setIsSidebarOpen(false);
+                          return;
+                        }
+                        if (item.type === "collection") {
+                          setCurrentView("collections");
+                          setIsSidebarOpen(false);
+                          return;
+                        }
+                        setCurrentView("chat");
+                        setIsSidebarOpen(false);
                       }}
                       className={`group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 ${
-                        conversationId === item.id ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
+                        item.type === "chat" && conversationId === item.id
+                          ? "bg-black/5 dark:bg-white/5"
+                          : "hover:bg-black/5 dark:hover:bg-white/5"
                       }`}
                     >
                       <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
@@ -738,6 +905,16 @@ export default function ChatInterface() {
                       </div>
                     </button>
                   ))
+                )}
+                {historyNextCursor && currentView === "chat" && searchText.trim().length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => loadMoreHistory()}
+                    disabled={isLoadingMoreHistory}
+                    className="mx-11 mt-2 rounded-[12px] border border-black/10 px-3 py-1.5 text-[12px] font-medium text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
+                  >
+                    {isLoadingMoreHistory ? t("common.loading") : t("common.retry")}
+                  </button>
                 )}
               </div>
             )}

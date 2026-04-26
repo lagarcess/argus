@@ -435,3 +435,117 @@ def test_profile_creation_on_first_login(mock_gateway):
     response = client.get("/api/v1/me", headers={"Authorization": "Bearer valid-token"})
     assert response.status_code == 200
     mock_gateway.get_or_create_profile_for_auth_user.assert_called_once()
+
+
+def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
+    now = utcnow()
+    mock_gateway.search_rows.return_value = {
+        "conversations": [
+            {
+                "id": "chat-1",
+                "title": "Tesla chat",
+                "last_message_preview": "Discussing TSLA",
+                "updated_at": now.isoformat(),
+                "pinned": True,
+            }
+        ],
+        "strategies": [
+            {
+                "id": "strat-1",
+                "name": "Tesla strategy",
+                "symbols": ["TSLA"],
+                "template": "rsi_mean_reversion",
+                "updated_at": now.isoformat(),
+                "pinned": False,
+            }
+        ],
+        "collections": [
+            {
+                "id": "col-1",
+                "name": "Tesla collection",
+                "updated_at": now.isoformat(),
+                "pinned": False,
+            }
+        ],
+        "runs": [
+            {
+                "id": "run-1",
+                "conversation_result_card": {"title": "TSLA backtest"},
+                "created_at": now.isoformat(),
+            }
+        ],
+    }
+
+    response = client.get(
+        "/api/v1/search?q=tesla&limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["items"]) == 2
+    assert payload["next_cursor"] is not None
+    assert {item["type"] for item in payload["items"]}.issubset(
+        {"chat", "strategy", "collection", "run"}
+    )
+
+
+def test_conversations_cursor_supabase_pages_without_duplicates(mock_gateway):
+    now = utcnow()
+    mock_gateway.list_conversations.return_value = [
+        Conversation(
+            id="conv-1",
+            title="Idea 1",
+            title_source="system_default",
+            language="en",
+            pinned=True,
+            archived=False,
+            last_message_preview="A",
+            deleted_at=None,
+            created_at=now,
+            updated_at=now,
+        ),
+        Conversation(
+            id="conv-2",
+            title="Idea 2",
+            title_source="system_default",
+            language="en",
+            pinned=False,
+            archived=False,
+            last_message_preview="B",
+            deleted_at=None,
+            created_at=now,
+            updated_at=now,
+        ),
+        Conversation(
+            id="conv-3",
+            title="Idea 3",
+            title_source="system_default",
+            language="en",
+            pinned=False,
+            archived=False,
+            last_message_preview="C",
+            deleted_at=None,
+            created_at=now,
+            updated_at=now,
+        ),
+    ]
+
+    first_page = client.get(
+        "/api/v1/conversations?limit=2",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert first_page.status_code == 200
+    payload = first_page.json()
+    assert len(payload["items"]) == 2
+    assert payload["next_cursor"] is not None
+
+    second_page = client.get(
+        f"/api/v1/conversations?limit=2&cursor={payload['next_cursor']}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    first_ids = {item["id"] for item in payload["items"]}
+    second_ids = {item["id"] for item in second_payload["items"]}
+    assert first_ids.isdisjoint(second_ids)
