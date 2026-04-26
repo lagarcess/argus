@@ -1,0 +1,194 @@
+openapi: 3.1.0
+info:
+  title: Argus Alpha API
+  version: 1.0.0-alpha
+  description: Contract-first Alpha API for chat-first investing idea validation.
+servers:
+  - url: /api/v1
+paths:
+  /api/v1/auth/signup:
+    post:
+      responses:
+        "200":
+          description: Account created or mocked in development.
+  /api/v1/auth/login:
+    post:
+      responses:
+        "200":
+          description: Session created.
+  /api/v1/auth/logout:
+    post:
+      responses:
+        "200":
+          description: Session cleared.
+  /api/v1/auth/session:
+    get:
+      responses:
+        "200":
+          description: Current authentication state and user.
+  /api/v1/me:
+    get:
+      responses:
+        "200":
+          description: Current user profile and preferences.
+    patch:
+      responses:
+        "200":
+          description: Updated user profile and preferences.
+  /api/v1/conversations:
+    get:
+      responses:
+        "200":
+          description: Cursor-paginated conversations.
+    post:
+      responses:
+        "200":
+          description: Created conversation.
+  /api/v1/conversations/{id}:
+    patch:
+      responses:
+        "200":
+          description: Updated conversation title, pin, or archive state.
+    delete:
+      responses:
+        "200":
+          description: Soft-deleted conversation.
+  /api/v1/conversations/{id}/messages:
+    get:
+      responses:
+        "200":
+          description: Cursor-paginated messages.
+  /api/v1/chat/stream:
+    post:
+      responses:
+        "200":
+          description: Server-sent token, status, title, result, and done events.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /api/v1/strategies:
+    get:
+      responses:
+        "200":
+          description: Cursor-paginated strategies with strategy_surface_metrics.
+    post:
+      responses:
+        "200":
+          description: Created executable strategy.
+  /api/v1/strategies/{id}:
+    patch:
+      responses:
+        "200":
+          description: Updated strategy metadata or metric preferences.
+    delete:
+      responses:
+        "200":
+          description: Soft-deleted strategy.
+  /api/v1/collections:
+    get:
+      responses:
+        "200":
+          description: Cursor-paginated collections.
+    post:
+      responses:
+        "200":
+          description: Created organizational collection.
+  /api/v1/collections/{id}:
+    patch:
+      responses:
+        "200":
+          description: Updated collection name or pin state.
+    delete:
+      responses:
+        "200":
+          description: Soft-deleted collection.
+  /api/v1/collections/{id}/strategies:
+    post:
+      responses:
+        "200":
+          description: Attached strategies to a collection.
+  /api/v1/collections/{id}/strategies/{strategy_id}:
+    delete:
+      responses:
+        "200":
+          description: Detached strategy from collection.
+  /api/v1/backtests/run:
+    post:
+      responses:
+        "200":
+          description: Completed Alpha backtest run.
+        "422":
+          description: Problem Details for unsupported Alpha requests.
+  /api/v1/backtests/{id}:
+    get:
+      responses:
+        "200":
+          description: Backtest run detail including chart and trades.
+  /api/v1/history:
+    get:
+      responses:
+        "200":
+          description: Mixed recent activity feed.
+  /api/v1/search:
+    get:
+      responses:
+        "200":
+          description: Global keyword search across chats, strategies, collections, and runs.
+  /api/v1/feedback:
+    post:
+      responses:
+        "200":
+          description: Feedback accepted.
+components:
+  schemas:
+    BacktestRun:
+      type: object
+      required:
+        - id
+        - status
+        - asset_class
+        - symbols
+        - benchmark_symbol
+        - metrics
+        - config_snapshot
+        - conversation_result_card
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          enum: [queued, running, completed, failed]
+        asset_class:
+          enum: [equity, crypto]
+        symbols:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+        allocation_method:
+          const: equal_weight
+        benchmark_symbol:
+          type: string
+          description: Equity defaults to SPY; crypto defaults to BTC.
+        metrics:
+          type: object
+          description: Canonical aggregate and by-symbol backtest metrics.
+        config_snapshot:
+          type: object
+          description: Reproducible normalized runtime configuration.
+        conversation_result_card:
+          type: object
+          description: Beginner-friendly inline chat result card.
+    Collection:
+      type: object
+      description: Lightweight organizational grouping of strategies.
+    Strategy:
+      type: object
+      description: Saved executable idea backed by a supported Alpha template.
+    Error:
+      type: object
+      description: RFC 9457 Problem Details with code and request_id.
+tags:
+  - name: backtest_runs
+    description: Immutable Alpha simulation results.

@@ -1,0 +1,280 @@
+{
+  "common": {
+    "backtest": "Backtest",
+    "strategy": "Strategy",
+    "collection": "Collection",
+    "chat": "Chat",
+    "history": "History",
+    "settings": "Settings",
+    "strategies": "Strategies",
+    "collections": "Collections",
+    "recents": "Recents",
+    "run_simulation": "Run simulation",
+    "add_to_collection": "Add to collection",
+    "rename": "Rename",
+    "delete": "Delete",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "error_occurred": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "archive": "Archive",
+    "archived": "Archived",
+    "today": "today",
+    "yesterday": "yesterday",
+    "no_items": "No items found",
+    "restore": "Restore",
+    "permanently_delete": "Permanently delete",
+    "submit": "Submit"
+  },
+  "feedback": {
+    "title_bug": "Report a Bug",
+    "title_feature": "Request a Feature",
+    "title_general": "General Feedback",
+    "title_rating": "Share feedback",
+    "placeholder": "Tell us more...",
+    "placeholder_details": "Share details (optional)",
+    "success": "Thank you for your feedback!",
+    "error": "Failed to send feedback. Please try again.",
+    "footer_note": "Your conversation will be included with your feedback to help improve Argus.",
+    "tags": {
+      "positive": {
+        "accurate": "Accurate and complete",
+        "exactly": "Exactly what I asked for",
+        "fast": "Fast and responsive",
+        "style": "Great style and tone",
+        "helpful": "Helpful and informative",
+        "other": "Other"
+      },
+      "negative": {
+        "incorrect": "Incorrect or incomplete",
+        "not_what_asked": "Not what I asked for",
+        "slow": "Slow or buggy",
+        "style": "Style or tone",
+        "safety": "Safety or legal concern",
+        "other": "Other"
+      }
+    }
+  },
+  "chat": {
+    "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
+    "input_placeholder": "Describe an investing idea...",
+    "trigger_create_strategy": "I want to create a new strategy.",
+    "trigger_create_collection": "I want to create a new collection.",
+    "placeholder_prompts": [
+      "What if I bought Tesla on significant dips?",
+      "How would a simple DCA strategy perform on Bitcoin?",
+      "Show me how an RSI crossover works on Apple.",
+      "What happens if I hold Nvidia during high volatility?",
+      "Compare holding ETH vs BTC over the last year.",
+      "Test a moving average breakout strategy on SPY.",
+      "How does momentum trading work for tech stocks?",
+      "What if I invested in dividend stocks during a recession?",
+      "Simulate a trend following strategy on Solana.",
+      "Can you explain how mean reversion works?"
+    ],
+    "view_history": "View history",
+    "chat_options": "Chat options",
+    "show_suggestions": "Show suggestions",
+    "hide_suggestions": "Hide suggestions",
+    "starter_actions": {
+      "tsla": {
+        "label": "Test Tesla dips",
+        "value": "What if I bought Tesla on significant dips?"
+      },
+      "btc": {
+        "label": "Try Bitcoin momentum",
+        "value": "Test a momentum breakout idea on Bitcoin"
+      },
+      "dca": {
+        "label": "Explore DCA",
+        "value": "Show me a DCA accumulation strategy for Apple"
+      }
+    },
+    "example_queries": {
+      "q1": "What if I bought Apple on significant dips?",
+      "q2": "Test a momentum breakout strategy on Bitcoin.",
+      "q3": "How would a simple DCA strategy perform on Tesla?"
+    },
+    "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
+    "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
+    "error_load": "Could not load that conversation. Try again.",
+    "error_backtest": "I could not complete that simulation. Check that the API is running and try again.",
+    "new_chat_ready": "New chat ready. What idea should we test?",
+    "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
+    "try_new_strategy": "Try a new strategy",
+    "empty_history": "Your past chats will appear here.",
+    "no_recent_activity": "No recent activity yet. Your strategies and chats will appear here.",
+    "new_chat": "New chat",
+    "delete_chat": "Delete chat",
+    "past_sessions": "Past sessions",
+    "archive_chat": "Archive chat",
+    "no_past_sessions": "No past sessions yet.",
+    "added_to_collection": "Added to \"{{name}}\"",
+    "good_response": "Good response",
+    "poor_response": "Poor response",
+    "more_actions": "More Actions",
+    "copy_plaintext": "Copy Plaintext",
+    "copy_id": "Copy ID",
+    "report_issue": "Report Issue",
+    "simulation_complete": "Simulation Complete",
+    "status": {
+      "understanding": "Understanding your idea",
+      "running": "Running simulation",
+      "preparing": "Preparing results"
+    }
+  },
+  "strategies": {
+    "empty_state": "Strategies you save from chat will appear here.",
+    "no_match": "No strategies match your search.",
+    "error_load": "Could not load strategies. Make sure the API is running.",
+    "search_placeholder": "Search strategies...",
+    "metrics": {
+      "overall_profit": "overall profit",
+      "max_drawdown": "max drawdown",
+      "win_rate": "win rate"
+    },
+    "unexecuted_hint": "Run this strategy to see performance",
+    "best_performer": "Best performer",
+    "suggestions": [
+      {
+        "title": "RSI Mean Reversion",
+        "desc": "Buy oversold dips and sell overbought peaks.",
+        "prompt": "Design a strategy that buys the dip whenever the RSI falls below 30 and sells when it hits 70 for BTC."
+      },
+      {
+        "title": "10% Stop-Loss",
+        "desc": "Protect your capital with an automated exit rule.",
+        "prompt": "I want a strategy that buys any stock in my list and automatically sells if the price drops 10% from my entry."
+      },
+      {
+        "title": "Trend Follower",
+        "desc": "Ride the momentum while the price is above the 50-day MA.",
+        "prompt": "Create a strategy that buys whenever the price is above the 50-day moving average on QQQ."
+      },
+      {
+        "title": "Monthly DCA",
+        "desc": "Build positions steadily with fixed recurring buys.",
+        "prompt": "Create a simple monthly DCA strategy that buys SPY on the first trading day of each month."
+      }
+    ]
+  },
+  "collections": {
+    "empty_state": "Add strategy to collection or save from chat to see them here.",
+    "no_match": "No collections match your search.",
+    "error_load": "Could not load collections. Make sure the API is running.",
+    "search_placeholder": "Search collections",
+    "new_collection": "New collection",
+    "no_strategies": "No strategies yet",
+    "strategy_count_one": "{{count}} strategy",
+    "strategy_count_other": "{{count}} strategies",
+    "suggestions": [
+      {
+        "title": "Tech Giants",
+        "desc": "Group FAANG or top semiconductor companies in one place.",
+        "prompt": "I want to create a collection of the top 5 tech giants like AAPL, MSFT, and NVDA."
+      },
+      {
+        "title": "Energy Transition",
+        "desc": "Climate-focused ideas and clean energy plays.",
+        "prompt": "I want to start a collection for energy transition and solar power ideas."
+      },
+      {
+        "title": "Dividend Kings",
+        "desc": "Safe, consistent yield plays for a defensive portfolio.",
+        "prompt": "How should I structure a collection for long-term dividend growth stocks?"
+      },
+      {
+        "title": "Crypto HODL",
+        "desc": "Store your Bitcoin and Ethereum dip-buying logic.",
+        "prompt": "Create a collection for my long-term crypto accumulation strategies."
+      }
+    ]
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": {
+      "display_name": "Display Name"
+    },
+    "subscription": {
+      "title": "Subscription",
+      "upgrade_pro": "Try upgrading to Pro for Free"
+    },
+    "app": {
+      "title": "App",
+      "language": "App language",
+      "appearance": "Appearance",
+      "appearance_options": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      }
+    },
+    "data": {
+      "title": "Data & Information",
+      "archived_chats": "Archived chats",
+      "recently_deleted": "Recently deleted",
+      "security": "Security"
+    },
+    "about": {
+      "title": "About",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "report_bug": "Report a bug",
+      "request_feature": "Request a feature",
+      "feedback": "General feedback"
+    },
+    "logout": "Log out",
+    "dev": {
+      "reset_onboarding": "Reset onboarding (dev)"
+    },
+    "search_language": "Search language",
+    "no_languages": "No languages found."
+  },
+  "onboarding": {
+    "prompt": "What is your current primary goal? Don't worry, you can change it later.",
+    "skip": "Skip for now",
+    "goals": {
+      "learn_basics": {
+        "title": "Learn investing basics",
+        "description": "Start with simple ideas and clear explanations."
+      },
+      "build_passive_strategy": {
+        "title": "Build a passive strategy",
+        "description": "Focus on long-term, low-maintenance ideas."
+      },
+      "test_stock_idea": {
+        "title": "Test a stock idea",
+        "description": "Validate a thesis on symbols you follow."
+      },
+      "explore_crypto": {
+        "title": "Explore crypto",
+        "description": "Try crypto-focused strategy starters."
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "brand": "argus",
+      "subtitle": "Sign in to continue",
+      "email_placeholder": "Email address",
+      "password_placeholder": "Password",
+      "submit": "Sign In",
+      "loading": "Signing in...",
+      "errors": {
+        "supabase_not_configured": "Supabase auth is not configured."
+      }
+    }
+  },
+  "landing": {
+    "sign_up_email": "Sign up with Email",
+    "already_account": "already have an account?",
+    "sign_in": "sign in",
+    "legal_prefix": "By signing up, you agree to our",
+    "terms": "Terms",
+    "privacy": "Privacy Policy"
+  }
+}

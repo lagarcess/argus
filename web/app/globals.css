@@ -160,3 +160,18 @@ body {
 .dark .argus-scroll-indicator {
   background-color: var(--argus-scroll-indicator-dark);
 }
+
+@keyframes argus_swoosh_up {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-24px);
+    opacity: 0;
+  }
+}
+
+.animate-argus-swoosh-up {
+  animation: argus_swoosh_up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

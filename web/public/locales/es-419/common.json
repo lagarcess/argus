@@ -1,0 +1,277 @@
+{
+  "common": {
+    "backtest": "Simulación",
+    "strategy": "Estrategia",
+    "collection": "Colección",
+    "chat": "Chat",
+    "history": "Historial",
+    "settings": "Ajustes",
+    "strategies": "Estrategias",
+    "collections": "Colecciones",
+    "recents": "Recientes",
+    "run_simulation": "Ejecutar simulación",
+    "add_to_collection": "Añadir a colección",
+    "rename": "Renombrar",
+    "delete": "Eliminar",
+    "pin": "Anclar",
+    "unpin": "Desanclar",
+    "loading": "Cargando...",
+    "retry": "Reintentar",
+    "error_occurred": "Ha ocurrido un error",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "search": "Buscar",
+    "archive": "Archivar",
+    "archived": "Archivado",
+    "today": "hoy",
+    "yesterday": "ayer",
+    "no_items": "No se encontraron elementos",
+    "restore": "Restaurar",
+    "permanently_delete": "Eliminar permanentemente",
+    "submit": "Enviar"
+  },
+  "feedback": {
+    "title_bug": "Reportar un error",
+    "title_feature": "Sugerir función",
+    "title_general": "Comentarios generales",
+    "title_rating": "Compartir comentarios",
+    "placeholder": "Cuéntanos más...",
+    "placeholder_details": "Compartir detalles (opcional)",
+    "success": "¡Gracias por tus comentarios!",
+    "error": "Error al enviar comentarios. Inténtalo de nuevo.",
+    "footer_note": "Tu conversación se incluirá con tus comentarios para ayudar a mejorar Argus.",
+    "tags": {
+      "positive": {
+        "accurate": "Preciso y completo",
+        "exactly": "Exactamente lo que pedí",
+        "fast": "Rápido y receptivo",
+        "style": "Buen estilo y tono",
+        "helpful": "Útil e informativo",
+        "other": "Otro"
+      },
+      "negative": {
+        "incorrect": "Incorrecto o incompleto",
+        "not_what_asked": "No es lo que pedí",
+        "slow": "Lento o con errores",
+        "style": "Estilo o tono",
+        "safety": "Preocupación de seguridad o legal",
+        "other": "Otro"
+      }
+    }
+  },
+  "chat": {
+    "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
+    "input_placeholder": "Describe una idea de inversión...",
+    "trigger_create_strategy": "Quiero crear una nueva estrategia.",
+    "trigger_create_collection": "Quiero crear una nueva colección.",
+    "placeholder_prompts": [
+      "¿Y si comprara Tesla en caídas importantes?",
+      "¿Cómo funcionaría una estrategia DCA en Bitcoin?",
+      "Muéstrame cómo funciona un cruce de RSI en Apple.",
+      "¿Qué pasa si mantengo Nvidia durante alta volatilidad?",
+      "Compara mantener ETH frente a BTC el último año.",
+      "Prueba una estrategia de ruptura de media móvil en SPY.",
+      "¿Cómo funciona el trading de momentum para tecnológicas?",
+      "¿Y si invirtiera en acciones de dividendos en una recesión?",
+      "Simula una estrategia de seguimiento de tendencia en Solana.",
+      "¿Puedes explicar cómo funciona la reversión a la media?"
+    ],
+    "view_history": "Ver historial",
+    "chat_options": "Opciones de chat",
+    "show_suggestions": "Mostrar sugerencias",
+    "hide_suggestions": "Ocultar sugerencias",
+    "starter_actions": {
+      "tsla": {
+        "label": "Prueba caídas de Tesla",
+        "value": "¿Y si comprara Tesla en caídas importantes?"
+      },
+      "btc": {
+        "label": "Prueba momentum de Bitcoin",
+        "value": "Prueba una idea de ruptura de impulso en Bitcoin"
+      },
+      "dca": {
+        "label": "Explora DCA",
+        "value": "Muéstrame una estrategia de acumulación DCA para Apple"
+      }
+    },
+    "example_queries": {
+      "q1": "¿Y si comprara Apple en caídas importantes?",
+      "q2": "Prueba una estrategia de ruptura de impulso en Bitcoin.",
+      "q3": "¿Cómo funcionaría una estrategia DCA simple en Tesla?"
+    },
+    "rate_limit_error": "Has alcanzado tu límite de solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
+    "error_offline": "Argus aún no ha podido conectarse a la API. Inicia el servicio FastAPI y envía tu idea de nuevo.",
+    "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
+    "error_backtest": "No pude completar esa simulación. Verifica que la API esté funcionando e inténtalo de nuevo.",
+    "new_chat_ready": "Nuevo chat listo. ¿Qué idea deberíamos probar?",
+    "resume_prompt": "Reanudando \"{{title}}\". ¿Qué te gustaría explorar ahora?",
+    "try_new_strategy": "Probar una nueva estrategia",
+    "empty_history": "Tus chats pasados aparecerán aquí.",
+    "no_recent_activity": "Sin actividad reciente aún. Tus estrategias y chats aparecerán aquí.",
+    "new_chat": "Nuevo chat",
+    "delete_chat": "Eliminar chat",
+    "past_sessions": "Sesiones pasadas",
+    "archive_chat": "Archivar chat",
+    "no_past_sessions": "No hay sesiones pasadas aún.",
+    "added_to_collection": "Añadido a \"{{name}}\"",
+    "good_response": "Buena respuesta",
+    "poor_response": "Mala respuesta",
+    "more_actions": "Más acciones",
+    "copy_plaintext": "Copiar texto",
+    "copy_id": "Copiar ID",
+    "report_issue": "Reportar problema",
+    "simulation_complete": "Simulación completa",
+    "status": {
+      "understanding": "Comprendiendo tu idea",
+      "running": "Ejecutando simulación",
+      "preparing": "Preparando resultados"
+    }
+  },
+  "strategies": {
+    "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",
+    "no_match": "No hay estrategias que coincidan con tu búsqueda.",
+    "error_load": "No se pudieron cargar las estrategias. Asegúrate de que la API esté funcionando.",
+    "search_placeholder": "Buscar estrategias...",
+    "metrics": {
+      "overall_profit": "ganancia total",
+      "max_drawdown": "caída máxima",
+      "win_rate": "tasa de éxito"
+    },
+    "unexecuted_hint": "Ejecuta esta estrategia para ver el rendimiento",
+    "best_performer": "Mejor rendimiento",
+    "suggestions": [
+      {
+        "title": "Reversión a la media RSI",
+        "desc": "Compra en caídas de sobreventa y vende en picos de sobrecompra.",
+        "prompt": "Diseña una estrategia que compre la caída cada vez que el RSI caiga por debajo de 30 y venda cuando llegue a 70 para BTC."
+      },
+      {
+        "title": "Stop-Loss del 10%",
+        "desc": "Protege tu capital con una regla de salida automatizada.",
+        "prompt": "Quiero una estrategia que compre cualquier acción de mi lista y venda automáticamente si el precio cae un 10% desde mi entrada."
+      },
+      {
+        "title": "Seguidor de Tendencia",
+        "desc": "Sigue el impulso mientras el precio esté por encima de la media móvil de 50 días.",
+        "prompt": "Crea una estrategia que compre siempre que el precio esté por encima de la media móvil de 50 días en QQQ."
+      },
+      {
+        "title": "DCA Mensual",
+        "desc": "Construye posiciones con compras fijas cada mes.",
+        "prompt": "Crea una estrategia DCA mensual simple que compre SPY el primer dia habil de cada mes."
+      }
+    ]
+  },
+  "collections": {
+    "empty_state": "Añade una estrategia a una colección o guárdala del chat para verlas aquí.",
+    "no_match": "No hay colecciones que coincidan con tu búsqueda.",
+    "error_load": "No se pudieron cargar las colecciones. Asegúrate de que la API esté funcionando.",
+    "search_placeholder": "Buscar colecciones",
+    "new_collection": "Nueva colección",
+    "no_strategies": "Sin estrategias aún",
+    "strategy_count_one": "{{count}} estrategia",
+    "strategy_count_other": "{{count}} estrategias",
+    "suggestions": [
+      {
+        "title": "Gigantes Tecnológicos",
+        "desc": "Agrupa FAANG o las mejores empresas de semiconductores en un solo lugar.",
+        "prompt": "Quiero crear una colección de los 5 gigantes tecnológicos más importantes, como AAPL, MSFT y NVDA."
+      },
+      {
+        "title": "Transición Energética",
+        "desc": "Ideas centradas en el clima y jugadas de energía limpia.",
+        "prompt": "Quiero empezar una colección para ideas de transición energética y energía solar."
+      },
+      {
+        "title": "Reyes de Dividendos",
+        "desc": "Jugadas de rendimiento seguras y consistentes para una cartera defensiva.",
+        "prompt": "¿Cómo debería estructurar una colección para acciones con crecimiento de dividendos a largo plazo?"
+      },
+      {
+        "title": "Cripto HODL",
+        "desc": "Guarda tu lógica de compra de caídas de Bitcoin y Ethereum.",
+        "prompt": "Crea una colección para mis estrategias de acumulación de criptomonedas a largo plazo."
+      }
+    ]
+  },
+  "settings": {
+    "title": "Ajustes",
+    "profile": {
+      "display_name": "Nombre de usuario"
+    },
+    "subscription": {
+      "title": "Suscripción",
+      "upgrade_pro": "Prueba Pro gratis"
+    },
+    "app": {
+      "title": "App",
+      "language": "Idioma de la app",
+      "appearance": "Apariencia",
+      "appearance_options": {
+        "light": "Claro",
+        "dark": "Oscuro",
+        "system": "Sistema"
+      }
+    },
+    "data": {
+      "title": "Datos e información",
+      "archived_chats": "Chats archivados",
+      "recently_deleted": "Borrados recientemente",
+      "security": "Seguridad"
+    },
+    "about": {
+      "title": "Acerca de",
+      "terms": "Términos de Servicio",
+      "privacy": "Política de Privacidad",
+      "report_bug": "Reportar un error",
+      "request_feature": "Sugerir función",
+      "feedback": "Comentarios generales"
+    },
+    "logout": "Cerrar sesión",
+    "search_language": "Buscar idioma",
+    "no_languages": "No se encontraron idiomas."
+  },
+  "onboarding": {
+    "prompt": "Cual es tu objetivo principal ahora? Puedes cambiarlo despues.",
+    "skip": "Omitir por ahora",
+    "goals": {
+      "learn_basics": {
+        "title": "Aprender lo basico",
+        "description": "Comienza con ideas simples y explicaciones claras."
+      },
+      "build_passive_strategy": {
+        "title": "Construir una estrategia pasiva",
+        "description": "Enfocate en ideas de largo plazo y bajo mantenimiento."
+      },
+      "test_stock_idea": {
+        "title": "Probar una idea de accion",
+        "description": "Valida una tesis en los simbolos que sigues."
+      },
+      "explore_crypto": {
+        "title": "Explorar cripto",
+        "description": "Prueba ideas iniciales enfocadas en cripto."
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "brand": "argus",
+      "subtitle": "Inicia sesion para continuar",
+      "email_placeholder": "Correo electronico",
+      "password_placeholder": "Contrasena",
+      "submit": "Iniciar sesion",
+      "loading": "Iniciando sesion...",
+      "errors": {
+        "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
+      }
+    }
+  },
+  "landing": {
+    "sign_up_email": "Registrarse con Email",
+    "already_account": "¿ya tienes una cuenta?",
+    "sign_in": "inicia sesión",
+    "legal_prefix": "Al registrarte, aceptas nuestros",
+    "terms": "Términos",
+    "privacy": "Política de Privacidad"
+  }
+}

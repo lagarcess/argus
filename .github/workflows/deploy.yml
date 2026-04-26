@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/alpha-functional]
   pull_request:
-    branches: [main]
+    branches: [main, codex/alpha-functional]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -15,6 +15,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ownership-gate:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run branch ownership gate
+        run: python .agent/scripts/ownership/verify_branch_ownership.py
+
   # -----------------------------------------------------------------------
   # NOTE: backend-lint, frontend-lint, backend-test, and frontend-test are
   # temporarily disabled during the mock-demo phase. The project has pivoted
@@ -142,7 +159,8 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
-    # TODO: Re-add needs: [backend-lint, frontend-lint, backend-test, frontend-test] when jobs are re-enabled
+    needs: [ownership-gate]
+    # TODO: Re-add backend/frontend jobs into needs when those jobs are re-enabled.
     steps:
       - name: All checks passed
-        run: echo "CI checks passed (lint/test jobs disabled during mock-demo phase)."
+        run: echo "CI checks passed (ownership gate active; lint/test jobs disabled during mock-demo phase)."

@@ -3,25 +3,28 @@
 import { useEffect, useState, useRef } from "react";
 import { useTheme } from "next-themes";
 import { Settings, Sun, Moon, Monitor, Search, Check } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { patchMe } from "@/lib/argus-api";
 
 const LANGUAGES = [
   { code: "en", name: "English", translation: "English" },
-  { code: "es-LA", name: "Español", translation: "Spanish" }
+  { code: "es-419", name: "Español", translation: "Spanish" }
 ];
 
 export function SettingsMenu() {
+  const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { theme, setTheme } = useTheme();
 
-  const [lang, setLang] = useState("en");
+  const lang = i18n.language || "en";
 
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
 
     function handleClickOutside(event: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
@@ -29,7 +32,10 @@ export function SettingsMenu() {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   // Prevent background scrolling when modal is open
@@ -46,15 +52,28 @@ export function SettingsMenu() {
 
   if (!mounted) return null;
 
-  const currentLangLabel = LANGUAGES.find(l => l.code === lang)?.name || "English";
+  const currentLangLabel = LANGUAGES.find(l => l.code === lang || l.code === lang.split('-')[0])?.name || "English";
   const filteredLanguages = LANGUAGES.filter(l =>
     l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     l.translation.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const changeLanguage = async (code: string) => {
+    await i18n.changeLanguage(code);
+    setIsLanguageModalOpen(false);
+    setSearchQuery("");
+
+    // Persist to backend if logged in
+    try {
+      await patchMe({ language: code as "en" | "es-419" });
+    } catch {
+      // Silently ignore if not logged in
+    }
+  };
+
   return (
     <>
-      <div className="hidden md:block absolute top-6 right-6 md:top-8 md:right-12 z-40 text-[var(--color-argus-fg)]" ref={popoverRef}>
+      <div className="absolute top-6 right-6 md:top-8 md:right-12 z-40 text-[var(--color-argus-fg)]" ref={popoverRef}>
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white"
@@ -93,7 +112,7 @@ export function SettingsMenu() {
               onClick={() => { setIsLanguageModalOpen(true); setIsOpen(false); }}
               className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             >
-              <span className="font-medium text-[15px] text-black dark:text-white tracking-tight">Language</span>
+              <span className="font-medium text-[15px] text-black dark:text-white tracking-tight">{t('settings.app.language')}</span>
               <span className="text-[14px] text-gray-500 dark:text-gray-400">{currentLangLabel}</span>
             </button>
           </div>
@@ -114,7 +133,7 @@ export function SettingsMenu() {
               <Search className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-3" />
               <input
                 type="text"
-                placeholder="Search language"
+                placeholder={t('settings.search_language')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
@@ -125,16 +144,16 @@ export function SettingsMenu() {
             {/* Language List */}
             <div className="flex flex-col py-2 max-h-[400px] overflow-y-auto">
               {filteredLanguages.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-gray-500">No languages found.</div>
+                <div className="px-4 py-8 text-center text-sm text-gray-500">{t('settings.no_languages')}</div>
               ) : (
                 filteredLanguages.map((l) => (
                   <button
                     key={l.code}
-                    onClick={() => { setLang(l.code); setIsLanguageModalOpen(false); setSearchQuery(""); }}
+                    onClick={() => changeLanguage(l.code)}
                     className="flex justify-between items-center px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
                     <span className="font-medium text-[15px] text-black dark:text-white">{l.name}</span>
-                    {lang === l.code ? (
+                    {lang.startsWith(l.code) ? (
                       <Check className="w-4 h-4 text-black dark:text-white" />
                     ) : (
                       <span className="text-[14px] text-gray-500">{l.translation}</span>

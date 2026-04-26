@@ -2,8 +2,8 @@
 
 ## Argus Data Model Source of Truth (Alpha MVP)
 
-**Status:** Active  
-**Audience:** Backend engineers, database agents, API agents, frontend agents  
+**Status:** Active
+**Audience:** Backend engineers, database agents, API agents, frontend agents
 **Purpose:** Define the Alpha MVP database entities, relationships, ownership rules, and persistence expectations for Argus.
 
 ---
@@ -124,7 +124,7 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 ```
 
 ### Constraints & Notes
-- **Supported Languages**: `en`, `es`
+- **Supported Languages**: `en`, `es-419`
 - **Supported Locales**: `en-US`, `es-419`
 - `display_name` is used for personalization.
 - `email` is for authentication, not primary UX identity.
@@ -452,8 +452,8 @@ Argus Alpha MVP implements three defensive layers to protect system stability an
 ### Layer 1: Engine Constraints
 Hard-coded technical limits in the backtesting logic.
 - **Symbols**: Max 5 symbols per run.
-- **Timeframe**: 1D, 1H only.
-- **Intraday Lookback**: Max 1 year for 1H.
+- **Timeframe**: 1h, 2h, 4h, 6h, 12h, 1D.
+- **Lookback**: Max 3 years.
 - **Capital**: Min 1,000 / Max 100,000,000.
 - **Side**: Long-only.
 
@@ -484,7 +484,7 @@ Generous usage boundaries tracked via the `usage_counters` table.
 7. **Response**: Return result with rate-limit headers.
 
 ### Admin Bypass
-Users with `profiles.is_admin = true` may have quota and rate-limit checks bypassed by backend logic. 
+Users with `profiles.is_admin = true` may have quota and rate-limit checks bypassed by backend logic.
 - Ownership and privacy rules still apply.
 - Engine safety constraints (e.g., symbol limits) may still apply.
 

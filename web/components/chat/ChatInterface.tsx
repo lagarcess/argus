@@ -1,901 +1,1312 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import ChatMessage from "./ChatMessage";
-import ChatInput from "./ChatInput";
-import { Menu, Plus, ChevronDown, Trash2, Search, Settings, X, ArrowDown, History, Folder, Archive, ChevronRight, FolderPlus, MessageSquarePlus } from "lucide-react";
-import StrategiesView from "../views/StrategiesView";
-import PortfoliosView from "../views/PortfoliosView";
+import { useMemo, useEffect, useRef, useState } from "react";
+import {
+  Archive,
+  ChevronRight,
+  History,
+  PanelLeft,
+  MessageSquarePlus,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+  TrendingUp,
+  Bitcoin,
+  LineChart,
+  Layers,
+  Compass,
+} from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { ArgusLogo } from "@/components/ArgusLogo";
+
+import {
+  createConversation,
+  deleteCollection,
+  deleteConversation,
+  deleteStrategy,
+  formatRelativeDate,
+  getMe,
+  getConversationMessages,
+  listHistory,
+  searchGlobal,
+  patchCollection,
+  patchConversation,
+  patchMe,
+  patchStrategy,
+  resultCardFromRun,
+  streamChatMessage,
+  type HistoryItem,
+  type BacktestRun,
+  type PrimaryGoal,
+  type SearchItem,
+} from "@/lib/argus-api";
+import CollectionPicker from "./CollectionPicker";
+import CollectionsView from "../views/CollectionsView";
 import SettingsView from "../views/SettingsView";
-import { ChatActionOption, Message, StrategyResultPayload } from "./types";
+import StrategiesView from "../views/StrategiesView";
+import ChatInput from "./ChatInput";
+import ChatMessage from "./ChatMessage";
+import FeedbackDialog from "../feedback/FeedbackDialog";
+import { type ChatActionOption, type Message } from "./types";
 
-type StrategyId = "buy_and_hold" | "btfd" | "hodl" | "dca" | "moon_mission";
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-type StrategyDraft = {
-  strategyId?: StrategyId;
-  symbols: string[];
-  startDate?: string;
-  endDate?: string;
+type View = "chat" | "strategies" | "collections" | "settings";
+type OnboardingChoice = {
+  goal: PrimaryGoal;
+  title: string;
+  description: string;
 };
 
-type StrategyDefinition = {
-  id: StrategyId;
-  label: string;
-  aliases: string[];
-  preset: {
-    totalReturn: string;
-    maxDrawdown: string;
-    winRate: string;
-    benchmark: string;
-    cashValue: string;
-    holdingPeriod: string;
-  };
-};
-
-const EMPTY_DRAFT: StrategyDraft = {
-  symbols: [],
-};
-
-const SUPPORTED_STRATEGIES: StrategyDefinition[] = [
-  {
-    id: "buy_and_hold",
-    label: "Buy and Hold (Long Only)",
-    aliases: ["buy and hold", "buy & hold", "long only"],
-    preset: {
-      totalReturn: "+18.6%",
-      maxDrawdown: "14.2%",
-      winRate: "61%",
-      benchmark: "+4.3% vs S&P",
-      cashValue: "$10k -> $27.1k",
-      holdingPeriod: "8 months",
-    },
-  },
-  {
-    id: "btfd",
-    label: "BTFD (Mean Reversion)",
-    aliases: ["btfd", "mean reversion", "buy the dip"],
-    preset: {
-      totalReturn: "+15.9%",
-      maxDrawdown: "9.8%",
-      winRate: "67%",
-      benchmark: "+2.8% vs S&P",
-      cashValue: "$10k -> $24.8k",
-      holdingPeriod: "5 months",
-    },
-  },
-  {
-    id: "hodl",
-    label: "HODL (Long Term Trend)",
-    aliases: ["hodl", "long term trend", "trend following"],
-    preset: {
-      totalReturn: "+20.4%",
-      maxDrawdown: "12.1%",
-      winRate: "64%",
-      benchmark: "+3.9% vs S&P",
-      cashValue: "$10k -> $29.0k",
-      holdingPeriod: "11 months",
-    },
-  },
-  {
-    id: "dca",
-    label: "DCA (Accumulation)",
-    aliases: ["dca", "accumulation", "dollar cost averaging", "dollar-cost averaging"],
-    preset: {
-      totalReturn: "+13.7%",
-      maxDrawdown: "7.6%",
-      winRate: "70%",
-      benchmark: "+2.1% vs S&P",
-      cashValue: "$10k -> $22.9k",
-      holdingPeriod: "9 months",
-    },
-  },
-  {
-    id: "moon_mission",
-    label: "Moon Mission (Momentum Breakout)",
-    aliases: ["moon mission", "to the moon", "momentum breakout", "moon"],
-    preset: {
-      totalReturn: "+23.0%",
-      maxDrawdown: "11%",
-      winRate: "68%",
-      benchmark: "+5.0% vs S&P",
-      cashValue: "$10k -> $31.4k",
-      holdingPeriod: "6 months",
-    },
-  },
-];
-
-const NON_SYMBOL_TOKENS = new Set([
-  "THE",
-  "AND",
-  "FOR",
-  "WITH",
-  "FROM",
-  "TO",
-  "RUN",
-  "LONG",
-  "ONLY",
-  "HOLD",
-  "HODL",
-  "BTFD",
-  "DCA",
-  "MOON",
-  "MISSION",
-  "MEAN",
-  "REVERSION",
-  "MOMENTUM",
-  "BREAKOUT",
-  "BUY",
-  "DIP",
-  "STYLE",
-  "STRATEGY",
-  "START",
-  "END",
-  "DATE",
-  "DATES",
-  "TODAY",
-  "THIS",
-  "THAT",
-  "NOW",
-  "CRYPTO",
-  "EQUITY",
-  "EQUITIES",
-]);
-
-const STYLE_ACTIONS: ChatActionOption[] = [
-  { id: "style-breakout", label: "I hunt breakouts", value: "I hunt breakouts" },
-  { id: "style-indexer", label: "I am a long-term indexer", value: "I am a long-term indexer" },
-  { id: "style-dips", label: "I buy dips", value: "I buy dips" },
-  { id: "style-balanced", label: "I mix swing and long-term", value: "I mix swing and long-term" },
-];
-
-const STRATEGY_ACTIONS: ChatActionOption[] = SUPPORTED_STRATEGIES.map((strategy) => ({
-  id: `strategy-${strategy.id}`,
-  label: strategy.label.replace(" (Long Only)", ""),
-  value: strategy.aliases[0],
-}));
-
-const SYMBOL_ACTIONS: ChatActionOption[] = [
-  { id: "symbols-tech", label: "AAPL, MSFT, NVDA", value: "AAPL MSFT NVDA" },
-  { id: "symbols-crypto", label: "BTC, ETH, SOL", value: "BTC ETH SOL" },
-  { id: "symbols-index", label: "SPY, QQQ", value: "SPY QQQ" },
-  { id: "symbols-manual", label: "I will type symbols", value: "I will type symbols" },
-];
-
-const DATE_ACTIONS: ChatActionOption[] = [
-  { id: "dates-2020-2024", label: "2020 to 2024", value: "2020 to 2024" },
-  { id: "dates-2022-2024", label: "2022 to 2024", value: "2022 to 2024" },
-  { id: "dates-2024-2025", label: "2024-01-01 to 2025-12-31", value: "2024-01-01 to 2025-12-31" },
-];
-
-const RESULT_ACTIONS: ChatActionOption[] = [
-  { id: "result-add", label: "Add strategy to portfolio", value: "/action:add-to-portfolio" },
-  { id: "result-new", label: "Try a new strategy", value: "/action:new-strategy" },
-];
-
-const getStrategyDefinition = (id?: StrategyId) =>
-  SUPPORTED_STRATEGIES.find((strategy) => strategy.id === id);
-
-const detectStrategy = (text: string): StrategyId | undefined => {
-  const normalized = text.toLowerCase();
-  const match = SUPPORTED_STRATEGIES.find((strategy) =>
-    strategy.aliases.some((alias) => normalized.includes(alias)),
-  );
-  return match?.id;
-};
-
-const extractSymbols = (text: string): string[] => {
-  const candidates = text.toUpperCase().match(/\b[A-Z]{2,5}\b/g) ?? [];
-  return [...new Set(candidates.filter((token) => !NON_SYMBOL_TOKENS.has(token)))];
-};
-
-const extractDateRange = (text: string): { startDate: string; endDate: string } | null => {
-  const explicitRange = text.match(/(20\d{2}-\d{2}-\d{2})\s*(?:to|-)\s*(20\d{2}-\d{2}-\d{2})/i);
-  if (explicitRange) {
-    return { startDate: explicitRange[1], endDate: explicitRange[2] };
-  }
-
-  const allIsoDates = text.match(/20\d{2}-\d{2}-\d{2}/g);
-  if (allIsoDates && allIsoDates.length >= 2) {
-    return { startDate: allIsoDates[0], endDate: allIsoDates[1] };
-  }
-
-  const yearRange = text.match(/\b(20\d{2})\s*(?:to|-)\s*(20\d{2})\b/);
-  if (yearRange) {
-    return {
-      startDate: `${yearRange[1]}-01-01`,
-      endDate: `${yearRange[2]}-12-31`,
-    };
-  }
-
-  return null;
-};
-
-const isValidDateOrder = (startDate?: string, endDate?: string) => {
-  if (!startDate || !endDate) return true;
-  return new Date(startDate).getTime() < new Date(endDate).getTime();
-};
-
-const mergeSymbols = (currentSymbols: string[], newSymbols: string[]) => [
-  ...new Set([...currentSymbols, ...newSymbols]),
-];
-
-const buildDemoResultPayload = (draft: StrategyDraft): StrategyResultPayload => {
-  const strategy = getStrategyDefinition(draft.strategyId) ?? SUPPORTED_STRATEGIES[0];
-  const universe = draft.symbols.join(", ");
-  return {
-    strategyName: strategy.label,
-    period: `${draft.startDate} to ${draft.endDate}`,
-    metrics: [
-      { label: "Total Return (%)", value: strategy.preset.totalReturn },
-      { label: "Top / Bottom Performer", value: "NVDA (top), BYD (bottom)" },
-      { label: "Cash Value ($)", value: strategy.preset.cashValue },
-      { label: "Max Drawdown", value: strategy.preset.maxDrawdown },
-      { label: "Benchmark", value: strategy.preset.benchmark },
-      { label: "Holding Period", value: strategy.preset.holdingPeriod },
-    ],
-    benchmarkNote: `Universe: ${universe}. Demo engine runs long-only presets.`,
-  };
-};
-
-const consumeActionPills = (messages: Message[]) => {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i];
-    if (message.role === "ai" && message.actions && message.actions.length > 0) {
-      return messages.map((entry, index) =>
-        index === i ? { ...entry, actions: undefined } : entry,
-      );
-    }
-  }
-  return messages;
-};
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
+  const { t, i18n } = useTranslation();
+
+  const starterActions = useMemo<ChatActionOption[]>(() => [
+    {
+      id: "starter-tsla",
+      label: t('chat.starter_actions.tsla.label'),
+      value: t('chat.starter_actions.tsla.value'),
+    },
+    {
+      id: "starter-btc",
+      label: t('chat.starter_actions.btc.label'),
+      value: t('chat.starter_actions.btc.value'),
+    },
+    {
+      id: "starter-dca",
+      label: t('chat.starter_actions.dca.label'),
+      value: t('chat.starter_actions.dca.value'),
+    },
+  ], [t]);
+  const onboardingChoices = useMemo<OnboardingChoice[]>(
+    () => [
+      {
+        goal: "learn_basics",
+        title: t("onboarding.goals.learn_basics.title", "Learn investing basics"),
+        description: t(
+          "onboarding.goals.learn_basics.description",
+          "Start with simple ideas and clear explanations.",
+        ),
+      },
+      {
+        goal: "build_passive_strategy",
+        title: t("onboarding.goals.build_passive_strategy.title", "Build a passive strategy"),
+        description: t(
+          "onboarding.goals.build_passive_strategy.description",
+          "Focus on long-term, low-maintenance ideas.",
+        ),
+      },
+      {
+        goal: "test_stock_idea",
+        title: t("onboarding.goals.test_stock_idea.title", "Test a stock idea"),
+        description: t(
+          "onboarding.goals.test_stock_idea.description",
+          "Validate a thesis on symbols you follow.",
+        ),
+      },
+      {
+        goal: "explore_crypto",
+        title: t("onboarding.goals.explore_crypto.title", "Explore crypto"),
+        description: t(
+          "onboarding.goals.explore_crypto.description",
+          "Try crypto-focused strategy starters.",
+        ),
+      },
+    ],
+    [t],
+  );
+
   const [messages, setMessages] = useState<Message[]>([]);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const runTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const welcomeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [strategyDraft, setStrategyDraft] = useState<StrategyDraft>(EMPTY_DRAFT);
-  const [profileStyle, setProfileStyle] = useState<string | null>(null);
-  const [showWelcomeBacksplash, setShowWelcomeBacksplash] = useState(true);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<View>("chat");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [showChatOptions, setShowChatOptions] = useState(false);
+  const [activeChatOptionsPanel, setActiveChatOptionsPanel] = useState<
+    "none" | "history" | "collection"
+  >("none");
   const [searchText, setSearchText] = useState("");
-  const [isScrolledUp, setIsScrolledUp] = useState(false);
-  const [isScrolling, setIsScrolling] = useState(false);
-  const [scrollIndicator, setScrollIndicator] = useState({ top: 0, height: 0, visible: false });
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
+  const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
+  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
+  const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
+    runId: string;
+    strategyId: string | null;
+    strategyName: string;
+    symbols: string[];
+    template: string;
+    assetClass: "equity" | "crypto";
+  } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
-  const [currentView, setCurrentView] = useState<'chat' | 'strategies' | 'portfolios' | 'settings'>('chat');
-  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
-  const [activeSubmenu, setActiveSubmenu] = useState<"none" | "history" | "portfolio">("none");
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [feedbackState, setFeedbackState] = useState<{
+    isOpen: boolean;
+    type: "bug" | "feature" | "general" | "rating";
+    rating?: "positive" | "negative";
+    context?: Record<string, any>;
+  }>({ isOpen: false, type: "general" });
 
-  const closeHeaderMenu = () => {
-    setShowHeaderMenu(false);
-    setActiveSubmenu("none");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const chatOptionsRef = useRef<HTMLDivElement>(null);
+
+  // ── Toast helper ───────────────────────────────────────────────────────────
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const handleScrollEvent = (e: React.UIEvent<HTMLDivElement>) => {
-    setIsScrolling(true);
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
+  const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
+    const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
+    const merged = [...existing];
+    for (const item of incoming) {
+      const key = `${item.type}:${item.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(item);
+      }
     }
-    scrollTimeoutRef.current = setTimeout(() => {
-      setIsScrolling(false);
-    }, 220);
-
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    const distanceToBottom = scrollHeight - Math.ceil(scrollTop) - clientHeight;
-    setIsScrolledUp(distanceToBottom > 200);
-    if (scrollHeight > clientHeight) {
-      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 28);
-      const maxTop = clientHeight - thumbHeight;
-      const top = (scrollTop / Math.max(scrollHeight - clientHeight, 1)) * maxTop;
-      setScrollIndicator({ top, height: thumbHeight, visible: true });
-    } else {
-      setScrollIndicator({ top: 0, height: 0, visible: false });
-    }
+    return merged;
   };
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    if (scrollHeight > clientHeight) {
-      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 28);
-      const maxTop = clientHeight - thumbHeight;
-      const top = (scrollTop / Math.max(scrollHeight - clientHeight, 1)) * maxTop;
-      setScrollIndicator({ top, height: thumbHeight, visible: true });
-    } else {
-      setScrollIndicator({ top: 0, height: 0, visible: false });
-    }
-  }, [messages.length]);
+  const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
+    const { items, next_cursor } = await listHistory({
+      limit: 30,
+      cursor: nextCursor ?? undefined,
+    });
+    const filtered = items.filter(
+      (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
+    );
+    setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
+    setHistoryNextCursor(next_cursor);
+  };
 
-  const startWelcomeFlow = () => {
-    setShowWelcomeBacksplash(true);
-    setMessages([]);
-    if (welcomeTimeoutRef.current) {
-      clearTimeout(welcomeTimeoutRef.current);
-    }
-    welcomeTimeoutRef.current = setTimeout(() => {
-      setShowWelcomeBacksplash(false);
-      setMessages([
-        {
-          id: Date.now().toString(),
-          role: "ai",
-          kind: "text",
-          content:
-            "Welcome to Argus. I can help you backtest strategies, compare results, and build portfolios. What is your investment or trading style?",
-          actions: STYLE_ACTIONS,
-        },
-      ]);
-    }, 3200);
+  // ── History ────────────────────────────────────────────────────────────────
+
+  /** Imperative refresh — safe to call from event handlers */
+  const refreshHistory = () => {
+    loadHistoryPage(null, false).catch(() => undefined);
+  };
+
+  const loadMoreHistory = () => {
+    if (!historyNextCursor || isLoadingMoreHistory) return;
+    setIsLoadingMoreHistory(true);
+    loadHistoryPage(historyNextCursor, true)
+      .catch(() => undefined)
+      .finally(() => setIsLoadingMoreHistory(false));
   };
 
   useEffect(() => {
-    const startupTimer = setTimeout(() => {
-      startWelcomeFlow();
-    }, 0);
+    loadHistoryPage(null, false).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarOpen) {
+      setIsRecentsExpanded(false);
+    }
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    const query = searchText.trim();
+    if (currentView !== "chat" || query.length === 0) {
+      setSearchResults([]);
+      setSearchNextCursor(null);
+      setIsSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setIsSearching(true);
+      searchGlobal({ q: query, limit: 20 })
+        .then(({ items, next_cursor }) => {
+          if (cancelled) return;
+          setSearchResults(items);
+          setSearchNextCursor(next_cursor);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSearchResults([]);
+          setSearchNextCursor(null);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setIsSearching(false);
+        });
+    }, 250);
+
     return () => {
-      clearTimeout(startupTimer);
-      if (runTimeoutRef.current) {
-        clearTimeout(runTimeoutRef.current);
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchText, currentView]);
+
+  const loadMoreSearch = async () => {
+    const query = searchText.trim();
+    if (!searchNextCursor || !query || isLoadingMoreSearch) return;
+    setIsLoadingMoreSearch(true);
+    try {
+      const { items, next_cursor } = await searchGlobal({
+        q: query,
+        limit: 20,
+        cursor: searchNextCursor,
+      });
+      setSearchResults((prev) => {
+        const seen = new Set(prev.map((item) => `${item.type}:${item.id}`));
+        const merged = [...prev];
+        for (const item of items) {
+          const key = `${item.type}:${item.id}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      setSearchNextCursor(next_cursor);
+    } finally {
+      setIsLoadingMoreSearch(false);
+    }
+  };
+
+  // ── Init conversation ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const meResponse = await getMe().catch(() => null);
+        const resolvedLanguage = meResponse?.user?.language ?? i18n.language;
+        if (resolvedLanguage && resolvedLanguage !== i18n.language) {
+          await i18n.changeLanguage(resolvedLanguage);
+        }
+        const { conversation } = await createConversation(resolvedLanguage);
+        if (cancelled) return;
+        setConversationId(conversation.id);
+        setMessages([]);
+        const stage = meResponse?.user?.onboarding?.stage;
+        setShowOnboardingGoalCards(
+          stage === "language_selection" || stage === "primary_goal_selection",
+        );
+      } catch {
+        if (cancelled) return;
+        setMessages([
+          {
+            id: "offline",
+            role: "ai",
+            kind: "text",
+            content: t('chat.error_offline'),
+          },
+        ]);
       }
-      if (welcomeTimeoutRef.current) {
-        clearTimeout(welcomeTimeoutRef.current);
-      }
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
-  const scrollToBottom = () => {
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, streamStatus]);
+
+  // ── Load existing conversation ─────────────────────────────────────────────
+
+  const loadConversation = async (convId: string) => {
+    setIsSidebarOpen(false);
+    closeChatOptions();
+    setCurrentView("chat");
+    setConversationId(convId);
+    setMessages([]);
+    setStreamStatus(t('common.loading'));
+    try {
+      const { items } = await getConversationMessages(convId, 50);
+      const loaded: Message[] = items.map((m) => ({
+        id: m.id,
+        role: m.role === "user" ? "user" : "ai",
+        kind: "text",
+        content: m.content,
+      }));
+      setMessages(loaded);
+    } catch {
+      setMessages([
+        {
+          id: "resume-error",
+          role: "ai",
+          kind: "text",
+          content: t('chat.error_load'),
+        },
+      ]);
+    } finally {
+      setStreamStatus(null);
+    }
   };
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
-    setShowWelcomeBacksplash(false);
-    if (welcomeTimeoutRef.current) {
-      clearTimeout(welcomeTimeoutRef.current);
-    }
+  // ── Start new chat ─────────────────────────────────────────────────────────
 
-    const now = Date.now();
-    const userId = now.toString();
-    const aiId = (now + 1).toString();
-
-    if (text === "/action:new-strategy") {
-      const refreshedDraft: StrategyDraft = { ...EMPTY_DRAFT };
-      setStrategyDraft(refreshedDraft);
-      setMessages((prev) => [
-        ...consumeActionPills(prev),
-        { id: userId, role: "user", kind: "text", content: "Try a new strategy" },
-        {
-          id: aiId,
-          role: "ai",
-          kind: "text",
-          content: "Perfect. Which strategy would you like to try next?",
-          actions: STRATEGY_ACTIONS,
-        },
-      ]);
-      return;
-    }
-
-    if (text === "/action:add-to-portfolio") {
-      setMessages((prev) => [
-        ...consumeActionPills(prev),
-        { id: userId, role: "user", kind: "text", content: "Add strategy to portfolio" },
-        {
-          id: aiId,
-          role: "ai",
-          kind: "text",
-          content: "Added to your demo portfolio. Want to test another strategy or symbols?",
-          actions: [
-            { id: "next-strategy", label: "Try a new strategy", value: "/action:new-strategy" },
-            { id: "next-symbols", label: "Change symbols", value: "AAPL MSFT NVDA" },
-          ],
-        },
-      ]);
-      return;
-    }
-
-    const parsedStrategy = detectStrategy(text);
-    const parsedSymbols = extractSymbols(text);
-    const parsedDateRange = extractDateRange(text);
-    const resolvedProfileStyle = profileStyle ?? text.trim();
-
-    const nextDraft: StrategyDraft = {
-      ...strategyDraft,
-      strategyId: parsedStrategy ?? strategyDraft.strategyId,
-      symbols: mergeSymbols(strategyDraft.symbols, parsedSymbols),
-      startDate: parsedDateRange?.startDate ?? strategyDraft.startDate,
-      endDate: parsedDateRange?.endDate ?? strategyDraft.endDate,
-    };
-
-    const hasTooManySymbols = nextDraft.symbols.length > 6;
-    const hasInvalidDateOrder = !isValidDateOrder(nextDraft.startDate, nextDraft.endDate);
-    const minimumReady = Boolean(
-      nextDraft.strategyId &&
-      nextDraft.symbols.length > 0 &&
-      nextDraft.startDate &&
-      nextDraft.endDate &&
-      !hasTooManySymbols &&
-      !hasInvalidDateOrder,
-    );
-
-    const newUserMsg: Message = { id: userId, role: "user", kind: "text", content: text };
-
-    if (!profileStyle) {
-      setProfileStyle(resolvedProfileStyle);
-    }
-
-    if (hasTooManySymbols) {
-      setMessages((prev) => [
-        ...consumeActionPills(prev),
-        newUserMsg,
-        {
-          id: aiId,
-          role: "ai",
-          kind: "text",
-          content: "Use up to 6 symbols only. Send a smaller list (equities and/or crypto).",
-          actions: SYMBOL_ACTIONS,
-        },
-      ]);
-      return;
-    }
-
-    if (hasInvalidDateOrder) {
-      setMessages((prev) => [
-        ...consumeActionPills(prev),
-        newUserMsg,
-        {
-          id: aiId,
-          role: "ai",
-          kind: "text",
-          content: "Your date range looks reversed. Send start date first, then end date.",
-          actions: DATE_ACTIONS,
-        },
-      ]);
-      return;
-    }
-
-    setStrategyDraft(nextDraft);
-
-    if (!minimumReady) {
-      const isShortRequest = /short|shorting|puts|put options|inverse/i.test(text);
-      const missingStrategy = !nextDraft.strategyId;
-      const missingSymbols = nextDraft.symbols.length === 0;
-      const missingDates = !nextDraft.startDate || !nextDraft.endDate;
-
-      let guidance = "";
-      let actions: ChatActionOption[] | undefined;
-
-      if (isShortRequest) {
-        guidance = "Argus demo runs long-only strategies for now. Pick a long strategy and I will run it.";
-        actions = STRATEGY_ACTIONS;
-      } else if (missingStrategy) {
-        guidance =
-          profileStyle === null
-            ? "That is a way to keep things interesting. Which strategy would you like to try first?"
-            : "Which strategy would you like to try first?";
-        actions = STRATEGY_ACTIONS;
-      } else if (missingSymbols) {
-        guidance = `Great pick: ${getStrategyDefinition(nextDraft.strategyId)?.label}. Choose up to 6 symbols or type your own.`;
-        actions = SYMBOL_ACTIONS;
-      } else if (missingDates) {
-        guidance = `Locked: ${getStrategyDefinition(nextDraft.strategyId)?.label} on ${nextDraft.symbols.join(", ")}. Select a date range.`;
-        actions = DATE_ACTIONS;
+  const startNewChat = async () => {
+    try {
+      const { conversation } = await createConversation(i18n.language);
+      setConversationId(conversation.id);
+      setIsSidebarOpen(false);
+      setCurrentView("chat");
+      setMessages([]);
+      try {
+        const me = await getMe();
+        const stage = me.user.onboarding.stage;
+        setShowOnboardingGoalCards(
+          stage === "language_selection" || stage === "primary_goal_selection",
+        );
+      } catch {
+        setShowOnboardingGoalCards(false);
       }
+      void refreshHistory();
+      return conversation.id;
+    } catch (err) {
+      console.error("Failed to start new chat:", err);
+      return null;
+    }
+  };
 
-      setMessages((prev) => [
-        ...consumeActionPills(prev),
-        newUserMsg,
-        {
-          id: aiId,
-          role: "ai",
-          kind: "text",
-          content: guidance,
-          actions,
-        },
-      ]);
-      return;
+  const handleTriggerPrompt = async (type: 'strategy' | 'collection', customPrompt?: string) => {
+    // 1. Switch view
+    setCurrentView("chat");
+    setIsSidebarOpen(false);
+
+    // 2. Start new chat
+    const newConvId = await startNewChat();
+    if (!newConvId) return;
+
+    // 3. Define the localized prompt or use custom
+    let prompt: string;
+    if (customPrompt) {
+      prompt = customPrompt;
+    } else {
+      const promptKey = type === 'strategy'
+        ? 'chat.trigger_create_strategy'
+        : 'chat.trigger_create_collection';
+
+      const fallback = type === 'strategy'
+        ? 'I want to create a new strategy.'
+        : 'I want to create a new collection.';
+
+      prompt = t(promptKey, fallback);
     }
 
-    const loadingAiMsg: Message = {
-      id: aiId,
-      role: "ai",
-      kind: "strategy_result",
-      content: "Let me crunch the numbers on that...",
-      isLoadingResult: true,
+    // 4. Send it
+    void handleSend(prompt);
+  };
+
+  // ── Send message ───────────────────────────────────────────────────────────
+
+  const handleSend = async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || !conversationId) return;
+
+    setIsSidebarOpen(false); // SOTA: Collapse sidebar to enter focus mode on message send
+
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      kind: "text",
+      content: trimmed,
     };
+    const assistantId = crypto.randomUUID();
 
-    setMessages((prev) => [...consumeActionPills(prev), newUserMsg, loadingAiMsg]);
+    setMessages((prev) => [
+      ...prev.map((m) => ({ ...m, actions: undefined })),
+      userMsg,
+      { id: assistantId, role: "ai", kind: "text", content: "" },
+    ]);
+    setStreamStatus(t('chat.status.understanding'));
 
-    if (runTimeoutRef.current) {
-      clearTimeout(runTimeoutRef.current);
-    }
-    runTimeoutRef.current = setTimeout(() => {
+    try {
+      await streamChatMessage(conversationId, trimmed, i18n.language, (event) => {
+        if (event.event === "status") {
+          setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
+        }
+        if (event.event === "token") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+                : m,
+            ),
+          );
+        }
+        if (event.event === "result") {
+          const run = event.data.run as BacktestRun;
+          const card = resultCardFromRun(run);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    kind: "strategy_result",
+                    content: undefined,
+                    result: card,
+                    actions: [
+                      {
+                        id: "add-to-collection",
+                        label: t('common.add_to_collection'),
+                        value: `/action:add-to-collection:${run.id}:${run.strategy_id ?? ""}:${run.symbols.join(",")}:${run.asset_class}`,
+                      },
+                      {
+                        id: "try-new",
+                        label: t('chat.try_new_strategy'),
+                        value: "/action:new-chat",
+                      },
+                    ],
+                  }
+                : m,
+            ),
+          );
+        }
+        if (event.event === "title") {
+          setHistoryItems((prev) =>
+            prev.map((item) =>
+              item.id === event.data.conversation_id
+                ? { ...item, title: event.data.title }
+                : item
+            )
+          );
+        }
+        if (event.event === "done") {
+          setStreamStatus(null);
+          refreshHistory();
+        }
+      });
+    } catch (err: unknown) {
+      setStreamStatus(null);
+      const status = (err as { status?: number }).status;
+      const isRateLimit = status === 429;
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiId
+        prev.map((m) =>
+          m.id === assistantId
             ? {
-                ...msg,
-                isLoadingResult: false,
-                content: undefined,
-                result: buildDemoResultPayload(nextDraft),
-                actions: RESULT_ACTIONS,
+                ...m,
+                content: isRateLimit
+                  ? t('chat.rate_limit_error')
+                  : t('chat.error_backtest'),
               }
-            : msg,
+            : m,
         ),
       );
-    }, 1100);
+    }
+  };
+
+  const handleOnboardingGoalChoice = async (goal: PrimaryGoal) => {
+    if (!conversationId) return;
+    const isSkip = goal === "surprise_me";
+    const hiddenMessage = isSkip ? "__ONBOARDING_SKIP__" : `__ONBOARDING_GOAL__:${goal}`;
+    const userCopy = isSkip
+      ? t("onboarding.skip", "Skip for now")
+      : onboardingChoices.find((choice) => choice.goal === goal)?.title ?? goal;
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      kind: "text",
+      content: userCopy,
+    };
+    const assistantId = crypto.randomUUID();
+
+    setMessages((prev) => [
+      ...prev.map((m) => ({ ...m, actions: undefined })),
+      userMsg,
+      { id: assistantId, role: "ai", kind: "text", content: "" },
+    ]);
+    setStreamStatus(t("chat.status.understanding"));
+    setIsSidebarOpen(false);
+
+    try {
+      await streamChatMessage(conversationId, hiddenMessage, i18n.language, (event) => {
+        if (event.event === "token") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+                : m,
+            ),
+          );
+        }
+        if (event.event === "done") {
+          setStreamStatus(null);
+          setShowOnboardingGoalCards(false);
+          refreshHistory();
+        }
+      });
+      await patchMe({
+        onboarding: {
+          stage: "ready",
+          language_confirmed: true,
+          primary_goal: goal,
+          completed: false,
+        },
+      });
+    } catch {
+      setStreamStatus(null);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: t("chat.error_backtest") }
+            : m,
+        ),
+      );
+    }
+  };
+
+  // ── Action routing ─────────────────────────────────────────────────────────
+
+  const handleRename = async (id: string, newTitle: string, type: string) => {
+    try {
+      if (type === 'chat') await patchConversation(id, { title: newTitle });
+      else if (type === 'strategies') await patchStrategy(id, { name: newTitle });
+      else if (type === 'collections') await patchCollection(id, { name: newTitle });
+
+      setHistoryItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, title: newTitle } : item)),
+      );
+      setEditingId(null);
+    } catch (err) {
+      console.error("Failed to rename:", err);
+      showToast(t('chat.error_generic'));
+    }
   };
 
   const handleAction = (value: string) => {
-    handleSend(value);
+    if (value === "/action:new-chat") {
+      void startNewChat();
+      return;
+    }
+    if (value.startsWith("/action:add-to-collection:")) {
+      // Format: /action:add-to-collection:<runId>:<strategyId>:<symbols>:<assetClass>
+      const parts = value.split(":");
+      const runId = parts[2];
+      const strategyId = parts[3] || null;
+      const symbols = (parts[4] ?? "").split(",").filter(Boolean);
+      const assetClass = (parts[5] ?? "equity") as "equity" | "crypto";
+      // Find the result card title from messages for strategy name
+      const resultMsg = messages.find(
+        (m) => m.kind === "strategy_result" && m.result,
+      );
+      const strategyName = resultMsg?.result?.strategyName ?? "My strategy";
+      setCollectionPickerTarget({
+        runId,
+        strategyId,
+        strategyName,
+        symbols,
+        template: "rsi_mean_reversion",
+        assetClass,
+      });
+      return;
+    }
+    void handleSend(value);
   };
 
+  // ── Chat options helpers ───────────────────────────────────────────────────
+
+  const closeChatOptions = () => {
+    setShowChatOptions(false);
+    setActiveChatOptionsPanel("none");
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (chatOptionsRef.current && !chatOptionsRef.current.contains(event.target as Node)) {
+        closeChatOptions();
+      }
+    }
+    if (showChatOptions) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showChatOptions]);
+
+  const handleArchiveChat = async () => {
+    if (!conversationId) return;
+    try {
+      await patchConversation(conversationId, { archived: true });
+      showToast(t("common.archived"));
+      closeChatOptions();
+      void startNewChat();
+    } catch {
+      showToast(t("common.error_occurred"));
+    }
+  };
+
+  const handleAddToCollection = () => {
+    // Find the latest strategy result in the message list
+    const lastStrategyMsg = [...messages].reverse().find(m => m.kind === "strategy_result" && m.result);
+    if (lastStrategyMsg?.result) {
+      const res = lastStrategyMsg.result;
+      setCollectionPickerTarget({
+        runId: res.runId ?? "",
+        strategyId: res.strategyId ?? null,
+        strategyName: res.strategyName,
+        symbols: [],
+        template: "",
+        assetClass: "equity",
+      });
+      closeChatOptions();
+    } else {
+      showToast(t('chat.error_load'));
+    }
+  };
+
+  // ── Recent items grouped by type ───────────────────────────────────────────
+  const groupedHistory = useMemo(() => ({
+    chat: historyItems.filter((h) => h.type === "chat").slice(0, 10),
+    strategy: historyItems.filter((h) => h.type === "strategy").slice(0, 10),
+    collection: historyItems.filter((h) => h.type === "collection").slice(0, 10),
+  }), [historyItems]);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="relative w-full h-[100dvh] bg-[#f9f9f9] dark:bg-[#141517] overflow-hidden flex">
-      <div className="absolute inset-y-0 left-0 w-full md:w-[320px] h-full flex flex-col pt-12 pb-8 px-6 z-0">
-        <div className="flex items-center justify-between w-full mb-10">
-           <h1 className="text-[26px] font-medium tracking-tight text-black dark:text-white" style={{ fontFamily: 'var(--font-space-grotesk)' }}>argus</h1>
-           <button
-             className="flex items-center justify-center p-2 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white"
-             onClick={() => {
-               setIsSidebarOpen(false);
-               setCurrentView("chat");
-               setStrategyDraft(EMPTY_DRAFT);
-               setProfileStyle(null);
-               startWelcomeFlow();
-             }}
-             title="New chat"
-           >
-              <MessageSquarePlus className="w-5 h-5" />
-           </button>
-        </div>
+    <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
 
-        <div className="flex flex-col gap-3 mb-8">
-           <button
-             className="flex items-center justify-center w-full py-3.5 rounded-[16px] border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white text-[15px] font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-             onClick={() => { setCurrentView('portfolios'); setIsSidebarOpen(false); }}
-           >
-             Portfolios
-           </button>
-           <button
-             className="flex items-center justify-center w-full py-3.5 rounded-[16px] border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white text-[15px] font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-             onClick={() => { setCurrentView('strategies'); setIsSidebarOpen(false); }}
-           >
-             Strategies
-           </button>
-        </div>
-
-        <div className="flex flex-col flex-1 overflow-hidden">
-           <button
-             onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
-             className="flex items-center gap-1.5 group w-fit mb-3"
-           >
-             <h2 className="text-[20px] font-medium tracking-tight text-black dark:text-white" style={{ fontFamily: 'var(--font-space-grotesk)' }}>Recents</h2>
-             <ChevronDown className={`w-4 h-4 text-black/40 dark:text-white/40 transition-transform duration-200 mt-1 ${isRecentsExpanded ? 'rotate-0' : '-rotate-90'}`} />
-           </button>
-
-           <div className={`flex flex-col gap-1 -mx-3 px-3 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isRecentsExpanded ? 'max-h-[40vh] opacity-100' : 'max-h-0 opacity-0'}`}>
-             <button className="flex flex-col items-start w-full py-3 px-4 rounded-[16px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0" onClick={() => setIsSidebarOpen(false)}>
-               <span className="text-[15px] font-medium text-black dark:text-white truncate w-full text-left">Short BTC Volatility</span>
-               <span className="text-[12px] text-black/40 dark:text-white/40 mt-0.5">today • Strategy</span>
-             </button>
-
-             <button className="flex flex-col items-start w-full py-3 px-4 rounded-[16px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0" onClick={() => setIsSidebarOpen(false)}>
-               <span className="text-[15px] font-medium text-black dark:text-white truncate w-full text-left">Crypto Moon Mission</span>
-               <span className="text-[12px] text-black/40 dark:text-white/40 mt-0.5">yesterday • Chat</span>
-             </button>
-
-             <button className="flex flex-col items-start w-full py-3 px-4 rounded-[16px] hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0" onClick={() => setIsSidebarOpen(false)}>
-               <span className="text-[15px] font-medium text-black dark:text-white truncate w-full text-left">Tech Breakouts Q3</span>
-               <span className="text-[12px] text-black/40 dark:text-white/40 mt-0.5">Oct 28, 2024 • Portfolio</span>
-             </button>
-           </div>
-        </div>
-
-        <div className="flex items-center gap-4 mt-auto pt-4">
-           <button
-             onClick={() => { setCurrentView('settings'); setIsSidebarOpen(false); }}
-             className="flex items-center justify-center w-12 h-12 rounded-full border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white shrink-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)]" title="Settings"
-           >
-             <Settings className="w-5 h-5" />
-           </button>
-           <div className="relative flex-1">
-             <Search className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40 pointer-events-none" />
-             <input
-               type="text"
-               placeholder="Search..."
-               value={searchText}
-               onChange={(e) => setSearchText(e.target.value)}
-               onBlur={() => setTimeout(() => setSearchText(""), 200)}
-               className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 dark:border-white/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] shadow-lg text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
-             />
-             {searchText && (
-               <button
-                 onClick={() => setSearchText("")}
-                 className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-black/60 dark:text-white/60 hover:bg-black/20 dark:hover:bg-white/20 transition-colors"
-               >
-                 <X className="w-3.5 h-3.5" />
-               </button>
-             )}
-          </div>
-        </div>
-      </div>
-
-      <div
-        className={`absolute inset-0 flex flex-col w-full h-full bg-[#f9f9f9] dark:bg-[#141517] overflow-hidden transform-gpu transition-all duration-[500ms] ease-[cubic-bezier(0.16,1,0.3,1)] z-10 ${
-          isSidebarOpen ? 'translate-x-[75%] md:translate-x-[320px] scale-[0.93] rounded-[32px] md:rounded-[32px] shadow-[-20px_0_40px_rgba(0,0,0,0.08)] dark:shadow-[-20px_0_40px_rgba(0,0,0,0.5)] cursor-pointer' : 'translate-x-0 scale-100 rounded-none'
+      {/* ── Desktop sidebar ── */}
+      <aside
+        className={`flex flex-col border-r border-black/5 bg-white transition-all duration-300 ease-in-out overflow-x-hidden dark:border-white/5 dark:bg-[#141517] ${
+          isSidebarOpen ? "w-72" : "w-14"
         }`}
-        onClick={() => {
-          if (isSidebarOpen) setIsSidebarOpen(false);
-        }}
       >
-      {currentView === 'chat' && (
-        <div className="flex flex-col w-full h-[100dvh] max-w-3xl mx-auto relative overflow-hidden" style={{ pointerEvents: isSidebarOpen ? 'none' : 'auto' }}>
+        {/* Sidebar Header: Brand & Toggle */}
+        <div className="flex h-20 items-center px-[6px] pb-4 pt-6 overflow-hidden">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-300 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+            aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            {isSidebarOpen ? (
+              <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
+            ) : (
+              <ArgusLogo  className="h-8 w-8 text-black dark:text-white" />
+            )}
+          </button>
+          <span className={`font-display pl-3 text-[22px] font-bold tracking-tight text-black transition-all duration-300 dark:text-white ${
+            isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+          }`}>
+            argus
+          </span>
+        </div>
 
-      <div className="absolute top-0 inset-x-0 h-28 z-10 pointer-events-none backdrop-blur-[8px] bg-[#f5f5f5]/10 dark:bg-[#191c1f]/20 [mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_30%,transparent_100%)]" />
+        <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-[6px] pb-4 pt-2">
+          {/* Main Navigation */}
+          <button
+            onClick={() => {
+              void startNewChat();
+              setIsSidebarOpen(false);
+            }}
+            className="group mb-2 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Plus className="h-5 w-5 text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+            </div>
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
+              {t('chat.new_chat')}
+            </span>
+          </button>
 
-      <div className="absolute top-4 left-4 z-20">
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white"
-          title="Open Menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-      </div>
+          <button
+            onClick={() => {
+              setCurrentView("strategies");
+              setIsSidebarOpen(false);
+            }}
+            className={`group mb-2 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${
+              currentView === "strategies" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+          >
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Compass className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+            </div>
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
+              {t('common.strategies')}
+            </span>
+          </button>
 
-      <div className="absolute top-6 inset-x-0 w-full flex justify-center z-20 pointer-events-none">
-        <h1 className="text-[16px] font-medium tracking-tight pointer-events-auto">argus</h1>
-      </div>
+          <button
+            onClick={() => {
+              setCurrentView("collections");
+              setIsSidebarOpen(false);
+            }}
+            className={`group mb-6 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${
+              currentView === "collections" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+          >
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Layers className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+            </div>
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
+              {t('common.collections')}
+            </span>
+          </button>
 
-      {showWelcomeBacksplash && (
-        <div className="absolute inset-0 z-[15] pointer-events-none flex items-center justify-center">
-          <div className="flex flex-col items-center gap-5 px-6 animate-in fade-in duration-700">
-            <p className="text-[22px] sm:text-[28px] font-medium tracking-tight text-black/80 dark:text-white/85">
-              <span className="argus-welcome-typed [filter:drop-shadow(0_0_0_rgba(255,255,255,0))] dark:[filter:drop-shadow(0_0_0_rgba(255,255,255,0))]">
-                Welcome to argus, user.
-              </span>
-            </p>
+          {/* History Accordion */}
+          <div className="mb-2">
+            <button
+              onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
+              className="flex h-11 w-full items-center justify-between rounded-[14px] px-0 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center">
+                  <History className="h-[22px] w-[22px] text-black/60 dark:text-white/60" />
+                </div>
+                <span className={`font-display pl-3 tracking-tight transition-all duration-300 ${
+                  isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                }`}>
+                  {t('common.recents')}
+                </span>
+              </div>
+              <div className={`pr-4 transition-opacity duration-300 ${
+                isSidebarOpen ? "block opacity-100" : "hidden opacity-0 pointer-events-none"
+              }`}>
+                <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isRecentsExpanded ? "rotate-90" : ""}`} />
+              </div>
+            </button>
+
+            {isRecentsExpanded && (
+              <div className="space-y-0.5 pb-2">
+                {currentView === "chat" && searchText.trim().length > 0 ? (
+                  <>
+                    {isSearching ? (
+                      <div className="px-11 py-4 text-[13px] text-black/45 dark:text-white/45">
+                        {t("common.loading")}
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="px-11 py-6">
+                        <p className={`text-[13px] leading-relaxed text-black/30 transition-all duration-300 dark:text-white/30 ${
+                          isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                        }`}>
+                          {t("common.no_items")}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {searchResults.map((item) => (
+                          <button
+                            key={`${item.type}:${item.id}`}
+                            onClick={() => {
+                              if (item.type === "chat") {
+                                void loadConversation(item.id);
+                                return;
+                              }
+                              if (item.type === "strategy") {
+                                setCurrentView("strategies");
+                                setIsSidebarOpen(false);
+                                return;
+                              }
+                              if (item.type === "collection") {
+                                setCurrentView("collections");
+                                setIsSidebarOpen(false);
+                                return;
+                              }
+                              setCurrentView("chat");
+                              setIsSidebarOpen(false);
+                            }}
+                            className="group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
+                          >
+                            <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
+                            <div className={`min-w-0 flex-1 pl-3 pr-4 transition-all duration-300 ${
+                              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                            }`}>
+                              <span className="font-display block truncate text-[15px] font-medium tracking-tight">
+                                {item.title}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
+                                {item.matched_text}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                        {searchNextCursor && (
+                          <button
+                            type="button"
+                            onClick={() => void loadMoreSearch()}
+                            disabled={isLoadingMoreSearch}
+                            className="mx-11 mt-2 rounded-[12px] border border-black/10 px-3 py-1.5 text-[12px] font-medium text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
+                          >
+                            {isLoadingMoreSearch ? t("common.loading") : t("common.retry")}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : historyItems.length === 0 ? (
+                  <div className="px-11 py-6">
+                    <p className={`text-[13px] leading-relaxed text-black/30 transition-all duration-300 dark:text-white/30 ${
+                      isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                    }`}>
+                      {t('chat.no_recent_activity')}
+                    </p>
+                  </div>
+                ) : (
+                  historyItems.map((item) => (
+                    <button
+                      key={`${item.type}:${item.id}`}
+                      onClick={() => {
+                        if (item.type === "chat") {
+                          void loadConversation(item.id);
+                          return;
+                        }
+                        if (item.type === "strategy") {
+                          setCurrentView("strategies");
+                          setIsSidebarOpen(false);
+                          return;
+                        }
+                        if (item.type === "collection") {
+                          setCurrentView("collections");
+                          setIsSidebarOpen(false);
+                          return;
+                        }
+                        setCurrentView("chat");
+                        setIsSidebarOpen(false);
+                      }}
+                      className={`group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 ${
+                        item.type === "chat" && conversationId === item.id
+                          ? "bg-black/5 dark:bg-white/5"
+                          : "hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
+                      <div className={`min-w-0 flex-1 pl-3 pr-4 transition-all duration-300 ${
+                        isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+                      }`}>
+                        <span className="font-display block truncate text-[15px] font-medium tracking-tight">
+                          {item.title}
+                        </span>
+                        <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
+                          {formatRelativeDate(
+                            item.created_at,
+                            { today: t('common.today'), yesterday: t('common.yesterday') },
+                            i18n.language
+                          )} · {t(`common.${item.type}`, item.type)}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+                {historyNextCursor && currentView === "chat" && searchText.trim().length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => loadMoreHistory()}
+                    disabled={isLoadingMoreHistory}
+                    className="mx-11 mt-2 rounded-[12px] border border-black/10 px-3 py-1.5 text-[12px] font-medium text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
+                  >
+                    {isLoadingMoreHistory ? t("common.loading") : t("common.retry")}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      )}
 
-      <div className="absolute top-4 right-4 z-30">
-        <button
-          onClick={() => {
-            if (showHeaderMenu) {
-              closeHeaderMenu();
-              return;
-            }
-            setShowHeaderMenu(true);
-          }}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-black dark:text-white"
-          title="Chat Options"
-        >
-          <History className="w-5 h-5" />
-        </button>
-
-        {showHeaderMenu && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/20 dark:bg-black/80 md:bg-transparent z-40 animate-in fade-in duration-300 md:duration-0"
-              onClick={closeHeaderMenu}
-            />
-
-            <div className="fixed md:absolute bottom-0 md:bottom-auto md:top-full inset-x-0 md:right-0 md:left-auto md:mt-1 w-full md:w-[240px] z-50 perspective-[1000px]">
-
-                <div
-                  className={`w-full bg-white dark:bg-[#1f2225] rounded-t-[32px] md:rounded-[24px] rounded-b-none md:rounded-b-[24px] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:shadow-xl dark:shadow-black/50 border-t md:border border-black/5 dark:border-white/5 pb-10 md:pb-2 pt-2 transform-gpu origin-bottom md:origin-top transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                    activeSubmenu !== 'none' ? 'scale-[0.93] opacity-40 blur-[1px] pointer-events-none' : 'scale-100 opacity-100 blur-0'
-                  } animate-in slide-in-from-bottom-[100%] md:slide-in-from-top-2 fade-in duration-300`}
-                >
-                  <div className="w-12 h-1.5 bg-black/10 dark:bg-white/10 rounded-full mx-auto my-3 md:hidden shrink-0" />
-
-                  <button
-                    className="w-full flex items-center gap-4 px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[16px] md:text-[15px] font-medium"
-                    onClick={() => {
-                      closeHeaderMenu();
-                      setCurrentView("chat");
-                      setStrategyDraft(EMPTY_DRAFT);
-                      setProfileStyle(null);
-                      startWelcomeFlow();
-                    }}
-                  >
-                    <Plus className="w-[18px] h-[18px] md:w-4 md:h-4 text-black/60 dark:text-white/60" />
-                    New chat
-                  </button>
-
-                  <button
-                    className="w-full flex items-center justify-between px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[16px] md:text-[15px] font-medium group"
-                    onClick={(e) => { e.stopPropagation(); setActiveSubmenu('history'); }}
-                  >
-                    <div className="flex items-center gap-4">
-                      <History className="w-[18px] h-[18px] md:w-4 md:h-4 text-black/60 dark:text-white/60" />
-                      View history
-                    </div>
-                    <ChevronRight className={`w-5 h-5 md:w-4 md:h-4 text-black/40 dark:text-white/40 transition-transform duration-[400ms] ${activeSubmenu === 'history' ? 'rotate-90' : 'group-hover:translate-x-0.5'}`} />
-                  </button>
-
-                  <button
-                    className="w-full flex items-center justify-between px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[16px] md:text-[15px] font-medium group"
-                    onClick={(e) => { e.stopPropagation(); setActiveSubmenu('portfolio'); }}
-                  >
-                    <div className="flex items-center gap-4">
-                      <Folder className="w-[18px] h-[18px] md:w-4 md:h-4 text-black/60 dark:text-white/60" />
-                      Add to portfolio
-                    </div>
-                    <ChevronRight className={`w-5 h-5 md:w-4 md:h-4 text-black/40 dark:text-white/40 transition-transform duration-[400ms] ${activeSubmenu === 'portfolio' ? 'rotate-90' : 'group-hover:translate-x-0.5'}`} />
-                  </button>
-
-                  <button
-                    className="w-full flex items-center gap-4 px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[16px] md:text-[15px] font-medium"
-                    onClick={closeHeaderMenu}
-                  >
-                    <Archive className="w-[18px] h-[18px] md:w-4 md:h-4 text-black/60 dark:text-white/60" />
-                    Archive
-                  </button>
-
-                  <div className="h-px w-full bg-black/5 dark:bg-white/5 my-2 md:my-1" />
-
-                  <button
-                    className="w-full flex items-center gap-4 px-6 md:px-5 py-4 md:py-3 hover:bg-red-500/10 transition-colors text-left text-red-500 text-[16px] md:text-[15px] font-medium"
-                    onClick={() => {
-                      closeHeaderMenu();
-                      setStrategyDraft(EMPTY_DRAFT);
-                      setProfileStyle(null);
-                      startWelcomeFlow();
-                    }}
-                  >
-                    <Trash2 className="w-[18px] h-[18px] md:w-4 md:h-4 text-red-500" />
-                    Delete chat
-                  </button>
-                </div>
-
-              {/* Overlay Submenu Card Container */}
-              {activeSubmenu !== 'none' && (
-                <div
-                  className="absolute top-0 right-0 w-full min-h-full bg-white/95 dark:bg-[#1f2225]/95 backdrop-blur-[20px] rounded-t-[32px] md:rounded-[24px] rounded-b-none md:rounded-b-[24px] shadow-2xl dark:shadow-black/80 border-t md:border border-black/5 dark:border-white/5 py-2 z-10 animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-top-6 duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col pb-8 md:pb-2"
-                >
-                  {/* Mobile Swap Handle */}
-                  <div className="w-12 h-1.5 bg-black/10 dark:bg-white/10 rounded-full mx-auto my-3 md:hidden shrink-0" />
-
-                  {/* Action Header back button */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setActiveSubmenu('none'); }}
-                    className="w-full flex items-center justify-between px-6 md:px-4 py-3 md:py-2 opacity-60 hover:opacity-100 transition-opacity mt-1 md:mt-0"
-                  >
-                    <span className="text-[14px] md:text-[13px] font-medium text-black dark:text-white tracking-wide uppercase">
-                      {activeSubmenu === 'history' ? 'Past Sessions' : 'Portfolios'}
-                    </span>
-                    <ChevronRight className="w-5 h-5 md:w-4 md:h-4 text-black dark:text-white -rotate-90" />
-                  </button>
-
-                  <div className="h-px w-[85%] mx-auto bg-black/5 dark:bg-white/5 mb-3 md:mb-2 mt-1" />
-
-                  {/* Portfolio Options */}
-                  {activeSubmenu === 'portfolio' && (
-                    <div className="flex flex-col animate-in fade-in zoom-in-95 duration-200 delay-100 fill-mode-both">
-                      <button className="w-full flex items-center gap-4 px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[16px] md:text-[15px] font-medium" onClick={closeHeaderMenu}>
-                        <FolderPlus className="w-[18px] h-[18px] md:w-4 md:h-4 text-black/60 dark:text-white/60" />
-                        New portfolio
-                      </button>
-                      <button className="w-full flex items-center gap-4 px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[16px] md:text-[15px] font-medium" onClick={closeHeaderMenu}>
-                        <Folder className="w-[18px] h-[18px] md:w-4 md:h-4 text-black/60 dark:text-white/60" />
-                        Alpha Volatility &apos;24
-                      </button>
-                      <button className="w-full flex items-center gap-4 px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[16px] md:text-[15px] font-medium" onClick={closeHeaderMenu}>
-                        <Folder className="w-[18px] h-[18px] md:w-4 md:h-4 text-black/60 dark:text-white/60" />
-                        Tech Breakouts Q3
-                      </button>
-                    </div>
-                  )}
-
-                  {/* History Options */}
-                  {activeSubmenu === 'history' && (
-                    <div className="flex flex-col animate-in fade-in zoom-in-95 duration-200 delay-100 fill-mode-both">
-                      <button className="w-full flex flex-col justify-center px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left cursor-pointer" onClick={closeHeaderMenu}>
-                        <div className="flex justify-between items-center w-full">
-                          <span className="text-black dark:text-white text-[16px] md:text-[15px] font-medium truncate pr-2">Short BTC Volatility</span>
-                          <span className="text-[14px] md:text-[12px] text-black/40 dark:text-white/40 shrink-0">Today</span>
-                        </div>
-                        <span className="text-[14px] md:text-[13px] text-black/50 dark:text-white/50 truncate w-full mt-1 md:mt-0.5">Parameters: 50d SMA, Take Profit 10%...</span>
-                      </button>
-                      <div className="h-px w-[85%] mx-auto bg-black/5 dark:bg-white/5 my-1 md:my-0" />
-                      <button className="w-full flex flex-col justify-center px-6 md:px-5 py-4 md:py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left cursor-pointer" onClick={closeHeaderMenu}>
-                        <div className="flex justify-between items-center w-full">
-                          <span className="text-black dark:text-white text-[16px] md:text-[15px] font-medium truncate pr-2">Crypto Moon Mission</span>
-                          <span className="text-[14px] md:text-[12px] text-black/40 dark:text-white/40 shrink-0">Nov 12</span>
-                        </div>
-                        <span className="text-[14px] md:text-[13px] text-black/50 dark:text-white/50 truncate w-full mt-1 md:mt-0.5">Assets: AAPL, MSFT, NVDA. No stop l...</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
+        {/* Search & Settings */}
+        <div className="border-t border-black/5 p-[6px] dark:border-white/5">
+          <div className="relative mb-4 h-11 overflow-hidden">
+            <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center">
+              <Search className="h-4 w-4 text-black/30 dark:text-white/30" />
             </div>
-            </>
-          )}
-        {/* End of Menu Stack */}
-      </div>
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder={t('common.search')}
+              className={`font-display h-11 w-full rounded-[14px] bg-black/[0.03] pl-[62px] pr-4 text-[15px] font-medium outline-none transition-all placeholder:text-black/30 hover:bg-black/[0.05] focus:bg-white focus:ring-1 focus:ring-black/5 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:hover:bg-white/[0.05] dark:focus:bg-[#1f2225] dark:focus:ring-white/5 ${
+                isSidebarOpen ? "block" : "hidden"
+              }`}
+            />
+          </div>
 
-      {/* Messages Scroll Area */}
-      <div className="relative flex-1 min-h-0">
-        <div 
-          ref={scrollContainerRef}
-          onScroll={handleScrollEvent}
-          className="argus-scrollbar h-full overflow-y-auto px-4 pt-[86px] pb-[120px] space-y-8 scroll-smooth transition-colors duration-300"
-        >
-          <div
-            className={`transition-[height,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-              messages.length <= 1 ? "h-[26vh] opacity-100" : messages.length <= 2 ? "h-[14vh] opacity-70" : "h-0 opacity-0"
+          <button
+            onClick={() => {
+              setCurrentView("settings");
+            }}
+            className={`group flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${
+              currentView === "settings" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5"
             }`}
-            aria-hidden="true"
-          />
-          {messages.map((msg) => (
-            <ChatMessage key={msg.id} message={msg} onAction={handleAction} />
-          ))}
-          <div ref={bottomRef} className="h-1 text-transparent font-medium" />
+          >
+            <div className="flex h-11 w-11 items-center justify-center">
+              <Settings className="h-5 w-5 text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+            </div>
+            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+              isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none"
+            }`}>
+              {t('common.settings')}
+            </span>
+          </button>
         </div>
-        {scrollIndicator.visible && (
-          <div
-            className={`absolute right-[2px] top-0 w-px rounded-full argus-scroll-indicator pointer-events-none ${isScrolling ? "opacity-100" : "opacity-0"}`}
-            style={{ height: `${scrollIndicator.height}px`, transform: `translateY(${scrollIndicator.top}px)` }}
-            aria-hidden="true"
+      </aside>
+
+      {/* ── Main panel ── */}
+      <section
+        className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]"
+      >
+        {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
+        {currentView !== "settings" && (
+          <header className="absolute inset-x-0 top-0 z-[50] flex h-20 items-center justify-between px-4 pointer-events-none md:px-8">
+          {/* Empty space for sidebar toggle alignment balance */}
+          <div className="w-11 md:w-32" />
+
+          {/* Title (Always Centered relative to Content) */}
+          <h1 className="pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+            {currentView === "chat" && (messages.length > 0 ? "Conversation" : t('chat.new_chat'))}
+            {currentView === "strategies" && t('common.strategies')}
+            {currentView === "collections" && t('common.collections')}
+          </h1>
+
+          {/* Action Button (Always Right-Anchored) */}
+          <div className="flex w-11 justify-end pointer-events-auto md:w-32">
+            {currentView === "chat" && (
+              <div className="relative" ref={chatOptionsRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowChatOptions(!showChatOptions)}
+                  className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                  aria-label="Chat options"
+                >
+                  <History className="h-5 w-5" />
+                </button>
+                {showChatOptions && (
+                  <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-2 md:w-[260px] md:rounded-[20px] md:border md:pb-2 md:shadow-xl">
+                    <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
+                    {activeChatOptionsPanel === "none" && (
+                      <div className="py-1">
+                        <button
+                          type="button"
+                          onClick={() => { closeChatOptions(); void startNewChat(); }}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('chat.new_chat')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddToCollection}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('common.add_to_collection')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
+                          className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <span className="flex items-center gap-4">
+                            <History className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                            {t('chat.view_history')}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-black/30 dark:text-white/30 transition-transform group-hover:translate-x-0.5" />
+                        </button>
+                        <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!conversationId) return;
+                            deleteConversation(conversationId)
+                              .then(() => {
+                                showToast(t('common.delete'));
+                                refreshHistory();
+                                void startNewChat();
+                                closeChatOptions();
+                              })
+                              .catch(() => showToast(t('common.error_occurred')));
+                          }}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
+                          {t('chat.delete_chat')}
+                        </button>
+                      </div>
+                    )}
+                    {activeChatOptionsPanel === "history" && (
+                      <div className="py-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveChatOptionsPanel("none")}
+                          className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
+                        >
+                          {t('chat.past_sessions')}
+                          <ChevronRight className="h-4 w-4 -rotate-90" />
+                        </button>
+                        <div className="max-h-[300px] overflow-y-auto pb-1">
+                          {groupedHistory.chat.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setConversationId(item.id);
+                                getConversationMessages(item.id).then(({ items }) => {
+                                  setMessages(
+                                    items.reverse().map((m) => ({
+                                      id: m.id,
+                                      role: m.role === "user" ? "user" : "ai",
+                                      content: m.content,
+                                      kind: m.content.includes("result") ? "strategy_result" : "text",
+                                    }))
+                                  );
+                                });
+                                closeChatOptions();
+                              }}
+                              className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
+                            >
+                              <span className="truncate text-[15px] font-medium">{item.title}</span>
+                              <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">{item.subtitle}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {(currentView === "strategies" || currentView === "collections") && (
+              <button
+                onClick={() => handleTriggerPrompt(currentView === "strategies" ? "strategy" : "collection")}
+                className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                aria-label="New item"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+          </header>
+        )}
+        {/* ── Chat view ── */}
+        {currentView === "chat" && (
+          <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
+
+            {messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-start px-4 pt-[35vh]">
+                <h1 className="mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
+                  argus
+                </h1>
+
+                <div className="w-full max-w-2xl">
+                  <ChatInput onSend={handleSend} />
+                </div>
+
+                {showOnboardingGoalCards && (
+                  <div
+                    className="mt-6 w-full max-w-2xl"
+                    data-testid="onboarding-goal-cards"
+                  >
+                    <p className="mb-3 text-center text-[14px] text-black/60 dark:text-white/60">
+                      {t(
+                        "onboarding.prompt",
+                        "What is your current primary goal? Don't worry, you can change it later.",
+                      )}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {onboardingChoices.map((choice) => (
+                        <button
+                          key={choice.goal}
+                          type="button"
+                          data-testid={`onboarding-goal-${choice.goal}`}
+                          onClick={() => handleOnboardingGoalChoice(choice.goal)}
+                          className="rounded-[14px] border border-black/10 bg-white/70 px-3 py-3 text-left transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/70 dark:hover:bg-white/5"
+                        >
+                          <p className="text-[14px] font-medium text-black dark:text-white">
+                            {choice.title}
+                          </p>
+                          <p className="mt-1 text-[12px] text-black/55 dark:text-white/55">
+                            {choice.description}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex justify-center">
+                      <button
+                        type="button"
+                        data-testid="onboarding-skip"
+                        onClick={() => handleOnboardingGoalChoice("surprise_me")}
+                        className="text-[13px] font-medium text-black/55 underline-offset-2 transition-colors hover:text-black hover:underline dark:text-white/55 dark:hover:text-white"
+                      >
+                        {t("onboarding.skip", "Skip for now")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show/Hide Suggestions Toggle */}
+                <div className="mt-4">
+                  <button
+                    onClick={() => setShowSuggestions(!showSuggestions)}
+                    className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+                  >
+                    {showSuggestions ? t('chat.hide_suggestions') : t('chat.show_suggestions')}
+                  </button>
+                </div>
+
+                <div className={`mt-6 w-full flex flex-col items-center transition-all duration-500 ease-in-out overflow-hidden ${
+                  showSuggestions ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+                }`}>
+                  {/* Starter Actions / Chips */}
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                      <button
+                        onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Show me TSLA analysis'))}
+                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                      >
+                        <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
+                        TSLA Analysis
+                      </button>
+                      <button
+                        onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Show me BTC trends'))}
+                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                      >
+                        <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
+                        BTC Trends
+                      </button>
+                      <button
+                        onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Explain DCA strategy'))}
+                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                      >
+                        <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
+                        DCA Strategy
+                      </button>
+                    </div>
+
+                    {/* Example Questions */}
+                    <div className="mt-12 flex flex-col items-center gap-4 text-center">
+                      <button onClick={() => handleSend(t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                        {t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?')}
+                      </button>
+                      <button onClick={() => handleSend(t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                        {t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.')}
+                      </button>
+                      <button onClick={() => handleSend(t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                        {t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+            ) : (
+              <>
+                {/* Messages */}
+                <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
+                  <div className="space-y-8">
+                    {messages.map((msg) => (
+                      <ChatMessage
+                        key={msg.id}
+                        message={msg}
+                        onAction={handleAction}
+                        onFeedback={(type, context, rating) => {
+                          setFeedbackState({ isOpen: true, type, context, rating });
+                          setIsSidebarOpen(false);
+                        }}
+                        isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
+                      />
+                    ))}
+                    {streamStatus && (
+                      <div className="ml-12 text-[13px] text-black/45 dark:text-white/45">
+                        {streamStatus}
+                      </div>
+                    )}
+                    <div ref={bottomRef} />
+                  </div>
+                </div>
+
+                {/* Input fade + bar */}
+                <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
+                <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 px-4">
+                  <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
+                    <ChatInput onSend={handleSend} />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {currentView === "strategies" && (
+          <StrategiesView
+            onMenuClick={() => setIsSidebarOpen((o) => !o)}
+            onAddClick={() => handleTriggerPrompt('strategy')}
+            searchText={searchText}
+            onSearchChange={setSearchText}
+            isSidebarOpen={isSidebarOpen}
+            onTriggerPrompt={handleTriggerPrompt}
           />
         )}
-      </div>
+        {currentView === "collections" && (
+          <CollectionsView
+            onMenuClick={() => setIsSidebarOpen((o) => !o)}
+            onAddClick={() => handleTriggerPrompt('collection')}
+            searchText={searchText}
+            onSearchChange={setSearchText}
+            isSidebarOpen={isSidebarOpen}
+            onTriggerPrompt={handleTriggerPrompt}
+          />
+        )}
+        {currentView === "settings" && (
+          <SettingsView
+            onClose={() => setCurrentView("chat")}
+            onLogout={() => {
+              window.location.href = "/";
+            }}
+            onFeedback={(type, context) => {
+              setFeedbackState({ isOpen: true, type, context });
+              setIsSidebarOpen(false);
+            }}
+          />
+        )}
+      </section>
 
-      {/* Floating Scroll to Bottom Button */}
-      {isScrolledUp && (
-        <button
-          onClick={scrollToBottom}
-          className="fixed md:absolute bottom-32 md:bottom-28 right-4 md:right-6 p-3 rounded-full bg-white dark:bg-[#2c2c2e] text-black dark:text-white shadow-xl dark:shadow-black/50 border border-black/5 dark:border-white/10 hover:scale-105 transition-transform z-50 animate-in fade-in zoom-in-95 duration-200"
-          aria-label="Scroll to bottom"
-        >
-          <ArrowDown className="w-5 h-5" />
-        </button>
+      {/* ── Collection picker sheet ── */}
+      {collectionPickerTarget && (
+        <CollectionPicker
+          strategyId={collectionPickerTarget.strategyId}
+          strategyFallback={{
+            name: collectionPickerTarget.strategyName,
+            template: collectionPickerTarget.template,
+            asset_class: collectionPickerTarget.assetClass,
+            symbols: collectionPickerTarget.symbols,
+          }}
+          onClose={() => setCollectionPickerTarget(null)}
+          onSuccess={(collectionName) => {
+            setCollectionPickerTarget(null);
+            showToast(t('chat.added_to_collection', { name: collectionName }));
+          }}
+        />
       )}
 
-      {/* Progressive Bottom Glass Blur Layer */}
-      <div className="absolute bottom-0 inset-x-0 h-40 z-10 pointer-events-none backdrop-blur-[0.8px] bg-[#f5f5f5]/10 dark:bg-[#191c1f]/20 [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_50%,transparent_100%)]" />
+      {/* ── Feedback Dialog ── */}
+      <FeedbackDialog
+        isOpen={feedbackState.isOpen}
+        onClose={() => setFeedbackState((s) => ({ ...s, isOpen: false }))}
+        type={feedbackState.type}
+        rating={feedbackState.rating}
+        context={feedbackState.context}
+      />
 
-      {/* Bottom Input Container */}
-      <div className="absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none">
-        <div className="pointer-events-auto max-w-3xl mx-auto shadow-2xl shadow-black/5 dark:shadow-black/50 rounded-[9999px]">
-          <ChatInput onSend={handleSend} />
-        </div>
-      </div>
-
-        </div>
-      )}
-
-      {currentView === 'strategies' && (
-        <div className="w-full h-[100dvh]" style={{ pointerEvents: isSidebarOpen ? 'none' : 'auto' }}>
-          <StrategiesView onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} onSettingsClick={() => setCurrentView('settings')} />
+      {/* ── Toast ── */}
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-full bg-black dark:bg-white px-5 py-2.5 text-[14px] font-medium text-white dark:text-black shadow-xl">
+          {toast}
         </div>
       )}
-
-      {currentView === 'portfolios' && (
-        <div className="w-full h-[100dvh]" style={{ pointerEvents: isSidebarOpen ? 'none' : 'auto' }}>
-          <PortfoliosView onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} onSettingsClick={() => setCurrentView('settings')} />
-        </div>
-      )}
-
-      {currentView === 'settings' && (
-        <div className="w-full h-[100dvh]" style={{ pointerEvents: isSidebarOpen ? 'none' : 'auto' }}>
-          <SettingsView onClose={() => setCurrentView('chat')} onLogout={() => window.location.href = '/'} />
-        </div>
-      )}
-
-      </div>
     </div>
   );
 }
