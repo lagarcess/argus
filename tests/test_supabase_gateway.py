@@ -3,6 +3,6 @@ from unittest.mock import MagicMock
 from argus.domain.supabase_gateway import SupabaseGateway
 
 
-def test_no_unbounded_fetches_when_limit_is_none():
+def test_batched_fetch_helper_exists_for_unbounded_queries():
     gateway = SupabaseGateway(client=MagicMock())
-    assert not hasattr(gateway, "_fetch_all_rows")
+    assert hasattr(gateway, "_fetch_all_rows")

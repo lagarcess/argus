@@ -277,6 +277,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert run["benchmark_symbol"] == "SPY"
     assert run["config_snapshot"]["side"] == "long"
     assert run["config_snapshot"]["starting_capital"] == 10000
+    assert "_execution_realism" not in run["config_snapshot"]
     assert "summary" not in run
     assert set(run["metrics"]) == {"aggregate", "by_symbol"}
     assert isinstance(
@@ -294,6 +295,28 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     history = client.get("/api/v1/history")
     assert history.status_code == 200
     assert [item["type"] for item in history.json()["items"]] == ["run", "chat"]
+
+
+def test_execution_realism_payload_is_ignored_when_feature_flag_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.engine import normalize_backtest_config
+
+    monkeypatch.delenv("ARGUS_ENABLE_EXECUTION_REALISM", raising=False)
+    config = normalize_backtest_config(
+        {
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "_execution_realism": {
+                "enabled": True,
+                "fee_bps": 25,
+                "slippage_bps": 40,
+            },
+        }
+    )
+
+    assert "_execution_realism" not in config
 
 
 @pytest.mark.parametrize("timeframe", ["1h", "2h", "4h", "6h", "12h", "1D"])

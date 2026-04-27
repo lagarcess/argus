@@ -1323,6 +1323,10 @@ Feature flags may be returned in session/profile responses.
 
 *Feature-disabled endpoints should return 403.*
 
+For Alpha, the Settings "Upgrade" button may be shown behind a feature flag as a visual placeholder only. No billing, entitlement mutation, or upgrade API behavior is implemented.
+
+Backend runtime flags may also control internal engine behavior. For Alpha, `ARGUS_ENABLE_EXECUTION_REALISM` exists for staged development and is `false` by default. While disabled, Alpha API behavior and snapshots remain canonical "no fees/slippage" with no public request/response contract expansion.
+
 ---
 
 # 20. Non-Negotiable Rules

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -72,6 +73,23 @@ class SupabaseGateway:
 
     def new_id(self) -> str:
         return str(uuid4())
+
+    def _fetch_all_rows(
+        self,
+        query_factory: Callable[[int, int], Any],
+        *,
+        batch_size: int = 500,
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        start = 0
+        while True:
+            response = query_factory(start, start + batch_size - 1).execute()
+            data = response.data or []
+            rows.extend(data)
+            if len(data) < batch_size:
+                break
+            start += batch_size
+        return rows
 
     def reset_dev_data(self) -> None:
         user = self.get_or_create_mock_user()
@@ -243,8 +261,10 @@ class SupabaseGateway:
             query = query.eq("archived", archived)
 
         ordered = query.order("pinned", desc=True).order("updated_at", desc=True)
-        limit = limit if limit is not None else 100
-        rows_data = ordered.limit(limit).execute().data or []
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
+        else:
+            rows_data = ordered.limit(limit).execute().data or []
         return [Conversation.model_validate(row) for row in rows_data]
 
     def get_conversation(
@@ -290,8 +310,10 @@ class SupabaseGateway:
             .eq("conversation_id", conversation_id)
             .order("created_at", desc=False)
         )
-        limit = limit if limit is not None else 100
-        rows_data = query.limit(limit).execute().data or []
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
+        else:
+            rows_data = query.limit(limit).execute().data or []
         return [Message.model_validate(row) for row in rows_data]
 
     def create_message(
@@ -398,11 +420,20 @@ class SupabaseGateway:
         ordered_strategies = query_strategies.order("updated_at", desc=True)
         ordered_collections = query_collections.order("updated_at", desc=True)
 
-        limit = limit if limit is not None else 100
-        runs = ordered_runs.limit(limit).execute().data or []
-        chats = ordered_chats.limit(limit).execute().data or []
-        strategies = ordered_strategies.limit(limit).execute().data or []
-        collections = ordered_collections.limit(limit).execute().data or []
+        if limit is None:
+            runs = self._fetch_all_rows(lambda start, end: ordered_runs.range(start, end))
+            chats = self._fetch_all_rows(lambda start, end: ordered_chats.range(start, end))
+            strategies = self._fetch_all_rows(
+                lambda start, end: ordered_strategies.range(start, end)
+            )
+            collections = self._fetch_all_rows(
+                lambda start, end: ordered_collections.range(start, end)
+            )
+        else:
+            runs = ordered_runs.limit(limit).execute().data or []
+            chats = ordered_chats.limit(limit).execute().data or []
+            strategies = ordered_strategies.limit(limit).execute().data or []
+            collections = ordered_collections.limit(limit).execute().data or []
 
         return {
             "runs": runs,
@@ -444,11 +475,22 @@ class SupabaseGateway:
             .order("created_at", desc=True)
         )
 
-        limit = limit if limit is not None else 100
-        conversations_raw = conversations_query.limit(limit).execute().data or []
-        strategies_raw = strategies_query.limit(limit).execute().data or []
-        collections_raw = collections_query.limit(limit).execute().data or []
-        runs_raw = runs_query.limit(limit).execute().data or []
+        if limit is None:
+            conversations_raw = self._fetch_all_rows(
+                lambda start, end: conversations_query.range(start, end)
+            )
+            strategies_raw = self._fetch_all_rows(
+                lambda start, end: strategies_query.range(start, end)
+            )
+            collections_raw = self._fetch_all_rows(
+                lambda start, end: collections_query.range(start, end)
+            )
+            runs_raw = self._fetch_all_rows(lambda start, end: runs_query.range(start, end))
+        else:
+            conversations_raw = conversations_query.limit(limit).execute().data or []
+            strategies_raw = strategies_query.limit(limit).execute().data or []
+            collections_raw = collections_query.limit(limit).execute().data or []
+            runs_raw = runs_query.limit(limit).execute().data or []
 
         conversations = [
             row
@@ -500,8 +542,10 @@ class SupabaseGateway:
             query = query.is_("deleted_at", "null")
 
         ordered = query.order("pinned", desc=True).order("updated_at", desc=True)
-        limit = limit if limit is not None else 100
-        rows_data = ordered.limit(limit).execute().data or []
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: ordered.range(start, end))
+        else:
+            rows_data = ordered.limit(limit).execute().data or []
         return [Strategy.model_validate(row) for row in rows_data]
 
     def get_strategy(self, *, user_id: str, strategy_id: str) -> Strategy | None:
@@ -556,8 +600,10 @@ class SupabaseGateway:
             .order("pinned", desc=True)
             .order("updated_at", desc=True)
         )
-        limit = limit if limit is not None else 100
-        rows_data = query.limit(limit).execute().data or []
+        if limit is None:
+            rows_data = self._fetch_all_rows(lambda start, end: query.range(start, end))
+        else:
+            rows_data = query.limit(limit).execute().data or []
         items: list[Collection] = []
         for row in rows_data:
             count = (

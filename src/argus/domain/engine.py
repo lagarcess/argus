@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from math import sqrt
@@ -101,6 +102,19 @@ def _vbt_freq(timeframe: str) -> str:
     return mapping[timeframe]
 
 
+def _execution_realism_feature_enabled() -> bool:
+    return os.getenv("ARGUS_ENABLE_EXECUTION_REALISM", "").strip().lower() == "true"
+
+
+def _normalize_execution_realism(raw: Any) -> dict[str, Any]:
+    source = raw if isinstance(raw, dict) else {}
+    return {
+        "enabled": bool(source.get("enabled", False)),
+        "fee_bps": float(source.get("fee_bps", 0.0)),
+        "slippage_bps": float(source.get("slippage_bps", 0.0)),
+    }
+
+
 def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
     today = date.today()
     end_default = today - timedelta(days=1)
@@ -119,7 +133,7 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         benchmark_symbol = default_benchmark(asset_class)
 
-    return {
+    config = {
         "template": payload["template"],
         "asset_class": asset_class,
         "symbols": symbols,
@@ -131,8 +145,12 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
         "allocation_method": payload.get("allocation_method") or "equal_weight",
         "benchmark_symbol": benchmark_symbol,
         "parameters": payload.get("parameters") or {},
-        "_execution_realism": payload.get("_execution_realism") or {"enabled": False},
     }
+    if _execution_realism_feature_enabled():
+        config["_execution_realism"] = _normalize_execution_realism(
+            payload.get("_execution_realism")
+        )
+    return config
 
 
 def validate_backtest_config(config: dict[str, Any]) -> None:
@@ -261,6 +279,8 @@ def _build_signals(
 
 
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
+    if not _execution_realism_feature_enabled():
+        return {"enabled": False, "fees": 0.0, "slippage": 0.0}
     raw = config.get("_execution_realism") or {}
     enabled = bool(raw.get("enabled", False))
     fee_bps = float(raw.get("fee_bps", 0.0))
