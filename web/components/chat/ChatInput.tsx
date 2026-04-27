@@ -104,7 +104,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
     <form
       onSubmit={handleSubmit}
       onClick={handleContainerClick}
-      className="relative flex items-end w-full bg-white dark:bg-[#1f2227] rounded-[32px] border border-black/5 dark:border-white/5 shadow-lg shadow-black/5 dark:shadow-none focus-within:ring-2 focus-within:ring-black/20 dark:focus-within:ring-white/20 transition-all cursor-text"
+      className="relative flex items-end w-full bg-white dark:bg-[#1f2227] rounded-[32px] border border-black/5 dark:border-white/5 focus-within:ring-2 focus-within:ring-black/20 dark:focus-within:ring-white/20 transition-all cursor-text"
     >
       <div className="relative flex-1 flex items-center min-w-0">
         <input
@@ -122,9 +122,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
         {isMounted && animState !== "idle" && !text && (
           <div
             key={`${currentPromptIndex}-${animState === "exiting"}`}
-            className={`absolute left-6 pointer-events-none text-[16px] font-medium tracking-tight text-gray-400 dark:text-gray-500 flex items-center whitespace-nowrap overflow-hidden ${
-              animState === "exiting" ? "animate-argus-swoosh-up" : ""
-            }`}
+            className={`absolute left-6 pointer-events-none text-[16px] font-medium tracking-tight text-gray-400 dark:text-gray-500 flex items-center whitespace-nowrap overflow-hidden ${ animState === "exiting" ? "animate-argus-swoosh-up" : "" }`}
           >
             {typedText}
             {animState === "typing" && (

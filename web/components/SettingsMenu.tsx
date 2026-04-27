@@ -83,25 +83,25 @@ export function SettingsMenu() {
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 mt-2 w-64 p-3 rounded-[24px] bg-[#f5f5f5] dark:bg-[#1c1f24] border border-black/5 dark:border-white/5 shadow-2xl overflow-hidden text-sm animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+          <div className="absolute right-0 mt-2 w-64 p-3 rounded-[24px] bg-[#f5f5f5] dark:bg-[#1c1f24] border border-black/5 dark:border-white/5 overflow-hidden text-sm animate-in fade-in zoom-in-95 duration-100 origin-top-right">
 
             {/* Theme Row */}
             <div className="flex items-center justify-between p-1 bg-black/5 dark:bg-black/40 rounded-2xl mb-3 relative">
               <button
                 onClick={() => setTheme('light')}
-                className={`flex-1 flex justify-center py-2.5 rounded-xl z-10 transition-colors ${theme === 'light' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
+                className={`flex-1 flex justify-center py-2.5 rounded-xl z-10 transition-colors ${theme === 'light' ? 'bg-white text-black ' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
               >
                 <Sun className="w-[18px] h-[18px] stroke-[2]" />
               </button>
               <button
                 onClick={() => setTheme('dark')}
-                className={`flex-1 flex justify-center py-2.5 rounded-xl z-10 transition-colors ${theme === 'dark' ? 'dark:bg-[#32363d] bg-white text-black dark:text-white shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
+                className={`flex-1 flex justify-center py-2.5 rounded-xl z-10 transition-colors ${theme === 'dark' ? 'dark:bg-[#32363d] bg-white text-black dark:text-white ' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
               >
                 <Moon className="w-[18px] h-[18px] stroke-[2]" />
               </button>
               <button
                 onClick={() => setTheme('system')}
-                className={`flex-1 flex justify-center py-2.5 rounded-xl z-10 transition-colors ${theme === 'system' ? 'dark:bg-[#32363d] bg-white text-black dark:text-white shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
+                className={`flex-1 flex justify-center py-2.5 rounded-xl z-10 transition-colors ${theme === 'system' ? 'dark:bg-[#32363d] bg-white text-black dark:text-white ' : 'text-gray-500 hover:text-black dark:hover:text-white'}`}
               >
                 <Monitor className="w-[18px] h-[18px] stroke-[2]" />
               </button>
@@ -126,7 +126,7 @@ export function SettingsMenu() {
           <div className="absolute inset-0" onClick={() => setIsLanguageModalOpen(false)} />
 
           {/* Modal Content */}
-          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[16px] shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" role="dialog" aria-modal="true" aria-label="Select Language">
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[16px] border border-black/5 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" role="dialog" aria-modal="true" aria-label="Select Language">
 
             {/* Search Input */}
             <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">

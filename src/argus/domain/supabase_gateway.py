@@ -189,7 +189,9 @@ class SupabaseGateway:
                 {
                     "email": email,
                     "password": password,
-                    "options": {"data": {"display_name": display_name, "username": username}},
+                    "options": {
+                        "data": {"display_name": display_name, "username": username}
+                    },
                 }
             )
             if not response.user:
@@ -494,9 +496,7 @@ class SupabaseGateway:
             row
             for row in conversations_raw
             if normalized_query
-            in (
-                f"{row.get('title', '')} {row.get('last_message_preview') or ''}"
-            ).lower()
+            in (f"{row.get('title', '')} {row.get('last_message_preview') or ''}").lower()
         ]
         strategies = [
             row

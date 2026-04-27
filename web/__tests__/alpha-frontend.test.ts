@@ -31,6 +31,7 @@ describe("Argus Alpha frontend contract", () => {
         ],
         assumptions: ["Long-only.", "Benchmark: SPY."],
         actions: [{ type: "add_to_collection", label: "Add strategy to collection" }],
+        benchmark_note: "Long-only. Benchmark: SPY."
       },
     });
 
@@ -93,4 +94,26 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(page).toContain('postCompleteHref="/chat"');
   });
+
+  test("settings subscription section is feature-flagged off by default", () => {
+    const settings = readFileSync(join(root, "components/views/SettingsView.tsx"), "utf-8");
+
+    expect(settings).toContain("NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION");
+    expect(settings).toContain("{showSubscriptionSection && (");
+  });
+
+  test("strategies surface renders dynamic metrics based on preferences", () => {
+    const file = readFileSync(join(root, "components/views/StrategiesView.tsx"), "utf-8");
+    expect(file).toContain("strategy.columns.map(");
+    expect(file).toContain("asset.pills.map(");
+    expect(file).not.toContain('className="grid grid-cols-4 gap-2 items-end pb-2 sticky top-[-1px]');
+    expect(file).toContain("style={{ gridTemplateColumns: `repeat(${strategy.columns.length + 1}, minmax(0, 1fr))` }}");
+  });
+
+
+  test("no shadow utility classes are used in chat input", () => {
+    const file = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    expect(file).not.toContain("shadow");
+  });
+
 });

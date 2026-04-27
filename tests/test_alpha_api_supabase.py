@@ -173,6 +173,7 @@ def test_run_backtest_quota_exceeded(mock_gateway):
     data = response.json()
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for backtest_runs" in data["detail"]
+    assert response.headers.get("Retry-After") == "60"
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
@@ -189,6 +190,7 @@ def test_chat_stream_quota_exceeded(mock_gateway):
     data = response.json()
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for chat_messages" in data["detail"]
+    assert response.headers.get("Retry-After") == "60"
 
 
 def test_me_reads_profile_from_supabase_gateway(mock_gateway):
@@ -259,6 +261,7 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     assert run["config_snapshot"]["side"] == "long"
     assert run["config_snapshot"]["starting_capital"] == 10000
     assert run["config_snapshot"]["benchmark_symbol"] == "SPY"
+    assert "_execution_realism" not in run["config_snapshot"]
     assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY."
     mock_gateway.create_backtest_run.assert_called_once()
     called_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
@@ -569,3 +572,49 @@ def test_conversations_cursor_supabase_pages_without_duplicates(mock_gateway):
     first_ids = {item["id"] for item in payload["items"]}
     second_ids = {item["id"] for item in second_payload["items"]}
     assert first_ids.isdisjoint(second_ids)
+
+
+def test_conversations_cursor_supabase_pages_beyond_one_hundred_items(mock_gateway):
+    now = utcnow()
+    mock_gateway.list_conversations.return_value = [
+        Conversation(
+            id=f"conv-{idx}",
+            title=f"Idea {idx}",
+            title_source="system_default",
+            language="en",
+            pinned=False,
+            archived=False,
+            last_message_preview=f"Preview {idx}",
+            deleted_at=None,
+            created_at=now,
+            updated_at=now,
+        )
+        for idx in range(130)
+    ]
+
+    first_page = client.get(
+        "/api/v1/conversations?limit=50",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert len(first_payload["items"]) == 50
+    assert first_payload["next_cursor"] is not None
+
+    second_page = client.get(
+        f"/api/v1/conversations?limit=50&cursor={first_payload['next_cursor']}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    assert len(second_payload["items"]) == 50
+    assert second_payload["next_cursor"] is not None
+
+    third_page = client.get(
+        f"/api/v1/conversations?limit=50&cursor={second_payload['next_cursor']}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert third_page.status_code == 200
+    third_payload = third_page.json()
+    assert len(third_payload["items"]) == 30
+    assert third_payload["next_cursor"] is None

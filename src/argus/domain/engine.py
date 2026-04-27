@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from math import sqrt
@@ -101,6 +102,19 @@ def _vbt_freq(timeframe: str) -> str:
     return mapping[timeframe]
 
 
+def _execution_realism_feature_enabled() -> bool:
+    return os.getenv("ARGUS_ENABLE_EXECUTION_REALISM", "").strip().lower() == "true"
+
+
+def _normalize_execution_realism(raw: Any) -> dict[str, Any]:
+    source = raw if isinstance(raw, dict) else {}
+    return {
+        "enabled": bool(source.get("enabled", False)),
+        "fee_bps": float(source.get("fee_bps", 0.0)),
+        "slippage_bps": float(source.get("slippage_bps", 0.0)),
+    }
+
+
 def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
     today = date.today()
     end_default = today - timedelta(days=1)
@@ -119,7 +133,7 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         benchmark_symbol = default_benchmark(asset_class)
 
-    return {
+    config = {
         "template": payload["template"],
         "asset_class": asset_class,
         "symbols": symbols,
@@ -131,8 +145,12 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
         "allocation_method": payload.get("allocation_method") or "equal_weight",
         "benchmark_symbol": benchmark_symbol,
         "parameters": payload.get("parameters") or {},
-        "_execution_realism": payload.get("_execution_realism") or {"enabled": False},
     }
+    if _execution_realism_feature_enabled():
+        config["_execution_realism"] = _normalize_execution_realism(
+            payload.get("_execution_realism")
+        )
+    return config
 
 
 def validate_backtest_config(config: dict[str, Any]) -> None:
@@ -261,6 +279,8 @@ def _build_signals(
 
 
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
+    if not _execution_realism_feature_enabled():
+        return {"enabled": False, "fees": 0.0, "slippage": 0.0}
     raw = config.get("_execution_realism") or {}
     enabled = bool(raw.get("enabled", False))
     fee_bps = float(raw.get("fee_bps", 0.0))
@@ -477,13 +497,19 @@ def build_result_card(
     is_es = language.startswith("es")
     template_names = {
         "buy_the_dip": "Comprar la Caída" if is_es else "Buy the Dip",
-        "rsi_mean_reversion": "Reversión a la Media RSI" if is_es else "RSI Mean Reversion",
-        "moving_average_crossover": "Cruce de Medias Móviles" if is_es else "Moving Average Crossover",
+        "rsi_mean_reversion": "Reversión a la Media RSI"
+        if is_es
+        else "RSI Mean Reversion",
+        "moving_average_crossover": "Cruce de Medias Móviles"
+        if is_es
+        else "Moving Average Crossover",
         "dca_accumulation": "Acumulación DCA" if is_es else "DCA Accumulation",
         "momentum_breakout": "Ruptura de Impulso" if is_es else "Momentum Breakout",
         "trend_follow": "Seguimiento de Tendencia" if is_es else "Trend Follow",
     }
-    template_display = template_names.get(config["template"], config["template"].replace("_", " ").title())
+    template_display = template_names.get(
+        config["template"], config["template"].replace("_", " ").title()
+    )
 
     status_label = "Simulación Completa" if is_es else "Simulation Complete"
 
@@ -491,22 +517,28 @@ def build_result_card(
     if is_es:
         benchmark_note = f"Universo: {symbols}. Referencia: {config['benchmark_symbol']}."
         assumptions = [
+            f"Universo: {symbols}.",
             "La simulación utiliza el preajuste solo-largo.",
             f"Capital inicial: ${config['starting_capital']:,.0f}.",
             "Asignación: igual peso.",
             "No se incluyen deslizamientos ni comisiones.",
+            f"Referencia: {config['benchmark_symbol']}.",
         ]
         if bool(realism["enabled"]):
-            assumptions[3] = "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
+            assumptions[4] = (
+                "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
+            )
     else:
         assumptions = [
+            f"Universe: {symbols}.",
             "Simulation uses long-only preset.",
             f"Starting capital: ${config['starting_capital']:,.0f}.",
             "Allocation: equal weight.",
             "No slippage or fees included.",
+            f"Benchmark: {config['benchmark_symbol']}.",
         ]
         if bool(realism["enabled"]):
-            assumptions[3] = "Execution realism enabled (fees/slippage applied)."
+            assumptions[4] = "Execution realism enabled (fees/slippage applied)."
 
     rows = [
         {
@@ -541,7 +573,8 @@ def build_result_card(
         "date_range": {
             "start": config["start_date"],
             "end": config["end_date"],
-            "display": f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}" if is_es
+            "display": f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}"
+            if is_es
             else f"{start.strftime('%B')} {start.day}, {start.year} to {end.strftime('%B')} {end.day}, {end.year}",
         },
         "status_label": status_label,
@@ -549,7 +582,15 @@ def build_result_card(
         "assumptions": assumptions,
         "benchmark_note": benchmark_note,
         "actions": [
-            {"type": "add_to_collection", "label": "Añadir estrategia a colección" if is_es else "Add strategy to collection"},
-            {"type": "try_new_strategy", "label": "Probar nueva estrategia" if is_es else "Try a new strategy"},
+            {
+                "type": "add_to_collection",
+                "label": "Añadir estrategia a colección"
+                if is_es
+                else "Add strategy to collection",
+            },
+            {
+                "type": "try_new_strategy",
+                "label": "Probar nueva estrategia" if is_es else "Try a new strategy",
+            },
         ],
     }

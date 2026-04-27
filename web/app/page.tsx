@@ -9,14 +9,14 @@ import { DevModeBadge } from "@/components/ui/DevModeBadge";
 export default function LandingPage() {
   const { t } = useTranslation();
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  const authHref = "/chat"; 
+  const authHref = "/chat";
   const loginHref = isMockAuth ? "/chat" : "/login";
 
   return (
     <OnboardingGate postCompleteHref="/chat">
       <main className="relative flex min-h-[100dvh] w-full flex-col justify-between overflow-hidden px-6 py-8 md:px-12">
         <SettingsMenu />
-        
+
         <div className="flex flex-grow items-center justify-center">
           <h1 className="text-6xl md:text-[80px] font-medium tracking-tight text-black dark:text-white z-10 select-none transition-colors">
             argus

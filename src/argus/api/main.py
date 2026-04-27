@@ -168,6 +168,7 @@ def problem(
     title: str,
     detail: str,
     context: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> HTTPException:
     body = {
         "type": f"https://api.argus.app/problems/{code.replace('_', '-')}",
@@ -179,7 +180,7 @@ def problem(
     }
     if context:
         body["context"] = context
-    return HTTPException(status_code=status_code, detail=body)
+    return HTTPException(status_code=status_code, detail=body, headers=headers)
 
 
 @app.exception_handler(HTTPException)
@@ -199,14 +200,15 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
         }
 
     origin = request.headers.get("origin")
-    headers = {"Access-Control-Allow-Origin": origin or "*"}
+    headers = dict(exc.headers or {})
+    headers["Access-Control-Allow-Origin"] = origin or "*"
     if origin:
         headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
 
-def _encode_cursor(payload: dict[str, Any]) -> str:
-    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+def _encode_cursor(timestamp: str, id: str) -> str:
+    raw = f"{timestamp}|{id}".encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
 
@@ -220,15 +222,15 @@ def _invalid_cursor_problem(request: Request) -> HTTPException:
     )
 
 
-def _decode_cursor(cursor: str, request: Request) -> dict[str, Any]:
+def _decode_cursor(cursor: str, request: Request) -> tuple[str, str]:
     try:
-        decoded = base64.urlsafe_b64decode(cursor.encode("ascii"))
-        payload = json.loads(decoded.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
+        decoded = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        if "|" not in decoded:
+            raise ValueError()
+        timestamp, item_id = decoded.rsplit("|", 1)
+        return timestamp, item_id
+    except (ValueError, UnicodeDecodeError, binascii.Error):
         raise _invalid_cursor_problem(request) from None
-    if not isinstance(payload, dict):
-        raise _invalid_cursor_problem(request)
-    return payload
 
 
 def _search_type_rank(kind: str) -> int:
@@ -565,19 +567,20 @@ def list_conversations(
 
             items.append(conversation)
 
-    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    items.sort(
+        key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True
+    )
     filtered = items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_updated_at = cursor_data.get("updated_at")
-        cursor_pinned = cursor_data.get("pinned")
-        if not isinstance(cursor_id, str) or not isinstance(cursor_updated_at, str):
-            raise _invalid_cursor_problem(request)
+        cursor_updated_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_updated_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
+        # Find the cursor item to get its pinned status, fallback to False if not found for strict tie breaking
+        cursor_pinned = next(
+            (item.pinned for item in items if item.id == cursor_id), False
+        )
         cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
         filtered = [
             item
@@ -590,13 +593,7 @@ def list_conversations(
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
-        next_cursor = _encode_cursor(
-            {
-                "id": last.id,
-                "pinned": bool(last.pinned),
-                "updated_at": last.updated_at.isoformat(),
-            }
-        )
+        next_cursor = _encode_cursor(last.updated_at.isoformat(), last.id)
     return PaginatedConversations(items=page_items, next_cursor=next_cursor)
 
 
@@ -712,31 +709,20 @@ def list_messages(
     items.sort(key=lambda item: (item.created_at, item.id))
     filtered = items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_created_at = cursor_data.get("created_at")
-        if not isinstance(cursor_id, str) or not isinstance(cursor_created_at, str):
-            raise _invalid_cursor_problem(request)
+        cursor_created_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_created_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
         cursor_key = (cursor_dt, cursor_id)
-        filtered = [
-            item for item in items if (item.created_at, item.id) > cursor_key
-        ]
+        filtered = [item for item in items if (item.created_at, item.id) > cursor_key]
     page = filtered[: limit + 1]
     has_more = len(page) > limit
     page_items = page[:limit]
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
-        next_cursor = _encode_cursor(
-            {
-                "id": last.id,
-                "created_at": last.created_at.isoformat(),
-            }
-        )
+        next_cursor = _encode_cursor(last.created_at.isoformat(), last.id)
     return PaginatedMessages(items=page_items, next_cursor=next_cursor)
 
 
@@ -975,6 +961,7 @@ def run_backtest(
                 code="too_many_requests",
                 title="Quota Exceeded",
                 detail=str(e),
+                headers={"Retry-After": "60"},
             ) from e
 
     data = payload.model_dump(exclude_none=True)
@@ -1109,19 +1096,20 @@ def list_strategies(
                     continue
             items.append(item)
 
-    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    items.sort(
+        key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True
+    )
     filtered = items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_updated_at = cursor_data.get("updated_at")
-        cursor_pinned = cursor_data.get("pinned")
-        if not isinstance(cursor_id, str) or not isinstance(cursor_updated_at, str):
-            raise _invalid_cursor_problem(request)
+        cursor_updated_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_updated_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
+        # Find the cursor item to get its pinned status, fallback to False if not found for strict tie breaking
+        cursor_pinned = next(
+            (item.pinned for item in items if item.id == cursor_id), False
+        )
         cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
         filtered = [
             item
@@ -1134,13 +1122,7 @@ def list_strategies(
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
-        next_cursor = _encode_cursor(
-            {
-                "id": last.id,
-                "pinned": bool(last.pinned),
-                "updated_at": last.updated_at.isoformat(),
-            }
-        )
+        next_cursor = _encode_cursor(last.updated_at.isoformat(), last.id)
     return PaginatedStrategies(items=page_items, next_cursor=next_cursor)
 
 
@@ -1262,19 +1244,20 @@ def list_collections(
         items = supabase_gateway.list_collections(user_id=user.id, limit=None)
     else:
         items = [item for item in store.collections.values() if item.deleted_at is None]
-    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    items.sort(
+        key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True
+    )
     filtered = items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_updated_at = cursor_data.get("updated_at")
-        cursor_pinned = cursor_data.get("pinned")
-        if not isinstance(cursor_id, str) or not isinstance(cursor_updated_at, str):
-            raise _invalid_cursor_problem(request)
+        cursor_updated_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_updated_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
+        # Find the cursor item to get its pinned status, fallback to False if not found for strict tie breaking
+        cursor_pinned = next(
+            (item.pinned for item in items if item.id == cursor_id), False
+        )
         cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
         filtered = [
             item
@@ -1287,13 +1270,7 @@ def list_collections(
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
-        next_cursor = _encode_cursor(
-            {
-                "id": last.id,
-                "pinned": bool(last.pinned),
-                "updated_at": last.updated_at.isoformat(),
-            }
-        )
+        next_cursor = _encode_cursor(last.updated_at.isoformat(), last.id)
     return PaginatedCollections(items=page_items, next_cursor=next_cursor)
 
 
@@ -1583,25 +1560,25 @@ def history(
     )
     filtered = items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_type = cursor_data.get("type")
-        cursor_created_at = cursor_data.get("created_at")
-        cursor_pinned = cursor_data.get("pinned")
-        if (
-            not isinstance(cursor_id, str)
-            or not isinstance(cursor_type, str)
-            or not isinstance(cursor_created_at, str)
-        ):
-            raise _invalid_cursor_problem(request)
+        cursor_created_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_created_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
+        cursor_item = next(
+            (
+                item
+                for item in items
+                if item.id == cursor_id and item.created_at == cursor_dt
+            ),
+            None,
+        )
+        if cursor_item is None:
+            raise _invalid_cursor_problem(request)
         cursor_key = (
-            int(bool(cursor_pinned)),
+            int(cursor_item.pinned),
             cursor_dt,
-            _search_type_rank(cursor_type),
+            _search_type_rank(cursor_item.type),
             cursor_id,
         )
         filtered = [
@@ -1621,14 +1598,7 @@ def history(
     next_cursor = None
     if has_more and page_items:
         last = page_items[-1]
-        next_cursor = _encode_cursor(
-            {
-                "id": last.id,
-                "type": last.type,
-                "pinned": bool(last.pinned),
-                "created_at": last.created_at.isoformat(),
-            }
-        )
+        next_cursor = _encode_cursor(last.created_at.isoformat(), last.id)
     return PaginatedHistory(items=page_items, next_cursor=next_cursor)
 
 
@@ -1795,7 +1765,9 @@ def search(
                     title=title,
                     matched_text=title,
                     pinned=False,
-                    symbol_exact_match=any(query == symbol.lower() for symbol in run.symbols),
+                    symbol_exact_match=any(
+                        query == symbol.lower() for symbol in run.symbols
+                    ),
                 )
                 scored_items.append((score, item))
 
@@ -1810,26 +1782,26 @@ def search(
     )
     filtered = scored_items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_type = cursor_data.get("type")
-        cursor_updated_at = cursor_data.get("updated_at")
-        cursor_score = cursor_data.get("score")
-        if (
-            not isinstance(cursor_id, str)
-            or not isinstance(cursor_type, str)
-            or not isinstance(cursor_updated_at, str)
-            or not isinstance(cursor_score, int)
-        ):
-            raise _invalid_cursor_problem(request)
+        cursor_updated_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_updated_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
+        cursor_pair = next(
+            (
+                pair
+                for pair in scored_items
+                if pair[1].id == cursor_id and pair[1].updated_at == cursor_dt
+            ),
+            None,
+        )
+        if cursor_pair is None:
+            raise _invalid_cursor_problem(request)
+        cursor_score, cursor_item = cursor_pair
         cursor_key = (
             cursor_score,
             cursor_dt,
-            _search_type_rank(cursor_type),
+            _search_type_rank(cursor_item.type),
             cursor_id,
         )
         filtered = [
@@ -1850,14 +1822,7 @@ def search(
     next_cursor = None
     if has_more and page_items:
         last_score, last_item = page_items[-1]
-        next_cursor = _encode_cursor(
-            {
-                "id": last_item.id,
-                "type": last_item.type,
-                "updated_at": last_item.updated_at.isoformat(),
-                "score": last_score,
-            }
-        )
+        next_cursor = _encode_cursor(last_item.updated_at.isoformat(), last_item.id)
     return PaginatedSearch(
         items=[item for _, item in page_items],
         next_cursor=next_cursor,
@@ -1937,13 +1902,18 @@ def chat_stream(
     }
     if supabase_gateway is not None:
         try:
-            if not _dev_memory_fallback_enabled():
-                supabase_gateway.check_and_increment_usage(
-                    user_id=user.id, resource="chat_messages", period="day", limit_count=200
-                )
-                supabase_gateway.check_and_increment_usage(
-                    user_id=user.id, resource="chat_messages", period="minute", limit_count=10
-                )
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id,
+                resource="chat_messages",
+                period="day",
+                limit_count=200,
+            )
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id,
+                resource="chat_messages",
+                period="minute",
+                limit_count=10,
+            )
         except QuotaExceededError as e:
             raise problem(
                 request,
@@ -1951,6 +1921,7 @@ def chat_stream(
                 code="too_many_requests",
                 title="Quota Exceeded",
                 detail=str(e),
+                headers={"Retry-After": "60"},
             ) from e
 
     current_user_profile = (
@@ -2051,7 +2022,9 @@ def chat_stream(
             decision = orchestrate_chat_turn(
                 message=payload.message,
                 language=(
-                    payload.language or conversation.language or current_user_profile.language
+                    payload.language
+                    or conversation.language
+                    or current_user_profile.language
                 ),
                 onboarding_required=False,
                 primary_goal=current_user_profile.onboarding.primary_goal,
