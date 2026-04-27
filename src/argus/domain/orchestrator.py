@@ -99,6 +99,53 @@ def get_starter_prompts(primary_goal: str | None) -> list[str]:
     return STARTER_PROMPTS[goal]
 
 
+class SlotValue(BaseModel):
+    value: Any | None = None
+    source: Literal["user_supplied", "history_inferred", "backend_default", "missing"]
+    confidence: float = 1.0
+
+
+class StrategyRunDraft(BaseModel):
+    template: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    asset_class: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    symbols: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    timeframe: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    start_date: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    end_date: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    benchmark_symbol: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    starting_capital: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+    def to_extraction(fixed_dates: bool = False) -> StrategyExtraction:
+        """Convert draft slots into a flat StrategyExtraction for the engine."""
+        return StrategyExtraction(
+            template=self.template.value,
+            asset_class=self.asset_class.value or "equity",
+            symbols=self.symbols.value or [],
+            timeframe=self.timeframe.value,
+            start_date=self.start_date.value,
+            end_date=self.end_date.value,
+            benchmark_symbol=self.benchmark_symbol.value,
+            parameters=self.parameters,
+        )
+
+
 class StrategyExtraction(BaseModel):
     template: str | None = None
     asset_class: Literal["equity", "crypto"]
@@ -119,11 +166,59 @@ class ChatOrchestrationDecision(BaseModel):
     ]
     assistant_message: str
     strategy: StrategyExtraction | None = None
+    strategy_draft: StrategyRunDraft | None = None
     title_suggestion: str | None = None
 
 
 class NameSuggestion(BaseModel):
     name: str
+
+
+def build_strategy_draft(
+    extraction: StrategyExtraction, history: list[dict[str, str]] | None = None
+) -> StrategyRunDraft:
+    """Assess where each parameter came from to guide readiness decisions."""
+    history = history or []
+    
+    def get_source(field_name: str, value: Any) -> Literal["user_supplied", "history_inferred", "backend_default", "missing"]:
+        if not value:
+            return "missing"
+        
+        # Check if the field was mentioned in the last user message
+        # This is a heuristic; in a real graph, the LLM would tag provenance
+        last_user_msg = next((m["content"].upper() for m in reversed(history) if m["role"] == "user"), "")
+        
+        # Symbols check
+        if field_name == "symbols" and isinstance(value, list) and value:
+            if any(s.upper() in last_user_msg for s in value):
+                return "user_supplied"
+            return "history_inferred"
+            
+        # Template check
+        if field_name == "template":
+            if value.upper() in last_user_msg:
+                return "user_supplied"
+            return "history_inferred"
+
+        # Timeframe/Dates check
+        if field_name in ["timeframe", "start_date", "end_date"]:
+            if value.upper() in last_user_msg:
+                return "user_supplied"
+            # If not in last message but exists, it's inferred from history or default
+            return "history_inferred"
+
+        return "backend_default"
+
+    return StrategyRunDraft(
+        template=SlotValue(value=extraction.template, source=get_source("template", extraction.template)),
+        asset_class=SlotValue(value=extraction.asset_class, source="backend_default"),
+        symbols=SlotValue(value=extraction.symbols, source=get_source("symbols", extraction.symbols)),
+        timeframe=SlotValue(value=extraction.timeframe, source=get_source("timeframe", extraction.timeframe)),
+        start_date=SlotValue(value=extraction.start_date, source=get_source("start_date", extraction.start_date)),
+        end_date=SlotValue(value=extraction.end_date, source=get_source("end_date", extraction.end_date)),
+        benchmark_symbol=SlotValue(value=extraction.benchmark_symbol, source="backend_default"),
+        parameters=extraction.parameters,
+    )
 
 
 @dataclass(frozen=True)
@@ -293,29 +388,49 @@ def _llm_extract_decision(
 
     messages.append({"role": "user", "content": message})
 
-    return structured.invoke(messages)
+    decision = structured.invoke(messages)
+    if decision.strategy:
+        decision.strategy_draft = build_strategy_draft(
+            decision.strategy, (history or []) + [{"role": "user", "content": message}]
+        )
+    return decision
 
 
 def _fallback_run_decision(
-    message: str, language: str | None, primary_goal: str | None = None
+    message: str, language: str | None, primary_goal: str | None = None, history: list[dict[str, str]] | None = None
 ) -> ChatOrchestrationDecision:
-    strategy = StrategyExtraction.model_validate(_heuristic_extract(message))
-    if strategy.symbols:
+    extraction = StrategyExtraction.model_validate(_heuristic_extract(message))
+    draft = build_strategy_draft(extraction, (history or []) + [{"role": "user", "content": message}])
+    
+    # Assess readiness using the draft and history
+    readiness = assess_strategy_readiness(extracted=extraction, language=language)
+
+    if readiness.ready_to_run:
         return ChatOrchestrationDecision(
             intent="run_backtest",
-            assistant_message=assistant_copy_for_result(strategy.symbols, language or "en"),
-            strategy=strategy,
+            assistant_message=assistant_copy_for_result(extraction.symbols, language or "en"),
+            strategy=extraction,
+            strategy_draft=draft,
             title_suggestion=None,
         )
 
-    # True fallback: extraction failed and no symbols found. Use goal-aware copy.
-    goal = primary_goal or "surprise_me"
-    assistant_message = goal_follow_up_message(goal, language)
+    # If no symbols were found even by heuristic, treat as unsupported/general chat
+    if not extraction.symbols:
+        goal = primary_goal or "surprise_me"
+        assistant_message = goal_follow_up_message(goal, language)
+        return ChatOrchestrationDecision(
+            intent="unsupported_request",
+            assistant_message=assistant_message,
+            strategy=None,
+            strategy_draft=draft,
+            title_suggestion=None,
+        )
 
     return ChatOrchestrationDecision(
-        intent="unsupported_request",
-        assistant_message=assistant_message,
-        strategy=None,
+        intent="education",
+        assistant_message=readiness.clarification_prompt or "Tell me more about your strategy.",
+        strategy=extraction,
+        strategy_draft=draft,
         title_suggestion=None,
     )
 
