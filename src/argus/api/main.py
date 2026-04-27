@@ -46,6 +46,7 @@ from argus.api.schemas import (
     StrategyPatch,
     StrategyResponse,
     SuccessResponse,
+    StarterPromptsResponse,
     User,
     UserResponse,
 )
@@ -60,6 +61,7 @@ from argus.domain.engine import (
 from argus.domain.orchestrator import (
     assess_strategy_readiness,
     assistant_copy_for_result,
+    get_starter_prompts,
     goal_follow_up_message,
     orchestrate_chat_turn,
     parse_onboarding_goal,
@@ -1627,6 +1629,14 @@ def history(
         last = page_items[-1]
         next_cursor = _encode_cursor(last.created_at.isoformat(), last.id)
     return PaginatedHistory(items=page_items, next_cursor=next_cursor)
+
+
+@app.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
+def list_starter_prompts(
+    user: User = Depends(current_user),  # noqa: B008
+) -> StarterPromptsResponse:
+    prompts = get_starter_prompts(user.onboarding.primary_goal)
+    return StarterPromptsResponse(prompts=prompts)
 
 
 @app.get("/api/v1/search", response_model=PaginatedSearch)

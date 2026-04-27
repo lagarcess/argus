@@ -295,3 +295,7 @@ class LoginRequest(BaseModel):
 
 class SuccessResponse(BaseModel):
     success: bool
+
+
+class StarterPromptsResponse(BaseModel):
+    prompts: list[str]

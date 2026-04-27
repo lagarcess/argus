@@ -828,3 +828,20 @@ def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
     assert response.status_code == 200
     assert captured_history is not None
     assert any(m["content"] == "Tell me about AAPL" for m in captured_history)
+
+
+def test_starter_prompts_returns_personalized_suggestions() -> None:
+    client = _client()
+
+    # Default goal: surprise_me (via OnboardingState default in Profile)
+    # Actually OnboardingState primary_goal is None by default, which maps to surprise_me
+    resp = client.get("/api/v1/chat/starter-prompts")
+    assert resp.status_code == 200
+    assert len(resp.json()["prompts"]) == 4
+    assert "Show me something interesting" in resp.json()["prompts"]
+
+    # Set specific goal
+    _set_onboarding_ready(client, primary_goal="explore_crypto")
+    resp = client.get("/api/v1/chat/starter-prompts")
+    assert resp.status_code == 200
+    assert "Backtest Bitcoin halvings" in resp.json()["prompts"]

@@ -59,6 +59,46 @@ COMMON_NAMES = {
 }
 
 
+STARTER_PROMPTS = {
+    "learn_basics": [
+        "How do I start investing?",
+        "What is a moving average?",
+        "Explain RSI to me simply",
+        "How do I test a stock idea?",
+    ],
+    "test_stock_idea": [
+        "Backtest buying Apple dips",
+        "How would Tesla perform in a crash?",
+        "Is Nvidia overvalued right now?",
+        "Show me MSFT momentum",
+    ],
+    "build_passive_strategy": [
+        "DCA into SPY every month",
+        "Compare index funds vs stocks",
+        "Building a retirement portfolio",
+        "Safe long-term strategies",
+    ],
+    "explore_crypto": [
+        "Backtest Bitcoin halvings",
+        "Should I buy ETH or BTC?",
+        "Crypto momentum breakout",
+        "DCA into Bitcoin strategy",
+    ],
+    "surprise_me": [
+        "Show me something interesting",
+        "Top performing tech stocks",
+        "Best crypto strategy lately",
+        "High risk high reward ideas",
+    ],
+}
+
+
+def get_starter_prompts(primary_goal: str | None) -> list[str]:
+    """Return 3-4 personalized prompts based on primary goal."""
+    goal = primary_goal if primary_goal in STARTER_PROMPTS else "surprise_me"
+    return STARTER_PROMPTS[goal]
+
+
 class StrategyExtraction(BaseModel):
     template: str | None = None
     asset_class: Literal["equity", "crypto"]
