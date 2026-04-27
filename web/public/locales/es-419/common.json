@@ -272,6 +272,11 @@
         "title": "Explorar criptomonedas",
         "description": "Prueba iniciadores de estrategias centrados en cripto."
       }
+    },
+    "error": {
+      "title": "API no disponible",
+      "description": "No pudimos conectarnos al motor de Argus. Asegúrate de que el servicio backend esté funcionando e inténtalo de nuevo.",
+      "retry": "Reintentar"
     }
   },
   "auth": {

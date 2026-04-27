@@ -275,6 +275,11 @@
         "title": "Explore crypto",
         "description": "Try crypto-focused strategy starters."
       }
+    },
+    "error": {
+      "title": "API Unreachable",
+      "description": "We couldn't connect to the Argus engine. Please ensure the backend service is running and try again.",
+      "retry": "Try Again"
     }
   },
   "auth": {
