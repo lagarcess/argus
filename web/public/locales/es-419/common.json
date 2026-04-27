@@ -250,8 +250,14 @@
   },
   "onboarding": {
     "prompt": "¿Cuál es tu objetivo principal ahora? No te preocupes, puedes cambiarlo después.",
-    "select_language": "Elige tu idioma",
-    "language_description": "Esto nos ayuda a personalizar tu experiencia.",
+    "language": {
+      "title": "Elige tu idioma",
+      "subtitle": "Argus habla varios idiomas. ¿Cuál prefieres?",
+      "description": "Esto nos ayuda a personalizar tu experiencia.",
+      "continue_in": "Continuar en {{language}}",
+      "en": "Inglés",
+      "es-419": "Español"
+    },
     "primary_goal": "¿Cuál es tu objetivo principal?",
     "goal_description": "Adaptaremos tus perspectivas de estrategia en función de esto.",
     "skip": "Omitir por ahora",

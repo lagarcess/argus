@@ -31,6 +31,17 @@ export function OnboardingGate({
   const [user, setUser] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<"language" | "goal" | "done" | "error">("language");
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Sync selected language with current i18n state if valid
+    const currentLang = i18n.language;
+    if (currentLang.startsWith('es')) {
+      setSelectedLanguage('es-419');
+    } else if (currentLang.startsWith('en')) {
+      setSelectedLanguage('en');
+    }
+  }, [i18n.language]);
 
   useEffect(() => {
     async function checkUser() {
@@ -69,10 +80,15 @@ export function OnboardingGate({
   }, [postCompleteHref, router, step, user]);
 
   const handleLanguageSelect = async (code: string) => {
+    setSelectedLanguage(code);
     await i18n.changeLanguage(code);
+  };
+
+  const handleConfirmLanguage = async () => {
+    if (!selectedLanguage) return;
     try {
       const response = await patchMe({
-        language: code as "en" | "es-419",
+        language: selectedLanguage as "en" | "es-419",
         onboarding: {
           stage: "primary_goal_selection",
           language_confirmed: true,
@@ -134,30 +150,47 @@ export function OnboardingGate({
         {step === "language" && (
           <div className="mt-8 space-y-6">
             <div>
-              <h2 className="text-xl font-medium flex items-center gap-2">
-                <Globe className="w-5 h-5 text-black/40 dark:text-white/40" />
-                {t('onboarding.select_language', 'Choose your language')}
+              <h2 className="text-xl font-medium">
+                {t('onboarding.language.title', 'Choose your language')}
               </h2>
               <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-                {t('onboarding.language_description', 'This helps us personalize your experience.')}
+                {t('onboarding.language.subtitle', 'Argus speaks multiple languages. Which one do you prefer?')}
               </p>
             </div>
             
             <div className="grid gap-3">
-              {LANGUAGES.map((lang) => (
-                <button
-                  key={lang.code}
-                  onClick={() => handleLanguageSelect(lang.code)}
-                  className="group flex items-center justify-between rounded-2xl border border-black/5 bg-black/[0.02] p-4 text-left transition-all hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]"
-                >
-                  <div className="flex flex-col">
-                    <span className="text-[16px] font-medium">{lang.name}</span>
-                    <span className="text-[13px] text-black/40 dark:text-white/40">{t(`settings.languages.${lang.code}`)}</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-black/20 dark:text-white/20 transition-transform group-hover:translate-x-0.5" />
-                </button>
-              ))}
+              {LANGUAGES.map((lang) => {
+                const isSelected = selectedLanguage === lang.code;
+                return (
+                  <button
+                    key={lang.code}
+                    onClick={() => handleLanguageSelect(lang.code)}
+                    className={`group flex items-center justify-between rounded-2xl border p-4 text-left transition-all ${
+                      isSelected 
+                        ? 'border-[#494fdf] bg-[#494fdf]/[0.02] dark:bg-[#494fdf]/[0.05]' 
+                        : 'border-black/5 bg-black/[0.02] hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-[16px] font-medium">{lang.name}</span>
+                      <span className="text-[13px] text-black/40 dark:text-white/40">{t(`onboarding.language.${lang.code}`)}</span>
+                    </div>
+                    <ChevronRight className={`w-5 h-5 transition-all ${isSelected ? 'text-[#494fdf] translate-x-0.5' : 'text-black/20 dark:text-white/20 group-hover:translate-x-0.5'}`} />
+                  </button>
+                );
+              })}
             </div>
+
+            <button
+              onClick={handleConfirmLanguage}
+              disabled={!selectedLanguage}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-[9999px] bg-[#191c1f] dark:bg-white px-[32px] py-[14px] text-[16px] font-medium text-white dark:text-black transition-all hover:opacity-85 disabled:opacity-50"
+            >
+              {selectedLanguage 
+                ? t('onboarding.language.continue_in', { language: LANGUAGES.find(l => l.code === selectedLanguage)?.name })
+                : t('common.submit', 'Submit')
+              }
+            </button>
           </div>
         )}
 

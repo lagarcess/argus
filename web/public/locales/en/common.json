@@ -253,8 +253,14 @@
   },
   "onboarding": {
     "prompt": "What is your current primary goal? Don't worry, you can change it later.",
-    "select_language": "Choose your language",
-    "language_description": "This helps us personalize your experience.",
+    "language": {
+      "title": "Choose your language",
+      "subtitle": "Argus speaks multiple languages. Which one do you prefer?",
+      "description": "This helps us personalize your experience.",
+      "continue_in": "Continue in {{language}}",
+      "en": "English",
+      "es-419": "Español"
+    },
     "primary_goal": "What is your primary goal?",
     "goal_description": "We'll tailor your strategy insights based on this.",
     "skip": "Skip for now",
