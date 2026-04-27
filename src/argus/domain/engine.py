@@ -475,8 +475,6 @@ def build_result_card(
     realism = _execution_realism_settings(config)
 
     is_es = language.startswith("es")
-
-    # Localized templates
     template_names = {
         "buy_the_dip": "Comprar la Caída" if is_es else "Buy the Dip",
         "rsi_mean_reversion": "Reversión a la Media RSI" if is_es else "RSI Mean Reversion",
@@ -487,10 +485,8 @@ def build_result_card(
     }
     template_display = template_names.get(config["template"], config["template"].replace("_", " ").title())
 
-    # Localized status
     status_label = "Simulación Completa" if is_es else "Simulation Complete"
 
-    # Localized assumptions
     if is_es:
         assumptions = [
             f"Universo: {symbols}.",
@@ -514,7 +510,6 @@ def build_result_card(
         if bool(realism["enabled"]):
             assumptions[4] = "Execution realism enabled (fees/slippage applied)."
 
-    # Localized rows
     rows = [
         {
             "key": "total_return_pct",

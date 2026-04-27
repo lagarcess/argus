@@ -34,7 +34,6 @@ export function OnboardingGate({
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Sync selected language with current i18n state if valid
     const currentLang = i18n.language;
     if (currentLang.startsWith('es')) {
       setSelectedLanguage('es-419');
@@ -56,13 +55,10 @@ export function OnboardingGate({
       } catch (err: any) {
         const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
         
-        // 401 or 403 means "Not Logged In" - show the children (landing page)
-        // unless we are in Mock Auth mode, in which case it's a server error.
         if (!isMockAuth && (err.status === 401 || err.status === 403)) {
           setUser(null);
           setStep("done");
         } else {
-          // 500, 404, or Network Error
           console.error("Argus API is unreachable or returned an error:", err);
           setStep("error");
         }
