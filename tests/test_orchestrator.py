@@ -72,3 +72,31 @@ def test_parse_onboarding_goal_hidden_protocol() -> None:
         orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:passive_strategy") is None
     )
     assert orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:unknown") is None
+
+
+def test_assess_strategy_readiness() -> None:
+    # Ready case
+    ready = orchestrator.assess_strategy_readiness(
+        extracted={"symbols": ["AAPL"], "template": "rsi_mean_reversion"}
+    )
+    assert ready.ready_to_run is True
+
+    # Missing symbols
+    missing_symbols = orchestrator.assess_strategy_readiness(
+        extracted={"symbols": [], "template": "rsi_mean_reversion"}
+    )
+    assert missing_symbols.ready_to_run is False
+    assert "symbols" in missing_symbols.missing_fields
+
+    # Missing template
+    missing_template = orchestrator.assess_strategy_readiness(
+        extracted={"symbols": ["AAPL"], "template": None}
+    )
+    assert missing_template.ready_to_run is False
+    assert "template" in missing_template.missing_fields
+
+    # Spanish prompt
+    spanish = orchestrator.assess_strategy_readiness(
+        extracted={"symbols": []}, language="es-419"
+    )
+    assert "¿Que simbolo" in spanish.clarification_prompt or "Que simbolo" in spanish.clarification_prompt

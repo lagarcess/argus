@@ -699,3 +699,41 @@ def test_invalid_cursor_returns_problem_details() -> None:
     assert response.status_code == 400
     payload = response.json()
     assert payload["code"] == "validation_error"
+
+
+def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
+    from argus.api import main as api_main
+    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
+
+    client = _client()
+    _set_onboarding_ready(client)
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    # Patch orchestrator to return a strategy missing symbols
+    monkeypatch.setattr(
+        api_main,
+        "orchestrate_chat_turn",
+        lambda **kwargs: ChatOrchestrationDecision(
+            intent="run_backtest",
+            assistant_message="I will test that.",
+            strategy=StrategyExtraction(
+                template="rsi_mean_reversion",
+                asset_class="equity",
+                symbols=[],  # Missing!
+            ),
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Run RSI",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "What ticker or crypto symbol" in response.text
+    assert "running_backtest" not in response.text
+    assert "event: result" not in response.text

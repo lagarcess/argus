@@ -58,6 +58,7 @@ from argus.domain.engine import (
     validate_backtest_config,
 )
 from argus.domain.orchestrator import (
+    assess_strategy_readiness,
     assistant_copy_for_result,
     goal_follow_up_message,
     orchestrate_chat_turn,
@@ -2053,6 +2054,23 @@ def chat_stream(
                 content=decision.assistant_message,
             )
             yield sse("token", {"text": decision.assistant_message})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        # Task 1: Requirements-aware strategy readiness gate
+        readiness = assess_strategy_readiness(
+            extracted=decision.strategy,
+            language=payload.language or conversation.language or current_user_profile.language,
+        )
+        if not readiness.ready_to_run:
+            assistant_text = readiness.clarification_prompt or "What should I test?"
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=assistant_text,
+            )
+            yield sse("token", {"text": assistant_text})
             yield sse("done", {"message_id": assistant_message.id})
             return
 

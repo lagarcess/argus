@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Literal
+from dataclasses import dataclass, field
+from typing import Any, Literal, cast
 
 from langchain_openrouter import ChatOpenRouter
 from pydantic import BaseModel, Field
@@ -59,7 +60,7 @@ COMMON_NAMES = {
 
 
 class StrategyExtraction(BaseModel):
-    template: str
+    template: str | None = None
     asset_class: Literal["equity", "crypto"]
     symbols: list[str] = Field(default_factory=list)
     parameters: dict[str, Any] = Field(default_factory=dict)
@@ -81,6 +82,13 @@ class NameSuggestion(BaseModel):
     name: str
 
 
+@dataclass(frozen=True)
+class StrategyReadiness:
+    ready_to_run: bool
+    missing_fields: list[str] = field(default_factory=list)
+    clarification_prompt: str | None = None
+
+
 def _resolve_language(language: str | None) -> Literal["en", "es-419"]:
     if (language or "en").lower().startswith("es"):
         return "es-419"
@@ -95,12 +103,14 @@ def _heuristic_extract(message: str) -> dict[str, Any]:
         for token in re.findall(r"\b[A-Z]{2,5}\b", upper)
         if token not in NON_SYMBOLS and token not in symbols
     )
-    template = "rsi_mean_reversion"
+
+    template = None
     lower = message.lower()
     for candidate, alias in TEMPLATE_ALIASES:
         if alias in lower:
             template = candidate
             break
+
     asset_class: Literal["equity", "crypto"] = (
         "crypto"
         if any(symbol in {"BTC", "ETH", "SOL"} for symbol in symbols)
@@ -109,9 +119,44 @@ def _heuristic_extract(message: str) -> dict[str, Any]:
     return {
         "template": template,
         "asset_class": asset_class,
-        "symbols": symbols[:5] or ["TSLA"],
+        "symbols": symbols[:5],
         "parameters": {},
     }
+
+
+def assess_strategy_readiness(
+    *,
+    extracted: StrategyExtraction | dict[str, Any],
+    language: str | None = "en",
+) -> StrategyReadiness:
+    missing: list[str] = []
+    data = (
+        extracted.model_dump()
+        if hasattr(extracted, "model_dump")
+        else cast(dict[str, Any], extracted)
+    )
+
+    symbols = data.get("symbols") or []
+    if not symbols:
+        missing.append("symbols")
+
+    if not data.get("template"):
+        missing.append("template")
+
+    if not missing:
+        return StrategyReadiness(ready_to_run=True)
+
+    normalized = _resolve_language(language)
+    prompt = (
+        "What ticker or crypto symbol should I test, and what kind of idea should I simulate?"
+        if normalized == "en"
+        else "Que simbolo de accion o cripto quieres probar, y que tipo de idea quieres simular?"
+    )
+    return StrategyReadiness(
+        ready_to_run=False,
+        missing_fields=missing,
+        clarification_prompt=prompt,
+    )
 
 
 def _default_onboarding_prompt(language: str | None) -> str:
