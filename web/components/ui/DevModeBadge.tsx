@@ -42,7 +42,7 @@ export function DevModeBadge() {
         <div className="flex h-1.5 w-1.5 rounded-full bg-black/20 dark:bg-white/20" />
         <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
           <Terminal className="h-3.5 w-3.5" />
-          <span className="tracking-tight font-mono uppercase">
+          <span className="tracking-tight">
             Mock Auth Mode
           </span>
         </div>
