@@ -103,7 +103,7 @@ def test_assess_strategy_readiness() -> None:
         extracted=StrategyExtraction(symbols=[], template="rsi_mean_reversion", asset_class="equity"), 
         language="es-419"
     )
-    assert "¿Que simbolo" in spanish.clarification_prompt or "Que simbolo" in spanish.clarification_prompt
+    assert "símbolos" in spanish.clarification_prompt or "simbolos" in spanish.clarification_prompt
 
 
 def test_orchestrate_chat_turn_passes_history(monkeypatch) -> None:
@@ -167,3 +167,31 @@ def test_orchestrate_chat_turn_fallback_honors_primary_goal(monkeypatch) -> None
     )
     assert decision.intent == "unsupported_request"
     assert "beginner-friendly" in decision.assistant_message.lower()
+
+
+def test_decide_run_readiness_honors_pending_questions() -> None:
+    # Scenario: Assistant asked for dates, user didn't provide them.
+    history = [
+        {"role": "user", "content": "Test BTC"},
+        {"role": "assistant", "content": "I can test BTC. For what period do you want to run it?"},
+    ]
+
+    # User just says "buy the dip" without dates
+    draft = orchestrator.StrategyRunDraft(
+        symbols=orchestrator.SlotValue(value=["BTC"], source="history_inferred"),
+        template=orchestrator.SlotValue(value="buy_the_dip", source="user_supplied"),
+        timeframe=orchestrator.SlotValue(value="1D", source="backend_default"),
+        start_date=orchestrator.SlotValue(value="2024-01-01", source="backend_default"),
+    )
+
+    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
+
+    assert readiness.ready_to_run is False
+    assert "time_preferences" in readiness.missing_fields
+    assert "period" in readiness.clarification_prompt.lower()
+
+    # Scenario: User explicitly says "use defaults"
+    history.append({"role": "user", "content": "use standard defaults"})
+    # Re-build draft logic would normally handle this, but for test we simulate
+    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
+    assert readiness.ready_to_run is True

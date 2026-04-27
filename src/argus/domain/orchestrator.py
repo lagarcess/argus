@@ -263,39 +263,63 @@ def _heuristic_extract(message: str) -> dict[str, Any]:
     }
 
 
-def assess_strategy_readiness(
-    *,
-    extracted: StrategyExtraction | dict[str, Any],
-    language: str | None = "en",
+def decide_run_readiness(
+    draft: StrategyRunDraft, history: list[dict[str, str]], language: str | None = None
 ) -> StrategyReadiness:
-    missing: list[str] = []
-    data = (
-        extracted.model_dump()
-        if hasattr(extracted, "model_dump")
-        else cast(dict[str, Any], extracted)
-    )
-
-    symbols = data.get("symbols") or []
-    if not symbols:
+    """Determine if we can run or if we need to ask more questions."""
+    missing = []
+    
+    # Policy: Always require symbols and template from user or history
+    if draft.symbols.source == "missing":
         missing.append("symbols")
-
-    if not data.get("template"):
+    if draft.template.source == "missing":
         missing.append("template")
+
+    # Policy: If we asked for time/dates in the last 3 turns and still don't have them from user, mark as missing
+    # This prevents silent defaulting when the user is in the middle of answering a time question.
+    pending_time_question = any(
+        m["role"] == "assistant" and 
+        any(kw in m["content"].lower() for kw in ["timeframe", "temporal", "period", "fecha", "cuándo", "cuando"])
+        for m in history[-3:]
+    )
+    
+    # If we asked and user didn't provide in this turn (source == history_inferred or backend_default means it wasn't in last msg)
+    if pending_time_question:
+        if draft.timeframe.source in ("missing", "backend_default", "history_inferred") and \
+           draft.start_date.source in ("missing", "backend_default", "history_inferred"):
+            # Check if last user message says "default" or "da igual" or similar
+            last_user_msg = next((m["content"].lower() for m in reversed(history) if m["role"] == "user"), "")
+            if not any(kw in last_user_msg for kw in ["default", "por defecto", "da igual", "any", "standard"]):
+                missing.append("time_preferences")
 
     if not missing:
         return StrategyReadiness(ready_to_run=True)
 
-    normalized = _resolve_language(language)
-    prompt = (
-        "What ticker or crypto symbol should I test, and what kind of idea should I simulate?"
-        if normalized == "en"
-        else "Que simbolo de accion o cripto quieres probar, y que tipo de idea quieres simular?"
-    )
+    # Build clarification prompt
+    lang = _resolve_language(language)
+    prompts = []
+    if "symbols" in missing:
+        prompts.append("¿Qué símbolos quieres probar?" if lang == "es-419" else "Which symbols do you want to test?")
+    if "template" in missing:
+        prompts.append("¿Qué estrategia quieres usar?" if lang == "es-419" else "Which strategy do you want to use?")
+    if "time_preferences" in missing:
+        prompts.append("¿En qué periodo o temporalidad?" if lang == "es-419" else "For what period or timeframe?")
+
     return StrategyReadiness(
         ready_to_run=False,
         missing_fields=missing,
-        clarification_prompt=prompt,
+        clarification_prompt=" ".join(prompts)
     )
+
+
+def assess_strategy_readiness(
+    *,
+    extracted: StrategyExtraction,
+    language: str | None,
+) -> StrategyReadiness:
+    """Deprecated: Use decide_run_readiness instead."""
+    draft = build_strategy_draft(extracted, [])
+    return decide_run_readiness(draft, [], language)
 
 
 def _default_onboarding_prompt(language: str | None) -> str:
@@ -403,7 +427,7 @@ def _fallback_run_decision(
     draft = build_strategy_draft(extraction, (history or []) + [{"role": "user", "content": message}])
     
     # Assess readiness using the draft and history
-    readiness = assess_strategy_readiness(extracted=extraction, language=language)
+    readiness = decide_run_readiness(draft=draft, history=history or [], language=language)
 
     if readiness.ready_to_run:
         return ChatOrchestrationDecision(
@@ -465,10 +489,23 @@ def orchestrate_chat_turn(
             model_name=primary_model,
             history=history,
         )
+        
+        # Policy Enforcement: override LLM if readiness gate fails
+        if decision.strategy_draft:
+            readiness = decide_run_readiness(
+                draft=decision.strategy_draft, 
+                history=history or [], 
+                language=language
+            )
+            if not readiness.ready_to_run:
+                decision.intent = "education"
+                decision.assistant_message = readiness.clarification_prompt or decision.assistant_message
+        
         if decision.strategy and decision.strategy.template not in SUPPORTED_TEMPLATES:
-            return _fallback_run_decision(message, language, primary_goal)
+            return _fallback_run_decision(message, language, primary_goal, history)
         if decision.strategy and not decision.strategy.symbols:
-            return _fallback_run_decision(message, language, primary_goal)
+            return _fallback_run_decision(message, language, primary_goal, history)
+            
         return decision
     except Exception:
         if fallback_model:
@@ -480,6 +517,18 @@ def orchestrate_chat_turn(
                     model_name=fallback_model,
                     history=history,
                 )
+                
+                # Policy Enforcement: override fallback LLM if readiness gate fails
+                if decision.strategy_draft:
+                    readiness = decide_run_readiness(
+                        draft=decision.strategy_draft, 
+                        history=history or [], 
+                        language=language
+                    )
+                    if not readiness.ready_to_run:
+                        decision.intent = "education"
+                        decision.assistant_message = readiness.clarification_prompt or decision.assistant_message
+                
                 if (
                     decision.strategy
                     and decision.strategy.template in SUPPORTED_TEMPLATES
@@ -487,7 +536,7 @@ def orchestrate_chat_turn(
                     return decision
             except Exception:
                 pass
-        return _fallback_run_decision(message, language, primary_goal)
+        return _fallback_run_decision(message, language, primary_goal, history)
 
 
 def extract_strategy_request(message: str) -> dict[str, Any]:
