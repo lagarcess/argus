@@ -329,7 +329,7 @@ def current_user(request: Request) -> User:
                         potential_tokens.append(clean_value)
                 except Exception:
                     potential_tokens.append(value)
-        
+
         for t_val in potential_tokens:
             if t_val:
                 token = t_val
