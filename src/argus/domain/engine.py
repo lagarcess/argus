@@ -497,24 +497,28 @@ def build_result_card(
     if is_es:
         benchmark_note = f"Universo: {symbols}. Referencia: {config['benchmark_symbol']}."
         assumptions = [
+            f"Universo: {symbols}.",
             "La simulación utiliza el preajuste solo-largo.",
             f"Capital inicial: ${config['starting_capital']:,.0f}.",
             "Asignación: igual peso.",
             "No se incluyen deslizamientos ni comisiones.",
+            f"Referencia: {config['benchmark_symbol']}.",
         ]
         if bool(realism["enabled"]):
-            assumptions[3] = (
+            assumptions[4] = (
                 "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
             )
     else:
         assumptions = [
+            f"Universe: {symbols}.",
             "Simulation uses long-only preset.",
             f"Starting capital: ${config['starting_capital']:,.0f}.",
             "Allocation: equal weight.",
             "No slippage or fees included.",
+            f"Benchmark: {config['benchmark_symbol']}.",
         ]
         if bool(realism["enabled"]):
-            assumptions[3] = "Execution realism enabled (fees/slippage applied)."
+            assumptions[4] = "Execution realism enabled (fees/slippage applied)."
 
     rows = [
         {

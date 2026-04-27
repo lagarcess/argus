@@ -246,7 +246,7 @@ export default function CollectionsView({
                     <button
                       key={idx}
                       onClick={() => onTriggerPrompt?.("collection", recipe.prompt)}
-                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover: dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
+                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
                     >
                       <div className="rounded-full bg-black/[0.03] p-2 dark:bg-white/[0.03]">
                         <Layers className="h-4 w-4 text-black/40 dark:text-white/40" />

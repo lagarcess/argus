@@ -357,7 +357,7 @@ export default function StrategiesView({
                     <button
                       key={idx}
                       onClick={() => onTriggerPrompt?.("strategy", recipe.prompt)}
-                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover: dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
+                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
                     >
                       <div className="rounded-full bg-black/[0.03] p-2 dark:bg-white/[0.03]">
                         <Compass className="h-4 w-4 text-black/40 dark:text-white/40" />
@@ -479,7 +479,7 @@ export default function StrategiesView({
                               {t('common.delete')}
                             </span>
                           </button>
-                          <div className="absolute inset-x-0 bottom-[-16px] h-4 flex justify-center items-center opacity-50 text-[9px] tracking-widest uppercase pointer-events-none drop-">
+                          <div className="absolute inset-x-0 bottom-[-16px] h-4 flex justify-center items-center opacity-50 text-[9px] tracking-widest uppercase pointer-events-none">
                             {t('common.tap_to_cancel')}
                           </div>
                         </div>
@@ -510,7 +510,7 @@ export default function StrategiesView({
                           <div className="flex flex-col px-5 py-4 gap-4">
                             {/* Header row */}
                             <div
-                              className="grid gap-2 items-end pb-2 sticky top-[-1px] bg-white dark:bg-[#1f2225] z-10 pt-1 -mt-1 -[0_4px_10px_-5px_rgba(0,0,0,0.1)] dark:-[0_4px_10px_-5px_rgba(0,0,0,0.5)]"
+                              className="grid gap-2 items-end pb-2 sticky top-[-1px] bg-white dark:bg-[#1f2225] z-10 pt-1 -mt-1"
                               style={{ gridTemplateColumns: `repeat(${strategy.columns.length + 1}, minmax(0, 1fr))` }}
                             >
                               <div className="col-span-1" />

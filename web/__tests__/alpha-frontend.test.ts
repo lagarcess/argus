@@ -95,6 +95,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(page).toContain('postCompleteHref="/chat"');
   });
 
+  test("settings subscription section is feature-flagged off by default", () => {
+    const settings = readFileSync(join(root, "components/views/SettingsView.tsx"), "utf-8");
+
+    expect(settings).toContain("NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION");
+    expect(settings).toContain("{showSubscriptionSection && (");
+  });
+
   test("strategies surface renders dynamic metrics based on preferences", () => {
     const file = readFileSync(join(root, "components/views/StrategiesView.tsx"), "utf-8");
     expect(file).toContain("strategy.columns.map(");

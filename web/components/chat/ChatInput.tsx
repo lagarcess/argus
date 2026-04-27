@@ -104,7 +104,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
     <form
       onSubmit={handleSubmit}
       onClick={handleContainerClick}
-      className="relative flex items-end w-full bg-white dark:bg-[#1f2227] rounded-[32px] border border-black/5 dark:border-white/5 dark: focus-within:ring-2 focus-within:ring-black/20 dark:focus-within:ring-white/20 transition-all cursor-text"
+      className="relative flex items-end w-full bg-white dark:bg-[#1f2227] rounded-[32px] border border-black/5 dark:border-white/5 focus-within:ring-2 focus-within:ring-black/20 dark:focus-within:ring-white/20 transition-all cursor-text"
     >
       <div className="relative flex-1 flex items-center min-w-0">
         <input

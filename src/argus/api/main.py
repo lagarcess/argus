@@ -200,7 +200,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
         }
 
     origin = request.headers.get("origin")
-    headers = {"Access-Control-Allow-Origin": origin or "*"}
+    headers = dict(exc.headers or {})
+    headers["Access-Control-Allow-Origin"] = origin or "*"
     if origin:
         headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
@@ -1559,25 +1560,25 @@ def history(
     )
     filtered = items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_type = cursor_data.get("type")
-        cursor_created_at = cursor_data.get("created_at")
-        cursor_pinned = cursor_data.get("pinned")
-        if (
-            not isinstance(cursor_id, str)
-            or not isinstance(cursor_type, str)
-            or not isinstance(cursor_created_at, str)
-        ):
-            raise _invalid_cursor_problem(request)
+        cursor_created_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_created_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
+        cursor_item = next(
+            (
+                item
+                for item in items
+                if item.id == cursor_id and item.created_at == cursor_dt
+            ),
+            None,
+        )
+        if cursor_item is None:
+            raise _invalid_cursor_problem(request)
         cursor_key = (
-            int(bool(cursor_pinned)),
+            int(cursor_item.pinned),
             cursor_dt,
-            _search_type_rank(cursor_type),
+            _search_type_rank(cursor_item.type),
             cursor_id,
         )
         filtered = [
@@ -1781,26 +1782,26 @@ def search(
     )
     filtered = scored_items
     if cursor:
-        cursor_data = _decode_cursor(cursor, request)
-        cursor_id = cursor_data.get("id")
-        cursor_type = cursor_data.get("type")
-        cursor_updated_at = cursor_data.get("updated_at")
-        cursor_score = cursor_data.get("score")
-        if (
-            not isinstance(cursor_id, str)
-            or not isinstance(cursor_type, str)
-            or not isinstance(cursor_updated_at, str)
-            or not isinstance(cursor_score, int)
-        ):
-            raise _invalid_cursor_problem(request)
+        cursor_updated_at, cursor_id = _decode_cursor(cursor, request)
         try:
             cursor_dt = datetime.fromisoformat(cursor_updated_at)
         except ValueError:
             raise _invalid_cursor_problem(request) from None
+        cursor_pair = next(
+            (
+                pair
+                for pair in scored_items
+                if pair[1].id == cursor_id and pair[1].updated_at == cursor_dt
+            ),
+            None,
+        )
+        if cursor_pair is None:
+            raise _invalid_cursor_problem(request)
+        cursor_score, cursor_item = cursor_pair
         cursor_key = (
             cursor_score,
             cursor_dt,
-            _search_type_rank(cursor_type),
+            _search_type_rank(cursor_item.type),
             cursor_id,
         )
         filtered = [
@@ -1901,19 +1902,18 @@ def chat_stream(
     }
     if supabase_gateway is not None:
         try:
-            if not _dev_memory_fallback_enabled():
-                supabase_gateway.check_and_increment_usage(
-                    user_id=user.id,
-                    resource="chat_messages",
-                    period="day",
-                    limit_count=200,
-                )
-                supabase_gateway.check_and_increment_usage(
-                    user_id=user.id,
-                    resource="chat_messages",
-                    period="minute",
-                    limit_count=10,
-                )
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id,
+                resource="chat_messages",
+                period="day",
+                limit_count=200,
+            )
+            supabase_gateway.check_and_increment_usage(
+                user_id=user.id,
+                resource="chat_messages",
+                period="minute",
+                limit_count=10,
+            )
         except QuotaExceededError as e:
             raise problem(
                 request,

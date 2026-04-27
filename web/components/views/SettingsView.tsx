@@ -56,6 +56,8 @@ type SubView = "main" | "archived" | "deleted";
 export default function SettingsView({ onClose, onLogout, onFeedback }: SettingsViewProps) {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
+  const showSubscriptionSection =
+    process.env.NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION === "true";
   const showDevOnboardingReset =
     process.env.NEXT_PUBLIC_ENABLE_DEV_ONBOARDING_RESET === "true";
   const [activeSubView, setActiveSubView] = useState<SubView>("main");
@@ -307,16 +309,18 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
             <ChevronRight className="w-5 h-5 text-black/40 dark:text-white/40" />
           </button>
 
-          <div className="flex flex-col gap-2">
-            <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">
-              {t("settings.subscription.title")}
-            </span>
-            <button className="w-full py-4 px-4 bg-[#f4e8ff]/80 dark:bg-[#342442]/80 border border-[#9a66d9]/20 dark:border-[#d3a8fc]/20 rounded-[16px] hover:opacity-80 transition-opacity text-center flex items-center justify-center">
-              <span className="text-[15px] font-medium text-[#7e47be] dark:text-[#e4c4fd]">
-                {t("settings.subscription.upgrade_pro")}
+          {showSubscriptionSection && (
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">
+                {t("settings.subscription.title")}
               </span>
-            </button>
-          </div>
+              <button className="w-full py-4 px-4 bg-[#f4e8ff]/80 dark:bg-[#342442]/80 border border-[#9a66d9]/20 dark:border-[#d3a8fc]/20 rounded-[16px] hover:opacity-80 transition-opacity text-center flex items-center justify-center">
+                <span className="text-[15px] font-medium text-[#7e47be] dark:text-[#e4c4fd]">
+                  {t("settings.subscription.upgrade_pro")}
+                </span>
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">
