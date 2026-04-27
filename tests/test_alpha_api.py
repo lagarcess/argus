@@ -737,3 +737,40 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
     assert "What ticker or crypto symbol" in response.text
     assert "running_backtest" not in response.text
     assert "event: result" not in response.text
+
+
+def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None:
+    from argus.api import main as api_main
+    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
+
+    client = _client()
+    _set_onboarding_ready(client)
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    # Patch orchestrator to return a strategy with explicit 1h timeframe
+    monkeypatch.setattr(
+        api_main,
+        "orchestrate_chat_turn",
+        lambda **kwargs: ChatOrchestrationDecision(
+            intent="run_backtest",
+            assistant_message="I will test that with 1h timeframe.",
+            strategy=StrategyExtraction(
+                template="rsi_mean_reversion",
+                asset_class="crypto",
+                symbols=["BTC"],
+                timeframe="1h",  # Now at root
+            ),
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Run BTC 1h",
+        },
+    )
+
+    assert response.status_code == 200
+    # The timeframe "1h" should be in the result run config_snapshot
+    assert '"timeframe":"1h"' in response.text or '"timeframe": "1h"' in response.text

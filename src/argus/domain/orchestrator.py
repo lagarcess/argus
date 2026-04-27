@@ -63,6 +63,10 @@ class StrategyExtraction(BaseModel):
     template: str | None = None
     asset_class: Literal["equity", "crypto"]
     symbols: list[str] = Field(default_factory=list)
+    timeframe: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    benchmark_symbol: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 

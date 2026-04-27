@@ -934,6 +934,32 @@ def create_run_from_payload(
     return run
 
 
+def build_chat_backtest_config(
+    *,
+    extracted: dict[str, Any],
+    asset_class: str,
+) -> dict[str, Any]:
+    """
+    Task 2: Build canonical backtest configuration from extracted AI parameters.
+    Ensures chat-created runs use explicit backend defaults instead of hardcoded chat values.
+    """
+    default_bench = "BTC" if asset_class == "crypto" else "SPY"
+
+    return {
+        "template": extracted.get("template"),
+        "asset_class": asset_class,
+        "symbols": extracted.get("symbols"),
+        "timeframe": extracted.get("timeframe"),
+        "start_date": extracted.get("start_date"),
+        "end_date": extracted.get("end_date"),
+        "side": extracted.get("side", "long"),
+        "starting_capital": extracted.get("starting_capital", 10000),
+        "allocation_method": extracted.get("allocation_method", "equal_weight"),
+        "benchmark_symbol": extracted.get("benchmark_symbol", default_bench),
+        "parameters": extracted.get("parameters", {}),
+    }
+
+
 @app.post("/api/v1/backtests/run", response_model=BacktestRunResponse)
 def run_backtest(
     payload: BacktestRunRequest,
@@ -2079,12 +2105,15 @@ def chat_stream(
         yield sse("token", {"text": "I can test that as a supported Alpha strategy. "})
         yield sse("status", {"status": "running_backtest"})
         try:
+            # Task 2: Use canonical config builder instead of hardcoded dict
+            config = build_chat_backtest_config(
+                extracted=extracted,
+                asset_class=extracted["asset_class"],
+            )
+            config["conversation_id"] = conversation.id
+
             run = create_run_from_payload(
-                {
-                    **extracted,
-                    "conversation_id": conversation.id,
-                    "timeframe": "1D",
-                },
+                config,
                 request,
                 user_id=user.id,
                 conversation_id=conversation.id,
