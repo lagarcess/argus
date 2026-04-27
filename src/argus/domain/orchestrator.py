@@ -474,7 +474,7 @@ def _fallback_run_decision(
 
     return ChatOrchestrationDecision(
         intent="education",
-        assistant_message=readiness.clarification_prompt or "Tell me more about your strategy.",
+        assistant_message=readiness.clarification_prompt or ("Cuéntame más sobre tu estrategia." if _resolve_language(language) == "es-419" else "Tell me more about your strategy."),
         strategy=extraction,
         strategy_draft=draft,
         title_suggestion=None,

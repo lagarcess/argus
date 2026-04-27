@@ -2122,7 +2122,8 @@ def chat_stream(
             language=payload.language or conversation.language or current_user_profile.language,
         )
         if not readiness.ready_to_run:
-            assistant_text = readiness.clarification_prompt or "What should I test?"
+            is_es = (payload.language or conversation.language or current_user_profile.language or "en").lower().startswith("es")
+            assistant_text = readiness.clarification_prompt or ("¿Qué debería probar?" if is_es else "What should I test?")
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -2134,8 +2135,10 @@ def chat_stream(
             return
 
         extracted = decision.strategy.model_dump()
+        lang = payload.language or conversation.language or current_user_profile.language
         yield sse("status", {"status": "extracting_strategy"})
-        yield sse("token", {"text": "I can test that as a supported Alpha strategy. "})
+        is_es = (lang or "en").lower().startswith("es")
+        yield sse("token", {"text": "Puedo probar eso como una estrategia Alpha soportada. " if is_es else "I can test that as a supported Alpha strategy. "})
         yield sse("status", {"status": "running_backtest"})
         try:
             # Task 2: Use canonical config builder instead of hardcoded dict
