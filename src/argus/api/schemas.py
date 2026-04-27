@@ -31,7 +31,7 @@ class OnboardingState(BaseModel):
     primary_goal: (
         Literal[
             "learn_basics",
-            "passive_strategy",
+            "build_passive_strategy",
             "test_stock_idea",
             "explore_crypto",
             "surprise_me",
