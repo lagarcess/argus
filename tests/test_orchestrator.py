@@ -100,3 +100,41 @@ def test_assess_strategy_readiness() -> None:
         extracted={"symbols": []}, language="es-419"
     )
     assert "¿Que simbolo" in spanish.clarification_prompt or "Que simbolo" in spanish.clarification_prompt
+
+
+def test_orchestrate_chat_turn_passes_history(monkeypatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("AGENT_MODEL", "primary-model")
+
+    captured_history: list[dict[str, str]] | None = None
+
+    def _fake_extract(*, history: list[dict[str, str]] | None = None, **kwargs) -> ChatOrchestrationDecision:  # type: ignore[no-untyped-def]
+        nonlocal captured_history
+        captured_history = history
+        return ChatOrchestrationDecision(
+            intent="run_backtest",
+            assistant_message="ok",
+            strategy=StrategyExtraction(
+                template="rsi_mean_reversion",
+                symbols=["TSLA"],
+                asset_class="equity",
+                parameters={},
+            ),
+        )
+
+    monkeypatch.setattr(orchestrator, "_llm_extract_decision", _fake_extract)
+
+    history = [
+        {"role": "user", "content": "Tell me about TSLA"},
+        {"role": "assistant", "content": "TSLA is a stock."},
+    ]
+
+    orchestrator.orchestrate_chat_turn(
+        message="Backtest it",
+        language="en",
+        onboarding_required=False,
+        primary_goal=None,
+        history=history,
+    )
+
+    assert captured_history == history

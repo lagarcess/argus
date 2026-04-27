@@ -91,7 +91,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         api_main,
         "orchestrate_chat_turn",
-        lambda message, language, onboarding_required, primary_goal: (
+        lambda message, language, onboarding_required, primary_goal, **kwargs: (
             ChatOrchestrationDecision(
                 intent="onboarding_prompt",
                 assistant_message=(
@@ -774,3 +774,57 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
     assert response.status_code == 200
     # The timeframe "1h" should be in the result run config_snapshot
     assert '"timeframe":"1h"' in response.text or '"timeframe": "1h"' in response.text
+
+
+def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
+    from argus.api import main as api_main
+    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
+
+    client = _client()
+    _set_onboarding_ready(client)
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    # Insert a message into memory store manually
+    from argus.api.main import store
+    from argus.domain.supabase_gateway import Message
+    from datetime import datetime, timezone
+
+    msg1 = Message(
+        id="msg1",
+        conversation_id=conversation["id"],
+        role="user",
+        content="Tell me about AAPL",
+        created_at=datetime.now(timezone.utc),
+    )
+    store.messages[conversation["id"]] = [msg1]
+
+    captured_history: list[dict[str, str]] | None = None
+
+    def _fake_orchestrate(
+        *, history: list[dict[str, str]] | None = None, **kwargs
+    ) -> ChatOrchestrationDecision:  # type: ignore[no-untyped-def]
+        nonlocal captured_history
+        captured_history = history
+        return ChatOrchestrationDecision(
+            intent="run_backtest",
+            assistant_message="ok",
+            strategy=StrategyExtraction(
+                template="rsi_mean_reversion",
+                symbols=["AAPL"],
+                asset_class="equity",
+            ),
+        )
+
+    monkeypatch.setattr(api_main, "orchestrate_chat_turn", _fake_orchestrate)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest it",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_history is not None
+    assert any(m["content"] == "Tell me about AAPL" for m in captured_history)

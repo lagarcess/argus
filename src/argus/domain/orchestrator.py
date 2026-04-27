@@ -223,28 +223,37 @@ def _llm_extract_decision(
     language: str | None,
     primary_goal: str | None,
     model_name: str,
+    history: list[dict[str, str]] | None = None,
 ) -> ChatOrchestrationDecision:
     prompt_language = _resolve_language(language)
     model = _build_model(model_name)
     structured = model.with_structured_output(ChatOrchestrationDecision)
-    return structured.invoke(
-        [
-            {
-                "role": "system",
-                "content": (
-                    "You are Argus Alpha orchestration. "
-                    "Return only supported intents and templates. "
-                    "Supported templates: buy_the_dip, rsi_mean_reversion, moving_average_crossover, "
-                    "dca_accumulation, momentum_breakout, trend_follow. "
-                    "Never propose unsupported capabilities. "
-                    "In 'assistant_message', ALWAYS use standard Markdown vertical lists (e.g., '- **Item**: description') for strategy lists. "
-                    "Never use horizontal dot-separated lists. Use vertical lists with newlines between paragraphs for clarity. "
-                    f"User language: {prompt_language}. Primary goal: {primary_goal or 'unknown'}."
-                ),
-            },
-            {"role": "user", "content": message},
-        ]
-    )
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus Alpha orchestration. "
+                "Use the provided conversation history to resolve pronouns (e.g., 'it', 'them') "
+                "or symbols mentioned in previous turns. "
+                "Return only supported intents and templates. "
+                "Supported templates: buy_the_dip, rsi_mean_reversion, moving_average_crossover, "
+                "dca_accumulation, momentum_breakout, trend_follow. "
+                "Never propose unsupported capabilities. "
+                "In 'assistant_message', ALWAYS use standard Markdown vertical lists (e.g., '- **Item**: description') for strategy lists. "
+                "Never use horizontal dot-separated lists. Use vertical lists with newlines between paragraphs for clarity. "
+                f"User language: {prompt_language}. Primary goal: {primary_goal or 'unknown'}."
+            ),
+        }
+    ]
+
+    if history:
+        # Pass up to last 6 messages for context
+        messages.extend(history[-6:])
+
+    messages.append({"role": "user", "content": message})
+
+    return structured.invoke(messages)
 
 
 def _fallback_run_decision(
@@ -265,6 +274,7 @@ def orchestrate_chat_turn(
     language: str | None,
     onboarding_required: bool,
     primary_goal: str | None,
+    history: list[dict[str, str]] | None = None,
 ) -> ChatOrchestrationDecision:
     if onboarding_required:
         return ChatOrchestrationDecision(
@@ -286,6 +296,7 @@ def orchestrate_chat_turn(
             language=language,
             primary_goal=primary_goal,
             model_name=primary_model,
+            history=history,
         )
         if decision.strategy and decision.strategy.template not in SUPPORTED_TEMPLATES:
             return _fallback_run_decision(message, language)
@@ -300,6 +311,7 @@ def orchestrate_chat_turn(
                     language=language,
                     primary_goal=primary_goal,
                     model_name=fallback_model,
+                    history=history,
                 )
                 if (
                     decision.strategy

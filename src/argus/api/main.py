@@ -2045,6 +2045,26 @@ def chat_stream(
             yield sse("done", {"message_id": assistant_message.id})
             return
 
+        # Task 3: Fetch history for context-aware extraction
+        history_msgs = []
+        if supabase_gateway is not None:
+            raw_history = supabase_gateway.list_messages(
+                user_id=user.id, conversation_id=conversation.id, limit=None
+            )
+            # Map roles to orchestrator expectations, only user/assistant
+            history_msgs = [
+                {"role": m.role, "content": m.content}
+                for m in raw_history
+                if m.role in ("user", "assistant")
+            ]
+        else:
+            raw_history = store.messages.get(conversation.id, [])
+            history_msgs = [
+                {"role": m.role, "content": m.content}
+                for m in raw_history
+                if m.role in ("user", "assistant")
+            ]
+
         try:
             decision = orchestrate_chat_turn(
                 message=payload.message,
@@ -2055,6 +2075,7 @@ def chat_stream(
                 ),
                 onboarding_required=False,
                 primary_goal=current_user_profile.onboarding.primary_goal,
+                history=history_msgs,
             )
             yield sse("status", {"status": f"intent_{decision.intent}"})
         except Exception as exc:
