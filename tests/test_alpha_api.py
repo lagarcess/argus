@@ -329,6 +329,7 @@ def test_backtest_accepts_supported_timeframes(timeframe: str) -> None:
             "asset_class": "equity",
             "symbols": ["AAPL"],
             "timeframe": timeframe,
+            "parameters": {"dca_cadence": "monthly"},
         },
     )
     assert response.status_code == 200
@@ -734,7 +735,7 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    assert "What ticker or crypto symbol" in response.text
+    assert "Which symbols do you want to test?" in response.text
     assert "running_backtest" not in response.text
     assert "event: result" not in response.text
 

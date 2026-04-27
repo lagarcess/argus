@@ -186,7 +186,14 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
         raise ValueError("stablecoin_not_supported")
 
     if config.get("parameters"):
-        raise ValueError("unsupported_parameters")
+        # Alpha MVP restricts indicator tuning, but allows strategy-specific config like DCA cadence
+        params = config["parameters"]
+        if config["template"] == "dca_accumulation":
+            allowed = {"dca_cadence"}
+            if not set(params.keys()).issubset(allowed):
+                raise ValueError("unsupported_parameters")
+        else:
+            raise ValueError("unsupported_parameters")
 
 
 def _resolve_indicator_series(
