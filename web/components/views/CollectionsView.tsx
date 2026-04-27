@@ -246,7 +246,7 @@ export default function CollectionsView({
                     <button
                       key={idx}
                       onClick={() => onTriggerPrompt?.("collection", recipe.prompt)}
-                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover:shadow-md dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
+                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover: dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
                     >
                       <div className="rounded-full bg-black/[0.03] p-2 dark:bg-white/[0.03]">
                         <Layers className="h-4 w-4 text-black/40 dark:text-white/40" />
@@ -312,9 +312,7 @@ export default function CollectionsView({
                   )}
 
                   <article
-                    className={`rounded-[20px] border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-[#1f2225] transition-transform duration-150 select-none ${
-                      isContextOpen ? "scale-[0.98]" : ""
-                    }`}
+                    className={`rounded-[20px] border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-[#1f2225] transition-transform duration-150 select-none ${ isContextOpen ? "scale-[0.98]" : "" }`}
                     onPointerDown={() => handlePointerDown(collection.id)}
                     onPointerUp={handlePointerUp}
                     onPointerLeave={handlePointerUp}
@@ -370,9 +368,7 @@ export default function CollectionsView({
 
       {/* Bottom bar */}
       <div
-        className={`absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none transition-all duration-300 ${
-          isSidebarOpen ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
-        }`}
+        className={`absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none transition-all duration-300 ${ isSidebarOpen ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0" }`}
       >
         <div className="pointer-events-auto max-w-3xl mx-auto flex items-center gap-4 transition-all duration-300 opacity-50 hover:opacity-100 focus-within:opacity-100 group">
           <div className="relative flex-1">
@@ -382,7 +378,7 @@ export default function CollectionsView({
               value={searchText}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={t('collections.search_placeholder')}
-              className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] shadow-lg text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
+              className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
             />
             {searchText && (
               <button

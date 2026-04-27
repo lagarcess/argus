@@ -173,6 +173,7 @@ def test_run_backtest_quota_exceeded(mock_gateway):
     data = response.json()
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for backtest_runs" in data["detail"]
+    assert response.headers.get("Retry-After") == "60"
 
 
 def test_chat_stream_quota_exceeded(mock_gateway):
@@ -189,6 +190,7 @@ def test_chat_stream_quota_exceeded(mock_gateway):
     data = response.json()
     assert data["code"] == "too_many_requests"
     assert "Quota exceeded for chat_messages" in data["detail"]
+    assert response.headers.get("Retry-After") == "60"
 
 
 def test_me_reads_profile_from_supabase_gateway(mock_gateway):

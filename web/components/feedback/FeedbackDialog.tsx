@@ -122,7 +122,7 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-lg bg-[#f5f5f5] dark:bg-[#1c1f24] border border-black/5 dark:border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+      <div className="relative w-full max-w-lg bg-[#f5f5f5] dark:bg-[#1c1f24] border border-black/5 dark:border-white/10 rounded-[32px] overflow-hidden animate-in zoom-in-95 fade-in duration-300">
         <div className="p-6 sm:p-8">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -159,11 +159,7 @@ export default function FeedbackDialog({ isOpen, onClose, type, rating, context 
                       key={tag.key}
                       type="button"
                       onClick={() => toggleTag(tag.key)}
-                      className={`px-4 py-2 rounded-full text-[14px] font-medium border transition-all ${
-                        selectedTags.includes(tag.key)
-                          ? "bg-black dark:bg-white text-white dark:text-black border-transparent"
-                          : "bg-white/50 dark:bg-white/5 border-black/5 dark:border-white/10 text-black/60 dark:text-white/60 hover:border-black/20 dark:hover:border-white/30"
-                      }`}
+                      className={`px-4 py-2 rounded-full text-[14px] font-medium border transition-all ${ selectedTags.includes(tag.key) ? "bg-black dark:bg-white text-white dark:text-black border-transparent" : "bg-white/50 dark:bg-white/5 border-black/5 dark:border-white/10 text-black/60 dark:text-white/60 hover:border-black/20 dark:hover:border-white/30" }`}
                     >
                       {tag.label}
                     </button>

@@ -477,13 +477,19 @@ def build_result_card(
     is_es = language.startswith("es")
     template_names = {
         "buy_the_dip": "Comprar la Caída" if is_es else "Buy the Dip",
-        "rsi_mean_reversion": "Reversión a la Media RSI" if is_es else "RSI Mean Reversion",
-        "moving_average_crossover": "Cruce de Medias Móviles" if is_es else "Moving Average Crossover",
+        "rsi_mean_reversion": "Reversión a la Media RSI"
+        if is_es
+        else "RSI Mean Reversion",
+        "moving_average_crossover": "Cruce de Medias Móviles"
+        if is_es
+        else "Moving Average Crossover",
         "dca_accumulation": "Acumulación DCA" if is_es else "DCA Accumulation",
         "momentum_breakout": "Ruptura de Impulso" if is_es else "Momentum Breakout",
         "trend_follow": "Seguimiento de Tendencia" if is_es else "Trend Follow",
     }
-    template_display = template_names.get(config["template"], config["template"].replace("_", " ").title())
+    template_display = template_names.get(
+        config["template"], config["template"].replace("_", " ").title()
+    )
 
     status_label = "Simulación Completa" if is_es else "Simulation Complete"
 
@@ -497,7 +503,9 @@ def build_result_card(
             "No se incluyen deslizamientos ni comisiones.",
         ]
         if bool(realism["enabled"]):
-            assumptions[3] = "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
+            assumptions[3] = (
+                "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
+            )
     else:
         assumptions = [
             "Simulation uses long-only preset.",
@@ -541,7 +549,8 @@ def build_result_card(
         "date_range": {
             "start": config["start_date"],
             "end": config["end_date"],
-            "display": f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}" if is_es
+            "display": f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}"
+            if is_es
             else f"{start.strftime('%B')} {start.day}, {start.year} to {end.strftime('%B')} {end.day}, {end.year}",
         },
         "status_label": status_label,
@@ -549,7 +558,15 @@ def build_result_card(
         "assumptions": assumptions,
         "benchmark_note": benchmark_note,
         "actions": [
-            {"type": "add_to_collection", "label": "Añadir estrategia a colección" if is_es else "Add strategy to collection"},
-            {"type": "try_new_strategy", "label": "Probar nueva estrategia" if is_es else "Try a new strategy"},
+            {
+                "type": "add_to_collection",
+                "label": "Añadir estrategia a colección"
+                if is_es
+                else "Add strategy to collection",
+            },
+            {
+                "type": "try_new_strategy",
+                "label": "Probar nueva estrategia" if is_es else "Try a new strategy",
+            },
         ],
     }

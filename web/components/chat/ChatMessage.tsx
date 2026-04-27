@@ -103,7 +103,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
   if (isUser) {
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal shadow-sm">
+        <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
           {getDisplayContent()}
         </div>
       </div>
@@ -161,11 +161,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
                 <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
                 {(rating === null || rating === "positive") && (
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
-                      rating === "positive"
-                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110"
-                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                    }`}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white" }`}
                     title={t('chat.good_response')}
                     onClick={() => handleRating("positive")}
                   >
@@ -174,11 +170,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
                 )}
                 {(rating === null || rating === "negative") && (
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
-                      rating === "negative"
-                        ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110"
-                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                    }`}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white" }`}
                     title={t('chat.poor_response')}
                     onClick={() => handleRating("negative")}
                   >
@@ -195,7 +187,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
 
                 {/* Popover Menu */}
                 {showOptions && (
-                  <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] shadow-xl dark:shadow-black/50 border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
+                  <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] dark: border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                       onClick={() => { navigator.clipboard.writeText(getCopyText()); setShowOptions(false); }}

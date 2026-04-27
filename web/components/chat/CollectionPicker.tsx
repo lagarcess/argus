@@ -97,7 +97,7 @@ export default function CollectionPicker({
       />
 
       {/* Sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-8 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:border-white/5 dark:bg-[#1f2225] animate-in slide-in-from-bottom-4 duration-300">
+      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-8 pt-2 -[0_-8px_30px_rgba(0,0,0,0.12)] dark:border-white/5 dark:bg-[#1f2225] animate-in slide-in-from-bottom-4 duration-300">
         {/* Drag handle */}
         <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10" />
 

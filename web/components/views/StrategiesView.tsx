@@ -38,9 +38,12 @@ type MetricPill = {
 type DisplayAsset = {
   ticker: string;
   name: string;
-  overallProfit: MetricPill;
-  maxDrawdown: MetricPill;
-  winRate: MetricPill;
+  pills: MetricPill[];
+};
+
+type DisplayColumn = {
+  key: string;
+  label: string;
 };
 
 type DisplayStrategy = {
@@ -50,6 +53,7 @@ type DisplayStrategy = {
   isPinned: boolean;
   hasMetrics: boolean;
   assets: DisplayAsset[];
+  columns: DisplayColumn[];
   // Raw strategy kept for re-run
   raw: Strategy;
 };
@@ -65,12 +69,18 @@ function mapStrategyToDisplay(s: Strategy, labels: { today: string; yesterday: s
   const rows: StrategySurfaceMetricRow[] =
     s.strategy_surface_metrics?.rows ?? [];
 
+  const columns = s.strategy_surface_metrics?.columns?.length
+    ? s.strategy_surface_metrics.columns
+    : [
+        { key: "total_return_pct", label: "Overall Profit" },
+        { key: "max_drawdown_pct", label: "Max Drawdown" },
+        { key: "win_rate", label: "Win Rate" }
+      ];
+
   const assets: DisplayAsset[] = rows.map((row) => ({
     ticker: row.symbol,
     name: row.asset_name,
-    overallProfit: parsePill(row.values["total_return_pct"] ?? "—"),
-    maxDrawdown: parsePill(row.values["max_drawdown_pct"] ?? "—"),
-    winRate: parsePill(row.values["win_rate"] ?? "—"),
+    pills: columns.map((col) => parsePill(row.values[col.key] ?? "—"))
   }));
 
   return {
@@ -80,6 +90,7 @@ function mapStrategyToDisplay(s: Strategy, labels: { today: string; yesterday: s
     isPinned: s.pinned,
     hasMetrics: rows.length > 0,
     assets,
+    columns,
     raw: s,
   };
 }
@@ -346,7 +357,7 @@ export default function StrategiesView({
                     <button
                       key={idx}
                       onClick={() => onTriggerPrompt?.("strategy", recipe.prompt)}
-                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover:shadow-md dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
+                      className="group flex flex-col items-start gap-2 rounded-[24px] border border-black/5 bg-white p-5 text-left transition-all hover:border-black/10 hover: dark:border-white/5 dark:bg-[#1f2225] dark:hover:border-white/10"
                     >
                       <div className="rounded-full bg-black/[0.03] p-2 dark:bg-white/[0.03]">
                         <Compass className="h-4 w-4 text-black/40 dark:text-white/40" />
@@ -372,11 +383,7 @@ export default function StrategiesView({
                 return (
                   <div key={strategy.id} className="flex flex-col">
                     <div
-                      className={`relative flex flex-col w-full bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 overflow-hidden transition-all duration-300 rounded-[24px] ${
-                        isContextOpen
-                          ? "scale-[0.98] shadow-inner bg-black/5 z-50"
-                          : "shadow-sm z-10"
-                      }`}
+                      className={`relative flex flex-col w-full bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 overflow-hidden transition-all duration-300 rounded-[24px] ${ isContextOpen ? "scale-[0.98] bg-black/5 z-50" : " z-10" }`}
                       onPointerDown={(e) => handlePointerDown(strategy.id, e)}
                       onPointerUp={handlePointerUp}
                       onPointerLeave={handlePointerUp}
@@ -428,9 +435,7 @@ export default function StrategiesView({
                           aria-label={isExpanded ? "Collapse" : "Expand"}
                         >
                           <ChevronDown
-                            className={`w-5 h-5 text-black/40 dark:text-white/40 transition-transform duration-200 ${
-                              isExpanded ? "rotate-0" : "-rotate-90"
-                            }`}
+                            className={`w-5 h-5 text-black/40 dark:text-white/40 transition-transform duration-200 ${ isExpanded ? "rotate-0" : "-rotate-90" }`}
                           />
                         </button>
                       </div>
@@ -474,7 +479,7 @@ export default function StrategiesView({
                               {t('common.delete')}
                             </span>
                           </button>
-                          <div className="absolute inset-x-0 bottom-[-16px] h-4 flex justify-center items-center opacity-50 text-[9px] tracking-widest uppercase pointer-events-none drop-shadow-sm">
+                          <div className="absolute inset-x-0 bottom-[-16px] h-4 flex justify-center items-center opacity-50 text-[9px] tracking-widest uppercase pointer-events-none drop-">
                             {t('common.tap_to_cancel')}
                           </div>
                         </div>
@@ -482,11 +487,7 @@ export default function StrategiesView({
 
                       {/* Expanded content */}
                       <div
-                        className={`argus-scrollbar overflow-y-auto transition-all duration-300 ease-in-out relative ${
-                          isExpanded
-                            ? "max-h-[280px] border-t border-black/5 dark:border-white/5"
-                            : "max-h-0"
-                        }`}
+                        className={`argus-scrollbar overflow-y-auto transition-all duration-300 ease-in-out relative ${ isExpanded ? "max-h-[280px] border-t border-black/5 dark:border-white/5" : "max-h-0" }`}
                       >
                         {isRunning ? (
                           <div className="flex flex-col px-5 py-8 gap-6 animate-pulse">
@@ -508,30 +509,34 @@ export default function StrategiesView({
                         ) : strategy.hasMetrics ? (
                           <div className="flex flex-col px-5 py-4 gap-4">
                             {/* Header row */}
-                            <div className="grid grid-cols-4 gap-2 items-end pb-2 sticky top-[-1px] bg-white dark:bg-[#1f2225] z-10 pt-1 -mt-1 shadow-[0_4px_10px_-5px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_10px_-5px_rgba(0,0,0,0.5)]">
+                            <div
+                              className="grid gap-2 items-end pb-2 sticky top-[-1px] bg-white dark:bg-[#1f2225] z-10 pt-1 -mt-1 -[0_4px_10px_-5px_rgba(0,0,0,0.1)] dark:-[0_4px_10px_-5px_rgba(0,0,0,0.5)]"
+                              style={{ gridTemplateColumns: `repeat(${strategy.columns.length + 1}, minmax(0, 1fr))` }}
+                            >
                               <div className="col-span-1" />
-                              <div className="col-span-1 flex flex-col items-center justify-center">
-                                <span className="text-[10px] lowercase font-medium text-black/40 dark:text-white/40 tracking-normal text-center leading-tight">
-                                  {t('strategies.metrics.overall_profit')}
-                                </span>
-                              </div>
-                              <div className="col-span-1 flex flex-col items-center justify-center">
-                                <span className="text-[10px] lowercase font-medium text-black/40 dark:text-white/40 tracking-normal text-center leading-tight">
-                                  {t('strategies.metrics.max_drawdown')}
-                                </span>
-                              </div>
-                              <div className="col-span-1 flex flex-col items-center justify-center">
-                                <span className="text-[10px] lowercase font-medium text-black/40 dark:text-white/40 tracking-normal text-center leading-tight">
-                                  {t('strategies.metrics.win_rate')}
-                                </span>
-                              </div>
+                              {strategy.columns.map((col, idx) => {
+                                // Attempt to translate known keys to match the old behavior/tone, else use the raw label.
+                                let translatedLabel = col.label;
+                                if (col.key === "total_return_pct") translatedLabel = t('strategies.metrics.overall_profit');
+                                if (col.key === "max_drawdown_pct") translatedLabel = t('strategies.metrics.max_drawdown');
+                                if (col.key === "win_rate") translatedLabel = t('strategies.metrics.win_rate');
+
+                                return (
+                                  <div key={idx} className="col-span-1 flex flex-col items-center justify-center">
+                                    <span className="text-[10px] lowercase font-medium text-black/40 dark:text-white/40 tracking-normal text-center leading-tight">
+                                      {translatedLabel}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
 
                             {/* Data rows */}
                             {strategy.assets.map((asset, idx) => (
                               <div
                                 key={idx}
-                                className="grid grid-cols-4 gap-2 items-center"
+                                className="grid gap-2 items-center"
+                                style={{ gridTemplateColumns: `repeat(${strategy.columns.length + 1}, minmax(0, 1fr))` }}
                               >
                                 <div className="col-span-1 flex flex-col pl-1">
                                   <span className="text-[16px] font-medium text-black dark:text-white tracking-tight">
@@ -541,21 +546,13 @@ export default function StrategiesView({
                                     {asset.name}
                                   </span>
                                 </div>
-                                {[
-                                  asset.overallProfit,
-                                  asset.maxDrawdown,
-                                  asset.winRate,
-                                ].map((pill, pi) => (
+                                {asset.pills.map((pill, pi) => (
                                   <div
                                     key={pi}
                                     className="col-span-1 flex items-center justify-center"
                                   >
                                     <div
-                                      className={`flex items-center justify-center w-full py-1.5 px-1 rounded-[8px] border text-[12px] font-medium tracking-tight ${
-                                        pill.isPositive
-                                          ? "bg-green-500/10 text-green-600 border-green-500/20"
-                                          : "bg-red-500/10 text-red-600 border-red-500/20"
-                                      }`}
+                                      className={`flex items-center justify-center w-full py-1.5 px-1 rounded-[8px] border text-[12px] font-medium tracking-tight ${ pill.isPositive ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-red-500/10 text-red-600 border-red-500/20" }`}
                                     >
                                       {pill.value}
                                     </div>
@@ -601,9 +598,7 @@ export default function StrategiesView({
 
         {scrollIndicator.visible && (
           <div
-            className={`absolute right-[2px] top-0 w-px rounded-full argus-scroll-indicator pointer-events-none ${
-              isScrolling ? "opacity-100" : "opacity-0"
-            }`}
+            className={`absolute right-[2px] top-0 w-px rounded-full argus-scroll-indicator pointer-events-none ${ isScrolling ? "opacity-100" : "opacity-0" }`}
             style={{
               height: `${scrollIndicator.height}px`,
               transform: `translateY(${scrollIndicator.top}px)`,
@@ -617,9 +612,7 @@ export default function StrategiesView({
       <div className="absolute bottom-0 inset-x-0 h-40 z-10 pointer-events-none backdrop-blur-[0.8px] bg-[#f9f9f9]/10 dark:bg-[#141517]/20 [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_50%,transparent_100%)]" />
 
       <div
-        className={`absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none transition-all duration-300 ${
-          isSidebarOpen ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"
-        }`}
+        className={`absolute bottom-6 inset-x-0 w-full px-4 z-20 pointer-events-none transition-all duration-300 ${ isSidebarOpen ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0" }`}
       >
         <div className="pointer-events-auto max-w-3xl mx-auto flex items-center gap-4 transition-all duration-300 opacity-50 hover:opacity-100 focus-within:opacity-100 group">
           <div className="relative flex-1">
@@ -629,7 +622,7 @@ export default function StrategiesView({
               placeholder={t('strategies.search_placeholder')}
               value={searchText}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 dark:border-white/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] shadow-lg text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
+              className="w-full h-[52px] pl-[48px] pr-12 rounded-full border border-black/10 dark:border-white/10 bg-white/50 dark:bg-[#1f2225]/50 backdrop-blur-xl focus:bg-white dark:focus:bg-[#1f2225] focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/5 transition-all text-[15px] text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40"
             />
             {searchText && (
               <button

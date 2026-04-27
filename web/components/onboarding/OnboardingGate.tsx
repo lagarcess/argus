@@ -54,7 +54,7 @@ export function OnboardingGate({
         }
       } catch (err: any) {
         const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-        
+
         if (!isMockAuth && (err.status === 401 || err.status === 403)) {
           setUser(null);
           setStep("done");
@@ -145,7 +145,7 @@ export function OnboardingGate({
       <DevModeBadge />
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
         <h1 className="mb-2 text-4xl font-medium tracking-tight">argus</h1>
-        
+
         {step === "language" && (
           <div className="mt-8 space-y-6">
             <div>
@@ -156,7 +156,7 @@ export function OnboardingGate({
                 {t('onboarding.language.subtitle', 'Argus speaks multiple languages. Which one do you prefer?')}
               </p>
             </div>
-            
+
             <div className="grid gap-3">
               {LANGUAGES.map((lang) => {
                 const isSelected = selectedLanguage === lang.code;
@@ -165,8 +165,8 @@ export function OnboardingGate({
                     key={lang.code}
                     onClick={() => handleLanguageSelect(lang.code)}
                     className={`group flex items-center justify-between rounded-2xl border p-4 text-left transition-all ${
-                      isSelected 
-                        ? 'border-[#494fdf] bg-[#494fdf]/[0.02] dark:bg-[#494fdf]/[0.05]' 
+                      isSelected
+                        ? 'border-[#494fdf] bg-[#494fdf]/[0.02] dark:bg-[#494fdf]/[0.05]'
                         : 'border-black/5 bg-black/[0.02] hover:bg-black/[0.05] dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]'
                     }`}
                   >
@@ -185,7 +185,7 @@ export function OnboardingGate({
               disabled={!selectedLanguage}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-[9999px] bg-[#191c1f] dark:bg-white px-[32px] py-[14px] text-[16px] font-medium text-white dark:text-black transition-all hover:opacity-85 disabled:opacity-50"
             >
-              {selectedLanguage 
+              {selectedLanguage
                 ? t('onboarding.language.continue_in', { language: LANGUAGES.find(l => l.code === selectedLanguage)?.name })
                 : t('common.submit', 'Submit')
               }

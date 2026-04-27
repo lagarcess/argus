@@ -207,7 +207,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
               {archivedChats.map((chat) => (
                 <div
                   key={chat.id}
-                  className="group flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm"
+                  className="group flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px]"
                 >
                   <div className="flex flex-col min-w-0 pr-4">
                     <span className="text-[15px] font-medium text-black dark:text-white truncate">
@@ -254,7 +254,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
               {deletedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="group flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm"
+                  className="group flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px]"
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-4">
                     <div className="shrink-0 w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40">
@@ -292,7 +292,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
       <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 relative z-10 w-full max-w-md mx-auto">
         <div className="flex flex-col gap-6 w-full">
           {/* Profile Section */}
-          <button className="flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[20px] shadow-sm hover:opacity-80 transition-opacity text-left w-full">
+          <button className="flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[20px] hover:opacity-80 transition-opacity text-left w-full">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-full bg-[#f4e8ff] dark:bg-[#342442] flex items-center justify-center border border-black/5 dark:border-white/5 shrink-0">
                 <User className="w-6 h-6 text-[#9a66d9] dark:text-[#d3a8fc]" />
@@ -311,7 +311,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">
               {t("settings.subscription.title")}
             </span>
-            <button className="w-full py-4 px-4 bg-[#f4e8ff]/80 dark:bg-[#342442]/80 border border-[#9a66d9]/20 dark:border-[#d3a8fc]/20 rounded-[16px] shadow-sm hover:opacity-80 transition-opacity text-center flex items-center justify-center">
+            <button className="w-full py-4 px-4 bg-[#f4e8ff]/80 dark:bg-[#342442]/80 border border-[#9a66d9]/20 dark:border-[#d3a8fc]/20 rounded-[16px] hover:opacity-80 transition-opacity text-center flex items-center justify-center">
               <span className="text-[15px] font-medium text-[#7e47be] dark:text-[#e4c4fd]">
                 {t("settings.subscription.upgrade_pro")}
               </span>
@@ -322,7 +322,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">
               {t("settings.app.title")}
             </span>
-            <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
+            <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] overflow-hidden">
               <button
                 onClick={() => setIsLanguageModalOpen(true)}
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
@@ -354,7 +354,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">
               {t("settings.data.title")}
             </span>
-            <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
+            <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] overflow-hidden">
               <button
                 onClick={() => setActiveSubView("archived")}
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
@@ -386,7 +386,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
             <span className="text-[13px] font-medium text-black/40 dark:text-white/40 px-2">
               {t("settings.about.title")}
             </span>
-            <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] shadow-sm overflow-hidden">
+            <div className="flex flex-col bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px] overflow-hidden">
               <button
                 className="flex items-center justify-between w-full p-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-black/5 dark:border-white/5"
               >
@@ -435,7 +435,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
 
           <button
             onClick={onLogout}
-            className="w-fit mt-2 py-3 px-6 bg-red-400/20 dark:bg-red-500/10 border border-red-500/20 rounded-[12px] shadow-sm hover:opacity-80 transition-opacity text-center flex items-center justify-center gap-2 whitespace-nowrap"
+            className="w-fit mt-2 py-3 px-6 bg-red-400/20 dark:bg-red-500/10 border border-red-500/20 rounded-[12px] hover:opacity-80 transition-opacity text-center flex items-center justify-center gap-2 whitespace-nowrap"
           >
             <LogOut className="w-4 h-4 text-red-600 dark:text-red-400" />
             <span className="text-[14px] font-medium text-red-600 dark:text-red-400">{t("settings.logout")}</span>
@@ -446,7 +446,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
               onClick={() => {
                 void resetOnboardingForDev();
               }}
-              className="w-fit mt-2 py-3 px-6 bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-[12px] shadow-sm hover:opacity-80 transition-opacity text-center flex items-center justify-center gap-2 whitespace-nowrap"
+              className="w-fit mt-2 py-3 px-6 bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-[12px] hover:opacity-80 transition-opacity text-center flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <Sparkles className="w-4 h-4 text-black/70 dark:text-white/80" />
               <span className="text-[14px] font-medium text-black/70 dark:text-white/80">
@@ -467,7 +467,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
               setSearchQuery("");
             }}
           />
-          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden shadow-2xl">
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden">
             <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
               <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />
               <input
@@ -512,14 +512,14 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
             aria-label="Close appearance modal"
             onClick={() => setIsAppearanceModalOpen(false)}
           />
-          <div className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden shadow-2xl p-3">
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden p-3">
             <div className="flex items-center justify-between p-1 bg-black/5 dark:bg-black/35 rounded-2xl">
               <button
                 onClick={() => {
                   setTheme("light");
                   setIsAppearanceModalOpen(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "light" ? "bg-white text-black shadow-sm" : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "light" ? "bg-white text-black " : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
               >
                 <Sun className="w-[16px] h-[16px]" />
                 <span className="text-[14px] font-medium">{t("settings.app.appearance_options.light")}</span>
@@ -529,7 +529,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                   setTheme("dark");
                   setIsAppearanceModalOpen(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "dark" ? "bg-white dark:bg-[#32363d] text-black dark:text-white shadow-sm" : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "dark" ? "bg-white dark:bg-[#32363d] text-black dark:text-white " : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
               >
                 <Moon className="w-[16px] h-[16px]" />
                 <span className="text-[14px] font-medium">{t("settings.app.appearance_options.dark")}</span>
@@ -539,7 +539,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                   setTheme("system");
                   setIsAppearanceModalOpen(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "system" ? "bg-white dark:bg-[#32363d] text-black dark:text-white shadow-sm" : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "system" ? "bg-white dark:bg-[#32363d] text-black dark:text-white " : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
               >
                 <Monitor className="w-[16px] h-[16px]" />
                 <span className="text-[14px] font-medium">{t("settings.app.appearance_options.system")}</span>

@@ -660,7 +660,9 @@ def test_search_supports_cursor_and_mixed_types() -> None:
     result_types = {item["type"] for item in payload["items"]}
     assert result_types.issubset({"chat", "strategy", "collection", "run"})
 
-    second_page = client.get(f"/api/v1/search?q=tesla&limit=2&cursor={payload['next_cursor']}")
+    second_page = client.get(
+        f"/api/v1/search?q=tesla&limit=2&cursor={payload['next_cursor']}"
+    )
     assert second_page.status_code == 200
     second_payload = second_page.json()
     first_ids = {(item["type"], item["id"]) for item in payload["items"]}
