@@ -234,3 +234,54 @@ def test_compute_alpha_metrics_preserves_contract_shape_multi_symbol() -> None:
     assert set(metrics["by_symbol"]) == {"AAPL", "MSFT"}
     assert metrics["aggregate"]["performance"]["total_return_pct"] != 0
     assert metrics["aggregate"]["efficiency"]["total_trades"] >= 2
+
+
+def test_build_result_card_actions_by_symbol_count() -> None:
+    config = {
+        "template": "rsi_mean_reversion",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-07",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 5.0,
+                "delta_vs_benchmark_pct": 1.0,
+                "profit": 500.0,
+            },
+            "risk": {"max_drawdown_pct": 2.0},
+            "efficiency": {"win_rate": 0.6, "total_trades": 10},
+        }
+    }
+
+    # Case 1: Single symbol
+    card = engine.build_result_card(config, metrics)
+    actions = [a["type"] for a in card["actions"]]
+    assert "chat_refinement" in actions
+    assert card["actions"][0]["label"] == "Try adding more symbols"
+
+    # Case 2: Multi-symbol (between 2 and 4)
+    config["symbols"] = ["AAPL", "MSFT"]
+    card = engine.build_result_card(config, metrics)
+    actions = [a["type"] for a in card["actions"]]
+    assert "add_to_collection" in actions
+    assert card["actions"][0]["label"] == "Add to collection"
+
+    # Case 3: Max symbols (5)
+    config["symbols"] = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"]
+    card = engine.build_result_card(config, metrics)
+    actions = [a["type"] for a in card["actions"]]
+    assert "add_to_collection" in actions
+    assert card["actions"][0]["label"] == "Save this to a collection"
+
+    # Verify Spanish labels
+    card = engine.build_result_card(config, metrics, language="es-419")
+    assert card["actions"][0]["label"] == "Añadir a colección"

@@ -568,6 +568,41 @@ def build_result_card(
         },
     ]
 
+    actions = []
+    num_symbols = len(config["symbols"])
+
+    if num_symbols == 1:
+        actions.append(
+            {
+                "type": "chat_refinement",
+                "label": "¿Quieres añadir más símbolos?"
+                if is_es
+                else "Try adding more symbols",
+            }
+        )
+    elif num_symbols >= 5:
+        actions.append(
+            {
+                "type": "add_to_collection",
+                "label": "Añadir a colección" if is_es else "Save this to a collection",
+            }
+        )
+    else:
+        # Default behavior for middle cases
+        actions.append(
+            {
+                "type": "add_to_collection",
+                "label": "Añadir a colección" if is_es else "Add to collection",
+            }
+        )
+
+    actions.append(
+        {
+            "type": "try_new_strategy",
+            "label": "Probar nueva estrategia" if is_es else "Try a new strategy",
+        }
+    )
+
     return {
         "title": f"{symbols} {template_display}",
         "date_range": {
@@ -581,16 +616,5 @@ def build_result_card(
         "rows": rows,
         "assumptions": assumptions,
         "benchmark_note": benchmark_note,
-        "actions": [
-            {
-                "type": "add_to_collection",
-                "label": "Añadir estrategia a colección"
-                if is_es
-                else "Add strategy to collection",
-            },
-            {
-                "type": "try_new_strategy",
-                "label": "Probar nueva estrategia" if is_es else "Try a new strategy",
-            },
-        ],
+        "actions": actions,
     }
