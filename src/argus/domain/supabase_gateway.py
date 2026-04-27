@@ -184,24 +184,30 @@ class SupabaseGateway:
         display_name: str | None = None,
         username: str | None = None,
     ) -> dict[str, Any]:
-        response = self.client.auth.sign_up(
-            {
-                "email": email,
-                "password": password,
-                "options": {"data": {"display_name": display_name, "username": username}},
-            }
-        )
-        if not response.user:
-            raise RuntimeError("Signup failed.")
-        return response.model_dump(mode="json")
+        try:
+            response = self.client.auth.sign_up(
+                {
+                    "email": email,
+                    "password": password,
+                    "options": {"data": {"display_name": display_name, "username": username}},
+                }
+            )
+            if not response.user:
+                raise RuntimeError("Signup failed: No user returned.")
+            return response.model_dump(mode="json")
+        except Exception as e:
+            raise RuntimeError(f"Signup failed: {e}") from e
 
     def login(self, email: str, password: str) -> dict[str, Any]:
-        response = self.client.auth.sign_in_with_password(
-            {"email": email, "password": password}
-        )
-        if not response.session:
-            raise RuntimeError("Login failed.")
-        return response.model_dump(mode="json")
+        try:
+            response = self.client.auth.sign_in_with_password(
+                {"email": email, "password": password}
+            )
+            if not response.session:
+                raise RuntimeError("Login failed: No session returned.")
+            return response.model_dump(mode="json")
+        except Exception as e:
+            raise RuntimeError(f"Login failed: {e}") from e
 
     def update_user(self, user_id: str, updates: dict[str, Any]) -> User:
         updates["updated_at"] = _now_iso()
