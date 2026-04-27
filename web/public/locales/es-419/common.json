@@ -130,14 +130,18 @@
     "copy_id": "Copiar ID",
     "report_issue": "Reportar problema",
     "simulation_complete": "Simulación completa",
-    "status": {
-      "understanding": "Comprendiendo tu idea",
-      "extracting_strategy": "Extrayendo estrategia",
-      "running_backtest": "Ejecutando simulación",
-      "calculating_metrics": "Calculando métricas",
-      "running": "Ejecutando simulación",
-      "preparing": "Preparando resultados"
-    }
+      "status": {
+        "understanding": "Pensando...",
+        "extracting_strategy": "Extrayendo estrategia",
+        "running_backtest": "Ejecutando simulación",
+        "calculating_metrics": "Calculando métricas",
+        "running": "Ejecutando simulación",
+        "preparing": "Preparando resultados",
+        "intent_run_backtest": "Diseñando tu estrategia...",
+        "intent_onboarding_prompt": "Personalizando tu experiencia...",
+        "intent_education": "Pensando...",
+        "intent_unsupported_request": "Pensando..."
+      }
   },
   "strategies": {
     "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",

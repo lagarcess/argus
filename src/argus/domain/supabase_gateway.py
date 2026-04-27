@@ -57,8 +57,8 @@ def _row_one(result: Any) -> dict[str, Any] | None:
 @dataclass
 class SupabaseGateway:
     client: Client
-    mock_user_email: str = "developer@argus.local"
-    mock_user_password: str = "ArgusDevUser123!"
+    mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
+    mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
 
     @classmethod
@@ -211,7 +211,7 @@ class SupabaseGateway:
 
     def update_user(self, user_id: str, updates: dict[str, Any]) -> User:
         updates["updated_at"] = _now_iso()
-        self.client.table("profiles").update(updates).eq("id", user_id).execute()
+        self.client.table("profiles").upsert(updates, on_conflict="id").execute()
         loaded = (
             self.client.table("profiles").select("*").eq("id", user_id).single().execute()
         )

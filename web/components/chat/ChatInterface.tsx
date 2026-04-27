@@ -415,7 +415,7 @@ export default function ChatInterface() {
     const trimmed = text.trim();
     if (!trimmed || !conversationId) return;
 
-    setIsSidebarOpen(false); // SOTA: Collapse sidebar to enter focus mode on message send
+    setIsSidebarOpen(false);
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -442,6 +442,19 @@ export default function ChatInterface() {
             prev.map((m) =>
               m.id === assistantId
                 ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+                : m,
+            ),
+          );
+        }
+        if (event.event === "error") {
+          setStreamStatus(null);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: event.data.detail || t('chat.error_backtest'),
+                  }
                 : m,
             ),
           );
@@ -522,11 +535,13 @@ export default function ChatInterface() {
     };
     const assistantId = crypto.randomUUID();
 
-    setMessages((prev) => [
-      ...prev.map((m) => ({ ...m, actions: undefined })),
-      userMsg,
-      { id: assistantId, role: "ai", kind: "text", content: "" },
-    ]);
+    setMessages((prev) => {
+      const base = prev.map((m) => ({ ...m, actions: undefined }));
+      if (isSkip) {
+        return [...base, { id: assistantId, role: "ai", kind: "text", content: "" }];
+      }
+      return [...base, userMsg, { id: assistantId, role: "ai", kind: "text", content: "" }];
+    });
     setStreamStatus(t("chat.status.understanding"));
     setIsSidebarOpen(false);
 
@@ -537,6 +552,19 @@ export default function ChatInterface() {
             prev.map((m) =>
               m.id === assistantId
                 ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+                : m,
+            ),
+          );
+        }
+        if (event.event === "error") {
+          setStreamStatus(null);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: event.data.detail || t('chat.error_backtest'),
+                  }
                 : m,
             ),
           );
@@ -1105,7 +1133,7 @@ export default function ChatInterface() {
                           <ChevronRight className="h-4 w-4 -rotate-90" />
                         </button>
                         <div className="max-h-[300px] overflow-y-auto pb-1">
-                          {groupedHistory.chat.map((item) => (
+                          {historyItems.filter(i => i.type === "chat").map((item: HistoryItem) => (
                             <button
                               key={item.id}
                               type="button"
@@ -1271,11 +1299,14 @@ export default function ChatInterface() {
                           setIsSidebarOpen(false);
                         }}
                         isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
+                        isStreaming={!!streamStatus && msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
                       />
                     ))}
                     {streamStatus && (
-                      <div className="ml-12 text-[13px] text-black/45 dark:text-white/45">
-                        {streamStatus}
+                      <div className="ml-12">
+                        <span className="animate-ethereal-shimmer text-[13px] text-black/45 dark:text-white/45">
+                          {streamStatus}
+                        </span>
                       </div>
                     )}
                     <div ref={bottomRef} />

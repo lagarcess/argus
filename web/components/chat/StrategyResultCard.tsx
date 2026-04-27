@@ -45,13 +45,25 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
         </dl>
       </div>
 
-      {result.benchmarkNote ? (
-        <div className="px-4 sm:px-5 py-3 border-t border-black/8 dark:border-white/8">
-          <p className="text-[12px] leading-[1.45] text-black/55 dark:text-white/55">
-            {result.benchmarkNote}
-          </p>
+      {(result.benchmarkNote || (result.assumptions && result.assumptions.length > 0)) && (
+        <div className="px-4 sm:px-5 py-3 border-t border-black/8 dark:border-white/8 flex flex-col gap-1.5">
+          {result.benchmarkNote && (
+            <p className="text-[12px] leading-[1.45] text-black/55 dark:text-white/55 italic">
+              {result.benchmarkNote}
+            </p>
+          )}
+          {result.assumptions && result.assumptions.length > 0 && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {result.assumptions.map((text, idx) => (
+                <span key={idx} className="text-[11px] text-black/45 dark:text-white/45 flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
+                  {text}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      ) : null}
+      )}
     </section>
   );
 }

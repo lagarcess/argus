@@ -35,6 +35,7 @@ export type ConversationResultCard = {
   };
   status_label: string;
   rows: ApiMetricRow[];
+  benchmark_note?: string;
   assumptions: string[];
   actions: Array<{ type: string; label: string }>;
 };
@@ -163,6 +164,7 @@ export type ChatStreamEvent =
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
   | { event: "result"; data: { run: BacktestRun } }
+  | { event: "error"; data: { detail: string } }
   | { event: "done"; data: { message_id: string } };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -188,7 +190,8 @@ export function resultCardFromRun(run: BacktestRun) {
     period: card.date_range.display,
     statusLabel: card.status_label,
     metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
-    benchmarkNote: card.assumptions.join(" "),
+    benchmarkNote: card.benchmark_note,
+    assumptions: card.assumptions,
     runId: run.id,
     strategyId: run.strategy_id ?? null,
   };

@@ -487,28 +487,26 @@ def build_result_card(
 
     status_label = "Simulación Completa" if is_es else "Simulation Complete"
 
+    benchmark_note = f"Universe: {symbols}. Benchmark: {config['benchmark_symbol']}."
     if is_es:
+        benchmark_note = f"Universo: {symbols}. Referencia: {config['benchmark_symbol']}."
         assumptions = [
-            f"Universo: {symbols}.",
             "La simulación utiliza el preajuste solo-largo.",
             f"Capital inicial: ${config['starting_capital']:,.0f}.",
             "Asignación: igual peso.",
             "No se incluyen deslizamientos ni comisiones.",
-            f"Referencia: {config['benchmark_symbol']}.",
         ]
         if bool(realism["enabled"]):
-            assumptions[4] = "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
+            assumptions[3] = "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
     else:
         assumptions = [
-            f"Universe: {symbols}.",
             "Simulation uses long-only preset.",
             f"Starting capital: ${config['starting_capital']:,.0f}.",
             "Allocation: equal weight.",
             "No slippage or fees included.",
-            f"Benchmark: {config['benchmark_symbol']}.",
         ]
         if bool(realism["enabled"]):
-            assumptions[4] = "Execution realism enabled (fees/slippage applied)."
+            assumptions[3] = "Execution realism enabled (fees/slippage applied)."
 
     rows = [
         {
@@ -549,6 +547,7 @@ def build_result_card(
         "status_label": status_label,
         "rows": rows,
         "assumptions": assumptions,
+        "benchmark_note": benchmark_note,
         "actions": [
             {"type": "add_to_collection", "label": "Añadir estrategia a colección" if is_es else "Add strategy to collection"},
             {"type": "try_new_strategy", "label": "Probar nueva estrategia" if is_es else "Try a new strategy"},

@@ -70,7 +70,8 @@ export function OnboardingGate({
   }, []);
 
   useEffect(() => {
-    if (user && step === "done" && postCompleteHref) {
+    const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
+    if (!isPreview && user && step === "done" && postCompleteHref) {
       router.replace(postCompleteHref);
     }
   }, [postCompleteHref, router, step, user]);
@@ -105,7 +106,7 @@ export function OnboardingGate({
         onboarding: {
           stage: "ready",
           language_confirmed: true,
-          primary_goal: goal as any,
+          primary_goal: goal as ApiUser["onboarding"]["primary_goal"],
           completed: true
         }
       });
@@ -116,7 +117,9 @@ export function OnboardingGate({
     }
   };
 
-  if (isLoading) {
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "true";
+
+  if (isLoading && !isPreview) {
     return (
       <>
         <DevModeBadge />
@@ -127,8 +130,8 @@ export function OnboardingGate({
     );
   }
 
-  if (step === "done") {
-    if (user && postCompleteHref) return null;
+  if (step === "done" || isPreview) {
+    if (!isPreview && user && postCompleteHref) return null;
     return (
       <>
         <DevModeBadge />

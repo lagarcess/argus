@@ -130,14 +130,18 @@
     "copy_id": "Copy ID",
     "report_issue": "Report Issue",
     "simulation_complete": "Simulation Complete",
-    "status": {
-      "understanding": "Understanding your idea",
-      "extracting_strategy": "Extracting strategy",
-      "running_backtest": "Running backtest",
-      "calculating_metrics": "Calculating metrics",
-      "running": "Running simulation",
-      "preparing": "Preparing results"
-    }
+      "status": {
+        "understanding": "Thinking...",
+        "extracting_strategy": "Extracting strategy",
+        "running_backtest": "Running backtest",
+        "calculating_metrics": "Calculating metrics",
+        "running": "Running simulation",
+        "preparing": "Preparing results",
+        "intent_run_backtest": "Designing your strategy...",
+        "intent_onboarding_prompt": "Personalizing your experience...",
+        "intent_education": "Thinking...",
+        "intent_unsupported_request": "Thinking..."
+      }
   },
   "strategies": {
     "empty_state": "Strategies you save from chat will appear here.",

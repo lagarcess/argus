@@ -187,16 +187,22 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
     from fastapi.responses import JSONResponse
 
     if isinstance(exc.detail, dict) and "code" in exc.detail:
-        return JSONResponse(exc.detail, status_code=exc.status_code)
-    body = {
-        "type": "https://api.argus.app/problems/http-error",
-        "title": "Request Failed",
-        "status": exc.status_code,
-        "detail": str(exc.detail),
-        "code": "http_error",
-        "request_id": request.state.request_id,
-    }
-    return JSONResponse(body, status_code=exc.status_code)
+        body = exc.detail
+    else:
+        body = {
+            "type": "https://api.argus.app/problems/http-error",
+            "title": "Request Failed",
+            "status": exc.status_code,
+            "detail": str(exc.detail),
+            "code": "http_error",
+            "request_id": request.state.request_id,
+        }
+
+    origin = request.headers.get("origin")
+    headers = {"Access-Control-Allow-Origin": origin or "*"}
+    if origin:
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
 
 def _encode_cursor(payload: dict[str, Any]) -> str:
@@ -1931,12 +1937,13 @@ def chat_stream(
     }
     if supabase_gateway is not None:
         try:
-            supabase_gateway.check_and_increment_usage(
-                user_id=user.id, resource="chat_messages", period="day", limit_count=200
-            )
-            supabase_gateway.check_and_increment_usage(
-                user_id=user.id, resource="chat_messages", period="minute", limit_count=10
-            )
+            if not _dev_memory_fallback_enabled():
+                supabase_gateway.check_and_increment_usage(
+                    user_id=user.id, resource="chat_messages", period="day", limit_count=200
+                )
+                supabase_gateway.check_and_increment_usage(
+                    user_id=user.id, resource="chat_messages", period="minute", limit_count=10
+                )
         except QuotaExceededError as e:
             raise problem(
                 request,
@@ -1986,13 +1993,10 @@ def chat_stream(
             content=payload.message,
         )
 
-    completed_runs = _count_completed_runs_for_user(user.id)
-    onboarding_stage = current_user_profile.onboarding.stage
-    onboarding_incomplete = onboarding_stage in {
+    onboarding_required = current_user_profile.onboarding.stage in {
         "language_selection",
         "primary_goal_selection",
     }
-    onboarding_required = onboarding_incomplete and completed_runs == 0
 
     def events() -> Iterable[str]:
         if onboarding_required and onboarding_goal is None:
@@ -2006,6 +2010,7 @@ def chat_stream(
                 onboarding_required=True,
                 primary_goal=current_user_profile.onboarding.primary_goal,
             )
+            yield sse("status", {"status": f"intent_{decision.intent}"})
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -2051,6 +2056,7 @@ def chat_stream(
                 onboarding_required=False,
                 primary_goal=current_user_profile.onboarding.primary_goal,
             )
+            yield sse("status", {"status": f"intent_{decision.intent}"})
         except Exception as exc:
             logger.exception(
                 "Chat orchestration failed",

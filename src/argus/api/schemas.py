@@ -53,6 +53,14 @@ class User(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @property
+    def is_onboarding_complete(self) -> bool:
+        return self.onboarding.completed
+
+    @property
+    def onboarding_incomplete(self) -> bool:
+        return not self.is_onboarding_complete
+
 
 class UserResponse(BaseModel):
     user: User
