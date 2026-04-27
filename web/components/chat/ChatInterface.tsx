@@ -29,6 +29,7 @@ import {
   formatRelativeDate,
   getMe,
   getConversationMessages,
+  getStarterPrompts,
   listHistory,
   searchGlobal,
   patchCollection,
@@ -65,23 +66,7 @@ type OnboardingChoice = {
 export default function ChatInterface() {
   const { t, i18n } = useTranslation();
 
-  const starterActions = useMemo<ChatActionOption[]>(() => [
-    {
-      id: "starter-tsla",
-      label: t('chat.starter_actions.tsla.label'),
-      value: t('chat.starter_actions.tsla.value'),
-    },
-    {
-      id: "starter-btc",
-      label: t('chat.starter_actions.btc.label'),
-      value: t('chat.starter_actions.btc.value'),
-    },
-    {
-      id: "starter-dca",
-      label: t('chat.starter_actions.dca.label'),
-      value: t('chat.starter_actions.dca.value'),
-    },
-  ], [t]);
+  const [starterActions, setStarterActions] = useState<ChatActionOption[]>([]);
   const onboardingChoices = useMemo<OnboardingChoice[]>(
     () => [
       {
@@ -301,6 +286,13 @@ export default function ChatInterface() {
         setShowOnboardingGoalCards(
           stage === "language_selection" || stage === "primary_goal_selection",
         );
+        
+        const prompts = await getStarterPrompts().catch(() => []);
+        setStarterActions(prompts.map((p, i) => ({
+          id: `starter-${i}`,
+          label: p,
+          value: p,
+        })));
       } catch {
         if (cancelled) return;
         setMessages([
@@ -583,6 +575,13 @@ export default function ChatInterface() {
           completed: false,
         },
       });
+
+      const prompts = await getStarterPrompts().catch(() => []);
+      setStarterActions(prompts.map((p, i) => ({
+        id: `starter-${i}`,
+        label: p,
+        value: p,
+      })));
     } catch {
       setStreamStatus(null);
       setMessages((prev) =>

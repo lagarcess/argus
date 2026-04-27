@@ -298,6 +298,10 @@ export async function patchMe(patch: ProfilePatch) {
   });
 }
 
+export async function getStarterPrompts() {
+  return apiFetch<string[]>("/onboarding/starter-prompts");
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function createConversation(language?: string | null) {
