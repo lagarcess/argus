@@ -17,7 +17,7 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
           <p className="text-[12px] text-black/45 dark:text-white/45">{result.period}</p>
         </div>
         <span className="shrink-0 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:text-white/70">
-          {t('chat.simulation_complete')}
+          {result.statusLabel || t('chat.simulation_complete')}
         </span>
       </div>
 

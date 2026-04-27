@@ -461,7 +461,9 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_result_card(config: dict[str, Any], metrics: dict[str, Any]) -> dict[str, Any]:
+def build_result_card(
+    config: dict[str, Any], metrics: dict[str, Any], language: str = "en"
+) -> dict[str, Any]:
     aggregate = metrics["aggregate"]
     performance = aggregate["performance"]
     risk = aggregate["risk"]
@@ -472,56 +474,88 @@ def build_result_card(config: dict[str, Any], metrics: dict[str, Any]) -> dict[s
     ending_capital = config["starting_capital"] + performance["profit"]
     realism = _execution_realism_settings(config)
 
-    assumptions = [
-        f"Universe: {symbols}.",
-        "Simulation uses long-only preset.",
-        f"Starting capital: ${config['starting_capital']:,.0f}.",
-        "Allocation: equal weight.",
-        "No slippage or fees included.",
-        f"Benchmark: {config['benchmark_symbol']}.",
+    is_es = language.startswith("es")
+
+    # Localized templates
+    template_names = {
+        "buy_the_dip": "Comprar la Caída" if is_es else "Buy the Dip",
+        "rsi_mean_reversion": "Reversión a la Media RSI" if is_es else "RSI Mean Reversion",
+        "moving_average_crossover": "Cruce de Medias Móviles" if is_es else "Moving Average Crossover",
+        "dca_accumulation": "Acumulación DCA" if is_es else "DCA Accumulation",
+        "momentum_breakout": "Ruptura de Impulso" if is_es else "Momentum Breakout",
+        "trend_follow": "Seguimiento de Tendencia" if is_es else "Trend Follow",
+    }
+    template_display = template_names.get(config["template"], config["template"].replace("_", " ").title())
+
+    # Localized status
+    status_label = "Simulación Completa" if is_es else "Simulation Complete"
+
+    # Localized assumptions
+    if is_es:
+        assumptions = [
+            f"Universo: {symbols}.",
+            "La simulación utiliza el preajuste solo-largo.",
+            f"Capital inicial: ${config['starting_capital']:,.0f}.",
+            "Asignación: igual peso.",
+            "No se incluyen deslizamientos ni comisiones.",
+            f"Referencia: {config['benchmark_symbol']}.",
+        ]
+        if bool(realism["enabled"]):
+            assumptions[4] = "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
+    else:
+        assumptions = [
+            f"Universe: {symbols}.",
+            "Simulation uses long-only preset.",
+            f"Starting capital: ${config['starting_capital']:,.0f}.",
+            "Allocation: equal weight.",
+            "No slippage or fees included.",
+            f"Benchmark: {config['benchmark_symbol']}.",
+        ]
+        if bool(realism["enabled"]):
+            assumptions[4] = "Execution realism enabled (fees/slippage applied)."
+
+    # Localized rows
+    rows = [
+        {
+            "key": "total_return_pct",
+            "label": "Retorno Total (%)" if is_es else "Total Return (%)",
+            "value": f"{performance['total_return_pct']:+.1f}%",
+        },
+        {
+            "key": "cash_value",
+            "label": "Valor en Efectivo ($)" if is_es else "Cash Value ($)",
+            "value": f"${config['starting_capital'] / 1000:.0f}k -> ${ending_capital / 1000:.1f}k",
+        },
+        {
+            "key": "max_drawdown_pct",
+            "label": "Máxima Caída" if is_es else "Max Drawdown",
+            "value": f"{risk['max_drawdown_pct']:.1f}%",
+        },
+        {
+            "key": "win_rate",
+            "label": "Tasa de Acierto" if is_es else "Win Rate",
+            "value": f"{efficiency['win_rate'] * 100:.1f}%",
+        },
+        {
+            "key": "benchmark_delta",
+            "label": "Referencia" if is_es else "Benchmark",
+            "value": f"{performance['delta_vs_benchmark_pct']:+.1f}% vs {config['benchmark_symbol']}",
+        },
     ]
-    if bool(realism["enabled"]):
-        assumptions[4] = "Execution realism enabled (fees/slippage applied)."
 
     return {
-        "title": f"{symbols} {config['template'].replace('_', ' ').title()}",
+        "title": f"{symbols} {template_display}",
         "date_range": {
             "start": config["start_date"],
             "end": config["end_date"],
-            "display": f"{start.strftime('%B')} {start.day}, {start.year} to "
-            f"{end.strftime('%B')} {end.day}, {end.year}",
+            "display": f"{start.strftime('%d/%m/%Y')} al {end.strftime('%d/%m/%Y')}" if is_es
+            else f"{start.strftime('%B')} {start.day}, {start.year} to {end.strftime('%B')} {end.day}, {end.year}",
         },
-        "status_label": "Simulation Complete",
-        "rows": [
-            {
-                "key": "total_return_pct",
-                "label": "Total Return (%)",
-                "value": f"{performance['total_return_pct']:+.1f}%",
-            },
-            {
-                "key": "cash_value",
-                "label": "Cash Value ($)",
-                "value": f"${config['starting_capital'] / 1000:.0f}k -> ${ending_capital / 1000:.1f}k",
-            },
-            {
-                "key": "max_drawdown_pct",
-                "label": "Max Drawdown",
-                "value": f"{risk['max_drawdown_pct']:.1f}%",
-            },
-            {
-                "key": "win_rate",
-                "label": "Win Rate",
-                "value": f"{efficiency['win_rate'] * 100:.1f}%",
-            },
-            {
-                "key": "benchmark_delta",
-                "label": "Benchmark",
-                "value": f"{performance['delta_vs_benchmark_pct']:+.1f}% vs {config['benchmark_symbol']}",
-            },
-        ],
+        "status_label": status_label,
+        "rows": rows,
         "assumptions": assumptions,
         "actions": [
-            {"type": "add_to_collection", "label": "Add strategy to collection"},
-            {"type": "try_new_strategy", "label": "Try a new strategy"},
+            {"type": "add_to_collection", "label": "Añadir estrategia a colección" if is_es else "Add strategy to collection"},
+            {"type": "try_new_strategy", "label": "Probar nueva estrategia" if is_es else "Try a new strategy"},
         ],
     }

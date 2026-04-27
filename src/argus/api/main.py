@@ -11,7 +11,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from loguru import logger
 
 from argus.api.schemas import (
@@ -30,6 +30,7 @@ from argus.api.schemas import (
     ConversationResponse,
     FeedbackRequest,
     HistoryItem,
+    LoginRequest,
     Message,
     PaginatedCollections,
     PaginatedConversations,
@@ -39,6 +40,7 @@ from argus.api.schemas import (
     PaginatedStrategies,
     ProfilePatch,
     SearchItem,
+    SignupRequest,
     Strategy,
     StrategyCreate,
     StrategyPatch,
@@ -257,6 +259,31 @@ def _score_search_item(
     return score
 
 
+def _auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
+    response = JSONResponse(payload)
+    session = payload.get("session")
+    if not isinstance(session, dict):
+        return response
+
+    access_token = session.get("access_token")
+    refresh_token = session.get("refresh_token")
+    max_age = session.get("expires_in")
+    cookie_kwargs: dict[str, Any] = {
+        "httponly": True,
+        "path": "/",
+        "samesite": "lax",
+        "secure": request.url.scheme == "https",
+    }
+    if isinstance(max_age, int):
+        cookie_kwargs["max_age"] = max_age
+
+    if isinstance(access_token, str) and access_token:
+        response.set_cookie("sb-auth-token", access_token, **cookie_kwargs)
+    if isinstance(refresh_token, str) and refresh_token:
+        response.set_cookie("sb-refresh-token", refresh_token, **cookie_kwargs)
+    return response
+
+
 def current_user(request: Request) -> User:
     if (
         os.getenv("NEXT_PUBLIC_MOCK_AUTH", "").strip().lower() == "true"
@@ -280,16 +307,37 @@ def current_user(request: Request) -> User:
         )
 
     auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.removeprefix("Bearer ")
+    else:
+        # Fallback to cookies (e.g. sb-<project-id>-auth-token or sb-access-token)
+        for key, value in request.cookies.items():
+            if key.startswith("sb-") and ("auth-token" in key or "access-token" in key):
+                try:
+                    if value.startswith("{") or value.startswith("["):
+                        token_data = json.loads(value)
+                        token = (
+                            token_data.get("access_token")
+                            if isinstance(token_data, dict)
+                            else None
+                        )
+                    else:
+                        token = value
+                except Exception:
+                    token = value
+                if token:
+                    break
+
+    if not token:
         raise problem(
             request,
             status_code=401,
             code="unauthorized",
             title="Unauthorized",
-            detail="Missing or invalid Authorization header.",
+            detail="Missing or invalid Authorization header or session cookie.",
         )
 
-    token = auth_header.removeprefix("Bearer ")
     try:
         auth_user = supabase_gateway.get_auth_user_from_token(token)
     except Exception:
@@ -322,18 +370,62 @@ def auth_session(user: User = Depends(current_user)) -> dict[str, Any]:  # noqa:
 
 
 @app.post("/api/v1/auth/signup")
-def signup(user: User = Depends(current_user)) -> dict[str, Any]:  # noqa: B008
-    return {"user": user.model_dump(mode="json"), "session": {"mock": True}}
+def signup(request: Request, body: SignupRequest) -> JSONResponse:
+    if supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for authentication.",
+        )
+    try:
+        result = supabase_gateway.signup(
+            email=body.email,
+            password=body.password,
+            display_name=body.display_name,
+            username=body.username,
+        )
+        return _auth_response(request, result)
+    except Exception as exc:
+        raise problem(
+            request,
+            status_code=400,
+            code="bad_request",
+            title="Signup Failed",
+            detail=str(exc),
+        ) from exc
 
 
 @app.post("/api/v1/auth/login")
-def login(user: User = Depends(current_user)) -> dict[str, Any]:  # noqa: B008
-    return {"user": user.model_dump(mode="json"), "session": {"mock": True}}
+def login(request: Request, body: LoginRequest) -> JSONResponse:
+    if supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for authentication.",
+        )
+    try:
+        result = supabase_gateway.login(email=body.email, password=body.password)
+        return _auth_response(request, result)
+    except Exception as exc:
+        raise problem(
+            request,
+            status_code=401,
+            code="unauthorized",
+            title="Login Failed",
+            detail=str(exc),
+        ) from exc
 
 
-@app.post("/api/v1/auth/logout", response_model=SuccessResponse)
-def logout() -> SuccessResponse:
-    return SuccessResponse(success=True)
+@app.post("/api/v1/auth/logout")
+def logout() -> JSONResponse:
+    response = JSONResponse({"success": True})
+    response.delete_cookie("sb-auth-token", path="/")
+    response.delete_cookie("sb-refresh-token", path="/")
+    return response
 
 
 @app.get("/api/v1/me", response_model=UserResponse)
@@ -548,7 +640,13 @@ def delete_conversation(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ):
-    conversation = store.conversations.get(conversation_id)
+    conversation = (
+        supabase_gateway.get_conversation(
+            user_id=user.id, conversation_id=conversation_id
+        )
+        if supabase_gateway
+        else store.conversations.get(conversation_id)
+    )
     if not conversation:
         raise problem(
             request,
@@ -766,6 +864,7 @@ def create_run_from_payload(
     payload: dict[str, Any],
     request: Request,
     *,
+    user: User | None = None,
     user_id: str | None = None,
     strategy_id: str | None = None,
     conversation_id: str | None = None,
@@ -816,7 +915,9 @@ def create_run_from_payload(
         benchmark_symbol=config["benchmark_symbol"],
         metrics=metrics,
         config_snapshot=config,
-        conversation_result_card=build_result_card(config, metrics),
+        conversation_result_card=build_result_card(
+            config, metrics, language=user.language if user else "en"
+        ),
         created_at=now,
         chart={
             "equity_curve": [
@@ -866,7 +967,14 @@ def run_backtest(
 
     data = payload.model_dump(exclude_none=True)
     if payload.strategy_id:
-        strategy = store.strategies.get(payload.strategy_id)
+        strategy = None
+        if supabase_gateway is not None:
+            strategy = supabase_gateway.get_strategy(
+                user_id=user.id, strategy_id=payload.strategy_id
+            )
+        else:
+            strategy = store.strategies.get(payload.strategy_id)
+
         if not strategy:
             raise problem(
                 request,
@@ -890,6 +998,7 @@ def run_backtest(
     run = create_run_from_payload(
         data,
         request,
+        user=user,
         user_id=user.id,
         persist_in_memory=supabase_gateway is None,
     )
@@ -1024,8 +1133,18 @@ def list_strategies(
 
 
 @app.patch("/api/v1/strategies/{strategy_id}", response_model=StrategyResponse)
-def patch_strategy(strategy_id: str, payload: StrategyPatch, request: Request):
-    strategy = store.strategies.get(strategy_id)
+def patch_strategy(
+    strategy_id: str,
+    payload: StrategyPatch,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+):
+    strategy = None
+    if supabase_gateway is not None:
+        strategy = supabase_gateway.get_strategy(user_id=user.id, strategy_id=strategy_id)
+    else:
+        strategy = store.strategies.get(strategy_id)
+
     if not strategy:
         raise problem(
             request,
@@ -1034,20 +1153,36 @@ def patch_strategy(strategy_id: str, payload: StrategyPatch, request: Request):
             title="Not Found",
             detail="Strategy not found.",
         )
-    data = strategy.model_dump()
+
     patch = payload.model_dump(exclude_unset=True)
     if patch.get("name"):
         patch["name_source"] = "user_renamed"
-    data.update(patch)
-    data["updated_at"] = utcnow()
-    updated = Strategy.model_validate(data)
-    store.strategies[strategy_id] = updated
+
+    if supabase_gateway is not None:
+        updated = supabase_gateway.patch_strategy(
+            user_id=user.id, strategy_id=strategy_id, patch=patch
+        )
+    else:
+        data = strategy.model_dump()
+        data.update(patch)
+        data["updated_at"] = utcnow()
+        updated = Strategy.model_validate(data)
+        store.strategies[strategy_id] = updated
     return StrategyResponse(strategy=updated)
 
 
 @app.delete("/api/v1/strategies/{strategy_id}", response_model=SuccessResponse)
-def delete_strategy(strategy_id: str, request: Request) -> SuccessResponse:
-    strategy = store.strategies.get(strategy_id)
+def delete_strategy(
+    strategy_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> SuccessResponse:
+    strategy = None
+    if supabase_gateway is not None:
+        strategy = supabase_gateway.get_strategy(user_id=user.id, strategy_id=strategy_id)
+    else:
+        strategy = store.strategies.get(strategy_id)
+
     if not strategy:
         raise problem(
             request,
@@ -1056,9 +1191,13 @@ def delete_strategy(strategy_id: str, request: Request) -> SuccessResponse:
             title="Not Found",
             detail="Strategy not found.",
         )
-    store.strategies[strategy_id] = strategy.model_copy(
-        update={"deleted_at": utcnow(), "updated_at": utcnow()}
-    )
+
+    if supabase_gateway is not None:
+        supabase_gateway.soft_delete_strategy(user_id=user.id, strategy_id=strategy_id)
+    else:
+        store.strategies[strategy_id] = strategy.model_copy(
+            update={"deleted_at": utcnow(), "updated_at": utcnow()}
+        )
     return SuccessResponse(success=True)
 
 
@@ -1147,8 +1286,20 @@ def list_collections(
 
 
 @app.patch("/api/v1/collections/{collection_id}", response_model=CollectionResponse)
-def patch_collection(collection_id: str, payload: CollectionPatch, request: Request):
-    collection = store.collections.get(collection_id)
+def patch_collection(
+    collection_id: str,
+    payload: CollectionPatch,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+):
+    collection = None
+    if supabase_gateway is not None:
+        collection = supabase_gateway.get_collection(
+            user_id=user.id, collection_id=collection_id
+        )
+    else:
+        collection = store.collections.get(collection_id)
+
     if not collection:
         raise problem(
             request,
@@ -1157,20 +1308,38 @@ def patch_collection(collection_id: str, payload: CollectionPatch, request: Requ
             title="Not Found",
             detail="Collection not found.",
         )
-    data = collection.model_dump()
+
     patch = payload.model_dump(exclude_unset=True)
     if patch.get("name"):
         patch["name_source"] = "user_renamed"
-    data.update(patch)
-    data["updated_at"] = utcnow()
-    updated = Collection.model_validate(data)
-    store.collections[collection_id] = updated
+
+    if supabase_gateway is not None:
+        updated = supabase_gateway.patch_collection(
+            user_id=user.id, collection_id=collection_id, patch=patch
+        )
+    else:
+        data = collection.model_dump()
+        data.update(patch)
+        data["updated_at"] = utcnow()
+        updated = Collection.model_validate(data)
+        store.collections[collection_id] = updated
     return CollectionResponse(collection=updated)
 
 
 @app.delete("/api/v1/collections/{collection_id}", response_model=SuccessResponse)
-def delete_collection(collection_id: str, request: Request) -> SuccessResponse:
-    collection = store.collections.get(collection_id)
+def delete_collection(
+    collection_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> SuccessResponse:
+    collection = None
+    if supabase_gateway is not None:
+        collection = supabase_gateway.get_collection(
+            user_id=user.id, collection_id=collection_id
+        )
+    else:
+        collection = store.collections.get(collection_id)
+
     if not collection:
         raise problem(
             request,
@@ -1179,9 +1348,15 @@ def delete_collection(collection_id: str, request: Request) -> SuccessResponse:
             title="Not Found",
             detail="Collection not found.",
         )
-    store.collections[collection_id] = collection.model_copy(
-        update={"deleted_at": utcnow(), "updated_at": utcnow()}
-    )
+
+    if supabase_gateway is not None:
+        supabase_gateway.soft_delete_collection(
+            user_id=user.id, collection_id=collection_id
+        )
+    else:
+        store.collections[collection_id] = collection.model_copy(
+            update={"deleted_at": utcnow(), "updated_at": utcnow()}
+        )
     return SuccessResponse(success=True)
 
 
@@ -1189,8 +1364,36 @@ def delete_collection(collection_id: str, request: Request) -> SuccessResponse:
     "/api/v1/collections/{collection_id}/strategies", response_model=CollectionResponse
 )
 def attach_strategies(
-    collection_id: str, payload: CollectionAttach, request: Request
+    collection_id: str,
+    payload: CollectionAttach,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
 ) -> CollectionResponse:
+    if supabase_gateway is not None:
+        try:
+            updated = supabase_gateway.attach_strategies(
+                user_id=user.id,
+                collection_id=collection_id,
+                strategy_ids=payload.strategy_ids,
+            )
+            if not updated:
+                raise problem(
+                    request,
+                    status_code=404,
+                    code="not_found",
+                    title="Not Found",
+                    detail="Collection not found.",
+                )
+            return CollectionResponse(collection=updated)
+        except ValueError as exc:
+            raise problem(
+                request,
+                status_code=400,
+                code="bad_request",
+                title="Bad Request",
+                detail=str(exc),
+            ) from exc
+
     collection = store.collections.get(collection_id)
     if not collection:
         raise problem(
@@ -1215,16 +1418,25 @@ def attach_strategies(
     "/api/v1/collections/{collection_id}/strategies/{strategy_id}",
     response_model=SuccessResponse,
 )
-def detach_strategy(collection_id: str, strategy_id: str) -> SuccessResponse:
-    store.collection_strategies.setdefault(collection_id, set()).discard(strategy_id)
-    collection = store.collections.get(collection_id)
-    if collection:
-        store.collections[collection_id] = collection.model_copy(
-            update={
-                "strategy_count": len(store.collection_strategies[collection_id]),
-                "updated_at": utcnow(),
-            }
+def detach_strategy(
+    collection_id: str,
+    strategy_id: str,
+    user: User = Depends(current_user),  # noqa: B008
+) -> SuccessResponse:
+    if supabase_gateway is not None:
+        supabase_gateway.detach_strategy(
+            user_id=user.id, collection_id=collection_id, strategy_id=strategy_id
         )
+    else:
+        store.collection_strategies.setdefault(collection_id, set()).discard(strategy_id)
+        collection = store.collections.get(collection_id)
+        if collection:
+            store.collections[collection_id] = collection.model_copy(
+                update={
+                    "strategy_count": len(store.collection_strategies[collection_id]),
+                    "updated_at": utcnow(),
+                }
+            )
     return SuccessResponse(success=True)
 
 
@@ -1249,6 +1461,7 @@ def history(
                     title=run["conversation_result_card"]["title"],
                     subtitle=run["conversation_result_card"]["rows"][0]["value"],
                     created_at=run["created_at"],
+                    conversation_id=run.get("conversation_id"),
                 )
             )
         for c in raw["conversations"]:
@@ -1295,6 +1508,7 @@ def history(
                         title=run.conversation_result_card["title"],
                         subtitle=run.conversation_result_card["rows"][0]["value"],
                         created_at=run.created_at,
+                        conversation_id=run.conversation_id,
                     )
                 )
         for conversation in store.conversations.values():
@@ -1482,6 +1696,7 @@ def search(
                 title=title,
                 matched_text=title,
                 updated_at=row["created_at"],
+                conversation_id=row.get("conversation_id"),
             )
             score = _score_search_item(
                 query=query,
@@ -1561,6 +1776,7 @@ def search(
                     title=title,
                     matched_text=title,
                     updated_at=run.created_at,
+                    conversation_id=run.conversation_id,
                 )
                 score = _score_search_item(
                     query=query,

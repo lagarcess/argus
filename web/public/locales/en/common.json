@@ -6,6 +6,7 @@
     "chat": "Chat",
     "history": "History",
     "settings": "Settings",
+    "conversation": "Conversation",
     "strategies": "Strategies",
     "collections": "Collections",
     "recents": "Recents",
@@ -28,7 +29,9 @@
     "no_items": "No items found",
     "restore": "Restore",
     "permanently_delete": "Permanently delete",
-    "submit": "Submit"
+    "submit": "Submit",
+    "and": "and",
+    "tap_to_cancel": "Tap elsewhere to cancel"
   },
   "feedback": {
     "title_bug": "Report a Bug",
@@ -107,6 +110,12 @@
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
     "try_new_strategy": "Try a new strategy",
     "empty_history": "Your past chats will appear here.",
+    "history": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last_7_days": "Last 7 days",
+      "earlier": "Earlier"
+    },
     "no_recent_activity": "No recent activity yet. Your strategies and chats will appear here.",
     "new_chat": "New chat",
     "delete_chat": "Delete chat",
@@ -123,6 +132,9 @@
     "simulation_complete": "Simulation Complete",
     "status": {
       "understanding": "Understanding your idea",
+      "extracting_strategy": "Extracting strategy",
+      "running_backtest": "Running backtest",
+      "calculating_metrics": "Calculating metrics",
       "running": "Running simulation",
       "preparing": "Preparing results"
     }
@@ -138,6 +150,7 @@
       "win_rate": "win rate"
     },
     "unexecuted_hint": "Run this strategy to see performance",
+    "run_hint": "Run this strategy to see how {{symbols}} would have performed.",
     "best_performer": "Best performer",
     "suggestions": [
       {
@@ -232,10 +245,18 @@
       "reset_onboarding": "Reset onboarding (dev)"
     },
     "search_language": "Search language",
-    "no_languages": "No languages found."
+    "no_languages": "No languages found.",
+    "languages": {
+      "en": "English",
+      "es-419": "Spanish"
+    }
   },
   "onboarding": {
     "prompt": "What is your current primary goal? Don't worry, you can change it later.",
+    "select_language": "Choose your language",
+    "language_description": "This helps us personalize your experience.",
+    "primary_goal": "What is your primary goal?",
+    "goal_description": "We'll tailor your strategy insights based on this.",
     "skip": "Skip for now",
     "goals": {
       "learn_basics": {

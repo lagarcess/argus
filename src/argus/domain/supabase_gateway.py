@@ -177,6 +177,32 @@ class SupabaseGateway:
         self._cached_mock_user = user
         return user
 
+    def signup(
+        self,
+        email: str,
+        password: str,
+        display_name: str | None = None,
+        username: str | None = None,
+    ) -> dict[str, Any]:
+        response = self.client.auth.sign_up(
+            {
+                "email": email,
+                "password": password,
+                "options": {"data": {"display_name": display_name, "username": username}},
+            }
+        )
+        if not response.user:
+            raise RuntimeError("Signup failed.")
+        return response.model_dump(mode="json")
+
+    def login(self, email: str, password: str) -> dict[str, Any]:
+        response = self.client.auth.sign_in_with_password(
+            {"email": email, "password": password}
+        )
+        if not response.session:
+            raise RuntimeError("Login failed.")
+        return response.model_dump(mode="json")
+
     def update_user(self, user_id: str, updates: dict[str, Any]) -> User:
         updates["updated_at"] = _now_iso()
         self.client.table("profiles").update(updates).eq("id", user_id).execute()
@@ -659,6 +685,19 @@ class SupabaseGateway:
             ).execute()
         return self.get_collection(user_id=user_id, collection_id=collection_id)
 
+    def detach_strategy(
+        self, *, user_id: str, collection_id: str, strategy_id: str
+    ) -> bool:
+        result = (
+            self.client.table("collection_strategies")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("collection_id", collection_id)
+            .eq("strategy_id", strategy_id)
+            .execute()
+        )
+        return bool(result.data)
+
     def check_and_increment_usage(
         self, *, user_id: str, resource: str, period: str, limit_count: int
     ) -> None:
@@ -723,13 +762,6 @@ class SupabaseGateway:
                 f"Failed to increment usage counter for {resource} ({period})."
             )
 
-    def detach_strategy(
-        self, *, user_id: str, collection_id: str, strategy_id: str
-    ) -> None:
-        self.client.table("collection_strategies").delete().eq("user_id", user_id).eq(
-            "collection_id", collection_id
-        ).eq("strategy_id", strategy_id).execute()
-
     def get_auth_user_from_token(self, token: str) -> dict[str, Any]:
         response = self.client.auth.get_user(token)
         if not response or not response.user:
@@ -744,14 +776,16 @@ class SupabaseGateway:
             return existing
 
         now = _now_iso()
+        user_metadata = auth_user.get("user_metadata") or {}
         # Canonical defaults per requirements
         payload = {
             "id": user_id,
             "email": auth_user.get("email"),
+            "username": user_metadata.get("username"),
+            "display_name": user_metadata.get("display_name"),
             "language": "en",
             "locale": "en-US",
             "theme": "dark",
-            "display_name": None,
             "onboarding": {
                 "completed": False,
                 "stage": "language_selection",

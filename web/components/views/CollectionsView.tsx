@@ -35,7 +35,7 @@ type DisplayCollection = {
   dateStr: string;
 };
 
-function mapCollection(c: Collection): DisplayCollection {
+function mapCollection(c: Collection, labels: { today: string; yesterday: string }): DisplayCollection {
   return {
     id: c.id,
     title: c.name,
@@ -45,7 +45,7 @@ function mapCollection(c: Collection): DisplayCollection {
         : "strategy_count",
     pinned: c.pinned,
     strategyCount: c.strategy_count,
-    dateStr: formatRelativeDate(c.updated_at, {today: "Today", yesterday: "Yesterday"}),
+    dateStr: formatRelativeDate(c.updated_at, labels),
   };
 }
 
@@ -87,14 +87,18 @@ export default function CollectionsView({
 
   const refreshCollections = () => {
     listCollections(50)
-      .then(({ items }) => setCollections(items.map(mapCollection)))
+      .then(({ items }) => {
+        const dateLabels = { today: t('common.today'), yesterday: t('common.yesterday') };
+        setCollections(items.map(c => mapCollection(c, dateLabels)));
+      })
       .catch(() => setError(t('collections.error_load')));
   };
 
   useEffect(() => {
     listCollections(50)
       .then(({ items }) => {
-        setCollections(items.map(mapCollection));
+        const dateLabels = { today: t('common.today'), yesterday: t('common.yesterday') };
+        setCollections(items.map(c => mapCollection(c, dateLabels)));
         setError(null);
       })
       .catch(() => setError(t('collections.error_load')))
@@ -120,7 +124,8 @@ export default function CollectionsView({
     setIsCreating(true);
     try {
       const { collection } = await createCollection();
-      const display = mapCollection(collection);
+      const dateLabels = { today: t('common.today'), yesterday: t('common.yesterday') };
+      const display = mapCollection(collection, dateLabels);
       setCollections((prev) => [display, ...prev]);
       // Immediately enter rename mode for the new collection
       setEditingId(display.id);

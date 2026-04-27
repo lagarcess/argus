@@ -437,6 +437,26 @@ def test_profile_creation_on_first_login(mock_gateway):
     mock_gateway.get_or_create_profile_for_auth_user.assert_called_once()
 
 
+def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
+    mock_gateway.login.return_value = {
+        "session": {
+            "access_token": "access-token-123",
+            "refresh_token": "refresh-token-123",
+            "expires_in": 3600,
+        },
+        "user": {"id": "user-1", "email": "developer@argus.local"},
+    }
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "developer@argus.local", "password": "password"},
+    )
+
+    assert response.status_code == 200
+    assert response.cookies.get("sb-auth-token") == "access-token-123"
+    assert response.cookies.get("sb-refresh-token") == "refresh-token-123"
+
+
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     now = utcnow()
     mock_gateway.search_rows.return_value = {

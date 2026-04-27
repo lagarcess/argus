@@ -87,4 +87,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(login).toContain("auth.login.password_placeholder");
     expect(login).toContain("t(\"auth.login.submit\"");
   });
+
+  test("landing onboarding continues into chat after completion", () => {
+    const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
+
+    expect(page).toContain('postCompleteHref="/chat"');
+  });
 });
