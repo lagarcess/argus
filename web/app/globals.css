@@ -191,14 +191,14 @@ body {
     90deg,
     currentColor 0%,
     currentColor 35%,
-    rgba(0, 0, 0, 0.25) 50%,
+    rgba(255, 255, 255, 0.5) 50%,
     currentColor 65%,
     currentColor 100%
   );
   background-size: 200% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
   animation: argus_ethereal_shimmer 3s infinite linear;
 }
 
@@ -207,7 +207,7 @@ body {
     90deg,
     currentColor 0%,
     currentColor 35%,
-    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0.5) 50%,
     currentColor 65%,
     currentColor 100%
   );

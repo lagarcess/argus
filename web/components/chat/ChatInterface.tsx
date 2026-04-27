@@ -1303,8 +1303,10 @@ export default function ChatInterface() {
                       />
                     ))}
                     {streamStatus && (
-                      <div className="animate-ethereal-shimmer ml-12 text-[13px] text-black/45 dark:text-white/45">
-                        {streamStatus}
+                      <div className="ml-12">
+                        <span className="animate-ethereal-shimmer text-[13px] text-black/45 dark:text-white/45">
+                          {streamStatus}
+                        </span>
                       </div>
                     )}
                     <div ref={bottomRef} />
