@@ -7,8 +7,8 @@ import { useTranslation } from "react-i18next";
 import { patchMe } from "@/lib/argus-api";
 
 const LANGUAGES = [
-  { code: "en", name: "English", translation: "English" },
-  { code: "es-419", name: "Español", translation: "Spanish" }
+  { code: "en", name: "English" },
+  { code: "es-419", name: "Español" }
 ];
 
 export function SettingsMenu() {
@@ -55,7 +55,7 @@ export function SettingsMenu() {
   const currentLangLabel = LANGUAGES.find(l => l.code === lang || l.code === lang.split('-')[0])?.name || "English";
   const filteredLanguages = LANGUAGES.filter(l =>
     l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    l.translation.toLowerCase().includes(searchQuery.toLowerCase())
+    t(`settings.languages.${l.code}`).toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const changeLanguage = async (code: string) => {
@@ -156,7 +156,7 @@ export function SettingsMenu() {
                     {lang.startsWith(l.code) ? (
                       <Check className="w-4 h-4 text-black dark:text-white" />
                     ) : (
-                      <span className="text-[14px] text-gray-500">{l.translation}</span>
+                      <span className="text-[14px] text-gray-500">{t(`settings.languages.${l.code}`)}</span>
                     )}
                   </button>
                 ))

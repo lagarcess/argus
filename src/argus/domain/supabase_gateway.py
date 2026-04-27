@@ -57,8 +57,8 @@ def _row_one(result: Any) -> dict[str, Any] | None:
 @dataclass
 class SupabaseGateway:
     client: Client
-    mock_user_email: str = "developer@argus.local"
-    mock_user_password: str = "ArgusDevUser123!"
+    mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
+    mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
 
     @classmethod
@@ -177,9 +177,41 @@ class SupabaseGateway:
         self._cached_mock_user = user
         return user
 
+    def signup(
+        self,
+        email: str,
+        password: str,
+        display_name: str | None = None,
+        username: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            response = self.client.auth.sign_up(
+                {
+                    "email": email,
+                    "password": password,
+                    "options": {"data": {"display_name": display_name, "username": username}},
+                }
+            )
+            if not response.user:
+                raise RuntimeError("Signup failed: No user returned.")
+            return response.model_dump(mode="json")
+        except Exception as e:
+            raise RuntimeError(f"Signup failed: {e}") from e
+
+    def login(self, email: str, password: str) -> dict[str, Any]:
+        try:
+            response = self.client.auth.sign_in_with_password(
+                {"email": email, "password": password}
+            )
+            if not response.session:
+                raise RuntimeError("Login failed: No session returned.")
+            return response.model_dump(mode="json")
+        except Exception as e:
+            raise RuntimeError(f"Login failed: {e}") from e
+
     def update_user(self, user_id: str, updates: dict[str, Any]) -> User:
         updates["updated_at"] = _now_iso()
-        self.client.table("profiles").update(updates).eq("id", user_id).execute()
+        self.client.table("profiles").upsert(updates, on_conflict="id").execute()
         loaded = (
             self.client.table("profiles").select("*").eq("id", user_id).single().execute()
         )
@@ -659,6 +691,19 @@ class SupabaseGateway:
             ).execute()
         return self.get_collection(user_id=user_id, collection_id=collection_id)
 
+    def detach_strategy(
+        self, *, user_id: str, collection_id: str, strategy_id: str
+    ) -> bool:
+        result = (
+            self.client.table("collection_strategies")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("collection_id", collection_id)
+            .eq("strategy_id", strategy_id)
+            .execute()
+        )
+        return bool(result.data)
+
     def check_and_increment_usage(
         self, *, user_id: str, resource: str, period: str, limit_count: int
     ) -> None:
@@ -723,13 +768,6 @@ class SupabaseGateway:
                 f"Failed to increment usage counter for {resource} ({period})."
             )
 
-    def detach_strategy(
-        self, *, user_id: str, collection_id: str, strategy_id: str
-    ) -> None:
-        self.client.table("collection_strategies").delete().eq("user_id", user_id).eq(
-            "collection_id", collection_id
-        ).eq("strategy_id", strategy_id).execute()
-
     def get_auth_user_from_token(self, token: str) -> dict[str, Any]:
         response = self.client.auth.get_user(token)
         if not response or not response.user:
@@ -744,14 +782,16 @@ class SupabaseGateway:
             return existing
 
         now = _now_iso()
+        user_metadata = auth_user.get("user_metadata") or {}
         # Canonical defaults per requirements
         payload = {
             "id": user_id,
             "email": auth_user.get("email"),
+            "username": user_metadata.get("username"),
+            "display_name": user_metadata.get("display_name"),
             "language": "en",
             "locale": "en-US",
             "theme": "dark",
-            "display_name": None,
             "onboarding": {
                 "completed": False,
                 "stage": "language_selection",

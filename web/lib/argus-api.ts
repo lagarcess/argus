@@ -13,8 +13,8 @@ export type OnboardingStage =
   | "completed";
 export type PrimaryGoal =
   | "learn_basics"
-  | "test_stock_idea"
   | "build_passive_strategy"
+  | "test_stock_idea"
   | "explore_crypto"
   | "surprise_me";
 
@@ -35,6 +35,7 @@ export type ConversationResultCard = {
   };
   status_label: string;
   rows: ApiMetricRow[];
+  benchmark_note?: string;
   assumptions: string[];
   actions: Array<{ type: string; label: string }>;
 };
@@ -73,6 +74,9 @@ export type Conversation = {
 
 export type ApiUser = {
   id: string;
+  email: string;
+  username: string | null;
+  display_name: string | null;
   language: "en" | "es-419";
   locale: "en-US" | "es-419";
   onboarding: {
@@ -141,6 +145,7 @@ export type HistoryItem = {
   subtitle: string;
   pinned: boolean;
   created_at: string;
+  conversation_id?: string | null;
 };
 
 export type SearchItem = {
@@ -149,6 +154,7 @@ export type SearchItem = {
   title: string;
   matched_text: string;
   updated_at: string;
+  conversation_id?: string | null;
 };
 
 // ─── Chat stream event types ──────────────────────────────────────────────────
@@ -158,6 +164,7 @@ export type ChatStreamEvent =
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
   | { event: "result"; data: { run: BacktestRun } }
+  | { event: "error"; data: { detail: string } }
   | { event: "done"; data: { message_id: string } };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -181,8 +188,10 @@ export function resultCardFromRun(run: BacktestRun) {
   return {
     strategyName: card.title,
     period: card.date_range.display,
+    statusLabel: card.status_label,
     metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
-    benchmarkNote: card.assumptions.join(" "),
+    benchmarkNote: card.benchmark_note,
+    assumptions: card.assumptions,
     runId: run.id,
     strategyId: run.strategy_id ?? null,
   };

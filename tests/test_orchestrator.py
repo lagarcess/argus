@@ -68,4 +68,5 @@ def test_parse_onboarding_goal_hidden_protocol() -> None:
         orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:build_passive_strategy")
         == "build_passive_strategy"
     )
+    assert orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:passive_strategy") is None
     assert orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:unknown") is None

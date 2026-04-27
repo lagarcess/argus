@@ -61,7 +61,7 @@ function parsePill(value: string): MetricPill {
   return { value, isPositive };
 }
 
-function mapStrategyToDisplay(s: Strategy): DisplayStrategy {
+function mapStrategyToDisplay(s: Strategy, labels: { today: string; yesterday: string }): DisplayStrategy {
   const rows: StrategySurfaceMetricRow[] =
     s.strategy_surface_metrics?.rows ?? [];
 
@@ -76,7 +76,7 @@ function mapStrategyToDisplay(s: Strategy): DisplayStrategy {
   return {
     id: s.id,
     name: s.name,
-    dateStr: formatRelativeDate(s.updated_at, {today: "Today", yesterday: "Yesterday"}),
+    dateStr: formatRelativeDate(s.updated_at, labels),
     isPinned: s.pinned,
     hasMetrics: rows.length > 0,
     assets,
@@ -146,7 +146,8 @@ export default function StrategiesView({
   const refreshStrategies = async () => {
     try {
       const { items } = await listStrategies({ limit: 50 });
-      setStrategies(items.map(mapStrategyToDisplay));
+      const dateLabels = { today: t('common.today'), yesterday: t('common.yesterday') };
+      setStrategies(items.map(s => mapStrategyToDisplay(s, dateLabels)));
     } catch {
       setError(t('strategies.error_load'));
     }
@@ -155,7 +156,8 @@ export default function StrategiesView({
   useEffect(() => {
     listStrategies({ limit: 50 })
       .then(({ items }) => {
-        setStrategies(items.map(mapStrategyToDisplay));
+        const dateLabels = { today: t('common.today'), yesterday: t('common.yesterday') };
+        setStrategies(items.map(s => mapStrategyToDisplay(s, dateLabels)));
         setError(null);
       })
       .catch(() => {
@@ -473,7 +475,7 @@ export default function StrategiesView({
                             </span>
                           </button>
                           <div className="absolute inset-x-0 bottom-[-16px] h-4 flex justify-center items-center opacity-50 text-[9px] tracking-widest uppercase pointer-events-none drop-shadow-sm">
-                            Tap elsewhere to cancel
+                            {t('common.tap_to_cancel')}
                           </div>
                         </div>
                       )}
@@ -486,7 +488,24 @@ export default function StrategiesView({
                             : "max-h-0"
                         }`}
                       >
-                        {strategy.hasMetrics ? (
+                        {isRunning ? (
+                          <div className="flex flex-col px-5 py-8 gap-6 animate-pulse">
+                            <div className="flex items-center gap-3">
+                              <Loader2 className="w-4 h-4 animate-spin text-black/20 dark:text-white/20" />
+                              <div className="h-4 w-32 bg-black/5 dark:bg-white/5 rounded-full" />
+                            </div>
+                            <div className="grid grid-cols-4 gap-3">
+                              {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="h-10 bg-black/5 dark:bg-white/5 rounded-[12px]" />
+                              ))}
+                            </div>
+                            <div className="grid grid-cols-4 gap-3">
+                              {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="h-10 bg-black/5 dark:bg-white/5 rounded-[12px]" />
+                              ))}
+                            </div>
+                          </div>
+                        ) : strategy.hasMetrics ? (
                           <div className="flex flex-col px-5 py-4 gap-4">
                             {/* Header row */}
                             <div className="grid grid-cols-4 gap-2 items-end pb-2 sticky top-[-1px] bg-white dark:bg-[#1f2225] z-10 pt-1 -mt-1 shadow-[0_4px_10px_-5px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_10px_-5px_rgba(0,0,0,0.5)]">
@@ -548,11 +567,7 @@ export default function StrategiesView({
                         ) : (
                           /* Option B — unexecuted strategy empty state */
                           <div className="flex flex-col items-center justify-center gap-4 px-5 py-8">
-                            <p className="text-[14px] text-black/50 dark:text-white/50 text-center leading-relaxed max-w-[240px]">
-                              Run this strategy to see how{" "}
-                              {strategy.raw.symbols.join(", ")} would have
-                              performed.
-                            </p>
+                              {t('strategies.run_hint', { symbols: strategy.raw.symbols.join(", ") })}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

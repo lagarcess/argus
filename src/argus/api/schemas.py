@@ -31,8 +31,8 @@ class OnboardingState(BaseModel):
     primary_goal: (
         Literal[
             "learn_basics",
-            "test_stock_idea",
             "build_passive_strategy",
+            "test_stock_idea",
             "explore_crypto",
             "surprise_me",
         ]
@@ -52,6 +52,14 @@ class User(BaseModel):
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
     updated_at: datetime
+
+    @property
+    def is_onboarding_complete(self) -> bool:
+        return self.onboarding.completed
+
+    @property
+    def onboarding_incomplete(self) -> bool:
+        return not self.is_onboarding_complete
 
 
 class UserResponse(BaseModel):
@@ -239,6 +247,7 @@ class HistoryItem(BaseModel):
     subtitle: str
     pinned: bool = False
     created_at: datetime
+    conversation_id: str | None = None
 
 
 class PaginatedHistory(BaseModel):
@@ -252,6 +261,7 @@ class SearchItem(BaseModel):
     title: str
     matched_text: str
     updated_at: datetime
+    conversation_id: str | None = None
 
 
 class PaginatedSearch(BaseModel):
@@ -269,6 +279,18 @@ class FeedbackRequest(BaseModel):
     type: Literal["bug", "feature", "general"]
     message: str = Field(min_length=1)
     context: dict[str, Any] = Field(default_factory=dict)
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    display_name: str | None = None
+    username: str | None = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class SuccessResponse(BaseModel):

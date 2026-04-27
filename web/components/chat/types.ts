@@ -13,7 +13,9 @@ export type StrategyResultPayload = {
   strategyName: string;
   period: string;
   benchmarkNote?: string;
+  statusLabel?: string;
   metrics: StrategyResultMetric[];
+  assumptions?: string[];
   runId?: string;
   strategyId?: string | null;
 };

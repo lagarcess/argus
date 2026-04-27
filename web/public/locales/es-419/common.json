@@ -6,6 +6,7 @@
     "chat": "Chat",
     "history": "Historial",
     "settings": "Ajustes",
+    "conversation": "Conversación",
     "strategies": "Estrategias",
     "collections": "Colecciones",
     "recents": "Recientes",
@@ -28,7 +29,9 @@
     "no_items": "No se encontraron elementos",
     "restore": "Restaurar",
     "permanently_delete": "Eliminar permanentemente",
-    "submit": "Enviar"
+    "submit": "Enviar",
+    "and": "y",
+    "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
   },
   "feedback": {
     "title_bug": "Reportar un error",
@@ -107,6 +110,12 @@
     "resume_prompt": "Reanudando \"{{title}}\". ¿Qué te gustaría explorar ahora?",
     "try_new_strategy": "Probar una nueva estrategia",
     "empty_history": "Tus chats pasados aparecerán aquí.",
+    "history": {
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "last_7_days": "Últimos 7 días",
+      "earlier": "Anterior"
+    },
     "no_recent_activity": "Sin actividad reciente aún. Tus estrategias y chats aparecerán aquí.",
     "new_chat": "Nuevo chat",
     "delete_chat": "Eliminar chat",
@@ -121,11 +130,18 @@
     "copy_id": "Copiar ID",
     "report_issue": "Reportar problema",
     "simulation_complete": "Simulación completa",
-    "status": {
-      "understanding": "Comprendiendo tu idea",
-      "running": "Ejecutando simulación",
-      "preparing": "Preparando resultados"
-    }
+      "status": {
+        "understanding": "Pensando...",
+        "extracting_strategy": "Extrayendo estrategia",
+        "running_backtest": "Ejecutando simulación",
+        "calculating_metrics": "Calculando métricas",
+        "running": "Ejecutando simulación",
+        "preparing": "Preparando resultados",
+        "intent_run_backtest": "Diseñando tu estrategia...",
+        "intent_onboarding_prompt": "Personalizando tu experiencia...",
+        "intent_education": "Pensando...",
+        "intent_unsupported_request": "Pensando..."
+      }
   },
   "strategies": {
     "empty_state": "Las estrategias que guardes del chat aparecerán aquí.",
@@ -138,6 +154,7 @@
       "win_rate": "tasa de éxito"
     },
     "unexecuted_hint": "Ejecuta esta estrategia para ver el rendimiento",
+    "run_hint": "Ejecuta esta estrategia para ver cómo se habría comportado {{symbols}}.",
     "best_performer": "Mejor rendimiento",
     "suggestions": [
       {
@@ -229,28 +246,47 @@
     },
     "logout": "Cerrar sesión",
     "search_language": "Buscar idioma",
-    "no_languages": "No se encontraron idiomas."
+    "no_languages": "No se encontraron idiomas.",
+    "languages": {
+      "en": "Inglés",
+      "es-419": "Español"
+    }
   },
   "onboarding": {
-    "prompt": "Cual es tu objetivo principal ahora? Puedes cambiarlo despues.",
+    "prompt": "¿Cuál es tu objetivo principal ahora? No te preocupes, puedes cambiarlo después.",
+    "language": {
+      "title": "Elige tu idioma",
+      "subtitle": "Argus habla varios idiomas. ¿Cuál prefieres?",
+      "description": "Esto nos ayuda a personalizar tu experiencia.",
+      "continue_in": "Continuar en {{language}}",
+      "en": "Inglés",
+      "es-419": "Español"
+    },
+    "primary_goal": "¿Cuál es tu objetivo principal?",
+    "goal_description": "Adaptaremos tus perspectivas de estrategia en función de esto.",
     "skip": "Omitir por ahora",
     "goals": {
       "learn_basics": {
-        "title": "Aprender lo basico",
-        "description": "Comienza con ideas simples y explicaciones claras."
+        "title": "Aprender conceptos básicos de inversión",
+        "description": "Comienza con ideas sencillas y explicaciones claras."
       },
       "build_passive_strategy": {
-        "title": "Construir una estrategia pasiva",
-        "description": "Enfocate en ideas de largo plazo y bajo mantenimiento."
+        "title": "Crear una estrategia pasiva",
+        "description": "Céntrate en ideas de largo plazo y bajo mantenimiento."
       },
       "test_stock_idea": {
-        "title": "Probar una idea de accion",
-        "description": "Valida una tesis en los simbolos que sigues."
+        "title": "Probar una idea de acciones",
+        "description": "Valida una tesis sobre los símbolos que sigues."
       },
       "explore_crypto": {
-        "title": "Explorar cripto",
-        "description": "Prueba ideas iniciales enfocadas en cripto."
+        "title": "Explorar criptomonedas",
+        "description": "Prueba iniciadores de estrategias centrados en cripto."
       }
+    },
+    "error": {
+      "title": "API no disponible",
+      "description": "No pudimos conectarnos al motor de Argus. Asegúrate de que el servicio backend esté funcionando e inténtalo de nuevo.",
+      "retry": "Reintentar"
     }
   },
   "auth": {

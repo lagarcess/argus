@@ -188,6 +188,8 @@ def _llm_extract_decision(
                     "Supported templates: buy_the_dip, rsi_mean_reversion, moving_average_crossover, "
                     "dca_accumulation, momentum_breakout, trend_follow. "
                     "Never propose unsupported capabilities. "
+                    "In 'assistant_message', ALWAYS use standard Markdown vertical lists (e.g., '- **Item**: description') for strategy lists. "
+                    "Never use horizontal dot-separated lists. Use vertical lists with newlines between paragraphs for clarity. "
                     f"User language: {prompt_language}. Primary goal: {primary_goal or 'unknown'}."
                 ),
             },

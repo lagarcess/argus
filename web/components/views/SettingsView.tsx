@@ -28,6 +28,7 @@ import {
 import { useTranslation } from "react-i18next";
 import {
   patchMe,
+  getMe,
   listConversations,
   listHistory,
   patchConversation,
@@ -36,6 +37,7 @@ import {
   deleteStrategy,
   type Conversation,
   type HistoryItem,
+  type ApiUser,
 } from "@/lib/argus-api";
 
 const LANGUAGES = [
@@ -65,6 +67,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
   // Sub-view data
   const [archivedChats, setArchivedChats] = useState<Conversation[]>([]);
   const [deletedItems, setDeletedItems] = useState<HistoryItem[]>([]);
+  const [profile, setProfile] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const currentLangLabel = useMemo(
@@ -97,6 +100,12 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
         .finally(() => setIsLoading(false));
     }
   }, [activeSubView]);
+
+  useEffect(() => {
+    getMe()
+      .then(({ user }) => setProfile(user))
+      .catch(() => null);
+  }, []);
 
   const setLanguage = async (nextLanguage: string) => {
     await i18n.changeLanguage(nextLanguage);
@@ -290,10 +299,9 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
               </div>
               <div className="flex flex-col">
                 <span className="text-[16px] font-medium text-black dark:text-white">
-                  {t("settings.profile.display_name")}
+                  {profile?.display_name || profile?.username || t("settings.profile.display_name")}
                 </span>
-                <span className="text-[14px] text-black/50 dark:text-white/50">user-name</span>
-                <span className="text-[14px] text-black/50 dark:text-white/50">email@example.com</span>
+                <span className="text-[14px] text-black/50 dark:text-white/50">{profile?.email || "email@example.com"}</span>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-black/40 dark:text-white/40" />

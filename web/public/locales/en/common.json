@@ -6,6 +6,7 @@
     "chat": "Chat",
     "history": "History",
     "settings": "Settings",
+    "conversation": "Conversation",
     "strategies": "Strategies",
     "collections": "Collections",
     "recents": "Recents",
@@ -28,7 +29,9 @@
     "no_items": "No items found",
     "restore": "Restore",
     "permanently_delete": "Permanently delete",
-    "submit": "Submit"
+    "submit": "Submit",
+    "and": "and",
+    "tap_to_cancel": "Tap elsewhere to cancel"
   },
   "feedback": {
     "title_bug": "Report a Bug",
@@ -107,6 +110,12 @@
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
     "try_new_strategy": "Try a new strategy",
     "empty_history": "Your past chats will appear here.",
+    "history": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last_7_days": "Last 7 days",
+      "earlier": "Earlier"
+    },
     "no_recent_activity": "No recent activity yet. Your strategies and chats will appear here.",
     "new_chat": "New chat",
     "delete_chat": "Delete chat",
@@ -121,11 +130,18 @@
     "copy_id": "Copy ID",
     "report_issue": "Report Issue",
     "simulation_complete": "Simulation Complete",
-    "status": {
-      "understanding": "Understanding your idea",
-      "running": "Running simulation",
-      "preparing": "Preparing results"
-    }
+      "status": {
+        "understanding": "Thinking...",
+        "extracting_strategy": "Extracting strategy",
+        "running_backtest": "Running backtest",
+        "calculating_metrics": "Calculating metrics",
+        "running": "Running simulation",
+        "preparing": "Preparing results",
+        "intent_run_backtest": "Designing your strategy...",
+        "intent_onboarding_prompt": "Personalizing your experience...",
+        "intent_education": "Thinking...",
+        "intent_unsupported_request": "Thinking..."
+      }
   },
   "strategies": {
     "empty_state": "Strategies you save from chat will appear here.",
@@ -138,6 +154,7 @@
       "win_rate": "win rate"
     },
     "unexecuted_hint": "Run this strategy to see performance",
+    "run_hint": "Run this strategy to see how {{symbols}} would have performed.",
     "best_performer": "Best performer",
     "suggestions": [
       {
@@ -232,10 +249,24 @@
       "reset_onboarding": "Reset onboarding (dev)"
     },
     "search_language": "Search language",
-    "no_languages": "No languages found."
+    "no_languages": "No languages found.",
+    "languages": {
+      "en": "English",
+      "es-419": "Spanish"
+    }
   },
   "onboarding": {
     "prompt": "What is your current primary goal? Don't worry, you can change it later.",
+    "language": {
+      "title": "Choose your language",
+      "subtitle": "Argus speaks multiple languages. Which one do you prefer?",
+      "description": "This helps us personalize your experience.",
+      "continue_in": "Continue in {{language}}",
+      "en": "English",
+      "es-419": "Español"
+    },
+    "primary_goal": "What is your primary goal?",
+    "goal_description": "We'll tailor your strategy insights based on this.",
     "skip": "Skip for now",
     "goals": {
       "learn_basics": {
@@ -254,6 +285,11 @@
         "title": "Explore crypto",
         "description": "Try crypto-focused strategy starters."
       }
+    },
+    "error": {
+      "title": "API Unreachable",
+      "description": "We couldn't connect to the Argus engine. Please ensure the backend service is running and try again.",
+      "retry": "Try Again"
     }
   },
   "auth": {
