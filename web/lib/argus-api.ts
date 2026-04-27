@@ -194,6 +194,7 @@ export function resultCardFromRun(run: BacktestRun) {
     assumptions: card.assumptions,
     runId: run.id,
     strategyId: run.strategy_id ?? null,
+    actions: card.actions,
   };
 }
 

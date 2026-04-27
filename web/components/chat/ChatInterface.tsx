@@ -462,18 +462,27 @@ export default function ChatInterface() {
                     kind: "strategy_result",
                     content: undefined,
                     result: card,
-                    actions: [
-                      {
-                        id: "add-to-collection",
-                        label: t('common.add_to_collection'),
-                        value: `/action:add-to-collection:${run.id}:${run.strategy_id ?? ""}:${run.symbols.join(",")}:${run.asset_class}`,
-                      },
-                      {
-                        id: "try-new",
-                        label: t('chat.try_new_strategy'),
-                        value: "/action:new-chat",
-                      },
-                    ],
+                    actions: card.actions?.map((a: any) => {
+                      if (a.type === "add_to_collection") {
+                        return {
+                          id: "add-to-collection",
+                          label: a.label,
+                          value: `/action:add-to-collection:${run.id}:${run.strategy_id ?? ""}:${run.symbols.join(",")}:${run.asset_class}`,
+                        };
+                      }
+                      if (a.type === "try_new_strategy") {
+                        return {
+                          id: "try-new",
+                          label: a.label,
+                          value: "/action:new-chat",
+                        };
+                      }
+                      return {
+                        id: a.type,
+                        label: a.label,
+                        value: a.label,
+                      };
+                    }) || [],
                   }
                 : m,
             ),
