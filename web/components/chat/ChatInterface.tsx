@@ -1133,7 +1133,7 @@ export default function ChatInterface() {
                           <ChevronRight className="h-4 w-4 -rotate-90" />
                         </button>
                         <div className="max-h-[300px] overflow-y-auto pb-1">
-                          {groupedHistory.chat.map((item) => (
+                          {historyItems.filter(i => i.type === "chat").map((item: HistoryItem) => (
                             <button
                               key={item.id}
                               type="button"

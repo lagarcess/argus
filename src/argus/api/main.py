@@ -198,10 +198,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
             "request_id": request.state.request_id,
         }
 
-    headers = {
-        "Access-Control-Allow-Origin": request.headers.get("origin") or "*",
-        "Access-Control-Allow-Credentials": "true",
-    }
+    origin = request.headers.get("origin")
+    headers = {"Access-Control-Allow-Origin": origin or "*"}
+    if origin:
+        headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
 

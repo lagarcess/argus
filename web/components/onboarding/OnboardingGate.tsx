@@ -106,7 +106,7 @@ export function OnboardingGate({
         onboarding: {
           stage: "ready",
           language_confirmed: true,
-          primary_goal: goal as any,
+          primary_goal: goal as ApiUser["onboarding"]["primary_goal"],
           completed: true
         }
       });
