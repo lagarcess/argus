@@ -311,13 +311,10 @@ def current_user(request: Request) -> User:
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.removeprefix("Bearer ")
     else:
-        # Fallback to cookies (e.g. sb-<project-id>-auth-token or sb-access-token)
-        # We look for common Supabase cookie patterns
         potential_tokens = []
         for key, value in request.cookies.items():
             if key.startswith("sb-") and ("auth-token" in key or "access-token" in key):
                 try:
-                    # Strip surrounding quotes (Supabase @supabase/ssr often quotes cookie values)
                     clean_value = value.strip('"')
                     if clean_value.startswith("{") or clean_value.startswith("["):
                         token_data = json.loads(clean_value)
@@ -333,7 +330,6 @@ def current_user(request: Request) -> User:
                 except Exception:
                     potential_tokens.append(value)
         
-        # Take the first non-empty token
         for t_val in potential_tokens:
             if t_val:
                 token = t_val
