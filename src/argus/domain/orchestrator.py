@@ -130,6 +130,9 @@ class StrategyRunDraft(BaseModel):
     starting_capital: SlotValue = Field(
         default_factory=lambda: SlotValue(source="missing")
     )
+    dca_cadence: SlotValue = Field(
+        default_factory=lambda: SlotValue(source="missing")
+    )
     parameters: dict[str, Any] = Field(default_factory=dict)
 
     def to_extraction(fixed_dates: bool = False) -> StrategyExtraction:
@@ -154,6 +157,7 @@ class StrategyExtraction(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
     benchmark_symbol: str | None = None
+    starting_capital: float | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -207,6 +211,12 @@ def build_strategy_draft(
             # If not in last message but exists, it's inferred from history or default
             return "history_inferred"
 
+        # DCA Cadence check
+        if field_name == "dca_cadence":
+            if any(kw in last_user_msg for kw in ["DAILY", "WEEKLY", "MONTHLY", "DIARIA", "SEMANAL", "MENSUAL"]):
+                return "user_supplied"
+            return "missing"
+
         return "backend_default"
 
     return StrategyRunDraft(
@@ -217,6 +227,11 @@ def build_strategy_draft(
         start_date=SlotValue(value=extraction.start_date, source=get_source("start_date", extraction.start_date)),
         end_date=SlotValue(value=extraction.end_date, source=get_source("end_date", extraction.end_date)),
         benchmark_symbol=SlotValue(value=extraction.benchmark_symbol, source="backend_default"),
+        starting_capital=SlotValue(value=extraction.starting_capital, source="backend_default"),
+        dca_cadence=SlotValue(
+            value=(extraction.parameters or {}).get("dca_cadence") or "weekly",
+            source=get_source("dca_cadence", (extraction.parameters or {}).get("dca_cadence"))
+        ),
         parameters=extraction.parameters,
     )
 
@@ -274,6 +289,11 @@ def decide_run_readiness(
         missing.append("symbols")
     if draft.template.source == "missing":
         missing.append("template")
+    
+    # Policy: For DCA, require explicit cadence from user or history
+    if draft.template.value == "dca_accumulation":
+        if draft.dca_cadence.source == "missing":
+            missing.append("dca_cadence")
 
     # Policy: If we asked for time/dates in the last 3 turns and still don't have them from user, mark as missing
     # This prevents silent defaulting when the user is in the middle of answering a time question.
@@ -304,6 +324,8 @@ def decide_run_readiness(
         prompts.append("¿Qué estrategia quieres usar?" if lang == "es-419" else "Which strategy do you want to use?")
     if "time_preferences" in missing:
         prompts.append("¿En qué periodo o temporalidad?" if lang == "es-419" else "For what period or timeframe?")
+    if "dca_cadence" in missing:
+        prompts.append("¿Con qué frecuencia quieres comprar (diaria, semanal, mensual)?" if lang == "es-419" else "How often do you want to buy (daily, weekly, monthly)?")
 
     return StrategyReadiness(
         ready_to_run=False,

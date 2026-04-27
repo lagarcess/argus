@@ -195,3 +195,29 @@ def test_decide_run_readiness_honors_pending_questions() -> None:
     # Re-build draft logic would normally handle this, but for test we simulate
     readiness = orchestrator.decide_run_readiness(draft, history, language="en")
     assert readiness.ready_to_run is True
+
+
+def test_decide_run_readiness_requires_dca_cadence() -> None:
+    # Scenario: User says "DCA into BTC", but doesn't specify cadence.
+    extraction = orchestrator.StrategyExtraction(
+        symbols=["BTC"], 
+        template="dca_accumulation", 
+        asset_class="crypto"
+    )
+    history = [{"role": "user", "content": "DCA into BTC"}]
+    draft = orchestrator.build_strategy_draft(extraction, history)
+    
+    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
+    
+    assert readiness.ready_to_run is False
+    assert "dca_cadence" in readiness.missing_fields
+    assert "often" in readiness.clarification_prompt.lower()
+
+    # Scenario: User specifies cadence
+    history.append({"role": "user", "content": "weekly"})
+    # Normal flow would re-extract, but here we simulate
+    extraction.parameters = {"dca_cadence": "weekly"}
+    draft = orchestrator.build_strategy_draft(extraction, history)
+    
+    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
+    assert readiness.ready_to_run is True

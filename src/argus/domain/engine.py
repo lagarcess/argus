@@ -150,6 +150,12 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
         config["_execution_realism"] = _normalize_execution_realism(
             payload.get("_execution_realism")
         )
+    
+    # Task 3: Handle DCA cadence
+    if config["template"] == "dca_accumulation":
+        cadence = (payload.get("parameters") or {}).get("dca_cadence") or "weekly"
+        config["parameters"]["dca_cadence"] = cadence.lower()
+        
     return config
 
 
@@ -238,10 +244,25 @@ def _build_signals(
     index = close.index
 
     if template == "dca_accumulation":
+        cadence = config.get("parameters", {}).get("dca_cadence", "weekly").lower()
         entries = pd.Series(False, index=index, dtype=bool)
-        entries.iloc[0] = True
+        
+        if cadence == "daily":
+            entries[:] = True
+        elif cadence == "weekly":
+            # Entry on the first day of each week present in data
+            weeks = index.to_series().dt.to_period("W")
+            entries = weeks != weeks.shift(1)
+        elif cadence == "monthly":
+            # Entry on the first day of each month present in data
+            months = index.to_series().dt.to_period("M")
+            entries = months != months.shift(1)
+        else:
+            # Fallback to single entry if unknown cadence
+            entries.iloc[0] = True
+            
         exits = pd.Series(False, index=index, dtype=bool)
-        return entries, exits
+        return entries.astype(bool), exits.astype(bool)
 
     if template == "rsi_mean_reversion":
         rsi = _resolve_indicator_series(data, indicator="rsi", period=14)
@@ -431,6 +452,7 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
             slippage=float(realism["slippage"]),
             init_cash=allocation_capital,
             freq=_vbt_freq(config["timeframe"]),
+            accumulate=True,
         )
 
         symbol_equity = pd.Series(
