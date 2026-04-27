@@ -175,3 +175,86 @@ body {
 .animate-argus-swoosh-up {
   animation: argus_swoosh_up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes argus_ethereal_shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-ethereal-shimmer {
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    currentColor 0%,
+    currentColor 35%,
+    rgba(0, 0, 0, 0.25) 50%,
+    currentColor 65%,
+    currentColor 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: argus_ethereal_shimmer 3s infinite linear;
+}
+
+.dark .animate-ethereal-shimmer {
+  background: linear-gradient(
+    90deg,
+    currentColor 0%,
+    currentColor 35%,
+    rgba(255, 255, 255, 0.75) 50%,
+    currentColor 65%,
+    currentColor 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Markdown Styling */
+.prose p {
+  margin-bottom: 1rem;
+}
+.prose p:last-child {
+  margin-bottom: 0;
+}
+.prose ul, .prose ol {
+  margin-top: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding-left: 1.25rem;
+}
+.prose ul {
+  list-style-type: disc;
+}
+.prose ol {
+  list-style-type: decimal;
+}
+.prose li {
+  margin-bottom: 0.5rem;
+}
+.prose li::marker {
+  color: rgba(0, 0, 0, 0.3);
+}
+.dark .prose li::marker {
+  color: rgba(255, 255, 255, 0.3);
+}
+.prose strong {
+  font-weight: 700;
+  color: inherit;
+}
+.prose em {
+  font-style: italic;
+}
+.prose code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+}
+.dark .prose code {
+  background: rgba(255, 255, 255, 0.1);
+}

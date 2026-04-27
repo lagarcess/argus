@@ -2010,6 +2010,7 @@ def chat_stream(
                 onboarding_required=True,
                 primary_goal=current_user_profile.onboarding.primary_goal,
             )
+            yield sse("status", {"status": f"intent_{decision.intent}"})
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -2055,6 +2056,7 @@ def chat_stream(
                 onboarding_required=False,
                 primary_goal=current_user_profile.onboarding.primary_goal,
             )
+            yield sse("status", {"status": f"intent_{decision.intent}"})
         except Exception as exc:
             logger.exception(
                 "Chat orchestration failed",

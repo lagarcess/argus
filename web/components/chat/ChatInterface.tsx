@@ -1299,10 +1299,11 @@ export default function ChatInterface() {
                           setIsSidebarOpen(false);
                         }}
                         isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
+                        isStreaming={!!streamStatus && msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
                       />
                     ))}
                     {streamStatus && (
-                      <div className="ml-12 text-[13px] text-black/45 dark:text-white/45">
+                      <div className="animate-ethereal-shimmer ml-12 text-[13px] text-black/45 dark:text-white/45">
                         {streamStatus}
                       </div>
                     )}

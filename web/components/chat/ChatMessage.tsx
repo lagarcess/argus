@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import { Message } from "./types";
@@ -12,9 +14,10 @@ type ChatMessageProps = {
   onAction?: (value: string) => void;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, any>, rating?: "positive" | "negative") => void;
   isLatest?: boolean;
+  isStreaming?: boolean;
 };
 
-export default function ChatMessage({ message, onAction, onFeedback, isLatest }: ChatMessageProps) {
+export default function ChatMessage({ message, onAction, onFeedback, isLatest, isStreaming }: ChatMessageProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
@@ -108,16 +111,29 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
   }
 
   return (
-    <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300 group">
-      <div className="flex flex-col max-w-[95%]">
+    <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300 group relative">
+      {!isUser && !isStreaming && (
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(getCopyText());
+          }}
+          className="absolute -left-10 top-1 opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black dark:text-white"
+          title={t('chat.copy_plaintext')}
+        >
+          <Copy className="w-4 h-4" />
+        </button>
+      )}
+      <div className="flex flex-col max-w-[85%]">
         <div className="flex flex-col mt-1.5">
           {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
             <div className="w-full max-w-[min(100%,660px)]">
               <StrategyResultCard result={message.result} />
             </div>
           ) : (
-            <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] whitespace-pre-wrap">
-              {message.content ?? ""}
+            <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content ?? ""}
+              </ReactMarkdown>
             </div>
           )}
 
@@ -140,8 +156,9 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
                 <div />
               )}
 
-              {/* Feedback Icon Row (Right-aligned) */}
-              <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
+              {/* Feedback Icon Row (Right-aligned) - Progressive Disclosure: Hide while streaming */}
+              {!isStreaming && (
+                <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
                 {(rating === null || rating === "positive") && (
                   <button
                     className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
@@ -202,7 +219,8 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
                     </button>
                   </div>
                 )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>
