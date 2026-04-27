@@ -85,11 +85,23 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest }:
     return message.content ?? "";
   };
 
+  const getDisplayContent = () => {
+    const content = message.content ?? "";
+    if (content.startsWith("__ONBOARDING_SKIP__")) {
+      return t("onboarding.skip", "Skip for now");
+    }
+    if (content.startsWith("__ONBOARDING_GOAL__:")) {
+      const goal = content.split(":")[1];
+      return t(`onboarding.goals.${goal}.title`, goal);
+    }
+    return content;
+  };
+
   if (isUser) {
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal shadow-sm">
-          {message.content ?? ""}
+          {getDisplayContent()}
         </div>
       </div>
     );

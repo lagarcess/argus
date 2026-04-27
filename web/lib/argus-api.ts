@@ -188,7 +188,8 @@ export function resultCardFromRun(run: BacktestRun) {
     period: card.date_range.display,
     statusLabel: card.status_label,
     metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
-    benchmarkNote: card.assumptions.join(" "),
+    benchmarkNote: card.benchmark_note,
+    assumptions: card.assumptions,
     runId: run.id,
     strategyId: run.strategy_id ?? null,
   };
