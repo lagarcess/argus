@@ -138,3 +138,28 @@ def test_orchestrate_chat_turn_passes_history(monkeypatch) -> None:
     )
 
     assert captured_history == history
+
+
+def test_orchestrate_chat_turn_fallback_honors_primary_goal(monkeypatch) -> None:
+    # Force fallback by disabling LLM provider
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    # Case 1: Explore Crypto goal
+    decision = orchestrator.orchestrate_chat_turn(
+        message="i", # No symbols here
+        language="en",
+        onboarding_required=False,
+        primary_goal="explore_crypto",
+    )
+    assert decision.intent == "unsupported_request"
+    assert "crypto" in decision.assistant_message.lower()
+
+    # Case 2: Learn Basics goal
+    decision = orchestrator.orchestrate_chat_turn(
+        message="i",
+        language="en",
+        onboarding_required=False,
+        primary_goal="learn_basics",
+    )
+    assert decision.intent == "unsupported_request"
+    assert "beginner-friendly" in decision.assistant_message.lower()

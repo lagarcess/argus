@@ -297,13 +297,25 @@ def _llm_extract_decision(
 
 
 def _fallback_run_decision(
-    message: str, language: str | None
+    message: str, language: str | None, primary_goal: str | None = None
 ) -> ChatOrchestrationDecision:
     strategy = StrategyExtraction.model_validate(_heuristic_extract(message))
+    if strategy.symbols:
+        return ChatOrchestrationDecision(
+            intent="run_backtest",
+            assistant_message=assistant_copy_for_result(strategy.symbols, language or "en"),
+            strategy=strategy,
+            title_suggestion=None,
+        )
+
+    # True fallback: extraction failed and no symbols found. Use goal-aware copy.
+    goal = primary_goal or "surprise_me"
+    assistant_message = goal_follow_up_message(goal, language)
+
     return ChatOrchestrationDecision(
-        intent="run_backtest",
-        assistant_message=assistant_copy_for_result(strategy.symbols, language or "en"),
-        strategy=strategy,
+        intent="unsupported_request",
+        assistant_message=assistant_message,
+        strategy=None,
         title_suggestion=None,
     )
 
@@ -328,7 +340,7 @@ def orchestrate_chat_turn(
     fallback_model = os.getenv("AGENT_FALLBACK_MODEL")
     has_provider_config = bool(primary_model and os.getenv("OPENROUTER_API_KEY"))
     if not has_provider_config:
-        return _fallback_run_decision(message, language)
+        return _fallback_run_decision(message, language, primary_goal)
 
     try:
         decision = _llm_extract_decision(
@@ -339,9 +351,9 @@ def orchestrate_chat_turn(
             history=history,
         )
         if decision.strategy and decision.strategy.template not in SUPPORTED_TEMPLATES:
-            return _fallback_run_decision(message, language)
+            return _fallback_run_decision(message, language, primary_goal)
         if decision.strategy and not decision.strategy.symbols:
-            return _fallback_run_decision(message, language)
+            return _fallback_run_decision(message, language, primary_goal)
         return decision
     except Exception:
         if fallback_model:
@@ -360,7 +372,7 @@ def orchestrate_chat_turn(
                     return decision
             except Exception:
                 pass
-        return _fallback_run_decision(message, language)
+        return _fallback_run_decision(message, language, primary_goal)
 
 
 def extract_strategy_request(message: str) -> dict[str, Any]:
