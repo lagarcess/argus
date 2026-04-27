@@ -870,6 +870,7 @@ def create_run_from_payload(
     strategy_id: str | None = None,
     conversation_id: str | None = None,
     persist_in_memory: bool = True,
+    language: str | None = None,
 ) -> BacktestRun:
     symbols = payload.get("symbols") or []
     if not symbols:
@@ -917,7 +918,7 @@ def create_run_from_payload(
         metrics=metrics,
         config_snapshot=config,
         conversation_result_card=build_result_card(
-            config, metrics, language=user.language if user else "en"
+            config, metrics, language=language or (user.language if user else "en")
         ),
         created_at=now,
         chart={
@@ -1029,6 +1030,7 @@ def run_backtest(
         user=user,
         user_id=user.id,
         persist_in_memory=supabase_gateway is None,
+        language=user.language,
     )
     if supabase_gateway is not None:
         run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
@@ -2150,6 +2152,7 @@ def chat_stream(
                 conversation_id=conversation.id,
                 persist_in_memory=supabase_gateway is None
                 or conversation.id in store.conversations,
+                language=payload.language or conversation.language or current_user_profile.language,
             )
             if supabase_gateway is not None:
                 try:
