@@ -67,7 +67,9 @@ def _normalize_timeframe(timeframe: str | None) -> str:
     return mapping[normalized]
 
 
-def _to_date(value: date | datetime) -> date:
+def _to_date(value: str | date | datetime) -> date:
+    if isinstance(value, str):
+        return date.fromisoformat(value)
     if isinstance(value, datetime):
         return value.date()
     return value
@@ -115,8 +117,20 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
     end_default = today - timedelta(days=1)
     end = _to_date(payload.get("end_date") or end_default)
     start = _to_date(payload.get("start_date") or (end - timedelta(days=365)))
-    asset_class = payload["asset_class"]
-    symbols = [classify_symbol(symbol).symbol for symbol in payload["symbols"]]
+    requested_asset_class = payload.get("asset_class")
+    classified = [classify_symbol(s) for s in payload["symbols"]]
+    
+    actual_classes = {c.asset_class for c in classified}
+    if len(actual_classes) > 1:
+        raise ValueError("mixed_asset_not_supported")
+        
+    inferred_class = next(iter(actual_classes)) if actual_classes else "equity"
+    asset_class = requested_asset_class or inferred_class
+    
+    if asset_class != inferred_class:
+        raise ValueError("asset_class_conflict")
+        
+    symbols = [c.symbol for c in classified]
     timeframe = _normalize_timeframe(payload.get("timeframe"))
 
     benchmark_input = payload.get("benchmark_symbol")

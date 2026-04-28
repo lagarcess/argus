@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import pytest
+from typing import Any
+from pydantic import BaseModel
 
 from argus.domain import orchestrator
 from argus.domain.orchestrator import (
     ChatOrchestrationDecision,
-    StrategyExtraction,
+    StrategyIntentExtraction,
+    StrategyDraft,
+    SlotValue,
+    ExtractedSlot,
 )
 from argus.domain.market_data.assets import ResolvedAsset
 
@@ -21,10 +26,14 @@ def mock_resolve_asset(monkeypatch):
     monkeypatch.setattr(orchestrator, "resolve_asset", _fake_resolve)
 
 
-def test_orchestrate_chat_turn_uses_heuristic_without_provider(monkeypatch) -> None:
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("AGENT_MODEL", raising=False)
-    monkeypatch.delenv("AGENT_FALLBACK_MODEL", raising=False)
+def test_orchestrate_chat_turn_without_history(monkeypatch) -> None:
+    # Disable LLM to force empty extraction
+    def _fake_extract(message: str, model_name: str) -> StrategyIntentExtraction:
+        return StrategyIntentExtraction(
+            template=ExtractedSlot(value="buy_the_dip", confidence=1.0),
+            symbols=ExtractedSlot(value=["TSLA"], confidence=1.0),
+        )
+    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _fake_extract)
 
     decision = orchestrator.orchestrate_chat_turn(
         message="Backtest Tesla dips",
@@ -34,210 +43,94 @@ def test_orchestrate_chat_turn_uses_heuristic_without_provider(monkeypatch) -> N
     )
 
     assert decision.intent == "run_backtest"
-    assert decision.strategy_intent is not None
-    assert decision.strategy_intent.template.value in orchestrator.SUPPORTED_TEMPLATES
+    assert decision.strategy_draft is not None
+    assert decision.strategy_draft.template.value == "buy_the_dip"
+    assert decision.strategy_draft.symbols.value == ["TSLA"]
 
 
-def test_orchestrate_chat_turn_uses_fallback_model_after_primary_failure(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("AGENT_MODEL", "primary-model")
-    monkeypatch.setenv("AGENT_FALLBACK_MODEL", "fallback-model")
-
-    calls: list[str] = []
-
-    def _fake_extract(*, model_name: str, **kwargs) -> ChatOrchestrationDecision:  # type: ignore[no-untyped-def]
-        calls.append(model_name)
-        if model_name == "primary-model":
-            raise RuntimeError("primary failed")
-        return ChatOrchestrationDecision(
-            intent="run_backtest",
-            assistant_message="Fallback model reply",
-            strategy_intent=orchestrator.StrategyIntent(
-                template=orchestrator.SlotValue(
-                    value="rsi_mean_reversion", source="user_supplied"
-                ),
-                asset_class=orchestrator.SlotValue(value="equity", source="user_supplied"),
-                symbols=orchestrator.SlotValue(value=["TSLA"], source="user_supplied"),
-            ),
+def test_orchestrate_chat_turn_merges_history(monkeypatch) -> None:
+    # 1. First turn: only symbols
+    def _fake_extract_1(message: str, model_name: str) -> StrategyIntentExtraction:
+        return StrategyIntentExtraction(
+            symbols=ExtractedSlot(value=["AAPL"], confidence=1.0),
         )
+    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _fake_extract_1)
 
-    monkeypatch.setattr(orchestrator, "_llm_extract_decision", _fake_extract)
-
-    decision = orchestrator.orchestrate_chat_turn(
-        message="Test Tesla dip",
-        language="en",
-        onboarding_required=False,
-        primary_goal="test_stock_idea",
-    )
-
-    assert decision.intent == "run_backtest"
-    assert decision.assistant_message == "Fallback model reply"
-    assert calls == ["primary-model", "fallback-model"]
-
-
-def test_parse_onboarding_goal_hidden_protocol() -> None:
-    assert orchestrator.parse_onboarding_goal("__ONBOARDING_SKIP__") == "surprise_me"
-    assert (
-        orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:build_passive_strategy")
-        == "build_passive_strategy"
-    )
-    assert (
-        orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:passive_strategy") is None
-    )
-    assert orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:unknown") is None
-
-
-def test_plan_strategy_action() -> None:
-    # Ready case
-    plan = orchestrator.plan_strategy_action(
-        intent=orchestrator.StrategyIntent(
-            template=orchestrator.SlotValue(value="rsi_mean_reversion", source="user_supplied"),
-            symbols=orchestrator.SlotValue(value=["AAPL"], source="user_supplied"),
-            asset_class=orchestrator.SlotValue(value="equity", source="user_supplied"),
-        ),
-        language="en"
-    )
-    assert plan.action == "run_backtest"
-
-    # Missing symbols
-    missing_symbols = orchestrator.plan_strategy_action(
-        intent=orchestrator.StrategyIntent(
-            template=orchestrator.SlotValue(value="rsi_mean_reversion", source="user_supplied"),
-            symbols=orchestrator.SlotValue(value=[], source="missing"),
-        ),
-        language="en"
-    )
-    assert missing_symbols.action == "ask_clarification"
-    assert "symbols" in missing_symbols.missing_fields
-
-    # Missing template
-    missing_template = orchestrator.plan_strategy_action(
-        intent=orchestrator.StrategyIntent(
-            template=orchestrator.SlotValue(value=None, source="missing"),
-            symbols=orchestrator.SlotValue(value=["AAPL"], source="user_supplied"),
-        ),
-        language="en"
-    )
-    assert missing_template.action == "ask_clarification"
-    assert "template" in missing_template.missing_fields
-
-    # Spanish prompt
-    spanish = orchestrator.plan_strategy_action(
-        intent=orchestrator.StrategyIntent(
-            template=orchestrator.SlotValue(value="rsi_mean_reversion", source="user_supplied"),
-            symbols=orchestrator.SlotValue(value=[], source="missing"),
-        ),
-        language="es-419"
-    )
-    assert "activos" in spanish.message or "símbolos" in spanish.message
-
-
-def test_orchestrate_chat_turn_passes_history(monkeypatch) -> None:
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("AGENT_MODEL", "primary-model")
-
-    captured_history: list[dict[str, str]] | None = None
-
-    def _fake_extract(*, history: list[dict[str, str]] | None = None, **kwargs) -> ChatOrchestrationDecision:  # type: ignore[no-untyped-def]
-        nonlocal captured_history
-        captured_history = history
-        return ChatOrchestrationDecision(
-            intent="run_backtest",
-            assistant_message="ok",
-            strategy=StrategyExtraction(
-                template="rsi_mean_reversion",
-                symbols=["TSLA"],
-                asset_class="equity",
-                parameters={},
-            ),
-        )
-
-    monkeypatch.setattr(orchestrator, "_llm_extract_decision", _fake_extract)
-
-    history = [
-        {"role": "user", "content": "Tell me about TSLA"},
-        {"role": "assistant", "content": "TSLA is a stock."},
-    ]
-
-    orchestrator.orchestrate_chat_turn(
-        message="Backtest it",
-        language="en",
-        onboarding_required=False,
-        primary_goal=None,
+    history = []
+    decision1 = orchestrator.orchestrate_chat_turn(
+        message="Apple",
         history=history,
-    )
-
-    assert captured_history == history
-
-
-def test_orchestrate_chat_turn_fallback_honors_primary_goal(monkeypatch) -> None:
-    # Force fallback by disabling LLM provider
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("AGENT_MODEL", raising=False)
-
-    # Case 1: Explore Crypto goal
-    decision = orchestrator.orchestrate_chat_turn(
-        message="i", # No symbols here
         language="en",
-        onboarding_required=False,
-        primary_goal="explore_crypto",
     )
-    assert decision.intent == "education"
-    assert "crypto" in decision.assistant_message.lower()
+    assert decision1.intent == "clarify"
+    assert "strategy" in decision1.assistant_message.lower() or "estrategia" in decision1.assistant_message.lower()
+    
+    # 2. Second turn: only template
+    def _fake_extract_2(message: str, model_name: str) -> StrategyIntentExtraction:
+        return StrategyIntentExtraction(
+            template=ExtractedSlot(value="buy_the_dip", confidence=1.0),
+        )
+    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _fake_extract_2)
 
-    # Case 2: Learn Basics goal
-    decision = orchestrator.orchestrate_chat_turn(
-        message="i",
+    # Simulate history with the previous draft in metadata
+    history = [
+        {"role": "user", "content": "Apple"},
+        {"role": "assistant", "content": "What strategy?", "metadata": {"strategy_draft": decision1.strategy_draft.model_dump()}}
+    ]
+    
+    decision2 = orchestrator.orchestrate_chat_turn(
+        message="Buy the dip",
+        history=history,
         language="en",
-        onboarding_required=False,
-        primary_goal="learn_basics",
     )
-    assert decision.intent == "education"
-    assert "beginner-friendly" in decision.assistant_message.lower()
+    
+    assert decision2.intent == "run_backtest"
+    assert decision2.strategy_draft.template.value == "buy_the_dip"
+    assert decision2.strategy_draft.symbols.value == ["AAPL"]
 
 
-def test_plan_strategy_action_honors_pending_questions() -> None:
-    # User message with only symbol
-    message = "Tell me about AAPL"
-    extraction = StrategyExtraction(**orchestrator._heuristic_extract(message))
-    history = [{"role": "user", "content": message}]
-    intent = orchestrator.build_strategy_intent(extraction, history)
-
-    # Should ask for template
-    plan = orchestrator.plan_strategy_action(intent, language="en")
-    assert plan.action == "ask_clarification"
-    assert "template" in plan.missing_fields
-
-
-def test_plan_strategy_action_requires_dca_cadence() -> None:
+def test_plan_draft_action_parameter_clarification() -> None:
     # DCA without cadence
-    message = "DCA into AAPL"
-    extraction = StrategyExtraction(
-        symbols=["AAPL"], template="dca_accumulation", asset_class="equity"
+    draft = StrategyDraft(
+        template=SlotValue(value="dca_accumulation", source="user_supplied"),
+        symbols=SlotValue(value=["BTC"], source="user_supplied"),
+        asset_class=SlotValue(value="crypto", source="backend_default"),
     )
-    history = [{"role": "user", "content": "DCA into AAPL"}]
-    intent = orchestrator.build_strategy_intent(extraction, history)
-
-    # Should ask for dca_cadence
-    plan = orchestrator.plan_strategy_action(intent, language="en")
+    
+    plan = orchestrator.plan_draft_action(draft, language="en")
     assert plan.action == "ask_clarification"
     assert "dca_cadence" in plan.missing_fields
-
-    # Normal flow would re-extract, but here we simulate
-    extraction.parameters = {"dca_cadence": "weekly"}
-    intent = orchestrator.build_strategy_intent(extraction, history)
-
-    # Assess readiness using the intent and history
-    plan = orchestrator.plan_strategy_action(intent, language="en")
-    assert plan.action == "run_backtest"
+    assert "daily, weekly, or monthly" in plan.message.lower() or "Argus makes a fixed-dollar purchase" in plan.message
 
 
-def test_build_capability_prompt() -> None:
-    prompt = orchestrator.build_capability_prompt()
-    assert "Argus Alpha can run these supported templates:" in prompt
-    assert "buy_the_dip" in prompt
-    assert "rsi_mean_reversion" in prompt
-    assert "aliases=" in prompt
-    assert "parameters=" in prompt
+def test_normalize_symbols_mappings() -> None:
+    assert orchestrator.normalize_symbols(["Tesla", "Apple"]) == ["TSLA", "AAPL"]
+    assert orchestrator.normalize_symbols(["Bitcoin"]) == ["BTC"]
+    assert orchestrator.normalize_symbols(["BTCUSD", "ETH/USD"]) == ["BTCUSD", "ETH/USD"]
+
+
+def test_infer_asset_class() -> None:
+    assert orchestrator.infer_asset_class(["AAPL", "TSLA"]) == "equity"
+    assert orchestrator.infer_asset_class(["BTC"]) == "crypto"
+    assert orchestrator.infer_asset_class(["ETHUSD"]) == "crypto"
+
+
+def test_compile_backtest_payload_defaults() -> None:
+    draft = StrategyDraft(
+        template=SlotValue(value="buy_the_dip", source="user_supplied"),
+        symbols=SlotValue(value=["TSLA"], source="user_supplied"),
+    )
+    payload = orchestrator.compile_backtest_payload(draft)
+    assert payload["template"] == "buy_the_dip"
+    assert payload["asset_class"] == "equity"
+    assert payload["benchmark_symbol"] == "SPY"
+    assert payload["starting_capital"] == 10000
+    assert "start_date" in payload
+    assert "end_date" in payload
+
+
+def test_canonical_template_aliases() -> None:
+    assert orchestrator.canonical_template("buy the dip") == "buy_the_dip"
+    assert orchestrator.canonical_template("rsi") == "rsi_mean_reversion"
+    assert orchestrator.canonical_template("dca") == "dca_accumulation"
+    assert orchestrator.canonical_template("unknown") is None

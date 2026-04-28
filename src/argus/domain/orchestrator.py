@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import Any, Literal, cast
 
 from langchain_openrouter import ChatOpenRouter
@@ -19,26 +20,12 @@ SUPPORTED_GOALS = {
     "explore_crypto",
     "surprise_me",
 }
-TEMPLATE_ALIASES: list[tuple[str, str]] = []
-for cap in STRATEGY_CAPABILITIES.values():
-    for alias in cap.aliases:
-        TEMPLATE_ALIASES.append((cap.template, alias))
+
 NON_SYMBOLS = {
-    "WHAT",
-    "IF",
-    "WHENEVER",
-    "WHEN",
-    "BOUGHT",
-    "BUY",
-    "DIPPED",
-    "HARD",
-    "THE",
-    "AND",
-    "FOR",
-    "WITH",
-    "STOCK",
-    "CRYPTO",
+    "WHAT", "IF", "WHENEVER", "WHEN", "BOUGHT", "BUY", "DIPPED", "HARD",
+    "THE", "AND", "FOR", "WITH", "STOCK", "CRYPTO", "I", "ME", "MY", "YOU"
 }
+
 COMMON_NAMES = {
     "TESLA": "TSLA",
     "APPLE": "AAPL",
@@ -48,7 +35,6 @@ COMMON_NAMES = {
     "ETHEREUM": "ETH",
     "SOLANA": "SOL",
 }
-
 
 STARTER_PROMPTS = {
     "learn_basics": [
@@ -83,42 +69,48 @@ STARTER_PROMPTS = {
     ],
 }
 
-
 def get_starter_prompts(primary_goal: str | None) -> list[str]:
-    """Return 3-4 personalized prompts based on primary goal."""
     goal = primary_goal if primary_goal in STARTER_PROMPTS else "surprise_me"
     return STARTER_PROMPTS[goal]
 
+# --- Models ---
+
+class ExtractedSlot(BaseModel):
+    value: Any = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence: str | None = None
+
+class StrategyIntentExtraction(BaseModel):
+    wants_backtest: bool = False
+    wants_education: bool = False
+    template: ExtractedSlot = Field(default_factory=ExtractedSlot)
+    symbols: ExtractedSlot = Field(default_factory=ExtractedSlot)
+    asset_class: ExtractedSlot = Field(default_factory=ExtractedSlot)
+    timeframe: ExtractedSlot = Field(default_factory=ExtractedSlot)
+    start_date: ExtractedSlot = Field(default_factory=ExtractedSlot)
+    end_date: ExtractedSlot = Field(default_factory=ExtractedSlot)
+    starting_capital: ExtractedSlot = Field(default_factory=ExtractedSlot)
+    parameters: dict[str, ExtractedSlot] = Field(default_factory=dict)
+    user_confirmed_defaults: bool = False
 
 class SlotValue(BaseModel):
     value: Any = None
     source: Literal["user_supplied", "history_inferred", "backend_default", "missing"]
-    confidence: float = 1.0
+    confidence: float = 0.0
+    evidence: str | None = None
 
-
-class StrategyIntent(BaseModel):
+class StrategyDraft(BaseModel):
     template: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
-    asset_class: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
     symbols: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    asset_class: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
     timeframe: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
     start_date: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
     end_date: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
     starting_capital: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    side: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    allocation_method: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
     benchmark_symbol: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
     parameters: dict[str, SlotValue] = Field(default_factory=dict)
-
-
-class StrategyExtraction(BaseModel):
-    template: str | None = None
-    asset_class: Literal["equity", "crypto"] | None = None
-    symbols: list[str] = Field(default_factory=list)
-    timeframe: str | None = None
-    start_date: str | None = None
-    end_date: str | None = None
-    benchmark_symbol: str | None = None
-    starting_capital: float | None = None
-    parameters: dict[str, Any] = Field(default_factory=dict)
-
 
 class ChatOrchestrationDecision(BaseModel):
     intent: Literal[
@@ -130,368 +122,309 @@ class ChatOrchestrationDecision(BaseModel):
         "unsupported_request",
     ]
     assistant_message: str
-    strategy_intent: StrategyIntent | None = None
+    strategy_draft: StrategyDraft | None = None
     title_suggestion: str | None = None
-
 
 class StrategyPlanDecision(BaseModel):
     action: Literal["ask_clarification", "run_backtest", "unsupported"]
     missing_fields: list[str] = Field(default_factory=list)
     message: str | None = None
 
-
 class NameSuggestion(BaseModel):
     name: str
 
-
-def build_strategy_intent(
-    extraction: StrategyExtraction, history: list[dict[str, str]] | None = None
-) -> StrategyIntent:
-    """Assess where each parameter came from to guide readiness decisions."""
-    history = history or []
-
-    def get_source(
-        field_name: str, value: Any
-    ) -> Literal["user_supplied", "history_inferred", "backend_default", "missing"]:
-        if value is None or (isinstance(value, list) and not value):
-            return "missing"
-
-        # Check if the field was mentioned in the last user message
-        last_user_msg = next(
-            (m["content"].upper() for m in reversed(history) if m["role"] == "user"), ""
-        )
-
-        # Symbols check
-        if field_name == "symbols" and isinstance(value, list) and value:
-            if any(s.upper() in last_user_msg for s in value):
-                return "user_supplied"
-            return "history_inferred"
-
-        # Template check
-        if field_name == "template":
-            if value.upper() in last_user_msg:
-                return "user_supplied"
-            return "history_inferred"
-
-        # Timeframe/Dates check
-        if field_name in ["timeframe", "start_date", "end_date"]:
-            if value.upper() in last_user_msg:
-                return "user_supplied"
-            return "history_inferred"
-
-        # Parameters check
-        if field_name.startswith("param:"):
-            if value and str(value).upper() in last_user_msg:
-                return "user_supplied"
-            # Cadence special check
-            if field_name == "param:dca_cadence" and any(
-                kw in last_user_msg
-                for kw in [
-                    "DAILY",
-                    "WEEKLY",
-                    "MONTHLY",
-                    "DIARIA",
-                    "SEMANAL",
-                    "MENSUAL",
-                ]
-            ):
-                return "user_supplied"
-            return "history_inferred"
-
-        return "backend_default"
-
-    # Convert parameters to SlotValues
-    param_slots = {}
-    for k, v in (extraction.parameters or {}).items():
-        param_slots[k] = SlotValue(
-            value=v, source=get_source(f"param:{k}", v)
-        )
-
-    # 1. Resolve symbols early
-    raw_symbols = extraction.symbols or []
-    resolved_symbols = resolve_supported_symbols(raw_symbols)
-
-    return StrategyIntent(
-        template=SlotValue(
-            value=extraction.template, source=get_source("template", extraction.template)
-        ),
-        asset_class=SlotValue(
-            value=extraction.asset_class or "equity", source="backend_default"
-        ),
-        symbols=SlotValue(
-            value=resolved_symbols,
-            source="user_supplied" if resolved_symbols else "missing",
-        ),
-        timeframe=SlotValue(
-            value=extraction.timeframe,
-            source=get_source("timeframe", extraction.timeframe),
-        ),
-        start_date=SlotValue(
-            value=extraction.start_date,
-            source=get_source("start_date", extraction.start_date),
-        ),
-        end_date=SlotValue(
-            value=extraction.end_date, source=get_source("end_date", extraction.end_date)
-        ),
-        benchmark_symbol=SlotValue(
-            value=extraction.benchmark_symbol, source="backend_default"
-        ),
-        starting_capital=SlotValue(
-            value=extraction.starting_capital or 10000, source="backend_default"
-        ),
-        parameters=param_slots,
-    )
-
-
-def merge_intent(
-    current: StrategyIntent, previous: StrategyIntent | None
-) -> StrategyIntent:
-    if previous is None:
-        return current
-
-    def pick(cur: SlotValue, old: SlotValue) -> SlotValue:
-        return cur if cur.source != "missing" else old
-
-    merged_params = {**previous.parameters}
-    for k, v in current.parameters.items():
-        if v.source != "missing":
-            merged_params[k] = v
-
-    return StrategyIntent(
-        template=pick(current.template, previous.template),
-        asset_class=pick(current.asset_class, previous.asset_class),
-        symbols=pick(current.symbols, previous.symbols),
-        timeframe=pick(current.timeframe, previous.timeframe),
-        start_date=pick(current.start_date, previous.start_date),
-        end_date=pick(current.end_date, previous.end_date),
-        starting_capital=pick(current.starting_capital, previous.starting_capital),
-        benchmark_symbol=pick(current.benchmark_symbol, previous.benchmark_symbol),
-        parameters=merged_params,
-    )
-
-
-
-
+# --- Helper Logic ---
 
 def _resolve_language(language: str | None) -> Literal["en", "es-419"]:
     if (language or "en").lower().startswith("es"):
         return "es-419"
     return "en"
 
+def parse_onboarding_goal(message: str) -> str | None:
+    if message == "__ONBOARDING_SKIP__":
+        return "surprise_me"
+    if message.startswith("__ONBOARDING_GOAL__:"):
+        goal = message.split(":", 1)[1]
+        if goal in SUPPORTED_GOALS:
+            return goal
+    return None
 
-def _heuristic_extract(message: str) -> dict[str, Any]:
-    upper = message.upper()
-    symbols = [symbol for name, symbol in COMMON_NAMES.items() if name in upper]
-    symbols.extend(
-        token
-        for token in re.findall(r"\b[A-Z]{2,5}\b", upper)
-        if token not in NON_SYMBOLS and token not in symbols
+def compile_backtest_payload(draft: StrategyDraft) -> dict[str, Any]:
+    """
+    Task 12: Payload Compiler.
+    Flattens a StrategyDraft into a dict ready for the backtest engine.
+    Applies registry defaults for missing fields.
+    """
+    template_id = draft.template.value
+    # Registry lookup for defaults
+    capability = STRATEGY_CAPABILITIES.get(template_id or "dca_accumulation")
+    
+    # Symbols normalization
+    symbols = draft.symbols.value or []
+    
+    # Benchmarks
+    asset_class = draft.asset_class.value or "equity"
+    default_bench = "BTC" if asset_class == "crypto" else "SPY"
+    
+    # Parameters merge
+    final_params = {}
+    if capability:
+        for p_id, p_info in capability.parameters.items():
+            val = draft.parameters.get(p_id)
+            if val and val.value is not None:
+                final_params[p_id] = val.value
+            else:
+                final_params[p_id] = p_info.default
+
+    return {
+        "template": template_id,
+        "asset_class": asset_class,
+        "symbols": symbols,
+        "timeframe": draft.timeframe.value or "1D",
+        "start_date": draft.start_date.value.isoformat() if hasattr(draft.start_date.value, "isoformat") else draft.start_date.value,
+        "end_date": draft.end_date.value.isoformat() if hasattr(draft.end_date.value, "isoformat") else draft.end_date.value,
+        "side": draft.side.value or "long",
+        "starting_capital": draft.starting_capital.value or 10000,
+        "allocation_method": draft.allocation_method.value or "equal_weight",
+        "benchmark_symbol": draft.benchmark_symbol.value or default_bench,
+        "parameters": final_params,
+    }
+
+def slot_from_extraction(slot: ExtractedSlot) -> SlotValue:
+    if slot.value is None or slot.confidence < 0.55:
+        return SlotValue(source="missing")
+    return SlotValue(
+        value=slot.value,
+        source="user_supplied",
+        confidence=slot.confidence,
+        evidence=slot.evidence,
     )
 
-    template = None
-    lower = message.lower()
-    for candidate, alias in TEMPLATE_ALIASES:
-        if alias in lower:
-            template = candidate
-            break
+def merge_slot(current: SlotValue, previous: SlotValue) -> SlotValue:
+    if current.source != "missing":
+        return current
+    return previous
 
-    asset_class: Literal["equity", "crypto"] = (
-        "crypto"
-        if any(symbol in {"BTC", "ETH", "SOL"} for symbol in symbols)
-        else "equity"
+def merge_draft(previous: StrategyDraft | None, extraction: StrategyIntentExtraction) -> StrategyDraft:
+    current = StrategyDraft(
+        template=slot_from_extraction(extraction.template),
+        symbols=slot_from_extraction(extraction.symbols),
+        asset_class=slot_from_extraction(extraction.asset_class),
+        timeframe=slot_from_extraction(extraction.timeframe),
+        start_date=slot_from_extraction(extraction.start_date),
+        end_date=slot_from_extraction(extraction.end_date),
+        starting_capital=slot_from_extraction(extraction.starting_capital),
+        parameters={k: slot_from_extraction(v) for k, v in extraction.parameters.items()},
     )
+
+    if previous is None:
+        return current
+
+    merged_params = dict(previous.parameters)
+    for key, value in current.parameters.items():
+        if value.source != "missing":
+            merged_params[key] = value
+
+    return StrategyDraft(
+        template=merge_slot(current.template, previous.template),
+        symbols=merge_slot(current.symbols, previous.symbols),
+        asset_class=merge_slot(current.asset_class, previous.asset_class),
+        timeframe=merge_slot(current.timeframe, previous.timeframe),
+        start_date=merge_slot(current.start_date, previous.start_date),
+        end_date=merge_slot(current.end_date, previous.end_date),
+        starting_capital=merge_slot(current.starting_capital, previous.starting_capital),
+        parameters=merged_params,
+    )
+
+def canonical_template(value: Any) -> str | None:
+    if not value:
+        return None
+    raw = str(value).lower()
+    if raw in STRATEGY_CAPABILITIES:
+        return raw
+    for capability in STRATEGY_CAPABILITIES.values():
+        if raw in [alias.lower() for alias in capability.aliases]:
+            return capability.template
+    return None
+
+def infer_asset_class(symbols: list[str]) -> Literal["equity", "crypto"]:
+    if not symbols:
+        return "equity"
+    crypto_symbols = {"BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "DOT"}
+    for s in symbols:
+        up = str(s).upper()
+        if up in crypto_symbols or "/" in up or up.endswith("USD"):
+            return "crypto"
+    return "equity"
+
+def normalize_symbols(raw_symbols: Any) -> list[str]:
+    if not raw_symbols:
+        return []
+    if isinstance(raw_symbols, str):
+        raw_symbols = [s.strip() for s in raw_symbols.split(",") if s.strip()]
+    
+    normalized = []
+    if isinstance(raw_symbols, list):
+        for s in raw_symbols:
+            up = str(s).upper().strip()
+            if up in COMMON_NAMES:
+                normalized.append(COMMON_NAMES[up])
+            elif up not in NON_SYMBOLS and len(up) <= 10:
+                normalized.append(up)
+    
+    unique = []
+    for r in normalized:
+        if r not in unique:
+            unique.append(r)
+    return unique[:5]
+
+def normalize_draft(draft: StrategyDraft) -> StrategyDraft:
+    template = canonical_template(draft.template.value)
+    if template:
+        draft.template = SlotValue(
+            value=template,
+            source=draft.template.source,
+            confidence=draft.template.confidence,
+            evidence=draft.template.evidence,
+        )
+
+    symbols = normalize_symbols(draft.symbols.value or [])
+    if symbols:
+        draft.symbols = SlotValue(
+            value=symbols,
+            source=draft.symbols.source,
+            confidence=draft.symbols.confidence,
+            evidence=draft.symbols.evidence,
+        )
+
+    if draft.asset_class.source == "missing" and symbols:
+        draft.asset_class = SlotValue(
+            value=infer_asset_class(symbols),
+            source="backend_default",
+            confidence=1.0,
+        )
+
+    return draft
+
+def plan_draft_action(draft: StrategyDraft, language: str) -> StrategyPlanDecision:
+    is_es = _resolve_language(language) == "es-419"
+    missing = []
+    if draft.template.source == "missing":
+        missing.append("template")
+    if draft.symbols.source == "missing":
+        missing.append("symbols")
+
+    if not missing:
+        # Check for missing required/clarify parameters
+        capability = STRATEGY_CAPABILITIES.get(str(draft.template.value))
+        if capability:
+            for key, spec in capability.parameters.items():
+                if spec.policy == "clarify_if_missing":
+                    slot = draft.parameters.get(key)
+                    if not slot or slot.source == "missing":
+                        missing.append(key)
+                        msg = (
+                            f"Necesito un dato más: {spec.description}" if is_es
+                            else f"I need one more thing: {spec.description}"
+                        )
+                        return StrategyPlanDecision(action="ask_clarification", missing_fields=[key], message=msg)
+
+        return StrategyPlanDecision(action="run_backtest")
+
+    if "template" in missing and "symbols" in missing:
+        msg = (
+            "Cuéntame, ¿qué estrategia quieres probar y con qué símbolos?"
+            if is_es
+            else "Tell me, what strategy do you want to test and with which symbols?"
+        )
+    elif "template" in missing:
+        msg = (
+            f"Tengo los símbolos {', '.join(draft.symbols.value or [])}. ¿Qué estrategia quieres aplicar?"
+            if is_es
+            else f"I have {', '.join(draft.symbols.value or [])}. What strategy should we apply?"
+        )
+    else:
+        # Symbols missing
+        capability = STRATEGY_CAPABILITIES.get(str(draft.template.value))
+        name = capability.display_name if capability else str(draft.template.value)
+        msg = (
+            f"Probaré {name}. ¿Con qué símbolos quieres correrla?"
+            if is_es
+            else f"I'll test {name}. Which symbols should we use?"
+        )
+
+    return StrategyPlanDecision(action="ask_clarification", missing_fields=missing, message=msg)
+
+def compile_backtest_payload(draft: StrategyDraft) -> dict[str, Any]:
+    template = str(draft.template.value)
+    symbols = draft.symbols.value or []
+    asset_class = draft.asset_class.value or "equity"
+    
+    end_date = draft.end_date.value or date.today().isoformat()
+    start_date = draft.start_date.value or (date.today() - timedelta(days=365)).isoformat()
+    
+    benchmark = "BTC" if asset_class == "crypto" else "SPY"
+    
+    params = {}
+    capability = STRATEGY_CAPABILITIES.get(template)
+    if capability:
+        for key, spec in capability.parameters.items():
+            slot = draft.parameters.get(key)
+            if slot and slot.source != "missing":
+                params[key] = slot.value
+            else:
+                params[key] = spec.default
+
     return {
         "template": template,
         "asset_class": asset_class,
-        "symbols": symbols[:5],
-        "parameters": {},
-    }
-
-
-def build_clarification_message(
-    missing_fields: list[str],
-    capability: StrategyCapability | None,
-    language: str | None,
-    intent: StrategyIntent | None = None,
-) -> str:
-    """Build a natural language question asking for missing information."""
-    is_es = _resolve_language(language) == "es-419"
-    symbols = intent.symbols.value if intent and intent.symbols.value else []
-    symbols_text = ", ".join(symbols) if symbols else ""
-
-    if "template" in missing_fields:
-        if symbols_text:
-            return (
-                f"Puedo probar una estrategia para {symbols_text}, pero ¿qué tipo de estrategia te gustaría usar? Por ejemplo, DCA o RSI."
-                if is_es
-                else f"I can test a strategy for {symbols_text}, but what kind of strategy would you like to use? For example, DCA or RSI."
-            )
-        return (
-            "¿Qué tipo de estrategia te gustaría probar? Por ejemplo, DCA o Cruce de Medias Móviles."
-            if is_es
-            else "What kind of strategy would you like to test? For example, DCA or Moving Average Crossover."
-        )
-
-    if "symbols" in missing_fields:
-        strategy_name = capability.display_name if capability else ""
-        if strategy_name:
-            return (
-                f"Me gusta la idea de usar {strategy_name}. ¿Sobre qué activos quieres probarla? Por ejemplo, AAPL o BTC."
-                if is_es
-                else f"I like the idea of using {strategy_name}. Which symbols do you want to test it on? For example, AAPL or BTC."
-            )
-        return (
-            "¿Sobre qué activos quieres probar la estrategia? Por ejemplo, AAPL o BTC."
-            if is_es
-            else "Which symbols do you want to test the strategy on? For example, AAPL or BTC."
-        )
-
-    # For parameters, use registry display names if possible
-    field = missing_fields[0]
-    param_spec = capability.parameters.get(field) if capability else None
-    display_name = param_spec.key if param_spec else field
-
-    if field == "dca_cadence":
-        prefix = ""
-        if symbols_text:
-            prefix = f"Puedo probar el DCA para {symbols_text}. " if is_es else f"I can test DCA on {symbols_text}. "
-        
-        return (
-            f"{prefix}¿Con qué frecuencia quieres que Argus compre: diariamente, semanalmente o mensualmente?"
-            if is_es
-            else f"{prefix}How often do you want Argus to buy: daily, weekly, or monthly?"
-        )
-
-    return (
-        f"Necesito un poco más de información sobre {display_name} para continuar."
-        if is_es
-        else f"I need a bit more information about {display_name} to continue."
-    )
-
-
-def plan_strategy_action(
-    intent: StrategyIntent, language: str | None
-) -> StrategyPlanDecision:
-    """Decide if a strategy is ready to run or needs clarification."""
-    template_val = intent.template.value
-    if not template_val or intent.template.source == "missing":
-        return StrategyPlanDecision(
-            action="ask_clarification",
-            missing_fields=["template"],
-            message=build_clarification_message(["template"], None, language, intent),
-        )
-
-    template_str = str(template_val)
-    if template_str not in STRATEGY_CAPABILITIES:
-        # Check aliases
-        found_cap = None
-        for cap in STRATEGY_CAPABILITIES.values():
-            if template_str.lower() in [a.lower() for a in cap.aliases]:
-                found_cap = cap
-                break
-        
-        if not found_cap:
-            return StrategyPlanDecision(
-                action="ask_clarification",
-                missing_fields=["template"],
-                message=build_clarification_message(["template"], None, language, intent),
-            )
-        template_str = found_cap.template
-
-    capability = STRATEGY_CAPABILITIES[template_str]
-
-    if not intent.symbols.value or intent.symbols.source == "missing":
-        return StrategyPlanDecision(
-            action="ask_clarification",
-            missing_fields=["symbols"],
-            message=build_clarification_message(["symbols"], capability, language, intent),
-        )
-
-    missing_params = []
-    for key, spec in capability.parameters.items():
-        slot = intent.parameters.get(key)
-        if spec.policy == "clarify_if_missing" and (slot is None or slot.source == "missing"):
-            missing_params.append(key)
-
-    if missing_params:
-        return StrategyPlanDecision(
-            action="ask_clarification",
-            missing_fields=missing_params,
-            message=build_clarification_message(missing_params, capability, language, intent),
-        )
-
-    return StrategyPlanDecision(action="run_backtest")
-
-
-def compile_backtest_payload(intent: StrategyIntent) -> dict[str, object]:
-    """Compile a StrategyIntent into a final backtest payload."""
-    template_val = intent.template.value
-    template_str = str(template_val)
-
-    # Resolve template from aliases if needed
-    if template_str not in STRATEGY_CAPABILITIES:
-        for cap in STRATEGY_CAPABILITIES.values():
-            if template_str.lower() in [a.lower() for a in cap.aliases]:
-                template_str = cap.template
-                break
-
-    capability = STRATEGY_CAPABILITIES[template_str]
-
-    parameters = {}
-    for key, spec in capability.parameters.items():
-        slot = intent.parameters.get(key)
-        if slot and slot.source != "missing" and slot.value is not None:
-            parameters[key] = slot.value
-        else:
-            parameters[key] = spec.default
-
-    # Infer asset class if missing
-    asset_class = intent.asset_class.value
-    if not asset_class and intent.symbols.value:
-        # Simple inference: if any symbol is BTC/ETH/SOL, it's crypto
-        crypto_hints = {"BTC", "ETH", "SOL", "DOGE", "SHIB"}
-        if any(s.upper() in crypto_hints for s in intent.symbols.value):
-            asset_class = "crypto"
-        else:
-            asset_class = "equity"
-    
-    if not asset_class:
-        asset_class = "equity"
-
-    benchmark_symbol = intent.benchmark_symbol.value
-    if not benchmark_symbol:
-        benchmark_symbol = "BTC" if asset_class == "crypto" else "SPY"
-
-    return {
-        "template": template_str,
-        "asset_class": asset_class,
-        "symbols": intent.symbols.value or [],
-        "timeframe": intent.timeframe.value or "1D",
-        "start_date": intent.start_date.value,
-        "end_date": intent.end_date.value,
+        "symbols": symbols,
+        "timeframe": draft.timeframe.value or "1D",
+        "start_date": start_date,
+        "end_date": end_date,
         "side": "long",
-        "starting_capital": intent.starting_capital.value or 10000,
+        "starting_capital": draft.starting_capital.value or 10000,
         "allocation_method": "equal_weight",
-        "benchmark_symbol": benchmark_symbol,
-        "parameters": parameters,
+        "benchmark_symbol": benchmark,
+        "parameters": params,
     }
 
+def assistant_copy_for_result(symbols: list[str], language: str, draft: StrategyDraft | None = None) -> str:
+    joined = ", ".join(symbols)
+    is_es = _resolve_language(language) == "es-419"
+    
+    strategy_display = ""
+    if draft and draft.template.value:
+        cap = STRATEGY_CAPABILITIES.get(str(draft.template.value))
+        if cap:
+            strategy_display = f" {cap.display_name}"
 
-def _default_onboarding_prompt(language: str | None) -> str:
-    if _resolve_language(language) == "es-419":
+    if is_es:
         return (
-            "¿Cuál es tu objetivo principal ahora? No te preocupes, "
-            "podrás cambiarlo después en Settings."
+            f"Probé tu idea de{strategy_display} con {joined}. Usé una simulación long-only, de peso igual, "
+            "sin comisiones ni deslizamiento para mantener la comparación clara."
         )
     return (
-        "What is your current primary goal? Don't worry, "
-        "you can change it later in Settings."
+        f"I tested your{strategy_display} idea with {joined}. I used a long-only, equal-weight simulation "
+        "with no fees or slippage so the comparison stays easy to understand."
     )
 
+def _build_model(model_name: str) -> ChatOpenRouter:
+    return ChatOpenRouter(model=model_name, temperature=0)
 
-def _default_follow_up_for_goal(goal: str, language: str | None) -> str:
-    normalized = _resolve_language(language)
-    if normalized == "es-419":
+def build_capability_prompt() -> str:
+    lines = ["Argus Alpha can run these supported templates:"]
+    for cap in STRATEGY_CAPABILITIES.values():
+        lines.append(
+            f"- {cap.template}: aliases={cap.aliases}; "
+            f"assets={cap.supported_asset_classes}; "
+            f"parameters={list(cap.parameters)}"
+        )
+    return "\n".join(lines)
+
+def goal_follow_up_message(goal: str, language: str | None) -> str:
+    is_es = _resolve_language(language) == "es-419"
+    if is_es:
         mapping = {
             "learn_basics": "Perfecto. Te ayudaré con ideas simples para empezar. ¿Qué activo te interesa?",
             "test_stock_idea": "Perfecto. Cuéntame tu idea de acción y la probamos.",
@@ -509,351 +442,98 @@ def _default_follow_up_for_goal(goal: str, language: str | None) -> str:
         }
     return mapping.get(goal, mapping["surprise_me"])
 
+# --- Core API ---
 
-def assistant_copy_for_result(symbols: list[str], language: str, intent: StrategyIntent | None = None) -> str:
-    joined = ", ".join(symbols)
-    normalized_language = _resolve_language(language)
-    is_es = normalized_language == "es-419"
-    
-    strategy_display = ""
-    if intent and intent.template.value:
-        cap = STRATEGY_CAPABILITIES.get(str(intent.template.value))
-        if cap:
-            strategy_display = f" {cap.display_name}"
-
-    if is_es:
-        return (
-            f"Probé tu idea de{strategy_display} con {joined}. Usé una simulación long-only, de peso igual, "
-            "sin comisiones ni deslizamiento para mantener la comparación clara."
-        )
-    return (
-        f"I tested your{strategy_display} idea with {joined}. I used a long-only, equal-weight simulation "
-        "with no fees or slippage so the comparison stays easy to understand."
-    )
-
-
-def _build_model(model_name: str) -> ChatOpenRouter:
-    return ChatOpenRouter(
-        model=model_name,
-        temperature=0,
-    )
-
-
-def build_capability_prompt() -> str:
-    lines = ["Argus Alpha can run these supported templates:"]
-    for cap in STRATEGY_CAPABILITIES.values():
-        lines.append(
-            f"- {cap.template}: aliases={cap.aliases}; "
-            f"assets={cap.supported_asset_classes}; "
-            f"parameters={list(cap.parameters)}"
-        )
-    return "\n".join(lines)
-
-
-def _llm_extract_decision(
-    *,
-    message: str,
-    language: str | None,
-    primary_goal: str | None,
-    model_name: str,
-    history: list[dict[str, str]] | None = None,
-) -> ChatOrchestrationDecision:
-    prompt_language = _resolve_language(language)
+def _extract_strategy_intent(message: str, model_name: str) -> StrategyIntentExtraction:
     model = _build_model(model_name)
-    structured = model.with_structured_output(ChatOrchestrationDecision)
-
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are Argus Alpha orchestration. "
-                "Use the provided conversation history to resolve pronouns (e.g., 'it', 'them') "
-                "or symbols mentioned in previous turns. "
-                "Return only supported intents and templates. "
-                f"{build_capability_prompt()}\n"
-                "If a user asks for a supported template and supported symbol, never say it is unsupported. "
-                "If required information is missing, ask a concise clarification question. "
-                "Never propose unsupported capabilities. "
-                "In 'assistant_message', ALWAYS use standard Markdown vertical lists (e.g., '- **Item**: description') for strategy lists. "
-                "Never use horizontal dot-separated lists. Use vertical lists with newlines between paragraphs for clarity. "
-                f"User language: {prompt_language}. Primary goal: {primary_goal or 'unknown'}."
-            ),
-        }
-    ]
-
-    if history:
-        # Pass up to last 6 messages for context
-        messages.extend(history[-6:])
-
-    messages.append({"role": "user", "content": message})
-
-    decision = structured.invoke(messages)
-    if decision.strategy_intent:
-        # Re-build intent with history awareness
-        # Note: decision.strategy_intent might be partially filled by LLM
-        # We use it as an extraction source
-        extraction = StrategyExtraction(
-            template=decision.strategy_intent.template.value,
-            asset_class=decision.strategy_intent.asset_class.value,
-            symbols=decision.strategy_intent.symbols.value or [],
-            timeframe=decision.strategy_intent.timeframe.value,
-            start_date=decision.strategy_intent.start_date.value,
-            end_date=decision.strategy_intent.end_date.value,
-            benchmark_symbol=decision.strategy_intent.benchmark_symbol.value,
-            starting_capital=decision.strategy_intent.starting_capital.value,
-            parameters={k: v.value for k, v in decision.strategy_intent.parameters.items()}
-        )
-        decision.strategy_intent = build_strategy_intent(
-            extraction, (history or []) + [{"role": "user", "content": message}]
-        )
-    return decision
-
-
-def _fallback_run_decision(
-    message: str,
-    language: str | None,
-    primary_goal: str | None = None,
-    history: list[dict[str, str]] | None = None,
-) -> ChatOrchestrationDecision:
-    extracted = StrategyExtraction.model_validate(_heuristic_extract(message))
-    intent = build_strategy_intent(
-        extracted, (history or []) + [{"role": "user", "content": message}]
+    structured = model.with_structured_output(StrategyIntentExtraction)
+    
+    system_prompt = (
+        "You are an expert at extracting financial strategy parameters from chat messages. "
+        "Confidence is 1.0 if explicitly stated, 0.5 if implied, 0.0 if missing. "
+        "Evidence must be the exact substring from the user message. "
+        f"{build_capability_prompt()}"
     )
-
-    # Merge with history
-    if history:
-        last_intent_dict = next(
-            (m.get("strategy_intent") for m in reversed(history) if m.get("strategy_intent")),
-            None
-        )
-        if last_intent_dict:
-            try:
-                last_intent = StrategyIntent(**last_intent_dict)
-                intent = merge_intent(intent, last_intent)
-            except Exception:
-                pass
-
-    # Assess readiness using the intent and history
-    is_empty = not intent.template.value and not intent.symbols.value
-    if is_empty:
-        goal = primary_goal or "surprise_me"
-        return ChatOrchestrationDecision(
-            intent="education",
-            assistant_message=goal_follow_up_message(goal, language),
-            strategy_intent=intent,
-            title_suggestion=None,
-        )
-
-    plan = plan_strategy_action(intent, language)
-
-    if plan.action == "run_backtest":
-        return ChatOrchestrationDecision(
-            intent="run_backtest",
-            assistant_message=assistant_copy_for_result(
-                intent.symbols.value or [], language or "en"
-            ),
-            strategy_intent=intent,
-            title_suggestion=None,
-        )
-
-    if plan.action == "ask_clarification":
-        return ChatOrchestrationDecision(
-            intent="education",
-            assistant_message=plan.message
-            or (
-                "Cuéntame más sobre tu estrategia."
-                if _resolve_language(language) == "es-419"
-                else "Tell me more about your strategy."
-            ),
-            strategy_intent=intent,
-            title_suggestion=None,
-        )
-
-    # Fallback for unsupported or general chat
-    goal = primary_goal or "surprise_me"
-    assistant_message = goal_follow_up_message(goal, language)
-    return ChatOrchestrationDecision(
-        intent="unsupported_request",
-        assistant_message=assistant_message,
-        strategy_intent=intent,
-        title_suggestion=None,
-    )
-
-
-def resolve_supported_symbols(raw_symbols: list[str]) -> list[str]:
-    """Canonicalize symbols (e.g. 'Apple' -> 'AAPL') and filter to supported ones."""
-    resolved = []
-    for raw in raw_symbols:
-        try:
-            asset = resolve_asset(raw)
-            resolved.append(asset.canonical_symbol)
-        except Exception:
-            continue
-    # De-duplicate and limit to Alpha max 5
-    unique = []
-    for r in resolved:
-        if r not in unique:
-            unique.append(r)
-    return unique[:5]
-
-
-def repair_llm_decision(
-    *,
-    decision: ChatOrchestrationDecision,
-    extracted_intent: StrategyIntent,
-    language: str,
-) -> ChatOrchestrationDecision:
-    """If LLM says supported DCA/AAPL is unsupported, backend repairs it based on registry."""
-    plan = plan_strategy_action(extracted_intent, language)
-
-    if decision.intent == "unsupported_request" and plan.action != "unsupported":
-        return ChatOrchestrationDecision(
-            intent="education" if plan.action == "ask_clarification" else "run_backtest",
-            assistant_message=plan.message
-            or assistant_copy_for_result(extracted_intent.symbols.value or [], language, extracted_intent),
-            strategy_intent=extracted_intent,
-            title_suggestion=None,
-        )
-
-    return decision
-
+    
+    try:
+        return structured.invoke([
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ])
+    except Exception:
+        return StrategyIntentExtraction()
 
 def orchestrate_chat_turn(
     *,
     message: str,
-    language: str | None,
-    onboarding_required: bool,
-    primary_goal: str | None,
-    history: list[dict[str, str]] | None = None,
+    history: list[dict[str, Any]] | None = None,
+    language: str | None = None,
+    onboarding_required: bool = False,
+    primary_goal: str | None = None,
+    model_name: str = "google/gemini-2.0-flash-001",
 ) -> ChatOrchestrationDecision:
+    lang = language or "en"
+    
     if onboarding_required:
         return ChatOrchestrationDecision(
             intent="onboarding_prompt",
-            assistant_message=_default_onboarding_prompt(language),
+            assistant_message=_default_onboarding_prompt(lang),
         )
 
-    primary_model = os.getenv("AGENT_MODEL")
-    fallback_model = os.getenv("AGENT_FALLBACK_MODEL")
-    has_provider_config = bool(primary_model and os.getenv("OPENROUTER_API_KEY"))
-    if not has_provider_config:
-        return _fallback_run_decision(message, language, primary_goal)
-
-    try:
-        decision = _llm_extract_decision(
-            message=message,
-            language=language,
-            primary_goal=primary_goal,
-            model_name=primary_model,
-            history=history,
+    # 1. Extraction
+    extraction = _extract_strategy_intent(message, model_name)
+    
+    # 2. Rehydrate previous draft
+    previous_draft = None
+    if history:
+        for m in reversed(history):
+            if m.get("role") == "assistant" and m.get("metadata"):
+                meta = m["metadata"]
+                if "strategy_draft" in meta:
+                    try:
+                        previous_draft = StrategyDraft.model_validate(meta["strategy_draft"])
+                        break
+                    except Exception:
+                        continue
+    
+    # 3. Merge & Normalize
+    draft = merge_draft(previous_draft, extraction)
+    draft = normalize_draft(draft)
+    
+    # 4. Plan Action
+    plan = plan_draft_action(draft, lang)
+    
+    if plan.action == "run_backtest":
+        return ChatOrchestrationDecision(
+            intent="run_backtest",
+            assistant_message=assistant_copy_for_result(draft.symbols.value or [], lang, draft),
+            strategy_draft=draft,
+        )
+    
+    if plan.action == "ask_clarification":
+        return ChatOrchestrationDecision(
+            intent="clarify",
+            assistant_message=plan.message or "Tell me more.",
+            strategy_draft=draft,
         )
 
-        # 1. Merge with history if LLM returned an intent
-        if decision.strategy_intent and history:
-            last_intent_dict = next(
-                (m.get("strategy_intent") for m in reversed(history) if m.get("strategy_intent")),
-                None
-            )
-            if last_intent_dict:
-                try:
-                    last_intent = StrategyIntent(**last_intent_dict)
-                    decision.strategy_intent = merge_intent(
-                        decision.strategy_intent, last_intent
-                    )
-                except Exception:
-                    pass
+    # Fallback/Unsupported
+    return ChatOrchestrationDecision(
+        intent="unsupported_request",
+        assistant_message=goal_follow_up_message(primary_goal or "surprise_me", lang),
+        strategy_draft=draft,
+    )
 
-        # 1.5. Repair LLM decision if it hallucinated "unsupported" for valid inputs
-        if decision.strategy_intent:
-            decision = repair_llm_decision(
-                decision=decision,
-                extracted_intent=decision.strategy_intent,
-                language=language or "en",
-            )
-
-        # 2. Policy Enforcement: override LLM if readiness gate fails
-        if decision.strategy_intent:
-            plan = plan_strategy_action(decision.strategy_intent, language)
-            if plan.action == "ask_clarification":
-                decision.intent = "education"
-                decision.assistant_message = (
-                    plan.message or decision.assistant_message
-                )
-            elif plan.action == "run_backtest" and decision.intent != "run_backtest":
-                decision.intent = "run_backtest"
-                decision.assistant_message = assistant_copy_for_result(
-                    decision.strategy_intent.symbols.value or [], language or "en", decision.strategy_intent
-                )
-
-        # 3. Validation
-        if (
-            decision.strategy_intent
-            and decision.strategy_intent.template.value
-            and str(decision.strategy_intent.template.value) not in STRATEGY_CAPABILITIES
-        ):
-            return _fallback_run_decision(message, language, primary_goal, history)
-
-        if (
-            decision.strategy_intent
-            and not decision.strategy_intent.symbols.value
-            and decision.intent == "run_backtest"
-        ):
-            return _fallback_run_decision(message, language, primary_goal, history)
-
-        # Standardize intent: clarify -> education
-        if decision.intent == "clarify":
-            decision.intent = "education"
-
-        return decision
-
-    except Exception:
-        if fallback_model:
-            try:
-                decision = _llm_extract_decision(
-                    message=message,
-                    language=language,
-                    primary_goal=primary_goal,
-                    model_name=fallback_model,
-                    history=history,
-                )
-                
-                # Minimum processing for fallback: history merge
-                if decision.strategy_intent and history:
-                    last_intent_dict = next(
-                        (m.get("strategy_intent") for m in reversed(history) if m.get("strategy_intent")),
-                        None
-                    )
-                    if last_intent_dict:
-                        try:
-                            last_intent = StrategyIntent(**last_intent_dict)
-                            decision.strategy_intent = merge_intent(decision.strategy_intent, last_intent)
-                        except Exception:
-                            pass
-                
-                # Policy check for fallback too
-                if decision.strategy_intent:
-                    plan = plan_strategy_action(decision.strategy_intent, language)
-                    if plan.action == "ask_clarification":
-                        decision.intent = "education"
-                        decision.assistant_message = plan.message or decision.assistant_message
-                    elif plan.action == "run_backtest" and decision.intent != "run_backtest":
-                        decision.intent = "run_backtest"
-                        decision.assistant_message = assistant_copy_for_result(
-                            decision.strategy_intent.symbols.value or [], language or "en", decision.strategy_intent
-                        )
-                # Standardize intent: clarify -> education
-                if decision.intent == "clarify":
-                    decision.intent = "education"
-                
-                return decision
-            except Exception:
-                pass
-        
-        return _fallback_run_decision(message, language, primary_goal, history)
-
-
-def extract_strategy_request(message: str) -> dict[str, Any]:
-    return _heuristic_extract(message)
-
+def _default_onboarding_prompt(language: str) -> str:
+    if _resolve_language(language) == "es-419":
+        return (
+            "¿Cuál es tu objetivo principal ahora? No te preocupes, "
+            "podrás cambiarlo después en Settings."
+        )
+    return (
+        "What is your current primary goal? Don't worry, "
+        "you can change it later in Settings."
+    )
 
 def suggest_entity_name(
     *,
@@ -861,8 +541,8 @@ def suggest_entity_name(
     context: str,
     language: str | None,
 ) -> str | None:
-    primary_model = os.getenv("AGENT_MODEL")
-    if not primary_model or not os.getenv("OPENROUTER_API_KEY"):
+    primary_model = os.getenv("AGENT_MODEL") or "google/gemini-2.0-flash-001"
+    if not os.getenv("OPENROUTER_API_KEY"):
         return None
 
     try:
@@ -883,22 +563,6 @@ def suggest_entity_name(
             ]
         )
         candidate = response.name.strip()
-        if not candidate:
-            return None
-        return candidate[:80]
+        return candidate if candidate else None
     except Exception:
         return None
-
-
-def parse_onboarding_goal(message: str) -> str | None:
-    if message == "__ONBOARDING_SKIP__":
-        return "surprise_me"
-    if message.startswith("__ONBOARDING_GOAL__:"):
-        goal = message.removeprefix("__ONBOARDING_GOAL__:").strip()
-        if goal in SUPPORTED_GOALS:
-            return goal
-    return None
-
-
-def goal_follow_up_message(goal: str, language: str | None) -> str:
-    return _default_follow_up_for_goal(goal, language)

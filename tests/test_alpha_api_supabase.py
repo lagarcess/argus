@@ -110,7 +110,7 @@ def _fake_fetch_price_series(
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.domain import engine as domain_engine
-    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyIntent, SlotValue
+    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyDraft, SlotValue
 
     monkeypatch.setattr(
         api_main,
@@ -122,7 +122,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                     "What is your current primary goal? Don't worry, "
                     "you can change it later in Settings."
                 ),
-                strategy_intent=None,
+                strategy_draft=None,
                 title_suggestion=None,
             )
             if kwargs.get("onboarding_required")
@@ -133,9 +133,8 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                     if str(kwargs.get("language")).lower().startswith("es")
                     else "I tested that idea with TSLA."
                 ),
-                strategy_intent=StrategyIntent(
+                strategy_draft=StrategyDraft(
                     template=SlotValue(value="rsi_mean_reversion", source="user_supplied"),
-                    asset_class=SlotValue(value="equity", source="user_supplied"),
                     symbols=SlotValue(value=["TSLA"], source="user_supplied"),
                 ),
                 title_suggestion="TSLA idea",

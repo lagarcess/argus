@@ -60,12 +60,13 @@ from argus.domain.engine import (
 )
 from argus.domain.orchestrator import (
     assistant_copy_for_result,
+    compile_backtest_payload,
     get_starter_prompts,
     goal_follow_up_message,
     orchestrate_chat_turn,
     parse_onboarding_goal,
     SlotValue,
-    StrategyIntent,
+    StrategyDraft,
     suggest_entity_name,
 )
 from argus.domain.store import AlphaStore, utcnow
@@ -893,24 +894,7 @@ def create_run_from_payload(
             title="Validation Error",
             detail="Symbol is required.",
         )
-    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(
-        symbols, request
-    )
-    payload["asset_class"] = payload.get("asset_class") or inferred_asset_class
-    if payload["asset_class"] != inferred_asset_class:
-        _raise_backtest_problem(
-            request,
-            "asset_class_conflict",
-            context={
-                "requested_asset_class": payload["asset_class"],
-                "inferred_asset_class": inferred_asset_class,
-                "symbols": [entry.symbol for entry in classified_symbols],
-            },
-        )
-    payload["benchmark_symbol"] = payload.get("benchmark_symbol") or default_benchmark(
-        payload["asset_class"]
-    )
-
+    # Execution Logic
     try:
         config = normalize_backtest_config(payload)
         validate_backtest_config(config)
@@ -949,30 +933,6 @@ def create_run_from_payload(
     return run
 
 
-def build_chat_backtest_config(
-    *,
-    extracted: dict[str, Any],
-    asset_class: str,
-) -> dict[str, Any]:
-    """
-    Task 2: Build canonical backtest configuration from extracted AI parameters.
-    Ensures chat-created runs use explicit backend defaults instead of hardcoded chat values.
-    """
-    default_bench = "BTC" if asset_class == "crypto" else "SPY"
-
-    return {
-        "template": extracted.get("template"),
-        "asset_class": asset_class,
-        "symbols": extracted.get("symbols"),
-        "timeframe": extracted.get("timeframe"),
-        "start_date": extracted.get("start_date"),
-        "end_date": extracted.get("end_date"),
-        "side": extracted.get("side", "long"),
-        "starting_capital": extracted.get("starting_capital", 10000),
-        "allocation_method": extracted.get("allocation_method", "equal_weight"),
-        "benchmark_symbol": extracted.get("benchmark_symbol", default_bench),
-        "parameters": extracted.get("parameters", {}),
-    }
 
 
 @app.post("/api/v1/backtests/run", response_model=BacktestRunResponse)
@@ -2069,18 +2029,17 @@ def chat_stream(
             yield sse("done", {"message_id": assistant_message.id})
             return
 
-        # Task 3: Fetch history for context-aware extraction
+        # 1. Fetch history for rehydration
         history_msgs = []
         if supabase_gateway is not None:
             raw_history = supabase_gateway.list_messages(
                 user_id=user.id, conversation_id=conversation.id, limit=None
             )
-            # Map roles to orchestrator expectations, only user/assistant
             history_msgs = [
                 {
                     "role": m.role,
                     "content": m.content,
-                    "strategy_intent": m.metadata.get("strategy_intent")
+                    "strategy_draft": m.metadata.get("strategy_draft")
                     if m.metadata
                     else None,
                 }
@@ -2093,7 +2052,7 @@ def chat_stream(
                 {
                     "role": m.role,
                     "content": m.content,
-                    "strategy_intent": m.metadata.get("strategy_intent")
+                    "strategy_draft": m.metadata.get("strategy_draft")
                     if m.metadata
                     else None,
                 }
@@ -2101,43 +2060,38 @@ def chat_stream(
                 if m.role in ("user", "assistant")
             ]
 
+        # 2. Orchestrate
+        lang = (
+            payload.language
+            or conversation.language
+            or current_user_profile.language
+            or "en"
+        )
         try:
             decision = orchestrate_chat_turn(
                 message=payload.message,
-                language=(
-                    payload.language
-                    or conversation.language
-                    or current_user_profile.language
-                ),
+                language=lang,
                 onboarding_required=False,
                 primary_goal=current_user_profile.onboarding.primary_goal,
                 history=history_msgs,
             )
             yield sse("status", {"status": f"intent_{decision.intent}"})
         except Exception as exc:
-            logger.exception(
-                "Chat orchestration failed",
-                error=str(exc),
-                conversation_id=conversation.id,
-            )
-            yield sse(
-                "error",
-                {
-                    "code": "internal_error",
-                    "detail": "An unexpected error occurred during orchestration.",
-                },
-            )
+            logger.exception("Chat orchestration failed", conversation_id=conversation.id)
+            yield sse("error", {"code": "internal_error", "detail": "Orchestration failed."})
             yield sse("done", {"error": True})
             return
-        if decision.intent != "run_backtest" or decision.strategy_intent is None:
+
+        # 3. Handle non-backtest intents
+        if decision.intent != "run_backtest":
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
                 role="assistant",
                 content=decision.assistant_message,
                 metadata={
-                    "strategy_intent": decision.strategy_intent.model_dump()
-                    if decision.strategy_intent
+                    "strategy_draft": decision.strategy_draft.model_dump()
+                    if decision.strategy_draft
                     else None
                 },
             )
@@ -2145,34 +2099,18 @@ def chat_stream(
             yield sse("done", {"message_id": assistant_message.id})
             return
 
-        # Strategy intent is ready to run
-        intent = decision.strategy_intent
-
-        def _val(slot: SlotValue | None, default: Any = None) -> Any:
-            return slot.value if slot is not None else default
-
-        extracted = {
-            "template": _val(intent.template),
-            "asset_class": _val(intent.asset_class),
-            "symbols": _val(intent.symbols, []),
-            "timeframe": _val(intent.timeframe),
-            "start_date": _val(intent.start_date),
-            "end_date": _val(intent.end_date),
-            "benchmark_symbol": _val(intent.benchmark_symbol),
-            "starting_capital": _val(intent.starting_capital),
-            "parameters": {k: v.value for k, v in intent.parameters.items()},
-        }
-        lang = payload.language or conversation.language or current_user_profile.language
+        # 4. Handle Backtest intent
+        draft = decision.strategy_draft
         yield sse("status", {"status": "extracting_strategy"})
-        is_es = (lang or "en").lower().startswith("es")
-        yield sse("token", {"text": "Puedo probar eso como una estrategia Alpha soportada. " if is_es else "I can test that as a supported Alpha strategy. "})
+        
+        # Emit the AI's assistant message (care/clarity)
+        yield sse("token", {"text": decision.assistant_message})
+        
         yield sse("status", {"status": "running_backtest"})
+        
         try:
-            # Task 2: Use canonical config builder instead of hardcoded dict
-            config = build_chat_backtest_config(
-                extracted=extracted,
-                asset_class=extracted["asset_class"],
-            )
+            # Task 12: Payload Compiler
+            config = compile_backtest_payload(draft)
             config["conversation_id"] = conversation.id
 
             run = create_run_from_payload(
@@ -2182,7 +2120,7 @@ def chat_stream(
                 conversation_id=conversation.id,
                 persist_in_memory=supabase_gateway is None
                 or conversation.id in store.conversations,
-                language=payload.language or conversation.language or current_user_profile.language,
+                language=lang,
             )
             if supabase_gateway is not None:
                 try:
@@ -2190,67 +2128,53 @@ def chat_stream(
                 except Exception as exc:
                     if not _dev_memory_fallback_enabled():
                         raise
-                    logger.warning(
-                        "Supabase backtest run write failed; using dev memory fallback",
-                        error=str(exc),
-                        run_id=run.id,
-                    )
+                    logger.warning("Supabase backtest run write failed; using dev memory fallback", run_id=run.id)
         except HTTPException as exc:
-            detail = (
-                exc.detail
-                if isinstance(exc.detail, dict)
-                else {"detail": str(exc.detail)}
-            )
+            detail = exc.detail if isinstance(exc.detail, dict) else {"detail": str(exc.detail)}
             yield sse("error", detail)
             yield sse("done", {"error": True})
             return
-        except Exception:
+        except Exception as exc:
+            logger.exception("Backtest execution failed")
             err = {
                 "type": "https://api.argus.app/problems/internal-error",
                 "title": "Internal Error",
                 "status": 500,
-                "detail": "Unexpected chat stream failure.",
+                "detail": f"Unexpected chat stream failure: {str(exc)}",
                 "code": "internal_error",
                 "request_id": request.state.request_id,
             }
             yield sse("error", err)
             yield sse("done", {"error": True})
             return
+
+        # Post-run: Update onboarding and conversation title
         _persist_onboarding_update(
             current_user_profile,
             {
                 "stage": "completed",
                 "completed": True,
                 "language_confirmed": True,
-                "primary_goal": current_user_profile.onboarding.primary_goal
-                or "surprise_me",
+                "primary_goal": current_user_profile.onboarding.primary_goal or "surprise_me",
             },
         )
-        assistant_text = decision.assistant_message or assistant_copy_for_result(
-            run.symbols,
-            payload.language or conversation.language or current_user_profile.language,
-        )
+
         assistant_message = _create_message(
             user_id=user.id,
             conversation_id=conversation.id,
             role="assistant",
-            content=assistant_text,
-            metadata={"strategy_intent": intent.model_dump()},
+            content=decision.assistant_message,
+            metadata={"strategy_draft": draft.model_dump()},
         )
+        
         template_name = str(run.config_snapshot.get("template", "strategy"))
         suggested = suggest_entity_name(
             entity_type="conversation",
-            context=(
-                f"{payload.message}\nTemplate: {template_name}\nSymbols: "
-                f"{', '.join(run.symbols)}"
-            ),
-            language=payload.language
-            or conversation.language
-            or current_user_profile.language,
+            context=f"{payload.message}\nTemplate: {template_name}\nSymbols: {', '.join(run.symbols)}",
+            language=lang,
         )
-        new_title = (
-            suggested or f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
-        )
+        new_title = suggested or f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
+        
         if conversation.title_source == "system_default":
             patch = {
                 "title": new_title,
@@ -2258,27 +2182,15 @@ def chat_stream(
                 "last_message_preview": payload.message[:120],
                 "updated_at": utcnow(),
             }
-            if (
-                supabase_gateway is not None
-                and conversation.id not in store.conversations
-            ):
+            if supabase_gateway is not None and conversation.id not in store.conversations:
                 try:
-                    supabase_gateway.patch_conversation(
-                        user_id=user.id, conversation_id=conversation.id, patch=patch
-                    )
-                except Exception as exc:
-                    if not _dev_memory_fallback_enabled():
-                        raise
-                    logger.warning(
-                        "Supabase conversation title patch failed; using dev memory fallback",
-                        error=str(exc),
-                        conversation_id=conversation.id,
-                    )
+                    supabase_gateway.patch_conversation(user_id=user.id, conversation_id=conversation.id, patch=patch)
+                except Exception:
+                    pass
             if conversation.id in store.conversations:
-                updated = conversation.model_copy(update=patch)
-                store.conversations[conversation.id] = updated
+                store.conversations[conversation.id] = conversation.model_copy(update=patch)
             yield sse("title", {"conversation_id": conversation.id, "title": new_title})
-        yield sse("token", {"text": assistant_text})
+
         yield sse("result", {"run": run.model_dump(mode="json")})
         yield sse("done", {"message_id": assistant_message.id})
 

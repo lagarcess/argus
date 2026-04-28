@@ -88,7 +88,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.domain.orchestrator import (
         ChatOrchestrationDecision,
         SlotValue,
-        StrategyIntent,
+        StrategyDraft,
     )
 
     monkeypatch.setattr(api_main, "supabase_gateway", None)
@@ -102,7 +102,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                     "What is your current primary goal? Don't worry, "
                     "you can change it later in Settings."
                 ),
-                strategy_intent=None,
+                strategy_draft=None,
                 title_suggestion=None,
             )
             if onboarding_required
@@ -113,7 +113,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                     if str(language).lower().startswith("es")
                     else "I tested that idea with TSLA."
                 ),
-                strategy_intent=StrategyIntent(
+                strategy_draft=StrategyDraft(
                     template=SlotValue(source="user_supplied", value="rsi_mean_reversion"),
                     asset_class=SlotValue(source="user_supplied", value="equity"),
                     symbols=SlotValue(source="user_supplied", value=["TSLA"]),
@@ -711,7 +711,7 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
     from argus.domain.orchestrator import (
         ChatOrchestrationDecision,
         SlotValue,
-        StrategyIntent,
+        StrategyDraft,
     )
 
     client = _client()
@@ -725,7 +725,7 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
         lambda **kwargs: ChatOrchestrationDecision(
             intent="clarify",
             assistant_message="Which symbols do you want to test?",
-            strategy_intent=StrategyIntent(
+            strategy_draft=StrategyDraft(
                 template=SlotValue(source="user_supplied", value="rsi_mean_reversion"),
                 asset_class=SlotValue(source="user_supplied", value="equity"),
                 symbols=SlotValue(source="user_supplied", value=[]),  # Missing!
@@ -753,7 +753,7 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
     from argus.domain.orchestrator import (
         ChatOrchestrationDecision,
         SlotValue,
-        StrategyIntent,
+        StrategyDraft,
     )
 
     client = _client()
@@ -767,7 +767,7 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
         lambda **kwargs: ChatOrchestrationDecision(
             intent="run_backtest",
             assistant_message="I will test that with 1h timeframe.",
-            strategy_intent=StrategyIntent(
+            strategy_draft=StrategyDraft(
                 template=SlotValue(source="user_supplied", value="rsi_mean_reversion"),
                 asset_class=SlotValue(source="user_supplied", value="crypto"),
                 symbols=SlotValue(source="user_supplied", value=["BTC"]),
@@ -794,7 +794,7 @@ def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
     from argus.domain.orchestrator import (
         ChatOrchestrationDecision,
         SlotValue,
-        StrategyIntent,
+        StrategyDraft,
     )
 
     client = _client()
@@ -825,10 +825,9 @@ def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
         return ChatOrchestrationDecision(
             intent="run_backtest",
             assistant_message="ok",
-            strategy_intent=StrategyIntent(
-                template=SlotValue(source="user_supplied", value="rsi_mean_reversion"),
-                symbols=SlotValue(source="user_supplied", value=["AAPL"]),
-                asset_class=SlotValue(source="user_supplied", value="equity"),
+            strategy_draft=StrategyDraft(
+                template=SlotValue(value="rsi_mean_reversion", source="user_supplied"),
+                symbols=SlotValue(value=["AAPL"], source="user_supplied"),
             ),
         )
 
