@@ -133,6 +133,12 @@ class ChatOrchestrationDecision(BaseModel):
     title_suggestion: str | None = None
 
 
+class StrategyPlanDecision(BaseModel):
+    action: Literal["ask_clarification", "run_backtest", "unsupported"]
+    missing_fields: list[str] = Field(default_factory=list)
+    message: str | None = None
+
+
 class NameSuggestion(BaseModel):
     name: str
 
@@ -258,11 +264,7 @@ def merge_intent(
     )
 
 
-@dataclass(frozen=True)
-class StrategyReadiness:
-    ready_to_run: bool
-    missing_fields: list[str] = field(default_factory=list)
-    clarification_prompt: str | None = None
+
 
 
 def _resolve_language(language: str | None) -> Literal["en", "es-419"]:
@@ -300,103 +302,99 @@ def _heuristic_extract(message: str) -> dict[str, Any]:
     }
 
 
-def decide_run_readiness(
-    intent: StrategyIntent, history: list[dict[str, str]], language: str | None = None
-) -> StrategyReadiness:
-    """Determine if we can run or if we need to ask more questions."""
-    missing = []
-
-    # Policy: Always require symbols and template from user or history
-    if intent.symbols.source == "missing":
-        missing.append("symbols")
-    if intent.template.source == "missing":
-        missing.append("template")
-
-    # Policy: For DCA, require explicit cadence from user or history
-    if intent.template.value == "dca_accumulation":
-        cadence = intent.parameters.get("dca_cadence")
-        if cadence is None or cadence.source == "missing":
-            missing.append("dca_cadence")
-
-    # Policy: If we asked for time/dates in the last 3 turns and still don't have them from user, mark as missing
-    # This prevents silent defaulting when the user is in the middle of answering a time question.
-    pending_time_question = any(
-        m["role"] == "assistant"
-        and any(
-            kw in m["content"].lower()
-            for kw in ["timeframe", "temporal", "period", "fecha", "cuándo", "cuando"]
-        )
-        for m in history[-3:]
-    )
-
-    # If we asked and user didn't provide in this turn (source == history_inferred or backend_default means it wasn't in last msg)
-    if pending_time_question:
-        if intent.timeframe.source in (
-            "missing",
-            "backend_default",
-            "history_inferred",
-        ) and intent.start_date.source in (
-            "missing",
-            "backend_default",
-            "history_inferred",
-        ):
-            # Check if last user message says "default" or "da igual" or similar
-            last_user_msg = next(
-                (m["content"].lower() for m in reversed(history) if m["role"] == "user"),
-                "",
-            )
-            if not any(
-                kw in last_user_msg
-                for kw in ["default", "por defecto", "da igual", "any", "standard"]
-            ):
-                missing.append("time_preferences")
-
-    if not missing:
-        return StrategyReadiness(ready_to_run=True)
-
-    # Build clarification prompt
-    lang = _resolve_language(language)
-    prompts = []
-    if "symbols" in missing:
-        prompts.append(
-            "¿Qué símbolos quieres probar?"
-            if lang == "es-419"
-            else "Which symbols do you want to test?"
-        )
-    if "template" in missing:
-        prompts.append(
-            "¿Qué estrategia quieres usar?"
-            if lang == "es-419"
-            else "Which strategy do you want to use?"
-        )
-    if "time_preferences" in missing:
-        prompts.append(
-            "¿En qué periodo o temporalidad?"
-            if lang == "es-419"
-            else "For what period or timeframe?"
-        )
-    if "dca_cadence" in missing:
-        prompts.append(
-            "¿Con qué frecuencia quieres comprar (diaria, semanal, mensual)?"
-            if lang == "es-419"
-            else "How often do you want to buy (daily, weekly, monthly)?"
-        )
-
-    return StrategyReadiness(
-        ready_to_run=False,
-        missing_fields=missing,
-        clarification_prompt=" ".join(prompts),
-    )
-
-
-def assess_strategy_readiness(
-    *,
-    extracted: StrategyExtraction,
+def build_clarification_message(
+    missing_fields: list[str],
+    capability: StrategyCapability | None,
     language: str | None,
-) -> StrategyReadiness:
-    """Deprecated: Use decide_run_readiness instead."""
-    intent = build_strategy_intent(extracted, [])
-    return decide_run_readiness(intent, [], language)
+) -> str:
+    """Build a natural language question asking for missing information."""
+    is_es = _resolve_language(language) == "es-419"
+
+    if "template" in missing_fields:
+        return (
+            "¿Qué tipo de estrategia te gustaría probar? Por ejemplo, DCA o Cruce de Medias Móviles."
+            if is_es
+            else "What kind of strategy would you like to test? For example, DCA or Moving Average Crossover."
+        )
+
+    if "symbols" in missing_fields:
+        return (
+            "¿Sobre qué activos quieres probar la estrategia? Por ejemplo, AAPL o BTC."
+            if is_es
+            else "Which symbols do you want to test the strategy on? For example, AAPL or BTC."
+        )
+
+    # For parameters, use registry display names if possible
+    field = missing_fields[0]
+    param_spec = capability.parameters.get(field) if capability else None
+    display_name = param_spec.key if param_spec else field
+
+    if field == "dca_cadence":
+        return (
+            "¿Con qué frecuencia quieres que Argus compre: diariamente, semanalmente o mensualmente?"
+            if is_es
+            else "How often do you want Argus to buy: daily, weekly, or monthly?"
+        )
+
+    return (
+        f"Necesito un poco más de información sobre {display_name} para continuar."
+        if is_es
+        else f"I need a bit more information about {display_name} to continue."
+    )
+
+
+def plan_strategy_action(
+    intent: StrategyIntent, language: str | None
+) -> StrategyPlanDecision:
+    """Decide if a strategy is ready to run or needs clarification."""
+    template_val = intent.template.value
+    if not template_val or intent.template.source == "missing":
+        return StrategyPlanDecision(
+            action="ask_clarification",
+            missing_fields=["template"],
+            message=build_clarification_message(["template"], None, language),
+        )
+
+    template_str = str(template_val)
+    if template_str not in STRATEGY_CAPABILITIES:
+        # Check aliases
+        found_cap = None
+        for cap in STRATEGY_CAPABILITIES.values():
+            if template_str.lower() in [a.lower() for a in cap.aliases]:
+                found_cap = cap
+                break
+        
+        if not found_cap:
+            return StrategyPlanDecision(
+                action="ask_clarification",
+                missing_fields=["template"],
+                message=build_clarification_message(["template"], None, language),
+            )
+        template_str = found_cap.template
+
+    capability = STRATEGY_CAPABILITIES[template_str]
+
+    if not intent.symbols.value or intent.symbols.source == "missing":
+        return StrategyPlanDecision(
+            action="ask_clarification",
+            missing_fields=["symbols"],
+            message=build_clarification_message(["symbols"], capability, language),
+        )
+
+    missing_params = []
+    for key, spec in capability.parameters.items():
+        slot = intent.parameters.get(key)
+        if spec.policy == "clarify_if_missing" and (slot is None or slot.source == "missing"):
+            missing_params.append(key)
+
+    if missing_params:
+        return StrategyPlanDecision(
+            action="ask_clarification",
+            missing_fields=missing_params,
+            message=build_clarification_message(missing_params, capability, language),
+        )
+
+    return StrategyPlanDecision(action="run_backtest")
 
 
 def _default_onboarding_prompt(language: str | None) -> str:
@@ -523,11 +521,9 @@ def _fallback_run_decision(
     )
 
     # Assess readiness using the intent and history
-    readiness = decide_run_readiness(
-        intent=intent, history=history or [], language=language
-    )
+    plan = plan_strategy_action(intent, language)
 
-    if readiness.ready_to_run:
+    if plan.action == "run_backtest":
         return ChatOrchestrationDecision(
             intent="run_backtest",
             assistant_message=assistant_copy_for_result(
@@ -537,25 +533,25 @@ def _fallback_run_decision(
             title_suggestion=None,
         )
 
-    # If no symbols were found even by heuristic, treat as unsupported/general chat
-    if not intent.symbols.value:
-        goal = primary_goal or "surprise_me"
-        assistant_message = goal_follow_up_message(goal, language)
+    if plan.action == "ask_clarification":
         return ChatOrchestrationDecision(
-            intent="unsupported_request",
-            assistant_message=assistant_message,
+            intent="education",
+            assistant_message=plan.message
+            or (
+                "Cuéntame más sobre tu estrategia."
+                if _resolve_language(language) == "es-419"
+                else "Tell me more about your strategy."
+            ),
             strategy_intent=intent,
             title_suggestion=None,
         )
 
+    # Fallback for unsupported or general chat
+    goal = primary_goal or "surprise_me"
+    assistant_message = goal_follow_up_message(goal, language)
     return ChatOrchestrationDecision(
-        intent="education",
-        assistant_message=readiness.clarification_prompt
-        or (
-            "Cuéntame más sobre tu estrategia."
-            if _resolve_language(language) == "es-419"
-            else "Tell me more about your strategy."
-        ),
+        intent="unsupported_request",
+        assistant_message=assistant_message,
         strategy_intent=intent,
         title_suggestion=None,
     )
