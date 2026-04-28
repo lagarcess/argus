@@ -633,7 +633,12 @@ def guided_beginner_message(intent: ChatTurnIntent, language: str | None) -> str
     )
 
 
-def result_review_message(intent: ChatTurnIntent, message: str, language: str | None) -> str:
+def result_review_message(
+    intent: ChatTurnIntent,
+    message: str,
+    language: str | None,
+    run_metrics: dict[str, Any] | None = None,
+) -> str:
     is_es = _resolve_language(language) == "es-419"
     lower = message.lower()
     if intent.result_action == "save_or_organize":
@@ -642,7 +647,14 @@ def result_review_message(intent: ChatTurnIntent, message: str, language: str | 
             if is_es
             else "I can help you save this strategy or organize it into a collection. For now, tell me the name you want to use."
         )
-    if "drawdown" in lower or intent.educational_need == "metric_explanation":
+
+    # Data-aware path: if we have actual metrics, explain from real data
+    if run_metrics:
+        return _build_data_aware_explanation(message, run_metrics, is_es)
+
+    if any(kw in lower for kw in (
+        "drawdown", "caida", "caída",
+    )) or intent.educational_need == "metric_explanation":
         return (
             "Drawdown es la caida mas grande desde un pico hasta un valle durante la simulacion. Ayuda a entender cuanto dolor habria soportado la idea antes de recuperarse."
             if is_es
@@ -687,7 +699,115 @@ def setup_guidance_message(language: str | None) -> str:
     )
 
 
-def assistant_message_for_chat_turn(intent: ChatTurnIntent, message: str, language: str | None) -> str:
+def _build_data_aware_explanation(
+    message: str,
+    run_metrics: dict[str, Any],
+    is_es: bool,
+) -> str:
+    """Build an explanation grounded in the actual backtest metrics."""
+    agg = run_metrics.get("aggregate", {})
+    perf = agg.get("performance", {})
+    risk = agg.get("risk", {})
+    eff = agg.get("efficiency", {})
+    config = run_metrics.get("config", {})
+
+    total_return = perf.get("total_return_pct", "N/A")
+    benchmark_return = perf.get("benchmark_return_pct", "N/A")
+    delta = perf.get("delta_vs_benchmark_pct", "N/A")
+    max_dd = risk.get("max_drawdown_pct", "N/A")
+    volatility = risk.get("volatility_pct", "N/A")
+    win_rate = eff.get("win_rate", "N/A")
+    sharpe = eff.get("sharpe_ratio", "N/A")
+    profit = perf.get("profit", "N/A")
+    trades = eff.get("total_trades", "N/A")
+    template = config.get("template", "unknown").replace("_", " ")
+    symbols = ", ".join(config.get("symbols", []))
+    benchmark = config.get("benchmark_symbol", "SPY")
+    capital = config.get("starting_capital", 10000)
+
+    # Try LLM-powered explanation if available
+    if os.getenv("OPENROUTER_API_KEY"):
+        try:
+            return _llm_result_explanation(message, run_metrics, is_es)
+        except Exception as exc:
+            logger.warning("LLM result explanation failed, using structured fallback", error=str(exc))
+
+    # Structured fallback: build a summary from real numbers
+    if is_es:
+        return (
+            f"Tu estrategia de {template} con {symbols} tuvo un retorno total de {total_return}% "
+            f"(vs {benchmark_return}% del benchmark {benchmark}, una diferencia de {delta}%). "
+            f"La máxima caída fue {max_dd}%, la volatilidad {volatility}%, "
+            f"y el ratio de Sharpe fue {sharpe}. "
+            f"Capital inicial: ${capital:,.0f}, ganancia: ${profit}. "
+            f"Total de operaciones: {trades}, tasa de acierto: {_fmt_pct(win_rate)}.\n\n"
+            "¿Quieres que explique alguna métrica en detalle, o prefieres probar otra idea?"
+        )
+    return (
+        f"Your {template} strategy on {symbols} returned {total_return}% total "
+        f"(vs {benchmark_return}% for {benchmark}, a delta of {delta}%). "
+        f"Max drawdown was {max_dd}%, volatility {volatility}%, "
+        f"and Sharpe ratio was {sharpe}. "
+        f"Starting capital: ${capital:,.0f}, profit: ${profit}. "
+        f"Total trades: {trades}, win rate: {_fmt_pct(win_rate)}.\n\n"
+        "Want me to explain any metric in detail, or try a different idea?"
+    )
+
+
+def _fmt_pct(value: Any) -> str:
+    """Format a 0-1 float as percentage, or pass through if already formatted."""
+    try:
+        v = float(value)
+        if v <= 1.0:
+            return f"{v * 100:.1f}%"
+        return f"{v:.1f}%"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _llm_result_explanation(
+    message: str,
+    run_metrics: dict[str, Any],
+    is_es: bool,
+) -> str:
+    """Use the LLM to answer the user's question grounded in actual metrics."""
+    agg = run_metrics.get("aggregate", {})
+    config = run_metrics.get("config", {})
+    model = _build_model(os.getenv("AGENT_MODEL") or DEFAULT_CHAT_INTENT_MODEL)
+    lang_label = "Spanish" if is_es else "English"
+
+    system_prompt = (
+        "You are Argus, an AI investing idea validation assistant. "
+        "The user just ran a backtest and is asking about the results. "
+        "You have the ACTUAL metrics below. Answer ONLY from this data. "
+        "NEVER say the simulation failed — it completed successfully. "
+        "NEVER invent numbers. If the user asks about a metric not listed, say so. "
+        f"Respond in {lang_label}. Keep the response concise (3-5 sentences). "
+        "Use plain language a beginner can understand.\n\n"
+        f"BACKTEST RESULTS:\n"
+        f"Template: {config.get('template', 'unknown')}\n"
+        f"Symbols: {', '.join(config.get('symbols', []))}\n"
+        f"Period: {config.get('start_date', '?')} to {config.get('end_date', '?')}\n"
+        f"Starting capital: ${config.get('starting_capital', 10000):,.0f}\n"
+        f"Benchmark: {config.get('benchmark_symbol', 'SPY')}\n"
+        f"Performance: {agg.get('performance', {})}\n"
+        f"Risk: {agg.get('risk', {})}\n"
+        f"Efficiency: {agg.get('efficiency', {})}\n"
+    )
+
+    response = model.invoke([
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": message},
+    ])
+    return str(response.content).strip()
+
+
+def assistant_message_for_chat_turn(
+    intent: ChatTurnIntent,
+    message: str,
+    language: str | None,
+    run_metrics: dict[str, Any] | None = None,
+) -> str:
     if intent.intent == "guide":
         if intent.educational_need == "concept_explanation":
             return education_assistant_message(message, language)
@@ -695,7 +815,7 @@ def assistant_message_for_chat_turn(intent: ChatTurnIntent, message: str, langua
     if intent.intent == "setup":
         return setup_guidance_message(language)
     if intent.intent == "explain_result":
-        return result_review_message(intent, message, language)
+        return result_review_message(intent, message, language, run_metrics=run_metrics)
     if intent.intent == "refine":
         return refine_message(intent, language)
     if intent.intent == "unsupported":
@@ -804,6 +924,12 @@ def classify_chat_turn_intent(
                         "Never execute a backtest. Never infer missing fields or defaults. "
                         "Use confirmation_action only when the user explicitly accepts, edits, or cancels a pending confirmation. "
                         "Use result_action only after a completed result exists. "
+                        "CRITICAL: If 'latest_run_id' is present in the pending backtest state, "
+                        "a backtest HAS completed successfully. If the user asks about results, "
+                        "performance, metrics, returns, drawdown, or explanation, classify as "
+                        "'explain_result'. NEVER say the simulation failed when latest_run_id exists. "
+                        "CRITICAL: If conversation_mode is 'result_review', we are in post-result context. "
+                        "Questions about the strategy, numbers, or outcomes are 'explain_result'. "
                         f"Language: {resolved}. Primary goal: {primary_goal or 'unknown'}. "
                         f"Onboarding stage: {onboarding_stage or 'unknown'}. "
                         f"Pending backtest state: {pending_backtest_state or {}}. "

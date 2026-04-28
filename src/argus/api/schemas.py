@@ -13,6 +13,7 @@ BacktestStatus = Literal["queued", "running", "completed", "failed"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 StrategyTemplate = Literal[
+    "buy_and_hold",
     "buy_the_dip",
     "rsi_mean_reversion",
     "moving_average_crossover",

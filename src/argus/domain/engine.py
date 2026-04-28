@@ -264,6 +264,12 @@ def _build_signals(
     template = config["template"]
     index = close.index
 
+    if template == "buy_and_hold":
+        entries = pd.Series(False, index=index, dtype=bool)
+        entries.iloc[0] = True
+        exits = pd.Series(False, index=index, dtype=bool)
+        return entries.astype(bool), exits.astype(bool)
+
     if template == "dca_accumulation":
         cadence = config.get("parameters", {}).get("dca_cadence", "weekly").lower()
         entries = pd.Series(False, index=index, dtype=bool)
@@ -539,6 +545,7 @@ def build_result_card(
 
     is_es = language.startswith("es")
     template_names = {
+        "buy_and_hold": "Comprar y Mantener" if is_es else "Buy and Hold",
         "buy_the_dip": "Comprar la Caída" if is_es else "Buy the Dip",
         "rsi_mean_reversion": "Reversión a la Media RSI"
         if is_es

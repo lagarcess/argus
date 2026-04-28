@@ -20,6 +20,12 @@ class StrategyCapability(BaseModel):
     parameters: dict[str, ParameterSpec] = Field(default_factory=dict)
 
 STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
+    "buy_and_hold": StrategyCapability(
+        template="buy_and_hold",
+        display_name="Buy and Hold",
+        aliases=["buy and hold", "comprar y mantener", "mantener", "hold", "compra y mantener"],
+        supported_asset_classes=["equity", "crypto"],
+    ),
     "buy_the_dip": StrategyCapability(
         template="buy_the_dip",
         display_name="Buy the Dip",

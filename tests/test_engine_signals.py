@@ -49,3 +49,20 @@ def test_dca_accumulation_signals_daily():
     entries, exits = _build_signals(config, data)
     assert entries.sum() == 5
     assert entries.all()
+
+
+def test_buy_and_hold_signals():
+    """buy_and_hold: single entry on bar 0, no exits, hold through entire period."""
+    index = pd.date_range("2024-01-01", periods=30, freq="D")
+    data = pd.DataFrame({"close": range(100, 130)}, index=index)
+    config = {"template": "buy_and_hold", "parameters": {}}
+
+    entries, exits = _build_signals(config, data)
+
+    # Exactly one entry on bar 0
+    assert entries.sum() == 1
+    assert bool(entries.iloc[0])
+    # No entries on any other bar
+    assert not entries.iloc[1:].any()
+    # Zero exits — hold through end_date
+    assert exits.sum() == 0

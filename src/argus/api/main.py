@@ -208,6 +208,29 @@ def _latest_completed_run_id(history: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def _fetch_run_metrics(user_id: str, run_id: str) -> dict[str, Any] | None:
+    """Fetch actual metrics and config from a completed backtest run."""
+    run = None
+    if supabase_gateway is not None:
+        try:
+            run = supabase_gateway.get_backtest_run(user_id=user_id, run_id=run_id)
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch run for result explanation",
+                error=str(exc),
+                run_id=run_id,
+            )
+    if run is None:
+        run = store.backtest_runs.get(run_id)
+    if run is None:
+        return None
+    return {
+        "aggregate": run.metrics.get("aggregate", {}),
+        "by_symbol": run.metrics.get("by_symbol", {}),
+        "config": run.config_snapshot,
+    }
+
+
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
     request_id = request.headers.get("x-request-id") or store.new_id()
@@ -2133,8 +2156,9 @@ def chat_stream(
                 onboarding_stage=current_user_profile.onboarding.stage,
                 pending_backtest_state={
                     **state.model_dump(mode="json"),
-                    "conversation_mode": "setup" if has_pending_backtest else "guide",
+                    "conversation_mode": "result_review" if latest_run_id and not has_pending_backtest else ("setup" if has_pending_backtest else "guide"),
                     "latest_run_id": latest_run_id,
+                    "has_completed_run": bool(latest_run_id),
                 },
                 history=history_msgs,
                 model_name=os.getenv("AGENT_MODEL") or DEFAULT_CHAT_INTENT_MODEL,
@@ -2173,7 +2197,13 @@ def chat_stream(
             and turn_intent.intent in {"guide", "explain_result", "unsupported"}
         ):
             mode = "result_review" if turn_intent.intent == "explain_result" else "guide"
-            assistant_text = assistant_message_for_chat_turn(turn_intent, payload.message, lang)
+            # Fetch actual run metrics for data-aware explanations
+            run_metrics = None
+            if turn_intent.intent == "explain_result" and latest_run_id:
+                run_metrics = _fetch_run_metrics(user.id, latest_run_id)
+            assistant_text = assistant_message_for_chat_turn(
+                turn_intent, payload.message, lang, run_metrics=run_metrics,
+            )
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
