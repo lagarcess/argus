@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+AssetClass = Literal["equity", "crypto"]
+SlotPolicy = Literal["required", "defaultable", "clarify_if_missing"]
+
+
+class ParameterSpec(BaseModel):
+    key: str
+    policy: SlotPolicy = "defaultable"
+    default: Any = None
+    allowed_values: list[str] = Field(default_factory=list)
+
+
+class StrategyCapability(BaseModel):
+    template: str
+    display_name: str
+    aliases: list[str]
+    supported_asset_classes: list[AssetClass]
+    parameters: dict[str, ParameterSpec] = Field(default_factory=dict)
+
+
+STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
+    "buy_the_dip": StrategyCapability(
+        template="buy_the_dip",
+        display_name="Buy the Dip",
+        aliases=["dip", "buy dips", "btfd"],
+        supported_asset_classes=["equity", "crypto"],
+    ),
+    "rsi_mean_reversion": StrategyCapability(
+        template="rsi_mean_reversion",
+        display_name="RSI Mean Reversion",
+        aliases=["rsi", "oversold", "mean reversion"],
+        supported_asset_classes=["equity", "crypto"],
+    ),
+    "moving_average_crossover": StrategyCapability(
+        template="moving_average_crossover",
+        display_name="Moving Average Crossover",
+        aliases=["ma crossover", "sma", "ema", "golden cross", "death cross"],
+        supported_asset_classes=["equity", "crypto"],
+    ),
+    "dca_accumulation": StrategyCapability(
+        template="dca_accumulation",
+        display_name="DCA Accumulation",
+        aliases=["dca", "dollar cost averaging", "accumulation"],
+        supported_asset_classes=["equity", "crypto"],
+        parameters={
+            "dca_cadence": ParameterSpec(
+                key="dca_cadence",
+                policy="clarify_if_missing",
+                default="monthly",
+                allowed_values=["daily", "weekly", "monthly"],
+            )
+        },
+    ),
+    "momentum_breakout": StrategyCapability(
+        template="momentum_breakout",
+        display_name="Momentum Breakout",
+        aliases=["momentum", "breakout", "ath"],
+        supported_asset_classes=["equity", "crypto"],
+    ),
+    "trend_follow": StrategyCapability(
+        template="trend_follow",
+        display_name="Trend Follow",
+        aliases=["trend", "following trend"],
+        supported_asset_classes=["equity", "crypto"],
+    ),
+}

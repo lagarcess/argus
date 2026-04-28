@@ -8,14 +8,9 @@ from typing import Any, Literal, cast
 from langchain_openrouter import ChatOpenRouter
 from pydantic import BaseModel, Field
 
-SUPPORTED_TEMPLATES = {
-    "buy_the_dip",
-    "rsi_mean_reversion",
-    "moving_average_crossover",
-    "dca_accumulation",
-    "momentum_breakout",
-    "trend_follow",
-}
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+
+SUPPORTED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys())
 SUPPORTED_GOALS = {
     "learn_basics",
     "test_stock_idea",
@@ -23,15 +18,10 @@ SUPPORTED_GOALS = {
     "explore_crypto",
     "surprise_me",
 }
-TEMPLATE_ALIASES: list[tuple[str, str]] = [
-    ("rsi_mean_reversion", "rsi"),
-    ("rsi_mean_reversion", "dip"),
-    ("moving_average_crossover", "moving average"),
-    ("dca_accumulation", "dca"),
-    ("momentum_breakout", "momentum"),
-    ("momentum_breakout", "breakout"),
-    ("trend_follow", "trend"),
-]
+TEMPLATE_ALIASES: list[tuple[str, str]] = []
+for cap in STRATEGY_CAPABILITIES.values():
+    for alias in cap.aliases:
+        TEMPLATE_ALIASES.append((cap.template, alias))
 NON_SYMBOLS = {
     "WHAT",
     "IF",

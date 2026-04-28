@@ -18,16 +18,11 @@ try:  # noqa: SIM105
 except Exception:  # pragma: no cover - accessor may already be available
     pass
 
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+
 AssetClass = Literal["equity", "crypto"]
 
-ALLOWED_TEMPLATES = {
-    "buy_the_dip",
-    "rsi_mean_reversion",
-    "moving_average_crossover",
-    "dca_accumulation",
-    "momentum_breakout",
-    "trend_follow",
-}
+ALLOWED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys())
 
 ALLOWED_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
 
@@ -185,14 +180,19 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
     if any(symbol in STABLECOINS for symbol in config["symbols"]):
         raise ValueError("stablecoin_not_supported")
 
-    if config.get("parameters"):
-        # Alpha MVP restricts indicator tuning, but allows strategy-specific config like DCA cadence
-        params = config["parameters"]
-        if config["template"] == "dca_accumulation":
-            allowed = {"dca_cadence"}
-            if not set(params.keys()).issubset(allowed):
-                raise ValueError("unsupported_parameters")
-        else:
+    # Registry-driven parameter validation
+    params = config.get("parameters") or {}
+    template_name = config["template"]
+    capability = STRATEGY_CAPABILITIES[template_name]
+    
+    allowed_params = set(capability.parameters.keys())
+    unknown = set(params.keys()) - allowed_params
+    if unknown:
+        raise ValueError("unsupported_parameters")
+
+    for key, value in params.items():
+        spec = capability.parameters[key]
+        if spec.allowed_values and value not in spec.allowed_values:
             raise ValueError("unsupported_parameters")
 
 
