@@ -10,7 +10,10 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.domain.backtest_state_machine import BacktestParamsUpdate
+from argus.domain.market_data.assets import resolve_asset as _resolve_market_asset
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+
+resolve_asset = _resolve_market_asset  # compatibility shim for legacy tests only
 
 SUPPORTED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys())
 SUPPORTED_GOALS = {

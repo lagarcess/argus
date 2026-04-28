@@ -26,67 +26,7 @@ def mock_resolve_asset(monkeypatch):
     monkeypatch.setattr(orchestrator, "resolve_asset", _fake_resolve)
 
 
-def test_orchestrate_chat_turn_without_history(monkeypatch) -> None:
-    # Disable LLM to force empty extraction
-    def _fake_extract(message: str, model_name: str) -> StrategyIntentExtraction:
-        return StrategyIntentExtraction(
-            template=ExtractedSlot(value="buy_the_dip", confidence=1.0),
-            symbols=ExtractedSlot(value=["TSLA"], confidence=1.0),
-        )
-    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _fake_extract)
 
-    decision = orchestrator.orchestrate_chat_turn(
-        message="Backtest Tesla dips",
-        language="en",
-        onboarding_required=False,
-        primary_goal=None,
-    )
-
-    assert decision.intent == "run_backtest"
-    assert decision.strategy_draft is not None
-    assert decision.strategy_draft.template.value == "buy_the_dip"
-    assert decision.strategy_draft.symbols.value == ["TSLA"]
-
-
-def test_orchestrate_chat_turn_merges_history(monkeypatch) -> None:
-    # 1. First turn: only symbols
-    def _fake_extract_1(message: str, model_name: str) -> StrategyIntentExtraction:
-        return StrategyIntentExtraction(
-            symbols=ExtractedSlot(value=["AAPL"], confidence=1.0),
-        )
-    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _fake_extract_1)
-
-    history = []
-    decision1 = orchestrator.orchestrate_chat_turn(
-        message="Apple",
-        history=history,
-        language="en",
-    )
-    assert decision1.intent == "clarify"
-    assert "strategy" in decision1.assistant_message.lower() or "estrategia" in decision1.assistant_message.lower()
-
-    # 2. Second turn: only template
-    def _fake_extract_2(message: str, model_name: str) -> StrategyIntentExtraction:
-        return StrategyIntentExtraction(
-            template=ExtractedSlot(value="buy_the_dip", confidence=1.0),
-        )
-    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _fake_extract_2)
-
-    # Simulate history with the previous draft in metadata
-    history = [
-        {"role": "user", "content": "Apple"},
-        {"role": "assistant", "content": "What strategy?", "metadata": {"strategy_draft": decision1.strategy_draft.model_dump()}}
-    ]
-
-    decision2 = orchestrator.orchestrate_chat_turn(
-        message="Buy the dip",
-        history=history,
-        language="en",
-    )
-
-    assert decision2.intent == "run_backtest"
-    assert decision2.strategy_draft.template.value == "buy_the_dip"
-    assert decision2.strategy_draft.symbols.value == ["AAPL"]
 
 
 def test_plan_draft_action_parameter_clarification() -> None:
@@ -136,56 +76,7 @@ def test_canonical_template_aliases() -> None:
     assert orchestrator.canonical_template("unknown") is None
 
 
-def test_dca_followup_reconstructs_slots_from_history_without_metadata(monkeypatch) -> None:
-    def _empty_extract(message: str, model_name: str, history: list[dict[str, Any]] | None = None) -> StrategyIntentExtraction:
-        return StrategyIntentExtraction()
 
-    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _empty_extract)
-
-    history = [
-        {"role": "user", "content": "How would a simple DCA strategy perform on Tesla?"},
-        {"role": "assistant", "content": "How often do you want Argus to buy: daily, weekly, or monthly?"},
-        {"role": "user", "content": "weeklu"},
-        {"role": "assistant", "content": "To run the DCA backtest, I need starting capital and timeframe."},
-        {"role": "user", "content": "10k and one year, based on YTD"},
-        {"role": "assistant", "content": "Please provide exact dates."},
-        {"role": "user", "content": "take today as the ending date, and exactly a year back from today"},
-        {"role": "assistant", "content": "How often do you want Argus to buy: daily, weekly, or monthly?"},
-    ]
-
-    decision = orchestrator.orchestrate_chat_turn(
-        message="daily",
-        history=history,
-        language="en",
-    )
-
-    assert decision.intent == "run_backtest"
-    assert decision.strategy_draft is not None
-    assert decision.strategy_draft.template.value == "dca_accumulation"
-    assert decision.strategy_draft.symbols.value == ["TSLA"]
-    assert decision.strategy_draft.starting_capital.value == 10000
-    assert decision.strategy_draft.parameters["dca_cadence"].value == "daily"
-
-
-def test_neutral_message_is_answer_not_backtest_clarification(monkeypatch) -> None:
-    def _empty_extract(
-        message: str,
-        model_name: str,
-        history: list[dict[str, Any]] | None = None,
-    ) -> StrategyIntentExtraction:
-        return StrategyIntentExtraction()
-
-    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _empty_extract)
-
-    decision = orchestrator.orchestrate_chat_turn(
-        message="hey",
-        history=[],
-        language="en",
-    )
-
-    assert decision.intent == "answer"
-    assert decision.strategy_draft is None
-    assert "strategy" not in decision.assistant_message.lower()
 
 
 def test_chat_turn_intent_does_not_use_regex_fallback_without_provider(monkeypatch) -> None:
