@@ -285,3 +285,54 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     # Verify Spanish labels
     card = engine.build_result_card(config, metrics, language="es-419")
     assert card["actions"][0]["label"] == "Añadir a colección"
+
+def test_validate_template_parameters_rejects_unknown():
+    config = {
+        "template": "rsi_mean_reversion",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-05",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"unknown_param": 123}
+    }
+    with pytest.raises(ValueError, match="unsupported_parameters"):
+        engine.validate_backtest_config(config)
+
+def test_validate_template_parameters_rejects_invalid_value():
+    config = {
+        "template": "dca_accumulation",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-05",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"dca_cadence": "hourly"} # Only daily/weekly/monthly allowed
+    }
+    with pytest.raises(ValueError, match="unsupported_parameters"):
+        engine.validate_backtest_config(config)
+
+def test_validate_template_parameters_accepts_valid():
+    config = {
+        "template": "dca_accumulation",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-05",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"dca_cadence": "weekly"}
+    }
+    # Should not raise
+    engine.validate_backtest_config(config)
