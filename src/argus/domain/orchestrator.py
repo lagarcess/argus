@@ -312,11 +312,20 @@ def build_clarification_message(
     missing_fields: list[str],
     capability: StrategyCapability | None,
     language: str | None,
+    intent: StrategyIntent | None = None,
 ) -> str:
     """Build a natural language question asking for missing information."""
     is_es = _resolve_language(language) == "es-419"
+    symbols = intent.symbols.value if intent and intent.symbols.value else []
+    symbols_text = ", ".join(symbols) if symbols else ""
 
     if "template" in missing_fields:
+        if symbols_text:
+            return (
+                f"Puedo probar una estrategia para {symbols_text}, pero ¿qué tipo de estrategia te gustaría usar? Por ejemplo, DCA o RSI."
+                if is_es
+                else f"I can test a strategy for {symbols_text}, but what kind of strategy would you like to use? For example, DCA or RSI."
+            )
         return (
             "¿Qué tipo de estrategia te gustaría probar? Por ejemplo, DCA o Cruce de Medias Móviles."
             if is_es
@@ -324,6 +333,13 @@ def build_clarification_message(
         )
 
     if "symbols" in missing_fields:
+        strategy_name = capability.display_name if capability else ""
+        if strategy_name:
+            return (
+                f"Me gusta la idea de usar {strategy_name}. ¿Sobre qué activos quieres probarla? Por ejemplo, AAPL o BTC."
+                if is_es
+                else f"I like the idea of using {strategy_name}. Which symbols do you want to test it on? For example, AAPL or BTC."
+            )
         return (
             "¿Sobre qué activos quieres probar la estrategia? Por ejemplo, AAPL o BTC."
             if is_es
@@ -336,10 +352,14 @@ def build_clarification_message(
     display_name = param_spec.key if param_spec else field
 
     if field == "dca_cadence":
+        prefix = ""
+        if symbols_text:
+            prefix = f"Puedo probar el DCA para {symbols_text}. " if is_es else f"I can test DCA on {symbols_text}. "
+        
         return (
-            "¿Con qué frecuencia quieres que Argus compre: diariamente, semanalmente o mensualmente?"
+            f"{prefix}¿Con qué frecuencia quieres que Argus compre: diariamente, semanalmente o mensualmente?"
             if is_es
-            else "How often do you want Argus to buy: daily, weekly, or monthly?"
+            else f"{prefix}How often do you want Argus to buy: daily, weekly, or monthly?"
         )
 
     return (
@@ -358,7 +378,7 @@ def plan_strategy_action(
         return StrategyPlanDecision(
             action="ask_clarification",
             missing_fields=["template"],
-            message=build_clarification_message(["template"], None, language),
+            message=build_clarification_message(["template"], None, language, intent),
         )
 
     template_str = str(template_val)
@@ -374,7 +394,7 @@ def plan_strategy_action(
             return StrategyPlanDecision(
                 action="ask_clarification",
                 missing_fields=["template"],
-                message=build_clarification_message(["template"], None, language),
+                message=build_clarification_message(["template"], None, language, intent),
             )
         template_str = found_cap.template
 
@@ -384,7 +404,7 @@ def plan_strategy_action(
         return StrategyPlanDecision(
             action="ask_clarification",
             missing_fields=["symbols"],
-            message=build_clarification_message(["symbols"], capability, language),
+            message=build_clarification_message(["symbols"], capability, language, intent),
         )
 
     missing_params = []
@@ -397,7 +417,7 @@ def plan_strategy_action(
         return StrategyPlanDecision(
             action="ask_clarification",
             missing_fields=missing_params,
-            message=build_clarification_message(missing_params, capability, language),
+            message=build_clarification_message(missing_params, capability, language, intent),
         )
 
     return StrategyPlanDecision(action="run_backtest")
@@ -490,16 +510,24 @@ def _default_follow_up_for_goal(goal: str, language: str | None) -> str:
     return mapping.get(goal, mapping["surprise_me"])
 
 
-def assistant_copy_for_result(symbols: list[str], language: str) -> str:
+def assistant_copy_for_result(symbols: list[str], language: str, intent: StrategyIntent | None = None) -> str:
     joined = ", ".join(symbols)
     normalized_language = _resolve_language(language)
-    if normalized_language == "es-419":
+    is_es = normalized_language == "es-419"
+    
+    strategy_display = ""
+    if intent and intent.template.value:
+        cap = STRATEGY_CAPABILITIES.get(str(intent.template.value))
+        if cap:
+            strategy_display = f" {cap.display_name}"
+
+    if is_es:
         return (
-            f"Probé la idea con {joined}. Usé una simulación long-only, de peso igual, "
+            f"Probé tu idea de{strategy_display} con {joined}. Usé una simulación long-only, de peso igual, "
             "sin comisiones ni deslizamiento para mantener la comparación clara."
         )
     return (
-        f"I tested that idea with {joined}. I used a long-only, equal-weight simulation "
+        f"I tested your{strategy_display} idea with {joined}. I used a long-only, equal-weight simulation "
         "with no fees or slippage so the comparison stays easy to understand."
     )
 
@@ -682,7 +710,7 @@ def repair_llm_decision(
         return ChatOrchestrationDecision(
             intent="education" if plan.action == "ask_clarification" else "run_backtest",
             assistant_message=plan.message
-            or assistant_copy_for_result(extracted_intent.symbols.value or [], language),
+            or assistant_copy_for_result(extracted_intent.symbols.value or [], language, extracted_intent),
             strategy_intent=extracted_intent,
             title_suggestion=None,
         )
@@ -753,7 +781,7 @@ def orchestrate_chat_turn(
             elif plan.action == "run_backtest" and decision.intent != "run_backtest":
                 decision.intent = "run_backtest"
                 decision.assistant_message = assistant_copy_for_result(
-                    decision.strategy_intent.symbols.value or [], language or "en"
+                    decision.strategy_intent.symbols.value or [], language or "en", decision.strategy_intent
                 )
 
         # 3. Validation
@@ -810,7 +838,7 @@ def orchestrate_chat_turn(
                     elif plan.action == "run_backtest" and decision.intent != "run_backtest":
                         decision.intent = "run_backtest"
                         decision.assistant_message = assistant_copy_for_result(
-                            decision.strategy_intent.symbols.value or [], language or "en"
+                            decision.strategy_intent.symbols.value or [], language or "en", decision.strategy_intent
                         )
                 # Standardize intent: clarify -> education
                 if decision.intent == "clarify":

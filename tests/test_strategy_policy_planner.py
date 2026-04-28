@@ -17,7 +17,7 @@ def test_plan_requires_template():
     plan = plan_strategy_action(intent, "en")
     assert plan.action == "ask_clarification"
     assert "template" in plan.missing_fields
-    assert "What kind of strategy" in plan.message
+    assert "what kind of strategy" in plan.message.lower()
 
 def test_plan_requires_symbols():
     intent = StrategyIntent(
@@ -27,7 +27,7 @@ def test_plan_requires_symbols():
     plan = plan_strategy_action(intent, "en")
     assert plan.action == "ask_clarification"
     assert "symbols" in plan.missing_fields
-    assert "Which symbols" in plan.message
+    assert "which symbols" in plan.message.lower()
 
 def test_plan_requires_dca_cadence():
     intent = StrategyIntent(
@@ -38,7 +38,7 @@ def test_plan_requires_dca_cadence():
     plan = plan_strategy_action(intent, "en")
     assert plan.action == "ask_clarification"
     assert "dca_cadence" in plan.missing_fields
-    assert "How often" in plan.message
+    assert "how often" in plan.message.lower()
 
 def test_plan_resolves_aliases():
     intent = StrategyIntent(
