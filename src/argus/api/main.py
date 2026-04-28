@@ -2235,6 +2235,7 @@ def chat_stream(
             conversation_id=conversation.id,
             role="assistant",
             content=assistant_text,
+            metadata={"strategy_intent": intent.model_dump()},
         )
         template_name = str(run.config_snapshot.get("template", "strategy"))
         suggested = suggest_entity_name(

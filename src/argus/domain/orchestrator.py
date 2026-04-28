@@ -574,6 +574,19 @@ def _fallback_run_decision(
         extracted, (history or []) + [{"role": "user", "content": message}]
     )
 
+    # Merge with history
+    if history:
+        last_intent_dict = next(
+            (m.get("strategy_intent") for m in reversed(history) if m.get("strategy_intent")),
+            None
+        )
+        if last_intent_dict:
+            try:
+                last_intent = StrategyIntent(**last_intent_dict)
+                intent = merge_intent(intent, last_intent)
+            except Exception:
+                pass
+
     # Assess readiness using the intent and history
     plan = plan_strategy_action(intent, language)
 
@@ -657,22 +670,24 @@ def orchestrate_chat_turn(
 
         # 2. Policy Enforcement: override LLM if readiness gate fails
         if decision.strategy_intent:
-            readiness = decide_run_readiness(
-                intent=decision.strategy_intent,
-                history=history or [],
-                language=language,
-            )
-            if not readiness.ready_to_run:
+            plan = plan_strategy_action(decision.strategy_intent, language)
+            if plan.action == "ask_clarification":
                 decision.intent = "education"
                 decision.assistant_message = (
-                    readiness.clarification_prompt or decision.assistant_message
+                    plan.message or decision.assistant_message
+                )
+            elif plan.action == "run_backtest" and decision.intent != "run_backtest":
+                # LLM extracted enough but didn't decide to run? Force run if it's high confidence or if we want to be proactive
+                decision.intent = "run_backtest"
+                decision.assistant_message = assistant_copy_for_result(
+                    decision.strategy_intent.symbols.value or [], language or "en"
                 )
 
         # 3. Validation
         if (
             decision.strategy_intent
             and decision.strategy_intent.template.value
-            and decision.strategy_intent.template.value not in SUPPORTED_TEMPLATES
+            and str(decision.strategy_intent.template.value) not in STRATEGY_CAPABILITIES
         ):
             return _fallback_run_decision(message, language, primary_goal, history)
 
