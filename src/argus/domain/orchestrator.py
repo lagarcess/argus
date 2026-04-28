@@ -8,6 +8,7 @@ from typing import Any, Literal, cast
 from langchain_openrouter import ChatOpenRouter
 from pydantic import BaseModel, Field
 
+from argus.domain.market_data import resolve_asset
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 SUPPORTED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys())
@@ -206,6 +207,10 @@ def build_strategy_intent(
             value=v, source=get_source(f"param:{k}", v)
         )
 
+    # 1. Resolve symbols early
+    raw_symbols = extraction.symbols or []
+    resolved_symbols = resolve_supported_symbols(raw_symbols)
+
     return StrategyIntent(
         template=SlotValue(
             value=extraction.template, source=get_source("template", extraction.template)
@@ -214,7 +219,8 @@ def build_strategy_intent(
             value=extraction.asset_class or "equity", source="backend_default"
         ),
         symbols=SlotValue(
-            value=extraction.symbols, source=get_source("symbols", extraction.symbols)
+            value=resolved_symbols,
+            source="user_supplied" if resolved_symbols else "missing",
         ),
         timeframe=SlotValue(
             value=extraction.timeframe,
@@ -622,6 +628,23 @@ def _fallback_run_decision(
         strategy_intent=intent,
         title_suggestion=None,
     )
+
+
+def resolve_supported_symbols(raw_symbols: list[str]) -> list[str]:
+    """Canonicalize symbols (e.g. 'Apple' -> 'AAPL') and filter to supported ones."""
+    resolved = []
+    for raw in raw_symbols:
+        try:
+            asset = resolve_asset(raw)
+            resolved.append(asset.canonical_symbol)
+        except Exception:
+            continue
+    # De-duplicate and limit to Alpha max 5
+    unique = []
+    for r in resolved:
+        if r not in unique:
+            unique.append(r)
+    return unique[:5]
 
 
 def repair_llm_decision(

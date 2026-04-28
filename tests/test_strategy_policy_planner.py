@@ -126,3 +126,23 @@ def test_repair_llm_decision_to_education():
     )
     assert repaired.intent == "education"
     assert "Which symbols" in repaired.assistant_message
+
+def test_resolve_supported_symbols(mocker):
+    from argus.domain.orchestrator import resolve_supported_symbols
+    from argus.domain.market_data.assets import ResolvedAsset
+    
+    mock_resolve = mocker.patch("argus.domain.orchestrator.resolve_asset")
+    def side_effect(s):
+        if s.upper() == "AAPL" or s.lower() == "apple":
+            return ResolvedAsset(canonical_symbol="AAPL", asset_class="equity", name="Apple Inc.", raw_symbol="AAPL")
+        if s.upper() == "BTC" or "BTC" in s.upper():
+            return ResolvedAsset(canonical_symbol="BTC", asset_class="crypto", name="Bitcoin", raw_symbol="BTCUSD")
+        raise ValueError("invalid_symbol")
+    
+    mock_resolve.side_effect = side_effect
+
+    res = resolve_supported_symbols(["Apple", "INVALID123", "BTC/USD"])
+    assert "AAPL" in res
+    assert "BTC" in res
+    assert "INVALID123" not in res
+    assert len(res) == 2

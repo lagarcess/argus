@@ -111,6 +111,11 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
             raw_symbol=raw_symbol,
         )
         _add_aliases(aliases, resolved, canonical=canonical)
+        
+        # Add name alias (lower-case, stripped)
+        name_alias = raw_name.lower().strip()
+        if name_alias and name_alias not in aliases:
+            aliases[name_alias] = resolved
 
     if not aliases:
         raise ValueError("asset_universe_unavailable")
@@ -139,12 +144,20 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
     assert _ASSET_ALIAS_MAP is not None
 
     candidate = _normalize_symbol(symbol)
+    # 1. Direct ticker match
     direct = _ASSET_ALIAS_MAP.get(candidate) or _ASSET_ALIAS_MAP.get(
         candidate.replace("/", "")
     )
     if direct:
         return direct
 
+    # 2. Case-insensitive ticker or name match
+    lower_candidate = symbol.lower().strip()
+    named = _ASSET_ALIAS_MAP.get(lower_candidate)
+    if named:
+        return named
+
+    # 3. Crypto USD suffix handling
     if candidate.endswith("/USD"):
         without_quote = candidate[:-4]
         alt = _ASSET_ALIAS_MAP.get(without_quote)
