@@ -4,6 +4,8 @@ from argus.domain.orchestrator import (
     SlotValue,
     plan_strategy_action,
     compile_backtest_payload,
+    repair_llm_decision,
+    ChatOrchestrationDecision,
 )
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
@@ -87,3 +89,40 @@ def test_compile_resolves_aliases_and_defaults():
     assert payload["template"] == "dca_accumulation"
     assert payload["parameters"]["dca_cadence"] == "monthly" # From registry default
     assert payload["benchmark_symbol"] == "BTC"
+
+def test_repair_llm_decision_to_run():
+    # LLM says unsupported, but intent is valid DCA/AAPL/Monthly
+    intent = StrategyIntent(
+        template=SlotValue(value="dca", source="user_supplied"),
+        symbols=SlotValue(value=["AAPL"], source="user_supplied"),
+        parameters={"dca_cadence": SlotValue(value="monthly", source="user_supplied")}
+    )
+    decision = ChatOrchestrationDecision(
+        intent="unsupported_request",
+        assistant_message="I can't do that."
+    )
+    repaired = repair_llm_decision(
+        decision=decision,
+        extracted_intent=intent,
+        language="en"
+    )
+    assert repaired.intent == "run_backtest"
+    assert "AAPL" in repaired.assistant_message
+
+def test_repair_llm_decision_to_education():
+    # LLM says unsupported, but it's actually just missing symbols for DCA
+    intent = StrategyIntent(
+        template=SlotValue(value="dca", source="user_supplied"),
+        symbols=SlotValue(value=[], source="missing"),
+    )
+    decision = ChatOrchestrationDecision(
+        intent="unsupported_request",
+        assistant_message="I can't do that."
+    )
+    repaired = repair_llm_decision(
+        decision=decision,
+        extracted_intent=intent,
+        language="en"
+    )
+    assert repaired.intent == "education"
+    assert "Which symbols" in repaired.assistant_message

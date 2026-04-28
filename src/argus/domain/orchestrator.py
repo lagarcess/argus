@@ -624,6 +624,27 @@ def _fallback_run_decision(
     )
 
 
+def repair_llm_decision(
+    *,
+    decision: ChatOrchestrationDecision,
+    extracted_intent: StrategyIntent,
+    language: str,
+) -> ChatOrchestrationDecision:
+    """If LLM says supported DCA/AAPL is unsupported, backend repairs it based on registry."""
+    plan = plan_strategy_action(extracted_intent, language)
+
+    if decision.intent == "unsupported_request" and plan.action != "unsupported":
+        return ChatOrchestrationDecision(
+            intent="education" if plan.action == "ask_clarification" else "run_backtest",
+            assistant_message=plan.message
+            or assistant_copy_for_result(extracted_intent.symbols.value or [], language),
+            strategy_intent=extracted_intent,
+            title_suggestion=None,
+        )
+
+    return decision
+
+
 def orchestrate_chat_turn(
     *,
     message: str,
@@ -667,6 +688,14 @@ def orchestrate_chat_turn(
                     )
                 except Exception:
                     pass
+
+        # 1.5. Repair LLM decision if it hallucinated "unsupported" for valid inputs
+        if decision.strategy_intent:
+            decision = repair_llm_decision(
+                decision=decision,
+                extracted_intent=decision.strategy_intent,
+                language=language or "en",
+            )
 
         # 2. Policy Enforcement: override LLM if readiness gate fails
         if decision.strategy_intent:
