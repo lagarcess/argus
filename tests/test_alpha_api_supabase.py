@@ -110,34 +110,33 @@ def _fake_fetch_price_series(
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.domain import engine as domain_engine
-    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
+    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyIntent, SlotValue
 
     monkeypatch.setattr(
         api_main,
         "orchestrate_chat_turn",
-        lambda message, language, onboarding_required, primary_goal: (
+        lambda **kwargs: (
             ChatOrchestrationDecision(
                 intent="onboarding_prompt",
                 assistant_message=(
                     "What is your current primary goal? Don't worry, "
                     "you can change it later in Settings."
                 ),
-                strategy=None,
+                strategy_intent=None,
                 title_suggestion=None,
             )
-            if onboarding_required
+            if kwargs.get("onboarding_required")
             else ChatOrchestrationDecision(
                 intent="run_backtest",
                 assistant_message=(
                     "Probé la idea con TSLA."
-                    if str(language).lower().startswith("es")
+                    if str(kwargs.get("language")).lower().startswith("es")
                     else "I tested that idea with TSLA."
                 ),
-                strategy=StrategyExtraction(
-                    template="rsi_mean_reversion",
-                    asset_class="equity",
-                    symbols=["TSLA"],
-                    parameters={},
+                strategy_intent=StrategyIntent(
+                    template=SlotValue(value="rsi_mean_reversion", source="user_supplied"),
+                    asset_class=SlotValue(value="equity", source="user_supplied"),
+                    symbols=SlotValue(value=["TSLA"], source="user_supplied"),
                 ),
                 title_suggestion="TSLA idea",
             )
