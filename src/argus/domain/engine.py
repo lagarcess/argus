@@ -119,17 +119,17 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
     start = _to_date(payload.get("start_date") or (end - timedelta(days=365)))
     requested_asset_class = payload.get("asset_class")
     classified = [classify_symbol(s) for s in payload["symbols"]]
-    
+
     actual_classes = {c.asset_class for c in classified}
     if len(actual_classes) > 1:
         raise ValueError("mixed_asset_not_supported")
-        
+
     inferred_class = next(iter(actual_classes)) if actual_classes else "equity"
     asset_class = requested_asset_class or inferred_class
-    
+
     if asset_class != inferred_class:
         raise ValueError("asset_class_conflict")
-        
+
     symbols = [c.symbol for c in classified]
     timeframe = _normalize_timeframe(payload.get("timeframe"))
 
@@ -159,12 +159,12 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
         config["_execution_realism"] = _normalize_execution_realism(
             payload.get("_execution_realism")
         )
-    
+
     # Task 3: Handle DCA cadence
     if config["template"] == "dca_accumulation":
         cadence = (payload.get("parameters") or {}).get("dca_cadence") or "weekly"
         config["parameters"]["dca_cadence"] = cadence.lower()
-        
+
     return config
 
 
@@ -198,7 +198,7 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
     params = config.get("parameters") or {}
     template_name = config["template"]
     capability = STRATEGY_CAPABILITIES[template_name]
-    
+
     allowed_params = set(capability.parameters.keys())
     unknown = set(params.keys()) - allowed_params
     if unknown:
@@ -267,7 +267,7 @@ def _build_signals(
     if template == "dca_accumulation":
         cadence = config.get("parameters", {}).get("dca_cadence", "weekly").lower()
         entries = pd.Series(False, index=index, dtype=bool)
-        
+
         if cadence == "daily":
             entries[:] = True
         elif cadence == "weekly":
@@ -281,7 +281,7 @@ def _build_signals(
         else:
             # Fallback to single entry if unknown cadence
             entries.iloc[0] = True
-            
+
         exits = pd.Series(False, index=index, dtype=bool)
         return entries.astype(bool), exits.astype(bool)
 

@@ -1,4 +1,5 @@
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 AssetClass = Literal["equity", "crypto"]

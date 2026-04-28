@@ -1,5 +1,6 @@
 from argus.domain.engine import build_result_card
 
+
 def test_build_result_card_localization():
     config = {
         "template": "rsi_mean_reversion",
@@ -28,12 +29,12 @@ def test_build_result_card_localization():
         }
     }
     config["benchmark_symbol"] = "SPY"
-    
+
     # Test English
     card_en = build_result_card(config, metrics, language="en")
     assert card_en["status_label"] == "Simulation Complete"
     assert any(row["label"] == "Total Return (%)" for row in card_en["rows"])
-    
+
     # Test Spanish
     card_es = build_result_card(config, metrics, language="es-419")
     assert card_es["status_label"] == "Simulación Completa"

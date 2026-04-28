@@ -110,7 +110,11 @@ def _fake_fetch_price_series(
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.domain import engine as domain_engine
-    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyDraft, SlotValue
+    from argus.domain.orchestrator import (
+        ChatOrchestrationDecision,
+        SlotValue,
+        StrategyDraft,
+    )
 
     monkeypatch.setattr(
         api_main,

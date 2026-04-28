@@ -1,6 +1,6 @@
 import pandas as pd
-import pytest
 from argus.domain.engine import _build_signals
+
 
 def test_dca_accumulation_signals_weekly():
     # Create 14 days of data (2 weeks)
@@ -10,15 +10,15 @@ def test_dca_accumulation_signals_weekly():
         "template": "dca_accumulation",
         "parameters": {"dca_cadence": "weekly"}
     }
-    
+
     entries, exits = _build_signals(config, data)
-    
+
     # Should have entries at start of each week
     # 2024-01-01 is a Monday (start of week 1)
     # 2024-01-08 is the next Monday (start of week 2)
     assert entries.sum() == 2
-    assert entries.iloc[0] == True
-    assert entries.iloc[7] == True
+    assert bool(entries.iloc[0])
+    assert bool(entries.iloc[7])
     assert exits.sum() == 0
 
 def test_dca_accumulation_signals_monthly():
@@ -29,13 +29,13 @@ def test_dca_accumulation_signals_monthly():
         "template": "dca_accumulation",
         "parameters": {"dca_cadence": "monthly"}
     }
-    
+
     entries, exits = _build_signals(config, data)
-    
+
     # 2024-01-01 and 2024-02-01
     assert entries.sum() == 2
-    assert entries.iloc[0] == True
-    assert entries.iloc[31] == True # Feb 1st
+    assert bool(entries.iloc[0])
+    assert bool(entries.iloc[31]) # Feb 1st
     assert exits.sum() == 0
 
 def test_dca_accumulation_signals_daily():
@@ -45,7 +45,7 @@ def test_dca_accumulation_signals_daily():
         "template": "dca_accumulation",
         "parameters": {"dca_cadence": "daily"}
     }
-    
+
     entries, exits = _build_signals(config, data)
     assert entries.sum() == 5
     assert entries.all()

@@ -41,14 +41,18 @@ from argus.api.schemas import (
     ProfilePatch,
     SearchItem,
     SignupRequest,
+    StarterPromptsResponse,
     Strategy,
     StrategyCreate,
     StrategyPatch,
     StrategyResponse,
     SuccessResponse,
-    StarterPromptsResponse,
     User,
     UserResponse,
+)
+from argus.domain.backtest_state_machine import (
+    BacktestConversationState,
+    apply_backtest_turn,
 )
 from argus.domain.engine import (
     build_result_card,
@@ -59,14 +63,14 @@ from argus.domain.engine import (
     validate_backtest_config,
 )
 from argus.domain.orchestrator import (
+    DEFAULT_CHAT_INTENT_MODEL,
     assistant_copy_for_result,
-    compile_backtest_payload,
+    assistant_message_for_chat_turn,
+    classify_chat_turn_intent,
     get_starter_prompts,
     goal_follow_up_message,
     orchestrate_chat_turn,
     parse_onboarding_goal,
-    SlotValue,
-    StrategyDraft,
     suggest_entity_name,
 )
 from argus.domain.store import AlphaStore, utcnow
@@ -162,6 +166,46 @@ def _create_message(
     return _memory_message(
         conversation_id=conversation_id, role=role, content=content, metadata=metadata
     )
+
+
+def _latest_backtest_state(
+    history: list[dict[str, Any]],
+) -> BacktestConversationState:
+    for message in reversed(history):
+        metadata = message.get("metadata") or {}
+        raw_state = metadata.get("backtest_state")
+        if not raw_state and metadata.get("conversation_mode") == "guide":
+            return BacktestConversationState()
+        if raw_state:
+            try:
+                return BacktestConversationState.model_validate(raw_state)
+            except Exception as exc:
+                logger.warning("Backtest state rehydration failed", error=str(exc))
+                return BacktestConversationState()
+    return BacktestConversationState()
+
+
+def _state_has_params(state: BacktestConversationState) -> bool:
+    params = state.params
+    return bool(
+        params.template
+        or params.symbols
+        or params.asset_class
+        or params.timeframe
+        or params.start_date
+        or params.end_date
+        or params.starting_capital
+        or params.parameters
+    )
+
+
+def _latest_completed_run_id(history: list[dict[str, Any]]) -> str | None:
+    for message in reversed(history):
+        metadata = message.get("metadata") or {}
+        run_id = metadata.get("latest_run_id")
+        if run_id:
+            return str(run_id)
+    return None
 
 
 @app.middleware("http")
@@ -2068,8 +2112,7 @@ def chat_stream(
                 if m.role in ("user", "assistant")
             ]
 
-        # 2. Orchestrate
-        from loguru import logger
+        # 2. Classify intent and extract explicit params in one structured pass.
         lang = (
             payload.language
             or conversation.language
@@ -2078,49 +2121,133 @@ def chat_stream(
         )
         logger.info(f"Retrieved {len(history_msgs)} history messages for conversation {conversation.id}")
         try:
-            decision = orchestrate_chat_turn(
+            state = _latest_backtest_state(history_msgs)
+            latest_run_id = _latest_completed_run_id(history_msgs)
+            has_pending_backtest = state.awaiting_confirmation or (
+                _state_has_params(state) and state.confirmed_at is None
+            )
+            turn_intent = classify_chat_turn_intent(
                 message=payload.message,
                 language=lang,
-                onboarding_required=False,
                 primary_goal=current_user_profile.onboarding.primary_goal,
+                onboarding_stage=current_user_profile.onboarding.stage,
+                pending_backtest_state={
+                    **state.model_dump(mode="json"),
+                    "conversation_mode": "setup" if has_pending_backtest else "guide",
+                    "latest_run_id": latest_run_id,
+                },
                 history=history_msgs,
+                model_name=os.getenv("AGENT_MODEL") or DEFAULT_CHAT_INTENT_MODEL,
             )
-            yield sse("status", {"status": f"intent_{decision.intent}"})
-        except Exception as exc:
+            yield sse("status", {"status": f"intent_{turn_intent.intent}"})
+        except Exception:
             logger.exception("Chat orchestration failed", conversation_id=conversation.id)
             yield sse("error", {"code": "internal_error", "detail": "Orchestration failed."})
             yield sse("done", {"error": True})
             return
 
-        # 3. Handle non-backtest intents
-        if decision.intent != "run_backtest":
+        if turn_intent.result_action == "save_or_organize":
+            assistant_text = assistant_message_for_chat_turn(turn_intent, payload.message, lang)
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
                 role="assistant",
-                content=decision.assistant_message,
+                content=assistant_text,
                 metadata={
-                    "strategy_draft": decision.strategy_draft.model_dump()
-                    if decision.strategy_draft
-                    else None
+                    "conversation_mode": "result_review",
+                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
+                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
+                    **(
+                        {"backtest_state": state.model_dump(mode="json")}
+                        if has_pending_backtest
+                        else {}
+                    ),
                 },
             )
-            yield sse("token", {"text": decision.assistant_message})
+            yield sse("token", {"text": assistant_text})
             yield sse("done", {"message_id": assistant_message.id})
             return
 
-        # 4. Handle Backtest intent
-        draft = decision.strategy_draft
-        yield sse("status", {"status": "extracting_strategy"})
-        
-        # Emit the AI's assistant message (care/clarity)
-        yield sse("token", {"text": decision.assistant_message})
-        
+        if (
+            not has_pending_backtest
+            and turn_intent.intent in {"guide", "explain_result", "unsupported"}
+        ):
+            mode = "result_review" if turn_intent.intent == "explain_result" else "guide"
+            assistant_text = assistant_message_for_chat_turn(turn_intent, payload.message, lang)
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=assistant_text,
+                metadata={
+                    "conversation_mode": mode,
+                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
+                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
+                },
+            )
+            yield sse("token", {"text": assistant_text})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        update = turn_intent.backtest_update
+
+        if not has_pending_backtest and not update.has_updates():
+            assistant_text = assistant_message_for_chat_turn(turn_intent, payload.message, lang)
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=assistant_text,
+                metadata={
+                    "conversation_mode": "guide",
+                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
+                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
+                },
+            )
+            yield sse("token", {"text": assistant_text})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        turn = apply_backtest_turn(
+            state=state,
+            update=update,
+            message=payload.message,
+            language=lang,
+            confirmation_action=turn_intent.confirmation_action,
+        )
+        yield sse("status", {"status": f"intent_{turn.action}"})
+
+        if turn.action != "run_backtest":
+            if turn.action == "cancel_backtest":
+                metadata = {
+                    "conversation_mode": "guide",
+                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
+                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
+                }
+            else:
+                mode = "confirm" if turn.action == "await_confirmation" else "setup"
+                metadata = {
+                    "conversation_mode": mode,
+                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
+                    "backtest_state": turn.state.model_dump(mode="json"),
+                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
+                }
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=turn.message,
+                metadata=metadata,
+            )
+            yield sse("token", {"text": turn.message})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        # 3. Execute only after the state machine accepts explicit confirmation.
         yield sse("status", {"status": "running_backtest"})
-        
+
         try:
-            # Task 12: Payload Compiler
-            config = compile_backtest_payload(draft)
+            config = dict(turn.config or {})
             config["conversation_id"] = conversation.id
 
             run = create_run_from_payload(
@@ -2135,7 +2262,7 @@ def chat_stream(
             if supabase_gateway is not None:
                 try:
                     run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
-                except Exception as exc:
+                except Exception:
                     if not _dev_memory_fallback_enabled():
                         raise
                     logger.warning("Supabase backtest run write failed; using dev memory fallback", run_id=run.id)
@@ -2173,10 +2300,15 @@ def chat_stream(
             user_id=user.id,
             conversation_id=conversation.id,
             role="assistant",
-            content=decision.assistant_message,
-            metadata={"strategy_draft": draft.model_dump()},
+            content=assistant_copy_for_result(run.symbols, lang),
+            metadata={
+                "conversation_mode": "result_review",
+                "chat_turn_intent": turn_intent.model_dump(mode="json"),
+                "backtest_state": turn.state.model_dump(mode="json"),
+                "latest_run_id": run.id,
+            },
         )
-        
+
         template_name = str(run.config_snapshot.get("template", "strategy"))
         suggested = suggest_entity_name(
             entity_type="conversation",
@@ -2184,7 +2316,7 @@ def chat_stream(
             language=lang,
         )
         new_title = suggested or f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
-        
+
         if conversation.title_source == "system_default":
             patch = {
                 "title": new_title,

@@ -111,7 +111,7 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
             raw_symbol=raw_symbol,
         )
         _add_aliases(aliases, resolved, canonical=canonical)
-        
+
         # Add name alias (lower-case, stripped)
         name_alias = raw_name.lower().strip()
         if name_alias and name_alias not in aliases:

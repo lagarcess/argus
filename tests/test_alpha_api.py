@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -802,9 +803,10 @@ def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
     # Insert a message into memory store manually
+    from datetime import datetime, timezone
+
     from argus.api.main import store
     from argus.api.schemas import Message
-    from datetime import datetime, timezone
 
     msg1 = Message(
         id="msg1",

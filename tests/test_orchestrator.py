@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import pytest
 from typing import Any
-from pydantic import BaseModel
 
+import pytest
 from argus.domain import orchestrator
-from argus.domain.orchestrator import (
-    ChatOrchestrationDecision,
-    StrategyIntentExtraction,
-    StrategyDraft,
-    SlotValue,
-    ExtractedSlot,
-)
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.orchestrator import (
+    ChatTurnIntent,
+    ExtractedSlot,
+    SlotValue,
+    StrategyDraft,
+    StrategyIntentExtraction,
+)
+
 
 @pytest.fixture(autouse=True)
 def mock_resolve_asset(monkeypatch):
@@ -64,7 +64,7 @@ def test_orchestrate_chat_turn_merges_history(monkeypatch) -> None:
     )
     assert decision1.intent == "clarify"
     assert "strategy" in decision1.assistant_message.lower() or "estrategia" in decision1.assistant_message.lower()
-    
+
     # 2. Second turn: only template
     def _fake_extract_2(message: str, model_name: str) -> StrategyIntentExtraction:
         return StrategyIntentExtraction(
@@ -77,13 +77,13 @@ def test_orchestrate_chat_turn_merges_history(monkeypatch) -> None:
         {"role": "user", "content": "Apple"},
         {"role": "assistant", "content": "What strategy?", "metadata": {"strategy_draft": decision1.strategy_draft.model_dump()}}
     ]
-    
+
     decision2 = orchestrator.orchestrate_chat_turn(
         message="Buy the dip",
         history=history,
         language="en",
     )
-    
+
     assert decision2.intent == "run_backtest"
     assert decision2.strategy_draft.template.value == "buy_the_dip"
     assert decision2.strategy_draft.symbols.value == ["AAPL"]
@@ -96,7 +96,7 @@ def test_plan_draft_action_parameter_clarification() -> None:
         symbols=SlotValue(value=["BTC"], source="user_supplied"),
         asset_class=SlotValue(value="crypto", source="backend_default"),
     )
-    
+
     plan = orchestrator.plan_draft_action(draft, language="en")
     assert plan.action == "ask_clarification"
     assert "dca_cadence" in plan.missing_fields
@@ -165,3 +165,73 @@ def test_dca_followup_reconstructs_slots_from_history_without_metadata(monkeypat
     assert decision.strategy_draft.symbols.value == ["TSLA"]
     assert decision.strategy_draft.starting_capital.value == 10000
     assert decision.strategy_draft.parameters["dca_cadence"].value == "daily"
+
+
+def test_neutral_message_is_answer_not_backtest_clarification(monkeypatch) -> None:
+    def _empty_extract(
+        message: str,
+        model_name: str,
+        history: list[dict[str, Any]] | None = None,
+    ) -> StrategyIntentExtraction:
+        return StrategyIntentExtraction()
+
+    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _empty_extract)
+
+    decision = orchestrator.orchestrate_chat_turn(
+        message="hey",
+        history=[],
+        language="en",
+    )
+
+    assert decision.intent == "answer"
+    assert decision.strategy_draft is None
+    assert "strategy" not in decision.assistant_message.lower()
+
+
+def test_chat_turn_intent_does_not_use_regex_fallback_without_provider(monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    def _fail_regex(message: str) -> StrategyIntentExtraction:  # noqa: ARG001
+        raise AssertionError("regex fallback should not be used for chat intent")
+
+    monkeypatch.setattr(orchestrator, "_extract_deterministic_intent", _fail_regex)
+
+    intent = orchestrator.classify_chat_turn_intent(
+        message="quiero ejecutar una estrategia",
+        language="es-419",
+    )
+
+    assert intent.intent == "guide"
+    assert intent.assistant_guidance_seed == "intent_unavailable"
+
+
+def test_chat_turn_intent_does_not_use_regex_fallback_after_provider_failure(monkeypatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    def _fail_model(model_name: str) -> object:  # noqa: ARG001
+        raise RuntimeError("provider unavailable")
+
+    def _fail_regex(message: str) -> StrategyIntentExtraction:  # noqa: ARG001
+        raise AssertionError("regex fallback should not be used after provider failure")
+
+    monkeypatch.setattr(orchestrator, "_build_model", _fail_model)
+    monkeypatch.setattr(orchestrator, "_extract_deterministic_intent", _fail_regex)
+
+    intent = orchestrator.classify_chat_turn_intent(
+        message="quiero ejecutar una estrategia",
+        language="es-419",
+    )
+
+    assert intent.intent == "guide"
+    assert intent.assistant_guidance_seed == "intent_unavailable"
+
+
+def test_setup_without_extracted_fields_gets_strategy_choices() -> None:
+    message = orchestrator.assistant_message_for_chat_turn(
+        ChatTurnIntent(intent="setup"),
+        "quiero ejecutar una estrategia",
+        "es-419",
+    )
+
+    assert "probar una estrategia" in message.lower()
+    assert "comprar y mantener" in message.lower()
