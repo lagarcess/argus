@@ -511,6 +511,17 @@ def _build_model(model_name: str) -> ChatOpenRouter:
     )
 
 
+def build_capability_prompt() -> str:
+    lines = ["Argus Alpha can run these supported templates:"]
+    for cap in STRATEGY_CAPABILITIES.values():
+        lines.append(
+            f"- {cap.template}: aliases={cap.aliases}; "
+            f"assets={cap.supported_asset_classes}; "
+            f"parameters={list(cap.parameters)}"
+        )
+    return "\n".join(lines)
+
+
 def _llm_extract_decision(
     *,
     message: str,
@@ -531,8 +542,9 @@ def _llm_extract_decision(
                 "Use the provided conversation history to resolve pronouns (e.g., 'it', 'them') "
                 "or symbols mentioned in previous turns. "
                 "Return only supported intents and templates. "
-                "Supported templates: buy_the_dip, rsi_mean_reversion, moving_average_crossover, "
-                "dca_accumulation, momentum_breakout, trend_follow. "
+                f"{build_capability_prompt()}\n"
+                "If a user asks for a supported template and supported symbol, never say it is unsupported. "
+                "If required information is missing, ask a concise clarification question. "
                 "Never propose unsupported capabilities. "
                 "In 'assistant_message', ALWAYS use standard Markdown vertical lists (e.g., '- **Item**: description') for strategy lists. "
                 "Never use horizontal dot-separated lists. Use vertical lists with newlines between paragraphs for clarity. "
@@ -594,6 +606,16 @@ def _fallback_run_decision(
                 pass
 
     # Assess readiness using the intent and history
+    is_empty = not intent.template.value and not intent.symbols.value
+    if is_empty:
+        goal = primary_goal or "surprise_me"
+        return ChatOrchestrationDecision(
+            intent="education",
+            assistant_message=goal_follow_up_message(goal, language),
+            strategy_intent=intent,
+            title_suggestion=None,
+        )
+
     plan = plan_strategy_action(intent, language)
 
     if plan.action == "run_backtest":
@@ -729,7 +751,6 @@ def orchestrate_chat_turn(
                     plan.message or decision.assistant_message
                 )
             elif plan.action == "run_backtest" and decision.intent != "run_backtest":
-                # LLM extracted enough but didn't decide to run? Force run if it's high confidence or if we want to be proactive
                 decision.intent = "run_backtest"
                 decision.assistant_message = assistant_copy_for_result(
                     decision.strategy_intent.symbols.value or [], language or "en"
@@ -750,7 +771,12 @@ def orchestrate_chat_turn(
         ):
             return _fallback_run_decision(message, language, primary_goal, history)
 
+        # Standardize intent: clarify -> education
+        if decision.intent == "clarify":
+            decision.intent = "education"
+
         return decision
+
     except Exception:
         if fallback_model:
             try:
@@ -761,8 +787,8 @@ def orchestrate_chat_turn(
                     model_name=fallback_model,
                     history=history,
                 )
-
-                # Merge and validate for fallback too
+                
+                # Minimum processing for fallback: history merge
                 if decision.strategy_intent and history:
                     last_intent_dict = next(
                         (m.get("strategy_intent") for m in reversed(history) if m.get("strategy_intent")),
@@ -771,27 +797,29 @@ def orchestrate_chat_turn(
                     if last_intent_dict:
                         try:
                             last_intent = StrategyIntent(**last_intent_dict)
-                            decision.strategy_intent = merge_intent(
-                                decision.strategy_intent, last_intent
-                            )
+                            decision.strategy_intent = merge_intent(decision.strategy_intent, last_intent)
                         except Exception:
                             pass
-
+                
+                # Policy check for fallback too
                 if decision.strategy_intent:
-                    readiness = decide_run_readiness(
-                        intent=decision.strategy_intent,
-                        history=history or [],
-                        language=language,
-                    )
-                    if not readiness.ready_to_run:
+                    plan = plan_strategy_action(decision.strategy_intent, language)
+                    if plan.action == "ask_clarification":
                         decision.intent = "education"
-                        decision.assistant_message = (
-                            readiness.clarification_prompt or decision.assistant_message
+                        decision.assistant_message = plan.message or decision.assistant_message
+                    elif plan.action == "run_backtest" and decision.intent != "run_backtest":
+                        decision.intent = "run_backtest"
+                        decision.assistant_message = assistant_copy_for_result(
+                            decision.strategy_intent.symbols.value or [], language or "en"
                         )
-
+                # Standardize intent: clarify -> education
+                if decision.intent == "clarify":
+                    decision.intent = "education"
+                
                 return decision
             except Exception:
                 pass
+        
         return _fallback_run_decision(message, language, primary_goal, history)
 
 
