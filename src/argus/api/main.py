@@ -65,6 +65,8 @@ from argus.domain.orchestrator import (
     goal_follow_up_message,
     orchestrate_chat_turn,
     parse_onboarding_goal,
+    SlotValue,
+    StrategyIntent,
     suggest_entity_name,
 )
 from argus.domain.store import AlphaStore, utcnow
@@ -117,20 +119,28 @@ def _memory_conversation(
     return conversation
 
 
-def _memory_message(*, conversation_id: str, role: str, content: str) -> Message:
+def _memory_message(
+    *, conversation_id: str, role: str, content: str, metadata: dict[str, Any] | None = None
+) -> Message:
     message = Message(
         id=store.new_id(),
         conversation_id=conversation_id,
         role=role,
         content=content,
         created_at=utcnow(),
+        metadata=metadata,
     )
     store.messages.setdefault(conversation_id, []).append(message)
     return message
 
 
 def _create_message(
-    *, user_id: str, conversation_id: str, role: str, content: str
+    *,
+    user_id: str,
+    conversation_id: str,
+    role: str,
+    content: str,
+    metadata: dict[str, Any] | None = None,
 ) -> Message:
     if supabase_gateway is not None:
         try:
@@ -139,6 +149,7 @@ def _create_message(
                 conversation_id=conversation_id,
                 role=role,
                 content=content,
+                metadata=metadata,
             )
         except Exception as exc:
             if not _dev_memory_fallback_enabled():
@@ -148,7 +159,9 @@ def _create_message(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
-    return _memory_message(conversation_id=conversation_id, role=role, content=content)
+    return _memory_message(
+        conversation_id=conversation_id, role=role, content=content, metadata=metadata
+    )
 
 
 @app.middleware("http")
@@ -2065,14 +2078,26 @@ def chat_stream(
             )
             # Map roles to orchestrator expectations, only user/assistant
             history_msgs = [
-                {"role": m.role, "content": m.content}
+                {
+                    "role": m.role,
+                    "content": m.content,
+                    "strategy_intent": m.metadata.get("strategy_intent")
+                    if m.metadata
+                    else None,
+                }
                 for m in raw_history
                 if m.role in ("user", "assistant")
             ]
         else:
             raw_history = store.messages.get(conversation.id, [])
             history_msgs = [
-                {"role": m.role, "content": m.content}
+                {
+                    "role": m.role,
+                    "content": m.content,
+                    "strategy_intent": m.metadata.get("strategy_intent")
+                    if m.metadata
+                    else None,
+                }
                 for m in raw_history
                 if m.role in ("user", "assistant")
             ]
@@ -2105,36 +2130,39 @@ def chat_stream(
             )
             yield sse("done", {"error": True})
             return
-        if decision.intent != "run_backtest" or decision.strategy is None:
+        if decision.intent != "run_backtest" or decision.strategy_intent is None:
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
                 role="assistant",
                 content=decision.assistant_message,
+                metadata={
+                    "strategy_intent": decision.strategy_intent.model_dump()
+                    if decision.strategy_intent
+                    else None
+                },
             )
             yield sse("token", {"text": decision.assistant_message})
             yield sse("done", {"message_id": assistant_message.id})
             return
 
-        # Task 1: Requirements-aware strategy readiness gate
-        readiness = assess_strategy_readiness(
-            extracted=decision.strategy,
-            language=payload.language or conversation.language or current_user_profile.language,
-        )
-        if not readiness.ready_to_run:
-            is_es = (payload.language or conversation.language or current_user_profile.language or "en").lower().startswith("es")
-            assistant_text = readiness.clarification_prompt or ("¿Qué debería probar?" if is_es else "What should I test?")
-            assistant_message = _create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-            )
-            yield sse("token", {"text": assistant_text})
-            yield sse("done", {"message_id": assistant_message.id})
-            return
+        # Strategy intent is ready to run
+        intent = decision.strategy_intent
 
-        extracted = decision.strategy.model_dump()
+        def _val(slot: SlotValue | None, default: Any = None) -> Any:
+            return slot.value if slot is not None else default
+
+        extracted = {
+            "template": _val(intent.template),
+            "asset_class": _val(intent.asset_class),
+            "symbols": _val(intent.symbols, []),
+            "timeframe": _val(intent.timeframe),
+            "start_date": _val(intent.start_date),
+            "end_date": _val(intent.end_date),
+            "benchmark_symbol": _val(intent.benchmark_symbol),
+            "starting_capital": _val(intent.starting_capital),
+            "parameters": {k: v.value for k, v in intent.parameters.items()},
+        }
         lang = payload.language or conversation.language or current_user_profile.language
         yield sse("status", {"status": "extracting_strategy"})
         is_es = (lang or "en").lower().startswith("es")

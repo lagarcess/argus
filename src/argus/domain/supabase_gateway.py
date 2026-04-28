@@ -317,7 +317,13 @@ class SupabaseGateway:
         return [Message.model_validate(row) for row in rows_data]
 
     def create_message(
-        self, *, user_id: str, conversation_id: str, role: str, content: str
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        role: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
     ) -> Message:
         conversation = self.get_conversation(
             user_id=user_id, conversation_id=conversation_id
@@ -329,6 +335,7 @@ class SupabaseGateway:
             "conversation_id": conversation_id,
             "role": role,
             "content": content,
+            "metadata": metadata,
             "created_at": _now_iso(),
         }
         created = self.client.table("messages").insert(payload).execute()

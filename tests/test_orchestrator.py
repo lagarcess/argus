@@ -20,8 +20,8 @@ def test_orchestrate_chat_turn_uses_heuristic_without_provider(monkeypatch) -> N
     )
 
     assert decision.intent == "run_backtest"
-    assert decision.strategy is not None
-    assert decision.strategy.template in orchestrator.SUPPORTED_TEMPLATES
+    assert decision.strategy_intent is not None
+    assert decision.strategy_intent.template.value in orchestrator.SUPPORTED_TEMPLATES
 
 
 def test_orchestrate_chat_turn_uses_fallback_model_after_primary_failure(
@@ -40,11 +40,12 @@ def test_orchestrate_chat_turn_uses_fallback_model_after_primary_failure(
         return ChatOrchestrationDecision(
             intent="run_backtest",
             assistant_message="Fallback model reply",
-            strategy=StrategyExtraction(
-                template="rsi_mean_reversion",
-                asset_class="equity",
-                symbols=["TSLA"],
-                parameters={},
+            strategy_intent=orchestrator.StrategyIntent(
+                template=orchestrator.SlotValue(
+                    value="rsi_mean_reversion", source="user_supplied"
+                ),
+                asset_class=orchestrator.SlotValue(value="equity", source="user_supplied"),
+                symbols=orchestrator.SlotValue(value=["TSLA"], source="user_supplied"),
             ),
         )
 
@@ -173,18 +174,21 @@ def test_decide_run_readiness_honors_pending_questions() -> None:
     # Scenario: Assistant asked for dates, user didn't provide them.
     history = [
         {"role": "user", "content": "Test BTC"},
-        {"role": "assistant", "content": "I can test BTC. For what period do you want to run it?"},
+        {
+            "role": "assistant",
+            "content": "I can test BTC. For what period do you want to run it?",
+        },
     ]
 
     # User just says "buy the dip" without dates
-    draft = orchestrator.StrategyRunDraft(
+    intent = orchestrator.StrategyIntent(
         symbols=orchestrator.SlotValue(value=["BTC"], source="history_inferred"),
         template=orchestrator.SlotValue(value="buy_the_dip", source="user_supplied"),
         timeframe=orchestrator.SlotValue(value="1D", source="backend_default"),
         start_date=orchestrator.SlotValue(value="2024-01-01", source="backend_default"),
     )
 
-    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
+    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
 
     assert readiness.ready_to_run is False
     assert "time_preferences" in readiness.missing_fields
@@ -192,23 +196,21 @@ def test_decide_run_readiness_honors_pending_questions() -> None:
 
     # Scenario: User explicitly says "use defaults"
     history.append({"role": "user", "content": "use standard defaults"})
-    # Re-build draft logic would normally handle this, but for test we simulate
-    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
+    # Re-build logic would normally handle this, but for test we simulate
+    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
     assert readiness.ready_to_run is True
 
 
 def test_decide_run_readiness_requires_dca_cadence() -> None:
     # Scenario: User says "DCA into BTC", but doesn't specify cadence.
     extraction = orchestrator.StrategyExtraction(
-        symbols=["BTC"], 
-        template="dca_accumulation", 
-        asset_class="crypto"
+        symbols=["BTC"], template="dca_accumulation", asset_class="crypto"
     )
     history = [{"role": "user", "content": "DCA into BTC"}]
-    draft = orchestrator.build_strategy_draft(extraction, history)
-    
-    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
-    
+    intent = orchestrator.build_strategy_intent(extraction, history)
+
+    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
+
     assert readiness.ready_to_run is False
     assert "dca_cadence" in readiness.missing_fields
     assert "often" in readiness.clarification_prompt.lower()
@@ -217,7 +219,7 @@ def test_decide_run_readiness_requires_dca_cadence() -> None:
     history.append({"role": "user", "content": "weekly"})
     # Normal flow would re-extract, but here we simulate
     extraction.parameters = {"dca_cadence": "weekly"}
-    draft = orchestrator.build_strategy_draft(extraction, history)
-    
-    readiness = orchestrator.decide_run_readiness(draft, history, language="en")
+    intent = orchestrator.build_strategy_intent(extraction, history)
+
+    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
     assert readiness.ready_to_run is True

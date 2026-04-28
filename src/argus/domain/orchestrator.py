@@ -90,58 +90,26 @@ def get_starter_prompts(primary_goal: str | None) -> list[str]:
 
 
 class SlotValue(BaseModel):
-    value: Any | None = None
+    value: Any = None
     source: Literal["user_supplied", "history_inferred", "backend_default", "missing"]
     confidence: float = 1.0
 
 
-class StrategyRunDraft(BaseModel):
-    template: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    asset_class: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    symbols: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    timeframe: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    start_date: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    end_date: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    benchmark_symbol: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    starting_capital: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    dca_cadence: SlotValue = Field(
-        default_factory=lambda: SlotValue(source="missing")
-    )
-    parameters: dict[str, Any] = Field(default_factory=dict)
-
-    def to_extraction(fixed_dates: bool = False) -> StrategyExtraction:
-        """Convert draft slots into a flat StrategyExtraction for the engine."""
-        return StrategyExtraction(
-            template=self.template.value,
-            asset_class=self.asset_class.value or "equity",
-            symbols=self.symbols.value or [],
-            timeframe=self.timeframe.value,
-            start_date=self.start_date.value,
-            end_date=self.end_date.value,
-            benchmark_symbol=self.benchmark_symbol.value,
-            parameters=self.parameters,
-        )
+class StrategyIntent(BaseModel):
+    template: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    asset_class: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    symbols: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    timeframe: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    start_date: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    end_date: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    starting_capital: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    benchmark_symbol: SlotValue = Field(default_factory=lambda: SlotValue(source="missing"))
+    parameters: dict[str, SlotValue] = Field(default_factory=dict)
 
 
 class StrategyExtraction(BaseModel):
     template: str | None = None
-    asset_class: Literal["equity", "crypto"]
+    asset_class: Literal["equity", "crypto"] | None = None
     symbols: list[str] = Field(default_factory=list)
     timeframe: str | None = None
     start_date: str | None = None
@@ -154,13 +122,14 @@ class StrategyExtraction(BaseModel):
 class ChatOrchestrationDecision(BaseModel):
     intent: Literal[
         "run_backtest",
+        "answer",
+        "clarify",
         "onboarding_prompt",
         "education",
         "unsupported_request",
     ]
     assistant_message: str
-    strategy: StrategyExtraction | None = None
-    strategy_draft: StrategyRunDraft | None = None
+    strategy_intent: StrategyIntent | None = None
     title_suggestion: str | None = None
 
 
@@ -168,26 +137,29 @@ class NameSuggestion(BaseModel):
     name: str
 
 
-def build_strategy_draft(
+def build_strategy_intent(
     extraction: StrategyExtraction, history: list[dict[str, str]] | None = None
-) -> StrategyRunDraft:
+) -> StrategyIntent:
     """Assess where each parameter came from to guide readiness decisions."""
     history = history or []
-    
-    def get_source(field_name: str, value: Any) -> Literal["user_supplied", "history_inferred", "backend_default", "missing"]:
-        if not value:
+
+    def get_source(
+        field_name: str, value: Any
+    ) -> Literal["user_supplied", "history_inferred", "backend_default", "missing"]:
+        if value is None or (isinstance(value, list) and not value):
             return "missing"
-        
+
         # Check if the field was mentioned in the last user message
-        # This is a heuristic; in a real graph, the LLM would tag provenance
-        last_user_msg = next((m["content"].upper() for m in reversed(history) if m["role"] == "user"), "")
-        
+        last_user_msg = next(
+            (m["content"].upper() for m in reversed(history) if m["role"] == "user"), ""
+        )
+
         # Symbols check
         if field_name == "symbols" and isinstance(value, list) and value:
             if any(s.upper() in last_user_msg for s in value):
                 return "user_supplied"
             return "history_inferred"
-            
+
         # Template check
         if field_name == "template":
             if value.upper() in last_user_msg:
@@ -198,31 +170,91 @@ def build_strategy_draft(
         if field_name in ["timeframe", "start_date", "end_date"]:
             if value.upper() in last_user_msg:
                 return "user_supplied"
-            # If not in last message but exists, it's inferred from history or default
             return "history_inferred"
 
-        # DCA Cadence check
-        if field_name == "dca_cadence":
-            if any(kw in last_user_msg for kw in ["DAILY", "WEEKLY", "MONTHLY", "DIARIA", "SEMANAL", "MENSUAL"]):
+        # Parameters check
+        if field_name.startswith("param:"):
+            if value and str(value).upper() in last_user_msg:
                 return "user_supplied"
-            return "missing"
+            # Cadence special check
+            if field_name == "param:dca_cadence" and any(
+                kw in last_user_msg
+                for kw in [
+                    "DAILY",
+                    "WEEKLY",
+                    "MONTHLY",
+                    "DIARIA",
+                    "SEMANAL",
+                    "MENSUAL",
+                ]
+            ):
+                return "user_supplied"
+            return "history_inferred"
 
         return "backend_default"
 
-    return StrategyRunDraft(
-        template=SlotValue(value=extraction.template, source=get_source("template", extraction.template)),
-        asset_class=SlotValue(value=extraction.asset_class, source="backend_default"),
-        symbols=SlotValue(value=extraction.symbols, source=get_source("symbols", extraction.symbols)),
-        timeframe=SlotValue(value=extraction.timeframe, source=get_source("timeframe", extraction.timeframe)),
-        start_date=SlotValue(value=extraction.start_date, source=get_source("start_date", extraction.start_date)),
-        end_date=SlotValue(value=extraction.end_date, source=get_source("end_date", extraction.end_date)),
-        benchmark_symbol=SlotValue(value=extraction.benchmark_symbol, source="backend_default"),
-        starting_capital=SlotValue(value=extraction.starting_capital, source="backend_default"),
-        dca_cadence=SlotValue(
-            value=(extraction.parameters or {}).get("dca_cadence") or "weekly",
-            source=get_source("dca_cadence", (extraction.parameters or {}).get("dca_cadence"))
+    # Convert parameters to SlotValues
+    param_slots = {}
+    for k, v in (extraction.parameters or {}).items():
+        param_slots[k] = SlotValue(
+            value=v, source=get_source(f"param:{k}", v)
+        )
+
+    return StrategyIntent(
+        template=SlotValue(
+            value=extraction.template, source=get_source("template", extraction.template)
         ),
-        parameters=extraction.parameters,
+        asset_class=SlotValue(
+            value=extraction.asset_class or "equity", source="backend_default"
+        ),
+        symbols=SlotValue(
+            value=extraction.symbols, source=get_source("symbols", extraction.symbols)
+        ),
+        timeframe=SlotValue(
+            value=extraction.timeframe,
+            source=get_source("timeframe", extraction.timeframe),
+        ),
+        start_date=SlotValue(
+            value=extraction.start_date,
+            source=get_source("start_date", extraction.start_date),
+        ),
+        end_date=SlotValue(
+            value=extraction.end_date, source=get_source("end_date", extraction.end_date)
+        ),
+        benchmark_symbol=SlotValue(
+            value=extraction.benchmark_symbol, source="backend_default"
+        ),
+        starting_capital=SlotValue(
+            value=extraction.starting_capital or 10000, source="backend_default"
+        ),
+        parameters=param_slots,
+    )
+
+
+def merge_intent(
+    current: StrategyIntent, previous: StrategyIntent | None
+) -> StrategyIntent:
+    if previous is None:
+        return current
+
+    def pick(cur: SlotValue, old: SlotValue) -> SlotValue:
+        return cur if cur.source != "missing" else old
+
+    merged_params = {**previous.parameters}
+    for k, v in current.parameters.items():
+        if v.source != "missing":
+            merged_params[k] = v
+
+    return StrategyIntent(
+        template=pick(current.template, previous.template),
+        asset_class=pick(current.asset_class, previous.asset_class),
+        symbols=pick(current.symbols, previous.symbols),
+        timeframe=pick(current.timeframe, previous.timeframe),
+        start_date=pick(current.start_date, previous.start_date),
+        end_date=pick(current.end_date, previous.end_date),
+        starting_capital=pick(current.starting_capital, previous.starting_capital),
+        benchmark_symbol=pick(current.benchmark_symbol, previous.benchmark_symbol),
+        parameters=merged_params,
     )
 
 
@@ -269,37 +301,54 @@ def _heuristic_extract(message: str) -> dict[str, Any]:
 
 
 def decide_run_readiness(
-    draft: StrategyRunDraft, history: list[dict[str, str]], language: str | None = None
+    intent: StrategyIntent, history: list[dict[str, str]], language: str | None = None
 ) -> StrategyReadiness:
     """Determine if we can run or if we need to ask more questions."""
     missing = []
-    
+
     # Policy: Always require symbols and template from user or history
-    if draft.symbols.source == "missing":
+    if intent.symbols.source == "missing":
         missing.append("symbols")
-    if draft.template.source == "missing":
+    if intent.template.source == "missing":
         missing.append("template")
-    
+
     # Policy: For DCA, require explicit cadence from user or history
-    if draft.template.value == "dca_accumulation":
-        if draft.dca_cadence.source == "missing":
+    if intent.template.value == "dca_accumulation":
+        cadence = intent.parameters.get("dca_cadence")
+        if cadence is None or cadence.source == "missing":
             missing.append("dca_cadence")
 
     # Policy: If we asked for time/dates in the last 3 turns and still don't have them from user, mark as missing
     # This prevents silent defaulting when the user is in the middle of answering a time question.
     pending_time_question = any(
-        m["role"] == "assistant" and 
-        any(kw in m["content"].lower() for kw in ["timeframe", "temporal", "period", "fecha", "cuándo", "cuando"])
+        m["role"] == "assistant"
+        and any(
+            kw in m["content"].lower()
+            for kw in ["timeframe", "temporal", "period", "fecha", "cuándo", "cuando"]
+        )
         for m in history[-3:]
     )
-    
+
     # If we asked and user didn't provide in this turn (source == history_inferred or backend_default means it wasn't in last msg)
     if pending_time_question:
-        if draft.timeframe.source in ("missing", "backend_default", "history_inferred") and \
-           draft.start_date.source in ("missing", "backend_default", "history_inferred"):
+        if intent.timeframe.source in (
+            "missing",
+            "backend_default",
+            "history_inferred",
+        ) and intent.start_date.source in (
+            "missing",
+            "backend_default",
+            "history_inferred",
+        ):
             # Check if last user message says "default" or "da igual" or similar
-            last_user_msg = next((m["content"].lower() for m in reversed(history) if m["role"] == "user"), "")
-            if not any(kw in last_user_msg for kw in ["default", "por defecto", "da igual", "any", "standard"]):
+            last_user_msg = next(
+                (m["content"].lower() for m in reversed(history) if m["role"] == "user"),
+                "",
+            )
+            if not any(
+                kw in last_user_msg
+                for kw in ["default", "por defecto", "da igual", "any", "standard"]
+            ):
                 missing.append("time_preferences")
 
     if not missing:
@@ -309,18 +358,34 @@ def decide_run_readiness(
     lang = _resolve_language(language)
     prompts = []
     if "symbols" in missing:
-        prompts.append("¿Qué símbolos quieres probar?" if lang == "es-419" else "Which symbols do you want to test?")
+        prompts.append(
+            "¿Qué símbolos quieres probar?"
+            if lang == "es-419"
+            else "Which symbols do you want to test?"
+        )
     if "template" in missing:
-        prompts.append("¿Qué estrategia quieres usar?" if lang == "es-419" else "Which strategy do you want to use?")
+        prompts.append(
+            "¿Qué estrategia quieres usar?"
+            if lang == "es-419"
+            else "Which strategy do you want to use?"
+        )
     if "time_preferences" in missing:
-        prompts.append("¿En qué periodo o temporalidad?" if lang == "es-419" else "For what period or timeframe?")
+        prompts.append(
+            "¿En qué periodo o temporalidad?"
+            if lang == "es-419"
+            else "For what period or timeframe?"
+        )
     if "dca_cadence" in missing:
-        prompts.append("¿Con qué frecuencia quieres comprar (diaria, semanal, mensual)?" if lang == "es-419" else "How often do you want to buy (daily, weekly, monthly)?")
+        prompts.append(
+            "¿Con qué frecuencia quieres comprar (diaria, semanal, mensual)?"
+            if lang == "es-419"
+            else "How often do you want to buy (daily, weekly, monthly)?"
+        )
 
     return StrategyReadiness(
         ready_to_run=False,
         missing_fields=missing,
-        clarification_prompt=" ".join(prompts)
+        clarification_prompt=" ".join(prompts),
     )
 
 
@@ -330,8 +395,8 @@ def assess_strategy_readiness(
     language: str | None,
 ) -> StrategyReadiness:
     """Deprecated: Use decide_run_readiness instead."""
-    draft = build_strategy_draft(extracted, [])
-    return decide_run_readiness(draft, [], language)
+    intent = build_strategy_intent(extracted, [])
+    return decide_run_readiness(intent, [], language)
 
 
 def _default_onboarding_prompt(language: str | None) -> str:
@@ -425,48 +490,73 @@ def _llm_extract_decision(
     messages.append({"role": "user", "content": message})
 
     decision = structured.invoke(messages)
-    if decision.strategy:
-        decision.strategy_draft = build_strategy_draft(
-            decision.strategy, (history or []) + [{"role": "user", "content": message}]
+    if decision.strategy_intent:
+        # Re-build intent with history awareness
+        # Note: decision.strategy_intent might be partially filled by LLM
+        # We use it as an extraction source
+        extraction = StrategyExtraction(
+            template=decision.strategy_intent.template.value,
+            asset_class=decision.strategy_intent.asset_class.value,
+            symbols=decision.strategy_intent.symbols.value or [],
+            timeframe=decision.strategy_intent.timeframe.value,
+            start_date=decision.strategy_intent.start_date.value,
+            end_date=decision.strategy_intent.end_date.value,
+            benchmark_symbol=decision.strategy_intent.benchmark_symbol.value,
+            starting_capital=decision.strategy_intent.starting_capital.value,
+            parameters={k: v.value for k, v in decision.strategy_intent.parameters.items()}
+        )
+        decision.strategy_intent = build_strategy_intent(
+            extraction, (history or []) + [{"role": "user", "content": message}]
         )
     return decision
 
 
 def _fallback_run_decision(
-    message: str, language: str | None, primary_goal: str | None = None, history: list[dict[str, str]] | None = None
+    message: str,
+    language: str | None,
+    primary_goal: str | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> ChatOrchestrationDecision:
-    extraction = StrategyExtraction.model_validate(_heuristic_extract(message))
-    draft = build_strategy_draft(extraction, (history or []) + [{"role": "user", "content": message}])
-    
-    # Assess readiness using the draft and history
-    readiness = decide_run_readiness(draft=draft, history=history or [], language=language)
+    extracted = StrategyExtraction.model_validate(_heuristic_extract(message))
+    intent = build_strategy_intent(
+        extracted, (history or []) + [{"role": "user", "content": message}]
+    )
+
+    # Assess readiness using the intent and history
+    readiness = decide_run_readiness(
+        intent=intent, history=history or [], language=language
+    )
 
     if readiness.ready_to_run:
         return ChatOrchestrationDecision(
             intent="run_backtest",
-            assistant_message=assistant_copy_for_result(extraction.symbols, language or "en"),
-            strategy=extraction,
-            strategy_draft=draft,
+            assistant_message=assistant_copy_for_result(
+                intent.symbols.value or [], language or "en"
+            ),
+            strategy_intent=intent,
             title_suggestion=None,
         )
 
     # If no symbols were found even by heuristic, treat as unsupported/general chat
-    if not extraction.symbols:
+    if not intent.symbols.value:
         goal = primary_goal or "surprise_me"
         assistant_message = goal_follow_up_message(goal, language)
         return ChatOrchestrationDecision(
             intent="unsupported_request",
             assistant_message=assistant_message,
-            strategy=None,
-            strategy_draft=draft,
+            strategy_intent=intent,
             title_suggestion=None,
         )
 
     return ChatOrchestrationDecision(
         intent="education",
-        assistant_message=readiness.clarification_prompt or ("Cuéntame más sobre tu estrategia." if _resolve_language(language) == "es-419" else "Tell me more about your strategy."),
-        strategy=extraction,
-        strategy_draft=draft,
+        assistant_message=readiness.clarification_prompt
+        or (
+            "Cuéntame más sobre tu estrategia."
+            if _resolve_language(language) == "es-419"
+            else "Tell me more about your strategy."
+        ),
+        strategy_intent=intent,
         title_suggestion=None,
     )
 
@@ -483,8 +573,6 @@ def orchestrate_chat_turn(
         return ChatOrchestrationDecision(
             intent="onboarding_prompt",
             assistant_message=_default_onboarding_prompt(language),
-            strategy=None,
-            title_suggestion=None,
         )
 
     primary_model = os.getenv("AGENT_MODEL")
@@ -501,23 +589,50 @@ def orchestrate_chat_turn(
             model_name=primary_model,
             history=history,
         )
-        
-        # Policy Enforcement: override LLM if readiness gate fails
-        if decision.strategy_draft:
+
+        # 1. Merge with history if LLM returned an intent
+        if decision.strategy_intent and history:
+            last_intent_dict = next(
+                (m.get("strategy_intent") for m in reversed(history) if m.get("strategy_intent")),
+                None
+            )
+            if last_intent_dict:
+                try:
+                    last_intent = StrategyIntent(**last_intent_dict)
+                    decision.strategy_intent = merge_intent(
+                        decision.strategy_intent, last_intent
+                    )
+                except Exception:
+                    pass
+
+        # 2. Policy Enforcement: override LLM if readiness gate fails
+        if decision.strategy_intent:
             readiness = decide_run_readiness(
-                draft=decision.strategy_draft, 
-                history=history or [], 
-                language=language
+                intent=decision.strategy_intent,
+                history=history or [],
+                language=language,
             )
             if not readiness.ready_to_run:
                 decision.intent = "education"
-                decision.assistant_message = readiness.clarification_prompt or decision.assistant_message
-        
-        if decision.strategy and decision.strategy.template not in SUPPORTED_TEMPLATES:
+                decision.assistant_message = (
+                    readiness.clarification_prompt or decision.assistant_message
+                )
+
+        # 3. Validation
+        if (
+            decision.strategy_intent
+            and decision.strategy_intent.template.value
+            and decision.strategy_intent.template.value not in SUPPORTED_TEMPLATES
+        ):
             return _fallback_run_decision(message, language, primary_goal, history)
-        if decision.strategy and not decision.strategy.symbols:
+
+        if (
+            decision.strategy_intent
+            and not decision.strategy_intent.symbols.value
+            and decision.intent == "run_backtest"
+        ):
             return _fallback_run_decision(message, language, primary_goal, history)
-            
+
         return decision
     except Exception:
         if fallback_model:
@@ -529,23 +644,35 @@ def orchestrate_chat_turn(
                     model_name=fallback_model,
                     history=history,
                 )
-                
-                # Policy Enforcement: override fallback LLM if readiness gate fails
-                if decision.strategy_draft:
+
+                # Merge and validate for fallback too
+                if decision.strategy_intent and history:
+                    last_intent_dict = next(
+                        (m.get("strategy_intent") for m in reversed(history) if m.get("strategy_intent")),
+                        None
+                    )
+                    if last_intent_dict:
+                        try:
+                            last_intent = StrategyIntent(**last_intent_dict)
+                            decision.strategy_intent = merge_intent(
+                                decision.strategy_intent, last_intent
+                            )
+                        except Exception:
+                            pass
+
+                if decision.strategy_intent:
                     readiness = decide_run_readiness(
-                        draft=decision.strategy_draft, 
-                        history=history or [], 
-                        language=language
+                        intent=decision.strategy_intent,
+                        history=history or [],
+                        language=language,
                     )
                     if not readiness.ready_to_run:
                         decision.intent = "education"
-                        decision.assistant_message = readiness.clarification_prompt or decision.assistant_message
-                
-                if (
-                    decision.strategy
-                    and decision.strategy.template in SUPPORTED_TEMPLATES
-                ):
-                    return decision
+                        decision.assistant_message = (
+                            readiness.clarification_prompt or decision.assistant_message
+                        )
+
+                return decision
             except Exception:
                 pass
         return _fallback_run_decision(message, language, primary_goal, history)
