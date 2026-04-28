@@ -3,6 +3,7 @@ from argus.domain.orchestrator import (
     StrategyIntent,
     SlotValue,
     plan_strategy_action,
+    compile_backtest_payload,
 )
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
@@ -62,3 +63,27 @@ def test_plan_spanish_clarification():
     plan = plan_strategy_action(intent, "es-419")
     assert plan.action == "ask_clarification"
     assert "¿Sobre qué activos" in plan.message
+
+def test_compile_backtest_payload():
+    intent = StrategyIntent(
+        template=SlotValue(value="dca_accumulation", source="user_supplied"),
+        symbols=SlotValue(value=["AAPL"], source="user_supplied"),
+        parameters={"dca_cadence": SlotValue(value="weekly", source="user_supplied")}
+    )
+    payload = compile_backtest_payload(intent)
+    assert payload["template"] == "dca_accumulation"
+    assert payload["symbols"] == ["AAPL"]
+    assert payload["parameters"]["dca_cadence"] == "weekly"
+    assert payload["starting_capital"] == 10000 # Default
+    assert payload["benchmark_symbol"] == "SPY" # Inferred
+
+def test_compile_resolves_aliases_and_defaults():
+    intent = StrategyIntent(
+        template=SlotValue(value="dca", source="user_supplied"),
+        symbols=SlotValue(value=["BTC"], source="user_supplied"),
+        # dca_cadence missing
+    )
+    payload = compile_backtest_payload(intent)
+    assert payload["template"] == "dca_accumulation"
+    assert payload["parameters"]["dca_cadence"] == "monthly" # From registry default
+    assert payload["benchmark_symbol"] == "BTC"

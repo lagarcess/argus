@@ -397,6 +397,60 @@ def plan_strategy_action(
     return StrategyPlanDecision(action="run_backtest")
 
 
+def compile_backtest_payload(intent: StrategyIntent) -> dict[str, object]:
+    """Compile a StrategyIntent into a final backtest payload."""
+    template_val = intent.template.value
+    template_str = str(template_val)
+
+    # Resolve template from aliases if needed
+    if template_str not in STRATEGY_CAPABILITIES:
+        for cap in STRATEGY_CAPABILITIES.values():
+            if template_str.lower() in [a.lower() for a in cap.aliases]:
+                template_str = cap.template
+                break
+
+    capability = STRATEGY_CAPABILITIES[template_str]
+
+    parameters = {}
+    for key, spec in capability.parameters.items():
+        slot = intent.parameters.get(key)
+        if slot and slot.source != "missing" and slot.value is not None:
+            parameters[key] = slot.value
+        else:
+            parameters[key] = spec.default
+
+    # Infer asset class if missing
+    asset_class = intent.asset_class.value
+    if not asset_class and intent.symbols.value:
+        # Simple inference: if any symbol is BTC/ETH/SOL, it's crypto
+        crypto_hints = {"BTC", "ETH", "SOL", "DOGE", "SHIB"}
+        if any(s.upper() in crypto_hints for s in intent.symbols.value):
+            asset_class = "crypto"
+        else:
+            asset_class = "equity"
+    
+    if not asset_class:
+        asset_class = "equity"
+
+    benchmark_symbol = intent.benchmark_symbol.value
+    if not benchmark_symbol:
+        benchmark_symbol = "BTC" if asset_class == "crypto" else "SPY"
+
+    return {
+        "template": template_str,
+        "asset_class": asset_class,
+        "symbols": intent.symbols.value or [],
+        "timeframe": intent.timeframe.value or "1D",
+        "start_date": intent.start_date.value,
+        "end_date": intent.end_date.value,
+        "side": "long",
+        "starting_capital": intent.starting_capital.value or 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": benchmark_symbol,
+        "parameters": parameters,
+    }
+
+
 def _default_onboarding_prompt(language: str | None) -> str:
     if _resolve_language(language) == "es-419":
         return (
