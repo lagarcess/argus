@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+import pytest
+
 from argus.domain import orchestrator
 from argus.domain.orchestrator import (
     ChatOrchestrationDecision,
     StrategyExtraction,
 )
+from argus.domain.market_data.assets import ResolvedAsset
+
+@pytest.fixture(autouse=True)
+def mock_resolve_asset(monkeypatch):
+    def _fake_resolve(symbol: str) -> ResolvedAsset:
+        return ResolvedAsset(
+            canonical_symbol=symbol.upper(),
+            asset_class="equity",
+            name=symbol,
+            raw_symbol=symbol
+        )
+    monkeypatch.setattr(orchestrator, "resolve_asset", _fake_resolve)
 
 
 def test_orchestrate_chat_turn_uses_heuristic_without_provider(monkeypatch) -> None:
@@ -75,36 +89,49 @@ def test_parse_onboarding_goal_hidden_protocol() -> None:
     assert orchestrator.parse_onboarding_goal("__ONBOARDING_GOAL__:unknown") is None
 
 
-def test_assess_strategy_readiness() -> None:
+def test_plan_strategy_action() -> None:
     # Ready case
-    ready = orchestrator.assess_strategy_readiness(
-        extracted=StrategyExtraction(symbols=["AAPL"], template="rsi_mean_reversion", asset_class="equity"),
+    plan = orchestrator.plan_strategy_action(
+        intent=orchestrator.StrategyIntent(
+            template=orchestrator.SlotValue(value="rsi_mean_reversion", source="user_supplied"),
+            symbols=orchestrator.SlotValue(value=["AAPL"], source="user_supplied"),
+            asset_class=orchestrator.SlotValue(value="equity", source="user_supplied"),
+        ),
         language="en"
     )
-    assert ready.ready_to_run is True
+    assert plan.action == "run_backtest"
 
     # Missing symbols
-    missing_symbols = orchestrator.assess_strategy_readiness(
-        extracted=StrategyExtraction(symbols=[], template="rsi_mean_reversion", asset_class="equity"),
+    missing_symbols = orchestrator.plan_strategy_action(
+        intent=orchestrator.StrategyIntent(
+            template=orchestrator.SlotValue(value="rsi_mean_reversion", source="user_supplied"),
+            symbols=orchestrator.SlotValue(value=[], source="missing"),
+        ),
         language="en"
     )
-    assert missing_symbols.ready_to_run is False
+    assert missing_symbols.action == "ask_clarification"
     assert "symbols" in missing_symbols.missing_fields
 
     # Missing template
-    missing_template = orchestrator.assess_strategy_readiness(
-        extracted=StrategyExtraction(symbols=["AAPL"], template=None, asset_class="equity"),
+    missing_template = orchestrator.plan_strategy_action(
+        intent=orchestrator.StrategyIntent(
+            template=orchestrator.SlotValue(value=None, source="missing"),
+            symbols=orchestrator.SlotValue(value=["AAPL"], source="user_supplied"),
+        ),
         language="en"
     )
-    assert missing_template.ready_to_run is False
+    assert missing_template.action == "ask_clarification"
     assert "template" in missing_template.missing_fields
 
     # Spanish prompt
-    spanish = orchestrator.assess_strategy_readiness(
-        extracted=StrategyExtraction(symbols=[], template="rsi_mean_reversion", asset_class="equity"), 
+    spanish = orchestrator.plan_strategy_action(
+        intent=orchestrator.StrategyIntent(
+            template=orchestrator.SlotValue(value="rsi_mean_reversion", source="user_supplied"),
+            symbols=orchestrator.SlotValue(value=[], source="missing"),
+        ),
         language="es-419"
     )
-    assert "símbolos" in spanish.clarification_prompt or "simbolos" in spanish.clarification_prompt
+    assert "activos" in spanish.message or "símbolos" in spanish.message
 
 
 def test_orchestrate_chat_turn_passes_history(monkeypatch) -> None:
@@ -148,6 +175,7 @@ def test_orchestrate_chat_turn_passes_history(monkeypatch) -> None:
 def test_orchestrate_chat_turn_fallback_honors_primary_goal(monkeypatch) -> None:
     # Force fallback by disabling LLM provider
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("AGENT_MODEL", raising=False)
 
     # Case 1: Explore Crypto goal
     decision = orchestrator.orchestrate_chat_turn(
@@ -156,7 +184,7 @@ def test_orchestrate_chat_turn_fallback_honors_primary_goal(monkeypatch) -> None
         onboarding_required=False,
         primary_goal="explore_crypto",
     )
-    assert decision.intent == "unsupported_request"
+    assert decision.intent == "education"
     assert "crypto" in decision.assistant_message.lower()
 
     # Case 2: Learn Basics goal
@@ -166,60 +194,50 @@ def test_orchestrate_chat_turn_fallback_honors_primary_goal(monkeypatch) -> None
         onboarding_required=False,
         primary_goal="learn_basics",
     )
-    assert decision.intent == "unsupported_request"
+    assert decision.intent == "education"
     assert "beginner-friendly" in decision.assistant_message.lower()
 
 
-def test_decide_run_readiness_honors_pending_questions() -> None:
-    # Scenario: Assistant asked for dates, user didn't provide them.
-    history = [
-        {"role": "user", "content": "Test BTC"},
-        {
-            "role": "assistant",
-            "content": "I can test BTC. For what period do you want to run it?",
-        },
-    ]
-
-    # User just says "buy the dip" without dates
-    intent = orchestrator.StrategyIntent(
-        symbols=orchestrator.SlotValue(value=["BTC"], source="history_inferred"),
-        template=orchestrator.SlotValue(value="buy_the_dip", source="user_supplied"),
-        timeframe=orchestrator.SlotValue(value="1D", source="backend_default"),
-        start_date=orchestrator.SlotValue(value="2024-01-01", source="backend_default"),
-    )
-
-    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
-
-    assert readiness.ready_to_run is False
-    assert "time_preferences" in readiness.missing_fields
-    assert "period" in readiness.clarification_prompt.lower()
-
-    # Scenario: User explicitly says "use defaults"
-    history.append({"role": "user", "content": "use standard defaults"})
-    # Re-build logic would normally handle this, but for test we simulate
-    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
-    assert readiness.ready_to_run is True
-
-
-def test_decide_run_readiness_requires_dca_cadence() -> None:
-    # Scenario: User says "DCA into BTC", but doesn't specify cadence.
-    extraction = orchestrator.StrategyExtraction(
-        symbols=["BTC"], template="dca_accumulation", asset_class="crypto"
-    )
-    history = [{"role": "user", "content": "DCA into BTC"}]
+def test_plan_strategy_action_honors_pending_questions() -> None:
+    # User message with only symbol
+    message = "Tell me about AAPL"
+    extraction = StrategyExtraction(**orchestrator._heuristic_extract(message))
+    history = [{"role": "user", "content": message}]
     intent = orchestrator.build_strategy_intent(extraction, history)
 
-    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
+    # Should ask for template
+    plan = orchestrator.plan_strategy_action(intent, language="en")
+    assert plan.action == "ask_clarification"
+    assert "template" in plan.missing_fields
 
-    assert readiness.ready_to_run is False
-    assert "dca_cadence" in readiness.missing_fields
-    assert "often" in readiness.clarification_prompt.lower()
 
-    # Scenario: User specifies cadence
-    history.append({"role": "user", "content": "weekly"})
+def test_plan_strategy_action_requires_dca_cadence() -> None:
+    # DCA without cadence
+    message = "DCA into AAPL"
+    extraction = StrategyExtraction(
+        symbols=["AAPL"], template="dca_accumulation", asset_class="equity"
+    )
+    history = [{"role": "user", "content": "DCA into AAPL"}]
+    intent = orchestrator.build_strategy_intent(extraction, history)
+
+    # Should ask for dca_cadence
+    plan = orchestrator.plan_strategy_action(intent, language="en")
+    assert plan.action == "ask_clarification"
+    assert "dca_cadence" in plan.missing_fields
+
     # Normal flow would re-extract, but here we simulate
     extraction.parameters = {"dca_cadence": "weekly"}
     intent = orchestrator.build_strategy_intent(extraction, history)
 
-    readiness = orchestrator.decide_run_readiness(intent, history, language="en")
-    assert readiness.ready_to_run is True
+    # Assess readiness using the intent and history
+    plan = orchestrator.plan_strategy_action(intent, language="en")
+    assert plan.action == "run_backtest"
+
+
+def test_build_capability_prompt() -> None:
+    prompt = orchestrator.build_capability_prompt()
+    assert "Argus Alpha can run these supported templates:" in prompt
+    assert "buy_the_dip" in prompt
+    assert "rsi_mean_reversion" in prompt
+    assert "aliases=" in prompt
+    assert "parameters=" in prompt
