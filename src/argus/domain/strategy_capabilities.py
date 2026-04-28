@@ -22,25 +22,25 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
     "buy_the_dip": StrategyCapability(
         template="buy_the_dip",
         display_name="Buy the Dip",
-        aliases=["buy the dip", "buy dips", "dip buying"],
+        aliases=["buy the dip", "buy dips", "dip buying", "compra en caidas", "compra en bajadas"],
         supported_asset_classes=["equity", "crypto"],
     ),
     "rsi_mean_reversion": StrategyCapability(
         template="rsi_mean_reversion",
         display_name="RSI Mean Reversion",
-        aliases=["rsi", "oversold", "mean reversion"],
+        aliases=["rsi", "oversold", "mean reversion", "reversion a la media", "sobreventa"],
         supported_asset_classes=["equity", "crypto"],
     ),
     "moving_average_crossover": StrategyCapability(
         template="moving_average_crossover",
         display_name="Moving Average Crossover",
-        aliases=["moving average", "ma crossover", "golden cross", "death cross"],
+        aliases=["moving average", "ma crossover", "golden cross", "death cross", "cruce de medias", "cruce de medias moviles"],
         supported_asset_classes=["equity", "crypto"],
     ),
     "dca_accumulation": StrategyCapability(
         template="dca_accumulation",
         display_name="DCA Accumulation",
-        aliases=["dca", "dollar cost averaging", "accumulation"],
+        aliases=["dca", "dollar cost averaging", "accumulation", "promedio de costo", "acumulacion"],
         supported_asset_classes=["equity", "crypto"],
         parameters={
             "dca_cadence": ParameterSpec(
@@ -55,13 +55,13 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
     "momentum_breakout": StrategyCapability(
         template="momentum_breakout",
         display_name="Momentum Breakout",
-        aliases=["momentum", "breakout"],
+        aliases=["momentum", "breakout", "ruptura de momentum", "rompimiento"],
         supported_asset_classes=["equity", "crypto"],
     ),
     "trend_follow": StrategyCapability(
         template="trend_follow",
         display_name="Trend Follow",
-        aliases=["trend follow", "trend following", "trend"],
+        aliases=["trend follow", "trend following", "trend", "seguimiento de tendencia", "tendencia"],
         supported_asset_classes=["equity", "crypto"],
     ),
 }

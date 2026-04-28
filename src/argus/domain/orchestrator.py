@@ -23,7 +23,10 @@ SUPPORTED_GOALS = {
 
 NON_SYMBOLS = {
     "WHAT", "IF", "WHENEVER", "WHEN", "BOUGHT", "BUY", "DIPPED", "HARD",
-    "THE", "AND", "FOR", "WITH", "STOCK", "CRYPTO", "I", "ME", "MY", "YOU"
+    "THE", "AND", "FOR", "WITH", "STOCK", "CRYPTO", "I", "ME", "MY", "YOU",
+    "HOW", "WOULD", "SIMPLE", "STRATEGY", "PERFORM", "ON", "RUN", "TEST",
+    "TODAY", "YTD", "YEAR", "BACK", "FROM", "START", "END", "DATE",
+    "DCA", "RSI", "MA",
 }
 
 COMMON_NAMES = {
@@ -31,6 +34,7 @@ COMMON_NAMES = {
     "APPLE": "AAPL",
     "MICROSOFT": "MSFT",
     "NVIDIA": "NVDA",
+    "GOOGLE": "GOOG",
     "BITCOIN": "BTC",
     "ETHEREUM": "ETH",
     "SOLANA": "SOL",
@@ -199,6 +203,108 @@ def slot_from_extraction(slot: ExtractedSlot) -> SlotValue:
         confidence=slot.confidence,
         evidence=slot.evidence,
     )
+
+def _slot(value: Any, evidence: str, confidence: float = 0.95) -> ExtractedSlot:
+    return ExtractedSlot(value=value, confidence=confidence, evidence=evidence)
+
+def _set_if_empty(extraction: StrategyIntentExtraction, field_name: str, slot: ExtractedSlot) -> None:
+    current = getattr(extraction, field_name)
+    if current.value is None or current.confidence <= slot.confidence:
+        setattr(extraction, field_name, slot)
+
+def _merge_extraction(base: StrategyIntentExtraction, overlay: StrategyIntentExtraction) -> StrategyIntentExtraction:
+    merged = base.model_copy(deep=True)
+    merged.wants_backtest = base.wants_backtest or overlay.wants_backtest
+    merged.wants_education = base.wants_education or overlay.wants_education
+    merged.user_confirmed_defaults = base.user_confirmed_defaults or overlay.user_confirmed_defaults
+    for field_name in (
+        "template",
+        "symbols",
+        "asset_class",
+        "timeframe",
+        "start_date",
+        "end_date",
+        "starting_capital",
+    ):
+        overlay_slot = getattr(overlay, field_name)
+        if overlay_slot.value is not None and overlay_slot.confidence >= 0.55:
+            _set_if_empty(merged, field_name, overlay_slot)
+    for key, overlay_slot in overlay.parameters.items():
+        current = merged.parameters.get(key)
+        if current is None or current.value is None or current.confidence <= overlay_slot.confidence:
+            merged.parameters[key] = overlay_slot
+    return merged
+
+def _extract_history_deterministic(history: list[dict[str, Any]] | None) -> StrategyIntentExtraction:
+    merged = StrategyIntentExtraction()
+    if not history:
+        return merged
+    for m in history:
+        if m.get("role") == "user" and m.get("content"):
+            merged = _merge_extraction(merged, _extract_deterministic_intent(str(m["content"])))
+    return merged
+
+def _extract_deterministic_intent(text: str) -> StrategyIntentExtraction:
+    extraction = StrategyIntentExtraction()
+    if not text.strip():
+        return extraction
+
+    lower = text.lower()
+    if re.search(r"\b(backtest|test|run|perform|simulate|probar|ejecutar|correr|simular)\b", lower):
+        extraction.wants_backtest = True
+    if re.search(r"\b(how|what is|explain|funciona|explica|aprend)\b", lower):
+        extraction.wants_education = True
+
+    for capability in STRATEGY_CAPABILITIES.values():
+        aliases = [capability.template, capability.display_name, *capability.aliases]
+        if any(re.search(rf"\b{re.escape(alias.lower())}\b", lower) for alias in aliases):
+            extraction.template = _slot(capability.template, "deterministic_template")
+            break
+
+    symbols: list[str] = []
+    for name, symbol in COMMON_NAMES.items():
+        if re.search(rf"\b{re.escape(name.lower())}\b", lower):
+            symbols.append(symbol)
+    for token in re.findall(r"\b[A-Z]{2,5}(?:[-/](?:USD|USDT))?\b", text):
+        if token not in NON_SYMBOLS:
+            symbols.append(token)
+    normalized = normalize_symbols(symbols)
+    if normalized:
+        extraction.symbols = _slot(normalized, "deterministic_symbols")
+        extraction.asset_class = _slot(infer_asset_class(normalized), "deterministic_asset_class", 0.85)
+
+    cadence_patterns = {
+        "daily": r"\b(daily|diario|diaria|diariamente|every day|cada dia|cada d[ií]a)\b",
+        "weekly": r"\b(weekly|weeklu|semanal|semanalmente|every week|cada semana)\b",
+        "monthly": r"\b(monthly|mensual|mensualmente|every month|cada mes)\b",
+    }
+    for cadence, pattern in cadence_patterns.items():
+        if re.search(pattern, lower):
+            extraction.parameters["dca_cadence"] = _slot(cadence, "deterministic_cadence")
+            break
+
+    capital_match = re.search(
+        r"\b(?:capital(?:\s+of)?|start(?:ing)?(?:\s+with)?|empieza(?:\s+con)?|con)?\s*\$?\s*(\d+(?:[.,]\d+)?)\s*(k|mil|thousand)?\b",
+        lower,
+    )
+    if capital_match and any(word in lower for word in ("capital", "start", "empieza", "10k", "mil", "thousand")):
+        amount = float(capital_match.group(1).replace(",", "."))
+        if capital_match.group(2) in {"k", "mil", "thousand"}:
+            amount *= 1000
+        extraction.starting_capital = _slot(amount, "deterministic_capital")
+
+    today = date.today()
+    if re.search(r"\b(one|1|exactly a)\s+year\b|\b1\s*a[nñ]o\b|\ba[nñ]o\s+hacia\s+atras\b", lower):
+        extraction.start_date = _slot((today - timedelta(days=365)).isoformat(), "deterministic_one_year")
+        extraction.end_date = _slot(today.isoformat(), "deterministic_one_year")
+        extraction.timeframe = _slot("1D", "deterministic_daily_timeframe", 0.8)
+    if "ytd" in lower:
+        extraction.start_date = _slot(date(today.year, 1, 1).isoformat(), "deterministic_ytd")
+        extraction.end_date = _slot(today.isoformat(), "deterministic_ytd")
+        extraction.timeframe = _slot("1D", "deterministic_daily_timeframe", 0.8)
+    if re.search(r"\btoday\b|\bhoy\b", lower) and extraction.end_date.value is None:
+        extraction.end_date = _slot(today.isoformat(), "deterministic_today", 0.85)
+    return extraction
 
 def merge_slot(current: SlotValue, previous: SlotValue) -> SlotValue:
     if current.source != "missing":
@@ -444,65 +550,48 @@ def goal_follow_up_message(goal: str, language: str | None) -> str:
 
 # --- Core API ---
 
-def _extract_strategy_intent(message: str, model_name: str) -> StrategyIntentExtraction:
+def _extract_strategy_intent(message: str, model_name: str, history: list[dict[str, Any]] | None = None) -> StrategyIntentExtraction:
     model = _build_model(model_name)
     structured = model.with_structured_output(StrategyIntentExtraction)
     
     system_prompt = (
-        "You are an expert at extracting financial strategy parameters from chat messages. "
+        "You are a structured extraction engine for financial strategies. "
+        "Your ONLY job is to output JSON matching the provided schema. "
+        "DO NOT write a conversational response. DO NOT explain anything. "
+        "Extract strategy type, symbols, and parameters from the user's input. "
+        "Use the history for context if the user's latest message is short (e.g. just a symbol or a number). "
         "Confidence is 1.0 if explicitly stated, 0.5 if implied, 0.0 if missing. "
-        "Evidence must be the exact substring from the user message. "
         f"{build_capability_prompt()}"
     )
     
+    messages = [
+        {"role": "system", "content": system_prompt},
+    ]
+    
+    # Add a few history items for context
+    if history:
+        for m in history[-5:]:
+            messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
+            
+    messages.append({"role": "user", "content": message})
+
     try:
-        return structured.invoke([
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message}
-        ])
-    except Exception:
+        res = structured.invoke(messages)
+        if isinstance(res, StrategyIntentExtraction):
+            return res
+        return StrategyIntentExtraction()
+    except Exception as e:
+        logger.warning(f"Extraction failed: {e}")
         return StrategyIntentExtraction()
 
-def orchestrate_chat_turn(
+    
+def final_decision_from_plan(
     *,
-    message: str,
-    history: list[dict[str, Any]] | None = None,
-    language: str | None = None,
-    onboarding_required: bool = False,
+    plan: OrchestrationPlan,
+    draft: StrategyDraft,
+    lang: str,
     primary_goal: str | None = None,
-    model_name: str = "google/gemini-2.0-flash-001",
 ) -> ChatOrchestrationDecision:
-    lang = language or "en"
-    
-    if onboarding_required:
-        return ChatOrchestrationDecision(
-            intent="onboarding_prompt",
-            assistant_message=_default_onboarding_prompt(lang),
-        )
-
-    # 1. Extraction
-    extraction = _extract_strategy_intent(message, model_name)
-    
-    # 2. Rehydrate previous draft
-    previous_draft = None
-    if history:
-        for m in reversed(history):
-            if m.get("role") == "assistant" and m.get("metadata"):
-                meta = m["metadata"]
-                if "strategy_draft" in meta:
-                    try:
-                        previous_draft = StrategyDraft.model_validate(meta["strategy_draft"])
-                        break
-                    except Exception:
-                        continue
-    
-    # 3. Merge & Normalize
-    draft = merge_draft(previous_draft, extraction)
-    draft = normalize_draft(draft)
-    
-    # 4. Plan Action
-    plan = plan_draft_action(draft, lang)
-    
     if plan.action == "run_backtest":
         return ChatOrchestrationDecision(
             intent="run_backtest",
@@ -522,6 +611,73 @@ def orchestrate_chat_turn(
         intent="unsupported_request",
         assistant_message=goal_follow_up_message(primary_goal or "surprise_me", lang),
         strategy_draft=draft,
+    )
+
+def orchestrate_chat_turn(
+    *,
+    message: str,
+    history: list[dict[str, Any]] | None = None,
+    language: str | None = None,
+    onboarding_required: bool = False,
+    primary_goal: str | None = None,
+    model_name: str = "google/gemini-2.0-flash-001",
+) -> ChatOrchestrationDecision:
+    from loguru import logger
+    
+    lang = language or "en"
+    history_len = len(history) if history else 0
+    logger.info(f"Chat Turn started. Message: '{message[:50]}...' Lang: {lang}. History items: {history_len}")
+
+    if onboarding_required:
+        return ChatOrchestrationDecision(
+            intent="onboarding_prompt",
+            assistant_message=_default_onboarding_prompt(lang),
+        )
+
+    # 1. Extraction (History-aware). The deterministic layer is a guardrail:
+    # live chat should not loop just because provider extraction drops prior slots.
+    try:
+        llm_extraction = _extract_strategy_intent(message, model_name, history)
+    except TypeError:
+        llm_extraction = _extract_strategy_intent(message, model_name)
+    history_extraction = _extract_history_deterministic(history)
+    current_extraction = _extract_deterministic_intent(message)
+    extraction = _merge_extraction(history_extraction, llm_extraction)
+    extraction = _merge_extraction(extraction, current_extraction)
+    
+    # 2. Rehydrate previous draft
+    previous_draft = None
+    if history:
+        for m in reversed(history):
+            if m.get("role") == "assistant" and m.get("metadata"):
+                meta = m["metadata"]
+                if "strategy_draft" in meta:
+                    try:
+                        previous_draft = StrategyDraft.model_validate(meta["strategy_draft"])
+                        logger.info(f"Rehydrated draft: {previous_draft.template.value}")
+                        break
+                    except Exception as e:
+                        logger.warning(f"Rehydration failed: {e}")
+    
+    if not previous_draft:
+        logger.info("No previous draft found in history.")
+
+    # 3. Merge and Normalize
+    draft = merge_draft(previous_draft, extraction)
+    draft = normalize_draft(draft)
+    
+    logger.info(f"Extracted: {extraction.model_dump_json(exclude_none=True)}")
+    logger.info(f"Final merged draft: {draft.model_dump_json(exclude_none=True)}")
+    
+    # 4. Plan Action
+    plan = plan_draft_action(draft, lang)
+    
+    # 5. Final Decision
+    return final_decision_from_plan(
+        plan=plan,
+        draft=draft,
+        lang=lang,
+        primary_goal=primary_goal,
     )
 
 def _default_onboarding_prompt(language: str) -> str:

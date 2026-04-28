@@ -134,3 +134,34 @@ def test_canonical_template_aliases() -> None:
     assert orchestrator.canonical_template("rsi") == "rsi_mean_reversion"
     assert orchestrator.canonical_template("dca") == "dca_accumulation"
     assert orchestrator.canonical_template("unknown") is None
+
+
+def test_dca_followup_reconstructs_slots_from_history_without_metadata(monkeypatch) -> None:
+    def _empty_extract(message: str, model_name: str, history: list[dict[str, Any]] | None = None) -> StrategyIntentExtraction:
+        return StrategyIntentExtraction()
+
+    monkeypatch.setattr(orchestrator, "_extract_strategy_intent", _empty_extract)
+
+    history = [
+        {"role": "user", "content": "How would a simple DCA strategy perform on Tesla?"},
+        {"role": "assistant", "content": "How often do you want Argus to buy: daily, weekly, or monthly?"},
+        {"role": "user", "content": "weeklu"},
+        {"role": "assistant", "content": "To run the DCA backtest, I need starting capital and timeframe."},
+        {"role": "user", "content": "10k and one year, based on YTD"},
+        {"role": "assistant", "content": "Please provide exact dates."},
+        {"role": "user", "content": "take today as the ending date, and exactly a year back from today"},
+        {"role": "assistant", "content": "How often do you want Argus to buy: daily, weekly, or monthly?"},
+    ]
+
+    decision = orchestrator.orchestrate_chat_turn(
+        message="daily",
+        history=history,
+        language="en",
+    )
+
+    assert decision.intent == "run_backtest"
+    assert decision.strategy_draft is not None
+    assert decision.strategy_draft.template.value == "dca_accumulation"
+    assert decision.strategy_draft.symbols.value == ["TSLA"]
+    assert decision.strategy_draft.starting_capital.value == 10000
+    assert decision.strategy_draft.parameters["dca_cadence"].value == "daily"

@@ -894,6 +894,18 @@ def create_run_from_payload(
             title="Validation Error",
             detail="Symbol is required.",
         )
+    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(symbols, request)
+    requested_asset_class = payload.get("asset_class")
+    if requested_asset_class and requested_asset_class != inferred_asset_class:
+        _raise_backtest_problem(
+            request,
+            "asset_class_conflict",
+            context={
+                "requested_asset_class": requested_asset_class,
+                "inferred_asset_class": inferred_asset_class,
+                "symbols": [entry.symbol for entry in classified_symbols],
+            },
+        )
     # Execution Logic
     try:
         config = normalize_backtest_config(payload)
@@ -2039,9 +2051,7 @@ def chat_stream(
                 {
                     "role": m.role,
                     "content": m.content,
-                    "strategy_draft": m.metadata.get("strategy_draft")
-                    if m.metadata
-                    else None,
+                    "metadata": m.metadata or {},
                 }
                 for m in raw_history
                 if m.role in ("user", "assistant")
@@ -2052,21 +2062,21 @@ def chat_stream(
                 {
                     "role": m.role,
                     "content": m.content,
-                    "strategy_draft": m.metadata.get("strategy_draft")
-                    if m.metadata
-                    else None,
+                    "metadata": m.metadata or {},
                 }
                 for m in raw_history
                 if m.role in ("user", "assistant")
             ]
 
         # 2. Orchestrate
+        from loguru import logger
         lang = (
             payload.language
             or conversation.language
             or current_user_profile.language
             or "en"
         )
+        logger.info(f"Retrieved {len(history_msgs)} history messages for conversation {conversation.id}")
         try:
             decision = orchestrate_chat_turn(
                 message=payload.message,

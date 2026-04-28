@@ -305,7 +305,7 @@ class SupabaseGateway:
     ) -> list[Message]:
         query = (
             self.client.table("messages")
-            .select("id,conversation_id,role,content,created_at")
+            .select("id,conversation_id,role,content,metadata,created_at")
             .eq("user_id", user_id)
             .eq("conversation_id", conversation_id)
             .order("created_at", desc=False)

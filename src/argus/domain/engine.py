@@ -194,7 +194,7 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
     if any(symbol in STABLECOINS for symbol in config["symbols"]):
         raise ValueError("stablecoin_not_supported")
 
-    # Registry-driven parameter validation
+    # Registry-driven parameter validation (Task 10)
     params = config.get("parameters") or {}
     template_name = config["template"]
     capability = STRATEGY_CAPABILITIES[template_name]
@@ -207,7 +207,7 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
     for key, value in params.items():
         spec = capability.parameters[key]
         if spec.allowed_values and value not in spec.allowed_values:
-            raise ValueError("unsupported_parameters")
+            raise ValueError(f"unsupported_parameter_value_{key}")
 
 
 def _resolve_indicator_series(
