@@ -11,6 +11,8 @@ class ParameterSpec(BaseModel):
     default: Any = None
     allowed_values: list[Any] = Field(default_factory=list)
     description: str
+    value_aliases: dict[str, list[str]] = Field(default_factory=dict)
+
 
 class StrategyCapability(BaseModel):
     template: str
@@ -56,7 +58,13 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
                 default="monthly",
                 allowed_values=["daily", "weekly", "monthly"],
                 description="How often Argus makes a fixed-dollar purchase.",
+                value_aliases={
+                    "daily": ["diario", "cada dia", "diariamente"],
+                    "weekly": ["semanal", "cada semana", "semanalmente"],
+                    "monthly": ["mensual", "cada mes", "mensualmente"],
+                },
             )
+
         },
     ),
     "momentum_breakout": StrategyCapability(

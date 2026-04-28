@@ -250,6 +250,8 @@ def apply_backtest_turn(
         )
 
     params = merge_params(state.params, update) if update.has_updates() else state.params
+
+
     missing = missing_required_fields(params)
     base_state = BacktestConversationState(
         params=params,

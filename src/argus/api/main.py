@@ -63,13 +63,9 @@ from argus.domain.engine import (
     validate_backtest_config,
 )
 from argus.domain.orchestrator import (
-    DEFAULT_CHAT_INTENT_MODEL,
-    assistant_copy_for_result,
     assistant_message_for_chat_turn,
     classify_chat_turn_intent,
     get_starter_prompts,
-    goal_follow_up_message,
-    orchestrate_chat_turn,
     parse_onboarding_goal,
     suggest_entity_name,
 )
@@ -229,6 +225,13 @@ def _fetch_run_metrics(user_id: str, run_id: str) -> dict[str, Any] | None:
         "by_symbol": run.metrics.get("by_symbol", {}),
         "config": run.config_snapshot,
     }
+
+
+def _assistant_copy_for_result(symbols: list[str], language: str) -> str:
+    joined = ", ".join(symbols)
+    if language.startswith("es"):
+        return f"¡Listo! Aquí tienes los resultados del backtest para {joined}. ¿Qué te parecen estas métricas?"
+    return f"Done! Here are the backtest results for {joined}. What do you think about these metrics?"
 
 
 @app.middleware("http")
@@ -2061,24 +2064,29 @@ def chat_stream(
 
     def events() -> Iterable[str]:
         if onboarding_required and onboarding_goal is None:
-            decision = orchestrate_chat_turn(
-                message=payload.message,
-                language=(
-                    payload.language
-                    or conversation.language
-                    or current_user_profile.language
-                ),
-                onboarding_required=True,
-                primary_goal=current_user_profile.onboarding.primary_goal,
+            lang = (
+                payload.language
+                or conversation.language
+                or current_user_profile.language
+                or "en"
             )
-            yield sse("status", {"status": f"intent_{decision.intent}"})
+            from argus.domain.orchestrator import _resolve_language
+            is_es = _resolve_language(lang) == "es-419"
+            msg = (
+                "¿Cuál es tu objetivo principal ahora? No te preocupes, "
+                "podrás cambiarlo después en Settings."
+                if is_es else
+                "What is your current primary goal? Don't worry, "
+                "you can change it later in Settings."
+            )
+            yield sse("status", {"status": "intent_onboarding_prompt"})
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
                 role="assistant",
-                content=decision.assistant_message,
+                content=msg,
             )
-            yield sse("token", {"text": decision.assistant_message})
+            yield sse("token", {"text": msg})
             yield sse("done", {"message_id": assistant_message.id})
             return
 
@@ -2092,12 +2100,31 @@ def chat_stream(
                     "completed": False,
                 },
             )
-            follow_up = goal_follow_up_message(
-                onboarding_goal,
+            lang = (
                 payload.language
                 or conversation.language
-                or current_user_profile.language,
+                or current_user_profile.language
+                or "en"
             )
+            from argus.domain.orchestrator import _resolve_language
+            is_es = _resolve_language(lang) == "es-419"
+            if is_es:
+                mapping = {
+                    "learn_basics": "Perfecto. Te ayudaré con ideas simples para empezar. ¿Qué activo te interesa?",
+                    "test_stock_idea": "Perfecto. Cuéntame tu idea de acción y la probamos.",
+                    "build_passive_strategy": "Perfecto. Podemos empezar con una idea pasiva tipo DCA.",
+                    "explore_crypto": "Perfecto. Empecemos con una idea de cripto que quieras validar.",
+                    "surprise_me": "Genial. Te propondré una idea inicial guiada para comenzar.",
+                }
+            else:
+                mapping = {
+                    "learn_basics": "Great. I'll keep this beginner-friendly. What asset are you curious about?",
+                    "test_stock_idea": "Great. Share the stock idea you want to test and I'll run it.",
+                    "build_passive_strategy": "Great. We can start with a passive DCA-style idea.",
+                    "explore_crypto": "Great. Let's start with a crypto idea you want to validate.",
+                    "surprise_me": "Great. I'll guide you with a starter idea to begin.",
+                }
+            follow_up = mapping.get(onboarding_goal, mapping["surprise_me"])
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -2164,8 +2191,12 @@ def chat_stream(
                 model_name=os.getenv("AGENT_MODEL") or DEFAULT_CHAT_INTENT_MODEL,
             )
             yield sse("status", {"status": f"intent_{turn_intent.intent}"})
-        except Exception:
+        except Exception as exc:
+            print(f"DEBUG ORCHESTRATION FAILED: {exc}")
+            import traceback
+            traceback.print_exc()
             logger.exception("Chat orchestration failed", conversation_id=conversation.id)
+
             yield sse("error", {"code": "internal_error", "detail": "Orchestration failed."})
             yield sse("done", {"error": True})
             return
@@ -2330,7 +2361,7 @@ def chat_stream(
             user_id=user.id,
             conversation_id=conversation.id,
             role="assistant",
-            content=assistant_copy_for_result(run.symbols, lang),
+            content=_assistant_copy_for_result(run.symbols, lang),
             metadata={
                 "conversation_mode": "result_review",
                 "chat_turn_intent": turn_intent.model_dump(mode="json"),
