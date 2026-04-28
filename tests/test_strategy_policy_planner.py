@@ -146,3 +146,32 @@ def test_resolve_supported_symbols(mocker):
     assert "BTC" in res
     assert "INVALID123" not in res
     assert len(res) == 2
+
+@pytest.mark.parametrize(
+    ("message", "template", "symbol"),
+    [
+        ("Backtest buying Apple dips", "buy_the_dip", "AAPL"),
+        ("Test RSI on Bitcoin", "rsi_mean_reversion", "BTC"),
+        ("Run moving average crossover on Tesla", "moving_average_crossover", "TSLA"),
+        ("Show me DCA accumulation for Apple", "dca_accumulation", "AAPL"),
+        ("Try momentum breakout on ETH", "momentum_breakout", "ETH"),
+        ("Trend follow MSFT", "trend_follow", "MSFT"),
+    ],
+)
+def test_supported_strategy_requests_never_become_unsupported(message, template, symbol):
+    from argus.domain.orchestrator import orchestrate_chat_turn
+    
+    decision = orchestrate_chat_turn(
+        message=message,
+        language="en",
+        onboarding_required=False,
+        primary_goal="test",
+    )
+    
+    # It should either be run_backtest or education, never unsupported_request
+    assert decision.intent in ["run_backtest", "education"]
+    
+    # If it's ready to run, check if template and symbols match
+    if decision.intent == "run_backtest":
+        assert decision.strategy_intent.template.value == template
+        assert symbol in (decision.strategy_intent.symbols.value or [])
