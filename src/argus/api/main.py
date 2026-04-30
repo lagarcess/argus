@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from loguru import logger
+from pydantic import BaseModel
 
 from argus.api.schemas import (
     BacktestRun,
@@ -71,6 +72,10 @@ from argus.domain.orchestrator import (
 )
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.runtime import run_agent_turn
+from argus.agent_runtime.session.manager import InMemorySessionManager
+from argus.agent_runtime.state.models import UserState
 
 load_dotenv()
 
@@ -90,6 +95,14 @@ app.add_middleware(
 store = AlphaStore()
 PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
+agent_runtime_session_manager = InMemorySessionManager()
+agent_runtime_workflow = build_workflow()
+
+
+class InternalAgentRuntimeTurnRequest(BaseModel):
+    user_id: str
+    thread_id: str
+    message: str
 
 
 def _dev_memory_fallback_enabled() -> bool:
@@ -462,6 +475,19 @@ def dev_reset() -> SuccessResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "healthy", "version": "1.0.0-alpha"}
+
+
+@app.post("/internal/agent-runtime/turn")
+def internal_agent_runtime_turn(
+    payload: InternalAgentRuntimeTurnRequest,
+) -> dict[str, Any]:
+    return run_agent_turn(
+        workflow=agent_runtime_workflow,
+        session_manager=agent_runtime_session_manager,
+        user=UserState(user_id=payload.user_id),
+        thread_id=payload.thread_id,
+        message=payload.message,
+    )
 
 
 @app.get("/api/v1/auth/session")
