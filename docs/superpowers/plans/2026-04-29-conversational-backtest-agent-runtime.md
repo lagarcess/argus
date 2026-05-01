@@ -153,7 +153,7 @@ Update `pyproject.toml`:
 
 ```toml
 [tool.poetry.dependencies]
-langgraph = "^0.4.8"
+langgraph = ">=1.1.5,<1.2.0"
 ```
 
 Create `src/argus/agent_runtime/state/models.py`:
@@ -741,7 +741,7 @@ def test_execute_does_not_retry_unsupported_capability():
 
     result = execute_stage(state=state, tool=tool, max_retries=2)
 
-    assert result.outcome == "execution_failed_terminally"
+    assert result.outcome == "needs_clarification"
     assert result.patch["failure_classification"] == "unsupported_capability"
 
 
