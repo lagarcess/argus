@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from loguru import logger
+from pydantic import BaseModel
 
 from argus.api.schemas import (
     BacktestRun,
@@ -71,6 +72,11 @@ from argus.domain.orchestrator import (
 )
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.runtime import run_agent_turn
+from argus.agent_runtime.session.manager import InMemorySessionManager
+from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 
 load_dotenv()
 
@@ -90,6 +96,14 @@ app.add_middleware(
 store = AlphaStore()
 PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
+agent_runtime_session_manager = InMemorySessionManager()
+agent_runtime_workflow = build_workflow(tool=RealBacktestTool())
+
+
+class InternalAgentRuntimeTurnRequest(BaseModel):
+    user_id: str
+    thread_id: str
+    message: str
 
 
 def _dev_memory_fallback_enabled() -> bool:
@@ -232,6 +246,150 @@ def _assistant_copy_for_result(symbols: list[str], language: str) -> str:
     if language.startswith("es"):
         return f"¡Listo! Aquí tienes los resultados del backtest para {joined}. ¿Qué te parecen estas métricas?"
     return f"Done! Here are the backtest results for {joined}. What do you think about these metrics?"
+
+
+def _runtime_result_message(runtime_result: dict[str, Any]) -> str | None:
+    assistant_response = runtime_result.get("assistant_response")
+    if isinstance(assistant_response, str) and assistant_response:
+        return assistant_response
+    assistant_prompt = runtime_result.get("assistant_prompt")
+    if isinstance(assistant_prompt, str) and assistant_prompt:
+        return assistant_prompt
+    return None
+
+
+def _runtime_stage_status(runtime_result: dict[str, Any]) -> str:
+    stage_outcome = runtime_result.get("stage_outcome")
+    if isinstance(stage_outcome, str) and stage_outcome:
+        return stage_outcome
+    return "agent_runtime_turn"
+
+
+def _runtime_result_card(runtime_result: dict[str, Any]) -> dict[str, Any] | None:
+    final_payload = runtime_result.get("final_response_payload")
+    if not isinstance(final_payload, dict):
+        return None
+    result_card = final_payload.get("result_card")
+    if isinstance(result_card, dict):
+        return result_card
+    return None
+
+
+def _runtime_result_envelope(runtime_result: dict[str, Any]) -> dict[str, Any]:
+    final_payload = runtime_result.get("final_response_payload")
+    if not isinstance(final_payload, dict):
+        return {}
+    result = final_payload.get("result")
+    return dict(result) if isinstance(result, dict) else {}
+
+
+def _build_runtime_backtest_run(
+    *,
+    user_id: str,
+    conversation_id: str,
+    result_card: dict[str, Any],
+    envelope: dict[str, Any],
+) -> BacktestRun | None:
+    resolved_strategy = envelope.get("resolved_strategy")
+    resolved_parameters = envelope.get("resolved_parameters")
+    metrics = envelope.get("metrics")
+    benchmark_metrics = envelope.get("benchmark_metrics")
+    if not isinstance(resolved_strategy, dict) or not isinstance(metrics, dict):
+        return None
+
+    symbol = resolved_strategy.get("symbol")
+    if not isinstance(symbol, str) or not symbol:
+        asset_universe = resolved_strategy.get("asset_universe")
+        if isinstance(asset_universe, list) and asset_universe:
+            symbol = str(asset_universe[0])
+        elif isinstance(asset_universe, str) and asset_universe:
+            symbol = asset_universe
+        else:
+            return None
+    symbol = symbol.strip().upper()
+
+    try:
+        asset_class = classify_symbol(symbol).asset_class
+    except ValueError:
+        asset_class = "equity"
+
+    benchmark_symbol = "BTC" if asset_class == "crypto" else "SPY"
+    if isinstance(benchmark_metrics, dict):
+        candidate_benchmark = benchmark_metrics.get("benchmark_symbol")
+        if isinstance(candidate_benchmark, str) and candidate_benchmark:
+            benchmark_symbol = candidate_benchmark.strip().upper()
+
+    resolved_parameters_dict = (
+        dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
+    )
+    config_snapshot = {
+        "template": resolved_strategy.get("strategy_type", "strategy"),
+        "symbols": [symbol],
+        "timeframe": resolved_parameters_dict.get("timeframe", "1D"),
+        "date_range": resolved_parameters_dict.get("date_range"),
+        "benchmark_symbol": benchmark_symbol,
+        "resolved_strategy": resolved_strategy,
+        "resolved_parameters": resolved_parameters_dict,
+    }
+
+    return BacktestRun(
+        id=store.new_id(),
+        conversation_id=conversation_id,
+        strategy_id=None,
+        status="completed",
+        asset_class=asset_class,
+        symbols=[symbol],
+        allocation_method="equal_weight",
+        benchmark_symbol=benchmark_symbol,
+        metrics=metrics,
+        config_snapshot=config_snapshot,
+        conversation_result_card=result_card,
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+
+def _persist_runtime_backtest_run(
+    *,
+    user: User,
+    conversation: Conversation,
+    result_card: dict[str, Any],
+    envelope: dict[str, Any],
+) -> BacktestRun | None:
+    run = _build_runtime_backtest_run(
+        user_id=user.id,
+        conversation_id=conversation.id,
+        result_card=result_card,
+        envelope=envelope,
+    )
+    if run is None:
+        return None
+
+    store.backtest_runs[run.id] = run
+    store.backtest_run_owners[run.id] = user.id
+
+    if supabase_gateway is not None:
+        try:
+            supabase_gateway.create_backtest_run(user_id=user.id, run=run)
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase backtest run write failed; using dev memory fallback",
+                error=str(exc),
+                run_id=run.id,
+            )
+
+    if conversation.id in store.conversations:
+        store.conversations[conversation.id] = conversation.model_copy(
+            update={
+                "last_message_preview": result_card.get("title") or conversation.last_message_preview,
+                "updated_at": utcnow(),
+            }
+        )
+
+    return run
 
 
 @app.middleware("http")
@@ -455,6 +613,7 @@ def current_user(request: Request) -> User:
 @app.post("/api/v1/dev/reset", response_model=SuccessResponse)
 def dev_reset() -> SuccessResponse:
     store.reset()
+    agent_runtime_session_manager._threads.clear()
     store.get_or_create_dev_user()
     return SuccessResponse(success=True)
 
@@ -462,6 +621,19 @@ def dev_reset() -> SuccessResponse:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "healthy", "version": "1.0.0-alpha"}
+
+
+@app.post("/internal/agent-runtime/turn")
+def internal_agent_runtime_turn(
+    payload: InternalAgentRuntimeTurnRequest,
+) -> dict[str, Any]:
+    return run_agent_turn(
+        workflow=agent_runtime_workflow,
+        session_manager=agent_runtime_session_manager,
+        user=UserState(user_id=payload.user_id),
+        thread_id=payload.thread_id,
+        message=payload.message,
+    )
 
 
 @app.get("/api/v1/auth/session")
@@ -2135,267 +2307,88 @@ def chat_stream(
             yield sse("done", {"message_id": assistant_message.id})
             return
 
-        # 1. Fetch history for rehydration
-        history_msgs = []
-        if supabase_gateway is not None:
-            raw_history = supabase_gateway.list_messages(
-                user_id=user.id, conversation_id=conversation.id, limit=None
-            )
-            history_msgs = [
-                {
-                    "role": m.role,
-                    "content": m.content,
-                    "metadata": m.metadata or {},
-                }
-                for m in raw_history
-                if m.role in ("user", "assistant")
-            ]
-        else:
-            raw_history = store.messages.get(conversation.id, [])
-            history_msgs = [
-                {
-                    "role": m.role,
-                    "content": m.content,
-                    "metadata": m.metadata or {},
-                }
-                for m in raw_history
-                if m.role in ("user", "assistant")
-            ]
-
-        # 2. Classify intent and extract explicit params in one structured pass.
-        lang = (
-            payload.language
-            or conversation.language
-            or current_user_profile.language
-            or "en"
-        )
-        logger.info(f"Retrieved {len(history_msgs)} history messages for conversation {conversation.id}")
         try:
-            state = _latest_backtest_state(history_msgs)
-            latest_run_id = _latest_completed_run_id(history_msgs)
-            has_pending_backtest = state.awaiting_confirmation or (
-                _state_has_params(state) and state.confirmed_at is None
-            )
-            turn_intent = classify_chat_turn_intent(
+            runtime_result = run_agent_turn(
+                workflow=agent_runtime_workflow,
+                session_manager=agent_runtime_session_manager,
+                user=UserState(user_id=user.id),
+                thread_id=conversation.id,
                 message=payload.message,
-                language=lang,
-                primary_goal=current_user_profile.onboarding.primary_goal,
-                onboarding_stage=current_user_profile.onboarding.stage,
-                pending_backtest_state={
-                    **state.model_dump(mode="json"),
-                    "conversation_mode": "result_review" if latest_run_id and not has_pending_backtest else ("setup" if has_pending_backtest else "guide"),
-                    "latest_run_id": latest_run_id,
-                    "has_completed_run": bool(latest_run_id),
-                },
-                history=history_msgs,
-                model_name=os.getenv("AGENT_MODEL") or DEFAULT_CHAT_INTENT_MODEL,
             )
-            yield sse("status", {"status": f"intent_{turn_intent.intent}"})
         except Exception as exc:
-            print(f"DEBUG ORCHESTRATION FAILED: {exc}")
-            import traceback
-            traceback.print_exc()
-            logger.exception("Chat orchestration failed", conversation_id=conversation.id)
-
-            yield sse("error", {"code": "internal_error", "detail": "Orchestration failed."})
+            logger.exception(
+                "Agent runtime chat cutover failed",
+                conversation_id=conversation.id,
+            )
+            yield sse(
+                "error",
+                {
+                    "code": "internal_error",
+                    "detail": f"Chat runtime failed: {str(exc)}",
+                },
+            )
             yield sse("done", {"error": True})
             return
 
-        if turn_intent.result_action == "save_or_organize":
-            assistant_text = assistant_message_for_chat_turn(turn_intent, payload.message, lang)
+        stage_status = _runtime_stage_status(runtime_result)
+        yield sse("status", {"status": stage_status})
+
+        assistant_text = _runtime_result_message(runtime_result)
+        result_card = _runtime_result_card(runtime_result)
+        envelope = _runtime_result_envelope(runtime_result)
+        run = None
+
+        if result_card is not None:
+            run = _persist_runtime_backtest_run(
+                user=user,
+                conversation=conversation,
+                result_card=result_card,
+                envelope=envelope,
+            )
+            _persist_onboarding_update(
+                current_user_profile,
+                {
+                    "stage": "completed",
+                    "completed": True,
+                    "language_confirmed": True,
+                    "primary_goal": current_user_profile.onboarding.primary_goal
+                    or "surprise_me",
+                },
+            )
+
+        metadata: dict[str, Any] = {
+            "conversation_mode": (
+                "result_review"
+                if result_card is not None
+                else "confirm"
+                if stage_status == "await_approval"
+                else "setup"
+                if stage_status == "await_user_reply"
+                else "guide"
+            ),
+            "agent_runtime_stage_outcome": stage_status,
+        }
+        if run is not None:
+            metadata["latest_run_id"] = run.id
+
+        assistant_message = None
+        if assistant_text is not None:
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
                 role="assistant",
                 content=assistant_text,
-                metadata={
-                    "conversation_mode": "result_review",
-                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
-                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
-                    **(
-                        {"backtest_state": state.model_dump(mode="json")}
-                        if has_pending_backtest
-                        else {}
-                    ),
-                },
-            )
-            yield sse("token", {"text": assistant_text})
-            yield sse("done", {"message_id": assistant_message.id})
-            return
-
-        if (
-            not has_pending_backtest
-            and turn_intent.intent in {"guide", "explain_result", "unsupported"}
-        ):
-            mode = "result_review" if turn_intent.intent == "explain_result" else "guide"
-            # Fetch actual run metrics for data-aware explanations
-            run_metrics = None
-            if turn_intent.intent == "explain_result" and latest_run_id:
-                run_metrics = _fetch_run_metrics(user.id, latest_run_id)
-            assistant_text = assistant_message_for_chat_turn(
-                turn_intent, payload.message, lang, run_metrics=run_metrics,
-            )
-            assistant_message = _create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-                metadata={
-                    "conversation_mode": mode,
-                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
-                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
-                },
-            )
-            yield sse("token", {"text": assistant_text})
-            yield sse("done", {"message_id": assistant_message.id})
-            return
-
-        update = turn_intent.backtest_update
-
-        if not has_pending_backtest and not update.has_updates():
-            assistant_text = assistant_message_for_chat_turn(turn_intent, payload.message, lang)
-            assistant_message = _create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-                metadata={
-                    "conversation_mode": "guide",
-                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
-                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
-                },
-            )
-            yield sse("token", {"text": assistant_text})
-            yield sse("done", {"message_id": assistant_message.id})
-            return
-
-        turn = apply_backtest_turn(
-            state=state,
-            update=update,
-            message=payload.message,
-            language=lang,
-            confirmation_action=turn_intent.confirmation_action,
-        )
-        yield sse("status", {"status": f"intent_{turn.action}"})
-
-        if turn.action != "run_backtest":
-            if turn.action == "cancel_backtest":
-                metadata = {
-                    "conversation_mode": "guide",
-                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
-                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
-                }
-            else:
-                mode = "confirm" if turn.action == "await_confirmation" else "setup"
-                metadata = {
-                    "conversation_mode": mode,
-                    "chat_turn_intent": turn_intent.model_dump(mode="json"),
-                    "backtest_state": turn.state.model_dump(mode="json"),
-                    **({"latest_run_id": latest_run_id} if latest_run_id else {}),
-                }
-            assistant_message = _create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=turn.message,
                 metadata=metadata,
             )
-            yield sse("token", {"text": turn.message})
-            yield sse("done", {"message_id": assistant_message.id})
-            return
+            yield sse("token", {"text": assistant_text})
 
-        # 3. Execute only after the state machine accepts explicit confirmation.
-        yield sse("status", {"status": "running_backtest"})
+        if run is not None:
+            yield sse("result", {"run": run.model_dump(mode="json")})
 
-        try:
-            config = dict(turn.config or {})
-            config["conversation_id"] = conversation.id
-
-            run = create_run_from_payload(
-                config,
-                request,
-                user_id=user.id,
-                conversation_id=conversation.id,
-                persist_in_memory=supabase_gateway is None
-                or conversation.id in store.conversations,
-                language=lang,
-            )
-            if supabase_gateway is not None:
-                try:
-                    run = supabase_gateway.create_backtest_run(user_id=user.id, run=run)
-                except Exception:
-                    if not _dev_memory_fallback_enabled():
-                        raise
-                    logger.warning("Supabase backtest run write failed; using dev memory fallback", run_id=run.id)
-        except HTTPException as exc:
-            detail = exc.detail if isinstance(exc.detail, dict) else {"detail": str(exc.detail)}
-            yield sse("error", detail)
-            yield sse("done", {"error": True})
-            return
-        except Exception as exc:
-            logger.exception("Backtest execution failed")
-            err = {
-                "type": "https://api.argus.app/problems/internal-error",
-                "title": "Internal Error",
-                "status": 500,
-                "detail": f"Unexpected chat stream failure: {str(exc)}",
-                "code": "internal_error",
-                "request_id": request.state.request_id,
-            }
-            yield sse("error", err)
-            yield sse("done", {"error": True})
-            return
-
-        # Post-run: Update onboarding and conversation title
-        _persist_onboarding_update(
-            current_user_profile,
-            {
-                "stage": "completed",
-                "completed": True,
-                "language_confirmed": True,
-                "primary_goal": current_user_profile.onboarding.primary_goal or "surprise_me",
-            },
+        yield sse(
+            "done",
+            {"message_id": assistant_message.id if assistant_message is not None else None},
         )
-
-        assistant_message = _create_message(
-            user_id=user.id,
-            conversation_id=conversation.id,
-            role="assistant",
-            content=_assistant_copy_for_result(run.symbols, lang),
-            metadata={
-                "conversation_mode": "result_review",
-                "chat_turn_intent": turn_intent.model_dump(mode="json"),
-                "backtest_state": turn.state.model_dump(mode="json"),
-                "latest_run_id": run.id,
-            },
-        )
-
-        template_name = str(run.config_snapshot.get("template", "strategy"))
-        suggested = suggest_entity_name(
-            entity_type="conversation",
-            context=f"{payload.message}\nTemplate: {template_name}\nSymbols: {', '.join(run.symbols)}",
-            language=lang,
-        )
-        new_title = suggested or f"{run.symbols[0]} {template_name.replace('_', ' ')} idea"
-
-        if conversation.title_source == "system_default":
-            patch = {
-                "title": new_title,
-                "title_source": "ai_generated",
-                "last_message_preview": payload.message[:120],
-                "updated_at": utcnow(),
-            }
-            if supabase_gateway is not None and conversation.id not in store.conversations:
-                try:
-                    supabase_gateway.patch_conversation(user_id=user.id, conversation_id=conversation.id, patch=patch)
-                except Exception:
-                    pass
-            if conversation.id in store.conversations:
-                store.conversations[conversation.id] = conversation.model_copy(update=patch)
-            yield sse("title", {"conversation_id": conversation.id, "title": new_title})
-
-        yield sse("result", {"run": run.model_dump(mode="json")})
-        yield sse("done", {"message_id": assistant_message.id})
 
     return StreamingResponse(
         events(),

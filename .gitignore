@@ -75,3 +75,6 @@ test-results/
 
 # Editor swap files
 **/*.swp
+
+# Git worktrees
+.worktrees/
