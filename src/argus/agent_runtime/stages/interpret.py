@@ -78,8 +78,13 @@ class InterpretDecision(BaseModel):
                 ),
                 "confidence": self.confidence,
                 "arbitration_mode": self.arbitration_mode,
-                "ambiguous_fields": list(self.ambiguous_fields),
-                "unsupported_constraints": list(self.unsupported_constraints),
+                "ambiguous_fields": [
+                    item.model_dump(mode="python") for item in self.ambiguous_fields
+                ],
+                "unsupported_constraints": [
+                    item.model_dump(mode="python")
+                    for item in self.unsupported_constraints
+                ],
             },
             "effective_response_profile": self.effective_response_profile,
             "reason_codes": list(self.reason_codes),

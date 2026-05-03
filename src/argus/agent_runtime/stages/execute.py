@@ -8,6 +8,7 @@ from typing import Any
 from argus.agent_runtime.recovery.policy import should_retry
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import ConfirmationPayload, RunState
+from argus.domain.market_data import resolve_asset
 
 
 def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageResult:
@@ -581,7 +582,11 @@ def _resolve_benchmark_symbol(symbol: str, optional_parameters: dict[str, Any]) 
     value = _resolve_optional_value(optional_parameters, "benchmark_symbol")
     if isinstance(value, str) and value:
         return value.strip().upper()
-    if symbol.endswith("USD") or symbol in {"BTC", "ETH", "SOL"}:
+    try:
+        asset = resolve_asset(symbol)
+    except Exception:
+        asset = None
+    if asset is not None and asset.asset_class == "crypto":
         return "BTC"
     return "SPY"
 
