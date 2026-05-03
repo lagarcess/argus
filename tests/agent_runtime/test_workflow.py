@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from argus.api import main as api_main
@@ -10,12 +11,15 @@ from argus.agent_runtime.graph.workflow import (
 from argus.agent_runtime.runtime import build_workflow_input, run_agent_turn
 from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.stages.execute import execute_stage
+from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     TaskSnapshot,
     UserState,
 )
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
+from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
+from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 
 
 class FakeWorkflow:
@@ -121,6 +125,79 @@ def test_workflow_transition_ends_for_unsupported_capability_failure() -> None:
     assert transition.outcome is WorkflowStageOutcome.NEEDS_CLARIFICATION
     assert transition.route is WorkflowRoute.END
     assert "supported backtest" in result.patch["assistant_prompt"]
+
+
+def test_execute_stage_with_real_tool_surfaces_result_card_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = RealBacktestTool()
+    state = build_workflow_input(
+        session_manager=InMemorySessionManager(),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        thread_id="thread-real-execute",
+        message="Run it",
+    )
+    state["run_state"].candidate_strategy_draft = {
+        "strategy_thesis": "Buy and hold Tesla over the last year",
+        "asset_universe": ["TSLA"],
+        "date_range": "last 1 year",
+    }
+    state["run_state"].confirmation_payload = {
+        "strategy": {
+            "strategy_thesis": "Buy and hold Tesla over the last year",
+            "asset_universe": ["TSLA"],
+            "date_range": "last 1 year",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 10000.0, "source": "default"},
+        },
+    }
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        lambda request: LaunchExecutionAdapterResult(
+            envelope=LaunchExecutionEnvelope(
+                execution_status="succeeded",
+                resolved_strategy={
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "TSLA",
+                },
+                resolved_parameters={"timeframe": "1D"},
+                metrics={
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                },
+                benchmark_metrics={
+                    "symbol": "SPY",
+                    "aggregate": {"total_return_pct": 9.2},
+                },
+                assumptions=["Starting capital: $10,000."],
+                caveats=["1D bars only."],
+                provider_metadata={"provider": "alpaca"},
+            ),
+            result_card={"title": "TSLA Buy and Hold"},
+            explanation_context={
+                "strategy_type": "buy_and_hold",
+                "metrics": {
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                },
+                "benchmark_metrics": {
+                    "aggregate": {"total_return_pct": 9.2},
+                },
+                "assumptions": ["Starting capital: $10,000."],
+                "caveats": ["1D bars only."],
+            },
+        ),
+    )
+
+    result = execute_stage(state=state["run_state"], tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert result.patch["final_response_payload"]["result_card"]["title"] == "TSLA Buy and Hold"
+    assert (
+        result.patch["final_response_payload"]["explanation_context"]["strategy_type"]
+        == "buy_and_hold"
+    )
 
 
 def test_build_workflow_input_seeds_selected_context_and_keeps_run_state_fresh() -> None:
@@ -438,4 +515,36 @@ def test_internal_agent_runtime_turn_endpoint_returns_confirmation_ready_result(
     assert (
         payload["confirmation_payload"]["strategy"]["asset_universe"]
         == ["TSLA"]
+    )
+
+
+def test_run_agent_turn_serializes_rich_final_response_payload() -> None:
+    manager = InMemorySessionManager()
+    workflow = FakeWorkflow(
+        {
+            "stage_outcome": "ready_to_respond",
+            "assistant_response": "Here is the result.",
+            "final_response_payload": {
+                "result": {"execution_status": "succeeded"},
+                "result_card": {"title": "TSLA Buy and Hold"},
+                "explanation_context": {
+                    "strategy_type": "buy_and_hold",
+                    "assumptions": ["Starting capital: $10,000."],
+                },
+            },
+        }
+    )
+
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        thread_id="thread-final-response",
+        message="Show me the result",
+    )
+
+    assert result["final_response_payload"]["result_card"]["title"] == "TSLA Buy and Hold"
+    assert (
+        result["final_response_payload"]["explanation_context"]["strategy_type"]
+        == "buy_and_hold"
     )

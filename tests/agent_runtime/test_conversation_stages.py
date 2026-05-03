@@ -66,6 +66,60 @@ def test_clarify_uses_beginner_guidance_when_no_required_field_is_selected() -> 
     assert "one idea" in result.patch["assistant_prompt"].lower()
 
 
+def test_clarify_groups_multiple_ambiguous_fields() -> None:
+    state = RunState.new(current_user_message="test", recent_thread_history=[])
+    state.requires_clarification = True
+    state.optional_parameter_status = {
+        "ambiguous_fields": [
+            {
+                "field_name": "entry_logic",
+                "raw_value": "buy if RSI is kind of weak",
+                "candidate_normalized_value": "enter when RSI drops below 30",
+                "reason_code": "semantic_category_shift",
+            },
+            {
+                "field_name": "exit_logic",
+                "raw_value": "sell if RSI is not above 70",
+                "candidate_normalized_value": "exit when RSI rises above 70",
+                "reason_code": "negation_or_conditional_reversal",
+            },
+        ]
+    }
+
+    result = clarify_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["ambiguous_fields"][0]["field_name"] == "entry_logic"
+    assert result.patch["ambiguous_fields"][1]["field_name"] == "exit_logic"
+    assert "interpreted it as" in result.patch["assistant_prompt"].lower()
+
+
+def test_clarify_surfaces_simplification_options_for_unsupported_constraints() -> None:
+    state = RunState.new(current_user_message="test", recent_thread_history=[])
+    state.requires_clarification = True
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_time_granularity",
+                "raw_value": "market open",
+                "explanation": "Market-open execution timing is not supported.",
+                "simplification_options": [
+                    {
+                        "label": "Retry with daily bars",
+                        "replacement_values": {"timeframe": "1D"},
+                    }
+                ],
+            }
+        ]
+    }
+
+    result = clarify_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["simplification_options"][0]["label"] == "Retry with daily bars"
+    assert "not supported" in result.patch["assistant_prompt"].lower()
+
+
 def test_clarify_offers_optional_parameters_as_bounded_opt_in() -> None:
     state = RunState.new(current_user_message="Use defaults unless I change them", recent_thread_history=[])
     state.intent = "strategy_drafting"

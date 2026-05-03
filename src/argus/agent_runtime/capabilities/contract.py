@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from argus.agent_runtime.state.models import IntentName
+from argus.agent_runtime.state.models import IntentName, SimplificationOption
 
 
 def freeze_contract_payload(value: Any) -> Any:
@@ -100,6 +100,13 @@ class UnsupportedCombination(BaseModel):
         return self
 
 
+class SimplificationTemplate(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    category: str
+    options: tuple[SimplificationOption, ...] = ()
+
+
 class CapabilityContract(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -110,6 +117,7 @@ class CapabilityContract(BaseModel):
     optional_parameters: dict[str, OptionalParameterSpec] = Field(default_factory=dict)
     validation_rules: tuple[ValidationRule, ...] = ()
     unsupported_combinations: tuple[UnsupportedCombination, ...] = ()
+    simplification_templates: dict[str, SimplificationTemplate] = Field(default_factory=dict)
 
     @property
     def required_fields(self) -> list[str]:
@@ -139,6 +147,15 @@ class CapabilityContract(BaseModel):
             return None
         return deepcopy(parameter.allowed_range)
 
+    def get_simplification_options(self, category: str) -> list[SimplificationOption]:
+        template = self.simplification_templates.get(category)
+        if template is None:
+            return []
+        return [
+            SimplificationOption.model_validate(option.model_dump(mode="python"))
+            for option in template.options
+        ]
+
     def describe_field(self, name: str) -> FieldDescription | None:
         if name in self.required_field_descriptions:
             return deepcopy(self.required_field_descriptions[name])
@@ -158,6 +175,11 @@ class CapabilityContract(BaseModel):
             self,
             "optional_parameters",
             MappingProxyType(dict(self.optional_parameters)),
+        )
+        object.__setattr__(
+            self,
+            "simplification_templates",
+            MappingProxyType(dict(self.simplification_templates)),
         )
 
         overlapping_fields = set(self.required_field_descriptions).intersection(
@@ -193,6 +215,18 @@ class CapabilityContract(BaseModel):
             raise ValueError(
                 "Unsupported combinations reference unknown capability fields: "
                 f"{unknown_names}."
+            )
+
+        mismatched_template_categories = {
+            category
+            for category, template in self.simplification_templates.items()
+            if template.category != category
+        }
+        if mismatched_template_categories:
+            category_names = ", ".join(sorted(mismatched_template_categories))
+            raise ValueError(
+                "Simplification template keys must match their declared category: "
+                f"{category_names}."
             )
 
         for parameter_name, parameter in self.optional_parameters.items():
@@ -326,4 +360,45 @@ def build_default_capability_contract() -> CapabilityContract:
             ),
         ],
         unsupported_combinations=[],
+        simplification_templates={
+            "unsupported_time_granularity": SimplificationTemplate(
+                category="unsupported_time_granularity",
+                options=(
+                    SimplificationOption(
+                        label="Retry with daily bars",
+                        replacement_values={"timeframe": "1D"},
+                    ),
+                    SimplificationOption(
+                        label="Retry with 1-hour bars",
+                        replacement_values={"timeframe": "1h"},
+                    ),
+                ),
+            ),
+            "unsupported_asset_mix": SimplificationTemplate(
+                category="unsupported_asset_mix",
+                options=(
+                    SimplificationOption(
+                        label="Run the strategy with equity symbols only",
+                        replacement_values={"asset_class": "equity"},
+                    ),
+                    SimplificationOption(
+                        label="Run the strategy with crypto symbols only",
+                        replacement_values={"asset_class": "crypto"},
+                    ),
+                    SimplificationOption(
+                        label="Split into separate equity and crypto runs",
+                        replacement_values={"split_runs": True},
+                    ),
+                ),
+            ),
+            "unsupported_strategy_logic": SimplificationTemplate(
+                category="unsupported_strategy_logic",
+                options=(
+                    SimplificationOption(
+                        label="Simplify to RSI-only logic",
+                        replacement_values={"simplify_logic": "rsi_only"},
+                    ),
+                ),
+            ),
+        },
     )

@@ -6,6 +6,7 @@ from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
     FieldDescription,
     OptionalParameterSpec,
+    SimplificationTemplate,
     UnsupportedCombination,
     ValidationRule,
     build_default_capability_contract,
@@ -14,11 +15,15 @@ from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
 from argus.agent_runtime.state.models import (
+    AmbiguousField,
     ConversationMessage,
+    ExtractedFieldValue,
     ResponseProfileOverrides,
     RunState,
+    SimplificationOption,
     TaskSnapshot,
     ThreadState,
+    UnsupportedConstraint,
     UserState,
 )
 
@@ -151,6 +156,39 @@ def test_run_state_starts_fresh_but_thread_state_keeps_history() -> None:
     ]
 
 
+def test_extraction_models_capture_resolution_states() -> None:
+    extracted = ExtractedFieldValue(
+        raw_value="sell when RSI > 70",
+        normalized_value="exit when RSI rises above 70",
+        status="resolved",
+    )
+    ambiguous = AmbiguousField(
+        field_name="exit_logic",
+        raw_value="sell if RSI is not above 70",
+        candidate_normalized_value="exit when RSI rises above 70",
+        reason_code="negation_or_conditional_reversal",
+    )
+    unsupported = UnsupportedConstraint(
+        category="unsupported_time_granularity",
+        raw_value="sell at market open",
+        explanation="Market-open execution timing is not supported in this runtime slice.",
+        simplification_options=[
+            SimplificationOption(
+                label="Retry with daily bars",
+                replacement_values={"timeframe": "1D"},
+            ),
+        ],
+    )
+
+    assert extracted.status == "resolved"
+    assert extracted.normalized_value == "exit when RSI rises above 70"
+    assert ambiguous.reason_code == "negation_or_conditional_reversal"
+    assert unsupported.simplification_options[0].label == "Retry with daily bars"
+    assert unsupported.simplification_options[0].replacement_values == {
+        "timeframe": "1D"
+    }
+
+
 def test_capability_contract_exposes_required_and_optional_fields() -> None:
     contract = build_default_capability_contract()
 
@@ -195,6 +233,81 @@ def test_capability_contract_optional_defaults_are_mutation_safe() -> None:
     defaults["engine_options"]["mode"] = "mutated"
 
     assert contract.optional_defaults["engine_options"] == {}
+
+
+def test_capability_contract_exposes_default_simplification_templates() -> None:
+    contract = build_default_capability_contract()
+
+    assert set(contract.simplification_templates) == {
+        "unsupported_time_granularity",
+        "unsupported_asset_mix",
+        "unsupported_strategy_logic",
+    }
+    options = contract.get_simplification_options("unsupported_time_granularity")
+
+    assert options == [
+        SimplificationOption(
+            label="Retry with daily bars",
+            replacement_values={"timeframe": "1D"},
+        ),
+        SimplificationOption(
+            label="Retry with 1-hour bars",
+            replacement_values={"timeframe": "1h"},
+        ),
+    ]
+    assert contract.get_simplification_options("unknown_category") == []
+
+
+def test_capability_contract_simplification_access_is_mutation_safe() -> None:
+    contract = build_default_capability_contract()
+
+    options = contract.get_simplification_options("unsupported_time_granularity")
+    options[0] = SimplificationOption(
+        label="Mutated",
+        replacement_values={"timeframe": "4h"},
+    )
+
+    with pytest.raises(TypeError):
+        contract.simplification_templates["unsupported_strategy_logic"] = SimplificationTemplate(
+            category="unsupported_strategy_logic",
+            options=(
+                SimplificationOption(
+                    label="Mutated",
+                    replacement_values={"position_side": "short"},
+                ),
+            ),
+        )
+
+    with pytest.raises((TypeError, ValidationError)):
+        contract.simplification_templates[
+            "unsupported_strategy_logic"
+        ].options += (
+            SimplificationOption(
+                label="Mutated",
+                replacement_values={"position_side": "short"},
+            ),
+        )
+
+    with pytest.raises((TypeError, ValidationError)):
+        contract.simplification_templates["unsupported_time_granularity"].options[
+            0
+        ].label = "Mutated"
+
+    with pytest.raises(TypeError):
+        contract.simplification_templates["unsupported_time_granularity"].options[
+            0
+        ].replacement_values["timeframe"] = "mutated"
+
+    assert contract.get_simplification_options("unsupported_time_granularity") == [
+        SimplificationOption(
+            label="Retry with daily bars",
+            replacement_values={"timeframe": "1D"},
+        ),
+        SimplificationOption(
+            label="Retry with 1-hour bars",
+            replacement_values={"timeframe": "1h"},
+        ),
+    ]
 
 
 def test_capability_contract_accessors_do_not_expose_live_mutable_internals() -> None:

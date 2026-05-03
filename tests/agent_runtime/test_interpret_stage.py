@@ -68,6 +68,13 @@ def test_interpret_treats_under_specified_backtest_as_drafting_not_ambiguous() -
         "exit_logic",
         "date_range",
     ]
+    assert result.decision.field_status == {
+        "strategy_thesis": "resolved",
+        "asset_universe": "resolved",
+        "entry_logic": "missing",
+        "exit_logic": "missing",
+        "date_range": "missing",
+    }
     assert "request_is_under_specified" in result.decision.reason_codes
 
 
@@ -235,3 +242,48 @@ def test_interpret_marks_fully_specified_backtest_ready_for_confirmation() -> No
     assert result.decision.candidate_strategy_draft.date_range == "last 2 years"
     assert result.decision.candidate_strategy_draft.entry_logic == "RSI drops below 30"
     assert result.decision.candidate_strategy_draft.exit_logic == "RSI rises above 55"
+
+
+def test_interpret_uses_extraction_sell_synonym_for_exit_logic() -> None:
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message=(
+            "Backtest Tesla over the last 2 years, buy when RSI drops below 30, "
+            "sell when RSI is above 55."
+        ),
+        recent_thread_history=[],
+    )
+
+    result = interpret_stage(state=state, user=user, latest_task_snapshot=None)
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.missing_required_fields == []
+    assert result.decision.candidate_strategy_draft.entry_logic == "RSI drops below 30"
+    assert result.decision.candidate_strategy_draft.exit_logic == "RSI rises above 55"
+    assert result.decision.field_status["exit_logic"] == "resolved"
+
+
+def test_interpret_requires_clarification_for_unsupported_constraints() -> None:
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message=(
+            "Backtest Tesla at market open over the last 2 years, enter when RSI "
+            "drops below 30, exit when RSI rises above 55."
+        ),
+        recent_thread_history=[],
+    )
+
+    result = interpret_stage(state=state, user=user, latest_task_snapshot=None)
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.intent == "backtest_execution"
+    assert result.decision.task_relation == "new_task"
+    assert result.decision.requires_clarification is True
+    assert result.decision.missing_required_fields == []
+    assert result.decision.reason_codes.count("unsupported_time_granularity") == 1
+    assert result.decision.unsupported_constraints[0].category == (
+        "unsupported_time_granularity"
+    )
+    assert result.patch["unsupported_constraints"][0]["category"] == (
+        "unsupported_time_granularity"
+    )

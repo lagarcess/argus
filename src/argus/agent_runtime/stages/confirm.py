@@ -101,7 +101,12 @@ def _build_confirmation_prompt(
     strategy: dict[str, Any],
     optional_parameters: dict[str, dict[str, Any]],
 ) -> str:
-    summary = _plain_language_strategy_summary(strategy)
+    strategy_type = _resolve_strategy_type(strategy, optional_parameters)
+    summary = _plain_language_strategy_summary(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        strategy_type=strategy_type,
+    )
     required_lines = []
     for field_name in contract.required_fields:
         field_description = contract.describe_field(field_name)
@@ -138,16 +143,99 @@ def _build_confirmation_prompt(
     )
 
 
-def _plain_language_strategy_summary(strategy: dict[str, Any]) -> str:
-    assets = _format_value(strategy.get("asset_universe"))
+def _plain_language_strategy_summary(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, dict[str, Any]],
+    strategy_type: str,
+) -> str:
+    assets = _asset_label(strategy.get("asset_universe"))
+    date_range = _format_value(strategy.get("date_range"))
+    strategy_type_label = _strategy_type_label(strategy_type)
+
+    if strategy_type == "buy_and_hold":
+        return (
+            f"Argus is about to run a backtest for {assets} "
+            f"as a {strategy_type_label} strategy over {date_range}."
+        )
+
+    if strategy_type == "dca_accumulation":
+        cadence = _resolved_cadence(strategy, optional_parameters)
+        cadence_phrase = f" on a {cadence} cadence" if cadence is not None else ""
+        return (
+            f"Argus is about to run a backtest for {assets} "
+            f"as a {strategy_type_label} strategy{cadence_phrase} over {date_range}."
+        )
+
     entry_logic = _format_value(strategy.get("entry_logic"))
     exit_logic = _format_value(strategy.get("exit_logic"))
-    date_range = _format_value(strategy.get("date_range"))
     return (
-        "Argus is about to run a backtest for "
-        f"{assets}, entering on {entry_logic}, exiting on {exit_logic}, "
+        f"Argus is about to run a backtest for {assets} "
+        f"as an {strategy_type_label} strategy, entering on {entry_logic}, exiting on {exit_logic}, "
         f"over {date_range}."
     )
+
+
+def _resolve_strategy_type(
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, dict[str, Any]],
+) -> str:
+    explicit_strategy_type = strategy.get("strategy_type")
+    if isinstance(explicit_strategy_type, str) and explicit_strategy_type:
+        return explicit_strategy_type
+
+    extra_parameters = strategy.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        nested_strategy_type = extra_parameters.get("strategy_type")
+        if isinstance(nested_strategy_type, str) and nested_strategy_type:
+            return nested_strategy_type
+        if extra_parameters.get("cadence"):
+            return "dca_accumulation"
+
+    if strategy.get("cadence") or _resolved_cadence(strategy, optional_parameters):
+        return "dca_accumulation"
+    if strategy.get("entry_logic") or strategy.get("exit_logic"):
+        return "indicator_threshold"
+    return "buy_and_hold"
+
+
+def _resolved_cadence(
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, dict[str, Any]],
+) -> str | None:
+    cadence = strategy.get("cadence")
+    if isinstance(cadence, str) and cadence:
+        return cadence
+
+    extra_parameters = strategy.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        nested_cadence = extra_parameters.get("cadence")
+        if isinstance(nested_cadence, str) and nested_cadence:
+            return nested_cadence
+
+    cadence_payload = optional_parameters.get("cadence")
+    if isinstance(cadence_payload, dict):
+        cadence_value = cadence_payload.get("value")
+        if isinstance(cadence_value, str) and cadence_value:
+            return cadence_value
+    return None
+
+
+def _strategy_type_label(strategy_type: str) -> str:
+    labels = {
+        "buy_and_hold": "buy-and-hold",
+        "dca_accumulation": "DCA accumulation",
+        "indicator_threshold": "indicator threshold",
+    }
+    return labels.get(strategy_type, strategy_type.replace("_", " "))
+
+
+def _asset_label(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) if value else "the selected asset"
+    if value is None or value == "":
+        return "the selected asset"
+    return str(value)
 
 
 def _format_value(value: Any) -> str:

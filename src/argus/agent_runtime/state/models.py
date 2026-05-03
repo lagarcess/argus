@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from types import MappingProxyType
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 ToneName = Literal["friendly", "concise"]
 VerbosityName = Literal["low", "medium", "high"]
 ExpertiseMode = Literal["beginner", "intermediate", "advanced"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
+FieldExtractionStatus = Literal["resolved", "missing", "ambiguous", "unsupported"]
 
 IntentName = Literal[
     "beginner_guidance",
@@ -23,6 +25,22 @@ IntentName = Literal[
 TaskRelation = Literal["new_task", "continue", "refine", "ambiguous"]
 
 
+def freeze_state_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return MappingProxyType(
+            {key: freeze_state_payload(nested_value) for key, nested_value in value.items()}
+        )
+    if isinstance(value, list):
+        return tuple(freeze_state_payload(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(freeze_state_payload(item) for item in value)
+    if isinstance(value, set):
+        return frozenset(freeze_state_payload(item) for item in value)
+    if isinstance(value, frozenset):
+        return frozenset(freeze_state_payload(item) for item in value)
+    return value
+
+
 class ConversationMessage(BaseModel):
     role: MessageRole
     content: str
@@ -35,6 +53,54 @@ class StrategySummary(BaseModel):
     exit_logic: str | None = None
     date_range: str | None = None
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExtractedFieldValue(BaseModel):
+    raw_value: str | None = None
+    normalized_value: Any | None = None
+    status: FieldExtractionStatus
+
+
+class AmbiguousField(BaseModel):
+    field_name: str
+    raw_value: str
+    candidate_normalized_value: Any | None = None
+    reason_code: str
+
+
+class SimplificationOption(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    label: str
+    replacement_values: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def freeze_replacement_values(self) -> "SimplificationOption":
+        object.__setattr__(
+            self,
+            "replacement_values",
+            MappingProxyType(
+                {
+                    key: freeze_state_payload(value)
+                    for key, value in self.replacement_values.items()
+                }
+            ),
+        )
+        return self
+
+    @field_serializer("replacement_values")
+    def serialize_replacement_values(self, value: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: deepcopy(nested_value)
+            for key, nested_value in value.items()
+        }
+
+
+class UnsupportedConstraint(BaseModel):
+    category: str
+    raw_value: str
+    explanation: str
+    simplification_options: list[SimplificationOption] = Field(default_factory=list)
 
 
 class ArtifactReference(BaseModel):
@@ -67,6 +133,8 @@ class FinalResponsePayload(BaseModel):
     result: dict[str, Any] | None = None
     error: str | None = None
     summary: str | None = None
+    result_card: dict[str, Any] | None = None
+    explanation_context: dict[str, Any] | None = None
 
 
 class ResponseProfile(BaseModel):

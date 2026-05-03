@@ -1,8 +1,13 @@
+import pytest
+
 from argus.agent_runtime.recovery.policy import should_retry
 from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.state.models import ResponseProfile, RunState
+from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
+from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
+from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 
 
 def test_parameter_validation_retries_only_for_mechanical_intent_preserving_fix() -> None:
@@ -77,7 +82,8 @@ def test_execute_applies_mechanical_correction_before_retry() -> None:
     result = execute_stage(state=state, tool=tool, max_retries=2)
 
     assert result.outcome == "execution_succeeded"
-    assert tool.calls[0] == {"strategy": {"asset_universe": ["tsla"]}}
+    assert tool.calls[0]["strategy_type"] == "buy_and_hold"
+    assert tool.calls[0]["symbol"] == "TSLA"
     assert tool.calls[1] == {"strategy": {"asset_universe": ["TSLA"]}}
 
 
@@ -248,6 +254,84 @@ def test_execute_ambiguous_user_intent_returns_to_conversation() -> None:
     assert len(result.patch["tool_call_records"]) == 1
 
 
+def test_execute_stage_uses_real_backtest_tool_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = RealBacktestTool()
+    state = RunState.new(current_user_message="Backtest Tesla", recent_thread_history=[])
+    state.candidate_strategy_draft = {
+        "strategy_thesis": "Buy and hold Tesla over the last year",
+        "asset_universe": ["TSLA"],
+        "date_range": "last 1 year",
+    }
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_thesis": "Buy and hold Tesla over the last year",
+            "asset_universe": ["TSLA"],
+            "date_range": "last 1 year",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 10000.0, "source": "default"},
+        },
+    }
+
+    observed_requests: list[dict[str, object]] = []
+
+    def fake_run_launch_backtest(
+        request,
+    ) -> LaunchExecutionAdapterResult:
+        observed_requests.append(request.model_dump(mode="python"))
+        return LaunchExecutionAdapterResult(
+            envelope=LaunchExecutionEnvelope(
+                execution_status="succeeded",
+                resolved_strategy={
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "TSLA",
+                },
+                resolved_parameters={"timeframe": "1D"},
+                metrics={
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                },
+                benchmark_metrics={
+                    "symbol": "SPY",
+                    "aggregate": {"total_return_pct": 9.2},
+                },
+                assumptions=["Starting capital: $10,000."],
+                caveats=["1D bars only."],
+                provider_metadata={"provider": "alpaca"},
+            ),
+            result_card={"title": "TSLA Buy and Hold"},
+            explanation_context={
+                "strategy_type": "buy_and_hold",
+                "metrics": {
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                },
+                "benchmark_metrics": {
+                    "aggregate": {"total_return_pct": 9.2},
+                },
+                "assumptions": ["Starting capital: $10,000."],
+                "caveats": ["1D bars only."],
+            },
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_run_launch_backtest,
+    )
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert observed_requests[0]["strategy_type"] == "buy_and_hold"
+    assert observed_requests[0]["symbol"] == "TSLA"
+    assert result.patch["final_response_payload"]["result_card"]["title"] == "TSLA Buy and Hold"
+    assert (
+        result.patch["final_response_payload"]["explanation_context"]["strategy_type"]
+        == "buy_and_hold"
+    )
+
+
 def test_execute_maps_unknown_tool_errors_into_runtime_taxonomy() -> None:
     tool = StubBacktestTool(
         responses=[
@@ -323,6 +407,46 @@ def test_explain_stage_reports_incomplete_result_payload_without_inventing_numbe
     assert "incomplete" in result.patch["assistant_response"].lower()
     assert "cannot report observed returns yet" in result.patch["assistant_response"].lower()
     assert "0.0%" not in result.patch["assistant_response"]
+
+
+def test_explain_stage_uses_execution_envelope_context() -> None:
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.effective_response_profile = ResponseProfile(
+        effective_tone="friendly",
+        effective_verbosity="medium",
+        effective_expertise_mode="beginner",
+    )
+    state.confirmation_payload = {
+        "strategy": {"strategy_thesis": "Buy and hold Tesla over the last year"},
+        "optional_parameters": {
+            "initial_capital": {
+                "label": "Initial capital",
+                "source": "default",
+            },
+        },
+    }
+    state.final_response_payload = {
+        "result": {
+            "execution_status": "succeeded",
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.5}}},
+        },
+        "result_card": {"title": "TSLA Buy and Hold"},
+        "explanation_context": {
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.5}}},
+            "benchmark_metrics": {"aggregate": {"total_return_pct": 9.2}},
+            "assumptions": ["Starting capital: $10,000."],
+            "caveats": ["1D bars only."],
+            "strategy_type": "buy_and_hold",
+        },
+    }
+
+    result = explain_stage(state=state)
+
+    assert result.outcome == "ready_to_respond"
+    assert "12.5%" in result.patch["assistant_response"]
+    assert "9.2%" in result.patch["assistant_response"]
+    assert "Starting capital: $10,000." in result.patch["assistant_response"]
+    assert "1D bars only." in result.patch["assistant_response"]
 
 
 def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:

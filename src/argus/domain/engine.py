@@ -284,6 +284,8 @@ def _build_signals(
             # Entry on the first day of each month present in data
             months = index.to_series().dt.to_period("M")
             entries = months != months.shift(1)
+        elif cadence == "quarterly":
+            entries.iloc[::3] = True
         else:
             # Fallback to single entry if unknown cadence
             entries.iloc[0] = True

@@ -15,6 +15,33 @@ OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
 
 
 def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
+    unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
+    if unsupported_constraints:
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": _unsupported_constraint_prompt(
+                    unsupported_constraints
+                ),
+                "requested_field": None,
+                "unsupported_constraints": unsupported_constraints,
+                "simplification_options": _simplification_options(
+                    unsupported_constraints
+                ),
+            },
+        )
+
+    ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
+    if ambiguous_fields:
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": _ambiguous_fields_prompt(ambiguous_fields),
+                "requested_field": None,
+                "ambiguous_fields": ambiguous_fields,
+            },
+        )
+
     requested_field = _first_missing_required_field(
         missing_required_fields=state.missing_required_fields,
         contract=contract,
@@ -88,6 +115,46 @@ def _optional_parameter_choices(
     return choices[:OPTIONAL_PARAMETER_OPT_IN_LIMIT]
 
 
+def _ambiguous_fields(optional_parameter_status: dict[str, object]) -> list[dict[str, object]]:
+    ambiguous_fields = optional_parameter_status.get("ambiguous_fields", [])
+    if not isinstance(ambiguous_fields, list):
+        return []
+    return [
+        value
+        for value in ambiguous_fields
+        if isinstance(value, dict) and isinstance(value.get("field_name"), str)
+    ]
+
+
+def _unsupported_constraints(
+    optional_parameter_status: dict[str, object],
+) -> list[dict[str, object]]:
+    unsupported_constraints = optional_parameter_status.get("unsupported_constraints", [])
+    if not isinstance(unsupported_constraints, list):
+        return []
+    return [
+        value
+        for value in unsupported_constraints
+        if isinstance(value, dict) and isinstance(value.get("category"), str)
+    ]
+
+
+def _simplification_options(
+    unsupported_constraints: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    options: list[dict[str, object]] = []
+    for constraint in unsupported_constraints:
+        raw_options = constraint.get("simplification_options", [])
+        if not isinstance(raw_options, list):
+            continue
+        for option in raw_options:
+            if not isinstance(option, dict):
+                continue
+            if isinstance(option.get("label"), str):
+                options.append(option)
+    return options
+
+
 def _optional_parameter_opt_in_prompt(
     *,
     optional_parameter_choices: list[str],
@@ -105,6 +172,41 @@ def _optional_parameter_opt_in_prompt(
         "I can use the defaults, or adjust a few optional settings first. "
         f"Do you want to change any of these: {labels}? {descriptions}"
     )
+
+
+def _ambiguous_fields_prompt(ambiguous_fields: list[dict[str, object]]) -> str:
+    parts = []
+    for field in ambiguous_fields:
+        field_name = str(field["field_name"]).replace("_", " ")
+        raw_value = str(field.get("raw_value", "")).strip()
+        candidate = str(field.get("candidate_normalized_value", "")).strip()
+        if raw_value and candidate:
+            parts.append(
+                f"{field_name}: you said '{raw_value}', and I interpreted it as '{candidate}'"
+            )
+        elif raw_value:
+            parts.append(f"{field_name}: you said '{raw_value}'")
+    joined = "; ".join(parts)
+    return (
+        "I need to clarify a couple of strategy details before I continue. "
+        f"{joined}. Which of those should I use?"
+    )
+
+
+def _unsupported_constraint_prompt(
+    unsupported_constraints: list[dict[str, object]],
+) -> str:
+    first_constraint = unsupported_constraints[0]
+    explanation = str(first_constraint.get("explanation", "")).strip()
+    labels = [
+        str(option.get("label", "")).strip()
+        for option in _simplification_options(unsupported_constraints)
+        if str(option.get("label", "")).strip()
+    ]
+    prompt = explanation or "Part of this strategy is not supported yet."
+    if labels:
+        prompt += " You can simplify it with: " + ", ".join(labels) + "."
+    return prompt
 
 
 def _optional_parameter_label(field_name: str, *, contract: CapabilityContract) -> str:

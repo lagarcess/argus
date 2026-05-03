@@ -181,7 +181,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "final_response_payload",
     }
     serialized = {
-        key: value
+        key: _serialize_public_value(key, value)
         for key, value in result.items()
         if key in allowed_keys and value is not None
     }
@@ -191,15 +191,17 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
             "confirmation_payload" not in serialized
             and getattr(run_state, "confirmation_payload", None) is not None
         ):
-            serialized["confirmation_payload"] = run_state.confirmation_payload.model_dump(
-                mode="python"
+            serialized["confirmation_payload"] = _serialize_public_value(
+                "confirmation_payload",
+                run_state.confirmation_payload,
             )
         if (
             "final_response_payload" not in serialized
             and getattr(run_state, "final_response_payload", None) is not None
         ):
-            serialized["final_response_payload"] = run_state.final_response_payload.model_dump(
-                mode="python"
+            serialized["final_response_payload"] = _serialize_public_value(
+                "final_response_payload",
+                run_state.final_response_payload,
             )
         if (
             "failure_classification" not in serialized
@@ -210,6 +212,15 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
     if stage_outcome is not None:
         serialized["stage_outcome"] = getattr(stage_outcome, "value", stage_outcome)
     return serialized
+
+
+def _serialize_public_value(key: str, value: Any) -> Any:
+    if key in {"confirmation_payload", "final_response_payload"} and hasattr(
+        value,
+        "model_dump",
+    ):
+        return value.model_dump(mode="python")
+    return value
 
 
 def _normalize_message_for_runtime_slice(message: str) -> str:

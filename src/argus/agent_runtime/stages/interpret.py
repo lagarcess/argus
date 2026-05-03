@@ -6,15 +6,22 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.extraction import (
+    StrategyExtractionResult,
+    extract_strategy_fields,
+)
 from argus.agent_runtime.profile.response_profile import resolve_effective_response_profile
 from argus.agent_runtime.signals.task_relation import ExtractedSignals, extract_signals
 from argus.agent_runtime.state.models import (
+    AmbiguousField,
+    FieldExtractionStatus,
     IntentName,
     ResponseProfile,
     RunState,
     StrategySummary,
     TaskRelation,
     TaskSnapshot,
+    UnsupportedConstraint,
     UserState,
 )
 
@@ -47,6 +54,9 @@ class InterpretDecision(BaseModel):
     effective_response_profile: ResponseProfile
     user_preference_overridden_for_turn: bool = False
     normalized_signals: dict[str, Any] = Field(default_factory=dict)
+    field_status: dict[str, FieldExtractionStatus] = Field(default_factory=dict)
+    ambiguous_fields: list[AmbiguousField] = Field(default_factory=list)
+    unsupported_constraints: list[UnsupportedConstraint] = Field(default_factory=list)
 
     def to_patch(self) -> dict[str, Any]:
         return {
@@ -68,9 +78,19 @@ class InterpretDecision(BaseModel):
                 ),
                 "confidence": self.confidence,
                 "arbitration_mode": self.arbitration_mode,
+                "ambiguous_fields": list(self.ambiguous_fields),
+                "unsupported_constraints": list(self.unsupported_constraints),
             },
             "effective_response_profile": self.effective_response_profile,
             "reason_codes": list(self.reason_codes),
+            "field_status": dict(self.field_status),
+            "ambiguous_fields": [
+                item.model_dump(mode="python") for item in self.ambiguous_fields
+            ],
+            "unsupported_constraints": [
+                item.model_dump(mode="python")
+                for item in self.unsupported_constraints
+            ],
         }
 
 
@@ -148,10 +168,11 @@ def interpret_stage(
         signals=signals,
         arbitration=arbitration,
     )
-    candidate_strategy = build_candidate_strategy(
-        current_message=state.current_user_message,
-        signals=signals,
+    extraction = extract_strategy_fields(
+        state.current_user_message,
+        capability_contract,
     )
+    candidate_strategy = build_candidate_strategy_from_extraction(extraction)
     missing_required_fields: list[str] = []
     if should_track_execution_requirements(
         intent=preliminary_intent,
@@ -161,7 +182,7 @@ def interpret_stage(
         missing_required_fields = [
             field_name
             for field_name in capability_contract.required_fields
-            if strategy_field_missing(candidate_strategy, field_name)
+            if extraction_field_status(extraction, field_name) == "missing"
         ]
     intent = resolve_intent(
         user=user,
@@ -176,6 +197,8 @@ def interpret_stage(
     requires_clarification = (
         intent == "beginner_guidance"
         or task_relation == "ambiguous"
+        or bool(extraction.ambiguous_fields)
+        or bool(extraction.unsupported_constraints)
         or (
             should_track_execution_requirements(
                 intent=intent,
@@ -205,16 +228,18 @@ def interpret_stage(
         arbitration_mode=arbitration.mode,
         reason_codes=merge_reason_codes(
             signals.reason_codes,
-            merge_reason_codes(
-                arbitration.reason_codes,
-                arbitration.decision.reason_codes
-                if arbitration.decision is not None
-                else [],
-            ),
+            extraction.reason_codes,
+            arbitration.reason_codes,
+            arbitration.decision.reason_codes
+            if arbitration.decision is not None
+            else [],
         ),
         effective_response_profile=effective_profile,
         user_preference_overridden_for_turn=has_response_profile_overrides(signals),
         normalized_signals=signals.to_patch_payload(),
+        field_status=build_field_status_payload(extraction),
+        ambiguous_fields=list(extraction.ambiguous_fields),
+        unsupported_constraints=list(extraction.unsupported_constraints),
     )
 
     outcome: StageOutcome = "needs_clarification"
@@ -224,26 +249,66 @@ def interpret_stage(
     return StageResult(outcome=outcome, decision=decision)
 
 
-def build_candidate_strategy(
-    *,
-    current_message: str,
-    signals: ExtractedSignals,
+def build_candidate_strategy_from_extraction(
+    extraction: StrategyExtractionResult,
 ) -> StrategySummary:
-    strategy = StrategySummary(asset_universe=list(signals.detected_symbols))
-    if signals.detected_date_range is not None:
-        strategy.date_range = signals.detected_date_range
-    strategy.entry_logic = extract_entry_logic(current_message)
-    strategy.exit_logic = extract_exit_logic(current_message)
-    if signals.detected_symbols and not signals.beginner_language_detected:
-        strategy.strategy_thesis = current_message.strip()
+    strategy = StrategySummary()
+    strategy.strategy_thesis = coerce_strategy_thesis(
+        extraction.strategy_thesis.normalized_value
+    )
+    strategy.asset_universe = coerce_asset_universe(
+        extraction.asset_universe.normalized_value
+    )
+    strategy.entry_logic = coerce_logic_clause(extraction.entry_logic.normalized_value)
+    strategy.exit_logic = coerce_logic_clause(extraction.exit_logic.normalized_value)
+    strategy.date_range = coerce_optional_string(extraction.date_range.normalized_value)
     return strategy
 
 
-def strategy_field_missing(strategy: StrategySummary, field_name: str) -> bool:
-    value = getattr(strategy, field_name)
+def build_field_status_payload(
+    extraction: StrategyExtractionResult,
+) -> dict[str, FieldExtractionStatus]:
+    return {
+        "strategy_thesis": extraction.strategy_thesis.status,
+        "asset_universe": extraction.asset_universe.status,
+        "entry_logic": extraction.entry_logic.status,
+        "exit_logic": extraction.exit_logic.status,
+        "date_range": extraction.date_range.status,
+    }
+
+
+def extraction_field_status(
+    extraction: StrategyExtractionResult,
+    field_name: str,
+) -> FieldExtractionStatus:
+    return getattr(extraction, field_name).status
+
+
+def coerce_strategy_thesis(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def coerce_asset_universe(value: Any) -> list[str]:
     if isinstance(value, list):
-        return len(value) == 0
-    return value is None or value == ""
+        return [str(item) for item in value]
+    if isinstance(value, str) and value:
+        return [value]
+    return []
+
+
+def coerce_optional_string(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def coerce_logic_clause(value: Any) -> str | None:
+    normalized = coerce_optional_string(value)
+    if normalized is None:
+        return None
+    return normalize_clause(strip_logic_prefix(normalized))
 
 
 def resolve_intent(
@@ -428,44 +493,32 @@ def should_track_execution_requirements(
     )
 
 
-def extract_entry_logic(message: str) -> str | None:
-    match = re.search(
-        r"(?:enter|buy)\s+when\s+(.+?)(?=,\s*exit\s+when\b| and exit\s+when\b|$)",
-        message,
-        flags=re.IGNORECASE,
-    )
-    if match is None:
-        return None
-    return normalize_clause(match.group(1))
-
-
-def extract_exit_logic(message: str) -> str | None:
-    match = re.search(
-        r"exit\s+when\s+(.+?)(?=[\.,;]|$)",
-        message,
-        flags=re.IGNORECASE,
-    )
-    if match is None:
-        return None
-    return normalize_clause(match.group(1))
-
-
 def normalize_clause(clause: str) -> str | None:
     normalized = clause.strip(" .,:;")
     if not normalized:
         return None
-    return normalized[0].upper() + normalized[1:]
+    normalized = normalized[0].upper() + normalized[1:]
+    normalized = re.sub(r"^Rsi\b", "RSI", normalized)
+    return normalized
 
 
-def merge_reason_codes(
-    signal_reason_codes: list[str],
-    arbitration_reason_codes: list[str],
-) -> list[str]:
+def strip_logic_prefix(clause: str) -> str:
+    return re.sub(
+        r"^(?:enter|exit)\s+when\s+",
+        "",
+        clause,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+
+def merge_reason_codes(*reason_code_groups: list[str]) -> list[str]:
     seen: set[str] = set()
     merged: list[str] = []
-    for reason_code in [*signal_reason_codes, *arbitration_reason_codes]:
-        if reason_code in seen:
-            continue
-        seen.add(reason_code)
-        merged.append(reason_code)
+    for reason_code_group in reason_code_groups:
+        for reason_code in reason_code_group:
+            if reason_code in seen:
+                continue
+            seen.add(reason_code)
+            merged.append(reason_code)
     return merged
