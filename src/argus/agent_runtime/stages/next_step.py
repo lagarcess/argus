@@ -3,7 +3,6 @@ from __future__ import annotations
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState
 
-
 SUCCESS_NEXT_ACTIONS = [
     "refine_strategy",
     "compare_benchmark",

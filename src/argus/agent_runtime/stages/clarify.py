@@ -4,7 +4,6 @@ from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState
 
-
 BEGINNER_GUIDANCE_PROMPT = (
     "No problem. I can help you pick a starting point. We can test a simple buy-and-hold idea, a recurring investment plan, or a rule like buying when RSI is low. If you want the simplest path, name an asset and say a timeframe, like 'Tesla over 2 years'."
 )

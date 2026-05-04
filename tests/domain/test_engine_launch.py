@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pytest
 import pandas as pd
-
+import pytest
 from argus.domain.engine import _build_signals
 from argus.domain.engine_launch.adapter import run_launch_backtest
 from argus.domain.engine_launch.models import (

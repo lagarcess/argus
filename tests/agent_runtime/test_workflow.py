@@ -1,7 +1,4 @@
 import pytest
-from fastapi.testclient import TestClient
-
-from argus.api import main as api_main
 from argus.agent_runtime.graph.workflow import (
     WorkflowRoute,
     WorkflowStageOutcome,
@@ -11,15 +8,17 @@ from argus.agent_runtime.graph.workflow import (
 from argus.agent_runtime.runtime import build_workflow_input, run_agent_turn
 from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.stages.execute import execute_stage
-from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     TaskSnapshot,
     UserState,
 )
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
+from argus.agent_runtime.tools.real_backtest import RealBacktestTool
+from argus.api import main as api_main
 from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
 from argus.domain.engine_launch.models import LaunchExecutionEnvelope
+from fastapi.testclient import TestClient
 
 
 class FakeWorkflow:

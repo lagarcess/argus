@@ -8,11 +8,6 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
-from argus.agent_runtime.strategy_contract import (
-    executable_strategy_type,
-    explicit_buy_and_hold_requested,
-    normalize_date_range_candidate,
-)
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
@@ -22,6 +17,11 @@ from argus.agent_runtime.state.models import (
     SimplificationOption,
     StrategySummary,
     UnsupportedConstraint,
+)
+from argus.agent_runtime.strategy_contract import (
+    executable_strategy_type,
+    explicit_buy_and_hold_requested,
+    normalize_date_range_candidate,
 )
 from argus.domain.market_data import resolve_asset
 

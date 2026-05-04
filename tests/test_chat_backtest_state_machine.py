@@ -113,12 +113,12 @@ def test_chat_backtest_requires_confirmation_before_running(
     def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
         lower = message.lower()
         if "rsi" in lower:
-            return ChatTurnIntent(assistant_response="", 
+            return ChatTurnIntent(assistant_response="",
                 intent="setup",
                 backtest_update=BacktestParamsUpdate(template="rsi_mean_reversion"),
             )
         if "aapl" in lower:
-            return ChatTurnIntent(assistant_response="", 
+            return ChatTurnIntent(assistant_response="",
                 intent="setup",
                 backtest_update=BacktestParamsUpdate(symbols=["AAPL"]),
             )
@@ -185,12 +185,12 @@ def test_chat_backtest_change_mind_updates_pending_state_before_confirmation(
     def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
         lower = message.lower()
         if "buy" in lower and "aapl" in lower:
-            return ChatTurnIntent(assistant_response="", 
+            return ChatTurnIntent(assistant_response="",
                 intent="setup",
                 backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
             )
         if "msft" in lower:
-            return ChatTurnIntent(assistant_response="", 
+            return ChatTurnIntent(assistant_response="",
                 intent="setup",
                 backtest_update=BacktestParamsUpdate(symbols=["MSFT"]),
             )
@@ -248,19 +248,18 @@ def test_localized_dca_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 3: Verify that Spanish user input 'semanal' is normalized to 'weekly' before execution."""
     from argus.api import main as api_main
     from argus.domain.orchestrator import ChatTurnIntent
-    from argus.domain import orchestrator
 
     calls = []
 
     def _stub_intent(*args: Any, **kwargs: Any) -> ChatTurnIntent:
         from argus.domain.backtest_state_machine import BacktestParamsUpdate
         from argus.domain.orchestrator import normalize_backtest_update
-        
+
         message = kwargs.get("message") or (args[0] if args else "")
         msg = message.lower()
-        
+
         if "¿cómo funcionaría una estrategia dca" in msg:
-            intent_obj = ChatTurnIntent(assistant_response="", 
+            intent_obj = ChatTurnIntent(assistant_response="",
                 intent="setup",
                 backtest_update=BacktestParamsUpdate(
                     template="dca_accumulation",
@@ -268,7 +267,7 @@ def test_localized_dca_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
                 ),
             )
         elif "semanal" in msg:
-            intent_obj = ChatTurnIntent(assistant_response="", 
+            intent_obj = ChatTurnIntent(assistant_response="",
                 intent="setup",
                 backtest_update=BacktestParamsUpdate(
                     parameters={"dca_cadence": "semanal"}
@@ -278,13 +277,13 @@ def test_localized_dca_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
             intent_obj = ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
         else:
             intent_obj = ChatTurnIntent(assistant_response="", intent="guide")
-            
+
         # Manually trigger normalization in mock to test the actual logic
         pending_state = kwargs.get("pending_backtest_state")
         pending_template = None
         if pending_state and "params" in pending_state:
             pending_template = pending_state["params"].get("template")
-            
+
         intent_obj.backtest_update = normalize_backtest_update(
             intent_obj.backtest_update,
             pending_template=pending_template
@@ -308,8 +307,8 @@ def test_localized_dca_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
                 self.aggregate = {"performance": {"total_return_pct": 10.0}}
             def model_dump(self, **kwargs: Any) -> dict[str, Any]:
                 return {
-                    "id": self.id, 
-                    "symbols": self.symbols, 
+                    "id": self.id,
+                    "symbols": self.symbols,
                     "config_snapshot": self.config_snapshot,
                     "metrics": {"aggregate": self.aggregate}
                 }
@@ -356,7 +355,7 @@ def test_localized_dca_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
     assert confirmed.status_code == 200
     assert "event: result" in confirmed.text
     assert len(calls) == 1
-    
+
     # THE CRITICAL ASSERTION:
     # Even though the user said 'semanal', the engine should receive 'weekly'
     assert calls[0]["parameters"]["dca_cadence"] == "weekly"
@@ -397,7 +396,7 @@ def test_education_chat_does_not_create_backtest_state(
     from argus.api import main as api_main
 
     def _education(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="", 
+        return ChatTurnIntent(assistant_response="",
             intent="guide",
             educational_need="concept_explanation",
             assistant_guidance_seed="momentum",
@@ -432,7 +431,7 @@ def test_confused_beginner_gets_guided_prompt_without_backtest_state(
     from argus.api import main as api_main
 
     def _beginner(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="", 
+        return ChatTurnIntent(assistant_response="",
             intent="guide",
             educational_need="beginner_confused",
             assistant_guidance_seed="",
@@ -468,7 +467,7 @@ def test_beginner_choice_narrows_guide_without_backtest_state(
     from argus.api import main as api_main
 
     def _choice(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="", 
+        return ChatTurnIntent(assistant_response="",
             intent="guide",
             educational_need="beginner_confused",
             guide_choice="compare_stocks",
@@ -500,7 +499,7 @@ def test_concrete_symbol_from_single_pass_intent_starts_state_machine(
     from argus.api import main as api_main
 
     def _symbol(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="", 
+        return ChatTurnIntent(assistant_response="",
             intent="setup",
             backtest_update=BacktestParamsUpdate(symbols=["AAPL"]),
         )
@@ -588,7 +587,7 @@ def test_confirm_edit_and_cancel_paths_do_not_run(
 
     def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
         if "buy" in message.lower():
-            return ChatTurnIntent(assistant_response="", 
+            return ChatTurnIntent(assistant_response="",
                 intent="setup",
                 backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
             )
@@ -653,14 +652,14 @@ def test_result_review_explains_metrics_without_rerunning(
 
     def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
         if phase == "explain":
-            return ChatTurnIntent(assistant_response="", 
+            return ChatTurnIntent(assistant_response="",
                 intent="explain_result",
                 result_action="explain_metrics",
                 educational_need="metric_explanation",
             )
         if message.lower().strip() == "yes":
             return ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
-        return ChatTurnIntent(assistant_response="", 
+        return ChatTurnIntent(assistant_response="",
             intent="setup",
             backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
         )
@@ -717,14 +716,14 @@ def test_result_refine_and_save_actions_do_not_rerun(
         if phase == "save":
             return ChatTurnIntent(assistant_response="", intent="refine", result_action="save_or_organize")
         if phase == "refine":
-            return ChatTurnIntent(assistant_response="", 
+            return ChatTurnIntent(assistant_response="",
                 intent="refine",
                 result_action="compare_or_refine",
                 backtest_update=BacktestParamsUpdate(symbols=["MSFT"]),
             )
         if message.lower().strip() == "yes":
             return ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
-        return ChatTurnIntent(assistant_response="", 
+        return ChatTurnIntent(assistant_response="",
             intent="setup",
             backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
         )

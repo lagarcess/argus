@@ -1,25 +1,17 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import re
 from typing import Any, Literal, Protocol
-
-from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import (
     StrategyExtractionResult,
     extract_strategy_fields,
 )
-from argus.agent_runtime.profile.response_profile import resolve_effective_response_profile
-from argus.agent_runtime.signals.task_relation import ExtractedSignals, extract_signals
-from argus.agent_runtime.strategy_contract import (
-    display_strategy_slug,
-    executable_strategy_type,
-    normalize_date_range_candidate,
-    resolve_date_range,
-    strategy_can_be_approved,
+from argus.agent_runtime.profile.response_profile import (
+    resolve_effective_response_profile,
 )
+from argus.agent_runtime.signals.task_relation import ExtractedSignals, extract_signals
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     FieldExtractionStatus,
@@ -32,7 +24,15 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.agent_runtime.strategy_contract import (
+    display_strategy_slug,
+    executable_strategy_type,
+    normalize_date_range_candidate,
+    resolve_date_range,
+    strategy_can_be_approved,
+)
 from argus.domain.market_data import resolve_asset
+from pydantic import BaseModel, Field
 
 StageOutcome = Literal[
     "needs_clarification",

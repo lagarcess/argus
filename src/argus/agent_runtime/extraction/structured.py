@@ -9,7 +9,6 @@ from argus.agent_runtime.signals.task_relation import detect_symbols, extract_da
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     ExtractedFieldValue,
-    SimplificationOption,
     UnsupportedConstraint,
 )
 from argus.domain.market_data import resolve_asset

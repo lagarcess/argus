@@ -15,6 +15,18 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
+from argus.agent_runtime.runtime import run_agent_turn
+from argus.agent_runtime.session.manager import InMemorySessionManager
+from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.strategy_contract import (
+    display_strategy_slug,
+    display_strategy_type,
+    resolve_date_range,
+)
+from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.api.schemas import (
     BacktestRun,
     BacktestRunRequest,
@@ -53,7 +65,6 @@ from argus.api.schemas import (
 )
 from argus.domain.backtest_state_machine import (
     BacktestConversationState,
-    apply_backtest_turn,
 )
 from argus.domain.engine import (
     build_result_card,
@@ -64,26 +75,12 @@ from argus.domain.engine import (
     validate_backtest_config,
 )
 from argus.domain.orchestrator import (
-    assistant_message_for_chat_turn,
-    classify_chat_turn_intent,
     get_starter_prompts,
     parse_onboarding_goal,
     suggest_entity_name,
 )
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
-from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.graph.workflow import build_workflow
-from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
-from argus.agent_runtime.runtime import run_agent_turn
-from argus.agent_runtime.session.manager import InMemorySessionManager
-from argus.agent_runtime.strategy_contract import (
-    display_strategy_slug,
-    display_strategy_type,
-    resolve_date_range,
-)
-from argus.agent_runtime.state.models import UserState
-from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 
 load_dotenv()
 

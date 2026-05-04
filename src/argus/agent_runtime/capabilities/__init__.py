@@ -1,8 +1,8 @@
 """Shared execution capability contracts."""
 
 from argus.agent_runtime.capabilities.contract import (
-    CapabilityRange,
     CapabilityContract,
+    CapabilityRange,
     FieldDescription,
     OptionalParameterSpec,
     UnsupportedCombination,

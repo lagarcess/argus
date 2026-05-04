@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import re
+from copy import deepcopy
 from typing import Any
 
 from argus.agent_runtime.recovery.policy import should_retry
+from argus.agent_runtime.stages.interpret import StageResult
+from argus.agent_runtime.state.models import ConfirmationPayload, RunState
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     resolve_date_range,
 )
-from argus.agent_runtime.stages.interpret import StageResult
-from argus.agent_runtime.state.models import ConfirmationPayload, RunState
 from argus.domain.market_data import resolve_asset
 
 

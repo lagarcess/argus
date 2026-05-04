@@ -11,7 +11,10 @@ from argus.domain.engine import (
     validate_backtest_config,
 )
 from argus.domain.engine_launch.cadence import resolve_dca_cadence
-from argus.domain.engine_launch.models import LaunchBacktestRequest, LaunchExecutionEnvelope
+from argus.domain.engine_launch.models import (
+    LaunchBacktestRequest,
+    LaunchExecutionEnvelope,
+)
 from argus.domain.engine_launch.results import (
     build_benchmark_metrics,
     build_explanation_context,

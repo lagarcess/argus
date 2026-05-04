@@ -5,8 +5,12 @@ from typing import Any
 
 from argus.agent_runtime.graph.workflow import WorkflowState
 from argus.agent_runtime.session.manager import InMemorySessionManager
-from argus.agent_runtime.state.models import ArtifactReference, RunState, TaskSnapshot, UserState
-
+from argus.agent_runtime.state.models import (
+    ArtifactReference,
+    RunState,
+    TaskSnapshot,
+    UserState,
+)
 
 SEEDED_THREAD_METADATA_KEYS = (
     "latest_task_type",

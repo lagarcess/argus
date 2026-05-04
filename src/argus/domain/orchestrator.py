@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
-from datetime import date, timedelta
 from typing import Any, Literal
 
 from langchain_openrouter import ChatOpenRouter
@@ -166,7 +164,7 @@ def assistant_message_for_chat_turn(
     # 100% of the message now comes from the AI.
     if intent.assistant_response:
         return intent.assistant_response
-    
+
     is_es = _resolve_language(language) == "es-419"
     return (
         "I'm here to help you validate your investing ideas with real historical data. What's on your mind?"
@@ -178,18 +176,21 @@ def assistant_message_for_chat_turn(
 
 def normalize_backtest_update(update: BacktestParamsUpdate, pending_template: str | None = None) -> BacktestParamsUpdate:
     """Canonicalizes localized values in a BacktestParamsUpdate."""
-    from argus.domain.slot_normalizer import normalize_template_name, normalize_parameter_value
-    
+    from argus.domain.slot_normalizer import (
+        normalize_parameter_value,
+        normalize_template_name,
+    )
+
     if update.template:
         update.template = normalize_template_name(update.template)
-        
+
     template_key = update.template or pending_template
     if template_key and update.parameters:
         normalized = {}
         for key, val in update.parameters.items():
             normalized[key] = normalize_parameter_value(template_key, key, val)
         update.parameters = normalized
-        
+
     return update
 
 def classify_chat_turn_intent(
@@ -206,7 +207,7 @@ def classify_chat_turn_intent(
     api_key = os.getenv("OPENROUTER_API_KEY")
     # Respect the AGENT_MODEL from env
     resolved_model = model_name or os.getenv("AGENT_MODEL") or "google/gemini-2.0-flash-001"
-    
+
     if not api_key:
         return ChatTurnIntent(
             intent="guide",
@@ -219,7 +220,7 @@ def classify_chat_turn_intent(
         # But we make it less likely to crash by providing a clear fallback for the response.
         structured = model.with_structured_output(ChatTurnIntent)
         resolved_lang = _resolve_language(language)
-        
+
         messages = [
             {
                 "role": "system",
@@ -246,13 +247,13 @@ def classify_chat_turn_intent(
             ],
             {"role": "user", "content": message},
         ]
-        
+
         response = structured.invoke(messages)
         if isinstance(response, ChatTurnIntent):
             # BREAK THE LOOP: If the user says "yes/si/go" and we are in a pending state, force confirmation.
             lower_msg = message.lower().strip()
             is_confirming = any(w in lower_msg for w in ["yes", "si", "ejecuta", "run", "go", "confirm", "vale", "dale"])
-            
+
             if is_confirming and response.intent in ["guide", "setup", "small_talk"]:
                 # If the model missed it, but it looks like a confirmation, we nudge it.
                 response.intent = "confirm"
@@ -261,9 +262,9 @@ def classify_chat_turn_intent(
             pending_template = None
             if pending_backtest_state and "params" in pending_backtest_state:
                 pending_template = pending_backtest_state["params"].get("template")
-                
+
             response.backtest_update = normalize_backtest_update(
-                response.backtest_update, 
+                response.backtest_update,
                 pending_template=pending_template
             )
             return response

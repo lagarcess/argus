@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypedDict, cast
 
-from langgraph.graph import END, StateGraph
-
 from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
     build_default_capability_contract,
@@ -28,6 +26,7 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
+from langgraph.graph import END, StateGraph
 
 
 class WorkflowNode(str, Enum):

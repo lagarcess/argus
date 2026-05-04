@@ -7,9 +7,9 @@ from argus.agent_runtime.llm_interpreter import (
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
 )
-from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.agent_runtime.stages.interpret import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot, UserState
+from argus.agent_runtime.strategy_contract import resolve_date_range
 
 
 @dataclass(frozen=True)

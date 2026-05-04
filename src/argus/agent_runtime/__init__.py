@@ -1,8 +1,8 @@
 """Conversational agent runtime primitives for Argus."""
 
 from argus.agent_runtime.capabilities.contract import (
-    CapabilityRange,
     CapabilityContract,
+    CapabilityRange,
     FieldDescription,
     OptionalParameterSpec,
     UnsupportedCombination,
@@ -27,8 +27,8 @@ from argus.agent_runtime.state.models import (
     TaskRelation,
     TaskSnapshot,
     ThreadState,
-    ToolCallRecord,
     ToneName,
+    ToolCallRecord,
     UserState,
     VerbosityName,
 )

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import ValidationError
-
 from argus.domain.engine_launch.adapter import run_launch_backtest
 from argus.domain.engine_launch.models import LaunchBacktestRequest
+from pydantic import ValidationError
 
 
 class RealBacktestTool:

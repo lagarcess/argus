@@ -1,9 +1,7 @@
 import pytest
-from pydantic import ValidationError
-
 from argus.agent_runtime.capabilities.contract import (
-    CapabilityRange,
     CapabilityContract,
+    CapabilityRange,
     FieldDescription,
     OptionalParameterSpec,
     SimplificationTemplate,
@@ -26,6 +24,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from pydantic import ValidationError
 
 
 def make_valid_contract_kwargs() -> dict:

@@ -4,9 +4,8 @@ import json
 from datetime import date
 from typing import Any
 
-from fastapi.testclient import TestClient
-
 from argus.api.main import app
+from fastapi.testclient import TestClient
 
 
 def _client() -> TestClient:

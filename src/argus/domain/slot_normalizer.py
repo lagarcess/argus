@@ -1,5 +1,7 @@
 from typing import Any
+
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+
 
 def normalize_template_name(raw_name: Any) -> str | None:
     """
@@ -8,13 +10,13 @@ def normalize_template_name(raw_name: Any) -> str | None:
     """
     if not raw_name:
         return None
-    
+
     clean = str(raw_name).strip().lower()
-    
+
     # Direct match
     if clean in STRATEGY_CAPABILITIES:
         return clean
-        
+
     # Alias match
     for template_key, capability in STRATEGY_CAPABILITIES.items():
         # Check primary template key, aliases, and display_name
@@ -22,7 +24,7 @@ def normalize_template_name(raw_name: Any) -> str | None:
         if clean == template_key or clean in aliases or clean == capability.display_name.lower():
             return template_key
 
-            
+
     return None
 
 def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any) -> Any:
@@ -32,15 +34,15 @@ def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any)
     """
     if not raw_value or not template_key or not param_key:
         return raw_value
-        
+
     capability = STRATEGY_CAPABILITIES.get(template_key)
     if not capability:
         return raw_value
-        
+
     spec = capability.parameters.get(param_key)
     if not spec:
         return raw_value
-        
+
     clean_value = str(raw_value).strip().lower()
     res = raw_value
 
@@ -60,7 +62,7 @@ def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any)
                 if clean_value == str(canonical_val).lower() or clean_value in clean_aliases:
                     res = canonical_val
                     break
-                    
+
     return res
 
 

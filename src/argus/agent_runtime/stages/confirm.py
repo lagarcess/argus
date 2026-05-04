@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
-from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
+from argus.agent_runtime.strategy_contract import resolve_date_range
 
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:

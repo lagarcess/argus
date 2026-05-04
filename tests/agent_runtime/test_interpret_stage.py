@@ -6,7 +6,12 @@ from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
 )
-from argus.agent_runtime.state.models import RunState, StrategySummary, TaskSnapshot, UserState
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
 
 
 @dataclass(frozen=True)
