@@ -8,7 +8,6 @@ import { patchMe } from "@/lib/argus-api";
 
 const LANGUAGES = [
   { code: "en", name: "English" },
-  { code: "es-419", name: "Español" }
 ];
 
 export function SettingsMenu() {

@@ -1,5 +1,5 @@
 import pandas as pd
-from argus.domain.engine import _build_signals
+from argus.domain.engine import _build_signals, build_result_card, compute_alpha_metrics
 
 
 def test_dca_accumulation_signals_weekly():
@@ -20,6 +20,63 @@ def test_dca_accumulation_signals_weekly():
     assert bool(entries.iloc[0])
     assert bool(entries.iloc[7])
     assert exits.sum() == 0
+
+
+def test_dca_metrics_account_for_each_recurring_contribution(monkeypatch):
+    index = pd.date_range("2024-01-01", periods=60, freq="D")
+    prices = [100.0] * 31 + [200.0] * 29
+    bars = pd.DataFrame(
+        {
+            "open": prices,
+            "high": prices,
+            "low": prices,
+            "close": prices,
+            "volume": [1_000_000] * 60,
+        },
+        index=index,
+    )
+
+    monkeypatch.setattr("argus.domain.engine.fetch_ohlcv", lambda **_kwargs: bars)
+    monkeypatch.setattr(
+        "argus.domain.engine.fetch_price_series",
+        lambda **_kwargs: bars["close"],
+    )
+
+    metrics = compute_alpha_metrics(
+        {
+            "template": "dca_accumulation",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-02-29",
+            "timeframe": "1D",
+            "starting_capital": 500.0,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "AAPL",
+            "parameters": {"dca_cadence": "monthly"},
+        }
+    )
+
+    performance = metrics["aggregate"]["performance"]
+    assert performance["profit"] == 500.0
+    assert performance["total_return_pct"] == 50.0
+    assert metrics["aggregate"]["efficiency"]["total_trades"] == 2
+
+    card = build_result_card(
+        {
+            "template": "dca_accumulation",
+            "symbols": ["AAPL"],
+            "start_date": "2024-01-01",
+            "end_date": "2024-02-29",
+            "starting_capital": 500.0,
+            "benchmark_symbol": "AAPL",
+        },
+        metrics,
+    )
+    cash_row = next(row for row in card["rows"] if row["key"] == "cash_value")
+    assert cash_row["label"] == "Final Value ($)"
+    assert cash_row["value"] == "$1.0k -> $1.5k"
+    assert "Recurring contribution: $500." in card["assumptions"]
 
 def test_dca_accumulation_signals_monthly():
     # Create 60 days of data (approx 2 months)

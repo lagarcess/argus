@@ -201,9 +201,7 @@ export function resultCardFromRun(run: BacktestRun) {
 }
 
 export function normalizeApiLanguage(language?: string | null): ApiLanguage {
-  if (language?.toLowerCase().startsWith("es")) {
-    return "es-419";
-  }
+  void language;
   return "en";
 }
 

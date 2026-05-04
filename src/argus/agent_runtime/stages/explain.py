@@ -112,7 +112,7 @@ def _thesis(strategy: dict[str, Any]) -> str | None:
     thesis = strategy.get("strategy_thesis")
     if thesis is None:
         return None
-    thesis_text = str(thesis).strip()
+    thesis_text = str(thesis).strip().rstrip(".")
     return thesis_text or None
 
 
@@ -137,13 +137,11 @@ def _assumption_summary(
 
     parts = []
     if isinstance(assumptions, list) and assumptions:
-        parts.append(
-            "Execution assumptions: "
-            + " ".join(str(assumption).strip() for assumption in assumptions if assumption)
-        )
-    parts.append("Benchmark comparison reflects the returned execution envelope.")
-    if defaulted_labels:
-        parts.append("Defaults used: " + ", ".join(defaulted_labels) + ".")
+        assumption_text = _compact_sentence_list(assumptions, limit=3)
+        if assumption_text:
+            parts.append("Assumptions: " + assumption_text)
+    elif defaulted_labels:
+        parts.append("Defaults: " + ", ".join(defaulted_labels) + ".")
     if user_labels:
         parts.append("User-set options: " + ", ".join(user_labels) + ".")
     return " ".join(parts)
@@ -151,13 +149,12 @@ def _assumption_summary(
 
 def _caveat_summary(explanation_context: dict[str, Any]) -> str:
     caveats = explanation_context.get("caveats", [])
-    base = (
-        "This summarizes the observed returns versus the reported benchmark; "
-        "it does not explain why performance differed."
-    )
     if not isinstance(caveats, list) or not caveats:
-        return base
-    return base + " " + " ".join(str(caveat).strip() for caveat in caveats if caveat)
+        return "This is a return comparison, not causal attribution."
+    caveat_text = _compact_sentence_list(caveats, limit=2)
+    if not caveat_text:
+        return "This is a return comparison, not causal attribution."
+    return f"This is a return comparison, not causal attribution. {caveat_text}"
 
 
 def _build_response(
@@ -181,43 +178,30 @@ def _build_response(
         f"{_benchmark_scope_phrase(same_period)}."
     )
     thesis_sentence = (
-        f"This result applies to your thesis: {thesis}."
+        f"I tested: {thesis}."
         if thesis is not None
-        else "This result applies to the confirmed strategy."
+        else "I tested the confirmed strategy."
     )
     expertise_sentence = _expertise_sentence(expertise_mode)
+    assumption_sentence = (
+        f" {assumption_summary}" if assumption_summary else ""
+    )
 
     if verbosity == "low":
-        if tone == "concise":
-            return (
-                f"{comparison_sentence} {thesis_sentence} "
-                f"{expertise_sentence} Caveat: {assumption_summary} {caveat}"
-            )
         return (
             f"{comparison_sentence} {thesis_sentence} "
-            f"{expertise_sentence} Caveat: {assumption_summary} {caveat}"
+            f"{expertise_sentence}{assumption_sentence} Caveat: {caveat}"
         )
 
     if verbosity == "high":
-        if tone == "friendly":
-            return (
-                f"Here is the confirmed result. {comparison_sentence} "
-                f"{thesis_sentence} {expertise_sentence} "
-                f"Assumptions and caveats: {assumption_summary} {caveat}"
-            )
         return (
-            f"{comparison_sentence} {thesis_sentence} {expertise_sentence} "
-            f"Assumptions and caveats: {assumption_summary} {caveat}"
+            f"{comparison_sentence} {thesis_sentence} {expertise_sentence}"
+            f"{assumption_sentence} Caveat: {caveat}"
         )
 
-    if tone == "concise":
-        return (
-            f"{comparison_sentence} {thesis_sentence} "
-            f"{expertise_sentence} Caveat: {assumption_summary} {caveat}"
-        )
     return (
-        f"{comparison_sentence} {thesis_sentence} {expertise_sentence} "
-        f"Assumptions and caveat: {assumption_summary} {caveat}"
+        f"{comparison_sentence} {thesis_sentence} {expertise_sentence}"
+        f"{assumption_sentence} Caveat: {caveat}"
     )
 
 
@@ -266,6 +250,23 @@ def _build_incomplete_result_response(
     if tone == "concise":
         return f"{base} Caveat: {assumption_summary} {caveat}"
     return f"{base} Assumptions and caveat: {assumption_summary} {caveat}"
+
+
+def _compact_sentence_list(values: list[Any], *, limit: int) -> str:
+    sentences: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        text = " ".join(text.split())
+        if len(text) > 140:
+            text = text[:137].rstrip() + "..."
+        if not text.endswith((".", "!", "?")):
+            text += "."
+        sentences.append(text)
+        if len(sentences) >= limit:
+            break
+    return " ".join(sentences)
 
 
 def _percent(value: Any) -> float | None:

@@ -271,6 +271,9 @@ def interpret_stage(
         signals=signals,
         arbitration=arbitration,
     )
+    if _completed_refinement(candidate_strategy, snapshot):
+        intent = "backtest_execution"
+        task_relation = "refine"
     requires_clarification = (
         intent == "beginner_guidance"
         or task_relation == "ambiguous"
@@ -290,7 +293,7 @@ def interpret_stage(
         signals=signals,
         snapshot=snapshot,
     )
-    if assistant_response is not None:
+    if assistant_response is not None and not strategy_can_be_approved(candidate_strategy):
         intent = "conversation_followup"
         task_relation = "continue"
         requires_clarification = False
@@ -341,6 +344,29 @@ def interpret_stage(
         outcome = "ready_for_confirmation"
 
     return StageResult(outcome=outcome, decision=decision)
+
+
+def _completed_refinement(
+    candidate_strategy: StrategySummary,
+    snapshot: TaskSnapshot | None,
+) -> bool:
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return False
+    if not strategy_can_be_approved(candidate_strategy):
+        return False
+    prior = snapshot.pending_strategy_summary.model_dump(mode="python")
+    current = candidate_strategy.model_dump(mode="python")
+    material_fields = (
+        "asset_universe",
+        "date_range",
+        "cadence",
+        "entry_logic",
+        "exit_logic",
+        "capital_amount",
+        "position_size",
+        "risk_rules",
+    )
+    return any(prior.get(field) != current.get(field) for field in material_fields)
 
 
 def build_candidate_strategy_from_extraction(

@@ -153,7 +153,7 @@ def _launch_payload(state: RunState) -> dict[str, Any]:
     capital_amount = (
         None
         if sizing_mode == "position_size"
-        else _resolve_capital_amount(optional_parameters)
+        else _resolve_capital_amount(strategy, optional_parameters, strategy_type)
     )
 
     return {
@@ -222,6 +222,13 @@ def _missing_required_fields(capability_context: dict[str, Any]) -> list[str]:
 
 
 def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> str | None:
+    if _is_lookback_limit_error(error_message):
+        return (
+            "That date range is longer than the current backtest engine supports. "
+            "Argus can run up to 3 years at a time right now. Choose a shorter "
+            "window, like February 7, 2021 - February 7, 2024, or change the "
+            "start and end dates."
+        )
     if error_type == "unsupported_capability":
         if error_message:
             return (
@@ -243,6 +250,13 @@ def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> st
             "Should I keep working on the current idea, or are you starting a new backtest?"
         )
     return error_message
+
+
+def _is_lookback_limit_error(error_message: str | None) -> bool:
+    if not error_message:
+        return False
+    normalized = error_message.strip().lower()
+    return "invalid_lookback_window" in normalized or "lookback" in normalized
 
 
 def _corrected_payload(capability_context: dict[str, Any]) -> dict[str, Any] | None:
@@ -503,11 +517,37 @@ def _resolve_sizing_mode(optional_parameters: dict[str, Any]) -> str:
     return "capital_amount"
 
 
-def _resolve_capital_amount(optional_parameters: dict[str, Any]) -> float | None:
+def _resolve_capital_amount(
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    strategy_type: str,
+) -> float | None:
+    strategy_capital = _resolve_strategy_capital_amount(strategy)
+    if strategy_capital is not None:
+        return strategy_capital
+    if strategy_type == "dca_accumulation":
+        nested_capital = _resolve_nested_strategy_capital_amount(strategy)
+        if nested_capital is not None:
+            return nested_capital
     value = _resolve_optional_value(optional_parameters, "initial_capital")
     if value is None:
         return 10000.0
     return _as_optional_float(value)
+
+
+def _resolve_strategy_capital_amount(strategy: dict[str, Any]) -> float | None:
+    return _as_optional_float(strategy.get("capital_amount"))
+
+
+def _resolve_nested_strategy_capital_amount(strategy: dict[str, Any]) -> float | None:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return None
+    for key in ("capital_amount", "recurring_amount", "contribution_amount"):
+        amount = _as_optional_float(extra_parameters.get(key))
+        if amount is not None:
+            return amount
+    return None
 
 
 def _resolve_position_size(optional_parameters: dict[str, Any]) -> float | None:

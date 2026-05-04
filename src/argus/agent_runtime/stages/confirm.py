@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
@@ -17,6 +18,16 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             stage_patch={
                 "assistant_prompt": None,
                 "missing_required_fields": missing_required_fields,
+            },
+        )
+    date_limit_prompt = _date_limit_prompt(strategy)
+    if date_limit_prompt is not None:
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": date_limit_prompt,
+                "requested_field": "date_range",
+                "missing_required_fields": ["date_range"],
             },
         )
 
@@ -77,6 +88,30 @@ def _required_fields_for_strategy(
             if field_name not in {"entry_logic", "exit_logic"}
         ]
     return list(contract.required_fields)
+
+
+def _date_limit_prompt(strategy: dict[str, Any]) -> str | None:
+    raw_date_range = strategy.get("date_range")
+    if raw_date_range in (None, ""):
+        return None
+    resolved = resolve_date_range(raw_date_range)
+    if (resolved.end - resolved.start).days <= 365 * 3:
+        return None
+    suggested_start = resolved.end - timedelta(days=365 * 3)
+    suggestion = (
+        f"{_format_date(suggested_start)} - {_format_date(resolved.end)}"
+        if suggested_start < resolved.end
+        else "a shorter window"
+    )
+    return (
+        "I understand the date range, but it is longer than the current backtest "
+        "engine can run. Argus supports up to 3 years per simulation right now. "
+        f"Do you want to use {suggestion}, or choose a different start and end date?"
+    )
+
+
+def _format_date(value: date) -> str:
+    return f"{value.strftime('%B')} {value.day}, {value.year}"
 
 
 def _resolve_optional_parameters(
@@ -182,6 +217,10 @@ def _format_optional_assumption(
 ) -> str | None:
     value = parameter.get("value")
     if field_name == "initial_capital" and isinstance(value, int | float):
+        if strategy_type == "dca_accumulation":
+            contribution = _strategy_capital_amount(strategy)
+            if contribution is not None:
+                return f"${contribution:,.0f} recurring contribution"
         return f"${float(value):,.0f} starting capital"
     if field_name == "timeframe" and value:
         return f"{value} bars"
@@ -194,6 +233,19 @@ def _format_optional_assumption(
     if field_name == "cadence" and strategy_type == "dca_accumulation":
         cadence = _resolved_cadence(strategy, {}) or value
         return f"{cadence} cadence" if cadence else None
+    return None
+
+
+def _strategy_capital_amount(strategy: dict[str, Any]) -> float | None:
+    value = strategy.get("capital_amount")
+    if isinstance(value, int | float):
+        return float(value)
+    extra_parameters = strategy.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        for key in ("capital_amount", "recurring_amount", "contribution_amount"):
+            nested_value = extra_parameters.get(key)
+            if isinstance(nested_value, int | float):
+                return float(nested_value)
     return None
 
 

@@ -525,6 +525,36 @@ def test_interpret_buy_and_hold_accepts_natural_january_last_year_period(
     assert strategy.exit_logic is None
 
 
+def test_interpret_buy_and_hold_accepts_explicit_month_name_period(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message="Buy and hold Apple from Jan 1 2010 to Dec 31 2020.",
+        recent_thread_history=[],
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=None,
+        structured_interpreter=lambda _request: None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range == {"start": "2010-01-01", "end": "2020-12-31"}
+    assert strategy.entry_logic is None
+    assert strategy.exit_logic is None
+
+
 def test_interpret_followup_cadence_refines_pending_dca_strategy(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -563,6 +593,54 @@ def test_interpret_followup_cadence_refines_pending_dca_strategy(monkeypatch) ->
     assert result.decision.candidate_strategy_draft.strategy_type == "dca_accumulation"
     assert result.decision.candidate_strategy_draft.cadence == "weekly"
     assert result.decision.candidate_strategy_draft.capital_amount == 500
+
+
+def test_interpret_date_followup_refines_pending_dca_to_confirmation(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message="Use May 4 2023 to May 3 2026",
+        recent_thread_history=[
+            {"role": "user", "content": "Invest $500 in Bitcoin every month since 2021."},
+            {
+                "role": "assistant",
+                "content": "That range is too long. Choose a shorter date range.",
+            },
+        ],
+    )
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Invest $500 in Bitcoin every month since 2021.",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Invest $500 in Bitcoin every month since 2021.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range="since 2021",
+            cadence="monthly",
+            capital_amount=500,
+        ),
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=snapshot,
+        structured_interpreter=lambda _request: None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2023-05-04", "end": "2026-05-03"}
+    assert strategy.capital_amount == 500
+    assert "assistant_response" not in result.patch
 
 
 def test_interpret_run_backtest_action_approves_pending_strategy() -> None:

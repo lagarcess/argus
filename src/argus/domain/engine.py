@@ -428,6 +428,66 @@ def _compute_metrics(
     }
 
 
+def _compute_metrics_from_equity(
+    *,
+    strategy_equity: pd.Series,
+    benchmark_equity: pd.Series,
+    invested_capital: float,
+    periods_per_year: float,
+    trade_count: int,
+) -> dict[str, Any]:
+    strategy_returns = strategy_equity.pct_change().fillna(0.0)
+    benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
+    total_return = float(strategy_equity.iloc[-1] / invested_capital - 1.0)
+    benchmark_return = float(benchmark_equity.iloc[-1] / invested_capital - 1.0)
+    total_return_pct = total_return * 100.0
+    benchmark_return_pct = benchmark_return * 100.0
+    volatility_pct = float(strategy_returns.std() * sqrt(periods_per_year) * 100.0)
+    active = strategy_returns[strategy_returns != 0]
+    win_rate = float((active > 0).mean()) if not active.empty else 0.0
+
+    return {
+        "performance": {
+            "total_return_pct": round(total_return_pct, 2),
+            "benchmark_return_pct": round(benchmark_return_pct, 2),
+            "delta_vs_benchmark_pct": round(total_return_pct - benchmark_return_pct, 2),
+            "profit": round(strategy_equity.iloc[-1] - invested_capital, 2),
+            "annualized_return_pct": round(
+                _annualized_return_pct(
+                    total_return, len(strategy_returns), periods_per_year
+                ),
+                2,
+            ),
+        },
+        "risk": {
+            "max_drawdown_pct": round(_max_drawdown_pct(strategy_equity), 2),
+            "volatility_pct": round(abs(volatility_pct), 2),
+        },
+        "efficiency": {
+            "win_rate": round(win_rate, 2),
+            "total_trades": trade_count,
+            "profit_factor": round(_compute_profit_factor(strategy_returns), 2),
+            "sharpe_ratio": round(_compute_sharpe(strategy_returns, periods_per_year), 2),
+        },
+    }
+
+
+def _dca_equity_curve(
+    *,
+    close: pd.Series,
+    entries: pd.Series,
+    contribution: float,
+) -> tuple[pd.Series, float]:
+    entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
+    shares_bought = (contribution / close).where(entry_mask, 0.0)
+    cumulative_shares = shares_bought.cumsum()
+    equity = cumulative_shares * close
+    invested_capital = float(entry_mask.sum()) * contribution
+    if invested_capital <= 0:
+        invested_capital = contribution
+    return equity.astype(float), invested_capital
+
+
 def build_benchmark_curve(
     config: dict[str, Any], target_index: pd.DatetimeIndex
 ) -> dict[str, Any]:
@@ -461,6 +521,7 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
     end = date.fromisoformat(config["end_date"])
     allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
     realism = _execution_realism_settings(config)
+    is_dca = config["template"] == "dca_accumulation"
 
     for symbol in config["symbols"]:
         bars = fetch_ohlcv(
@@ -473,41 +534,61 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
         close = bars["close"].astype(float)
         entries, exits = _build_signals(config, bars)
 
-        portfolio = vbt.Portfolio.from_signals(
-            close=close,
-            entries=entries,
-            exits=exits,
-            fees=float(realism["fees"]),
-            slippage=float(realism["slippage"]),
-            init_cash=allocation_capital,
-            freq=_vbt_freq(config["timeframe"]),
-            accumulate=True,
-        )
-
-        symbol_equity = pd.Series(
-            portfolio.value().values, index=close.index, dtype=float
-        )
-        strategy_returns = symbol_equity.pct_change().fillna(0.0)
-
         benchmark_curve = build_benchmark_curve(config, close.index)
         benchmark_normalized = pd.Series(
             benchmark_curve["equity_curve"], index=close.index, dtype=float
         )
-        benchmark_equity = benchmark_normalized * allocation_capital
-        benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
+        if is_dca:
+            symbol_equity, invested_capital = _dca_equity_curve(
+                close=close,
+                entries=entries,
+                contribution=allocation_capital,
+            )
+            benchmark_equity, benchmark_invested_capital = _dca_equity_curve(
+                close=benchmark_normalized,
+                entries=entries,
+                contribution=allocation_capital,
+            )
+            invested_capital = max(invested_capital, benchmark_invested_capital)
+            strategy_returns = symbol_equity.pct_change().fillna(0.0)
+            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
+            by_symbol[symbol] = _compute_metrics_from_equity(
+                strategy_equity=symbol_equity,
+                benchmark_equity=benchmark_equity,
+                invested_capital=invested_capital,
+                periods_per_year=periods_per_year,
+                trade_count=_trade_count(entries),
+            )
+        else:
+            portfolio = vbt.Portfolio.from_signals(
+                close=close,
+                entries=entries,
+                exits=exits,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
+                init_cash=allocation_capital,
+                freq=_vbt_freq(config["timeframe"]),
+                accumulate=True,
+            )
+
+            symbol_equity = pd.Series(
+                portfolio.value().values, index=close.index, dtype=float
+            )
+            strategy_returns = symbol_equity.pct_change().fillna(0.0)
+            benchmark_equity = benchmark_normalized * allocation_capital
+            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
+            by_symbol[symbol] = _compute_metrics(
+                strategy_returns=strategy_returns,
+                benchmark_returns=benchmark_returns,
+                allocation_capital=allocation_capital,
+                periods_per_year=periods_per_year,
+                trade_count=_trade_count(entries),
+            )
 
         symbol_returns.append(strategy_returns)
         benchmark_returns_aligned.append(benchmark_returns)
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
-
-        by_symbol[symbol] = _compute_metrics(
-            strategy_returns=strategy_returns,
-            benchmark_returns=benchmark_returns,
-            allocation_capital=allocation_capital,
-            periods_per_year=periods_per_year,
-            trade_count=_trade_count(entries),
-        )
 
     aggregate_strategy_equity = (
         pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1)
@@ -518,18 +599,35 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
     aggregate_strategy_returns = aggregate_strategy_equity.pct_change().fillna(0.0)
     aggregate_benchmark_returns = aggregate_benchmark_equity.pct_change().fillna(0.0)
 
-    aggregate_metrics = _compute_metrics(
-        strategy_returns=aggregate_strategy_returns,
-        benchmark_returns=aggregate_benchmark_returns,
-        allocation_capital=float(config["starting_capital"]),
-        periods_per_year=periods_per_year,
-        trade_count=sum(row["efficiency"]["total_trades"] for row in by_symbol.values()),
-    )
+    trade_count = sum(row["efficiency"]["total_trades"] for row in by_symbol.values())
+    if is_dca:
+        aggregate_invested = allocation_capital * max(trade_count, 1)
+        aggregate_metrics = _compute_metrics_from_equity(
+            strategy_equity=aggregate_strategy_equity,
+            benchmark_equity=aggregate_benchmark_equity,
+            invested_capital=aggregate_invested,
+            periods_per_year=periods_per_year,
+            trade_count=trade_count,
+        )
+    else:
+        aggregate_metrics = _compute_metrics(
+            strategy_returns=aggregate_strategy_returns,
+            benchmark_returns=aggregate_benchmark_returns,
+            allocation_capital=float(config["starting_capital"]),
+            periods_per_year=periods_per_year,
+            trade_count=trade_count,
+        )
 
     return {
         "aggregate": aggregate_metrics,
         "by_symbol": by_symbol,
     }
+
+
+def _format_money(value: float) -> str:
+    if abs(value) >= 1000:
+        return f"${value / 1000:.1f}k"
+    return f"${value:,.0f}"
 
 
 def build_result_card(
@@ -542,7 +640,15 @@ def build_result_card(
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
     symbols = ", ".join(config["symbols"])
-    ending_capital = config["starting_capital"] + performance["profit"]
+    is_dca = config["template"] == "dca_accumulation"
+    capital_basis = float(config["starting_capital"])
+    if is_dca:
+        capital_basis = (
+            float(config["starting_capital"])
+            / max(len(config["symbols"]), 1)
+            * max(int(efficiency.get("total_trades", 0)), 1)
+        )
+    ending_capital = capital_basis + performance["profit"]
     realism = _execution_realism_settings(config)
 
     is_es = language.startswith("es")
@@ -584,7 +690,11 @@ def build_result_card(
         assumptions = [
             f"Universe: {symbols}.",
             "Simulation uses long-only preset.",
-            f"Starting capital: ${config['starting_capital']:,.0f}.",
+            (
+                f"Recurring contribution: ${config['starting_capital']:,.0f}."
+                if is_dca
+                else f"Starting capital: ${config['starting_capital']:,.0f}."
+            ),
             "Allocation: equal weight.",
             "No slippage or fees included.",
             f"Benchmark: {config['benchmark_symbol']}.",
@@ -600,8 +710,16 @@ def build_result_card(
         },
         {
             "key": "cash_value",
-            "label": "Valor en Efectivo ($)" if is_es else "Cash Value ($)",
-            "value": f"${config['starting_capital'] / 1000:.0f}k -> ${ending_capital / 1000:.1f}k",
+            "label": (
+                "Valor Final ($)"
+                if is_es and is_dca
+                else "Valor en Efectivo ($)"
+                if is_es
+                else "Final Value ($)"
+                if is_dca
+                else "Cash Value ($)"
+            ),
+            "value": f"{_format_money(capital_basis)} -> {_format_money(ending_capital)}",
         },
         {
             "key": "max_drawdown_pct",

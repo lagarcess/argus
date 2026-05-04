@@ -24,6 +24,7 @@ from argus.agent_runtime.state.models import UserState
 from argus.agent_runtime.strategy_contract import (
     display_strategy_slug,
     display_strategy_type,
+    executable_strategy_type,
     resolve_date_range,
 )
 from argus.agent_runtime.tools.real_backtest import RealBacktestTool
@@ -315,7 +316,8 @@ def _runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any]
         {"label": "Assets", "value": assets},
         {"label": "Period", "value": date_range},
     ]
-    if strategy.get("cadence") and _strategy_type_uses_cadence(strategy_type):
+    canonical_strategy_type = executable_strategy_type(strategy)
+    if strategy.get("cadence") and _strategy_type_uses_cadence(canonical_strategy_type):
         rows.append({"label": "Cadence", "value": str(strategy["cadence"]).title()})
     if strategy.get("entry_logic"):
         rows.append({"label": "Buy rule", "value": _format_confirmation_value(strategy["entry_logic"])})
@@ -355,7 +357,11 @@ def _confirmation_assumptions(
     assumptions: list[str] = []
     initial_capital = _optional_parameter_value(optional_parameters, "initial_capital")
     if isinstance(initial_capital, int | float):
-        assumptions.append(f"${float(initial_capital):,.0f} starting capital")
+        strategy_type = executable_strategy_type(strategy)
+        if _strategy_type_uses_cadence(strategy_type) and strategy.get("capital_amount"):
+            assumptions.append(f"${float(strategy['capital_amount']):,.0f} recurring contribution")
+        else:
+            assumptions.append(f"${float(initial_capital):,.0f} starting capital")
     timeframe = _optional_parameter_value(optional_parameters, "timeframe")
     if timeframe:
         assumptions.append(f"{timeframe} bars")
@@ -399,7 +405,12 @@ def _format_confirmation_period(value: Any) -> str:
 
 def _strategy_type_uses_cadence(strategy_type: str) -> bool:
     normalized = strategy_type.strip().lower().replace("-", "_").replace(" ", "_")
-    return normalized in {"dca", "dca_accumulation", "recurring_accumulation"}
+    return normalized in {
+        "dca",
+        "dca_accumulation",
+        "recurring_accumulation",
+        "recurring_buys",
+    }
 
 
 def _article_for(value: str) -> str:

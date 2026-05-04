@@ -456,6 +456,91 @@ def test_execute_stage_resolves_structured_date_range_with_today(
     }
 
 
+def test_execute_stage_uses_strategy_contribution_for_dca(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import execute as execute_module
+
+    monkeypatch.setattr(
+        execute_module,
+        "resolve_date_range",
+        lambda value: resolve_date_range(value, today=date(2026, 5, 3)),
+    )
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"total_return": 0.14, "benchmark_return": 0.09},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": "Invest $500 in Bitcoin every month since 2021.",
+            "asset_universe": ["BTC"],
+            "asset_class": "crypto",
+            "date_range": "since 2021",
+            "cadence": "monthly",
+            "capital_amount": 500,
+            "sizing_mode": "capital_amount",
+        },
+        "optional_parameters": {
+            "initial_capital": {"value": 10000, "source": "default"},
+            "timeframe": {"value": "1D", "source": "default"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert tool.calls[0]["strategy_type"] == "dca_accumulation"
+    assert tool.calls[0]["capital_amount"] == 500
+    assert tool.calls[0]["cadence"] == "monthly"
+    assert tool.calls[0]["date_range"] == {
+        "start": "2021-01-01",
+        "end": "2026-05-03",
+    }
+
+
+def test_execute_stage_translates_lookback_limit_to_human_recovery() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "parameter_validation_error",
+                "error_message": "invalid_lookback_window",
+                "retryable": False,
+                "payload": None,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold Apple from 2020 to 2024.",
+            "asset_universe": ["AAPL"],
+            "date_range": {"start": "2020-02-07", "end": "2024-02-07"},
+        },
+        "optional_parameters": {},
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_failed_terminally"
+    prompt = result.patch["assistant_prompt"]
+    assert "invalid_lookback_window" not in prompt
+    assert "longer than the current backtest engine supports" in prompt
+    assert "up to 3 years" in prompt
+
+
 def test_execute_maps_unknown_tool_errors_into_runtime_taxonomy() -> None:
     tool = StubBacktestTool(
         responses=[
@@ -503,7 +588,7 @@ def test_explain_stage_uses_result_payload_without_fabricating() -> None:
     assert "Buy Tesla on pullbacks" in result.patch["assistant_response"]
     assert "return comparison only" in result.patch["assistant_response"]
     assert "Caveat:" in result.patch["assistant_response"]
-    assert "Defaults used: Initial capital." in result.patch["assistant_response"]
+    assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "same period" not in result.patch["assistant_response"].lower()
     assert "because" not in result.patch["assistant_response"].lower()
 
@@ -594,11 +679,10 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     result = explain_stage(state=state)
 
     assert result.outcome == "ready_to_respond"
-    assert "Here is the confirmed result." in result.patch["assistant_response"]
-    assert "Assumptions and caveats:" in result.patch["assistant_response"]
-    assert "Defaults used: Initial capital." in result.patch["assistant_response"]
+    assert "I tested: Test a Tesla pullback idea." in result.patch["assistant_response"]
+    assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "User-set options: Timeframe." in result.patch["assistant_response"]
-    assert "does not explain why performance differed" in result.patch["assistant_response"]
+    assert "return comparison, not causal attribution" in result.patch["assistant_response"]
 
 
 def test_explain_stage_varies_with_expertise_mode() -> None:

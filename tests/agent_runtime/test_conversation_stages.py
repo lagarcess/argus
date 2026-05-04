@@ -328,6 +328,44 @@ def test_confirm_stage_formats_structured_date_range_in_prompt() -> None:
     assert "January 1, 2025" in result.patch["assistant_prompt"]
 
 
+def test_confirm_stage_blocks_ranges_longer_than_engine_limit() -> None:
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    state.intent = "backtest_execution"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple from 2010 to 2020.",
+        asset_universe=["AAPL"],
+        date_range={"start": "2010-01-01", "end": "2020-12-31"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "date_range"
+    assert "longer than the current backtest engine can run" in result.patch["assistant_prompt"]
+    assert "up to 3 years" in result.patch["assistant_prompt"]
+    assert "January 1, 2010" not in result.patch["assistant_prompt"]
+
+
+def test_confirm_stage_formats_dca_contribution_as_recurring_money() -> None:
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    state.intent = "backtest_execution"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Invest $500 in Bitcoin every month.",
+        asset_universe=["BTC"],
+        cadence="monthly",
+        capital_amount=500.0,
+        date_range={"start": "2024-05-03", "end": "2026-05-03"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    assert "$500 recurring contribution" in result.patch["assistant_prompt"]
+    assert "$10,000 starting capital" not in result.patch["assistant_prompt"]
+
+
 def test_confirm_stage_does_not_enter_approval_when_required_inputs_are_missing() -> None:
     state = RunState.new(current_user_message="run it", recent_thread_history=[])
     state.intent = "backtest_execution"

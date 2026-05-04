@@ -268,6 +268,52 @@ def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
     }
 
 
+def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Invest $500 in Bitcoin every month since 2021.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Invest $500 in Bitcoin every month since 2021.",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Invest $500 in Bitcoin every month since 2021.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range="past year",
+            cadence="monthly",
+            capital_amount=500,
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Invest $500 in Bitcoin every month since 2021.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.date_range == "since 2021"
+    assert strategy.capital_amount == 500
+    assert strategy.cadence == "monthly"
+
+
 def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(
     monkeypatch,
 ) -> None:

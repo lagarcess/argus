@@ -13,6 +13,33 @@ SUPPORTED_STRATEGY_TYPES = {
     "indicator_threshold",
 }
 
+MONTH_ALIASES = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+
 
 @dataclass(frozen=True)
 class DateRangeResolution:
@@ -171,6 +198,9 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         explicit = _explicit_iso_range(normalized)
         if explicit is not None:
             return explicit
+        natural_explicit = _explicit_natural_range(normalized)
+        if natural_explicit is not None:
+            return natural_explicit
 
     start = _add_months(current_date, -12)
     return DateRangeResolution(label="past year", start=start, end=current_date)
@@ -186,6 +216,13 @@ def normalize_date_range_candidate(
     raw_period = _date_range_from_raw_phrase(raw_user_phrasing, today=current_date)
     if raw_period is not None:
         return raw_period
+    if isinstance(raw_user_phrasing, str):
+        raw_period_label = _extract_period_label_from_raw_phrase(
+            raw_user_phrasing,
+            today=current_date,
+        )
+        if raw_period_label is not None:
+            return raw_period_label
     if isinstance(value, dict):
         return {
             key: nested_value
@@ -244,6 +281,9 @@ def _parse_date_token(value: Any, *, today: date) -> date | None:
     normalized = _normalize_token(value)
     if normalized in {"today", "now", "present", "to_date", "current_date"}:
         return today
+    natural = _parse_natural_date(normalized)
+    if natural is not None:
+        return natural
     return None
 
 
@@ -267,6 +307,37 @@ def _date_range_from_raw_phrase(
     )
     if starts_at_last_year_january and ends_at_current_date:
         return {"start": date(today.year - 1, 1, 1).isoformat(), "end": "today"}
+    natural_explicit = _explicit_natural_range(normalized)
+    if natural_explicit is not None:
+        return {
+            "start": natural_explicit.start.isoformat(),
+            "end": natural_explicit.end.isoformat(),
+        }
+    return None
+
+
+def _extract_period_label_from_raw_phrase(
+    raw_user_phrasing: str,
+    *,
+    today: date,
+) -> str | None:
+    del today
+    normalized = raw_user_phrasing.lower()
+    normalized = re.sub(r"[^a-z0-9\s]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    since_match = re.search(r"\bsince (?P<year>\d{4})\b", normalized)
+    if since_match is not None:
+        return f"since {since_match.group('year')}"
+    ytd_match = re.search(r"\b(?:ytd|year to date)\b", normalized)
+    if ytd_match is not None:
+        return "year_to_date"
+    relative_match = re.search(
+        r"\b(?:past|last) (?P<count>\d+) "
+        r"(?P<unit>day|days|week|weeks|month|months|year|years)\b",
+        normalized,
+    )
+    if relative_match is not None:
+        return relative_match.group(0)
     return None
 
 
@@ -286,6 +357,79 @@ def _explicit_iso_range(value: str) -> DateRangeResolution | None:
         start=start,
         end=end,
     )
+
+
+def _explicit_natural_range(value: str) -> DateRangeResolution | None:
+    match = re.search(
+        r"(?P<start_month>[a-z]{3,9})\s+"
+        r"(?P<start_day>\d{1,2}|first)\s+"
+        r"(?P<start_year>\d{4})\s+"
+        r"(?:to|through|until|till|-)\s+"
+        r"(?P<end_month>[a-z]{3,9})\s+"
+        r"(?P<end_day>\d{1,2}|first)\s+"
+        r"(?P<end_year>\d{4})",
+        value,
+    )
+    if match is None:
+        return None
+    groups = match.groupdict()
+    start = _build_natural_date(
+        groups.get("start_month"),
+        groups.get("start_day"),
+        groups.get("start_year"),
+    )
+    end = _build_natural_date(
+        groups.get("end_month"),
+        groups.get("end_day"),
+        groups.get("end_year"),
+    )
+    if start is None or end is None:
+        return None
+    return DateRangeResolution(
+        label=f"{format_display_date(start)} to {format_display_date(end)}",
+        start=start,
+        end=end,
+    )
+
+
+def _parse_natural_date(value: str) -> date | None:
+    match = re.fullmatch(
+        r"(?P<month>[a-z]{3,9})\s+(?P<day>\d{1,2}|first)\s+(?P<year>\d{4})",
+        value.strip().lower(),
+    )
+    if match is None:
+        return None
+    return _build_natural_date(
+        match.group("month"),
+        match.group("day"),
+        match.group("year"),
+    )
+
+
+def _build_natural_date(
+    month_value: Any,
+    day_value: Any,
+    year_value: Any,
+) -> date | None:
+    month = MONTH_ALIASES.get(str(month_value or "").lower())
+    if month is None:
+        return None
+    day_text = str(day_value or "").lower()
+    day = 1 if day_text == "first" else _int_or_none(day_text)
+    year = _int_or_none(year_value)
+    if day is None or year is None:
+        return None
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
 def _year_to_date(value: str, *, today: date) -> DateRangeResolution | None:
