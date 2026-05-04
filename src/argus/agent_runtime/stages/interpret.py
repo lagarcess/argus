@@ -221,6 +221,7 @@ def interpret_stage(
     if structured_result is not None:
         return structured_result
 
+    llm_reason_codes = _structured_interpreter_reason_codes(structured_interpreter)
     signals = extract_signals(
         message=state.current_user_message,
         latest_task_snapshot=snapshot,
@@ -326,6 +327,7 @@ def interpret_stage(
         arbitration_mode=arbitration.mode,
         reason_codes=merge_reason_codes(
             signals.reason_codes,
+            llm_reason_codes,
             extraction.reason_codes,
             arbitration.reason_codes,
             arbitration.decision.reason_codes
@@ -781,10 +783,17 @@ def _structured_stage_result(
         and interpretation.intent not in {"backtest_execution", "strategy_drafting"}
     )
     if should_use_assistant_response:
+        fallback_response = _educational_fallback_response(state.current_user_message)
+        assistant_response = (
+            fallback_response
+            if _assistant_response_is_too_thin(interpretation.assistant_response)
+            and fallback_response is not None
+            else interpretation.assistant_response
+        )
         return StageResult(
             outcome="ready_to_respond",
             decision=decision,
-            stage_patch={"assistant_response": interpretation.assistant_response},
+            stage_patch={"assistant_response": assistant_response},
         )
     return StageResult(
         outcome="needs_clarification" if requires_clarification else "ready_for_confirmation",
@@ -797,12 +806,22 @@ def _direct_conversational_response(
     snapshot: TaskSnapshot | None,
 ) -> str | None:
     lowered = message.lower().strip()
+    symbol_only_response = _symbol_only_guidance_response(
+        message=message,
+        signals=signals,
+    )
+    if symbol_only_response is not None:
+        return symbol_only_response
     if re.search(r"\bwhat can you do\b", lowered):
         return (
-            "I can help you turn plain-language investing ideas into backtests, "
-            "explain concepts like RSI or DCA, and tell you where Argus has limits. "
-            "For supported runs, I’ll confirm the strategy, run the backtest, and explain "
-            "the result against the right benchmark."
+            "I help you turn an investing idea into something you can understand and test. "
+            "You can ask me to explain a term, shape a rough idea into a strategy, check what "
+            "Argus can actually run, or compare a supported backtest against the right benchmark. "
+            "Try something like: 'buy and hold Tesla over the past year', 'make a recurring "
+            "Bitcoin plan for $500 every month since 2021', or 'buy when RSI is below 30 "
+            "and sell when RSI is above 55'. "
+            "If an idea is too vague or not executable yet, I’ll say what I understood and offer "
+            "a simpler version instead of forcing you through a form."
         )
     if re.search(r"\bhow do i start\b|\bhelp me test an idea\b", lowered):
         return (
@@ -816,6 +835,19 @@ def _direct_conversational_response(
             "like below 30, as potentially oversold and high readings as potentially overbought. "
             "It is not a prediction by itself; it is a way to define a rule you can test."
         )
+    if re.search(r"\bwhat(?:'s| is)\s+dca\b|\bexplain dca\b", lowered):
+        return (
+            "DCA means buying a fixed amount on a regular schedule, like $500 every month. "
+            "The point is to avoid trying to pick the perfect day. In Argus, I can test how that "
+            "recurring-buy plan would have performed historically for a supported asset."
+        )
+    if re.search(r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b", lowered):
+        return (
+            "No problem. The simple version: Argus turns an investing idea into a historical test. "
+            "If we were talking about RSI, think of it like a temperature gauge for recent price movement: "
+            "low can mean the asset has been weak recently, high can mean it has been strong recently. "
+            "It is useful only as a rule to test, not as a prediction."
+        )
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         if re.search(r"\bwhat exactly are you testing\b|\bassumptions\b", lowered):
             strategy = snapshot.pending_strategy_summary
@@ -828,6 +860,73 @@ def _direct_conversational_response(
         return (
             "Argus is for testing investing ideas without risking real money. "
             "You can ask a question, describe a strategy, or name an asset you want to learn about."
+        )
+    return None
+
+
+def _structured_interpreter_reason_codes(
+    structured_interpreter: StructuredInterpreter | None,
+) -> list[str]:
+    if structured_interpreter is None:
+        return []
+    status = getattr(structured_interpreter, "last_status", None)
+    if status == "failed":
+        return ["llm_interpreter_failed"]
+    if status == "missing_api_key":
+        return ["llm_interpreter_unavailable"]
+    if status == "invalid_response":
+        return ["llm_interpreter_invalid_response"]
+    return []
+
+
+def _symbol_only_guidance_response(
+    *,
+    message: str,
+    signals: ExtractedSignals,
+) -> str | None:
+    symbols = list(signals.detected_symbols)
+    if len(symbols) != 1:
+        return None
+    normalized = message.strip().lower()
+    symbol = symbols[0]
+    aliases = {symbol.lower(), *_asset_name_aliases([symbol])}
+    if normalized not in aliases:
+        return None
+    return _asset_direction_response(symbol)
+
+
+def _asset_direction_response(symbol: str) -> str:
+    return (
+        f"I can work with {symbol}. If you're learning, we can start in a few simple ways: "
+        f"explain what {symbol} is, test a plain buy-and-hold over a period you choose, "
+        "or build a simple rule like buying when RSI is low. "
+        "Say the direction you want, or say 'simple test' and I'll set up a basic buy-and-hold to confirm."
+    )
+
+
+def _assistant_response_is_too_thin(response: str | None) -> bool:
+    if response is None:
+        return True
+    stripped = response.strip()
+    if not stripped:
+        return True
+    return len(stripped.split()) <= 3
+
+
+def _educational_fallback_response(message: str) -> str | None:
+    lowered = message.lower().strip()
+    if re.search(r"\bwhat(?:'s| is)\s+dca\b|\bexplain dca\b", lowered):
+        return (
+            "DCA means buying a fixed amount on a regular schedule, like $500 every month. "
+            "The point is to avoid trying to pick the perfect day. In Argus, I can test how that "
+            "recurring-buy plan would have performed historically for a supported asset."
+        )
+    if re.search(r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b", lowered):
+        return (
+            "No problem. The simple version: Argus turns an investing idea into a historical test. "
+            "If we were talking about RSI, think of it like a temperature gauge for recent price movement: "
+            "low can mean the asset has been weak recently, high can mean it has been strong recently. "
+            "It is useful only as a rule to test, not as a prediction."
         )
     return None
 
@@ -941,10 +1040,16 @@ def _clean_fragment_label(value: str) -> str:
 
 def _asset_name_aliases(assets: list[str]) -> set[str]:
     aliases: set[str] = set()
+    if "AAPL" in assets:
+        aliases.add("apple")
     if "TSLA" in assets:
         aliases.add("tesla")
     if "NVDA" in assets:
         aliases.add("nvidia")
+    if "GOOG" in assets or "GOOGL" in assets:
+        aliases.update({"google", "alphabet"})
+    if "META" in assets:
+        aliases.update({"meta", "facebook"})
     if "BTC" in assets:
         aliases.update({"bitcoin", "btc"})
     if "ETH" in assets:

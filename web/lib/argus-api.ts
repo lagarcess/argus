@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "./supabase-client";
-import type { StrategyConfirmationPayload } from "@/components/chat/types";
+import type { ChatActionOption, StrategyConfirmationPayload } from "@/components/chat/types";
 import { normalizeEnabledLanguage } from "./language-features";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
@@ -39,7 +39,7 @@ export type ConversationResultCard = {
   rows: ApiMetricRow[];
   benchmark_note?: string;
   assumptions: string[];
-  actions: Array<{ type: string; label: string }>;
+  actions: ChatActionOption[];
 };
 
 // ─── Domain objects ──────────────────────────────────────────────────────────
@@ -170,6 +170,24 @@ export type ChatStreamEvent =
   | { event: "result"; data: { run: BacktestRun } }
   | { event: "error"; data: { detail: string } }
   | { event: "done"; data: { message_id: string } };
+
+export type ChatActionRequest = {
+  type: NonNullable<ChatActionOption["type"]>;
+  label?: string;
+  payload?: Record<string, unknown>;
+  presentation?: "confirmation" | "result";
+};
+
+export type DiscoveryItem = {
+  id: string;
+  type: "asset" | "indicator";
+  label: string;
+  symbol?: string | null;
+  description?: string | null;
+  insert_text: string;
+  provider: string;
+  support_status: "supported" | "draft_only" | "unavailable";
+};
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -509,7 +527,7 @@ export async function runBacktest(payload: {
 
 export async function streamChatMessage(
   conversationId: string,
-  message: string,
+  input: string | ChatActionRequest,
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
 ) {
@@ -536,7 +554,7 @@ export async function streamChatMessage(
     },
     body: JSON.stringify({
       conversation_id: conversationId,
-      message,
+      ...(typeof input === "string" ? { message: input } : { action: input }),
       language: normalizeApiLanguage(language),
     }),
   });
@@ -568,6 +586,17 @@ export async function streamChatMessage(
       } as ChatStreamEvent);
     }
   }
+}
+
+export async function searchDiscovery(
+  kind: "assets" | "indicators",
+  query: string,
+  limit = 8,
+) {
+  const searchParams = new URLSearchParams({ q: query, limit: String(limit) });
+  return apiFetch<{ items: DiscoveryItem[] }>(
+    `/discovery/${kind}?${searchParams.toString()}`,
+  );
 }
 
 export async function postFeedback(payload: {

@@ -1,72 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import date
 from typing import Any
 
-import pandas as pd
 import pytest
 from argus.api.main import app
-from argus.domain.backtest_state_machine import BacktestParamsUpdate
+from argus.domain.engine import SymbolAsset
+from argus.domain.indicators import IndicatorInfo
 from argus.domain.market_data.assets import ResolvedAsset
-from argus.domain.orchestrator import ChatTurnIntent
 from fastapi.testclient import TestClient
-
-
-def _fake_resolve_asset(symbol: str) -> ResolvedAsset:
-    up = symbol.strip().upper()
-    asset_class = "crypto" if up in {"BTC", "ETH", "SOL"} else "equity"
-    return ResolvedAsset(
-        canonical_symbol=up,
-        asset_class=asset_class,
-        name=up,
-        raw_symbol=up,
-    )
-
-
-def _fake_fetch_ohlcv(
-    symbol: str,
-    asset_class: str,  # noqa: ARG001
-    start_date: date,
-    end_date: date,
-    timeframe: str,
-) -> pd.DataFrame:
-    freq_map = {"1D": "D", "1h": "h", "2h": "2h", "4h": "4h", "6h": "6h", "12h": "12h"}
-    index = pd.date_range(start=start_date, end=end_date, freq=freq_map[timeframe], tz="UTC")
-    if len(index) < 80:
-        index = pd.date_range(start=start_date, periods=80, freq=freq_map[timeframe], tz="UTC")
-    close = pd.Series(100.0 + pd.RangeIndex(len(index)).astype(float), index=index)
-    return pd.DataFrame(
-        {
-            "open": close,
-            "high": close + 1,
-            "low": close - 1,
-            "close": close,
-            "volume": 1000,
-        },
-        index=index,
-    )
-
-
-def _fake_fetch_price_series(
-    symbol: str,
-    asset_class: str,
-    start_date: date,
-    end_date: date,
-    timeframe: str,
-) -> pd.Series:
-    return _fake_fetch_ohlcv(symbol, asset_class, start_date, end_date, timeframe)["close"]
-
-
-@pytest.fixture(autouse=True)
-def _patch_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import main as api_main
-    from argus.domain import engine as domain_engine
-
-    monkeypatch.setattr(api_main, "supabase_gateway", None)
-    monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
-    monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
-    monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
 
 
 def _client() -> TestClient:
@@ -96,671 +38,362 @@ def _stream_payloads(stream: str, event_name: str) -> list[dict[str, Any]]:
     return payloads
 
 
-def _latest_assistant_metadata(client: TestClient, conversation_id: str) -> dict[str, Any]:
-    messages = client.get(f"/api/v1/conversations/{conversation_id}/messages").json()["items"]
-    assistant = messages[-1]
-    assert assistant["role"] == "assistant"
-    return assistant["metadata"]
+def _conversation(client: TestClient) -> dict[str, Any]:
+    return client.post("/api/v1/conversations", json={}).json()["conversation"]
 
 
-def test_chat_backtest_requires_confirmation_before_running(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import main as api_main
-
-    calls: list[dict[str, Any]] = []
-
-    def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
-        lower = message.lower()
-        if "rsi" in lower:
-            return ChatTurnIntent(assistant_response="",
-                intent="setup",
-                backtest_update=BacktestParamsUpdate(template="rsi_mean_reversion"),
-            )
-        if "aapl" in lower:
-            return ChatTurnIntent(assistant_response="",
-                intent="setup",
-                backtest_update=BacktestParamsUpdate(symbols=["AAPL"]),
-            )
-        if lower.strip() == "yes":
-            return ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
-        return ChatTurnIntent(assistant_response="", intent="guide")
-
-    original_create_run = api_main.create_run_from_payload
-
-    def _spy_create_run(payload: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
-        calls.append(payload)
-        return original_create_run(payload, *args, **kwargs)
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _stub_intent)
-    monkeypatch.setattr(api_main, "create_run_from_payload", _spy_create_run)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    first = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "run RSI", "language": "en"},
-    )
-    assert first.status_code == 200
-    assert "event: result" not in first.text
-    assert calls == []
-
-    second = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "use AAPL", "language": "en"},
-    )
-    assert second.status_code == 200
-    assert "event: result" not in second.text
-    assert "Run this" in second.text
-    assert "Change something" in second.text
-    assert "Cancel" in second.text
-    assert calls == []
-    assert _latest_assistant_metadata(client, conversation["id"])["conversation_mode"] == "confirm"
-
-    third = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "yes", "language": "en"},
-    )
-    assert third.status_code == 200
-    assert "event: result" in third.text
-    assert len(calls) == 1
-    assert calls[0]["template"] == "rsi_mean_reversion"
-    assert calls[0]["symbols"] == ["AAPL"]
-
-    result_payload = _stream_payloads(third.text, "result")[0]
-    assert result_payload["run"]["conversation_result_card"]["status_label"]
-    meta = _latest_assistant_metadata(client, conversation["id"])
-    assert meta["conversation_mode"] == "result_review"
-    assert meta["latest_run_id"] == result_payload["run"]["id"]
-
-
-def test_chat_backtest_change_mind_updates_pending_state_before_confirmation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import main as api_main
-
-    calls: list[dict[str, Any]] = []
-
-    def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
-        lower = message.lower()
-        if "buy" in lower and "aapl" in lower:
-            return ChatTurnIntent(assistant_response="",
-                intent="setup",
-                backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
-            )
-        if "msft" in lower:
-            return ChatTurnIntent(assistant_response="",
-                intent="setup",
-                backtest_update=BacktestParamsUpdate(symbols=["MSFT"]),
-            )
-        if lower.strip() == "yes":
-            return ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
-        return ChatTurnIntent(assistant_response="", intent="guide")
-
-    original_create_run = api_main.create_run_from_payload
-
-    def _spy_create_run(payload: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
-        calls.append(payload)
-        return original_create_run(payload, *args, **kwargs)
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _stub_intent)
-    monkeypatch.setattr(api_main, "create_run_from_payload", _spy_create_run)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    initial = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "buy dips on AAPL",
-            "language": "en",
+def _confirmation_runtime_result() -> dict[str, Any]:
+    return {
+        "stage_outcome": "await_approval",
+        "assistant_response": "I read this as AAPL buy and hold.",
+        "confirmation_payload": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["AAPL"],
+                "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
+                "capital_amount": 10000,
+            },
+            "optional_parameters": {
+                "initial_capital": {
+                    "value": 10000.0,
+                    "source": "default",
+                    "label": "Initial capital",
+                    "description": "Starting cash",
+                },
+                "timeframe": {
+                    "value": "1D",
+                    "source": "default",
+                    "label": "Timeframe",
+                    "description": "Bar interval",
+                },
+                "fees": {"value": 0.0, "source": "default", "label": "Fees"},
+                "slippage": {"value": 0.0, "source": "default", "label": "Slippage"},
+            },
         },
-    )
-    assert initial.status_code == 200
-    assert "event: result" not in initial.text
+    }
 
-    changed = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "use MSFT instead",
-            "language": "en",
+
+def _result_runtime_result() -> dict[str, Any]:
+    result_card = {
+        "title": "AAPL buy and hold",
+        "date_range": {
+            "start": "2025-05-03",
+            "end": "2026-05-03",
+            "display": "May 3, 2025 to May 3, 2026",
         },
-    )
-    assert changed.status_code == 200
-    assert "MSFT" in changed.text
-    assert "AAPL" not in changed.text
-    assert calls == []
-
-    confirmed = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "yes", "language": "en"},
-    )
-    assert confirmed.status_code == 200
-    assert "event: result" in confirmed.text
-    assert len(calls) == 1
-    assert calls[0]["symbols"] == ["MSFT"]
-
-
-def test_localized_dca_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 3: Verify that Spanish user input 'semanal' is normalized to 'weekly' before execution."""
-    from argus.api import main as api_main
-    from argus.domain.orchestrator import ChatTurnIntent
-
-    calls = []
-
-    def _stub_intent(*args: Any, **kwargs: Any) -> ChatTurnIntent:
-        from argus.domain.backtest_state_machine import BacktestParamsUpdate
-        from argus.domain.orchestrator import normalize_backtest_update
-
-        message = kwargs.get("message") or (args[0] if args else "")
-        msg = message.lower()
-
-        if "¿cómo funcionaría una estrategia dca" in msg:
-            intent_obj = ChatTurnIntent(assistant_response="",
-                intent="setup",
-                backtest_update=BacktestParamsUpdate(
-                    template="dca_accumulation",
-                    symbols=["TSLA"],
-                ),
-            )
-        elif "semanal" in msg:
-            intent_obj = ChatTurnIntent(assistant_response="",
-                intent="setup",
-                backtest_update=BacktestParamsUpdate(
-                    parameters={"dca_cadence": "semanal"}
-                ),
-            )
-        elif "si dale" in msg or "sí" in msg:
-            intent_obj = ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
-        else:
-            intent_obj = ChatTurnIntent(assistant_response="", intent="guide")
-
-        # Manually trigger normalization in mock to test the actual logic
-        pending_state = kwargs.get("pending_backtest_state")
-        pending_template = None
-        if pending_state and "params" in pending_state:
-            pending_template = pending_state["params"].get("template")
-
-        intent_obj.backtest_update = normalize_backtest_update(
-            intent_obj.backtest_update,
-            pending_template=pending_template
-        )
-        return intent_obj
-
-    def _spy_create_run(payload: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
-        calls.append(payload)
-        # Mock successful run object
-        class MockRun:
-            def __init__(self, p):
-                self.id = "mock_run_id"
-                self.symbols = p.get("symbols", ["AAPL"])
-                self.config_snapshot = p
-                self.aggregate = {"performance": {"total_return_pct": 10.0}}
-            def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-                return {
-                    "id": self.id,
-                    "symbols": self.symbols,
-                    "config_snapshot": self.config_snapshot,
-                    "metrics": {"aggregate": self.aggregate}
-                }
-        return MockRun(payload)
-
-
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _stub_intent)
-    monkeypatch.setattr(api_main, "create_run_from_payload", _spy_create_run)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    # 1. User starts DCA
-    client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "¿Cómo funcionaría una estrategia DCA simple en Tesla?",
-            "language": "es-419",
+        "status_label": "Completed",
+        "rows": [
+            {"key": "total_return_pct", "label": "Total Return (%)", "value": "+12.4%"},
+            {"key": "benchmark_delta", "label": "Benchmark", "value": "+2.1% vs SPY"},
+        ],
+        "assumptions": ["$10,000 starting capital", "1D bars", "Benchmark: SPY"],
+        "benchmark_note": "Compared with SPY.",
+        "actions": [
+            {
+                "id": "show-breakdown",
+                "type": "show_breakdown",
+                "label": "Show a breakdown",
+                "presentation": "result",
+                "payload": {},
+            },
+            {
+                "id": "add-to-collection",
+                "type": "add_to_collection",
+                "label": "Add to collection",
+                "presentation": "result",
+                "payload": {},
+            },
+            {
+                "id": "refine-strategy",
+                "type": "refine_strategy",
+                "label": "Refine strategy",
+                "presentation": "result",
+                "payload": {},
+            },
+        ],
+    }
+    return {
+        "stage_outcome": "end_run",
+        "assistant_response": "Short grounded summary from the runtime.",
+        "final_response_payload": {
+            "result_card": result_card,
+            "result": {
+                "resolved_strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "AAPL",
+                    "asset_universe": ["AAPL"],
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "date_range": "May 3, 2025 to May 3, 2026",
+                },
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 12.4,
+                            "delta_vs_benchmark_pct": 2.1,
+                        }
+                    }
+                },
+                "benchmark_metrics": {"benchmark_symbol": "SPY"},
+            },
         },
-    )
-
-    # 2. User provides localized cadence
-    client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "semanal",
-            "language": "es-419",
-        },
-    )
-
-    # 3. User confirms
-    confirmed = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "si dale",
-            "language": "es-419",
-        },
-    )
-
-    assert confirmed.status_code == 200
-    assert "event: result" in confirmed.text
-    assert len(calls) == 1
-
-    # THE CRITICAL ASSERTION:
-    # Even though the user said 'semanal', the engine should receive 'weekly'
-    assert calls[0]["parameters"]["dca_cadence"] == "weekly"
+    }
 
 
-def test_hey_returns_guide_and_does_not_create_backtest_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+@pytest.fixture(autouse=True)
+def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
 
-    def _guide(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="", intent="guide")
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _guide)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "hey", "language": "en"},
+    monkeypatch.setattr(api_main, "supabase_gateway", None)
+    monkeypatch.setattr(
+        api_main,
+        "classify_symbol",
+        lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
     )
 
-    assert response.status_code == 200
-    assert "Orchestration failed" not in response.text
-    assert "event: result" not in response.text
-    assert "I'm here to help you validate" in response.text
-    assert "real historical data" in response.text
 
-    metadata = _latest_assistant_metadata(client, conversation["id"])
-    assert metadata.get("backtest_state") is None
-    assert metadata["conversation_mode"] == "guide"
-
-
-def test_education_chat_does_not_create_backtest_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import main as api_main
-
-    def _education(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="",
-            intent="guide",
-            educational_need="concept_explanation",
-            assistant_guidance_seed="momentum",
-        )
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _education)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "How does Momentum is all about work?",
-            "language": "en",
-        },
-    )
-
-    assert response.status_code == 200
-    assert "event: result" not in response.text
-    assert "Momentum is all about" in response.text
-
-    metadata = _latest_assistant_metadata(client, conversation["id"])
-    assert metadata.get("backtest_state") is None
-    assert metadata["conversation_mode"] == "guide"
-
-
-def test_confused_beginner_gets_guided_prompt_without_backtest_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import main as api_main
-
-    def _beginner(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="",
-            intent="guide",
-            educational_need="beginner_confused",
-            assistant_guidance_seed="",
-        )
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _beginner)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "you tell me, i dont know anything about this",
-            "language": "en",
-        },
-    )
-
-    assert response.status_code == 200
-    assert "event: result" not in response.text
-    assert "simple and fun" in response.text
-    assert "stock you already know" in response.text
-
-    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()["items"]
-    assistant = messages[-1]
-    assert assistant["metadata"].get("backtest_state") is None
-
-
-def test_beginner_choice_narrows_guide_without_backtest_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import main as api_main
-
-    def _choice(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="",
-            intent="guide",
-            educational_need="beginner_confused",
-            guide_choice="compare_stocks",
-        )
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _choice)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "2", "language": "en"},
-    )
-
-    assert response.status_code == 200
-    assert "event: result" not in response.text
-    assert "two or three stocks" in response.text
-    assert "stack up" in response.text
-
-    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()["items"]
-    assistant = messages[-1]
-    assert assistant["metadata"].get("backtest_state") is None
-
-
-def test_concrete_symbol_from_single_pass_intent_starts_state_machine(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import main as api_main
-
-    def _symbol(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="",
-            intent="setup",
-            backtest_update=BacktestParamsUpdate(symbols=["AAPL"]),
-        )
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _symbol)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "AAPL", "language": "en"},
-    )
-
-    assert response.status_code == 200
-    assert "event: result" not in response.text
-    assert "What strategy do you want to test?" in response.text
-
-    metadata = _latest_assistant_metadata(client, conversation["id"])
-    assert metadata.get("backtest_state") is not None
-    assert metadata["conversation_mode"] == "setup"
-
-
-def test_can_i_test_strategy_returns_beginner_safe_choices(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api import main as api_main
-
-    def _guide(**_: Any) -> ChatTurnIntent:
-        return ChatTurnIntent(assistant_response="", intent="guide", educational_need="strategy_help")
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _guide)
-
-    client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    response = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "can i test a strategy?",
-            "language": "en",
-        },
-    )
-
-    assert response.status_code == 200
-    assert "event: result" not in response.text
-    assert "Got it!" in response.text
-    assert "buy the dip" in response.text.lower()
-
-
-def test_chat_stream_passes_agent_model_to_intent_classifier(
+def test_chat_stream_emits_structured_confirmation_actions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api import main as api_main
 
     seen: dict[str, Any] = {}
 
-    def _guide(**kwargs: Any) -> ChatTurnIntent:
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
         seen.update(kwargs)
-        return ChatTurnIntent(assistant_response="", intent="guide")
+        return _confirmation_runtime_result()
 
-    monkeypatch.setenv("AGENT_MODEL", "openrouter/test-intent-model")
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _guide)
-
+    monkeypatch.setattr(api_main, "run_agent_turn", _runtime)
     client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    conversation = _conversation(client)
 
     response = client.post(
         "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "hola", "language": "es-419"},
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Buy and hold Apple over the past year",
+            "language": "en",
+        },
     )
 
     assert response.status_code == 200
-    assert seen["model_name"] == "openrouter/test-intent-model"
+    assert seen["thread_id"] == conversation["id"]
+    assert seen["message"] == "Buy and hold Apple over the past year"
+    confirmation = _stream_payloads(response.text, "confirmation")[0]["confirmation"]
+    assert confirmation["actions"] == [
+        {
+            "id": "run-backtest",
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        {
+            "id": "change-dates",
+            "type": "change_dates",
+            "label": "Change dates",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        {
+            "id": "change-asset",
+            "type": "change_asset",
+            "label": "Change asset",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        {
+            "id": "adjust-assumptions",
+            "type": "adjust_assumptions",
+            "label": "Adjust assumptions",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+    ]
 
 
-def test_confirm_edit_and_cancel_paths_do_not_run(
+def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api import main as api_main
 
-    calls: list[dict[str, Any]] = []
-    action = "edit_parameters"
+    seen_messages: list[str] = []
 
-    def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
-        if "buy" in message.lower():
-            return ChatTurnIntent(assistant_response="",
-                intent="setup",
-                backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
-            )
-        return ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action=action)
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
+        seen_messages.append(kwargs["message"])
+        return _result_runtime_result()
 
-    def _spy_create_run(payload: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
-        calls.append(payload)
-        return api_main.create_run_from_payload(payload, *args, **kwargs)
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _stub_intent)
-    monkeypatch.setattr(api_main, "create_run_from_payload", _spy_create_run)
-
+    monkeypatch.setattr(api_main, "run_agent_turn", _runtime)
     client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    conversation = _conversation(client)
 
-    ready = client.post(
+    response = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
-            "message": "buy dips on AAPL",
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
             "language": "en",
         },
     )
-    assert ready.status_code == 200
-    assert "Run this" in ready.text
 
-    edit = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "change something",
-            "language": "en",
-        },
-    )
-    assert edit.status_code == 200
-    assert "event: result" not in edit.text
-    assert "What would you like to change?" in edit.text
-    assert calls == []
-    assert _latest_assistant_metadata(client, conversation["id"])["conversation_mode"] == "setup"
-
-    action = "cancel_backtest"
-    cancel = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "cancel", "language": "en"},
-    )
-    assert cancel.status_code == 200
-    assert "event: result" not in cancel.text
-    assert "cancelled" in cancel.text.lower()
-    metadata = _latest_assistant_metadata(client, conversation["id"])
-    assert metadata["conversation_mode"] == "guide"
-    assert metadata.get("backtest_state") is None
-    assert calls == []
+    assert response.status_code == 200
+    assert seen_messages == ["run backtest"]
+    assert "Run backtest" in client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).text
+    assert response.text.index("event: result") < response.text.index("event: token")
+    run = _stream_payloads(response.text, "result")[0]["run"]
+    assert [action["type"] for action in run["conversation_result_card"]["actions"]] == [
+        "show_breakdown",
+        "add_to_collection",
+        "refine_strategy",
+    ]
 
 
-def test_result_review_explains_metrics_without_rerunning(
+def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api import main as api_main
 
-    calls: list[dict[str, Any]] = []
-    phase = "run"
+    runtime_calls = 0
 
-    def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
-        if phase == "explain":
-            return ChatTurnIntent(assistant_response="",
-                intent="explain_result",
-                result_action="explain_metrics",
-                educational_need="metric_explanation",
-            )
-        if message.lower().strip() == "yes":
-            return ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
-        return ChatTurnIntent(assistant_response="",
-            intent="setup",
-            backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
-        )
+    def _runtime(**_: Any) -> dict[str, Any]:
+        nonlocal runtime_calls
+        runtime_calls += 1
+        return _result_runtime_result()
 
-    original_create_run = api_main.create_run_from_payload
-
-    def _spy_create_run(payload: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
-        calls.append(payload)
-        return original_create_run(payload, *args, **kwargs)
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _stub_intent)
-    monkeypatch.setattr(api_main, "create_run_from_payload", _spy_create_run)
-
+    monkeypatch.setattr(api_main, "run_agent_turn", _runtime)
+    monkeypatch.setattr(api_main, "build_openrouter_model", lambda _task: None)
     client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    conversation = _conversation(client)
 
-    client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "buy dips on AAPL", "language": "en"},
-    )
-    run_response = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "yes", "language": "en"},
-    )
-    assert "event: result" in run_response.text
-    assert len(calls) == 1
-
-    phase = "explain"
-    explain = client.post(
+    first = client.post(
         "/api/v1/chat/stream",
         json={
             "conversation_id": conversation["id"],
-            "message": "what does drawdown mean?",
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "en",
+        },
+    )
+    run_id = _stream_payloads(first.text, "result")[0]["run"]["id"]
+
+    second = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "show_breakdown",
+                "label": "Show a breakdown",
+                "presentation": "result",
+                "payload": {"run_id": run_id},
+            },
             "language": "en",
         },
     )
 
-    assert explain.status_code == 200
-    assert "event: result" not in explain.text
-    assert "based on the results" in explain.text.lower()
-    assert len(calls) == 1
-    assert _latest_assistant_metadata(client, conversation["id"])["conversation_mode"] == "result_review"
+    assert second.status_code == 200
+    assert runtime_calls == 1
+    breakdown = _stream_payloads(second.text, "token")[0]["text"]
+    assert "Total Return (%)" in breakdown
+    assert "Benchmark" in breakdown
+    assert run_id in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
 
 
-def test_result_refine_and_save_actions_do_not_rerun(
+def test_chat_stream_requires_message_or_action() -> None:
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"conversation_id": conversation["id"], "language": "en"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    client = TestClient(app)
+    client.post("/api/v1/dev/reset")
+    client.patch(
+        "/api/v1/me",
+        json={
+            "onboarding": {
+                "stage": "primary_goal_selection",
+                "language_confirmed": True,
+                "primary_goal": None,
+                "completed": False,
+            }
+        },
+    )
+    conversation = _conversation(client)
+
+    first = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "__ONBOARDING_GOAL__:learn_basics",
+            "language": "en",
+        },
+    )
+    second = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "apple",
+            "language": "en",
+        },
+    )
+
+    first_text = _stream_payloads(first.text, "token")[0]["text"]
+    second_text = _stream_payloads(second.text, "token")[0]["text"]
+    assert "help you choose a sensible next step" in first_text
+    assert "What should trigger the buy?" not in second_text
+    assert "I can work with AAPL" in second_text
+    assert "simple test" in second_text
+
+
+def test_discovery_endpoints_return_assets_and_indicators(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api import main as api_main
 
-    calls: list[dict[str, Any]] = []
-    phase = "run"
-
-    def _stub_intent(message: str, **_: Any) -> ChatTurnIntent:
-        if phase == "save":
-            return ChatTurnIntent(assistant_response="", intent="refine", result_action="save_or_organize")
-        if phase == "refine":
-            return ChatTurnIntent(assistant_response="",
-                intent="refine",
-                result_action="compare_or_refine",
-                backtest_update=BacktestParamsUpdate(symbols=["MSFT"]),
+    monkeypatch.setattr(
+        api_main,
+        "search_assets",
+        lambda q, limit=12: [
+            ResolvedAsset(
+                canonical_symbol="AAPL",
+                asset_class="equity",
+                name="Apple Inc.",
+                raw_symbol=q,
             )
-        if message.lower().strip() == "yes":
-            return ChatTurnIntent(assistant_response="", intent="confirm", confirmation_action="accept_and_run")
-        return ChatTurnIntent(assistant_response="",
-            intent="setup",
-            backtest_update=BacktestParamsUpdate(template="buy_the_dip", symbols=["AAPL"]),
-        )
-
-    original_create_run = api_main.create_run_from_payload
-
-    def _spy_create_run(payload: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
-        calls.append(payload)
-        return original_create_run(payload, *args, **kwargs)
-
-    monkeypatch.setattr(api_main, "classify_chat_turn_intent", _stub_intent)
-    monkeypatch.setattr(api_main, "create_run_from_payload", _spy_create_run)
-
+        ],
+    )
+    monkeypatch.setattr(
+        api_main,
+        "search_indicators",
+        lambda q, limit=12: [IndicatorInfo("rsi", "RSI", "Relative Strength Index", "supported")],
+    )
     client = _client()
-    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
-    client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "buy dips on AAPL", "language": "en"},
-    )
-    client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "yes", "language": "en"},
-    )
-    assert len(calls) == 1
+    assets = client.get("/api/v1/discovery/assets?q=apple&limit=5")
+    indicators = client.get("/api/v1/discovery/indicators?q=rsi&limit=5")
 
-    phase = "refine"
-    refine = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "try MSFT too", "language": "en"},
-    )
-    assert refine.status_code == 200
-    assert "event: result" not in refine.text
-    assert "MSFT" in refine.text
-    assert len(calls) == 1
-    assert _latest_assistant_metadata(client, conversation["id"])["conversation_mode"] == "confirm"
-
-    phase = "save"
-    save = client.post(
-        "/api/v1/chat/stream",
-        json={"conversation_id": conversation["id"], "message": "save this", "language": "en"},
-    )
-    assert save.status_code == 200
-    assert "event: result" not in save.text
-    assert "ready to run" in save.text.lower() or "updated" in save.text.lower()
-    assert len(calls) == 1
+    assert assets.status_code == 200
+    assert assets.json()["items"][0]["insert_text"] == "AAPL"
+    assert indicators.status_code == 200
+    assert indicators.json()["items"][0]["provider"] == "pandas-ta-classic"

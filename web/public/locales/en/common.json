@@ -68,16 +68,16 @@
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [
-      "What if I bought Tesla on significant dips?",
-      "How would a simple DCA strategy perform on Bitcoin?",
-      "Show me how an RSI crossover works on Apple.",
-      "What happens if I hold Nvidia during high volatility?",
-      "Compare holding ETH vs BTC over the last year.",
-      "Test a moving average breakout strategy on SPY.",
-      "How does momentum trading work for tech stocks?",
-      "What if I invested in dividend stocks during a recession?",
-      "Simulate a trend following strategy on Solana.",
-      "Can you explain how mean reversion works?"
+      "What if I bought Tesla after big drops?",
+      "What if I bought Bitcoin every month?",
+      "Explain a market term in simple words.",
+      "What happens if I hold Nvidia for a year?",
+      "Compare Ethereum and Bitcoin over the last year.",
+      "Test buying SPY when it starts rising.",
+      "How does buying strong stocks work?",
+      "What if I bought dividend stocks during a recession?",
+      "Try a simple Solana idea.",
+      "Why do people buy after a price drop?"
     ],
     "view_history": "View history",
     "chat_options": "Chat options",
@@ -85,22 +85,22 @@
     "hide_suggestions": "Hide suggestions",
     "starter_actions": {
       "tsla": {
-        "label": "Test Tesla dips",
-        "value": "What if I bought Tesla on significant dips?"
+        "label": "Buy Tesla after drops",
+        "value": "What if I bought Tesla after big drops?"
       },
       "btc": {
-        "label": "Try Bitcoin momentum",
-        "value": "Test a momentum breakout idea on Bitcoin"
+        "label": "Test Bitcoin strength",
+        "value": "What if I bought Bitcoin when it has been rising?"
       },
       "dca": {
-        "label": "Explore DCA",
-        "value": "Show me a DCA accumulation strategy for Apple"
+        "label": "Buy every month",
+        "value": "What if I bought a fixed amount every month?"
       }
     },
     "example_queries": {
-      "q1": "What if I bought Apple on significant dips?",
-      "q2": "Test a momentum breakout strategy on Bitcoin.",
-      "q3": "How would a simple DCA strategy perform on Tesla?"
+      "q1": "What if I bought Apple after big drops?",
+      "q2": "What if I bought Bitcoin when it starts rising?",
+      "q3": "What if I bought Tesla every month?"
     },
     "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
     "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",

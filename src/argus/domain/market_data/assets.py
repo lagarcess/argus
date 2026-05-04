@@ -22,6 +22,24 @@ class ResolvedAsset:
     raw_symbol: str
 
 
+ASSET_SEARCH_ALIASES = {
+    "alphabet": ("GOOG", "GOOGL"),
+    "amazon": ("AMZN",),
+    "apple": ("AAPL",),
+    "bitcoin": ("BTC", "BTCUSD"),
+    "btc": ("BTC", "BTCUSD"),
+    "ethereum": ("ETH", "ETHUSD"),
+    "ether": ("ETH", "ETHUSD"),
+    "facebook": ("META",),
+    "google": ("GOOG", "GOOGL"),
+    "meta": ("META",),
+    "microsoft": ("MSFT",),
+    "netflix": ("NFLX",),
+    "nvidia": ("NVDA",),
+    "tesla": ("TSLA",),
+}
+
+
 _ASSET_ALIAS_MAP: dict[str, ResolvedAsset] | None = None
 _ASSET_CACHE_TS: float = 0.0
 _ASSET_CACHE_LOCK = threading.Lock()
@@ -165,6 +183,50 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
             return alt
 
     raise ValueError("invalid_symbol")
+
+
+def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
+    _refresh_asset_cache_if_needed()
+    assert _ASSET_ALIAS_MAP is not None
+
+    normalized_query = _normalize_symbol(query)
+    lowered_query = query.lower().strip()
+    if not normalized_query and not lowered_query:
+        return []
+
+    scored: dict[str, tuple[int, ResolvedAsset]] = {}
+    for alias in ASSET_SEARCH_ALIASES.get(lowered_query, ()):
+        record = _ASSET_ALIAS_MAP.get(_normalize_symbol(alias)) or _ASSET_ALIAS_MAP.get(
+            alias.lower()
+        )
+        if record is not None:
+            scored[record.canonical_symbol] = (0, record)
+
+    for alias, record in _ASSET_ALIAS_MAP.items():
+        alias_upper = _normalize_symbol(alias)
+        name_lower = record.name.lower().strip()
+        score: int | None = None
+        if alias_upper == normalized_query or record.canonical_symbol == normalized_query:
+            score = 1
+        elif alias_upper.startswith(normalized_query):
+            score = 2
+        elif name_lower.startswith(lowered_query):
+            score = 3
+        elif normalized_query in alias_upper:
+            score = 4
+        elif lowered_query and lowered_query in name_lower:
+            score = 5
+        if score is None:
+            continue
+        existing = scored.get(record.canonical_symbol)
+        if existing is None or score < existing[0]:
+            scored[record.canonical_symbol] = (score, record)
+
+    ranked = sorted(
+        scored.values(),
+        key=lambda item: (item[0], item[1].asset_class, item[1].canonical_symbol),
+    )
+    return [record for _, record in ranked[: max(1, min(limit, 25))]]
 
 
 def clear_asset_cache() -> None:

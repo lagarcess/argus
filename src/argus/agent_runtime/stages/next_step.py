@@ -26,7 +26,7 @@ def next_step_stage(*, state: RunState) -> StageResult:
         outcome="end_run",
         stage_patch={
             "next_actions": next_actions,
-            "assistant_prompt": _build_next_step_prompt(next_actions),
+            "assistant_prompt": None,
         },
     )
 
@@ -49,22 +49,3 @@ def _has_result_or_summary(state: RunState) -> bool:
         return bool(payload.get("result") or payload.get("summary"))
     return bool(payload.result or payload.summary)
 
-
-def _build_next_step_prompt(next_actions: list[str]) -> str:
-    labels = [_next_action_label(action) for action in next_actions]
-    return "Next step options:\n" + "\n".join(labels)
-
-
-def _next_action_label(action: str) -> str:
-    labels: dict[str, str] = {
-        "refine_strategy": "Refine the strategy",
-        "compare_benchmark": "Compare it with the benchmark",
-        "save_to_collection": "Save it to a collection",
-        "provide_missing_details": "Provide the missing strategy details",
-        "simplify_strategy": "Simplify the strategy setup",
-        "ask_for_example": "Ask for a concrete example",
-        "share_example_strategy": "See an example strategy",
-        "explain_backtests": "Explain what a backtest does",
-        "start_simple": "Start with a simple idea",
-    }
-    return labels.get(action, action.replace("_", " ").capitalize())

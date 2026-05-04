@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from typing import Any, Literal
 
-from langchain_openrouter import ChatOpenRouter
-from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
@@ -24,6 +22,7 @@ from argus.agent_runtime.strategy_contract import (
     normalize_date_range_candidate,
 )
 from argus.domain.market_data import resolve_asset
+from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
 
 
 class LLMRiskRule(BaseModel):
@@ -100,21 +99,31 @@ class OpenRouterStructuredInterpreter:
         self.model_name = model_name or os.getenv("AGENT_MODEL") or (
             "google/gemini-2.0-flash-001"
         )
+        self.last_status: str | None = None
 
     def __call__(self, request: InterpretationRequest) -> StructuredInterpretation | None:
-        if not os.getenv("OPENROUTER_API_KEY"):
+        model = build_openrouter_model("interpretation", model_name=self.model_name)
+        if model is None:
+            self.last_status = "missing_api_key"
             return None
 
         try:
-            model = ChatOpenRouter(model=self.model_name, temperature=0)
             structured = model.with_structured_output(LLMInterpretationResponse)
             response = structured.invoke(self._messages(request))
         except Exception as exc:
-            logger.warning("LLM interpretation failed; falling back", error=str(exc))
+            self.last_status = "failed"
+            log_openrouter_failure(
+                task="interpretation",
+                model_name=self.model_name,
+                exc=exc,
+                message="LLM interpretation failed; falling back",
+            )
             return None
 
         if not isinstance(response, LLMInterpretationResponse):
+            self.last_status = "invalid_response"
             return None
+        self.last_status = "used"
         return self._to_runtime_interpretation(response, request=request)
 
     def _messages(self, request: InterpretationRequest) -> list[dict[str, str]]:

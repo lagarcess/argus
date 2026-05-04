@@ -7,13 +7,13 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
-import { Message } from "./types";
+import { type ChatActionOption, Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
 
 type ChatMessageProps = {
   message: Message;
-  onAction?: (value: string) => void;
-  onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, any>, rating?: "positive" | "negative") => void;
+  onAction?: (action: ChatActionOption) => void;
+  onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   isLatest?: boolean;
   isStreaming?: boolean;
 };
@@ -149,15 +149,15 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
             </div>
           )}
 
-          {isLatest && (
+          {isLatest && message.kind === "text" && (
             <div className="flex items-start justify-between gap-4 mt-2">
               {message.actions && message.actions.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {message.actions.map((action) => (
                     <button
-                      key={action.id}
+                      key={action.id ?? action.type ?? action.label}
                       type="button"
-                      onClick={() => onAction?.(action.value)}
+                      onClick={() => onAction?.(action)}
                       className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
                     >
                       {action.label}

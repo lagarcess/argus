@@ -315,6 +315,9 @@ def test_interpret_product_question_returns_conversational_response_not_opener()
     assert result.outcome == "ready_to_respond"
     assert result.patch["assistant_response"]
     assert "one idea or market question" not in result.patch["assistant_response"].lower()
+    assert "try something like" in result.patch["assistant_response"].lower()
+    assert "buy and hold" in result.patch["assistant_response"].lower()
+    assert "recurring" in result.patch["assistant_response"].lower()
     assert result.decision.intent == "conversation_followup"
 
 

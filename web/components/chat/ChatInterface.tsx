@@ -39,6 +39,7 @@ import {
   resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
+  type ChatActionRequest,
   type ConversationResultCard,
   type HistoryItem,
   type BacktestRun,
@@ -144,7 +145,7 @@ export default function ChatInterface() {
     isOpen: boolean;
     type: "bug" | "feature" | "general" | "rating";
     rating?: "positive" | "negative";
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
   }>({ isOpen: false, type: "general" });
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -169,6 +170,24 @@ export default function ChatInterface() {
     }
     return merged;
   };
+
+  const resultActionsForRun = (actions: ChatActionOption[], run: BacktestRun): ChatActionOption[] =>
+    actions.map((action) => ({
+      id: action.id || action.type || action.label,
+      label: action.label,
+      type: action.type,
+      presentation: "result",
+      payload: {
+        ...(action.payload ?? {}),
+        run_id: run.id,
+        strategy_id: run.strategy_id ?? null,
+        strategy_name: run.conversation_result_card.title,
+        symbols: run.symbols,
+        template: String(run.config_snapshot?.template ?? ""),
+        asset_class: run.asset_class,
+      },
+      value: action.value,
+    }));
 
   const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({
@@ -334,15 +353,30 @@ export default function ChatInterface() {
         const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
         const resultCard = metadata.result_card as ConversationResultCard | undefined;
         if (m.role !== "user" && resultCard && Array.isArray(resultCard.rows)) {
+          const card = resultCardFromConversationCard(resultCard, {
+            id: String(metadata.result_run_id ?? metadata.latest_run_id ?? ""),
+            strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
+          });
+          const restoredActions = (card.actions ?? []).map((action) => ({
+            ...action,
+            presentation: "result" as const,
+            payload: {
+              ...(action.payload ?? {}),
+              run_id: card.runId ?? "",
+              strategy_id: card.strategyId ?? null,
+              strategy_name: card.strategyName,
+              symbols: [],
+              template: "",
+              asset_class: "equity",
+            },
+          }));
           return {
             id: m.id,
             role: "ai",
             kind: "strategy_result",
             content: m.content,
-            result: resultCardFromConversationCard(resultCard, {
-              id: String(metadata.result_run_id ?? metadata.latest_run_id ?? ""),
-              strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
-            }),
+            result: card,
+            actions: restoredActions,
           };
         }
         if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
@@ -351,6 +385,7 @@ export default function ChatInterface() {
             role: "ai",
             kind: "strategy_confirmation",
             confirmation,
+            actions: confirmation.actions ?? [],
           };
         }
         return {
@@ -361,6 +396,10 @@ export default function ChatInterface() {
         };
       });
       setMessages(loaded);
+      const latestAiWithActions = [...loaded]
+        .reverse()
+        .find((message) => message.role === "ai" && message.actions?.length);
+      setInputActions(latestAiWithActions?.actions ?? []);
     } catch {
       setMessages([
         {
@@ -433,7 +472,7 @@ export default function ChatInterface() {
 
   // ── Send message ───────────────────────────────────────────────────────────
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, action?: ChatActionOption) => {
     const trimmed = text.trim();
     if (!trimmed || !conversationId) return;
 
@@ -443,7 +482,7 @@ export default function ChatInterface() {
       id: crypto.randomUUID(),
       role: "user",
       kind: "text",
-      content: trimmed,
+      content: action?.label ?? trimmed,
     };
     const assistantId = crypto.randomUUID();
 
@@ -456,7 +495,15 @@ export default function ChatInterface() {
     setStreamStatus(t('chat.status.understanding'));
 
     try {
-      await streamChatMessage(conversationId, trimmed, i18n.language, (event) => {
+      const streamInput: string | ChatActionRequest = action?.type
+        ? {
+            type: action.type,
+            label: action.label,
+            payload: action.payload,
+            presentation: action.presentation,
+          }
+        : trimmed;
+      await streamChatMessage(conversationId, streamInput, i18n.language, (event) => {
         if (event.event === "status") {
           setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
         }
@@ -500,9 +547,10 @@ export default function ChatInterface() {
           );
         }
         if (event.event === "result") {
-          setInputActions([]);
           const run = event.data.run as BacktestRun;
           const card = resultCardFromRun(run);
+          const resultActions = resultActionsForRun(card.actions ?? [], run);
+          setInputActions(resultActions);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -511,27 +559,7 @@ export default function ChatInterface() {
                   kind: "strategy_result",
                   content: m.content,
                   result: card,
-                  actions: card.actions?.map((a: any) => {
-                      if (a.type === "add_to_collection") {
-                        return {
-                          id: "add-to-collection",
-                          label: a.label,
-                          value: `/action:add-to-collection:${run.id}:${run.strategy_id ?? ""}:${run.symbols.join(",")}:${run.asset_class}`,
-                        };
-                      }
-                      if (a.type === "try_new_strategy") {
-                        return {
-                          id: "try-new",
-                          label: a.label,
-                          value: "/action:new-chat",
-                        };
-                      }
-                      return {
-                        id: a.type,
-                        label: a.label,
-                        value: a.label,
-                      };
-                    }) || [],
+                  actions: resultActions,
                   }
                 : m,
             ),
@@ -671,7 +699,21 @@ export default function ChatInterface() {
     }
   };
 
-  const handleAction = (value: string) => {
+  const handleAction = (action: ChatActionOption) => {
+    const value = action.value ?? "";
+    if (action.type === "add_to_collection" || value.startsWith("/action:add-to-collection:")) {
+      if (action.payload) {
+        setCollectionPickerTarget({
+          runId: String(action.payload.run_id ?? ""),
+          strategyId: action.payload.strategy_id == null ? null : String(action.payload.strategy_id),
+          strategyName: String(action.payload.strategy_name ?? "My strategy"),
+          symbols: Array.isArray(action.payload.symbols) ? action.payload.symbols.map(String) : [],
+          template: String(action.payload.template ?? ""),
+          assetClass: (action.payload.asset_class === "crypto" ? "crypto" : "equity"),
+        });
+        return;
+      }
+    }
     if (value === "/action:new-chat") {
       void startNewChat();
       return;
@@ -699,7 +741,7 @@ export default function ChatInterface() {
       return;
     }
     setInputActions([]);
-    void handleSend(value);
+    void handleSend(action.label || value, action.type ? action : undefined);
   };
 
   // ── Chat options helpers ───────────────────────────────────────────────────
@@ -1340,9 +1382,9 @@ export default function ChatInterface() {
                       <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {inputActions.map((action) => (
                           <button
-                            key={action.id}
+                            key={action.id ?? action.type ?? action.label}
                             type="button"
-                            onClick={() => handleAction(action.value)}
+                            onClick={() => handleAction(action)}
                             className="min-h-11 rounded-full border border-black/10 bg-white/90 px-4 py-2 text-[14px] font-medium tracking-tight text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
                           >
                             {action.label}

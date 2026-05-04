@@ -453,7 +453,7 @@ def test_next_step_stage_limits_follow_up_actions() -> None:
         "compare_benchmark",
         "save_to_collection",
     ]
-    assert result.patch["assistant_prompt"].count("\n") <= 3
+    assert result.patch["assistant_prompt"] is None
 
 
 def test_next_step_stage_uses_failure_relevant_actions() -> None:
@@ -469,7 +469,7 @@ def test_next_step_stage_uses_failure_relevant_actions() -> None:
         "simplify_strategy",
         "ask_for_example",
     ]
-    assert "missing strategy details" in result.patch["assistant_prompt"].lower()
+    assert result.patch["assistant_prompt"] is None
 
 
 def test_next_step_stage_uses_beginner_relevant_actions() -> None:
@@ -484,4 +484,4 @@ def test_next_step_stage_uses_beginner_relevant_actions() -> None:
         "explain_backtests",
         "start_simple",
     ]
-    assert "example strategy" in result.patch["assistant_prompt"].lower()
+    assert result.patch["assistant_prompt"] is None

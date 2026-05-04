@@ -4,9 +4,20 @@ export type StrategyResultMetric = {
 };
 
 export type ChatActionOption = {
-  id: string;
+  id?: string;
   label: string;
-  value: string;
+  value?: string;
+  type?:
+    | "run_backtest"
+    | "change_dates"
+    | "change_asset"
+    | "adjust_assumptions"
+    | "cancel_confirmation"
+    | "show_breakdown"
+    | "add_to_collection"
+    | "refine_strategy";
+  presentation?: "confirmation" | "result";
+  payload?: Record<string, unknown>;
 };
 
 export type StrategyResultPayload = {
@@ -18,6 +29,7 @@ export type StrategyResultPayload = {
   assumptions?: string[];
   runId?: string;
   strategyId?: string | null;
+  actions?: ChatActionOption[];
 };
 
 export type StrategyConfirmationRow = {

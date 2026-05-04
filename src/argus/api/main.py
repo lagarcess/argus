@@ -42,6 +42,8 @@ from argus.api.schemas import (
     ConversationCreate,
     ConversationPatch,
     ConversationResponse,
+    DiscoveryItem,
+    DiscoveryResponse,
     FeedbackRequest,
     HistoryItem,
     LoginRequest,
@@ -75,6 +77,8 @@ from argus.domain.engine import (
     normalize_backtest_config,
     validate_backtest_config,
 )
+from argus.domain.indicators import search_indicators
+from argus.domain.market_data import search_assets
 from argus.domain.orchestrator import (
     get_starter_prompts,
     parse_onboarding_goal,
@@ -82,6 +86,7 @@ from argus.domain.orchestrator import (
 )
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
 
 load_dotenv()
 
@@ -341,10 +346,34 @@ def _runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any]
         "rows": rows,
         "assumptions": assumptions,
         "actions": [
-            {"id": "run-backtest", "label": "Run backtest", "value": "Run backtest"},
-            {"id": "change-dates", "label": "Change dates", "value": "Change the date range"},
-            {"id": "change-asset", "label": "Change asset", "value": "Use a different asset"},
-            {"id": "adjust-assumptions", "label": "Adjust assumptions", "value": "Change the assumptions"},
+            {
+                "id": "run-backtest",
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            {
+                "id": "change-dates",
+                "type": "change_dates",
+                "label": "Change dates",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            {
+                "id": "change-asset",
+                "type": "change_asset",
+                "label": "Change asset",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            {
+                "id": "adjust-assumptions",
+                "type": "adjust_assumptions",
+                "label": "Adjust assumptions",
+                "presentation": "confirmation",
+                "payload": {},
+            },
         ],
     }
 
@@ -2240,6 +2269,70 @@ def search(
     )
 
 
+@app.get("/api/v1/discovery/assets", response_model=DiscoveryResponse)
+def discovery_assets(
+    q: str = Query("", max_length=80),
+    limit: int = Query(12, ge=1, le=25),
+    user: User = Depends(current_user),  # noqa: B008
+) -> DiscoveryResponse:
+    del user
+    query = q.strip()
+    if not query:
+        return DiscoveryResponse(items=[])
+    try:
+        assets = search_assets(query, limit=limit)
+    except Exception as exc:
+        logger.warning("Asset discovery unavailable", error=str(exc))
+        return DiscoveryResponse(items=[])
+    return DiscoveryResponse(
+        items=[
+            DiscoveryItem(
+                id=f"asset:{asset.canonical_symbol}",
+                type="asset",
+                label=(
+                    f"{asset.canonical_symbol} · {asset.name}"
+                    if asset.name
+                    else asset.canonical_symbol
+                ),
+                symbol=asset.canonical_symbol,
+                description=asset.asset_class.title(),
+                insert_text=asset.canonical_symbol,
+                provider="alpaca",
+                support_status="supported",
+            )
+            for asset in assets
+        ]
+    )
+
+
+@app.get("/api/v1/discovery/indicators", response_model=DiscoveryResponse)
+def discovery_indicators(
+    q: str = Query("", max_length=80),
+    limit: int = Query(12, ge=1, le=25),
+    user: User = Depends(current_user),  # noqa: B008
+) -> DiscoveryResponse:
+    del user
+    query = q.strip()
+    if not query:
+        return DiscoveryResponse(items=[])
+    indicators = search_indicators(query, limit=limit)
+    return DiscoveryResponse(
+        items=[
+            DiscoveryItem(
+                id=f"indicator:{indicator.key}",
+                type="indicator",
+                label=indicator.label,
+                symbol=indicator.key,
+                description=indicator.description,
+                insert_text=indicator.key.upper(),
+                provider="pandas-ta-classic",
+                support_status=indicator.support_status,  # type: ignore[arg-type]
+            )
+            for indicator in indicators
+        ]
+    )
+
+
 def sse(event: str, payload: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
@@ -2296,6 +2389,162 @@ def _persist_onboarding_update(user: User, patch: dict[str, Any]) -> User:
     return updated
 
 
+def _chat_request_message(payload: ChatStreamRequest) -> str:
+    if payload.action is None:
+        return payload.message or ""
+    action_type = payload.action.type
+    action_messages = {
+        "run_backtest": "run backtest",
+        "change_dates": "change dates",
+        "change_asset": "change asset",
+        "adjust_assumptions": "adjust assumptions",
+        "cancel_confirmation": "cancel backtest",
+        "show_breakdown": "show a detailed breakdown of this result",
+        "refine_strategy": "refine this strategy",
+        "add_to_collection": "add this result to a collection",
+    }
+    return action_messages[action_type]
+
+
+def _chat_display_message(payload: ChatStreamRequest) -> str:
+    if payload.action is None:
+        return payload.message or ""
+    return payload.action.label or _chat_request_message(payload)
+
+
+def _chat_action_run_id(payload: ChatStreamRequest) -> str | None:
+    if payload.action is None:
+        return None
+    raw_run_id = payload.action.payload.get("run_id")
+    if raw_run_id is None:
+        raw_run_id = payload.action.payload.get("runId")
+    if raw_run_id is None:
+        return None
+    run_id = str(raw_run_id).strip()
+    return run_id or None
+
+
+def _latest_completed_run_for_conversation(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> BacktestRun | None:
+    candidates = [
+        run
+        for run_id, run in store.backtest_runs.items()
+        if store.backtest_run_owners.get(run_id) == user_id
+        and run.conversation_id == conversation_id
+        and run.status == "completed"
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda run: run.created_at)
+
+
+def _run_for_result_action(
+    *,
+    payload: ChatStreamRequest,
+    user: User,
+    conversation_id: str,
+) -> BacktestRun | None:
+    run_id = _chat_action_run_id(payload)
+    run = store.backtest_runs.get(run_id) if run_id else None
+    if run is not None and store.backtest_run_owners.get(run.id) == user.id:
+        return run
+    return _latest_completed_run_for_conversation(
+        user_id=user.id,
+        conversation_id=conversation_id,
+    )
+
+
+def _result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
+    card = run.conversation_result_card
+    return {
+        "run_id": run.id,
+        "title": card.get("title") if isinstance(card, dict) else None,
+        "asset_class": run.asset_class,
+        "symbols": run.symbols,
+        "benchmark_symbol": run.benchmark_symbol,
+        "date_range": card.get("date_range") if isinstance(card, dict) else None,
+        "metrics": card.get("rows") if isinstance(card, dict) else None,
+        "assumptions": card.get("assumptions") if isinstance(card, dict) else None,
+        "benchmark_note": card.get("benchmark_note") if isinstance(card, dict) else None,
+        "config_snapshot": run.config_snapshot,
+    }
+
+
+def _llm_result_breakdown_message(context: dict[str, Any]) -> str | None:
+    model = build_openrouter_model("result_breakdown")
+    if model is None:
+        return None
+    try:
+        response = model.invoke(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Argus, an investing backtest copilot. Explain the stored "
+                        "backtest result for a novice using only the supplied JSON. Do not "
+                        "invent causes, trades, prices, support, or missing metrics. Explain "
+                        "what the metrics mean, the benchmark comparison, assumptions, and "
+                        "caveats. Keep it concise and conversational."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(context, default=str),
+                },
+            ]
+        )
+    except Exception as exc:
+        log_openrouter_failure(
+            task="result_breakdown",
+            model_name=None,
+            exc=exc,
+            message="LLM result breakdown failed; using deterministic fallback",
+        )
+        return None
+    content = getattr(response, "content", "")
+    text = content.strip() if isinstance(content, str) else ""
+    return text if len(text.split()) >= 12 else None
+
+
+def _fallback_result_breakdown_message(context: dict[str, Any]) -> str:
+    metrics = context.get("metrics")
+    metric_lines = []
+    if isinstance(metrics, list):
+        for row in metrics:
+            if isinstance(row, dict):
+                label = str(row.get("label") or "").strip()
+                value = str(row.get("value") or "").strip()
+                if label and value:
+                    metric_lines.append(f"{label}: {value}")
+    metric_summary = "; ".join(metric_lines[:5])
+    assumptions = context.get("assumptions")
+    assumption_summary = (
+        " ".join(str(item).strip() for item in assumptions[:4] if str(item).strip())
+        if isinstance(assumptions, list)
+        else ""
+    )
+    benchmark = str(context.get("benchmark_symbol") or "").strip()
+    title = str(context.get("title") or "this backtest")
+    return (
+        f"Here is the breakdown for {title}. {metric_summary}. "
+        f"The benchmark is {benchmark}, so the comparison is against that reference over the run period. "
+        f"{assumption_summary} This is historical evidence from the simulation, not a prediction or a reason to trade."
+    )
+
+
+def _result_breakdown_message(run: BacktestRun | None) -> str:
+    if run is None:
+        return (
+            "I could not find the latest completed result for this conversation. "
+            "Run the backtest again and I can break down the metrics from that result."
+        )
+    context = _result_breakdown_context(run)
+    return _llm_result_breakdown_message(context) or _fallback_result_breakdown_message(context)
+
+
 @app.post("/api/v1/chat/stream")
 def chat_stream(
     payload: ChatStreamRequest,
@@ -2343,7 +2592,9 @@ def chat_stream(
     if current_user_profile is None:
         current_user_profile = user
 
-    onboarding_goal = parse_onboarding_goal(payload.message)
+    request_message = _chat_request_message(payload)
+    display_message = _chat_display_message(payload)
+    onboarding_goal = parse_onboarding_goal(request_message)
 
     conversation = store.conversations.get(payload.conversation_id)
     if conversation is None and supabase_gateway is not None:
@@ -2372,7 +2623,7 @@ def chat_stream(
             user_id=user.id,
             conversation_id=conversation.id,
             role="user",
-            content=payload.message,
+            content=display_message,
         )
 
     onboarding_required = current_user_profile.onboarding.stage in {
@@ -2381,7 +2632,7 @@ def chat_stream(
     }
 
     def events() -> Iterable[str]:
-        if onboarding_required and onboarding_goal is None and not payload.message.strip():
+        if onboarding_required and onboarding_goal is None and not request_message.strip():
             lang = (
                 payload.language
                 or conversation.language
@@ -2436,7 +2687,11 @@ def chat_stream(
                 }
             else:
                 mapping = {
-                    "learn_basics": "Great. I'll keep this beginner-friendly. What asset are you curious about?",
+                    "learn_basics": (
+                        "I'll keep this beginner-friendly. You can ask me to explain an investing term, "
+                        "walk through an asset in plain English, or set up a simple historical test. "
+                        "If you name an asset like Apple or Bitcoin, I'll help you choose a sensible next step."
+                    ),
                     "test_stock_idea": "Great. Share the stock idea you want to test and I'll run it.",
                     "build_passive_strategy": "Great. We can start with a passive DCA-style idea.",
                     "explore_crypto": "Great. Let's start with a crypto idea you want to validate.",
@@ -2450,6 +2705,34 @@ def chat_stream(
                 content=follow_up,
             )
             yield sse("token", {"text": follow_up})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        if payload.action is not None and payload.action.type == "show_breakdown":
+            run = _run_for_result_action(
+                payload=payload,
+                user=user,
+                conversation_id=conversation.id,
+            )
+            assistant_text = _result_breakdown_message(run)
+            metadata: dict[str, Any] = {
+                "conversation_mode": "result_review",
+                "chat_action": payload.action.model_dump(mode="python"),
+            }
+            if run is not None:
+                metadata["latest_run_id"] = run.id
+                metadata["result_run_id"] = run.id
+                metadata["result_strategy_id"] = run.strategy_id
+                metadata["result_card"] = run.conversation_result_card
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=assistant_text,
+                metadata=metadata,
+            )
+            yield sse("status", {"status": "ready_to_respond"})
+            yield sse("token", {"text": assistant_text})
             yield sse("done", {"message_id": assistant_message.id})
             return
 
@@ -2468,7 +2751,7 @@ def chat_stream(
                     ),
                 ),
                 thread_id=conversation.id,
-                message=payload.message,
+                message=request_message,
             )
         except Exception as exc:
             logger.exception(
@@ -2544,7 +2827,7 @@ def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
-            if confirmation_card is None:
+            if confirmation_card is None and result_card is None:
                 yield sse("token", {"text": assistant_text})
 
         if confirmation_card is not None:
@@ -2552,6 +2835,8 @@ def chat_stream(
 
         if run is not None:
             yield sse("result", {"run": run.model_dump(mode="json")})
+            if assistant_text:
+                yield sse("token", {"text": assistant_text})
 
         yield sse(
             "done",

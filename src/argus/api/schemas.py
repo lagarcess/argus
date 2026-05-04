@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
@@ -271,10 +271,53 @@ class PaginatedSearch(BaseModel):
     next_cursor: str | None = None
 
 
+ChatActionType = Literal[
+    "run_backtest",
+    "change_dates",
+    "change_asset",
+    "adjust_assumptions",
+    "cancel_confirmation",
+    "show_breakdown",
+    "add_to_collection",
+    "refine_strategy",
+]
+
+
+class ChatActionPayload(BaseModel):
+    type: ChatActionType
+    label: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    presentation: Literal["confirmation", "result"] | None = None
+
+
 class ChatStreamRequest(BaseModel):
     conversation_id: str
-    message: str
+    message: str | None = None
+    action: ChatActionPayload | None = None
     language: Language | None = None
+
+    @model_validator(mode="after")
+    def require_message_or_action(self) -> "ChatStreamRequest":
+        if self.action is not None:
+            return self
+        if self.message is not None and self.message.strip():
+            return self
+        raise ValueError("message_or_action_required")
+
+
+class DiscoveryItem(BaseModel):
+    id: str
+    type: Literal["asset", "indicator"]
+    label: str
+    symbol: str | None = None
+    description: str | None = None
+    insert_text: str
+    provider: str
+    support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
+
+
+class DiscoveryResponse(BaseModel):
+    items: list[DiscoveryItem]
 
 
 class FeedbackRequest(BaseModel):

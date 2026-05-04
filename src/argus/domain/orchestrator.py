@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import os
 from typing import Any, Literal
 
-from langchain_openrouter import ChatOpenRouter
-from loguru import logger
 from pydantic import BaseModel, Field
 
 from argus.domain.backtest_state_machine import BacktestParamsUpdate
 from argus.domain.market_data.assets import resolve_asset as _resolve_market_asset
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+from argus.llm.openrouter import (
+    build_openrouter_model,
+    log_openrouter_failure,
+    resolve_openrouter_model,
+)
 
 resolve_asset = _resolve_market_asset  # compatibility shim for legacy tests only
 
@@ -44,33 +46,33 @@ COMMON_NAMES = {
 STARTER_PROMPTS = {
     "learn_basics": [
         "How do I start investing?",
-        "What is a moving average?",
-        "Explain RSI to me simply",
-        "How do I test a stock idea?",
+        "Explain a market term simply",
+        "What does buying every month mean?",
+        "How do I test an idea?",
     ],
     "test_stock_idea": [
-        "Backtest buying Apple dips",
-        "How would Tesla perform in a crash?",
-        "Is Nvidia overvalued right now?",
-        "Show me MSFT momentum",
+        "Buy Apple after big drops",
+        "Hold Tesla for a year",
+        "Compare Nvidia with Apple",
+        "Test Microsoft when it starts rising",
     ],
     "build_passive_strategy": [
-        "DCA into SPY every month",
-        "Compare index funds vs stocks",
-        "Building a retirement portfolio",
-        "Safe long-term strategies",
+        "Buy SPY every month",
+        "Compare a fund with a stock",
+        "Test a simple long-term idea",
+        "Start with a low-maintenance idea",
     ],
     "explore_crypto": [
-        "Backtest Bitcoin halvings",
-        "Should I buy ETH or BTC?",
-        "Crypto momentum breakout",
-        "DCA into Bitcoin strategy",
+        "Hold Bitcoin for a year",
+        "Compare Ethereum and Bitcoin",
+        "Buy Bitcoin after big drops",
+        "Buy Bitcoin every month",
     ],
     "surprise_me": [
-        "Show me something interesting",
-        "Top performing tech stocks",
-        "Best crypto strategy lately",
-        "High risk high reward ideas",
+        "Show me a simple first idea",
+        "Test a familiar stock",
+        "Compare two familiar assets",
+        "Explain a result like I am new",
     ],
 }
 
@@ -142,9 +144,6 @@ def build_capability_prompt() -> str:
         lines.append(f"- {cap.display_name} (template: {cap.template}). {param_str}")
     return "\n".join(lines)
 
-def _build_model(model_name: str) -> ChatOpenRouter:
-    return ChatOpenRouter(model=model_name, temperature=0)
-
 def parse_onboarding_goal(message: str) -> str | None:
     if message == "__ONBOARDING_SKIP__":
         return "surprise_me"
@@ -204,18 +203,17 @@ def classify_chat_turn_intent(
     model_name: str | None = None,
 ) -> ChatTurnIntent:
     is_es = _resolve_language(language) == "es-419"
-    api_key = os.getenv("OPENROUTER_API_KEY")
     # Respect the AGENT_MODEL from env
-    resolved_model = model_name or os.getenv("AGENT_MODEL") or "google/gemini-2.0-flash-001"
+    resolved_model = resolve_openrouter_model(model_name)
+    model = build_openrouter_model("chat_composer", model_name=resolved_model)
 
-    if not api_key:
+    if model is None:
         return ChatTurnIntent(
             intent="guide",
             assistant_response="I'm here to help you validate ideas, but I'm in offline mode right now!" if not is_es else "¡Estoy aquí para ayudarte, pero estoy en modo offline ahora mismo!"
         )
 
     try:
-        model = _build_model(resolved_model)
         # We use a combined prompt to get BOTH the soulful response and the intent.
         # But we make it less likely to crash by providing a clear fallback for the response.
         structured = model.with_structured_output(ChatTurnIntent)
@@ -270,7 +268,12 @@ def classify_chat_turn_intent(
             return response
 
     except Exception as exc:
-        logger.error(f"Classification failed: {exc}")
+        log_openrouter_failure(
+            task="chat_composer",
+            model_name=resolved_model,
+            exc=exc,
+            message="Classification failed",
+        )
         # Soulful fallback that doesn't feel like a template
         return ChatTurnIntent(
             intent="guide",
@@ -285,12 +288,12 @@ def suggest_entity_name(
     context: str,
     language: str | None,
 ) -> str | None:
-    primary_model = os.getenv("AGENT_MODEL") or "google/gemini-2.0-flash-001"
-    if not os.getenv("OPENROUTER_API_KEY"):
+    primary_model = resolve_openrouter_model()
+    model = build_openrouter_model("name_suggestion", model_name=primary_model)
+    if model is None:
         return None
 
     try:
-        model = _build_model(primary_model)
         structured = model.with_structured_output(NameSuggestion)
         resolved = _resolve_language(language)
         response = structured.invoke(
@@ -308,5 +311,11 @@ def suggest_entity_name(
         )
         candidate = response.name.strip()
         return candidate if candidate else None
-    except Exception:
+    except Exception as exc:
+        log_openrouter_failure(
+            task="name_suggestion",
+            model_name=primary_model,
+            exc=exc,
+            message="Name suggestion failed",
+        )
         return None

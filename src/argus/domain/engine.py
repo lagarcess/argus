@@ -732,46 +732,34 @@ def build_result_card(
         },
         {
             "key": "benchmark_delta",
-            "label": "Referencia" if is_es else "Benchmark",
-            "value": f"{performance['delta_vs_benchmark_pct']:+.1f}% vs {config['benchmark_symbol']}",
+            "label": "Vs referencia" if is_es else "Vs benchmark",
+            "value": f"{performance['delta_vs_benchmark_pct']:+.1f} pts vs {config['benchmark_symbol']}",
         },
     ]
 
-    actions = []
-    num_symbols = len(config["symbols"])
-
-    if num_symbols == 1:
-        actions.append(
-            {
-                "type": "chat_refinement",
-                "label": "¿Quieres añadir más símbolos?"
-                if is_es
-                else "Try adding more symbols",
-            }
-        )
-    elif num_symbols >= 5:
-        actions.append(
-            {
-                "type": "add_to_collection",
-                "label": "Añadir a colección" if is_es else "Save this to a collection",
-            }
-        )
-    else:
-        # Default behavior for middle cases
-        actions.append(
-            {
-                "type": "add_to_collection",
-                "label": "Añadir a colección" if is_es else "Add to collection",
-            }
-        )
-
-    actions.append(
+    actions = [
         {
-            "type": "try_new_strategy",
-            "label": "Probar nueva estrategia" if is_es else "Try a new strategy",
-        }
-    )
-
+            "id": "show-breakdown",
+            "type": "show_breakdown",
+            "label": "Ver desglose" if is_es else "Show a breakdown",
+            "presentation": "result",
+            "payload": {},
+        },
+        {
+            "id": "add-to-collection",
+            "type": "add_to_collection",
+            "label": "AÃ±adir a colecciÃ³n" if is_es else "Add to collection",
+            "presentation": "result",
+            "payload": {},
+        },
+        {
+            "id": "refine-strategy",
+            "type": "refine_strategy",
+            "label": "Refinar estrategia" if is_es else "Refine strategy",
+            "presentation": "result",
+            "payload": {},
+        },
+    ]
     return {
         "title": f"{symbols} {template_display}",
         "date_range": {
