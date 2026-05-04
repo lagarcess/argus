@@ -347,6 +347,26 @@ def test_confirm_stage_blocks_ranges_longer_than_engine_limit() -> None:
     assert "January 1, 2010" not in result.patch["assistant_prompt"]
 
 
+def test_confirm_stage_blocks_since_ipo_without_past_year_fallback() -> None:
+    state = RunState.new(current_user_message="take META since IPO", recent_thread_history=[])
+    state.intent = "backtest_execution"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Backtest META RSI since IPO.",
+        asset_universe=["META"],
+        entry_logic="RSI below 30",
+        exit_logic="RSI above 60",
+        date_range="since_ipo",
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "date_range"
+    assert "Since IPO is longer" in result.patch["assistant_prompt"]
+    assert "past year" not in result.patch["assistant_prompt"]
+
+
 def test_confirm_stage_formats_dca_contribution_as_recurring_money() -> None:
     state = RunState.new(current_user_message="run it", recent_thread_history=[])
     state.intent = "backtest_execution"

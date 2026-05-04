@@ -206,7 +206,7 @@ def _unsupported_constraint_prompt(
     first_constraint = unsupported_constraints[0]
     explanation = str(first_constraint.get("explanation", "")).strip()
     labels = [
-        str(option.get("label", "")).strip()
+        _friendly_option_label(str(option.get("label", "")).strip())
         for option in _simplification_options(unsupported_constraints)
         if str(option.get("label", "")).strip()
     ]
@@ -214,6 +214,21 @@ def _unsupported_constraint_prompt(
     if labels:
         prompt += " I can " + _choice_phrase(labels) + ". Which direction should I take?"
     return prompt
+
+
+def _friendly_option_label(label: str) -> str:
+    normalized = label.strip().lower()
+    if normalized in {"max_available", "maximum_available"}:
+        return "use the maximum available history"
+    if normalized == "since_ipo":
+        return "start at the IPO date"
+    if normalized.startswith("last_") and normalized.endswith("_years"):
+        count = normalized.removeprefix("last_").removesuffix("_years")
+        if count.isdigit():
+            return f"use the last {count} years"
+    if "_" in label and not label.lower().startswith("run "):
+        return label.replace("_", " ")
+    return label
 
 
 def _choice_phrase(labels: list[str]) -> str:

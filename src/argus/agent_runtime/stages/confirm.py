@@ -94,6 +94,12 @@ def _date_limit_prompt(strategy: dict[str, Any]) -> str | None:
     raw_date_range = strategy.get("date_range")
     if raw_date_range in (None, ""):
         return None
+    if _is_since_ipo_request(raw_date_range):
+        return (
+            "Since IPO is longer than the current backtest engine can run for most listed assets. "
+            "Argus supports up to 3 years per simulation right now. Do you want to use the latest "
+            "3-year window, or choose specific start and end dates?"
+        )
     resolved = resolve_date_range(raw_date_range)
     if (resolved.end - resolved.start).days <= 365 * 3:
         return None
@@ -108,6 +114,13 @@ def _date_limit_prompt(strategy: dict[str, Any]) -> str | None:
         "engine can run. Argus supports up to 3 years per simulation right now. "
         f"Do you want to use {suggestion}, or choose a different start and end date?"
     )
+
+
+def _is_since_ipo_request(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+    return normalized in {"since_ipo", "max_available", "maximum_available"}
 
 
 def _format_date(value: date) -> str:

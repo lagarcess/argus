@@ -5,10 +5,7 @@ import { useTheme } from "next-themes";
 import { Settings, Sun, Moon, Monitor, Search, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { patchMe } from "@/lib/argus-api";
-
-const LANGUAGES = [
-  { code: "en", name: "English" },
-];
+import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
 
 export function SettingsMenu() {
   const { t, i18n } = useTranslation();
@@ -51,8 +48,8 @@ export function SettingsMenu() {
 
   if (!mounted) return null;
 
-  const currentLangLabel = LANGUAGES.find(l => l.code === lang || l.code === lang.split('-')[0])?.name || "English";
-  const filteredLanguages = LANGUAGES.filter(l =>
+  const currentLangLabel = ENABLED_LANGUAGES.find(l => l.code === normalizeEnabledLanguage(lang))?.name || "English";
+  const filteredLanguages = ENABLED_LANGUAGES.filter(l =>
     l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t(`settings.languages.${l.code}`).toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -64,7 +61,7 @@ export function SettingsMenu() {
 
     // Persist to backend if logged in
     try {
-      await patchMe({ language: code as "en" | "es-419" });
+    await patchMe({ language: normalizeEnabledLanguage(code) });
     } catch {
       // Silently ignore if not logged in
     }
@@ -152,7 +149,7 @@ export function SettingsMenu() {
                     className="flex justify-between items-center px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
                     <span className="font-medium text-[15px] text-black dark:text-white">{l.name}</span>
-                    {lang.startsWith(l.code) ? (
+                    {normalizeEnabledLanguage(lang) === l.code ? (
                       <Check className="w-4 h-4 text-black dark:text-white" />
                     ) : (
                       <span className="text-[14px] text-gray-500">{t(`settings.languages.${l.code}`)}</span>

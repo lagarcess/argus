@@ -13,7 +13,7 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
     <section className="w-full rounded-[20px] border border-black/12 bg-white dark:border-white/12 dark:bg-[#1d2023] overflow-hidden">
       <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-3.5 dark:border-white/8 sm:px-5">
         <div className="min-w-0">
-          <p className="truncate text-[14px] font-medium tracking-tight text-black dark:text-white sm:text-[15px]">
+          <p className="text-[14px] font-medium leading-snug tracking-tight text-black dark:text-white sm:text-[15px]">
             {confirmation.title}
           </p>
           <p className="mt-1 text-[12px] leading-[1.45] text-black/50 dark:text-white/50">
@@ -33,7 +33,7 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
               <dt className="text-[11px] uppercase tracking-[0.08em] text-black/45 dark:text-white/45">
                 {row.label}
               </dt>
-              <dd className="mt-1 truncate text-[15px] font-semibold tracking-tight text-black dark:text-white">
+              <dd className="mt-1 whitespace-normal break-words text-[15px] font-semibold leading-snug tracking-tight text-black dark:text-white">
                 {row.value}
               </dd>
             </div>
@@ -47,7 +47,7 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
                 <dt className="text-[12px] text-black/45 dark:text-white/45">
                   {row.label}
                 </dt>
-                <dd className="mt-0.5 text-[14px] font-medium leading-[1.45] text-black dark:text-white">
+                <dd className="mt-0.5 whitespace-normal break-words text-[14px] font-medium leading-[1.45] text-black dark:text-white">
                   {row.value}
                 </dd>
               </div>
@@ -59,7 +59,7 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
       {confirmation.assumptions && confirmation.assumptions.length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-black/8 px-4 py-3 dark:border-white/8 sm:px-5">
           {confirmation.assumptions.map((text) => (
-            <span key={text} className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-black/45 dark:text-white/45">
+            <span key={text} className="flex min-w-0 items-start gap-1.5 whitespace-normal break-words text-[11px] leading-snug text-black/45 dark:text-white/45">
               <span className="h-1 w-1 rounded-full bg-black/20 dark:bg-white/20" />
               {text}
             </span>

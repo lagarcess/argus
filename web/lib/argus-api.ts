@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "./supabase-client";
 import type { StrategyConfirmationPayload } from "@/components/chat/types";
+import { normalizeEnabledLanguage } from "./language-features";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -95,6 +96,7 @@ export type ApiMessage = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type StrategySurfaceMetricRow = {
@@ -185,8 +187,10 @@ export type ApiLanguage = "en" | "es-419";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-export function resultCardFromRun(run: BacktestRun) {
-  const card = run.conversation_result_card;
+export function resultCardFromConversationCard(
+  card: ConversationResultCard,
+  run?: Pick<BacktestRun, "id" | "strategy_id">,
+) {
   return {
     strategyName: card.title,
     period: card.date_range.display,
@@ -194,15 +198,18 @@ export function resultCardFromRun(run: BacktestRun) {
     metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
     benchmarkNote: card.benchmark_note,
     assumptions: card.assumptions,
-    runId: run.id,
-    strategyId: run.strategy_id ?? null,
+    runId: run?.id,
+    strategyId: run?.strategy_id ?? null,
     actions: card.actions,
   };
 }
 
+export function resultCardFromRun(run: BacktestRun) {
+  return resultCardFromConversationCard(run.conversation_result_card, run);
+}
+
 export function normalizeApiLanguage(language?: string | null): ApiLanguage {
-  void language;
-  return "en";
+  return normalizeEnabledLanguage(language);
 }
 
 /**

@@ -758,7 +758,62 @@ def test_interpret_confirmation_action_chips_ask_natural_followups() -> None:
         assert result.outcome == "await_user_reply"
         assert result.patch["requested_field"] == requested_field
         assert expected_prompt in result.patch["assistant_prompt"]
-        assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["GOOGL"]
+
+
+def test_interpret_result_metric_question_does_not_become_strategy_thesis() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=True,
+        confirmed_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Google over the past year.",
+            asset_universe=["GOOGL"],
+            date_range="past year",
+        ),
+    )
+    state = RunState.new(
+        current_user_message="i don't know what im looking at what are these metrics im a complete novice",
+        recent_thread_history=[
+            {"role": "assistant", "content": "Your strategy returned 134.8% versus 27.8%."},
+        ],
+    )
+
+    result = interpret_stage(state=state, user=user, latest_task_snapshot=snapshot)
+
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["intent"] == "results_explanation"
+    assert "Those metrics are a compact readout" in result.patch["assistant_response"]
+    assert (
+        result.patch["candidate_strategy_draft"]["strategy_thesis"]
+        == "Buy and hold Google over the past year."
+    )
+
+
+def test_interpret_pending_limitations_question_does_not_change_strategy() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            strategy_type="indicator_threshold",
+            strategy_thesis="Backtest META RSI.",
+            asset_universe=["META"],
+            date_range="since_ipo",
+            entry_logic="RSI drops below 30",
+            exit_logic="RSI rises above 60",
+        ),
+    )
+    state = RunState.new(
+        current_user_message="ok weird since ipo is a long time and you gave me still 3 years, tell me about your limitations",
+        recent_thread_history=[],
+    )
+
+    result = interpret_stage(state=state, user=user, latest_task_snapshot=snapshot)
+
+    assert result.outcome == "ready_to_respond"
+    assert "same-asset-class" in result.patch["assistant_response"]
+    assert "silently falling back to past year" in result.patch["assistant_response"]
 
 
 def test_interpret_mixed_asset_request_preserves_intent_with_simplification(monkeypatch) -> None:

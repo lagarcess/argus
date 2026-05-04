@@ -290,12 +290,6 @@ def test_localized_dca_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
         )
         return intent_obj
 
-
-
-
-
-    original_create_run = api_main.create_run_from_payload
-
     def _spy_create_run(payload: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
         calls.append(payload)
         # Mock successful run object

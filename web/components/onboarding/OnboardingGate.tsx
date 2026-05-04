@@ -3,14 +3,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Globe } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { getMe, patchMe, ApiUser } from "@/lib/argus-api";
 import { DevModeBadge } from "@/components/ui/DevModeBadge";
-
-const LANGUAGES = [
-  { code: "en", name: "English" },
-  { code: "es-419", name: "Español" }
-];
+import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
 
 const GOAL_IDS = [
   "learn_basics",
@@ -31,15 +27,15 @@ export function OnboardingGate({
   const [user, setUser] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<"language" | "goal" | "done" | "error">("language");
-  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() =>
+    normalizeEnabledLanguage(i18n.language),
+  );
 
   useEffect(() => {
-    const currentLang = i18n.language;
-    if (currentLang.startsWith('es')) {
-      setSelectedLanguage('es-419');
-    } else if (currentLang.startsWith('en')) {
-      setSelectedLanguage('en');
-    }
+    const frame = window.requestAnimationFrame(() => {
+      setSelectedLanguage(normalizeEnabledLanguage(i18n.language));
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [i18n.language]);
 
   useEffect(() => {
@@ -52,10 +48,13 @@ export function OnboardingGate({
         } else {
           setStep(me.user.onboarding.stage === "primary_goal_selection" ? "goal" : "language");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
+        const status = typeof err === "object" && err !== null && "status" in err
+          ? (err as { status?: number }).status
+          : undefined;
 
-        if (!isMockAuth && (err.status === 401 || err.status === 403)) {
+        if (!isMockAuth && (status === 401 || status === 403)) {
           setUser(null);
           setStep("done");
         } else {
@@ -77,15 +76,16 @@ export function OnboardingGate({
   }, [postCompleteHref, router, step, user]);
 
   const handleLanguageSelect = async (code: string) => {
-    setSelectedLanguage(code);
-    await i18n.changeLanguage(code);
+    const nextLanguage = normalizeEnabledLanguage(code);
+    setSelectedLanguage(nextLanguage);
+    await i18n.changeLanguage(nextLanguage);
   };
 
   const handleConfirmLanguage = async () => {
     if (!selectedLanguage) return;
     try {
       const response = await patchMe({
-        language: selectedLanguage as "en" | "es-419",
+        language: normalizeEnabledLanguage(selectedLanguage),
         onboarding: {
           stage: "primary_goal_selection",
           language_confirmed: true,
@@ -158,7 +158,7 @@ export function OnboardingGate({
             </div>
 
             <div className="grid gap-3">
-              {LANGUAGES.map((lang) => {
+              {ENABLED_LANGUAGES.map((lang) => {
                 const isSelected = selectedLanguage === lang.code;
                 return (
                   <button
@@ -186,7 +186,7 @@ export function OnboardingGate({
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-[9999px] bg-[#191c1f] dark:bg-white px-[32px] py-[14px] text-[16px] font-medium text-white dark:text-black transition-all hover:opacity-85 disabled:opacity-50"
             >
               {selectedLanguage
-                ? t('onboarding.language.continue_in', { language: LANGUAGES.find(l => l.code === selectedLanguage)?.name })
+                ? t('onboarding.language.continue_in', { language: ENABLED_LANGUAGES.find(l => l.code === selectedLanguage)?.name })
                 : t('common.submit', 'Submit')
               }
             </button>

@@ -193,16 +193,23 @@ def _build_response(
             f"{expertise_sentence}{assumption_sentence} Caveat: {caveat}"
         )
 
+    tone_prefix = _tone_result_prefix(tone)
     if verbosity == "high":
         return (
-            f"{comparison_sentence} {thesis_sentence} {expertise_sentence}"
+            f"{tone_prefix}{comparison_sentence} {thesis_sentence} {expertise_sentence}"
             f"{assumption_sentence} Caveat: {caveat}"
         )
 
     return (
-        f"{comparison_sentence} {thesis_sentence} {expertise_sentence}"
+        f"{tone_prefix}{comparison_sentence} {thesis_sentence} {expertise_sentence}"
         f"{assumption_sentence} Caveat: {caveat}"
     )
+
+
+def _tone_result_prefix(tone: str) -> str:
+    if tone == "friendly":
+        return "Here is the readout. "
+    return ""
 
 
 def _expertise_sentence(expertise_mode: str) -> str:

@@ -128,6 +128,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
         <div className="flex flex-col mt-1.5">
           {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
+              <StrategyResultCard result={message.result} />
               {message.content && (
                 <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -135,7 +136,6 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
                   </ReactMarkdown>
                 </div>
               )}
-              <StrategyResultCard result={message.result} />
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
             <div className="w-full max-w-[min(100%,660px)]">

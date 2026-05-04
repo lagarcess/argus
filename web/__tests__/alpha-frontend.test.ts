@@ -70,6 +70,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain('message.kind === "strategy_result"');
     expect(message).toContain("message.content &&");
     expect(message).toContain("<StrategyResultCard result={message.result} />");
+    expect(message.indexOf("<StrategyResultCard result={message.result} />")).toBeLessThan(
+      message.indexOf("message.content &&"),
+    );
   });
 
   test("chat renders structured confirmation cards with input actions", () => {
@@ -82,6 +85,25 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("setInputActions(confirmation.actions ?? [])");
     expect(chat).toContain("slide-in-from-bottom-2");
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
+  });
+
+  test("chat hydrates persisted structured cards from message metadata", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(api).toContain("metadata?: Record<string, unknown> | null");
+    expect(chat).toContain("metadata.confirmation_card");
+    expect(chat).toContain("metadata.result_card");
+    expect(chat).toContain("resultCardFromConversationCard");
+  });
+
+  test("spanish remains registered behind a feature flag", () => {
+    const languages = readFileSync(join(root, "lib/language-features.ts"), "utf-8");
+    const i18n = readFileSync(join(root, "lib/i18n.ts"), "utf-8");
+
+    expect(languages).toContain('code: "es-419"');
+    expect(languages).toContain("NEXT_PUBLIC_ENABLE_SPANISH");
+    expect(i18n).toContain("ENABLED_LANGUAGE_CODES");
   });
 
   test("chat includes onboarding goal cards and hidden onboarding protocol", () => {

@@ -11,10 +11,10 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
     <section className="w-full rounded-[20px] border border-black/12 dark:border-white/12 bg-white dark:bg-[#1d2023] overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-black/8 dark:border-white/8">
         <div className="min-w-0">
-          <p className="text-[14px] sm:text-[15px] font-medium tracking-tight text-black dark:text-white truncate">
+          <p className="text-[14px] sm:text-[15px] font-medium leading-snug tracking-tight text-black dark:text-white">
             {result.strategyName}
           </p>
-          <p className="text-[12px] text-black/45 dark:text-white/45">{result.period}</p>
+          <p className="text-[12px] leading-snug text-black/45 dark:text-white/45">{result.period}</p>
         </div>
         <span className="shrink-0 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:text-white/70">
           {result.statusLabel || t('chat.simulation_complete')}
@@ -36,8 +36,8 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
         <dl className="grid grid-cols-2 gap-4">
           {result.metrics.slice(1).map((metric) => (
             <div key={metric.label} className="flex flex-col gap-0.5">
-              <dt className="text-[12px] text-black/45 dark:text-white/45 truncate">{metric.label}</dt>
-              <dd className="text-[15px] font-semibold tracking-tight text-black dark:text-white">
+              <dt className="text-[12px] leading-snug text-black/45 dark:text-white/45">{metric.label}</dt>
+              <dd className="whitespace-normal break-words text-[15px] font-semibold leading-snug tracking-tight text-black dark:text-white">
                 {metric.value}
               </dd>
             </div>
@@ -55,7 +55,7 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
           {result.assumptions && result.assumptions.length > 0 && (
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               {result.assumptions.map((text, idx) => (
-                <span key={idx} className="text-[11px] text-black/45 dark:text-white/45 flex items-center gap-1.5 whitespace-nowrap">
+                <span key={idx} className="flex min-w-0 items-start gap-1.5 whitespace-normal break-words text-[11px] leading-snug text-black/45 dark:text-white/45">
                   <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
                   {text}
                 </span>

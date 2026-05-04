@@ -437,7 +437,6 @@ def _compute_metrics_from_equity(
     trade_count: int,
 ) -> dict[str, Any]:
     strategy_returns = strategy_equity.pct_change().fillna(0.0)
-    benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
     total_return = float(strategy_equity.iloc[-1] / invested_capital - 1.0)
     benchmark_return = float(benchmark_equity.iloc[-1] / invested_capital - 1.0)
     total_return_pct = total_return * 100.0

@@ -34,3 +34,13 @@ def test_raw_since_year_period_overrides_model_default() -> None:
     )
 
     assert normalized == "since 2021"
+
+
+def test_raw_since_ipo_period_overrides_model_default() -> None:
+    normalized = normalize_date_range_candidate(
+        "past year",
+        raw_user_phrasing="take META since IPO",
+        today=date(2026, 5, 3),
+    )
+
+    assert normalized == "since_ipo"

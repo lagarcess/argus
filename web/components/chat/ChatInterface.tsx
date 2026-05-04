@@ -36,8 +36,10 @@ import {
   patchConversation,
   patchMe,
   patchStrategy,
+  resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
+  type ConversationResultCard,
   type HistoryItem,
   type BacktestRun,
   type PrimaryGoal,
@@ -327,12 +329,37 @@ export default function ChatInterface() {
     setStreamStatus(t('common.loading'));
     try {
       const { items } = await getConversationMessages(convId, 50);
-      const loaded: Message[] = items.map((m) => ({
-        id: m.id,
-        role: m.role === "user" ? "user" : "ai",
-        kind: "text",
-        content: m.content,
-      }));
+      const loaded: Message[] = items.map((m) => {
+        const metadata = m.metadata ?? {};
+        const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
+        const resultCard = metadata.result_card as ConversationResultCard | undefined;
+        if (m.role !== "user" && resultCard && Array.isArray(resultCard.rows)) {
+          return {
+            id: m.id,
+            role: "ai",
+            kind: "strategy_result",
+            content: m.content,
+            result: resultCardFromConversationCard(resultCard, {
+              id: String(metadata.result_run_id ?? metadata.latest_run_id ?? ""),
+              strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
+            }),
+          };
+        }
+        if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
+          return {
+            id: m.id,
+            role: "ai",
+            kind: "strategy_confirmation",
+            confirmation,
+          };
+        }
+        return {
+          id: m.id,
+          role: m.role === "user" ? "user" : "ai",
+          kind: "text",
+          content: m.content,
+        };
+      });
       setMessages(loaded);
     } catch {
       setMessages([

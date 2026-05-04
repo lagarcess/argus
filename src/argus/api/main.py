@@ -2526,8 +2526,14 @@ def chat_stream(
             ),
             "agent_runtime_stage_outcome": stage_status,
         }
+        if confirmation_card is not None:
+            metadata["confirmation_card"] = confirmation_card
+        if result_card is not None:
+            metadata["result_card"] = result_card
         if run is not None:
             metadata["latest_run_id"] = run.id
+            metadata["result_run_id"] = run.id
+            metadata["result_strategy_id"] = run.strategy_id
 
         assistant_message = None
         if assistant_text is not None:

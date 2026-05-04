@@ -679,6 +679,7 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     result = explain_stage(state=state)
 
     assert result.outcome == "ready_to_respond"
+    assert result.patch["assistant_response"].startswith("Here is the readout.")
     assert "I tested: Test a Tesla pullback idea." in result.patch["assistant_response"]
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "User-set options: Timeframe." in result.patch["assistant_response"]
@@ -715,6 +716,9 @@ def test_explain_stage_varies_with_expertise_mode() -> None:
     beginner_result = explain_stage(state=beginner_state)
     advanced_result = explain_stage(state=advanced_state)
 
+    assert not beginner_result.patch["assistant_response"].startswith(
+        "Here is the readout."
+    )
     assert (
         "simple benchmark comparison"
         in beginner_result.patch["assistant_response"].lower()

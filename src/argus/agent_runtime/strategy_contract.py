@@ -183,6 +183,12 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
 
     if isinstance(value, str):
         normalized = _normalize_period_text(value)
+        if normalized in {"since_ipo", "since ipo", "max_available", "maximum available"}:
+            return DateRangeResolution(
+                label="since IPO" if "ipo" in normalized else "maximum available history",
+                start=date(1900, 1, 1),
+                end=current_date,
+            )
         ytd = _year_to_date(normalized, today=current_date)
         if ytd is not None:
             return ytd
@@ -331,6 +337,8 @@ def _extract_period_label_from_raw_phrase(
     ytd_match = re.search(r"\b(?:ytd|year to date)\b", normalized)
     if ytd_match is not None:
         return "year_to_date"
+    if re.search(r"\bsince (?:ipo|public listing)\b|\bmax(?:imum)? available\b", normalized):
+        return "since_ipo"
     relative_match = re.search(
         r"\b(?:past|last) (?P<count>\d+) "
         r"(?P<unit>day|days|week|weeks|month|months|year|years)\b",

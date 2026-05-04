@@ -203,6 +203,14 @@ def interpret_stage(
     if confirmation_action_result is not None:
         return confirmation_action_result
 
+    contextual_response_result = _contextual_response_stage_result_if_applicable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+    )
+    if contextual_response_result is not None:
+        return contextual_response_result
+
     structured_result = _structured_stage_result(
         state=state,
         user=user,
@@ -367,6 +375,60 @@ def _completed_refinement(
         "risk_rules",
     )
     return any(prior.get(field) != current.get(field) for field in material_fields)
+
+
+def _contextual_response_stage_result_if_applicable(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+) -> StageResult | None:
+    if snapshot is None:
+        return None
+    signals = extract_signals(
+        message=state.current_user_message,
+        latest_task_snapshot=snapshot,
+    )
+    response = _direct_conversational_response(
+        message=state.current_user_message,
+        signals=signals,
+        snapshot=snapshot,
+    )
+    if response is None:
+        return None
+    strategy = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    decision = InterpretDecision(
+        intent=_contextual_intent(state.current_user_message, snapshot),
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked a contextual follow-up about the current backtest.",
+        candidate_strategy_draft=strategy or StrategySummary(),
+        missing_required_fields=[],
+        optional_parameter_opportunity=[],
+        confidence=0.95,
+        arbitration_mode="deterministic",
+        reason_codes=["contextual_followup_response"],
+        effective_response_profile=resolve_effective_response_profile(
+            user=user,
+            explicit_overrides=signals.response_profile_overrides,
+        ),
+        user_preference_overridden_for_turn=has_response_profile_overrides(signals),
+        normalized_signals=signals.to_patch_payload(),
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={"assistant_response": response},
+    )
+
+
+def _contextual_intent(
+    message: str,
+    snapshot: TaskSnapshot,
+) -> IntentName:
+    if _is_result_explanation_followup(message, snapshot):
+        return "results_explanation"
+    return "conversation_followup"
 
 
 def build_candidate_strategy_from_extraction(
@@ -758,12 +820,72 @@ def _direct_conversational_response(
         if re.search(r"\bwhat exactly are you testing\b|\bassumptions\b", lowered):
             strategy = snapshot.pending_strategy_summary
             return _strategy_summary_response(strategy)
+        if re.search(r"\blimitations?\b|\bwhat can(?:not|'t) you run\b", lowered):
+            return _current_limitations_response(snapshot.pending_strategy_summary)
+    if _is_result_explanation_followup(message, snapshot):
+        return _result_followup_response(lowered)
     if signals.beginner_language_detected and not signals.detected_symbols:
         return (
             "Argus is for testing investing ideas without risking real money. "
             "You can ask a question, describe a strategy, or name an asset you want to learn about."
         )
     return None
+
+
+def _is_result_explanation_followup(
+    message: str,
+    snapshot: TaskSnapshot | None,
+) -> bool:
+    if snapshot is None:
+        return False
+    has_result_context = (
+        snapshot.completed is True
+        or snapshot.confirmed_strategy_summary is not None
+        or snapshot.latest_backtest_result_reference is not None
+    )
+    if not has_result_context:
+        return False
+    lowered = message.lower()
+    return bool(
+        re.search(
+            r"\b(what am i looking at|what are these metrics|explain.*metrics|"
+            r"complete novice|beginner|why did|why .*underperform|assumptions?|"
+            r"limitations?|what exactly.*tested|what does .*mean)\b",
+            lowered,
+        )
+    )
+
+
+def _result_followup_response(lowered_message: str) -> str:
+    if re.search(r"\blimitations?\b", lowered_message):
+        return (
+            "The main limits are: Argus runs historical backtests, not predictions; "
+            "the current engine is long-only, same-asset-class, and capped at about 3 years per run; "
+            "some drafted rules need simplification before execution; and the result explains observed returns, "
+            "not the exact cause of performance."
+        )
+    if re.search(r"\bassumptions?\b|what exactly.*tested", lowered_message):
+        return (
+            "I can summarize the confirmed setup: asset, date range, buy and sell rules, contribution or capital, "
+            "fees, slippage, bar timeframe, and benchmark. The card shows the tested configuration; the explanation "
+            "should not change the strategy after the run."
+        )
+    return (
+        "Those metrics are a compact readout of the backtest. Total return is the strategy's gain or loss over the "
+        "period. Benchmark compares it with the default reference asset, usually SPY for equities or BTC for crypto. "
+        "Max drawdown shows the largest peak-to-trough drop. Win rate and trade count describe how often the rule "
+        "produced profitable trading periods. Treat this as historical evidence, not a prediction."
+    )
+
+
+def _current_limitations_response(strategy: StrategySummary) -> str:
+    assets = ", ".join(strategy.asset_universe) or "the selected asset"
+    return (
+        f"For the current {assets} draft, the important limits are: I can only run same-asset-class simulations, "
+        "the engine is long-only, and the current executable window is capped at about 3 years per run. "
+        "If you ask for a longer period like since IPO, I should ask you to choose an executable shorter window "
+        "instead of silently falling back to past year."
+    )
 
 
 def _symbol_only_strategy_response(
