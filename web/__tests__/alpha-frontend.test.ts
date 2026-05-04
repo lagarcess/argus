@@ -62,6 +62,28 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain('aria-label="Archived chats"');
   });
 
+  test("chat result messages preserve assistant explanation next to card", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+
+    expect(chat).toContain("content: m.content");
+    expect(message).toContain('message.kind === "strategy_result"');
+    expect(message).toContain("message.content &&");
+    expect(message).toContain("<StrategyResultCard result={message.result} />");
+  });
+
+  test("chat renders structured confirmation cards with input actions", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(api).toContain('event: "confirmation"');
+    expect(chat).toContain('kind: "strategy_confirmation"');
+    expect(chat).toContain("setInputActions(confirmation.actions ?? [])");
+    expect(chat).toContain("slide-in-from-bottom-2");
+    expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
+  });
+
   test("chat includes onboarding goal cards and hidden onboarding protocol", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 

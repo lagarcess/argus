@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -157,3 +158,194 @@ def test_chat_stream_falls_back_conversationally_for_unsupported_runtime_result(
     assert "event: token" in response.text
     assert "supported backtest" in response.text.lower()
     assert "event: result" not in response.text
+
+
+def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
+    monkeypatch,
+) -> None:
+    from argus.api import main as api_main
+
+    monkeypatch.setattr(
+        api_main,
+        "_confirmation_today",
+        lambda: date(2026, 5, 3),
+    )
+
+    card = api_main._runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "rsi_threshold",
+                    "strategy_thesis": "Run the supported RSI preset on Google.",
+                    "asset_universe": ["GOOGL"],
+                    "asset_class": "equity",
+                    "date_range": "past year",
+                    "entry_logic": "Buy when RSI(14) drops to 30 or below",
+                    "exit_logic": "Sell when RSI(14) rises to 55 or above",
+                    "capital_amount": 10000,
+                },
+                "optional_parameters": {
+                    "timeframe": {"value": "1D", "source": "default"},
+                    "initial_capital": {"value": 10000.0, "source": "default"},
+                },
+            },
+        }
+    )
+
+    assert card is not None
+    period = next(row["value"] for row in card["rows"] if row["label"] == "Period")
+    assert period == "past year (May 3, 2025 - May 3, 2026)"
+    assert card["summary"].endswith(
+        "over past year (May 3, 2025 - May 3, 2026)."
+    )
+    assert card["actions"][0] == {
+        "id": "run-backtest",
+        "label": "Run backtest",
+        "value": "Run backtest",
+    }
+
+
+def test_runtime_confirmation_card_expands_compact_period_and_hides_indicator_cadence(
+    monkeypatch,
+) -> None:
+    from argus.api import main as api_main
+
+    monkeypatch.setattr(
+        api_main,
+        "_confirmation_today",
+        lambda: date(2026, 5, 3),
+    )
+
+    card = api_main._runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "rsi_threshold",
+                    "strategy_thesis": "Run the supported RSI preset on Google.",
+                    "asset_universe": ["GOOGL"],
+                    "asset_class": "equity",
+                    "date_range": "1y",
+                    "cadence": "daily",
+                    "entry_logic": "RSI drops below 30",
+                    "exit_logic": "RSI rises above 55",
+                    "capital_amount": 10000,
+                },
+                "optional_parameters": {},
+            },
+        }
+    )
+
+    assert card is not None
+    rows_by_label = {row["label"]: row["value"] for row in card["rows"]}
+    assert rows_by_label["Period"] == "past year (May 3, 2025 - May 3, 2026)"
+    assert "Cadence" not in rows_by_label
+
+
+def test_runtime_confirmation_card_simplifies_counted_one_year_period(
+    monkeypatch,
+) -> None:
+    from argus.api import main as api_main
+
+    monkeypatch.setattr(
+        api_main,
+        "_confirmation_today",
+        lambda: date(2026, 5, 3),
+    )
+
+    card = api_main._runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "rsi_threshold",
+                    "strategy_thesis": "Run the supported RSI preset on Google.",
+                    "asset_universe": ["GOOGL"],
+                    "asset_class": "equity",
+                    "date_range": "past 1 year",
+                    "entry_logic": "RSI drops below 30",
+                    "exit_logic": "RSI rises above 55",
+                },
+                "optional_parameters": {},
+            },
+        }
+    )
+
+    assert card is not None
+    rows_by_label = {row["label"]: row["value"] for row in card["rows"]}
+    assert rows_by_label["Period"] == "past year (May 3, 2025 - May 3, 2026)"
+
+
+def test_runtime_confirmation_card_formats_machine_date_tokens(
+    monkeypatch,
+) -> None:
+    from argus.api import main as api_main
+
+    monkeypatch.setattr(
+        api_main,
+        "_confirmation_today",
+        lambda: date(2026, 5, 3),
+    )
+
+    def card_for(date_range: str) -> dict[str, Any]:
+        card = api_main._runtime_confirmation_card(
+            {
+                "stage_outcome": "await_approval",
+                "confirmation_payload": {
+                    "strategy": {
+                        "strategy_type": "indicator_threshold",
+                        "strategy_thesis": "Run a dip-buying strategy on Apple.",
+                        "asset_universe": ["AAPL"],
+                        "asset_class": "equity",
+                        "date_range": date_range,
+                        "entry_logic": "Buy when RSI <= 30",
+                        "exit_logic": "Sell when RSI >= 55",
+                    },
+                    "optional_parameters": {},
+                },
+            }
+        )
+        assert card is not None
+        return card
+
+    last_three_months = card_for("last_3_months")
+    ytd = card_for("year_to_date")
+
+    last_rows = {row["label"]: row["value"] for row in last_three_months["rows"]}
+    ytd_rows = {row["label"]: row["value"] for row in ytd["rows"]}
+    assert last_rows["Strategy"] == "Dip Buying"
+    assert last_rows["Period"] == "past 3 months (February 3, 2026 - May 3, 2026)"
+    assert ytd_rows["Period"] == "year to date (January 1, 2026 - May 3, 2026)"
+
+
+def test_runtime_confirmation_card_formats_structured_date_range(
+    monkeypatch,
+) -> None:
+    from argus.api import main as api_main
+
+    monkeypatch.setattr(
+        api_main,
+        "_confirmation_today",
+        lambda: date(2026, 5, 3),
+    )
+
+    card = api_main._runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Bitcoin from January 1 last year.",
+                    "asset_universe": ["BTC"],
+                    "asset_class": "crypto",
+                    "date_range": {"start": "2025-01-01", "end": "today"},
+                },
+                "optional_parameters": {},
+            },
+        }
+    )
+
+    assert card is not None
+    rows_by_label = {row["label"]: row["value"] for row in card["rows"]}
+    assert rows_by_label["Period"] == "January 1, 2025 - May 3, 2026"

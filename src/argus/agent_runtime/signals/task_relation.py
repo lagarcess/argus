@@ -73,14 +73,18 @@ VERBOSITY_OVERRIDE_PATTERNS = (
 SYMBOL_ALIASES: dict[str, tuple[str, ...]] = {
     "AAPL": ("apple", "aapl"),
     "TSLA": ("tesla", "tsla"),
+    "NVDA": ("nvidia", "nvda"),
     "GOOG": ("google", "goog", "alphabet"),
     "SPY": ("spy", "s&p 500", "s and p 500"),
     "BTC": ("bitcoin", "btc"),
+    "ETH": ("ethereum", "eth"),
+    "SOL": ("solana", "sol"),
 }
 
 DATE_RANGE_PATTERNS = (
     r"\blast \d+ (?:day|days|week|weeks|month|months|year|years)\b",
     r"\bover the last \d+ (?:day|days|week|weeks|month|months|year|years)\b",
+    r"\b(?:over the )?(?:past|last) (?:day|week|month|year)\b",
     r"\bfrom \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}\b",
 )
 
@@ -126,14 +130,16 @@ def extract_signals(
 
     detected_symbols = detect_symbols(lowered)
     prior_symbols = []
-    if (
-        snapshot is not None
-        and snapshot.confirmed_strategy_summary is not None
-        and snapshot.confirmed_strategy_summary.asset_universe
-    ):
+    prior_strategy = None
+    if snapshot is not None:
+        prior_strategy = (
+            snapshot.pending_strategy_summary
+            or snapshot.confirmed_strategy_summary
+        )
+    if prior_strategy is not None and prior_strategy.asset_universe:
         prior_symbols = [
             symbol.upper()
-            for symbol in snapshot.confirmed_strategy_summary.asset_universe
+            for symbol in prior_strategy.asset_universe
         ]
 
     symbols_changed = bool(
@@ -146,8 +152,27 @@ def extract_signals(
 
     overrides = resolve_response_profile_overrides(lowered)
 
+    followup_has_pending_strategy = bool(
+        snapshot is not None
+        and snapshot.pending_strategy_summary is not None
+        and (
+            explicit_refinement_request
+            or "instead" in lowered
+            or "weekly" in lowered
+            or "monthly" in lowered
+            or "keep everything else" in lowered
+        )
+    )
+    if followup_has_pending_strategy:
+        explicit_refinement_request = True
+        explicit_new_request = False
+        symbols_changed = False
+        if "strategy_logic_changed" not in reason_codes:
+            reason_codes.append("strategy_logic_changed")
+
     request_is_under_specified = bool(
         (backtest_request or detected_symbols)
+        and not followup_has_pending_strategy
         and (
             not detected_symbols
             or detected_date_range is None
@@ -217,9 +242,16 @@ def matches_any(message: str, patterns: tuple[str, ...]) -> bool:
 def detect_symbols(message: str) -> list[str]:
     detected: list[str] = []
     for symbol, aliases in SYMBOL_ALIASES.items():
-        if any(alias in message for alias in aliases):
+        if any(alias_matches(message, alias) for alias in aliases):
             detected.append(symbol)
     return detected
+
+
+def alias_matches(message: str, alias: str) -> bool:
+    escaped = re.escape(alias)
+    if re.search(rf"(?<![a-z0-9]){escaped}(?![a-z0-9])", message):
+        return True
+    return False
 
 
 def extract_date_range(message: str) -> str | None:

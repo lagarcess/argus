@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
+import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import { Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
 
@@ -126,8 +127,19 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
       <div className="flex flex-col max-w-[85%]">
         <div className="flex flex-col mt-1.5">
           {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
-            <div className="w-full max-w-[min(100%,660px)]">
+            <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
+              {message.content && (
+                <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+              )}
               <StrategyResultCard result={message.result} />
+            </div>
+          ) : message.kind === "strategy_confirmation" && message.confirmation ? (
+            <div className="w-full max-w-[min(100%,660px)]">
+              <StrategyConfirmationCard confirmation={message.confirmation} />
             </div>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">

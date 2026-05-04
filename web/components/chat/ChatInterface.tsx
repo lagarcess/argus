@@ -50,7 +50,7 @@ import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
-import { type ChatActionOption, type Message } from "./types";
+import { type ChatActionOption, type Message, type StrategyConfirmationPayload } from "./types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -106,6 +106,7 @@ export default function ChatInterface() {
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -322,6 +323,7 @@ export default function ChatInterface() {
     setCurrentView("chat");
     setConversationId(convId);
     setMessages([]);
+    setInputActions([]);
     setStreamStatus(t('common.loading'));
     try {
       const { items } = await getConversationMessages(convId, 50);
@@ -355,6 +357,7 @@ export default function ChatInterface() {
       setIsSidebarOpen(false);
       setCurrentView("chat");
       setMessages([]);
+      setInputActions([]);
       try {
         const me = await getMe();
         const stage = me.user.onboarding.stage;
@@ -422,6 +425,7 @@ export default function ChatInterface() {
       userMsg,
       { id: assistantId, role: "ai", kind: "text", content: "" },
     ]);
+    setInputActions([]);
     setStreamStatus(t('chat.status.understanding'));
 
     try {
@@ -439,6 +443,7 @@ export default function ChatInterface() {
           );
         }
         if (event.event === "error") {
+          setInputActions([]);
           setStreamStatus(null);
           setMessages((prev) =>
             prev.map((m) =>
@@ -451,18 +456,35 @@ export default function ChatInterface() {
             ),
           );
         }
+        if (event.event === "confirmation") {
+          const confirmation = event.data.confirmation as StrategyConfirmationPayload;
+          setInputActions(confirmation.actions ?? []);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    kind: "strategy_confirmation",
+                    content: undefined,
+                    confirmation,
+                  }
+                : m,
+            ),
+          );
+        }
         if (event.event === "result") {
+          setInputActions([]);
           const run = event.data.run as BacktestRun;
           const card = resultCardFromRun(run);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
                 ? {
-                    ...m,
-                    kind: "strategy_result",
-                    content: undefined,
-                    result: card,
-                    actions: card.actions?.map((a: any) => {
+                  ...m,
+                  kind: "strategy_result",
+                  content: m.content,
+                  result: card,
+                  actions: card.actions?.map((a: any) => {
                       if (a.type === "add_to_collection") {
                         return {
                           id: "add-to-collection",
@@ -503,6 +525,7 @@ export default function ChatInterface() {
         }
       });
     } catch (err: unknown) {
+      setInputActions([]);
       setStreamStatus(null);
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
@@ -648,6 +671,7 @@ export default function ChatInterface() {
       });
       return;
     }
+    setInputActions([]);
     void handleSend(value);
   };
 
@@ -1285,6 +1309,20 @@ export default function ChatInterface() {
                 <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
                 <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 px-4">
                   <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
+                    {inputActions.length > 0 && !streamStatus && (
+                      <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {inputActions.map((action) => (
+                          <button
+                            key={action.id}
+                            type="button"
+                            onClick={() => handleAction(action.value)}
+                            className="min-h-11 rounded-full border border-black/10 bg-white/90 px-4 py-2 text-[14px] font-medium tracking-tight text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <ChatInput onSend={handleSend} />
                   </div>
                 </div>

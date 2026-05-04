@@ -20,12 +20,27 @@ export type StrategyResultPayload = {
   strategyId?: string | null;
 };
 
+export type StrategyConfirmationRow = {
+  label: string;
+  value: string;
+};
+
+export type StrategyConfirmationPayload = {
+  title: string;
+  statusLabel: string;
+  summary: string;
+  rows: StrategyConfirmationRow[];
+  assumptions?: string[];
+  actions?: ChatActionOption[];
+};
+
 export type Message = {
   id: string;
   role: "user" | "ai";
-  kind?: "text" | "strategy_result";
+  kind?: "text" | "strategy_result" | "strategy_confirmation";
   content?: string;
   result?: StrategyResultPayload;
+  confirmation?: StrategyConfirmationPayload;
   isLoadingResult?: boolean;
   actions?: ChatActionOption[];
 };

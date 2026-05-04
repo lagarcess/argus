@@ -123,6 +123,16 @@ def _build_task_snapshot(
     return TaskSnapshot(
         latest_task_type=run_state.intent,
         completed=stage_outcome_value in completed_outcomes,
+        pending_strategy_summary=(
+            run_state.candidate_strategy_draft
+            if stage_outcome_value in {"await_user_reply", "await_approval"}
+            else (
+                prior_task_snapshot.pending_strategy_summary
+                if prior_task_snapshot is not None
+                and stage_outcome_value not in completed_outcomes
+                else None
+            )
+        ),
         confirmed_strategy_summary=(
             run_state.candidate_strategy_draft
             if stage_outcome_value in completed_outcomes
@@ -225,7 +235,6 @@ def _serialize_public_value(key: str, value: Any) -> Any:
 
 def _normalize_message_for_runtime_slice(message: str) -> str:
     normalized = " ".join(message.strip().split())
-    normalized = _normalize_single_unit_date_ranges(normalized)
     normalized = _move_trailing_date_clause_ahead_of_strategy_logic(normalized)
     normalized = _normalize_entry_clause(normalized)
     normalized = _normalize_exit_clause(normalized)

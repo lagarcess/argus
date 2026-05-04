@@ -5,7 +5,7 @@ import binascii
 import json
 import os
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from dotenv import load_dotenv
@@ -72,9 +72,16 @@ from argus.domain.orchestrator import (
 )
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.session.manager import InMemorySessionManager
+from argus.agent_runtime.strategy_contract import (
+    display_strategy_slug,
+    display_strategy_type,
+    resolve_date_range,
+)
 from argus.agent_runtime.state.models import UserState
 from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 
@@ -97,7 +104,14 @@ store = AlphaStore()
 PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
 agent_runtime_session_manager = InMemorySessionManager()
-agent_runtime_workflow = build_workflow(tool=RealBacktestTool())
+agent_runtime_capability_contract = build_default_capability_contract()
+agent_runtime_workflow = build_workflow(
+    contract=agent_runtime_capability_contract,
+    tool=RealBacktestTool(),
+    structured_interpreter=OpenRouterStructuredInterpreter(
+        contract=agent_runtime_capability_contract,
+    ),
+)
 
 
 class InternalAgentRuntimeTurnRequest(BaseModel):
@@ -273,6 +287,130 @@ def _runtime_result_card(runtime_result: dict[str, Any]) -> dict[str, Any] | Non
     if isinstance(result_card, dict):
         return result_card
     return None
+
+
+def _runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any] | None:
+    if runtime_result.get("stage_outcome") != "await_approval":
+        return None
+    payload = runtime_result.get("confirmation_payload")
+    if not isinstance(payload, dict):
+        return None
+    strategy = payload.get("strategy")
+    if not isinstance(strategy, dict):
+        return None
+    optional_parameters = payload.get("optional_parameters")
+    if not isinstance(optional_parameters, dict):
+        optional_parameters = {}
+
+    symbols = [
+        str(symbol)
+        for symbol in strategy.get("asset_universe", [])
+        if str(symbol).strip()
+    ]
+    assets = ", ".join(symbols) if symbols else "Selected asset"
+    strategy_type = display_strategy_slug(strategy)
+    strategy_label = display_strategy_type(strategy)
+    date_range = _format_confirmation_period(strategy.get("date_range"))
+    title = f"{assets} {strategy_type}".strip()
+
+    rows = [
+        {"label": "Strategy", "value": strategy_label},
+        {"label": "Assets", "value": assets},
+        {"label": "Period", "value": date_range},
+    ]
+    if strategy.get("cadence") and _strategy_type_uses_cadence(strategy_type):
+        rows.append({"label": "Cadence", "value": str(strategy["cadence"]).title()})
+    if strategy.get("entry_logic"):
+        rows.append({"label": "Buy rule", "value": _format_confirmation_value(strategy["entry_logic"])})
+    if strategy.get("exit_logic"):
+        rows.append({"label": "Exit rule", "value": _format_confirmation_value(strategy["exit_logic"])})
+    if strategy.get("capital_amount"):
+        rows.append({"label": "Contribution", "value": f"${float(strategy['capital_amount']):,.0f}"})
+
+    assumptions = _confirmation_assumptions(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+    )
+    summary = (
+        f"I read this as {assets} using {_article_for(strategy_type)} "
+        f"{strategy_type} approach over {date_range}."
+    )
+    return {
+        "title": title,
+        "statusLabel": "Ready to run",
+        "summary": summary,
+        "rows": rows,
+        "assumptions": assumptions,
+        "actions": [
+            {"id": "run-backtest", "label": "Run backtest", "value": "Run backtest"},
+            {"id": "change-dates", "label": "Change dates", "value": "Change the date range"},
+            {"id": "change-asset", "label": "Change asset", "value": "Use a different asset"},
+            {"id": "adjust-assumptions", "label": "Adjust assumptions", "value": "Change the assumptions"},
+        ],
+    }
+
+
+def _confirmation_assumptions(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+) -> list[str]:
+    assumptions: list[str] = []
+    initial_capital = _optional_parameter_value(optional_parameters, "initial_capital")
+    if isinstance(initial_capital, int | float):
+        assumptions.append(f"${float(initial_capital):,.0f} starting capital")
+    timeframe = _optional_parameter_value(optional_parameters, "timeframe")
+    if timeframe:
+        assumptions.append(f"{timeframe} bars")
+    fees = _optional_parameter_value(optional_parameters, "fees")
+    if fees in (0, 0.0, "0", "0.0"):
+        assumptions.append("No fees")
+    slippage = _optional_parameter_value(optional_parameters, "slippage")
+    if slippage in (0, 0.0, "0", "0.0"):
+        assumptions.append("No slippage")
+    asset_class = strategy.get("asset_class")
+    if asset_class == "crypto":
+        assumptions.append("Benchmark: BTC")
+    elif asset_class == "equity":
+        assumptions.append("Benchmark: SPY")
+    return assumptions
+
+
+def _optional_parameter_value(optional_parameters: dict[str, Any], key: str) -> Any:
+    value = optional_parameters.get(key)
+    if isinstance(value, dict):
+        return value.get("value")
+    return None
+
+
+def _format_confirmation_value(value: Any) -> str:
+    if isinstance(value, dict):
+        start = value.get("start") or value.get("from")
+        end = value.get("end") or value.get("to")
+        if start and end:
+            return f"{start} to {end}"
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    if value is None or value == "":
+        return "Default period"
+    return str(value)
+
+
+def _format_confirmation_period(value: Any) -> str:
+    return resolve_date_range(value, today=_confirmation_today()).display
+
+
+def _strategy_type_uses_cadence(strategy_type: str) -> bool:
+    normalized = strategy_type.strip().lower().replace("-", "_").replace(" ", "_")
+    return normalized in {"dca", "dca_accumulation", "recurring_accumulation"}
+
+
+def _article_for(value: str) -> str:
+    return "an" if value[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
+
+
+def _confirmation_today() -> date:
+    return date.today()
 
 
 def _runtime_result_envelope(runtime_result: dict[str, Any]) -> dict[str, Any]:
@@ -2235,7 +2373,7 @@ def chat_stream(
     }
 
     def events() -> Iterable[str]:
-        if onboarding_required and onboarding_goal is None:
+        if onboarding_required and onboarding_goal is None and not payload.message.strip():
             lang = (
                 payload.language
                 or conversation.language
@@ -2311,7 +2449,16 @@ def chat_stream(
             runtime_result = run_agent_turn(
                 workflow=agent_runtime_workflow,
                 session_manager=agent_runtime_session_manager,
-                user=UserState(user_id=user.id),
+                user=UserState(
+                    user_id=user.id,
+                    display_name=current_user_profile.display_name,
+                    language_preference=(
+                        payload.language
+                        or conversation.language
+                        or current_user_profile.language
+                        or "en"
+                    ),
+                ),
                 thread_id=conversation.id,
                 message=payload.message,
             )
@@ -2334,6 +2481,9 @@ def chat_stream(
         yield sse("status", {"status": stage_status})
 
         assistant_text = _runtime_result_message(runtime_result)
+        confirmation_card = _runtime_confirmation_card(runtime_result)
+        if confirmation_card is not None:
+            assistant_text = str(confirmation_card["summary"])
         result_card = _runtime_result_card(runtime_result)
         envelope = _runtime_result_envelope(runtime_result)
         run = None
@@ -2380,7 +2530,11 @@ def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
-            yield sse("token", {"text": assistant_text})
+            if confirmation_card is None:
+                yield sse("token", {"text": assistant_text})
+
+        if confirmation_card is not None:
+            yield sse("confirmation", {"confirmation": confirmation_card})
 
         if run is not None:
             yield sse("result", {"run": run.model_dump(mode="json")})

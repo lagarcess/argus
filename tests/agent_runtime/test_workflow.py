@@ -50,7 +50,8 @@ def test_workflow_requires_confirmation_before_execute() -> None:
     )
 
     assert result["stage_outcome"] == "await_approval"
-    assert "Please confirm this backtest" in result["assistant_prompt"]
+    assert "I read this as" in result["assistant_prompt"]
+    assert "Reply yes to run it" in result["assistant_prompt"]
 
 
 def test_runtime_keeps_thread_history_but_not_unapproved_confirmation_state() -> None:
@@ -95,7 +96,7 @@ def test_workflow_routes_under_specified_backtest_into_clarification() -> None:
 
     assert result["stage_outcome"] == "await_user_reply"
     assert result["requested_field"] == "entry_logic"
-    assert "entry logic" in result["assistant_prompt"].lower()
+    assert "trigger the buy" in result["assistant_prompt"].lower()
 
 
 def test_workflow_transition_ends_for_unsupported_capability_failure() -> None:
@@ -479,6 +480,19 @@ def test_build_workflow_input_bounds_recent_thread_history() -> None:
         "message-6",
         "message-7",
     ]
+
+
+def test_build_workflow_input_preserves_natural_date_phrasing() -> None:
+    message = "let's try a basic buy and hold on BTC from jan first last year to date"
+
+    state = build_workflow_input(
+        session_manager=InMemorySessionManager(),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        thread_id="thread-natural-date",
+        message=message,
+    )
+
+    assert state["run_state"].current_user_message == message
 
 
 def test_internal_agent_runtime_turn_endpoint_returns_confirmation_ready_result(

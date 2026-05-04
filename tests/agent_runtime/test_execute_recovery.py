@@ -1,6 +1,8 @@
 import pytest
+from datetime import date
 
 from argus.agent_runtime.recovery.policy import should_retry
+from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.state.models import ResponseProfile, RunState
@@ -85,6 +87,7 @@ def test_execute_applies_mechanical_correction_before_retry() -> None:
     assert tool.calls[0]["strategy_type"] == "buy_and_hold"
     assert tool.calls[0]["symbol"] == "TSLA"
     assert tool.calls[1] == {"strategy": {"asset_universe": ["TSLA"]}}
+    assert result.patch["tool_call_records"][0]["payload"] == {}
 
 
 def test_execute_does_not_retry_when_corrected_payload_changes_protected_intent_fields() -> None:
@@ -145,6 +148,7 @@ def test_execute_retries_only_for_retryable_transient_failure() -> None:
     assert result.patch["failure_classification"] is None
     assert result.patch["final_response_payload"]["result"]["total_return"] == 0.14
     assert result.patch["tool_call_records"][0]["error_message"] == "timeout"
+    assert result.patch["tool_call_records"][0]["payload"] == {}
 
 
 def test_execute_does_not_retry_unsupported_capability() -> None:
@@ -330,6 +334,126 @@ def test_execute_stage_uses_real_backtest_tool_payload(
         result.patch["final_response_payload"]["explanation_context"]["strategy_type"]
         == "buy_and_hold"
     )
+
+
+def test_execute_stage_normalizes_user_facing_strategy_type_aliases() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"total_return": 0.14, "benchmark_return": 0.09},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "rsi_threshold",
+            "strategy_thesis": "Run the supported RSI preset on Google.",
+            "asset_universe": ["GOOGL"],
+            "date_range": "past year",
+            "entry_logic": "Buy when RSI(14) drops to 30 or below",
+            "exit_logic": "Sell when RSI(14) rises to 55 or above",
+        },
+        "optional_parameters": {},
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert tool.calls[0]["strategy_type"] == "indicator_threshold"
+
+
+def test_execute_stage_normalizes_dip_buying_and_machine_date_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import execute as execute_module
+
+    monkeypatch.setattr(
+        execute_module,
+        "resolve_date_range",
+        lambda value: resolve_date_range(value, today=date(2026, 5, 3)),
+    )
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"total_return": 0.14, "benchmark_return": 0.09},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "dip_buying",
+            "strategy_thesis": "Buy Apple on RSI-defined dips.",
+            "asset_universe": ["AAPL"],
+            "date_range": "last_3_months",
+            "entry_logic": "Buy when RSI <= 30",
+            "exit_logic": "Sell when RSI >= 55",
+        },
+        "optional_parameters": {},
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert tool.calls[0]["strategy_type"] == "indicator_threshold"
+    assert tool.calls[0]["date_range"] == {
+        "start": "2026-02-03",
+        "end": "2026-05-03",
+    }
+
+
+def test_execute_stage_resolves_structured_date_range_with_today(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import execute as execute_module
+
+    monkeypatch.setattr(
+        execute_module,
+        "resolve_date_range",
+        lambda value: resolve_date_range(value, today=date(2026, 5, 3)),
+    )
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"total_return": 0.14, "benchmark_return": 0.09},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold Bitcoin from January 1 last year to date.",
+            "asset_universe": ["BTC"],
+            "asset_class": "crypto",
+            "date_range": {"start": "2025-01-01", "end": "today"},
+        },
+        "optional_parameters": {},
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert tool.calls[0]["date_range"] == {
+        "start": "2025-01-01",
+        "end": "2026-05-03",
+    }
 
 
 def test_execute_maps_unknown_tool_errors_into_runtime_taxonomy() -> None:

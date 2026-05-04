@@ -6,7 +6,7 @@ from argus.agent_runtime.state.models import RunState
 
 
 BEGINNER_GUIDANCE_PROMPT = (
-    "What is one idea or market question you want to explore first?"
+    "No problem. I can help you pick a starting point. We can test a simple buy-and-hold idea, a recurring investment plan, or a rule like buying when RSI is low. If you want the simplest path, name an asset and say a timeframe, like 'Tesla over 2 years'."
 )
 AMBIGUOUS_TURN_PROMPT = (
     "Should I keep working on the current idea, or are you starting a new backtest?"
@@ -175,12 +175,20 @@ def _optional_parameter_opt_in_prompt(
 
 
 def _ambiguous_fields_prompt(ambiguous_fields: list[dict[str, object]]) -> str:
+    if len(ambiguous_fields) == 1 and ambiguous_fields[0].get("field_name") == "entry_logic":
+        raw_value = str(ambiguous_fields[0].get("raw_value", "")).strip()
+        if raw_value:
+            return (
+                f"I understand the idea as buying on {raw_value}. To backtest it, "
+                "I need to turn that into a specific rule. Do you want to define the dip as a percent drop, "
+                "use a supported RSI rule, or keep drafting the idea first?"
+            )
     parts = []
     for field in ambiguous_fields:
         field_name = str(field["field_name"]).replace("_", " ")
         raw_value = str(field.get("raw_value", "")).strip()
         candidate = str(field.get("candidate_normalized_value", "")).strip()
-        if raw_value and candidate:
+        if raw_value and candidate and candidate.lower() != "none":
             parts.append(
                 f"{field_name}: you said '{raw_value}', and I interpreted it as '{candidate}'"
             )
@@ -205,8 +213,16 @@ def _unsupported_constraint_prompt(
     ]
     prompt = explanation or "Part of this strategy is not supported yet."
     if labels:
-        prompt += " You can simplify it with: " + ", ".join(labels) + "."
+        prompt += " I can " + _choice_phrase(labels) + ". Which direction should I take?"
     return prompt
+
+
+def _choice_phrase(labels: list[str]) -> str:
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]}, or {labels[1]}"
+    return ", ".join(labels[:-1]) + f", or {labels[-1]}"
 
 
 def _optional_parameter_label(field_name: str, *, contract: CapabilityContract) -> str:
@@ -253,10 +269,10 @@ def _first_missing_required_field(
 
 def _required_field_prompt(*, requested_field: str, label: str) -> str:
     prompts = {
-        "strategy_thesis": "What investing idea do you want to test?",
-        "asset_universe": "Which symbol or symbols should I include?",
-        "entry_logic": "What entry logic should I use?",
-        "exit_logic": "What exit logic should I use?",
-        "date_range": "What date range should I test?",
+        "strategy_thesis": "I can help shape this. Are you thinking buy-and-hold, recurring buys, or a rule-based strategy?",
+        "asset_universe": "Which asset should I test?",
+        "entry_logic": "What should trigger the buy?",
+        "exit_logic": "What should trigger the sell or exit?",
+        "date_range": "What time period should I test?",
     }
     return prompts.get(requested_field, f"What {label} should I use?")

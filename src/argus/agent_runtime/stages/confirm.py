@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
+from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 
@@ -53,7 +54,7 @@ def _missing_required_fields(
     contract: CapabilityContract,
 ) -> list[str]:
     missing_fields: list[str] = []
-    for field_name in contract.required_fields:
+    for field_name in _required_fields_for_strategy(strategy, contract):
         value = strategy.get(field_name)
         if isinstance(value, list):
             if not value:
@@ -62,6 +63,20 @@ def _missing_required_fields(
         if value is None or value == "":
             missing_fields.append(field_name)
     return missing_fields
+
+
+def _required_fields_for_strategy(
+    strategy: dict[str, Any],
+    contract: CapabilityContract,
+) -> list[str]:
+    strategy_type = _resolve_strategy_type(strategy, {})
+    if strategy_type in {"buy_and_hold", "dca_accumulation"}:
+        return [
+            field_name
+            for field_name in contract.required_fields
+            if field_name not in {"entry_logic", "exit_logic"}
+        ]
+    return list(contract.required_fields)
 
 
 def _resolve_optional_parameters(
@@ -107,40 +122,25 @@ def _build_confirmation_prompt(
         optional_parameters=optional_parameters,
         strategy_type=strategy_type,
     )
-    required_lines = []
-    for field_name in contract.required_fields:
-        field_description = contract.describe_field(field_name)
-        label = (
-            field_description.label
-            if field_description is not None
-            else field_name.replace("_", " ").title()
-        )
-        required_lines.append(f"{label}: {_format_value(strategy.get(field_name))}")
-
     user_selected_lines = []
-    defaulted_lines = []
+    assumption_lines = []
     for field_name, parameter in optional_parameters.items():
-        entry = (
-            f"{parameter.get('label')}: {_format_value(parameter.get('value'))} "
-            f"({parameter.get('source')}; {parameter.get('description')})"
+        entry = _format_optional_assumption(
+            field_name=field_name,
+            parameter=parameter,
+            strategy=strategy,
+            strategy_type=strategy_type,
         )
+        if entry is None:
+            continue
         if parameter.get("source") == "user":
             user_selected_lines.append(entry)
         else:
-            defaulted_lines.append(entry)
+            assumption_lines.append(entry)
 
-    required_summary = "; ".join(required_lines)
-    user_selected_summary = (
-        ", ".join(user_selected_lines) if user_selected_lines else "none"
-    )
-    defaulted_summary = ", ".join(defaulted_lines) if defaulted_lines else "none"
-    return (
-        "Please confirm this backtest.\n"
-        f"{summary}\n"
-        f"Required inputs: {required_summary}\n"
-        f"User-selected optional parameters: {user_selected_summary}\n"
-        f"Default assumptions: {defaulted_summary}"
-    )
+    assumptions = [*user_selected_lines, *assumption_lines]
+    assumption_text = f" I will use {', '.join(assumptions)}." if assumptions else ""
+    return f"{summary}{assumption_text} Reply yes to run it, or tell me what to change."
 
 
 def _plain_language_strategy_summary(
@@ -155,25 +155,46 @@ def _plain_language_strategy_summary(
 
     if strategy_type == "buy_and_hold":
         return (
-            f"Argus is about to run a backtest for {assets} "
-            f"as a {strategy_type_label} strategy over {date_range}."
+            f"I read this as a {strategy_type_label} backtest for {assets} over {date_range}."
         )
 
     if strategy_type == "dca_accumulation":
         cadence = _resolved_cadence(strategy, optional_parameters)
         cadence_phrase = f" on a {cadence} cadence" if cadence is not None else ""
         return (
-            f"Argus is about to run a backtest for {assets} "
-            f"as a {strategy_type_label} strategy{cadence_phrase} over {date_range}."
+            f"I read this as a {strategy_type_label} backtest for {assets}{cadence_phrase} over {date_range}."
         )
 
     entry_logic = _format_value(strategy.get("entry_logic"))
     exit_logic = _format_value(strategy.get("exit_logic"))
     return (
-        f"Argus is about to run a backtest for {assets} "
-        f"as an {strategy_type_label} strategy, entering on {entry_logic}, exiting on {exit_logic}, "
-        f"over {date_range}."
+        f"I read this as an {strategy_type_label} backtest for {assets}: buy when {entry_logic}, "
+        f"exit when {exit_logic}, over {date_range}."
     )
+
+
+def _format_optional_assumption(
+    *,
+    field_name: str,
+    parameter: dict[str, Any],
+    strategy: dict[str, Any],
+    strategy_type: str,
+) -> str | None:
+    value = parameter.get("value")
+    if field_name == "initial_capital" and isinstance(value, int | float):
+        return f"${float(value):,.0f} starting capital"
+    if field_name == "timeframe" and value:
+        return f"{value} bars"
+    if field_name == "fees":
+        return "no trading fees" if value in (0, 0.0, "0", "0.0") else f"{value} fees"
+    if field_name == "slippage":
+        return "no slippage" if value in (0, 0.0, "0", "0.0") else f"{value} slippage"
+    if field_name == "engine_options":
+        return None
+    if field_name == "cadence" and strategy_type == "dca_accumulation":
+        cadence = _resolved_cadence(strategy, {}) or value
+        return f"{cadence} cadence" if cadence else None
+    return None
 
 
 def _resolve_strategy_type(
@@ -239,6 +260,10 @@ def _asset_label(value: Any) -> str:
 
 
 def _format_value(value: Any) -> str:
+    if isinstance(value, dict):
+        if {"start", "end"}.intersection(value) or {"from", "to"}.intersection(value):
+            return resolve_date_range(value).display
+        return ", ".join(f"{key}: {nested_value}" for key, nested_value in value.items())
     if isinstance(value, list):
         return ", ".join(str(item) for item in value) if value else "none provided"
     if value is None or value == "":

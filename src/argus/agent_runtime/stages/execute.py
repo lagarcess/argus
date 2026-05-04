@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date, timedelta
 import re
 from typing import Any
 
 from argus.agent_runtime.recovery.policy import should_retry
+from argus.agent_runtime.strategy_contract import (
+    canonical_strategy_type,
+    resolve_date_range,
+)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import ConfirmationPayload, RunState
 from argus.domain.market_data import resolve_asset
@@ -176,6 +179,7 @@ def _build_tool_call_record(
     attempt: int,
     envelope: dict[str, Any],
 ) -> dict[str, Any]:
+    payload = envelope.get("payload")
     return {
         "tool_name": _tool_name(tool),
         "attempt": attempt,
@@ -184,7 +188,7 @@ def _build_tool_call_record(
         "error_message": _as_optional_str(envelope.get("error_message")),
         "retryable": bool(envelope.get("retryable")),
         "capability_context": dict(envelope.get("capability_context") or {}),
-        "payload": envelope.get("payload"),
+        "payload": payload if isinstance(payload, dict) else {},
     }
 
 
@@ -392,13 +396,23 @@ def _resolve_strategy_type(
 ) -> str:
     explicit_strategy_type = strategy.get("strategy_type")
     if isinstance(explicit_strategy_type, str) and explicit_strategy_type:
-        return explicit_strategy_type
+        return canonical_strategy_type(
+            explicit_strategy_type,
+            entry_logic=strategy.get("entry_logic"),
+            exit_logic=strategy.get("exit_logic"),
+            cadence=strategy.get("cadence"),
+        )
 
     extra_parameters = strategy.get("extra_parameters")
     if isinstance(extra_parameters, dict):
         nested_strategy_type = extra_parameters.get("strategy_type")
         if isinstance(nested_strategy_type, str) and nested_strategy_type:
-            return nested_strategy_type
+            return canonical_strategy_type(
+                nested_strategy_type,
+                entry_logic=strategy.get("entry_logic"),
+                exit_logic=strategy.get("exit_logic"),
+                cadence=strategy.get("cadence"),
+            )
         if extra_parameters.get("cadence"):
             return "dca_accumulation"
 
@@ -408,6 +422,10 @@ def _resolve_strategy_type(
     if strategy.get("entry_logic") or strategy.get("exit_logic"):
         return "indicator_threshold"
     return "buy_and_hold"
+
+
+def _normalize_strategy_type(value: str) -> str:
+    return canonical_strategy_type(value)
 
 
 def _resolve_symbol(strategy: dict[str, Any]) -> str:
@@ -420,42 +438,7 @@ def _resolve_symbol(strategy: dict[str, Any]) -> str:
 
 
 def _resolve_date_range(value: Any) -> dict[str, str]:
-    if isinstance(value, dict):
-        start = value.get("start")
-        end = value.get("end")
-        if isinstance(start, str) and isinstance(end, str):
-            return {"start": start, "end": end}
-
-    if isinstance(value, str):
-        match = re.search(
-            r"(?:over the last|last)\s+(?P<count>\d+)\s+"
-            r"(?P<unit>day|days|week|weeks|month|months|year|years)",
-            value,
-            flags=re.IGNORECASE,
-        )
-        if match is not None:
-            count = int(match.group("count"))
-            unit = match.group("unit").lower()
-            end_date = date.today()
-            start_date = end_date - timedelta(days=_unit_days(unit) * count)
-            return {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat(),
-            }
-
-    end_date = date.today()
-    start_date = end_date - timedelta(days=365)
-    return {"start": start_date.isoformat(), "end": end_date.isoformat()}
-
-
-def _unit_days(unit: str) -> int:
-    if unit.startswith("day"):
-        return 1
-    if unit.startswith("week"):
-        return 7
-    if unit.startswith("month"):
-        return 30
-    return 365
+    return resolve_date_range(value).payload
 
 
 def _resolve_entry_rule(

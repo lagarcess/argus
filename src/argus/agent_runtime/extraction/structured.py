@@ -12,6 +12,7 @@ from argus.agent_runtime.state.models import (
     SimplificationOption,
     UnsupportedConstraint,
 )
+from argus.domain.market_data import resolve_asset
 
 
 class StrategyExtractionResult(BaseModel):
@@ -141,6 +142,15 @@ def extract_exit_logic(
 
 
 def extract_strategy_date_range(*, message: str) -> ExtractedFieldValue:
+    since_match = re.search(r"\bsince\s+(\d{4})\b", message, flags=re.IGNORECASE)
+    if since_match is not None:
+        raw_value = since_match.group(0)
+        return ExtractedFieldValue(
+            raw_value=raw_value,
+            normalized_value=raw_value,
+            status="resolved",
+        )
+
     date_range = extract_date_range(message)
     if date_range is None:
         return ExtractedFieldValue(status="missing")
@@ -183,6 +193,27 @@ def detect_unsupported_constraints(
                 explanation="Market-open execution timing is not supported in this runtime slice.",
                 simplification_options=contract.get_simplification_options(
                     "unsupported_time_granularity"
+                ),
+            )
+        )
+    symbols = detect_symbols(lowered)
+    asset_classes = set()
+    for symbol in symbols:
+        try:
+            asset_classes.add(resolve_asset(symbol).asset_class)
+        except Exception:
+            continue
+    if len(asset_classes) > 1:
+        unsupported_constraints.append(
+            UnsupportedConstraint(
+                category="unsupported_asset_mix",
+                raw_value=", ".join(symbols),
+                explanation=(
+                    "I understand that you want to test these assets together, "
+                    "but Argus Alpha cannot run equity and crypto in one simulation yet."
+                ),
+                simplification_options=contract.get_simplification_options(
+                    "unsupported_asset_mix"
                 ),
             )
         )

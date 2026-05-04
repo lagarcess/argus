@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./supabase-client";
+import type { StrategyConfirmationPayload } from "@/components/chat/types";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -163,6 +164,7 @@ export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
+  | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
   | { event: "error"; data: { detail: string } }
   | { event: "done"; data: { message_id: string } };

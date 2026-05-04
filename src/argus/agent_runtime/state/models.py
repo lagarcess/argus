@@ -47,11 +47,23 @@ class ConversationMessage(BaseModel):
 
 
 class StrategySummary(BaseModel):
+    raw_user_phrasing: str | None = None
+    strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
+    asset_class: str | None = None
+    timeframe: str | None = None
+    cadence: str | None = None
     entry_logic: str | None = None
     exit_logic: str | None = None
-    date_range: str | None = None
+    date_range: str | dict[str, Any] | None = None
+    sizing_mode: str | None = None
+    capital_amount: float | None = None
+    position_size: float | None = None
+    risk_rules: list[dict[str, Any]] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    comparison_baseline: str | None = None
+    refinement_of: str | None = None
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -112,6 +124,7 @@ class ArtifactReference(BaseModel):
 class TaskSnapshot(BaseModel):
     latest_task_type: IntentName | None = None
     completed: bool | None = None
+    pending_strategy_summary: StrategySummary | None = None
     confirmed_strategy_summary: StrategySummary | None = None
     latest_backtest_result_reference: ArtifactReference | None = None
     latest_collection_action_reference: ArtifactReference | None = None

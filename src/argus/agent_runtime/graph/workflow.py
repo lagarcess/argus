@@ -18,6 +18,7 @@ from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.stages.interpret import (
     StageResult,
     StructuredArbitrator,
+    StructuredInterpreter,
     interpret_stage,
 )
 from argus.agent_runtime.stages.next_step import next_step_stage
@@ -111,6 +112,7 @@ def build_workflow(
     tool: Any | None = None,
     max_retries: int = 2,
     structured_arbitrator: StructuredArbitrator | None = None,
+    structured_interpreter: StructuredInterpreter | None = None,
 ):
     active_contract = contract or build_default_capability_contract()
     active_tool = tool or DefaultBacktestTool()
@@ -121,6 +123,7 @@ def build_workflow(
         lambda state: _interpret_node(
             state,
             structured_arbitrator=structured_arbitrator,
+            structured_interpreter=structured_interpreter,
         ),
     )
     graph.add_node(
@@ -176,6 +179,8 @@ def build_workflow(
         {
             WorkflowRoute.CLARIFY.value: WorkflowNode.CLARIFY.value,
             WorkflowRoute.CONFIRM.value: WorkflowNode.CONFIRM.value,
+            WorkflowRoute.EXECUTE.value: WorkflowNode.EXECUTE.value,
+            WorkflowRoute.END.value: END,
         },
     )
     graph.add_conditional_edges(
@@ -220,6 +225,7 @@ def _interpret_node(
     state: WorkflowState,
     *,
     structured_arbitrator: StructuredArbitrator | None,
+    structured_interpreter: StructuredInterpreter | None,
 ) -> WorkflowState:
     return _apply_stage_result(
         state,
@@ -228,6 +234,7 @@ def _interpret_node(
             user=_user(state),
             latest_task_snapshot=state.get("latest_task_snapshot"),
             structured_arbitrator=structured_arbitrator,
+            structured_interpreter=structured_interpreter,
         ),
     )
 
@@ -296,7 +303,7 @@ def resolve_workflow_transition(*, result: StageResult) -> WorkflowTransition:
     if outcome is WorkflowStageOutcome.READY_TO_RESPOND:
         return WorkflowTransition(
             outcome=outcome,
-            route=WorkflowRoute.NEXT_STEP,
+            route=WorkflowRoute.END,
         )
     return WorkflowTransition(
         outcome=outcome,

@@ -16,7 +16,7 @@ def test_clarify_asks_only_for_first_missing_required_field() -> None:
 
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "entry_logic"
-    assert "entry logic" in result.patch["assistant_prompt"].lower()
+    assert "trigger the buy" in result.patch["assistant_prompt"].lower()
     assert "exit logic" not in result.patch["assistant_prompt"].lower()
     assert "date range" not in result.patch["assistant_prompt"].lower()
 
@@ -63,7 +63,7 @@ def test_clarify_uses_beginner_guidance_when_no_required_field_is_selected() -> 
 
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] is None
-    assert "one idea" in result.patch["assistant_prompt"].lower()
+    assert "starting point" in result.patch["assistant_prompt"].lower()
 
 
 def test_clarify_groups_multiple_ambiguous_fields() -> None:
@@ -94,6 +94,31 @@ def test_clarify_groups_multiple_ambiguous_fields() -> None:
     assert "interpreted it as" in result.patch["assistant_prompt"].lower()
 
 
+def test_clarify_entry_logic_ambiguity_asks_for_rule_not_none_mapping() -> None:
+    state = RunState.new(
+        current_user_message="What if I bought Apple on significant dips?",
+        recent_thread_history=[],
+    )
+    state.requires_clarification = True
+    state.optional_parameter_status = {
+        "ambiguous_fields": [
+            {
+                "field_name": "entry_logic",
+                "raw_value": "significant dips",
+                "candidate_normalized_value": None,
+                "reason_code": "entry_rule_needs_definition",
+            }
+        ]
+    }
+
+    result = clarify_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_user_reply"
+    assert "buying on significant dips" in result.patch["assistant_prompt"]
+    assert "interpreted it as 'None'" not in result.patch["assistant_prompt"]
+    assert "percent drop" in result.patch["assistant_prompt"]
+
+
 def test_clarify_surfaces_simplification_options_for_unsupported_constraints() -> None:
     state = RunState.new(current_user_message="test", recent_thread_history=[])
     state.requires_clarification = True
@@ -118,6 +143,8 @@ def test_clarify_surfaces_simplification_options_for_unsupported_constraints() -
     assert result.outcome == "await_user_reply"
     assert result.patch["simplification_options"][0]["label"] == "Retry with daily bars"
     assert "not supported" in result.patch["assistant_prompt"].lower()
+    assert "I can Retry with daily bars" in result.patch["assistant_prompt"]
+    assert "Which direction should I take?" in result.patch["assistant_prompt"]
 
 
 def test_clarify_offers_optional_parameters_as_bounded_opt_in() -> None:
@@ -222,7 +249,7 @@ def test_clarify_beginner_guidance_stays_in_idea_shaping_before_optional_opt_in(
 
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] is None
-    assert "one idea or market question" in result.patch["assistant_prompt"].lower()
+    assert "starting point" in result.patch["assistant_prompt"].lower()
     assert "optional settings" not in result.patch["assistant_prompt"].lower()
     assert "optional_parameter_choices" not in result.patch
 
@@ -276,13 +303,29 @@ def test_confirm_stage_includes_defaults_for_undisclosed_optional_fields() -> No
         result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"]["label"]
         == "Initial capital"
     )
-    assert "Argus is about to run a backtest for TSLA" in result.patch["assistant_prompt"]
-    assert "entering on RSI below 30" in result.patch["assistant_prompt"]
-    assert "exiting on RSI above 55" in result.patch["assistant_prompt"]
-    assert "default assumptions" in result.patch["assistant_prompt"].lower()
-    assert "Initial capital: 10000.0" in result.patch["assistant_prompt"]
-    assert "Starting cash for the simulated backtest." in result.patch["assistant_prompt"]
+    assert "I read this as an indicator threshold backtest for TSLA" in result.patch["assistant_prompt"]
+    assert "buy when RSI below 30" in result.patch["assistant_prompt"]
+    assert "exit when RSI above 55" in result.patch["assistant_prompt"]
+    assert "$10,000 starting capital" in result.patch["assistant_prompt"]
+    assert "no trading fees" in result.patch["assistant_prompt"]
     assert "initial_capital=" not in result.patch["assistant_prompt"]
+
+
+def test_confirm_stage_formats_structured_date_range_in_prompt() -> None:
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    state.intent = "backtest_execution"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Bitcoin from January 1 last year.",
+        asset_universe=["BTC"],
+        date_range={"start": "2025-01-01", "end": "today"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    assert "{'start'" not in result.patch["assistant_prompt"]
+    assert "January 1, 2025" in result.patch["assistant_prompt"]
 
 
 def test_confirm_stage_does_not_enter_approval_when_required_inputs_are_missing() -> None:
@@ -334,10 +377,9 @@ def test_confirm_stage_prefers_user_optional_values_over_defaults() -> None:
         result.patch["confirmation_payload"]["optional_parameters"]["timeframe"]["source"]
         == "user"
     )
-    assert "user-selected optional parameters" in result.patch["assistant_prompt"].lower()
-    assert "Initial capital: 25000.0 (user;" in result.patch["assistant_prompt"]
-    assert "Timeframe: 4h (user;" in result.patch["assistant_prompt"]
-    assert "Bar interval used for the simulation." in result.patch["assistant_prompt"]
+    assert "$25,000 starting capital" in result.patch["assistant_prompt"]
+    assert "4h bars" in result.patch["assistant_prompt"]
+    assert "Reply yes to run it" in result.patch["assistant_prompt"]
     assert "timeframe=" not in result.patch["assistant_prompt"]
 
 
