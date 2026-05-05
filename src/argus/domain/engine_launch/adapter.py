@@ -4,8 +4,11 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from loguru import logger
+
 from argus.domain.engine import (
     build_result_card,
+    build_result_chart,
     classify_symbol,
     compute_alpha_metrics,
     validate_backtest_config,
@@ -101,7 +104,7 @@ def _run_indicator_threshold(
     validate_backtest_config(config)
 
     metrics = compute_alpha_metrics(config)
-    result_card = build_result_card(config, metrics, language=language)
+    result_card = _build_launch_result_card(config, metrics, language=language)
     benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
     envelope = build_success_envelope(
         resolved_strategy={
@@ -177,7 +180,7 @@ def _run_dca_accumulation(
     _validate_launch_config(config)
 
     metrics = compute_alpha_metrics(config)
-    result_card = build_result_card(config, metrics, language=language)
+    result_card = _build_launch_result_card(config, metrics, language=language)
     benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
     envelope = build_success_envelope(
         resolved_strategy={
@@ -246,7 +249,7 @@ def _run_buy_and_hold(
     validate_backtest_config(config)
 
     metrics = compute_alpha_metrics(config)
-    result_card = build_result_card(config, metrics, language=language)
+    result_card = _build_launch_result_card(config, metrics, language=language)
     benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
     envelope = build_success_envelope(
         resolved_strategy={
@@ -314,6 +317,25 @@ def _build_periodic_config(
         "benchmark_symbol": benchmark_asset.symbol,
         "parameters": {"dca_cadence": cadence},
     }
+
+
+def _build_launch_result_card(
+    config: dict[str, Any],
+    metrics: dict[str, Any],
+    *,
+    language: str,
+) -> dict[str, Any]:
+    try:
+        chart = build_result_chart(config)
+    except Exception as exc:
+        logger.warning("Result chart build failed", error=str(exc))
+        chart = None
+    try:
+        return build_result_card(config, metrics, language=language, chart=chart)
+    except TypeError as exc:
+        if "chart" not in str(exc):
+            raise
+        return build_result_card(config, metrics, language=language)
 
 
 def _validate_launch_config(config: dict[str, Any]) -> None:

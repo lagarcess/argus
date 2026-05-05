@@ -467,18 +467,72 @@ Immutable simulation result.
     ],
     "actions": [
       {
-        "type": "add_to_collection",
-        "label": "Add strategy to collection"
+        "type": "show_breakdown",
+        "label": "Show a breakdown"
       },
       {
-        "type": "try_new_strategy",
-        "label": "Try a new strategy"
+        "type": "save_strategy",
+        "label": "Save strategy"
+      },
+      {
+        "type": "refine_strategy",
+        "label": "Refine strategy"
       }
-    ]
+    ],
+    "chart": {
+      "kind": "portfolio_equity",
+      "series": [
+        { "time": "2022-01-03", "value": 10000.0 },
+        { "time": "2022-01-04", "value": 10042.5 }
+      ],
+      "markers": [
+        {
+          "time": "2022-01-03",
+          "type": "entry",
+          "label": "Buy NVDA, BYD",
+          "symbols": ["NVDA", "BYD"]
+        }
+      ],
+      "currency": "USD",
+      "base_value": 10000.0,
+      "attribution": "TradingView Lightweight Charts"
+    }
   },
+  "chart": {
+    "kind": "portfolio_equity",
+    "series": [
+      { "time": "2022-01-03", "value": 10000.0 },
+      { "time": "2022-01-04", "value": 10042.5 }
+    ],
+    "markers": [
+      {
+        "time": "2022-01-03",
+        "type": "entry",
+        "label": "Buy NVDA, BYD",
+        "symbols": ["NVDA", "BYD"]
+      }
+    ],
+    "currency": "USD",
+    "base_value": 10000.0,
+    "attribution": "TradingView Lightweight Charts"
+  },
+  "trades": [
+    {
+      "time": "2022-01-03",
+      "type": "entry",
+      "label": "Buy NVDA, BYD",
+      "symbols": ["NVDA", "BYD"]
+    }
+  ],
   "created_at": "timestamp"
 }
 ```
+
+**Result chart contract:**
+- `chart.kind` is currently `portfolio_equity`.
+- `chart.series` is the aggregate portfolio equity curve. Multi-symbol runs must use the equal-weight portfolio curve, not a symbol comparison chart.
+- `chart.markers` contains capped entry/exit events derived from executable signals.
+- The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 
 ---
 

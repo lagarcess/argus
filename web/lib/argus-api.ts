@@ -28,6 +28,20 @@ export type ApiMetricRow = {
   value: string;
 };
 
+export type ResultChartPayload = {
+  kind: "portfolio_equity";
+  series: Array<{ time: string; value: number }>;
+  markers?: Array<{
+    time: string;
+    type: "entry" | "exit";
+    label: string;
+    symbols?: string[];
+  }>;
+  currency?: string;
+  base_value?: number | null;
+  attribution?: string;
+};
+
 export type ConversationResultCard = {
   title: string;
   symbols?: string[];
@@ -42,6 +56,7 @@ export type ConversationResultCard = {
   benchmark_note?: string;
   assumptions: string[];
   actions: ChatActionOption[];
+  chart?: ResultChartPayload | null;
 };
 
 // ─── Domain objects ──────────────────────────────────────────────────────────
@@ -61,6 +76,8 @@ export type BacktestRun = {
   };
   config_snapshot: Record<string, unknown>;
   conversation_result_card: ConversationResultCard;
+  chart?: ResultChartPayload | null;
+  trades?: Record<string, unknown>[] | null;
   created_at: string;
 };
 
@@ -223,6 +240,7 @@ export function resultCardFromConversationCard(
     runId: run?.id,
     strategyId: run?.strategy_id ?? null,
     actions: card.actions,
+    chart: card.chart ?? null,
   };
 }
 

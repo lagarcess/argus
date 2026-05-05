@@ -106,7 +106,7 @@ function latestInputActions(messages: Message[]) {
   const latestAiWithActions = [...messages]
     .reverse()
     .find((message) => message.role === "ai" && message.actions?.length);
-  return latestAiWithActions?.actions ?? [];
+  return (latestAiWithActions?.actions ?? []).filter((action) => action.type !== "save_strategy");
 }
 
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
@@ -137,7 +137,7 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         role: "ai",
         kind: "strategy_result",
         content: m.content,
-        result: card,
+        result: { ...card, actions: restoredActions },
         actions: restoredActions,
       };
     }
@@ -273,7 +273,7 @@ export default function ChatInterface() {
     return merged;
   };
 
-  const resultActionsForRun = (actions: ChatActionOption[], run: BacktestRun): ChatActionOption[] =>
+  const hydrateResultActionsForRun = (actions: ChatActionOption[], run: BacktestRun): ChatActionOption[] =>
     actions.map((action) => ({
       id: action.id || action.type || action.label,
       label: action.label,
@@ -290,6 +290,9 @@ export default function ChatInterface() {
       },
       value: action.value,
     }));
+
+  const visibleInputActions = (actions: ChatActionOption[]) =>
+    actions.filter((action) => action.type !== "save_strategy");
 
   const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({
@@ -666,9 +669,10 @@ export default function ChatInterface() {
         }
         if (event.event === "result") {
           const run = event.data.run as BacktestRun;
-          const card = resultCardFromRun(run);
-          const resultActions = resultActionsForRun(card.actions ?? [], run);
-          setInputActions(resultActions);
+          const baseCard = resultCardFromRun(run);
+          const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
+          const card = { ...baseCard, actions: resultActions };
+          setInputActions(visibleInputActions(resultActions));
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -1509,9 +1513,9 @@ export default function ChatInterface() {
                         </button>
                       </div>
                     )}
-                    {inputActions.length > 0 && !streamStatus && (
+                    {visibleInputActions(inputActions).length > 0 && !streamStatus && (
                       <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {inputActions.map((action) => (
+                        {visibleInputActions(inputActions).map((action) => (
                           <button
                             key={action.id ?? action.type ?? action.label}
                             type="button"

@@ -31,7 +31,12 @@ describe("Argus Alpha frontend contract", () => {
         ],
         assumptions: ["Long-only.", "Benchmark: SPY."],
         actions: [{ type: "save_strategy", label: "Save strategy" }],
-        benchmark_note: "Long-only. Benchmark: SPY."
+        benchmark_note: "Long-only. Benchmark: SPY.",
+        chart: {
+          kind: "portfolio_equity",
+          series: [{ time: "2026-01-02", value: 10000 }],
+          attribution: "TradingView Lightweight Charts",
+        },
       },
     });
 
@@ -39,6 +44,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(result.period).toBe("April 23, 2025 to April 23, 2026");
     expect(result.metrics).toEqual([{ label: "Total Return (%)", value: "+12.4%" }]);
     expect(result.benchmarkNote).toBe("Long-only. Benchmark: SPY.");
+    expect(result.chart?.kind).toBe("portfolio_equity");
   });
 
   test("collections remain launch-gated instead of removed", () => {
@@ -70,10 +76,25 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("content: m.content");
     expect(message).toContain('message.kind === "strategy_result"');
     expect(message).toContain("message.content &&");
-    expect(message).toContain("<StrategyResultCard result={message.result} />");
-    expect(message.indexOf("<StrategyResultCard result={message.result} />")).toBeLessThan(
+    expect(message).toContain("<StrategyResultCard result={message.result} onAction={onAction} />");
+    expect(message.indexOf("<StrategyResultCard result={message.result} onAction={onAction} />")).toBeLessThan(
       message.indexOf("message.content &&"),
     );
+  });
+
+  test("result card renders save inside the card and charts portfolio equity", () => {
+    const card = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
+    const chart = readFileSync(join(root, "components/chat/ResultEquityChart.tsx"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(card).toContain("<ResultEquityChart chart={result.chart} />");
+    expect(card).toContain('action.type === "save_strategy"');
+    expect(card).toContain("<Save");
+    expect(chat).toContain('action.type !== "save_strategy"');
+    expect(chart).toContain("BaselineSeries");
+    expect(chart).toContain("createSeriesMarkers");
+    expect(chart).toContain("attributionLogo: true");
+    expect(chart).toContain('data-testid="result-equity-chart"');
   });
 
   test("chat renders structured confirmation cards with input actions", () => {

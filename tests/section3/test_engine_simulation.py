@@ -436,6 +436,33 @@ def test_compute_alpha_metrics_preserves_contract_shape_multi_symbol() -> None:
     assert metrics["aggregate"]["efficiency"]["total_trades"] >= 2
 
 
+def test_build_result_chart_uses_aggregate_portfolio_curve() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL", "MSFT"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 2),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+        }
+    )
+
+    chart = engine.build_result_chart(config)
+
+    assert chart["kind"] == "portfolio_equity"
+    assert chart["attribution"] == "TradingView Lightweight Charts"
+    assert len(chart["series"]) >= 2
+    assert chart["series"][0]["value"] == 10000
+    assert chart["markers"][0]["type"] == "entry"
+    assert chart["markers"][0]["label"] == "Buy AAPL, MSFT"
+
+
 def test_build_result_card_actions_by_symbol_count() -> None:
     config = {
         "template": "rsi_mean_reversion",

@@ -3,6 +3,27 @@ export type StrategyResultMetric = {
   value: string;
 };
 
+export type ResultChartPoint = {
+  time: string;
+  value: number;
+};
+
+export type ResultChartMarker = {
+  time: string;
+  type: "entry" | "exit";
+  label: string;
+  symbols?: string[];
+};
+
+export type ResultChartPayload = {
+  kind: "portfolio_equity";
+  series: ResultChartPoint[];
+  markers?: ResultChartMarker[];
+  currency?: string;
+  base_value?: number | null;
+  attribution?: string;
+};
+
 export type ChatActionOption = {
   id?: string;
   label: string;
@@ -42,6 +63,7 @@ export type StrategyResultPayload = {
   runId?: string;
   strategyId?: string | null;
   actions?: ChatActionOption[];
+  chart?: ResultChartPayload | null;
 };
 
 export type StrategyConfirmationRow = {

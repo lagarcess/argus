@@ -71,6 +71,7 @@ from argus.domain.backtest_state_machine import (
 )
 from argus.domain.engine import (
     build_result_card,
+    build_result_chart,
     classify_symbol,
     compute_alpha_metrics,
     default_benchmark,
@@ -563,6 +564,10 @@ def _build_runtime_backtest_run(
         "resolved_parameters": resolved_parameters_dict,
     }
 
+    chart = (
+        result_card.get("chart") if isinstance(result_card.get("chart"), dict) else None
+    )
+
     return BacktestRun(
         id=store.new_id(),
         conversation_id=conversation_id,
@@ -576,8 +581,8 @@ def _build_runtime_backtest_run(
         config_snapshot=config_snapshot,
         conversation_result_card=result_card,
         created_at=utcnow(),
-        chart=None,
-        trades=[],
+        chart=chart,
+        trades=list(chart.get("markers", [])) if isinstance(chart, dict) else [],
     )
 
 
@@ -1396,6 +1401,11 @@ def create_run_from_payload(
         metrics = compute_alpha_metrics(config)
     except ValueError as exc:
         _raise_backtest_problem(request, str(exc))
+    try:
+        chart = build_result_chart(config)
+    except Exception as exc:
+        logger.warning("Result chart build failed", error=str(exc))
+        chart = None
     now = utcnow()
     run = BacktestRun(
         id=store.new_id(),
@@ -1409,17 +1419,14 @@ def create_run_from_payload(
         metrics=metrics,
         config_snapshot=config,
         conversation_result_card=build_result_card(
-            config, metrics, language=language or (user.language if user else "en")
+            config,
+            metrics,
+            language=language or (user.language if user else "en"),
+            chart=chart,
         ),
         created_at=now,
-        chart={
-            "equity_curve": [
-                config["starting_capital"],
-                config["starting_capital"]
-                + metrics["aggregate"]["performance"]["profit"],
-            ]
-        },
-        trades=[],
+        chart=chart,
+        trades=list(chart.get("markers", [])) if isinstance(chart, dict) else [],
     )
     if persist_in_memory:
         store.backtest_runs[run.id] = run
