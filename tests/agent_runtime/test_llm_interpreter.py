@@ -285,6 +285,58 @@ def test_llm_interpreter_drops_stale_unsupported_copy_for_executable_rsi_thresho
     assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
 
 
+def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="refine",
+        user_goal_summary="User wants to define Apple dip buying.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="What if I bought Apple after big drops?",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Buy Apple after big drops.",
+            asset_universe=["AAPL"],
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="What if I bought Apple after big drops?",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="strategy_drafting",
+                completed=False,
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="dca_accumulation",
+                    strategy_thesis="Buy a fixed amount every month.",
+                    cadence="monthly",
+                    capital_amount=500,
+                ),
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.strategy_type == "indicator_threshold"
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.cadence is None
+    assert strategy.capital_amount is None
+
+
 def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 

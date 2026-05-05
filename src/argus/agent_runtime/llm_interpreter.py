@@ -300,6 +300,11 @@ def _merge_prior_strategy(
 ) -> None:
     if request.latest_task_snapshot is None or response.task_relation != "refine":
         return
+    if _current_turn_starts_fresh_strategy(request.current_user_message):
+        response.task_relation = "new_task"
+        if "semantic_boundary_new_strategy" not in response.reason_codes:
+            response.reason_codes.append("semantic_boundary_new_strategy")
+        return
     prior = (
         request.latest_task_snapshot.pending_strategy_summary
         or request.latest_task_snapshot.confirmed_strategy_summary
@@ -314,6 +319,23 @@ def _merge_prior_strategy(
         setattr(merged, key, value)
     for key, value in merged.model_dump(mode="python").items():
         setattr(strategy, key, value)
+
+
+def _current_turn_starts_fresh_strategy(message: str) -> bool:
+    lowered = " ".join(message.lower().strip().split())
+    if not lowered:
+        return False
+    if re.search(r"\b(actually|instead|keep|same|change|modify|make that)\b", lowered):
+        return False
+    return bool(
+        re.search(
+            r"\b(what if|backtest|test|try|simulate|bought|buy|invest)\b",
+            lowered,
+        )
+        and re.search(
+            r"\b(after|when|every|over|since|from|hold|dca|rsi|dip|drops?)\b", lowered
+        )
+    )
 
 
 def _validate_capability_boundaries(
