@@ -152,6 +152,7 @@ class StructuredInterpretation(BaseModel):
     reason_codes: list[str] = Field(default_factory=list)
     ambiguous_fields: list[AmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[UnsupportedConstraint] = Field(default_factory=list)
+    uses_latest_result_context: bool | None = None
 
 
 class InterpretationRequest(BaseModel):
@@ -202,14 +203,6 @@ def interpret_stage(
     if confirmation_action_result is not None:
         return confirmation_action_result
 
-    contextual_response_result = _contextual_response_stage_result_if_applicable(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-    )
-    if contextual_response_result is not None:
-        return contextual_response_result
-
     social_opener_result = _social_opener_stage_result_if_applicable(
         state=state,
         user=user,
@@ -227,6 +220,14 @@ def interpret_stage(
     )
     if structured_result is not None:
         return structured_result
+
+    contextual_response_result = _contextual_response_stage_result_if_applicable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+    )
+    if contextual_response_result is not None:
+        return contextual_response_result
 
     llm_reason_codes = _structured_interpreter_reason_codes(structured_interpreter)
     signals = extract_signals(
@@ -791,7 +792,11 @@ def _structured_stage_result(
         or missing_required_fields
     )
     decision = InterpretDecision(
-        intent=interpretation.intent,
+        intent=_guard_structured_result_intent(
+            interpretation,
+            message=state.current_user_message,
+            snapshot=latest_task_snapshot,
+        ),
         task_relation=interpretation.task_relation,
         requires_clarification=requires_clarification,
         user_goal_summary=interpretation.user_goal_summary,
@@ -1053,6 +1058,14 @@ def _is_result_explanation_followup(
     message: str,
     snapshot: TaskSnapshot | None,
 ) -> bool:
+    return _result_context_relevance(message=message, snapshot=snapshot)
+
+
+def _result_context_relevance(
+    *,
+    message: str,
+    snapshot: TaskSnapshot | None,
+) -> bool:
     if snapshot is None:
         return False
     has_result_context = (
@@ -1063,14 +1076,52 @@ def _is_result_explanation_followup(
     if not has_result_context:
         return False
     lowered = message.lower()
+    result_terms = (
+        "result",
+        "results",
+        "metric",
+        "metrics",
+        "return",
+        "benchmark",
+        "drawdown",
+        "win rate",
+        "trade count",
+        "underperform",
+        "outperform",
+        "backtest",
+        "simulation",
+        "tested",
+    )
+    if not any(term in lowered for term in result_terms):
+        return False
     return bool(
         re.search(
             r"\b(what am i looking at|what are these metrics|explain.*metrics|"
-            r"complete novice|beginner|why did|why .*underperform|assumptions?|"
+            r"why did|why .*underperform|assumptions?|"
             r"limitations?|what exactly.*tested|what does .*mean)\b",
             lowered,
         )
     )
+
+
+def _guard_structured_result_intent(
+    interpretation: StructuredInterpretation,
+    *,
+    message: str,
+    snapshot: TaskSnapshot | None,
+) -> IntentName:
+    if interpretation.intent != "results_explanation":
+        return interpretation.intent
+    if interpretation.uses_latest_result_context is True:
+        return "results_explanation"
+    if interpretation.uses_latest_result_context is False:
+        return "conversation_followup"
+    if _result_context_relevance(
+        message=message,
+        snapshot=snapshot,
+    ):
+        return "results_explanation"
+    return "conversation_followup"
 
 
 def _result_followup_response(lowered_message: str) -> str:

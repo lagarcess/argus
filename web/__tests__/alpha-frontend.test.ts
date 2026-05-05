@@ -95,6 +95,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("createSeriesMarkers");
     expect(chart).toContain("attributionLogo: true");
     expect(chart).toContain('data-testid="result-equity-chart"');
+    expect(chart).toContain("normalizeChartTime");
   });
 
   test("chat renders structured confirmation cards with input actions", () => {

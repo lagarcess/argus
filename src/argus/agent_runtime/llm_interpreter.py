@@ -82,6 +82,7 @@ class LLMInterpretationResponse(BaseModel):
     candidate_strategy_draft: LLMStrategyDraft = Field(default_factory=LLMStrategyDraft)
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
+    uses_latest_result_context: bool | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     reason_codes: list[str] = Field(default_factory=list)
     ambiguous_fields: list[LLMAmbiguousField] = Field(default_factory=list)
@@ -186,7 +187,13 @@ class OpenRouterStructuredInterpreter:
             "For product questions or education, set assistant_response and do not "
             "force a backtest. Keep prose concise, no emoji, no decorative markdown, "
             "and no generic chatbot openers. For unsupported requests, acknowledge the understood "
-            "intent, explain the limitation, and offer executable simplifications."
+            "intent, explain the limitation, and offer executable simplifications.\n\n"
+            "Treat prior result state as optional context, not the active topic by default. "
+            "Set uses_latest_result_context=true only when the latest user message is semantically "
+            "about the latest run/result, such as metrics, return, benchmark, drawdown, assumptions "
+            "in the backtest, underperformance, or what exactly was tested. If the user asks for "
+            "beginner onboarding, product help, a concept explanation, or a new idea, set it false "
+            "and do not classify as results_explanation just because a completed run exists."
         )
 
     def _to_runtime_interpretation(
@@ -218,6 +225,7 @@ class OpenRouterStructuredInterpreter:
             reason_codes=list(response.reason_codes),
             ambiguous_fields=ambiguous,
             unsupported_constraints=unsupported,
+            uses_latest_result_context=response.uses_latest_result_context,
         )
 
 

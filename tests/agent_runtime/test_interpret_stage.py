@@ -7,6 +7,7 @@ from argus.agent_runtime.stages.interpret import (
     interpret_stage,
 )
 from argus.agent_runtime.state.models import (
+    ArtifactReference,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -321,6 +322,87 @@ def test_interpret_product_question_returns_conversational_response_not_opener()
     assert "buy and hold" in result.patch["assistant_response"].lower()
     assert "recurring" in result.patch["assistant_response"].lower()
     assert result.decision.intent == "conversation_followup"
+
+
+def test_interpret_beginner_walkthrough_ignores_stale_result_context() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=True,
+        confirmed_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Google over the past year.",
+            asset_universe=["GOOGL"],
+            date_range="past year",
+        ),
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+        ),
+    )
+    state = RunState.new(
+        current_user_message="walk me through it, what do i need to do? im a beginner",
+        recent_thread_history=[
+            {"role": "user", "content": "Hey what can you do? I'm new here"},
+            {
+                "role": "assistant",
+                "content": "I help you describe an investing idea in plain English.",
+            },
+        ],
+    )
+
+    result = interpret_stage(state=state, user=user, latest_task_snapshot=snapshot)
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.intent == "conversation_followup"
+    assert (
+        "metrics are a compact readout" not in result.patch["assistant_response"].lower()
+    )
+    assert "testing investing ideas" in result.patch["assistant_response"].lower()
+    assert "name an asset" in result.patch["assistant_response"].lower()
+
+
+def test_structured_result_intent_requires_latest_result_relevance() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=True,
+        confirmed_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Google over the past year.",
+            asset_universe=["GOOGL"],
+            date_range="past year",
+        ),
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+        ),
+    )
+    state = RunState.new(
+        current_user_message="walk me through it, what do i need to do? im a beginner",
+        recent_thread_history=[],
+    )
+
+    def stale_result_interpreter(_request: object) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="results_explanation",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User needs onboarding help.",
+            assistant_response="I can walk you through the product from the beginning.",
+            uses_latest_result_context=False,
+        )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=snapshot,
+        structured_interpreter=stale_result_interpreter,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.intent == "conversation_followup"
+    assert "walk you through" in result.patch["assistant_response"].lower()
 
 
 def test_interpret_greeting_never_enters_asset_slot_flow_with_llm() -> None:

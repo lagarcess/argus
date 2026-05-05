@@ -10,6 +10,10 @@ from argus.agent_runtime.state.models import ResponseProfileOverrides, TaskSnaps
 BEGINNER_PATTERNS = (
     r"don't know anything about finance",
     r"\bnew to (investing|trading|finance)\b",
+    r"\bnew here\b",
+    r"\bi(?:'| a)?m a beginner\b",
+    r"\bwalk me through\b",
+    r"\bwhat do i need to do\b",
     r"\bwhat can you do\b",
     r"\bhelp me understand\b",
 )

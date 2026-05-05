@@ -34,7 +34,7 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
   const data = useMemo<BaselineData<Time>[]>(
     () =>
       chart.series.map((point) => ({
-        time: point.time as Time,
+        time: normalizeChartTime(point.time) as Time,
         value: point.value,
       })),
     [chart.series],
@@ -42,7 +42,7 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
   const eventByTime = useMemo(() => {
     const map = new Map<string, string>();
     for (const marker of chart.markers ?? []) {
-      map.set(marker.time, marker.label);
+      map.set(normalizeChartTime(marker.time), marker.label);
     }
     return map;
   }, [chart.markers]);
@@ -72,7 +72,7 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       },
       timeScale: {
         borderVisible: false,
-        timeVisible: chart.series.some((point) => point.time.includes("T")),
+        timeVisible: data.some((point) => String(point.time).includes("T")),
         secondsVisible: false,
         rightOffset: 4,
         barSpacing: data.length > 240 ? 4 : 7,
@@ -116,7 +116,7 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
     createSeriesMarkers(
       series as ISeriesApi<"Baseline", Time>,
       (chart.markers ?? []).map((marker) => ({
-        time: marker.time as Time,
+        time: normalizeChartTime(marker.time) as Time,
         position: marker.type === "entry" ? "belowBar" : "aboveBar",
         color: marker.type === "entry" ? "#315d97" : "#a98b2d",
         shape: marker.type === "entry" ? "arrowUp" : "arrowDown",
@@ -177,4 +177,12 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       )}
     </div>
   );
+}
+
+function normalizeChartTime(value: string) {
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const dateOnly = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/);
+  if (dateOnly) return dateOnly[1];
+  return trimmed;
 }
