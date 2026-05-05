@@ -399,6 +399,13 @@ def _runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any]
                 "presentation": "confirmation",
                 "payload": {},
             },
+            {
+                "id": "cancel-confirmation",
+                "type": "cancel_confirmation",
+                "label": "Cancel",
+                "presentation": "confirmation",
+                "payload": {},
+            },
         ],
     }
 
@@ -2457,7 +2464,7 @@ def _chat_request_message(payload: ChatStreamRequest) -> str:
         "cancel_confirmation": "cancel backtest",
         "show_breakdown": "show a detailed breakdown of this result",
         "refine_strategy": "refine this strategy",
-        "add_to_collection": "add this result to a collection",
+        "save_strategy": "save this strategy",
     }
     return action_messages[action_type]
 
@@ -2511,6 +2518,72 @@ def _run_for_result_action(
         user_id=user.id,
         conversation_id=conversation_id,
     )
+
+
+def _strategy_template_from_run(run: BacktestRun) -> str:
+    template = str(run.config_snapshot.get("template") or "buy_and_hold")
+    supported_templates = {
+        "buy_and_hold",
+        "buy_the_dip",
+        "rsi_mean_reversion",
+        "moving_average_crossover",
+        "dca_accumulation",
+        "momentum_breakout",
+        "trend_follow",
+    }
+    return template if template in supported_templates else "buy_and_hold"
+
+
+def _save_strategy_from_run(*, user: User, run: BacktestRun) -> Strategy:
+    if run.strategy_id:
+        existing = (
+            supabase_gateway.get_strategy(user_id=user.id, strategy_id=run.strategy_id)
+            if supabase_gateway is not None
+            else store.strategies.get(run.strategy_id)
+        )
+        if existing is not None:
+            return existing
+
+    now = utcnow()
+    template = _strategy_template_from_run(run)
+    strategy_name = (
+        run.conversation_result_card.get("title") or f"{', '.join(run.symbols)} idea"
+    )
+    parameters = dict(run.config_snapshot)
+    payload = {
+        "name": strategy_name,
+        "name_source": "ai_generated",
+        "template": template,
+        "asset_class": run.asset_class,
+        "symbols": run.symbols,
+        "parameters": parameters,
+        "metrics_preferences": [
+            "total_return_pct",
+            "max_drawdown_pct",
+            "benchmark_delta",
+        ],
+        "benchmark_symbol": run.benchmark_symbol,
+        "conversation_id": run.conversation_id,
+    }
+    if supabase_gateway is not None:
+        strategy = supabase_gateway.create_strategy(user_id=user.id, payload=payload)
+    else:
+        strategy = Strategy(
+            id=store.new_id(),
+            name=strategy_name,
+            name_source="ai_generated",
+            template=template,  # type: ignore[arg-type]
+            asset_class=run.asset_class,
+            symbols=run.symbols,
+            parameters=parameters,
+            metrics_preferences=payload["metrics_preferences"],
+            benchmark_symbol=run.benchmark_symbol,
+            created_at=now,
+            updated_at=now,
+        )
+        store.strategies[strategy.id] = strategy
+    run.strategy_id = strategy.id
+    return strategy
 
 
 def _result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
@@ -2769,6 +2842,39 @@ def chat_stream(
                 content=follow_up,
             )
             yield sse("token", {"text": follow_up})
+            yield sse("done", {"message_id": assistant_message.id})
+            return
+
+        if payload.action is not None and payload.action.type == "save_strategy":
+            run = _run_for_result_action(
+                payload=payload,
+                user=user,
+                conversation_id=conversation.id,
+            )
+            metadata: dict[str, Any] = {
+                "conversation_mode": "result_review",
+                "chat_action": payload.action.model_dump(mode="python"),
+            }
+            if run is None:
+                assistant_text = (
+                    "I could not find the completed backtest to save. Run the "
+                    "strategy again, then save it from the result card."
+                )
+            else:
+                strategy = _save_strategy_from_run(user=user, run=run)
+                metadata["latest_run_id"] = run.id
+                metadata["result_run_id"] = run.id
+                metadata["result_strategy_id"] = strategy.id
+                assistant_text = f"Saved {strategy.name} to Strategies."
+            assistant_message = _create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=assistant_text,
+                metadata=metadata,
+            )
+            yield sse("status", {"status": "ready_to_respond"})
+            yield sse("token", {"text": assistant_text})
             yield sse("done", {"message_id": assistant_message.id})
             return
 

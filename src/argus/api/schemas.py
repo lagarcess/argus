@@ -278,8 +278,8 @@ ChatActionType = Literal[
     "adjust_assumptions",
     "cancel_confirmation",
     "show_breakdown",
-    "add_to_collection",
     "refine_strategy",
+    "save_strategy",
 ]
 
 

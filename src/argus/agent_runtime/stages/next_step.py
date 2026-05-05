@@ -6,7 +6,7 @@ from argus.agent_runtime.state.models import RunState
 SUCCESS_NEXT_ACTIONS = [
     "refine_strategy",
     "compare_benchmark",
-    "save_to_collection",
+    "save_strategy",
 ]
 FAILURE_NEXT_ACTIONS = [
     "provide_missing_details",

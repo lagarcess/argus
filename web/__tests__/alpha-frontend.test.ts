@@ -30,7 +30,7 @@ describe("Argus Alpha frontend contract", () => {
           { key: "total_return_pct", label: "Total Return (%)", value: "+12.4%" },
         ],
         assumptions: ["Long-only.", "Benchmark: SPY."],
-        actions: [{ type: "add_to_collection", label: "Add strategy to collection" }],
+        actions: [{ type: "save_strategy", label: "Save strategy" }],
         benchmark_note: "Long-only. Benchmark: SPY."
       },
     });
@@ -41,7 +41,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(result.benchmarkNote).toBe("Long-only. Benchmark: SPY.");
   });
 
-  test("chat shell uses Collections terminology instead of Portfolios", () => {
+  test("collections remain launch-gated instead of removed", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const files = [
       chat,
@@ -49,7 +49,8 @@ describe("Argus Alpha frontend contract", () => {
     ].join("\n");
 
     expect(files).toContain("CollectionsView");
-    expect(files).toContain("common.add_to_collection");
+    expect(chat).toContain("NEXT_PUBLIC_COLLECTIONS_ENABLED");
+    expect(chat).toContain("collectionsEnabled");
     expect(files.toLowerCase()).not.toContain("portfolio");
   });
 
@@ -58,7 +59,7 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain('aria-label="Chat options"');
     expect(chat).toContain("chat.view_history");
-    expect(chat).toContain("common.add_to_collection");
+    expect(chat).toContain("{collectionsEnabled && (");
     expect(chat).not.toContain('aria-label="Archived chats"');
   });
 

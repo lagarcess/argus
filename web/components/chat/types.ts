@@ -14,8 +14,8 @@ export type ChatActionOption = {
     | "adjust_assumptions"
     | "cancel_confirmation"
     | "show_breakdown"
-    | "add_to_collection"
-    | "refine_strategy";
+    | "refine_strategy"
+    | "save_strategy";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
 };

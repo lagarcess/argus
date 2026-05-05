@@ -71,6 +71,7 @@ const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 
 export default function ChatInterface() {
   const { t, i18n } = useTranslation();
+  const collectionsEnabled = process.env.NEXT_PUBLIC_COLLECTIONS_ENABLED === "true";
 
   const [starterActions, setStarterActions] = useState<ChatActionOption[]>([]);
   const onboardingChoices = useMemo<OnboardingChoice[]>(
@@ -201,7 +202,9 @@ export default function ChatInterface() {
       cursor: nextCursor ?? undefined,
     });
     const filtered = items.filter(
-      (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
+      (item) =>
+        !(item.type === "chat" && item.subtitle === "No messages yet") &&
+        (collectionsEnabled || item.type !== "collection"),
     );
     setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
     setHistoryNextCursor(next_cursor);
@@ -247,7 +250,9 @@ export default function ChatInterface() {
       searchGlobal({ q: query, limit: 20 })
         .then(({ items, next_cursor }) => {
           if (cancelled) return;
-          setSearchResults(items);
+          setSearchResults(
+            collectionsEnabled ? items : items.filter((item) => item.type !== "collection"),
+          );
           setSearchNextCursor(next_cursor);
         })
         .catch(() => {
@@ -265,7 +270,7 @@ export default function ChatInterface() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [searchText, currentView]);
+  }, [searchText, currentView, collectionsEnabled]);
 
   const loadMoreSearch = async () => {
     const query = searchText.trim();
@@ -280,7 +285,10 @@ export default function ChatInterface() {
       setSearchResults((prev) => {
         const seen = new Set(prev.map((item) => `${item.type}:${item.id}`));
         const merged = [...prev];
-        for (const item of items) {
+        const visibleItems = collectionsEnabled
+          ? items
+          : items.filter((item) => item.type !== "collection");
+        for (const item of visibleItems) {
           const key = `${item.type}:${item.id}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -736,7 +744,7 @@ export default function ChatInterface() {
 
   const handleAction = (action: ChatActionOption) => {
     const value = action.value ?? "";
-    if (action.type === "add_to_collection" || value.startsWith("/action:add-to-collection:")) {
+    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
       if (action.payload) {
         setCollectionPickerTarget({
           runId: String(action.payload.run_id ?? ""),
@@ -753,7 +761,7 @@ export default function ChatInterface() {
       void startNewChat();
       return;
     }
-    if (value.startsWith("/action:add-to-collection:")) {
+    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
       // Format: /action:add-to-collection:<runId>:<strategyId>:<symbols>:<assetClass>
       const parts = value.split(":");
       const runId = parts[2];
@@ -924,20 +932,22 @@ export default function ChatInterface() {
             </span>
           </button>
 
-          <button
-            onClick={() => {
-              setCurrentView("collections");
-              setIsSidebarOpen(false);
-            }}
-            className={`group mb-6 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${ currentView === "collections" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
-          >
-            <div className="flex h-11 w-11 items-center justify-center">
-              <Layers className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
-            </div>
-            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-              {t('common.collections')}
-            </span>
-          </button>
+          {collectionsEnabled && (
+            <button
+              onClick={() => {
+                setCurrentView("collections");
+                setIsSidebarOpen(false);
+              }}
+              className={`group mb-6 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${ currentView === "collections" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
+            >
+              <div className="flex h-11 w-11 items-center justify-center">
+                <Layers className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+              </div>
+              <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
+                {t('common.collections')}
+              </span>
+            </button>
+          )}
 
           {/* History Accordion */}
           <div className="mb-2">
@@ -1180,14 +1190,16 @@ export default function ChatInterface() {
                           <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
                           {t('chat.new_chat')}
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleAddToCollection}
-                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                        >
-                          <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                          {t('common.add_to_collection')}
-                        </button>
+                        {collectionsEnabled && (
+                          <button
+                            type="button"
+                            onClick={handleAddToCollection}
+                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                          >
+                            <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                            {t('common.add_to_collection')}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
@@ -1463,7 +1475,7 @@ export default function ChatInterface() {
             onTriggerPrompt={handleTriggerPrompt}
           />
         )}
-        {currentView === "collections" && (
+        {collectionsEnabled && currentView === "collections" && (
           <CollectionsView
             onMenuClick={() => setIsSidebarOpen((o) => !o)}
             onAddClick={() => handleTriggerPrompt('collection')}
@@ -1488,7 +1500,7 @@ export default function ChatInterface() {
       </section>
 
       {/* ── Collection picker sheet ── */}
-      {collectionPickerTarget && (
+      {collectionsEnabled && collectionPickerTarget && (
         <CollectionPicker
           strategyId={collectionPickerTarget.strategyId}
           strategyFallback={{

@@ -515,7 +515,7 @@ def test_next_step_stage_limits_follow_up_actions() -> None:
     assert result.patch["next_actions"] == [
         "refine_strategy",
         "compare_benchmark",
-        "save_to_collection",
+        "save_strategy",
     ]
     assert result.patch["assistant_prompt"] is None
 

@@ -97,9 +97,9 @@ def _result_runtime_result() -> dict[str, Any]:
                 "payload": {},
             },
             {
-                "id": "add-to-collection",
-                "type": "add_to_collection",
-                "label": "Add to collection",
+                "id": "save-strategy",
+                "type": "save_strategy",
+                "label": "Save strategy",
                 "presentation": "result",
                 "payload": {},
             },
@@ -210,6 +210,13 @@ def test_chat_stream_emits_structured_confirmation_actions(
             "presentation": "confirmation",
             "payload": {},
         },
+        {
+            "id": "cancel-confirmation",
+            "type": "cancel_confirmation",
+            "label": "Cancel",
+            "presentation": "confirmation",
+            "payload": {},
+        },
     ]
 
 
@@ -252,7 +259,7 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
     run = _stream_payloads(response.text, "result")[0]["run"]
     assert [action["type"] for action in run["conversation_result_card"]["actions"]] == [
         "show_breakdown",
-        "add_to_collection",
+        "save_strategy",
         "refine_strategy",
     ]
 
@@ -311,6 +318,44 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert (
         run_id in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
     )
+
+
+def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
+    client = _client()
+    conversation = _conversation(client)
+    run_response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "conversation_id": conversation["id"],
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2025-05-03",
+            "end_date": "2026-05-03",
+            "starting_capital": 10000,
+        },
+    )
+    run_id = run_response.json()["run"]["id"]
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "save_strategy",
+                "label": "Save strategy",
+                "presentation": "result",
+                "payload": {"run_id": run_id},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "Saved" in text
+    strategies = client.get("/api/v1/strategies").json()["items"]
+    assert [strategy["symbols"] for strategy in strategies] == [["AAPL"]]
 
 
 def test_chat_stream_requires_message_or_action() -> None:

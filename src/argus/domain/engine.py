@@ -746,9 +746,9 @@ def build_result_card(
             "payload": {},
         },
         {
-            "id": "add-to-collection",
-            "type": "add_to_collection",
-            "label": "AÃ±adir a colecciÃ³n" if is_es else "Add to collection",
+            "id": "save-strategy",
+            "type": "save_strategy",
+            "label": "Guardar estrategia" if is_es else "Save strategy",
             "presentation": "result",
             "payload": {},
         },
