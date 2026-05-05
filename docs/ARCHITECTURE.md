@@ -296,6 +296,13 @@ The simulation logic (Numba/Python) that calculates metrics and returns results.
 - Historical price data
 - Supported symbols
 
+Provider ownership:
+
+- Alpaca is primary for equity and crypto availability.
+- Kraken public REST complements coverage for currency pairs and crypto fallback.
+- Provider-specific windows are execution truth. Kraken OHLC returns only the latest 720 candles per interval, so the runtime must ask the user to shorten the request or widen the timeframe when the requested window cannot be served.
+- Backtests remain single asset class per run: `equity`, `crypto`, or `currency_pair`.
+
 ### PostHog (When Enabled)
 
 **Use for:**
@@ -415,6 +422,7 @@ Alpha search is implemented using **Postgres Full-Text Search (FTS)** + recency 
 Semantic retrieval (Vector embeddings) is deferred from Alpha.
 - Use SQL/Text search first.
 - Re-evaluate semantic search for Beta.
+- Do not add pgvector or embedding tables for the launch chat/backtest branch. Structured Supabase state, run metadata, and saved strategies are sufficient until Argus needs semantic recall across large histories.
 
 # 15. Deletion / Archival Model
 

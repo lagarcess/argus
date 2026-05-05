@@ -1087,6 +1087,8 @@ Soft delete.
 
 # 14. Collections
 
+Launch flag: collection endpoints remain part of the API contract and the tables remain in Supabase, but dedicated collection UI should be hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`. Strategy saving from chat must use result/run state and should not depend on collections being visible.
+
 ## `GET /collections`
 
 **Query Params:**

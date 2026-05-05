@@ -20,9 +20,11 @@ bun run dev
 Recommended local settings:
 
 - `NEXT_PUBLIC_MOCK_AUTH=true`
+- `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`
 - `NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1`
 - `OPENROUTER_API_KEY` set in backend `.env`
 - Alpaca credentials set in backend `.env`
+- Supabase variables set when testing persistence.
 
 ## Pass Criteria
 
@@ -35,7 +37,11 @@ For every transcript:
 - Unsupported requests are explained honestly and include an executable alternative.
 - Supported runs require confirmation before execution.
 - Executed runs produce a result card and a grounded assistant explanation.
+- Result cards appear before summaries and expose result-only actions.
+- Save Strategy is inside the result card, not in confirmation actions.
+- Reloading chat preserves messages, cards, latest run state, and action availability.
 - The assistant does not fabricate missing metrics.
+- The result card chart renders with visible TradingView attribution in light and dark themes.
 
 ## Transcript Set
 
@@ -63,6 +69,74 @@ Run these in one conversation unless a case explicitly says to start a new chat:
 20. `Compare this to DCA.`
 21. `What exactly are you testing here?`
 
+## Launch Additions
+
+Run these as separate focused checks after the main transcript set.
+
+### Structured Actions
+
+1. Create a supported buy-and-hold strategy.
+2. Confirm that the confirmation card shows only `Run backtest`, `Change dates`, `Change asset`, `Adjust assumptions`, and cancel behavior.
+3. Click `Run backtest`.
+4. Confirm no fake user text such as `yes` or `Run backtest` is submitted.
+5. Confirm the result card shows before the result summary.
+6. Confirm result actions are `Show a breakdown`, `Refine strategy`, and the in-card `Save strategy` control.
+7. Click `Show a breakdown` and verify the answer explains metrics, assumptions, benchmark, chart caveats, and data limits without inventing fields.
+8. Click `Refine strategy` and verify Argus keeps the latest run context.
+
+### Save Strategy And Strategies Surface
+
+1. Run a supported backtest.
+2. Click the in-card `Save strategy` control.
+3. Navigate to the Strategies sidebar item.
+4. Confirm the saved strategy appears with the same symbols, strategy type, period, and latest run summary.
+5. Refresh the browser and confirm the saved strategy still appears.
+6. Confirm collections UI remains hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
+
+### Persistence And Reload
+
+1. Start a new chat and create a confirmation card.
+2. Refresh the browser.
+3. Confirm the confirmation card and action availability are restored.
+4. Run the backtest.
+5. Refresh again.
+6. Confirm the result card, summary, chart, latest run id, and result actions are restored.
+
+### Provider Truth
+
+1. `Backtest EUR/USD over the last 3 months.`
+2. Confirm Argus treats it as a currency pair and uses Kraken availability.
+3. Ask for a window that exceeds Kraken's OHLC availability at the chosen interval.
+4. Confirm Argus explains the 720-candle provider limit and offers a shorter window or wider timeframe.
+5. `Backtest Tesla and Bitcoin together.`
+6. Confirm Argus explains mixed asset classes and offers separate runs or an asset-class choice.
+
+### Indicator Assumptions
+
+1. `Buy Apple when RSI is below 32 and sell when RSI is above 61.`
+2. Confirm the card preserves the user thresholds if the executable spec accepts them.
+3. Ask `What indicator assumptions are you using?`
+4. Confirm Argus answers from the executable indicator registry: period, output, allowed bounds, and defaults.
+5. Try a discovered but non-executable indicator and confirm Argus drafts the idea but offers an executable simplification instead of pretending support.
+
+### Backtest Trust
+
+1. Run a buy-and-hold strategy.
+2. Confirm the main card shows total return, final value, max drawdown, and benchmark delta.
+3. Confirm win rate is hidden for buy-and-hold if closed trades are not meaningful.
+4. Run a rule-based strategy with closed trades.
+5. Confirm win rate appears only when there are meaningful closed trades.
+6. Ask for a breakdown and confirm secondary metrics and caveats live there, not in the main card.
+
+### Chart Behavior
+
+1. Run a multi-symbol backtest such as `Buy and hold SBUX and CMG year to date with 100k capital.`
+2. Confirm the result card universe shows all symbols.
+3. Confirm the chart shows the aggregate portfolio equity curve rather than separate symbol comparison lines.
+4. Hover over the chart and verify tooltip date/value/event behavior.
+5. Switch light/dark/system theme and verify chart colors remain legible.
+6. Run a strategy with entry/exit events and verify markers appear without clutter.
+
 ## Evidence To Capture
 
 Record:
@@ -82,3 +156,8 @@ Record:
 - Losing the prior strategy after `weekly instead`, `keep everything else`, or `use Nvidia`.
 - Showing a result card while dropping the assistant explanation.
 - Treating unsupported strategy drafting as a fresh empty session.
+- Any one-word answer such as `AAPL`, `DCA`, or `Since IPO` when the user asked for explanation.
+- Result summaries that quote the latest novice question instead of the confirmed strategy thesis.
+- Result cards that drop symbols from multi-symbol runs.
+- Provider errors exposed as raw exception names without natural recovery.
+- TradingView chart attribution hidden or covered.

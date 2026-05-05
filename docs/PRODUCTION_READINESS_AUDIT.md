@@ -11,15 +11,15 @@ Before implementation changes, the branch baseline passed:
 - `poetry run pytest tests\agent_runtime tests\test_chat_backtest_state_machine.py -q`
 - `cd web; bun test __tests__`
 
-## Current Product Gaps Being Closed
+## Product Gaps Closed In This Branch
 
-- Deterministic clarification copy can still surface as the assistant voice.
-- Thin or stale LLM outputs can pass through to users.
-- Result actions still include collection-oriented behavior instead of result-card save.
-- Conversation reload and history paths need stronger structured-card hydration.
-- Provider truth is equity/crypto-only in schema and runtime; currency pairs need a truthful provider boundary.
-- Indicator execution is still narrower than the discovery catalog implies.
-- Result cards need clearer metric display policy, multi-symbol universe truth, and charted context.
+- Deterministic clarification copy is gated so raw fields and enums do not become the primary assistant voice.
+- Thin or stale LLM outputs are rejected or recomposed from current state.
+- Confirmation and result actions are separated; Save Strategy belongs inside the result card.
+- Conversation reload and history paths hydrate structured cards and latest run metadata.
+- Provider truth supports `equity`, `crypto`, and `currency_pair`, with Kraken public REST for currency pairs and crypto fallback.
+- Indicator execution is controlled by an executable registry instead of assuming every discovered indicator can run.
+- Result cards use a clearer metric display policy, preserve multi-symbol universe truth, and include charted context.
 
 ## Supabase Table Usefulness
 
@@ -54,3 +54,9 @@ No tables should be dropped for this branch. Collections should be hidden behind
 - Charted result cards are an approved product override to the older Alpha note that avoided charts.
 - Charts must stay calm, flat, theme-aware, and secondary to the conversational result moment.
 - Save Strategy belongs inside the result card only, not the confirmation card.
+- TradingView Lightweight Charts attribution must remain visible wherever the result chart renders.
+- Confirmation and result cards use distinct restrained reveal animations. Positive and negative result animations differ without becoming decorative noise.
+
+## Acceptance Boundary
+
+This branch does not make embeddings part of launch readiness. Supabase structured state, run metadata, saved strategies, provider catalogs, and keyword search are the launch path. Add pgvector later only after semantic recall becomes a real product need.
