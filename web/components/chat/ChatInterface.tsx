@@ -1347,6 +1347,8 @@ export default function ChatInterface() {
                 </div>
             ) : (
               <>
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_bottom,black_48%,transparent_100%)] dark:bg-[#141517]/80" />
+
                 {/* Messages */}
                 <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
                   <div className="space-y-8">
