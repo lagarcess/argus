@@ -8,6 +8,7 @@ from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
+    StrategyFrame,
     TaskSnapshot,
     UserState,
 )
@@ -227,19 +228,36 @@ def _build_task_snapshot(
         artifact_references=artifact_references,
         artifact_kind="collection_action",
     )
+    pending_strategy_summary = (
+        run_state.candidate_strategy_draft
+        if stage_outcome_value in {"await_user_reply", "await_approval"}
+        else (
+            prior_task_snapshot.pending_strategy_summary
+            if prior_task_snapshot is not None
+            and stage_outcome_value not in completed_outcomes
+            else None
+        )
+    )
+    pending_needs = _pending_needs_from_run_state(
+        run_state=run_state,
+        stage_outcome_value=stage_outcome_value,
+        pending_strategy_summary=pending_strategy_summary,
+    )
+    field_provenance = _field_provenance_from_strategy(pending_strategy_summary)
+    strategy_frame = (
+        StrategyFrame(
+            strategy=pending_strategy_summary,
+            pending_needs=pending_needs,
+            field_provenance=field_provenance,
+            last_assistant_question=run_state.user_goal_summary,
+        )
+        if pending_strategy_summary is not None
+        else None
+    )
     return TaskSnapshot(
         latest_task_type=run_state.intent,
         completed=stage_outcome_value in completed_outcomes,
-        pending_strategy_summary=(
-            run_state.candidate_strategy_draft
-            if stage_outcome_value in {"await_user_reply", "await_approval"}
-            else (
-                prior_task_snapshot.pending_strategy_summary
-                if prior_task_snapshot is not None
-                and stage_outcome_value not in completed_outcomes
-                else None
-            )
-        ),
+        pending_strategy_summary=pending_strategy_summary,
         confirmed_strategy_summary=(
             run_state.candidate_strategy_draft
             if stage_outcome_value in completed_outcomes
@@ -249,6 +267,9 @@ def _build_task_snapshot(
                 else None
             )
         ),
+        strategy_frame=strategy_frame,
+        pending_needs=pending_needs,
+        field_provenance=field_provenance,
         latest_backtest_result_reference=(
             latest_backtest_reference
             or (
@@ -271,6 +292,61 @@ def _build_task_snapshot(
             else None
         ),
     )
+
+
+def _pending_needs_from_run_state(
+    *,
+    run_state: RunState,
+    stage_outcome_value: str,
+    pending_strategy_summary: Any,
+) -> list[str]:
+    if stage_outcome_value not in {"await_user_reply", "await_approval"}:
+        return []
+    semantic_needs: list[str] = []
+    field_map = {
+        "asset_universe": "asset_target",
+        "capital_amount": "sizing_amount",
+        "date_range": "period",
+        "entry_logic": "rule_definition",
+        "exit_logic": "rule_definition",
+    }
+    for field_name in run_state.missing_required_fields:
+        need = field_map.get(field_name)
+        if need is not None and need not in semantic_needs:
+            semantic_needs.append(need)
+    if pending_strategy_summary is not None:
+        if (
+            not pending_strategy_summary.asset_universe
+            and "asset_target" not in semantic_needs
+        ):
+            semantic_needs.append("asset_target")
+        if (
+            pending_strategy_summary.strategy_type == "dca_accumulation"
+            and pending_strategy_summary.capital_amount is None
+            and "sizing_amount" not in semantic_needs
+        ):
+            semantic_needs.append("sizing_amount")
+        if pending_strategy_summary.date_range is None and "period" not in semantic_needs:
+            semantic_needs.append("period")
+    return semantic_needs
+
+
+def _field_provenance_from_strategy(strategy: Any) -> dict[str, str]:
+    if strategy is None:
+        return {}
+    provenance: dict[str, str] = {}
+    for field_name in (
+        "asset_universe",
+        "capital_amount",
+        "date_range",
+        "cadence",
+        "entry_logic",
+        "exit_logic",
+    ):
+        value = getattr(strategy, field_name, None)
+        if value not in (None, "", [], {}):
+            provenance[field_name] = "user_or_confirmed_state"
+    return provenance
 
 
 def _build_thread_metadata(

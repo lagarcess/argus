@@ -437,6 +437,8 @@ def test_execute_stage_normalizes_user_facing_strategy_type_aliases() -> None:
 
     assert result.outcome == "execution_succeeded"
     assert tool.calls[0]["strategy_type"] == "indicator_threshold"
+    assert tool.calls[0]["entry_rule"]["threshold"] == 30.0
+    assert tool.calls[0]["exit_rule"]["threshold"] == 55.0
 
 
 def test_execute_stage_normalizes_dip_buying_and_machine_date_tokens(

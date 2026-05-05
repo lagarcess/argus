@@ -31,6 +31,10 @@ from argus.agent_runtime.strategy_contract import (
     resolve_date_range,
     strategy_can_be_approved,
 )
+from argus.domain.indicators import (
+    detect_executable_indicator_key,
+    executable_indicator_spec,
+)
 from argus.domain.market_data import resolve_asset
 from pydantic import BaseModel, Field
 
@@ -47,6 +51,15 @@ StageOutcome = Literal[
     "end_run",
 ]
 ArbitrationMode = Literal["deterministic", "structured_arbitration"]
+SemanticTurnAct = Literal[
+    "new_idea",
+    "answer_pending_need",
+    "refine_current_idea",
+    "educational_question",
+    "result_followup",
+    "approval",
+    "unsupported_request",
+]
 
 
 class InterpretDecision(BaseModel):
@@ -265,11 +278,19 @@ def interpret_stage(
         state.current_user_message,
         capability_contract,
     )
+    semantic_turn_act = _resolve_semantic_turn_act(
+        message=state.current_user_message,
+        snapshot=snapshot,
+        signals=signals,
+        task_relation=preliminary_task_relation,
+        extraction=extraction,
+    )
     candidate_strategy = _candidate_strategy_for_turn(
         message=state.current_user_message,
         extraction=extraction,
         snapshot=snapshot,
         capability_contract=capability_contract,
+        semantic_turn_act=semantic_turn_act,
     )
     missing_required_fields: list[str] = []
     if should_track_execution_requirements(
@@ -352,6 +373,7 @@ def interpret_stage(
             llm_reason_codes,
             extraction.reason_codes,
             arbitration.reason_codes,
+            [f"semantic_act_{semantic_turn_act}"],
             ["generic_pending_asset_reply"] if pending_asset_reply else [],
             arbitration.decision.reason_codes if arbitration.decision is not None else [],
         ),
@@ -514,14 +536,175 @@ def build_candidate_strategy_from_extraction(
     return strategy
 
 
+def _resolve_semantic_turn_act(
+    *,
+    message: str,
+    snapshot: TaskSnapshot | None,
+    signals: ExtractedSignals,
+    task_relation: TaskRelation,
+    extraction: StrategyExtractionResult,
+) -> SemanticTurnAct:
+    if _is_approval_message(message):
+        return "approval"
+    if _is_result_explanation_followup(message, snapshot):
+        return "result_followup"
+    if _is_educational_turn(message):
+        return "educational_question"
+
+    pending_needs = _pending_needs(snapshot)
+    if pending_needs and _message_answers_pending_need(message, pending_needs):
+        return "answer_pending_need"
+    if _message_starts_new_idea(
+        message=message,
+        signals=signals,
+        extraction=extraction,
+        task_relation=task_relation,
+    ):
+        return "new_idea"
+    if snapshot is not None and snapshot.pending_strategy_summary is not None:
+        if _message_refines_pending_strategy(message):
+            return "refine_current_idea"
+    if pending_needs and _message_refines_pending_strategy(message):
+        return "refine_current_idea"
+    if task_relation == "refine":
+        return "refine_current_idea"
+    if extraction.unsupported_constraints:
+        return "unsupported_request"
+    if pending_needs:
+        return "answer_pending_need"
+    return "new_idea"
+
+
+def _pending_needs(snapshot: TaskSnapshot | None) -> list[str]:
+    if snapshot is None:
+        return []
+    needs = list(snapshot.pending_needs)
+    if snapshot.strategy_frame is not None:
+        needs.extend(snapshot.strategy_frame.pending_needs)
+    strategy = snapshot.pending_strategy_summary
+    if strategy is None:
+        return list(dict.fromkeys(needs))
+    if not strategy.asset_universe:
+        needs.append("asset_target")
+    if strategy.strategy_type == "dca_accumulation" and strategy.capital_amount is None:
+        needs.append("sizing_amount")
+    if strategy.date_range is None:
+        needs.append("period")
+    if executable_strategy_type(strategy) == "indicator_threshold":
+        if not strategy.entry_logic or not strategy.exit_logic:
+            needs.append("rule_definition")
+    return list(dict.fromkeys(needs))
+
+
+def _semantic_needs_include(snapshot: TaskSnapshot | None, need: str) -> bool:
+    return need in _pending_needs(snapshot)
+
+
+def _message_answers_pending_need(message: str, pending_needs: list[str]) -> bool:
+    if (
+        "sizing_amount" in pending_needs
+        and _detect_capital_amount(
+            message,
+            allow_bare_number=True,
+        )
+        is not None
+    ):
+        return True
+    if "asset_target" in pending_needs and _is_pending_asset_reply(
+        message=message,
+        snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(),
+            pending_needs=["asset_target"],
+        ),
+    ):
+        return True
+    if (
+        "period" in pending_needs
+        and normalize_date_range_candidate(
+            None,
+            raw_user_phrasing=message,
+        )
+        is not None
+    ):
+        return True
+    if "rule_definition" in pending_needs and _message_contains_rule_definition(message):
+        return True
+    if "simplification_choice" in pending_needs and _message_chooses_direction(message):
+        return True
+    return False
+
+
+def _message_starts_new_idea(
+    *,
+    message: str,
+    signals: ExtractedSignals,
+    extraction: StrategyExtractionResult,
+    task_relation: TaskRelation,
+) -> bool:
+    lowered = message.lower()
+    if signals.explicit_new_request or task_relation == "new_task":
+        return True
+    if extraction.strategy_thesis.status == "resolved":
+        return True
+    if signals.backtest_request_detected:
+        return True
+    if re.search(r"\b(what if|backtest|test|try|simulate|bought|buy|invest)\b", lowered):
+        return bool(
+            _generic_asset_candidates(message)
+        ) or _message_contains_rule_definition(message)
+    return False
+
+
+def _message_refines_pending_strategy(message: str) -> bool:
+    lowered = message.lower()
+    return bool(
+        re.search(
+            r"\b(actually|instead|change|keep|same|make that|use|sell|exit|entry)\b",
+            lowered,
+        )
+        or _message_contains_rule_definition(message)
+    )
+
+
+def _message_contains_rule_definition(message: str) -> bool:
+    lowered = message.lower()
+    return bool(
+        re.search(
+            r"\b(rsi|relative strength index|indicator|threshold|entry|exit|sell|"
+            r"buy when|drops? below|drops? to|rises? above|rises? to|dip|dips|"
+            r"big drops?|significant drops?)\b",
+            lowered,
+        )
+    )
+
+
+def _message_chooses_direction(message: str) -> bool:
+    lowered = message.lower()
+    return bool(
+        re.search(r"\b(sure|ok|okay|yes|use|take|do|run|simple|preset)\b", lowered)
+    )
+
+
+def _is_educational_turn(message: str) -> bool:
+    lowered = message.lower()
+    return bool(
+        re.search(
+            r"\b(what is|what's|explain|teach|walk me through|i don't understand|"
+            r"tell me about|how does|why does|what can you do|how do i start)\b",
+            lowered,
+        )
+    )
+
+
 def _candidate_strategy_for_turn(
     *,
     message: str,
     extraction: StrategyExtractionResult,
     snapshot: TaskSnapshot | None,
     capability_contract: Any,
+    semantic_turn_act: SemanticTurnAct,
 ) -> StrategySummary:
-    prior = snapshot.pending_strategy_summary if snapshot is not None else None
+    prior = _prior_strategy_for_reducer(snapshot, semantic_turn_act)
     strategy = prior.model_copy(deep=True) if prior is not None else StrategySummary()
     extracted = build_candidate_strategy_from_extraction(extraction)
     lowered = message.lower()
@@ -569,7 +752,11 @@ def _candidate_strategy_for_turn(
         if strategy.strategy_type is None or strategy.strategy_type == "buy_and_hold":
             strategy.strategy_type = "dca_accumulation"
 
-    capital_amount = _detect_capital_amount(message)
+    capital_amount = _detect_capital_amount(
+        message,
+        allow_bare_number=_semantic_needs_include(snapshot, "sizing_amount")
+        and semantic_turn_act == "answer_pending_need",
+    )
     if capital_amount is not None:
         strategy.capital_amount = capital_amount
         strategy.sizing_mode = "capital_amount"
@@ -594,6 +781,7 @@ def _candidate_strategy_for_turn(
             strategy.cadence = "monthly"
     if executable_type == "indicator_threshold":
         strategy.strategy_type = executable_type
+        _apply_executable_indicator_defaults(strategy)
 
     if strategy.raw_user_phrasing is None:
         strategy.raw_user_phrasing = message.strip()
@@ -603,6 +791,17 @@ def _candidate_strategy_for_turn(
 
     strategy.assumptions = _strategy_assumptions(strategy, capability_contract)
     return strategy
+
+
+def _prior_strategy_for_reducer(
+    snapshot: TaskSnapshot | None,
+    semantic_turn_act: SemanticTurnAct,
+) -> StrategySummary | None:
+    if snapshot is None:
+        return None
+    if semantic_turn_act in {"answer_pending_need", "refine_current_idea", "approval"}:
+        return snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    return None
 
 
 def missing_required_fields_for_strategy(
@@ -1402,6 +1601,8 @@ def _detect_strategy_type(message: str, strategy: StrategySummary) -> str | None
         r"\bdca\b|\bevery\s+(day|week|month|year)\b|\bweekly\b|\bmonthly\b", lowered
     ):
         return "dca_accumulation"
+    if re.search(r"\b(?:dip|dips|drops?|rsi|relative strength index)\b", lowered):
+        return "indicator_threshold"
     if strategy.entry_logic or strategy.exit_logic or "rsi" in lowered:
         return "indicator_threshold"
     return strategy.strategy_type
@@ -1417,11 +1618,29 @@ def _detect_cadence(message: str) -> str | None:
     return None
 
 
-def _detect_capital_amount(message: str) -> float | None:
+def _detect_capital_amount(
+    message: str, *, allow_bare_number: bool = False
+) -> float | None:
     match = re.search(r"\$\s*(\d+(?:,\d{3})*(?:\.\d+)?)", message)
+    if match is None and allow_bare_number:
+        match = re.fullmatch(r"\s*(\d+(?:,\d{3})*(?:\.\d+)?)\s*", message)
     if match is None:
         return None
     return float(match.group(1).replace(",", ""))
+
+
+def _apply_executable_indicator_defaults(strategy: StrategySummary) -> None:
+    combined_logic = " ".join(
+        value
+        for value in (strategy.entry_logic, strategy.exit_logic, strategy.strategy_thesis)
+        if isinstance(value, str)
+    )
+    indicator_key = detect_executable_indicator_key(combined_logic, default="rsi")
+    spec = executable_indicator_spec(indicator_key)
+    if spec is None:
+        return
+    if strategy.entry_logic and not strategy.exit_logic:
+        strategy.exit_logic = spec.format_threshold_rule("exit")
 
 
 def _detect_risk_rules(message: str) -> list[dict[str, Any]]:

@@ -223,6 +223,68 @@ def test_llm_interpreter_humanizes_unsupported_simplification_labels(monkeypatch
     assert result.unsupported_constraints[0].explanation.startswith("I understand")
 
 
+def test_llm_interpreter_drops_stale_unsupported_copy_for_executable_rsi_threshold(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="refine",
+        user_goal_summary="Use RSI 40 for the Apple dip rule.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="buy every time rsi drops below 40",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Buy Apple when RSI drops below 40.",
+            asset_universe=["AAPL"],
+            date_range="last two years",
+            entry_logic="RSI drops below 40",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_indicator_rule",
+                raw_value="RSI below 40",
+                explanation="The only executable RSI preset is buy below 30.",
+                simplification_labels=["rsi_preset"],
+            )
+        ],
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="buy every time rsi drops below 40",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="strategy_drafting",
+                completed=False,
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="indicator_threshold",
+                    strategy_thesis="Buy Apple after big drops.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range="last two years",
+                ),
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert result.unsupported_constraints == []
+    assert strategy.entry_logic == "RSI drops below 40"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+
+
 def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 

@@ -11,6 +11,15 @@ VerbosityName = Literal["low", "medium", "high"]
 ExpertiseMode = Literal["beginner", "intermediate", "advanced"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 FieldExtractionStatus = Literal["resolved", "missing", "ambiguous", "unsupported"]
+PendingNeedName = Literal[
+    "asset_target",
+    "sizing_amount",
+    "schedule",
+    "period",
+    "rule_definition",
+    "assumption",
+    "simplification_choice",
+]
 
 IntentName = Literal[
     "beginner_guidance",
@@ -115,6 +124,14 @@ class UnsupportedConstraint(BaseModel):
     simplification_options: list[SimplificationOption] = Field(default_factory=list)
 
 
+class StrategyFrame(BaseModel):
+    frame_id: str | None = None
+    strategy: StrategySummary = Field(default_factory=StrategySummary)
+    pending_needs: list[PendingNeedName] = Field(default_factory=list)
+    field_provenance: dict[str, str] = Field(default_factory=dict)
+    last_assistant_question: str | None = None
+
+
 class ArtifactReference(BaseModel):
     artifact_kind: str
     artifact_id: str
@@ -126,6 +143,9 @@ class TaskSnapshot(BaseModel):
     completed: bool | None = None
     pending_strategy_summary: StrategySummary | None = None
     confirmed_strategy_summary: StrategySummary | None = None
+    strategy_frame: StrategyFrame | None = None
+    pending_needs: list[PendingNeedName] = Field(default_factory=list)
+    field_provenance: dict[str, str] = Field(default_factory=dict)
     latest_backtest_result_reference: ArtifactReference | None = None
     latest_collection_action_reference: ArtifactReference | None = None
     last_unresolved_follow_up: str | None = None

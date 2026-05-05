@@ -501,7 +501,14 @@ def _parse_indicator_rule(
     if not text:
         return None
 
-    threshold_match = re.search(r"(-?\d+(?:\.\d+)?)", text)
+    threshold_match = re.search(
+        r"(?:below|under|above|over|<=|>=|<|>|drops?\s+(?:to|below)|"
+        r"rises?\s+(?:to|above))\s*(-?\d+(?:\.\d+)?)",
+        text,
+    )
+    if threshold_match is None:
+        without_indicator_period = re.sub(r"\b[a-z_]+\s*\(\s*\d+\s*\)", "", text)
+        threshold_match = re.search(r"(-?\d+(?:\.\d+)?)", without_indicator_period)
     if threshold_match is None:
         return None
 

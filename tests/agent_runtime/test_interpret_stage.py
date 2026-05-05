@@ -966,6 +966,88 @@ def test_interpret_followup_cadence_refines_pending_dca_strategy(monkeypatch) ->
     assert result.decision.candidate_strategy_draft.capital_amount == 500
 
 
+def test_interpret_bare_number_answers_pending_recurring_amount_need() -> None:
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message="500",
+        recent_thread_history=[
+            {"role": "user", "content": "What if I bought Apple every month?"},
+            {
+                "role": "assistant",
+                "content": "How much should each recurring purchase be?",
+            },
+        ],
+    )
+    snapshot = TaskSnapshot(
+        latest_task_type="strategy_drafting",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="What if I bought Apple every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple on a recurring monthly schedule.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            cadence="monthly",
+            date_range="last two years",
+        ),
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=snapshot,
+        structured_interpreter=lambda _request: None,
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert result.outcome == "ready_for_confirmation"
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.capital_amount == 500
+    assert strategy.sizing_mode == "capital_amount"
+    assert "capital_amount" not in result.decision.missing_required_fields
+
+
+def test_interpret_new_idea_replaces_pending_dca_instead_of_inheriting_amount_need() -> (
+    None
+):
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message="What if I bought Apple after big drops?",
+        recent_thread_history=[
+            {"role": "user", "content": "What if I bought a fixed amount every month?"},
+            {
+                "role": "assistant",
+                "content": "How much should each recurring purchase be?",
+            },
+        ],
+    )
+    snapshot = TaskSnapshot(
+        latest_task_type="strategy_drafting",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="What if I bought a fixed amount every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy a fixed amount on a recurring monthly schedule.",
+            cadence="monthly",
+        ),
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=snapshot,
+        structured_interpreter=lambda _request: None,
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.strategy_type == "indicator_threshold"
+    assert strategy.cadence is None
+    assert strategy.capital_amount is None
+    assert "capital_amount" not in result.decision.missing_required_fields
+
+
 def test_interpret_date_followup_refines_pending_dca_to_confirmation(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 

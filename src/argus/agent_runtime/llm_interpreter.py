@@ -22,6 +22,10 @@ from argus.agent_runtime.strategy_contract import (
     explicit_buy_and_hold_requested,
     normalize_date_range_candidate,
 )
+from argus.domain.indicators import (
+    detect_executable_indicator_key,
+    executable_indicator_spec,
+)
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
 
@@ -166,12 +170,15 @@ class OpenRouterStructuredInterpreter:
             "meaning. Use prior strategy state for corrections like 'weekly instead', "
             "'use Nvidia instead', 'keep everything else', and 'sell all'.\n\n"
             "Supported execution truth for Alpha: long-only backtests; buy_and_hold, "
-            "dca_accumulation, and one RSI indicator threshold preset are executable. "
-            "The executable RSI preset is buy when RSI drops below 30 and sell when RSI "
-            "rises above 55. Moving-average crossovers, volume filters, price plus "
-            "indicator confluence, and other custom indicator rules can be understood "
-            "and drafted, but are not executable yet unless the user chooses a supported "
-            "simplification. Same asset class only; max 5 symbols; equity benchmark is "
+            "dca_accumulation, and registry-backed indicator threshold rules are "
+            "executable. RSI is executable with user-specified thresholds from 0 to "
+            "100, a default period of 14, a default entry threshold of 30, and a "
+            "default exit threshold of 55 when the user leaves one side unspecified. "
+            "Moving-average crossovers, volume filters, price plus indicator "
+            "confluence, and indicator rules without an executable registry spec can "
+            "be understood and drafted, but are not executable yet unless the user "
+            "chooses a supported simplification. Same asset class only; max 5 symbols; "
+            "equity benchmark is "
             "SPY; crypto benchmark is BTC; no brokerage trading, shorting, mixed "
             "equity+crypto runs, custom scripting, or real slippage/fee realism.\n\n"
             "When the user says something like 'buy Nvidia when the 50-day moving average "
@@ -371,6 +378,7 @@ def _validate_capability_boundaries(
         strategy.exit_logic = None
     if canonical_type == "indicator_threshold":
         strategy.strategy_type = canonical_type
+        _apply_executable_indicator_defaults(strategy)
     if canonical_type == "dca_accumulation" and not strategy.cadence:
         strategy.cadence = "monthly"
     if (
@@ -394,18 +402,14 @@ def _validate_indicator_rule_support(
         for value in [strategy.entry_logic, strategy.exit_logic]
         if isinstance(value, str)
     ).lower()
-    unsupported_terms = [
-        "moving average",
-        "sma",
-        "ema",
-        "crossover",
-        "crosses above",
-        "crosses below",
-        "volume",
-        "200-day",
-        "50-day",
-    ]
-    if not any(term in combined_logic for term in unsupported_terms):
+    if _indicator_rule_is_registry_executable(combined_logic):
+        response.unsupported_constraints = [
+            item
+            for item in response.unsupported_constraints
+            if item.category != "unsupported_indicator_rule"
+        ]
+        return
+    if not _contains_unsupported_indicator_terms(combined_logic):
         return
     if any(
         item.category == "unsupported_indicator_rule"
@@ -428,6 +432,44 @@ def _validate_indicator_rule_support(
             ],
         )
     )
+
+
+def _contains_unsupported_indicator_terms(text: str) -> bool:
+    unsupported_terms = (
+        "moving average",
+        "sma",
+        "ema",
+        "crossover",
+        "crosses above",
+        "crosses below",
+        "volume",
+        "200-day",
+        "50-day",
+    )
+    return any(term in text for term in unsupported_terms)
+
+
+def _indicator_rule_is_registry_executable(text: str) -> bool:
+    if not text:
+        return False
+    if _contains_unsupported_indicator_terms(text):
+        return False
+    key = detect_executable_indicator_key(text, default="rsi")
+    return executable_indicator_spec(key) is not None
+
+
+def _apply_executable_indicator_defaults(strategy: StrategySummary) -> None:
+    combined_logic = " ".join(
+        value
+        for value in (strategy.entry_logic, strategy.exit_logic, strategy.strategy_thesis)
+        if isinstance(value, str)
+    )
+    indicator_key = detect_executable_indicator_key(combined_logic, default="rsi")
+    spec = executable_indicator_spec(indicator_key)
+    if spec is None:
+        return
+    if strategy.entry_logic and not strategy.exit_logic:
+        strategy.exit_logic = spec.format_threshold_rule("exit")
 
 
 def _dca_amount_has_user_provenance(
