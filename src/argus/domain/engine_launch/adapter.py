@@ -23,6 +23,7 @@ from argus.domain.engine_launch.results import (
 )
 from argus.domain.engine_launch.sizing import resolve_starting_capital
 from argus.domain.engine_launch.strategies import (
+    indicator_threshold_parameters,
     normalize_template_name,
     validate_launch_supported,
 )
@@ -89,11 +90,13 @@ def _run_indicator_threshold(
         request,
         initial_price=initial_price,
     )
+    indicator_parameters = indicator_threshold_parameters(request)
     config = _build_indicator_threshold_config(
         request=request,
         asset_class=asset_class,
         symbols=symbols,
         starting_capital=starting_capital,
+        indicator_parameters=indicator_parameters,
     )
     validate_backtest_config(config)
 
@@ -120,13 +123,20 @@ def _run_indicator_threshold(
             "position_size": request.position_size,
             "cadence": request.cadence,
             "template": config["template"],
+            "indicator": indicator_parameters["indicator"],
+            "indicator_period": indicator_parameters["indicator_period"],
+            "entry_threshold": indicator_parameters["entry_threshold"],
+            "exit_threshold": indicator_parameters["exit_threshold"],
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
         assumptions=list(result_card.get("assumptions", [])),
         caveats=[
             f"{config['timeframe']} bars only.",
-            "Launch support is currently limited to RSI below 30 and RSI above 55.",
+            (
+                "Indicator thresholds use the executable indicator registry; "
+                "draft-only indicators are not run until they have execution specs."
+            ),
         ],
         provider_metadata={
             "provider": "alpaca",
@@ -357,6 +367,7 @@ def _build_indicator_threshold_config(
     asset_class: str,
     symbols: list[str],
     starting_capital: float,
+    indicator_parameters: dict[str, Any],
 ) -> dict[str, Any]:
     benchmark_asset = classify_symbol(request.benchmark_symbol)
     if benchmark_asset.asset_class != asset_class:
@@ -373,7 +384,7 @@ def _build_indicator_threshold_config(
         "starting_capital": starting_capital,
         "allocation_method": "equal_weight",
         "benchmark_symbol": benchmark_asset.symbol,
-        "parameters": {},
+        "parameters": indicator_parameters,
     }
 
 

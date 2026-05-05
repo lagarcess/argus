@@ -455,7 +455,9 @@ def test_adapter_blocks_unsupported_risk_rules() -> None:
     assert result.result_card is None
 
 
-def test_adapter_blocks_unsupported_indicator_threshold_shape() -> None:
+def test_adapter_accepts_registry_bounded_indicator_threshold_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     request = LaunchBacktestRequest(
         strategy_type="indicator_threshold",
         symbol="TSLA",
@@ -472,11 +474,48 @@ def test_adapter_blocks_unsupported_indicator_threshold_shape() -> None:
         benchmark_symbol="SPY",
     )
 
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    captured: dict[str, object] = {}
+
+    def compute_metrics_stub(config: dict[str, object]) -> dict[str, object]:
+        captured["config"] = config
+        return {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 11.0,
+                    "benchmark_return_pct": 7.5,
+                }
+            },
+            "by_symbol": {},
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        compute_metrics_stub,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_card",
+        lambda config, metrics, language="en": {
+            "title": "TSLA RSI Mean Reversion",
+            "assumptions": [],
+            "rows": [],
+        },
+    )
+
     result = run_launch_backtest(request)
 
-    assert result.envelope.execution_status == "blocked_unsupported"
-    assert result.envelope.failure_category == "unsupported_capability"
-    assert result.envelope.failure_reason == "unsupported_indicator_threshold"
+    assert result.envelope.execution_status == "succeeded"
+    assert result.envelope.resolved_parameters["indicator"] == "rsi"
+    assert result.envelope.resolved_parameters["entry_threshold"] == 25.0
+    assert result.envelope.resolved_parameters["exit_threshold"] == 60.0
+    assert captured["config"]["parameters"]["entry_threshold"] == 25.0
 
 
 def test_adapter_maps_market_data_failure_to_upstream_dependency(

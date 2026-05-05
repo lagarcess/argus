@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-AssetClass = Literal["equity", "crypto"]
+AssetClass = Literal["equity", "crypto", "currency_pair"]
 SlotPolicy = Literal["required", "defaultable", "clarify_if_missing"]
 
 
@@ -34,7 +34,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "hold",
             "compra y mantener",
         ],
-        supported_asset_classes=["equity", "crypto"],
+        supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "buy_the_dip": StrategyCapability(
         template="buy_the_dip",
@@ -46,7 +46,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "compra en caidas",
             "compra en bajadas",
         ],
-        supported_asset_classes=["equity", "crypto"],
+        supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "rsi_mean_reversion": StrategyCapability(
         template="rsi_mean_reversion",
@@ -58,7 +58,34 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "reversion a la media",
             "sobreventa",
         ],
-        supported_asset_classes=["equity", "crypto"],
+        supported_asset_classes=["equity", "crypto", "currency_pair"],
+        parameters={
+            "indicator": ParameterSpec(
+                key="indicator",
+                policy="defaultable",
+                default="rsi",
+                allowed_values=["rsi"],
+                description="Executable indicator for this threshold strategy.",
+            ),
+            "indicator_period": ParameterSpec(
+                key="indicator_period",
+                policy="defaultable",
+                default=14,
+                description="Number of bars used to calculate the indicator.",
+            ),
+            "entry_threshold": ParameterSpec(
+                key="entry_threshold",
+                policy="defaultable",
+                default=30,
+                description="Indicator value that triggers an entry.",
+            ),
+            "exit_threshold": ParameterSpec(
+                key="exit_threshold",
+                policy="defaultable",
+                default=55,
+                description="Indicator value that triggers an exit.",
+            ),
+        },
     ),
     "moving_average_crossover": StrategyCapability(
         template="moving_average_crossover",
@@ -71,7 +98,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "cruce de medias",
             "cruce de medias moviles",
         ],
-        supported_asset_classes=["equity", "crypto"],
+        supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "dca_accumulation": StrategyCapability(
         template="dca_accumulation",
@@ -83,7 +110,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "promedio de costo",
             "acumulacion",
         ],
-        supported_asset_classes=["equity", "crypto"],
+        supported_asset_classes=["equity", "crypto", "currency_pair"],
         parameters={
             "dca_cadence": ParameterSpec(
                 key="dca_cadence",
@@ -103,7 +130,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         template="momentum_breakout",
         display_name="Momentum Breakout",
         aliases=["momentum", "breakout", "ruptura de momentum", "rompimiento"],
-        supported_asset_classes=["equity", "crypto"],
+        supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "trend_follow": StrategyCapability(
         template="trend_follow",
@@ -115,6 +142,6 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "seguimiento de tendencia",
             "tendencia",
         ],
-        supported_asset_classes=["equity", "crypto"],
+        supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
 }

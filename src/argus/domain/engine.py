@@ -11,6 +11,11 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 
+from argus.domain.indicators import (
+    executable_indicator_spec,
+    indicator_assumption_lines,
+    normalize_indicator_parameters,
+)
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series, resolve_asset
 
 try:  # noqa: SIM105
@@ -199,8 +204,14 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
         raise ValueError("stablecoin_not_supported")
 
     # Registry-driven parameter validation (Task 10)
-    params = config.get("parameters") or {}
+    params = dict(config.get("parameters") or {})
     template_name = config["template"]
+    if template_name == "rsi_mean_reversion":
+        params = normalize_indicator_parameters(
+            str(params.get("indicator") or "rsi"),
+            params,
+        )
+        config["parameters"] = params
     capability = STRATEGY_CAPABILITIES[template_name]
 
     allowed_params = set(capability.parameters.keys())
@@ -224,7 +235,8 @@ def _resolve_indicator_series(
     if fallback_col not in data.columns:
         raise ValueError("market_data_unavailable")
 
-    name = indicator.strip().lower()
+    spec = executable_indicator_spec(indicator)
+    name = spec.key if spec is not None else indicator.strip().lower()
     ta_accessor = getattr(data, "ta", None)
     if ta_accessor is None:
         raise ValueError("unsupported_indicator")
@@ -250,10 +262,16 @@ def _resolve_indicator_series(
 
     accessor(**kwargs)
 
-    upper = indicator.upper()
-    candidates = [
-        col for col in data.columns if upper in col.upper() and str(period) in col
-    ]
+    candidates: list[str] = []
+    if spec is not None:
+        selector = spec.output_selector.format(period=period).upper()
+        candidates = [col for col in data.columns if selector == col.upper()]
+
+    upper = name.upper()
+    if not candidates:
+        candidates = [
+            col for col in data.columns if upper in col.upper() and str(period) in col
+        ]
     if not candidates:
         candidates = [col for col in data.columns if upper in col.upper()]
     if not candidates:
@@ -298,9 +316,17 @@ def _build_signals(
         return entries.astype(bool), exits.astype(bool)
 
     if template == "rsi_mean_reversion":
-        rsi = _resolve_indicator_series(data, indicator="rsi", period=14)
-        entries = (rsi <= 30).fillna(False)
-        exits = (rsi >= 55).fillna(False)
+        indicator_params = normalize_indicator_parameters(
+            "rsi",
+            config.get("parameters"),
+        )
+        rsi = _resolve_indicator_series(
+            data,
+            indicator=str(indicator_params["indicator"]),
+            period=int(indicator_params["indicator_period"]),
+        )
+        entries = (rsi <= float(indicator_params["entry_threshold"])).fillna(False)
+        exits = (rsi >= float(indicator_params["exit_threshold"])).fillna(False)
         return entries.astype(bool), exits.astype(bool)
 
     if template == "moving_average_crossover":
@@ -704,6 +730,9 @@ def build_result_card(
         ]
         if bool(realism["enabled"]):
             assumptions[4] = "Execution realism enabled (fees/slippage applied)."
+
+    if config["template"] == "rsi_mean_reversion":
+        assumptions.extend(indicator_assumption_lines(config.get("parameters") or {}))
 
     rows = [
         {

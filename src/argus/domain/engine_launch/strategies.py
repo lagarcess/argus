@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from argus.domain.engine_launch.models import LaunchBacktestRequest
+from argus.domain.indicators import normalize_indicator_parameters
 
 
 def normalize_template_name(request: LaunchBacktestRequest) -> str:
@@ -23,41 +24,40 @@ def validate_launch_supported(request: LaunchBacktestRequest) -> None:
     if not request.entry_rule or not request.exit_rule:
         raise ValueError("missing_threshold_rules")
 
-    if not _is_supported_rsi_rule(
-        request.entry_rule,
-        indicator="rsi",
-        operator="below",
-        threshold=30.0,
-    ):
-        raise ValueError("unsupported_indicator_threshold")
-
-    if not _is_supported_rsi_rule(
-        request.exit_rule,
-        indicator="rsi",
-        operator="above",
-        threshold=55.0,
-    ):
+    if _indicator_threshold_parameters(request) is None:
         raise ValueError("unsupported_indicator_threshold")
 
 
-def _is_supported_rsi_rule(
-    rule: dict[str, Any],
-    *,
-    indicator: str,
-    operator: str,
-    threshold: float,
-) -> bool:
-    raw_indicator = str(rule.get("indicator", "")).strip().lower()
-    raw_operator = str(rule.get("operator", "")).strip().lower()
-    raw_threshold = rule.get("threshold")
+def indicator_threshold_parameters(request: LaunchBacktestRequest) -> dict[str, Any]:
+    parameters = _indicator_threshold_parameters(request)
+    if parameters is None:
+        raise ValueError("unsupported_indicator_threshold")
+    return parameters
+
+
+def _indicator_threshold_parameters(
+    request: LaunchBacktestRequest,
+) -> dict[str, Any] | None:
+    if not request.entry_rule or not request.exit_rule:
+        return None
+
+    entry_indicator = str(request.entry_rule.get("indicator") or "rsi")
+    exit_indicator = str(request.exit_rule.get("indicator") or entry_indicator)
+    entry_operator = str(request.entry_rule.get("operator") or "").strip().lower()
+    exit_operator = str(request.exit_rule.get("operator") or "").strip().lower()
+    if entry_operator != "below" or exit_operator != "above":
+        return None
+    if entry_indicator.strip().lower() != exit_indicator.strip().lower():
+        return None
 
     try:
-        normalized_threshold = float(raw_threshold)
-    except (TypeError, ValueError):
-        return False
-
-    return (
-        raw_indicator == indicator
-        and raw_operator == operator
-        and normalized_threshold == threshold
-    )
+        return normalize_indicator_parameters(
+            entry_indicator,
+            {
+                **request.parameters,
+                "entry_threshold": request.entry_rule.get("threshold"),
+                "exit_threshold": request.exit_rule.get("threshold"),
+            },
+        )
+    except ValueError:
+        return None

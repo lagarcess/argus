@@ -11,6 +11,7 @@ from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     resolve_date_range,
 )
+from argus.domain.indicators import detect_executable_indicator_key
 from argus.domain.market_data import resolve_asset
 
 
@@ -511,12 +512,8 @@ def _parse_indicator_rule(
     else:
         return None
 
-    indicator = default_indicator
-    if "rsi" in text:
-        indicator = "rsi"
-
     return {
-        "indicator": indicator,
+        "indicator": detect_executable_indicator_key(text, default=default_indicator),
         "operator": operator,
         "threshold": float(threshold_match.group(1)),
     }

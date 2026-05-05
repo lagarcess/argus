@@ -211,6 +211,56 @@ def test_validate_backtest_config_rejects_custom_parameters() -> None:
         engine.validate_backtest_config(config)
 
 
+def test_validate_backtest_config_accepts_custom_rsi_thresholds() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {
+                "rsi_period": 10,
+                "buy_threshold": 25,
+                "sell_threshold": 60,
+            },
+        }
+    )
+
+    engine.validate_backtest_config(config)
+
+    assert config["parameters"]["indicator"] == "rsi"
+    assert config["parameters"]["indicator_period"] == 10
+    assert config["parameters"]["entry_threshold"] == 25.0
+    assert config["parameters"]["exit_threshold"] == 60.0
+
+
+def test_validate_backtest_config_rejects_out_of_bounds_indicator_threshold() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "rsi_mean_reversion",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {"entry_threshold": 120},
+        }
+    )
+
+    with pytest.raises(ValueError, match="indicator_threshold_out_of_bounds"):
+        engine.validate_backtest_config(config)
+
+
 def test_validate_backtest_config_rejects_lookback_over_three_years() -> None:
     config = engine.normalize_backtest_config(
         {
