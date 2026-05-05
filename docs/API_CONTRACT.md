@@ -113,6 +113,7 @@ Every API response should include rate-limit headers where applicable:
 ## Asset Classes (Alpha Enum)
 - `equity`
 - `crypto`
+- `currency_pair`
 
 ## Backtest Status (Alpha Enum)
 - `queued`
@@ -361,7 +362,7 @@ A saved executable idea backed by a supported template.
 - One strategy may apply to one symbol or multiple symbols.
 - Maximum 5 symbols.
 - All symbols must be from the same asset class.
-- Mixed equity + crypto backtests return **422 Unprocessable Content**.
+- Mixed equity + crypto + currency-pair backtests return **422 Unprocessable Content**.
 - Cross-asset strategies are deferred.
 - Strategy surface metric preferences apply only to strategy surface displays.
 - Symbol-level strategy surface rows should be derived from the most recent or selected run, represented by `as_of_run_id`.
@@ -525,6 +526,7 @@ Metrics are grouped into categories.
 ## Benchmark Defaults
 - **equity** -> `SPY`
 - **crypto** -> `BTC`
+- **currency_pair** -> the tested pair itself, for example `EURUSD`
 
 **Notes on units:**
 - `_pct` means percent value (e.g., `18.4` = 18.4%).
@@ -570,7 +572,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - `side`: "long"
 - `starting_capital`: 10000
 - `allocation_method`: "equal_weight"
-- `benchmark_symbol`: `SPY` (equity), `BTC` (crypto)
+- `benchmark_symbol`: `SPY` (equity), `BTC` (crypto), tested pair (`currency_pair`)
 - `parameters`: Template-specific defaults
 
 ## Constraints & Validation (Alpha MVP)
@@ -592,6 +594,12 @@ The canonical backtest config used by the engine for execution and reproducibili
 - **Maximum:** 5 symbols
 - **Rules:** Same asset class required. Cross-asset multi-symbol backtests are deferred.
 - *Return 422 for violations.*
+
+### Provider Availability
+- **Equity:** Alpaca is the primary availability and OHLC provider.
+- **Crypto:** Alpaca is primary; Kraken public OHLC may be used as fallback when available.
+- **Currency pairs:** Kraken public market data is the provider. The UI may label this asset class as "Currency" or "Forex".
+- **Kraken OHLC limit:** Kraken returns only the latest 720 candles for a requested interval. Requests outside that provider window must return a natural recovery response asking the user to shorten the date range or use a wider timeframe.
 
 ### Timeframe & Lookback
 - **Supported:** "1h", "2h", "4h", "6h", "12h", "1D"
@@ -1216,7 +1224,7 @@ Mixed recent activity feed.
 - `limit`
 - `cursor`
 - `type=all|chat|strategy|collection|run`
-- `asset_class=equity|crypto` (Optional filter)
+- `asset_class=equity|crypto|currency_pair` (Optional filter)
 
 **Response:**
 ```json

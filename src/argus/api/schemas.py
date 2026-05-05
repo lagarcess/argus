@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
 Theme = Literal["dark", "light", "system"]
-AssetClass = Literal["equity", "crypto"]
+AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]

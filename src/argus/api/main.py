@@ -544,7 +544,7 @@ def _build_runtime_backtest_run(
     except ValueError:
         asset_class = "equity"
 
-    benchmark_symbol = "BTC" if asset_class == "crypto" else "SPY"
+    benchmark_symbol = default_benchmark(asset_class, symbols)
     if isinstance(benchmark_metrics, dict):
         candidate_benchmark = benchmark_metrics.get("benchmark_symbol")
         if isinstance(candidate_benchmark, str) and candidate_benchmark:
@@ -1299,6 +1299,13 @@ def _raise_backtest_problem(
             503,
             "Market Data Unavailable",
             "Market data is temporarily unavailable. Please retry shortly.",
+        ),
+        "kraken_ohlc_window_exceeded": (
+            422,
+            "Kraken Data Window Exceeded",
+            "Currency and Kraken crypto data can use only the latest 720 "
+            "candles for the selected timeframe. Choose a shorter date range "
+            "or a wider timeframe.",
         ),
     }
     status_code, title, detail = mapping.get(

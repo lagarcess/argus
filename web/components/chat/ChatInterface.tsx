@@ -41,6 +41,7 @@ import {
   resultCardFromRun,
   streamChatMessage,
   type ApiMessage,
+  type AssetClass,
   type ChatActionRequest,
   type ConversationResultCard,
   type HistoryItem,
@@ -232,7 +233,7 @@ export default function ChatInterface() {
     strategyName: string;
     symbols: string[];
     template: string;
-    assetClass: "equity" | "crypto";
+    assetClass: AssetClass;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
@@ -842,7 +843,7 @@ export default function ChatInterface() {
       const runId = parts[2];
       const strategyId = parts[3] || null;
       const symbols = (parts[4] ?? "").split(",").filter(Boolean);
-      const assetClass = (parts[5] ?? "equity") as "equity" | "crypto";
+      const assetClass = (parts[5] ?? "equity") as AssetClass;
       // Find the result card title from messages for strategy name
       const resultMsg = messages.find(
         (m) => m.kind === "strategy_result" && m.result,

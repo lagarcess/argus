@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
 from dataclasses import dataclass
 from typing import Literal
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import AssetClass as AlpacaAssetClass
 from alpaca.trading.enums import AssetStatus
 from alpaca.trading.requests import GetAssetsRequest
 
-AssetClass = Literal["equity", "crypto"]
+AssetClass = Literal["equity", "crypto", "currency_pair"]
 
 
 @dataclass(frozen=True)
@@ -30,7 +33,11 @@ ASSET_SEARCH_ALIASES = {
     "btc": ("BTC", "BTCUSD"),
     "ethereum": ("ETH", "ETHUSD"),
     "ether": ("ETH", "ETHUSD"),
+    "euro dollar": ("EURUSD",),
+    "eur usd": ("EURUSD",),
+    "eurusd": ("EURUSD",),
     "facebook": ("META",),
+    "forex": ("EURUSD",),
     "google": ("GOOG", "GOOGL"),
     "meta": ("META",),
     "microsoft": ("MSFT",),
@@ -43,6 +50,9 @@ ASSET_SEARCH_ALIASES = {
 _ASSET_ALIAS_MAP: dict[str, ResolvedAsset] | None = None
 _ASSET_CACHE_TS: float = 0.0
 _ASSET_CACHE_LOCK = threading.Lock()
+KRAKEN_PUBLIC_API_BASE = "https://api.kraken.com/0"
+FIAT_CODES = {"USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"}
+KRAKEN_CRYPTO_ALIASES = {"XBT": "BTC", "XXBT": "BTC", "XETH": "ETH"}
 
 
 def _cache_ttl_seconds() -> int:
@@ -58,10 +68,38 @@ def _normalize_symbol(symbol: str) -> str:
     return symbol.strip().upper().replace("-", "/")
 
 
+def _compact_symbol(symbol: str) -> str:
+    return _normalize_symbol(symbol).replace("/", "")
+
+
+def _kraken_public_get(path: str, params: dict[str, object] | None = None) -> dict:
+    query = f"?{urlencode(params)}" if params else ""
+    request = Request(
+        f"{KRAKEN_PUBLIC_API_BASE}{path}{query}",
+        headers={"User-Agent": "Argus/1.0"},
+    )
+    with urlopen(request, timeout=10) as response:  # noqa: S310 - fixed public Kraken API base
+        payload = json.loads(response.read().decode("utf-8"))
+    if payload.get("error"):
+        raise ValueError("asset_universe_unavailable")
+    return payload
+
+
 def _canonicalize_crypto_symbol(symbol: str) -> str:
     normalized = _normalize_symbol(symbol).replace("/", "")
     if normalized.endswith("USD") and len(normalized) > 3:
         return normalized[:-3]
+    return normalized
+
+
+def _canonicalize_kraken_asset(asset: str) -> str:
+    normalized = _compact_symbol(asset)
+    if normalized in KRAKEN_CRYPTO_ALIASES:
+        return KRAKEN_CRYPTO_ALIASES[normalized]
+    if normalized.startswith("Z") and len(normalized) == 4:
+        return normalized[1:]
+    if normalized.startswith("X") and len(normalized) == 4:
+        return normalized[1:]
     return normalized
 
 
@@ -85,6 +123,8 @@ def _add_aliases(
     if record.asset_class == "crypto":
         base_aliases.add(f"{canonical}/USD")
         base_aliases.add(f"{canonical}USD")
+    if record.asset_class == "currency_pair" and len(canonical) == 6:
+        base_aliases.add(f"{canonical[:3]}/{canonical[3:]}")
 
     for alias in base_aliases:
         aliases[alias] = record
@@ -141,6 +181,64 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
     return aliases
 
 
+def _load_assets_from_kraken() -> dict[str, ResolvedAsset]:
+    payload = _kraken_public_get("/public/AssetPairs")
+    pairs = payload.get("result")
+    if not isinstance(pairs, dict):
+        raise ValueError("asset_universe_unavailable")
+
+    aliases: dict[str, ResolvedAsset] = {}
+    for key, row in pairs.items():
+        if not isinstance(row, dict) or row.get("status") not in {None, "online"}:
+            continue
+        altname = str(row.get("altname") or key).upper()
+        wsname = str(row.get("wsname") or altname)
+        base = _canonicalize_kraken_asset(str(row.get("base") or altname[:3]))
+        quote = _canonicalize_kraken_asset(str(row.get("quote") or altname[-3:]))
+        if not base or not quote:
+            continue
+
+        is_currency_pair = base in FIAT_CODES and quote in FIAT_CODES
+        asset_class: AssetClass = "currency_pair" if is_currency_pair else "crypto"
+        canonical = f"{base}{quote}" if is_currency_pair else base
+        raw_symbol = altname if is_currency_pair else f"{base}/USD"
+        name = f"{base}/{quote}" if is_currency_pair else wsname
+        if asset_class == "crypto" and quote != "USD":
+            continue
+
+        resolved = ResolvedAsset(
+            canonical_symbol=canonical,
+            asset_class=asset_class,
+            name=name,
+            raw_symbol=raw_symbol,
+        )
+        _add_aliases(aliases, resolved, canonical=canonical)
+        aliases[_normalize_symbol(altname)] = resolved
+        aliases[_compact_symbol(altname)] = resolved
+        aliases[wsname.lower().strip()] = resolved
+        if is_currency_pair:
+            aliases[f"{base.lower()} {quote.lower()}"] = resolved
+            aliases[f"{base.lower()}/{quote.lower()}"] = resolved
+            if base == "EUR" and quote == "USD":
+                aliases["euro dollar"] = resolved
+
+    return aliases
+
+
+def _load_asset_universe() -> dict[str, ResolvedAsset]:
+    aliases: dict[str, ResolvedAsset] = {}
+    first_error: Exception | None = None
+    for loader in (_load_assets_from_alpaca, _load_assets_from_kraken):
+        try:
+            aliases.update(loader())
+        except Exception as exc:
+            first_error = first_error or exc
+
+    if not aliases:
+        raise ValueError("asset_universe_unavailable") from first_error
+    return aliases
+
+
 def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
     global _ASSET_ALIAS_MAP, _ASSET_CACHE_TS
 
@@ -153,7 +251,7 @@ def _refresh_asset_cache_if_needed(*, force: bool = False) -> None:
         now = time.time()
         expired = (now - _ASSET_CACHE_TS) >= ttl
         if force or _ASSET_ALIAS_MAP is None or expired:
-            _ASSET_ALIAS_MAP = _load_assets_from_alpaca()
+            _ASSET_ALIAS_MAP = _load_asset_universe()
             _ASSET_CACHE_TS = now
 
 

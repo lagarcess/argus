@@ -203,7 +203,7 @@ Represents a saved, executable strategy idea backed by an engine template.
 - **Symbols**: Min 1, Max 5.
 - **Asset Class**: All symbols must share the same asset class.
 - **Side**: Long-only (Short is deferred).
-- **Asset Classes**: `equity`, `crypto`.
+- **Asset Classes**: `equity`, `crypto`, `currency_pair`.
 - **Note**: Strategies may target multiple symbols but only within the same `asset_class`.
 
 > [!TIP]
@@ -279,7 +279,7 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 
 ### Notes
 - Runs are immutable after completion.
-- `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto).
+- `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
 ---
 
 # 12. Backtest Metrics Shape
@@ -309,6 +309,7 @@ Backtest results use a standardized nested shape.
 - Aggregate metrics for grouped symbols compare against the class benchmark:
   - Equity groups vs **SPY**
   - Crypto groups vs **BTC** (excluding stablecoins)
+  - Currency-pair groups vs the tested pair itself
 ---
 
 # 13. usage_counters

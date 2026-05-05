@@ -31,8 +31,6 @@ def _patch_asset_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_resolve_asset(symbol: str) -> ResolvedAsset:
         candidate = symbol.strip().upper().replace("-", "/")
         compact = candidate.replace("/", "")
-        if compact.endswith("USD") and len(compact) > 3:
-            compact = compact[:-3]
 
         if compact in {"AAPL", "TSLA", "MSFT", "NVDA", "SPY"}:
             return ResolvedAsset(
@@ -42,6 +40,22 @@ def _patch_asset_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
                 raw_symbol=compact,
             )
         if compact in {"BTC", "ETH", "SOL", "USDC", "USDT"}:
+            return ResolvedAsset(
+                canonical_symbol=compact,
+                asset_class="crypto",
+                name=compact,
+                raw_symbol=compact,
+            )
+        if compact in {"EURUSD", "USDJPY"}:
+            return ResolvedAsset(
+                canonical_symbol=compact,
+                asset_class="currency_pair",
+                name=compact,
+                raw_symbol=compact,
+            )
+        if compact.endswith("USD") and len(compact) > 3:
+            compact = compact[:-3]
+        if compact in {"BTC", "ETH", "SOL"}:
             return ResolvedAsset(
                 canonical_symbol=compact,
                 asset_class="crypto",
@@ -60,6 +74,7 @@ def _patch_market_data(monkeypatch: pytest.MonkeyPatch) -> None:
         "MSFT": _make_bars([100, 101, 102, 103, 104, 106, 108]),
         "SPY": _make_bars([100, 101, 102, 103, 104, 105, 106]),
         "BTC": _make_bars([100, 103, 104, 108, 110, 111, 113]),
+        "EURUSD": _make_bars([100, 100.5, 99.5, 101, 102, 101.5, 103]),
     }
 
     def fake_fetch_ohlcv(
@@ -131,6 +146,29 @@ def test_normalize_backtest_config_timeframe_variants(
         }
     )
     assert config["timeframe"] == expected
+
+
+def test_currency_pair_config_uses_same_pair_as_default_benchmark() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "currency_pair",
+            "symbols": ["EUR/USD"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "parameters": {},
+        }
+    )
+
+    assert config["asset_class"] == "currency_pair"
+    assert config["symbols"] == ["EURUSD"]
+    assert config["benchmark_symbol"] == "EURUSD"
+    metrics = engine.compute_alpha_metrics(config)
+    assert metrics["aggregate"]["performance"]["total_return_pct"] > 0
 
 
 def test_validate_backtest_config_rejects_stablecoins() -> None:
@@ -265,26 +303,26 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     # Case 1: Single symbol
     card = engine.build_result_card(config, metrics)
     actions = [a["type"] for a in card["actions"]]
-    assert "chat_refinement" in actions
-    assert card["actions"][0]["label"] == "Try adding more symbols"
+    assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
+    assert card["actions"][0]["label"] == "Show a breakdown"
 
     # Case 2: Multi-symbol (between 2 and 4)
     config["symbols"] = ["AAPL", "MSFT"]
     card = engine.build_result_card(config, metrics)
     actions = [a["type"] for a in card["actions"]]
-    assert "add_to_collection" in actions
-    assert card["actions"][0]["label"] == "Add to collection"
+    assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
+    assert card["actions"][1]["label"] == "Save strategy"
 
     # Case 3: Max symbols (5)
     config["symbols"] = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"]
     card = engine.build_result_card(config, metrics)
     actions = [a["type"] for a in card["actions"]]
-    assert "add_to_collection" in actions
-    assert card["actions"][0]["label"] == "Save this to a collection"
+    assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
+    assert all(action["presentation"] == "result" for action in card["actions"])
 
     # Verify Spanish labels
     card = engine.build_result_card(config, metrics, language="es-419")
-    assert card["actions"][0]["label"] == "Añadir a colección"
+    assert card["actions"][1]["label"] == "Guardar estrategia"
 
 
 def test_validate_template_parameters_rejects_unknown():
@@ -319,7 +357,7 @@ def test_validate_template_parameters_rejects_invalid_value():
         "benchmark_symbol": "SPY",
         "parameters": {"dca_cadence": "hourly"},  # Only daily/weekly/monthly allowed
     }
-    with pytest.raises(ValueError, match="unsupported_parameters"):
+    with pytest.raises(ValueError, match="unsupported_parameter_value_dca_cadence"):
         engine.validate_backtest_config(config)
 
 

@@ -4,7 +4,7 @@ import { normalizeEnabledLanguage } from "./language-features";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
-export type AssetClass = "equity" | "crypto";
+export type AssetClass = "equity" | "crypto" | "currency_pair";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";

@@ -20,7 +20,7 @@ except Exception:  # pragma: no cover - accessor may already be available
 
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
-AssetClass = Literal["equity", "crypto"]
+AssetClass = Literal["equity", "crypto", "currency_pair"]
 
 ALLOWED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys())
 
@@ -40,8 +40,12 @@ def classify_symbol(symbol: str) -> SymbolAsset:
     return SymbolAsset(symbol=resolved.canonical_symbol, asset_class=resolved.asset_class)
 
 
-def default_benchmark(asset_class: AssetClass) -> str:
-    return "SPY" if asset_class == "equity" else "BTC"
+def default_benchmark(asset_class: AssetClass, symbols: list[str] | None = None) -> str:
+    if asset_class == "equity":
+        return "SPY"
+    if asset_class == "currency_pair":
+        return symbols[0] if symbols else "EURUSD"
+    return "BTC"
 
 
 def _normalize_timeframe(timeframe: str | None) -> str:
@@ -140,7 +144,7 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("invalid_benchmark_symbol")
         benchmark_symbol = benchmark_asset.symbol
     else:
-        benchmark_symbol = default_benchmark(asset_class)
+        benchmark_symbol = default_benchmark(asset_class, symbols)
 
     config = {
         "template": payload["template"],
