@@ -759,16 +759,19 @@ def build_result_card(
             "value": f"{risk['max_drawdown_pct']:.1f}%",
         },
         {
-            "key": "win_rate",
-            "label": "Tasa de Acierto" if is_es else "Win Rate",
-            "value": f"{efficiency['win_rate'] * 100:.1f}%",
-        },
-        {
             "key": "benchmark_delta",
             "label": "Vs referencia" if is_es else "Vs benchmark",
             "value": f"{performance['delta_vs_benchmark_pct']:+.1f} pts vs {config['benchmark_symbol']}",
         },
     ]
+    if _should_show_win_rate(config, efficiency):
+        rows.append(
+            {
+                "key": "win_rate",
+                "label": "Tasa de Acierto" if is_es else "Win Rate",
+                "value": f"{efficiency['win_rate'] * 100:.1f}%",
+            }
+        )
 
     actions = [
         {
@@ -810,3 +813,9 @@ def build_result_card(
         "benchmark_note": benchmark_note,
         "actions": actions,
     }
+
+
+def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) -> bool:
+    if config["template"] in {"buy_and_hold", "dca_accumulation"}:
+        return False
+    return int(efficiency.get("total_trades", 0) or 0) > 1

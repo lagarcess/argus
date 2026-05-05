@@ -28,12 +28,11 @@ def test_rsi_has_executable_spec_with_bounds_defaults_and_formatting() -> None:
 
 
 def test_discovered_indicators_remain_draft_only_without_execution_spec() -> None:
+    result = search_indicators("moving average convergence divergence")[0]
+
     assert executable_indicator_spec("macd") is None
-    assert search_indicators("moving average convergence divergence")[0].key == "macd"
-    assert search_indicators("moving average convergence divergence")[0].support_status
-    assert search_indicators("moving average convergence divergence")[0].support_status == (
-        "draft_only"
-    )
+    assert result.key == "macd"
+    assert result.support_status == "draft_only"
 
 
 def test_normalize_indicator_parameters_accepts_aliases_and_defaults() -> None:

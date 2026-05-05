@@ -298,6 +298,118 @@ def test_build_benchmark_curve_aligns_and_normalizes() -> None:
     assert curve["equity_curve"][0] == pytest.approx(1.0, abs=1e-6)
 
 
+def test_buy_and_hold_metrics_match_total_return_benchmark_and_profit() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+        }
+    )
+
+    metrics = engine.compute_alpha_metrics(config)
+    performance = metrics["aggregate"]["performance"]
+
+    assert performance["total_return_pct"] == pytest.approx(12.0, abs=0.05)
+    assert performance["benchmark_return_pct"] == pytest.approx(6.0, abs=0.05)
+    assert performance["delta_vs_benchmark_pct"] == pytest.approx(6.0, abs=0.05)
+    assert performance["profit"] == pytest.approx(1200.0, abs=1)
+
+
+def test_max_drawdown_uses_peak_inside_selected_period() -> None:
+    equity = pd.Series([100.0, 150.0, 120.0, 180.0])
+
+    assert engine._max_drawdown_pct(equity) == pytest.approx(-20.0)
+
+
+def test_dca_metrics_use_actual_invested_cash_flows() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "dca_accumulation",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 100,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {"dca_cadence": "daily"},
+        }
+    )
+
+    metrics = engine.compute_alpha_metrics(config)
+
+    assert metrics["aggregate"]["efficiency"]["total_trades"] == 7
+    assert metrics["aggregate"]["performance"]["profit"] == pytest.approx(40.68, abs=0.1)
+
+
+def test_multi_symbol_aggregate_uses_equal_weight_capital() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL", "MSFT"],
+            "timeframe": "1D",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 1, 7),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+        }
+    )
+
+    metrics = engine.compute_alpha_metrics(config)
+
+    assert metrics["aggregate"]["performance"]["total_return_pct"] == pytest.approx(
+        10.0,
+        abs=0.05,
+    )
+    assert set(metrics["by_symbol"]) == {"AAPL", "MSFT"}
+
+
+def test_indicator_signals_use_user_selected_thresholds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    index = pd.date_range("2025-01-01", periods=5, freq="D", tz="UTC")
+    bars = pd.DataFrame({"close": [100, 101, 102, 103, 104]}, index=index)
+    monkeypatch.setattr(
+        engine,
+        "_resolve_indicator_series",
+        lambda data, *, indicator, period, fallback_col="close": pd.Series(
+            [35, 24, 29, 61, 50],
+            index=data.index,
+        ),
+    )
+
+    entries, exits = engine._build_signals(
+        {
+            "template": "rsi_mean_reversion",
+            "parameters": {
+                "indicator": "rsi",
+                "indicator_period": 10,
+                "entry_threshold": 25,
+                "exit_threshold": 60,
+            },
+        },
+        bars,
+    )
+
+    assert entries.tolist() == [False, True, False, False, False]
+    assert exits.tolist() == [False, False, False, True, False]
+
+
 def test_compute_alpha_metrics_preserves_contract_shape_multi_symbol() -> None:
     config = engine.normalize_backtest_config(
         {
@@ -352,6 +464,14 @@ def test_build_result_card_actions_by_symbol_count() -> None:
 
     # Case 1: Single symbol
     card = engine.build_result_card(config, metrics)
+    row_keys = [row["key"] for row in card["rows"]]
+    assert row_keys[:4] == [
+        "total_return_pct",
+        "cash_value",
+        "max_drawdown_pct",
+        "benchmark_delta",
+    ]
+    assert "win_rate" in row_keys
     actions = [a["type"] for a in card["actions"]]
     assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
     assert card["actions"][0]["label"] == "Show a breakdown"
@@ -373,6 +493,42 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     # Verify Spanish labels
     card = engine.build_result_card(config, metrics, language="es-419")
     assert card["actions"][1]["label"] == "Guardar estrategia"
+
+
+def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:
+    config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-01-07",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 5.0,
+                "delta_vs_benchmark_pct": 1.0,
+                "profit": 500.0,
+            },
+            "risk": {"max_drawdown_pct": 2.0},
+            "efficiency": {"win_rate": 1.0, "total_trades": 1},
+        }
+    }
+
+    card = engine.build_result_card(config, metrics)
+
+    assert [row["key"] for row in card["rows"]] == [
+        "total_return_pct",
+        "cash_value",
+        "max_drawdown_pct",
+        "benchmark_delta",
+    ]
 
 
 def test_validate_template_parameters_rejects_unknown():
