@@ -69,11 +69,17 @@ def log_openrouter_failure(
     message: str,
 ) -> None:
     profile = OPENROUTER_PROFILES[task]
+    resolved_model = resolve_openrouter_model(model_name)
+    error_type = type(exc).__name__
     logger.warning(
-        message,
+        (
+            f"{message} "
+            f"task={task} model={resolved_model} "
+            f"max_tokens={profile.max_tokens} error_type={error_type}"
+        ),
         llm_task=task,
-        model=resolve_openrouter_model(model_name),
+        model=resolved_model,
         max_tokens=profile.max_tokens,
-        error_type=type(exc).__name__,
+        error_type=error_type,
         error=str(exc),
     )

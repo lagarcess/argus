@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 import pytest
 from argus.domain.engine import _build_signals
@@ -698,3 +700,37 @@ def test_build_signals_supports_quarterly_dca_cadence() -> None:
 
     assert entries.tolist() == [True, False, False, True, False, False, True, False]
     assert exits.tolist() == [False] * len(index)
+
+
+def test_build_signals_monthly_dca_does_not_warn_for_timezone_index() -> None:
+    index = pd.date_range("2024-01-02", periods=4, freq="MS", tz="UTC")
+    data = pd.DataFrame({"close": [100, 101, 102, 103]}, index=index)
+    config = {
+        "template": "dca_accumulation",
+        "parameters": {"dca_cadence": "monthly"},
+    }
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "error",
+            message="Converting to PeriodArray/Index representation will drop timezone information.",
+            category=UserWarning,
+        )
+        entries, exits = _build_signals(config, data)
+
+    assert entries.tolist() == [True, True, True, True]
+    assert exits.tolist() == [False] * len(index)
+
+
+def test_build_signals_preserves_rule_template_branches_after_rsi() -> None:
+    index = pd.date_range("2024-01-01", periods=80, freq="D")
+    data = pd.DataFrame(
+        {"close": [100 + step for step in range(len(index))]},
+        index=index,
+    )
+    config = {"template": "moving_average_crossover", "parameters": {}}
+
+    entries, exits = _build_signals(config, data)
+
+    assert len(entries) == len(index)
+    assert len(exits) == len(index)

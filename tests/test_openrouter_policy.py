@@ -11,6 +11,7 @@ from argus.agent_runtime.stages.interpret import InterpretationRequest
 from argus.agent_runtime.state.models import UserState
 from argus.domain.orchestrator import ChatTurnIntent, classify_chat_turn_intent
 from argus.llm import openrouter
+from argus.llm.openrouter import log_openrouter_failure
 
 
 class FakeChatOpenRouter:
@@ -134,3 +135,27 @@ def test_legacy_chat_composer_uses_bounded_profile(monkeypatch) -> None:
         "temperature": 0.2,
         "max_tokens": 1200,
     }
+
+
+def test_openrouter_failure_log_includes_visible_diagnostics(monkeypatch) -> None:
+    observed: list[tuple[str, dict[str, object]]] = []
+
+    def warning_stub(message: str, **kwargs: object) -> None:
+        observed.append((message, kwargs))
+
+    monkeypatch.setattr("argus.llm.openrouter.logger.warning", warning_stub)
+
+    log_openrouter_failure(
+        task="interpretation",
+        model_name="test/model",
+        exc=RuntimeError("provider rejected request"),
+        message="LLM interpretation failed; falling back",
+    )
+
+    message, kwargs = observed[0]
+    assert "task=interpretation" in message
+    assert "model=test/model" in message
+    assert "max_tokens=1200" in message
+    assert "error_type=RuntimeError" in message
+    assert "provider rejected request" not in message
+    assert kwargs["error_type"] == "RuntimeError"

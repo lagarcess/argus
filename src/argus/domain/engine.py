@@ -300,11 +300,11 @@ def _build_signals(
             entries[:] = True
         elif cadence == "weekly":
             # Entry on the first day of each week present in data
-            weeks = index.to_series().dt.to_period("W")
+            weeks = _index_period_series(index, freq="W")
             entries = weeks != weeks.shift(1)
         elif cadence == "monthly":
             # Entry on the first day of each month present in data
-            months = index.to_series().dt.to_period("M")
+            months = _index_period_series(index, freq="M")
             entries = months != months.shift(1)
         elif cadence == "quarterly":
             entries.iloc[::3] = True
@@ -356,6 +356,13 @@ def _build_signals(
         return entries.astype(bool), exits.astype(bool)
 
     raise ValueError("unsupported_template")
+
+
+def _index_period_series(index: pd.Index, *, freq: str) -> pd.Series:
+    datetime_index = pd.DatetimeIndex(index)
+    if datetime_index.tz is not None:
+        datetime_index = datetime_index.tz_convert(None)
+    return pd.Series(datetime_index.to_period(freq), index=index)
 
 
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
