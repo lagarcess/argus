@@ -1,5 +1,6 @@
 import { StrategyResultPayload } from "./types";
 import { useTranslation } from "react-i18next";
+import { splitPeriodDisplay } from "./card-formatting";
 
 type StrategyResultCardProps = {
   result: StrategyResultPayload;
@@ -7,14 +8,28 @@ type StrategyResultCardProps = {
 
 export default function StrategyResultCard({ result }: StrategyResultCardProps) {
   const { t } = useTranslation();
+  const period = splitPeriodDisplay(result.period);
+  const symbols = result.symbols ?? [];
   return (
     <section className="w-full rounded-[20px] border border-black/12 dark:border-white/12 bg-white dark:bg-[#1d2023] overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-black/8 dark:border-white/8">
         <div className="min-w-0">
-          <p className="text-[14px] sm:text-[15px] font-medium leading-snug tracking-tight text-black dark:text-white">
-            {result.strategyName}
+          {symbols.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <AssetSymbols symbols={symbols} />
+              <span className="text-[14px] font-medium leading-snug tracking-tight text-black dark:text-white sm:text-[15px]">
+                {result.strategyLabel ?? result.strategyName}
+              </span>
+            </div>
+          ) : (
+            <p className="text-[14px] sm:text-[15px] font-medium leading-snug tracking-tight text-black dark:text-white">
+              {result.strategyName}
+            </p>
+          )}
+          <p className="mt-1 text-[12px] leading-snug text-black/45 dark:text-white/45">
+            <span className="block">{period.label}</span>
+            {period.dates && <span className="block">{period.dates}</span>}
           </p>
-          <p className="text-[12px] leading-snug text-black/45 dark:text-white/45">{result.period}</p>
         </div>
         <span className="shrink-0 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:text-white/70">
           {result.statusLabel || t('chat.simulation_complete')}
@@ -65,5 +80,20 @@ export default function StrategyResultCard({ result }: StrategyResultCardProps) 
         </div>
       )}
     </section>
+  );
+}
+
+function AssetSymbols({ symbols }: { symbols: string[] }) {
+  return (
+    <span className="flex flex-wrap gap-x-1.5 gap-y-1">
+      {symbols.map((symbol) => (
+        <span
+          key={symbol}
+          className="rounded-[5px] border border-[#c2a44d]/25 bg-[#c2a44d]/10 px-1.5 py-0.5 text-[12px] font-semibold leading-none tracking-tight text-[#8b7329] dark:border-[#c2a44d]/30 dark:bg-[#c2a44d]/12 dark:text-[#d9c574]"
+        >
+          {symbol}
+        </span>
+      ))}
+    </span>
   );
 }

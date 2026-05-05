@@ -20,8 +20,20 @@ export type ChatActionOption = {
   payload?: Record<string, unknown>;
 };
 
+export type ChatMention = {
+  id: string;
+  type: "asset" | "indicator";
+  label: string;
+  symbol?: string | null;
+  description?: string | null;
+  insert_text: string;
+  support_status?: "supported" | "draft_only" | "unavailable";
+};
+
 export type StrategyResultPayload = {
   strategyName: string;
+  strategyLabel?: string;
+  symbols?: string[];
   period: string;
   benchmarkNote?: string;
   statusLabel?: string;
@@ -51,6 +63,7 @@ export type Message = {
   role: "user" | "ai";
   kind?: "text" | "strategy_result" | "strategy_confirmation";
   content?: string;
+  mentions?: ChatMention[];
   result?: StrategyResultPayload;
   confirmation?: StrategyConfirmationPayload;
   isLoadingResult?: boolean;

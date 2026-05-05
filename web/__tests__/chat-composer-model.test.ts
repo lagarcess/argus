@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  composerMentions,
   deleteTokenBeforeOffset,
   findMentionAtOffset,
   insertTextAtOffset,
@@ -48,6 +49,17 @@ describe("chat composer model", () => {
       { type: "text", text: " when it dips" },
     ]);
     expect(serializeComposerSegments(next)).toBe("Buy GOOG when it dips");
+    expect(composerMentions(next)).toEqual([
+      {
+        id: "asset:GOOG",
+        type: "asset",
+        label: "GOOG",
+        symbol: "GOOG",
+        description: "Alphabet Class C",
+        insert_text: "GOOG",
+        support_status: "supported",
+      },
+    ]);
   });
 
   test("inserting another token does not replace previous inline tokens", () => {

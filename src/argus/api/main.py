@@ -329,15 +329,21 @@ def _runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any]
     if strategy.get("exit_logic"):
         rows.append({"label": "Exit rule", "value": _format_confirmation_value(strategy["exit_logic"])})
     if strategy.get("capital_amount"):
-        rows.append({"label": "Contribution", "value": f"${float(strategy['capital_amount']):,.0f}"})
+        capital_label = (
+            "Contribution"
+            if _strategy_type_uses_cadence(canonical_strategy_type)
+            else "Starting capital"
+        )
+        rows.append({"label": capital_label, "value": f"${float(strategy['capital_amount']):,.0f}"})
 
     assumptions = _confirmation_assumptions(
         strategy=strategy,
         optional_parameters=optional_parameters,
     )
+    summary_period = _confirmation_period_without_parentheses(date_range)
     summary = (
         f"I read this as {assets} using {_article_for(strategy_type)} "
-        f"{strategy_type} approach over {date_range}."
+        f"{strategy_type} approach over {summary_period}."
     )
     return {
         "title": title,
@@ -384,9 +390,15 @@ def _confirmation_assumptions(
     optional_parameters: dict[str, Any],
 ) -> list[str]:
     assumptions: list[str] = []
+    strategy_type = executable_strategy_type(strategy)
+    strategy_capital = strategy.get("capital_amount")
+    if isinstance(strategy_capital, int | float):
+        if _strategy_type_uses_cadence(strategy_type):
+            assumptions.append(f"${float(strategy_capital):,.0f} recurring contribution")
+        else:
+            assumptions.append(f"${float(strategy_capital):,.0f} starting capital")
     initial_capital = _optional_parameter_value(optional_parameters, "initial_capital")
-    if isinstance(initial_capital, int | float):
-        strategy_type = executable_strategy_type(strategy)
+    if isinstance(initial_capital, int | float) and not isinstance(strategy_capital, int | float):
         if _strategy_type_uses_cadence(strategy_type) and strategy.get("capital_amount"):
             assumptions.append(f"${float(strategy['capital_amount']):,.0f} recurring contribution")
         else:
@@ -432,6 +444,13 @@ def _format_confirmation_period(value: Any) -> str:
     return resolve_date_range(value, today=_confirmation_today()).display
 
 
+def _confirmation_period_without_parentheses(value: str) -> str:
+    if "(" not in value or not value.endswith(")"):
+        return value
+    label, _, dates = value.partition("(")
+    return f"{label.strip()}, {dates[:-1].strip()}"
+
+
 def _strategy_type_uses_cadence(strategy_type: str) -> bool:
     normalized = strategy_type.strip().lower().replace("-", "_").replace(" ", "_")
     return normalized in {
@@ -472,16 +491,10 @@ def _build_runtime_backtest_run(
     if not isinstance(resolved_strategy, dict) or not isinstance(metrics, dict):
         return None
 
-    symbol = resolved_strategy.get("symbol")
-    if not isinstance(symbol, str) or not symbol:
-        asset_universe = resolved_strategy.get("asset_universe")
-        if isinstance(asset_universe, list) and asset_universe:
-            symbol = str(asset_universe[0])
-        elif isinstance(asset_universe, str) and asset_universe:
-            symbol = asset_universe
-        else:
-            return None
-    symbol = symbol.strip().upper()
+    symbols = _resolved_run_symbols(resolved_strategy)
+    if not symbols:
+        return None
+    symbol = symbols[0]
 
     try:
         asset_class = classify_symbol(symbol).asset_class
@@ -499,7 +512,7 @@ def _build_runtime_backtest_run(
     )
     config_snapshot = {
         "template": resolved_strategy.get("strategy_type", "strategy"),
-        "symbols": [symbol],
+        "symbols": symbols,
         "timeframe": resolved_parameters_dict.get("timeframe", "1D"),
         "date_range": resolved_parameters_dict.get("date_range"),
         "benchmark_symbol": benchmark_symbol,
@@ -513,7 +526,7 @@ def _build_runtime_backtest_run(
         strategy_id=None,
         status="completed",
         asset_class=asset_class,
-        symbols=[symbol],
+        symbols=symbols,
         allocation_method="equal_weight",
         benchmark_symbol=benchmark_symbol,
         metrics=metrics,
@@ -2267,6 +2280,25 @@ def search(
         items=[item for _, item in page_items],
         next_cursor=next_cursor,
     )
+
+
+def _resolved_run_symbols(resolved_strategy: dict[str, Any]) -> list[str]:
+    asset_universe = resolved_strategy.get("asset_universe")
+    raw_symbols: list[Any] = []
+    if isinstance(asset_universe, list):
+        raw_symbols.extend(asset_universe)
+    elif isinstance(asset_universe, str):
+        raw_symbols.append(asset_universe)
+    symbol = resolved_strategy.get("symbol")
+    if isinstance(symbol, str):
+        raw_symbols.append(symbol)
+
+    symbols: list[str] = []
+    for raw_symbol in raw_symbols:
+        candidate = str(raw_symbol).strip().upper()
+        if candidate and candidate not in symbols:
+            symbols.append(candidate)
+    return symbols
 
 
 @app.get("/api/v1/discovery/assets", response_model=DiscoveryResponse)

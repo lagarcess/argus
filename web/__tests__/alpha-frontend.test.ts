@@ -87,6 +87,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
   });
 
+  test("chat restores jump-to-latest affordance without forced reading jumps", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("scrollContainerRef");
+    expect(chat).toContain("showJumpToLatest");
+    expect(chat).toContain('aria-label="Jump to latest"');
+    expect(chat).toContain("distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX");
+    expect(chat).toContain("scrollToLatest");
+    expect(chat).toContain("shouldAutoScrollRef.current");
+  });
+
   test("chat hydrates persisted structured cards from message metadata", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");

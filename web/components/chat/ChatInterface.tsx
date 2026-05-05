@@ -3,6 +3,7 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 import {
   Archive,
+  ArrowDown,
   ChevronRight,
   History,
   PanelLeft,
@@ -53,7 +54,7 @@ import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
-import { type ChatActionOption, type Message, type StrategyConfirmationPayload } from "./types";
+import { type ChatActionOption, type ChatMention, type Message, type StrategyConfirmationPayload } from "./types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,8 @@ type OnboardingChoice = {
   title: string;
   description: string;
 };
+
+const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -149,7 +152,10 @@ export default function ChatInterface() {
   }>({ isOpen: false, type: "general" });
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const chatOptionsRef = useRef<HTMLDivElement>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
@@ -332,8 +338,28 @@ export default function ChatInterface() {
     };
   }, []);
 
+  const updateScrollPositionState = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
+    shouldAutoScrollRef.current = isNearBottom;
+    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
+  };
+
+  const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
+    bottomRef.current?.scrollIntoView({ behavior });
+    shouldAutoScrollRef.current = true;
+    setShowJumpToLatest(false);
+  };
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (shouldAutoScrollRef.current) {
+      scrollToLatest("smooth");
+    } else {
+      updateScrollPositionState();
+    }
   }, [messages.length, streamStatus]);
 
   // ── Load existing conversation ─────────────────────────────────────────────
@@ -472,17 +498,25 @@ export default function ChatInterface() {
 
   // ── Send message ───────────────────────────────────────────────────────────
 
-  const handleSend = async (text: string, action?: ChatActionOption) => {
+  const handleSend = async (
+    text: string,
+    mentionsOrAction?: ChatMention[] | ChatActionOption,
+    actionArg?: ChatActionOption,
+  ) => {
     const trimmed = text.trim();
     if (!trimmed || !conversationId) return;
+    const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
+    const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
 
     setIsSidebarOpen(false);
+    shouldAutoScrollRef.current = true;
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
       kind: "text",
       content: action?.label ?? trimmed,
+      mentions,
     };
     const assistantId = crypto.randomUUID();
 
@@ -615,6 +649,7 @@ export default function ChatInterface() {
     const assistantId = crypto.randomUUID();
 
     setMessages((prev) => {
+      shouldAutoScrollRef.current = true;
       const base = prev.map((m) => ({ ...m, actions: undefined }));
       if (isSkip) {
         return [...base, { id: assistantId, role: "ai", kind: "text", content: "" }];
@@ -1114,7 +1149,7 @@ export default function ChatInterface() {
           <div className="w-11 md:w-32" />
 
           {/* Title (Always Centered relative to Content) */}
-          <h1 className="pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+          <h1 className="font-display pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
             {currentView === "chat" && (messages.length > 0 ? t('common.conversation', 'Conversation') : t('chat.new_chat'))}
             {currentView === "strategies" && t('common.strategies')}
             {currentView === "collections" && t('common.collections')}
@@ -1245,7 +1280,7 @@ export default function ChatInterface() {
 
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-start px-4 pt-[35vh]">
-                <h1 className="mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
+                <h1 className="font-display mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
                   argus
                 </h1>
 
@@ -1350,7 +1385,11 @@ export default function ChatInterface() {
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_bottom,black_48%,transparent_100%)] dark:bg-[#141517]/80" />
 
                 {/* Messages */}
-                <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={updateScrollPositionState}
+                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]"
+                >
                   <div className="space-y-8">
                     {messages.map((msg) => (
                       <ChatMessage
@@ -1380,6 +1419,18 @@ export default function ChatInterface() {
                 <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
                 <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 px-4">
                   <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
+                    {showJumpToLatest && (
+                      <div className="mb-3 flex justify-center">
+                        <button
+                          type="button"
+                          aria-label="Jump to latest"
+                          onClick={() => scrollToLatest("smooth")}
+                          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/90 text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                     {inputActions.length > 0 && !streamStatus && (
                       <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {inputActions.map((action) => (

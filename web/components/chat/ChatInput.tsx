@@ -3,6 +3,7 @@ import { ArrowUp, AtSign } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { searchDiscovery, type DiscoveryItem } from "@/lib/argus-api";
 import {
+  composerMentions,
   deleteTokenBeforeOffset,
   findMentionAtOffset,
   insertTextAtOffset,
@@ -14,9 +15,10 @@ import {
   serializeComposerSegments,
   type ComposerSegment,
 } from "./composer-model";
+import type { ChatMention } from "./types";
 
 type ChatInputProps = {
-  onSend: (text: string) => void;
+  onSend: (text: string, mentions?: ChatMention[]) => void;
 };
 
 export default function ChatInput({ onSend }: ChatInputProps) {
@@ -162,9 +164,10 @@ export default function ChatInput({ onSend }: ChatInputProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const message = serializeComposerSegments(readCurrentSegments());
+    const current = readCurrentSegments();
+    const message = serializeComposerSegments(current);
     if (message) {
-      onSend(message);
+      onSend(message, composerMentions(current));
       setSegments([{ type: "text", text: "" }]);
       setComposerHasContent(false);
       setIsDiscoveryOpen(false);
@@ -229,7 +232,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
     <form
       onSubmit={handleSubmit}
       onClick={handleContainerClick}
-      className="relative flex min-h-[76px] w-full cursor-text items-end rounded-[32px] border border-black/5 bg-white transition-all focus-within:ring-2 focus-within:ring-black/20 dark:border-white/5 dark:bg-[#1f2227] dark:focus-within:ring-white/20"
+      className="relative flex min-h-[64px] w-full cursor-text items-end rounded-[32px] border border-black/5 bg-white transition-all focus-within:ring-2 focus-within:ring-black/20 dark:border-white/5 dark:bg-[#1f2227] dark:focus-within:ring-white/20"
     >
       {isDiscoveryOpen && (
         <div className="absolute bottom-full left-0 z-30 mb-2 w-full overflow-hidden rounded-[20px] border border-black/10 bg-white dark:border-white/10 dark:bg-[#1f2227]">
@@ -276,7 +279,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
         <AtSign className="h-4 w-4" />
       </button>
 
-      <div className="relative flex min-w-0 flex-1 flex-col justify-center py-3 pl-14 pr-2">
+      <div className="relative flex min-w-0 flex-1 flex-col justify-center py-2 pl-14 pr-2">
         <div
           ref={editorRef}
           data-testid="chat-input"
@@ -313,11 +316,11 @@ export default function ChatInput({ onSend }: ChatInputProps) {
               setDiscoveryItems(DEFAULT_DISCOVERY_ITEMS);
             }
           }}
-          className="min-h-[44px] flex-1 whitespace-pre-wrap break-words border-none bg-transparent p-0 text-[16px] font-medium leading-[1.45] tracking-tight text-black outline-none dark:text-white"
+          className="min-h-[34px] flex-1 whitespace-pre-wrap break-words border-none bg-transparent p-0 text-[16px] font-medium leading-[1.45] tracking-tight text-black outline-none dark:text-white"
         />
 
         {isMounted && animState === "idle" && composerIsEmpty && !isFocused && (
-          <div className="pointer-events-none absolute left-14 top-3 text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500">
+          <div className="pointer-events-none absolute left-14 top-2 text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500">
             {t("chat.input_placeholder")}
           </div>
         )}
@@ -325,7 +328,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
         {isMounted && animState !== "idle" && composerIsEmpty && (
           <div
             key={`${currentPromptIndex}-${animState === "exiting"}`}
-            className={`pointer-events-none absolute left-14 top-3 flex max-w-[calc(100%-4rem)] items-center overflow-hidden whitespace-nowrap text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500 ${animState === "exiting" ? "animate-argus-swoosh-up" : ""}`}
+            className={`pointer-events-none absolute left-14 top-2 flex max-w-[calc(100%-4rem)] items-center overflow-hidden whitespace-nowrap text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500 ${animState === "exiting" ? "animate-argus-swoosh-up" : ""}`}
           >
             {typedText}
             {animState === "typing" && (

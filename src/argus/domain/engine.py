@@ -762,6 +762,8 @@ def build_result_card(
     ]
     return {
         "title": f"{symbols} {template_display}",
+        "symbols": list(config["symbols"]),
+        "strategy_label": template_display,
         "date_range": {
             "start": config["start_date"],
             "end": config["end_date"],

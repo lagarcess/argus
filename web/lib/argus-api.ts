@@ -30,6 +30,8 @@ export type ApiMetricRow = {
 
 export type ConversationResultCard = {
   title: string;
+  symbols?: string[];
+  strategy_label?: string;
   date_range: {
     start: string;
     end: string;
@@ -211,6 +213,8 @@ export function resultCardFromConversationCard(
 ) {
   return {
     strategyName: card.title,
+    strategyLabel: card.strategy_label,
+    symbols: card.symbols,
     period: card.date_range.display,
     statusLabel: card.status_label,
     metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),

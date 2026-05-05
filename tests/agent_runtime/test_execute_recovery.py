@@ -336,6 +336,72 @@ def test_execute_stage_uses_real_backtest_tool_payload(
     )
 
 
+def test_execute_stage_preserves_multi_symbol_launch_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = RealBacktestTool()
+    state = RunState.new(
+        current_user_message="Run backtest",
+        recent_thread_history=[],
+    )
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_thesis": "Buy and hold SBUX and CMG year to date",
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["SBUX", "CMG"],
+            "asset_class": "equity",
+            "date_range": "year_to_date",
+            "capital_amount": 100000.0,
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 10000.0, "source": "default"},
+        },
+    }
+
+    observed_requests: list[dict[str, object]] = []
+
+    def fake_run_launch_backtest(request) -> LaunchExecutionAdapterResult:
+        observed_requests.append(request.model_dump(mode="python"))
+        return LaunchExecutionAdapterResult(
+            envelope=LaunchExecutionEnvelope(
+                execution_status="succeeded",
+                resolved_strategy={
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "SBUX",
+                    "asset_universe": ["SBUX", "CMG"],
+                },
+                resolved_parameters={"timeframe": "1D"},
+                metrics={"aggregate": {"performance": {"total_return_pct": 25.0}}},
+                benchmark_metrics={
+                    "symbol": "SPY",
+                    "aggregate": {"total_return_pct": 5.1},
+                },
+                assumptions=["Starting capital: $100,000."],
+                caveats=["1D bars only."],
+                provider_metadata={"provider": "alpaca"},
+            ),
+            result_card={
+                "title": "SBUX, CMG Buy and Hold",
+                "symbols": ["SBUX", "CMG"],
+                "strategy_label": "Buy and Hold",
+            },
+            explanation_context={"strategy_type": "buy_and_hold"},
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_run_launch_backtest,
+    )
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert observed_requests[0]["symbol"] == "SBUX"
+    assert observed_requests[0]["symbols"] == ["SBUX", "CMG"]
+    assert observed_requests[0]["capital_amount"] == 100000.0
+
+
 def test_execute_stage_normalizes_user_facing_strategy_type_aliases() -> None:
     tool = StubBacktestTool(
         responses=[

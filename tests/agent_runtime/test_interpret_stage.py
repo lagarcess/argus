@@ -321,6 +321,72 @@ def test_interpret_product_question_returns_conversational_response_not_opener()
     assert result.decision.intent == "conversation_followup"
 
 
+def test_interpret_greeting_never_enters_asset_slot_flow_with_llm() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    state = RunState.new(current_user_message="hey", recent_thread_history=[])
+
+    def bad_interpreter(_request: object) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary="User wants to start a strategy.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing="hey",
+                strategy_thesis="Start a strategy.",
+            ),
+            assistant_response=None,
+        )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=None,
+        structured_interpreter=bad_interpreter,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.intent == "conversation_followup"
+    assert result.decision.missing_required_fields == []
+    assert "asset" not in result.patch["assistant_response"].lower()
+    assert "trigger the buy" not in result.patch["assistant_response"].lower()
+
+
+def test_interpret_greeting_preserves_pending_draft_without_slot_prompt() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    snapshot = TaskSnapshot(
+        latest_task_type="strategy_drafting",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="What if I bought a fixed amount every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy a fixed amount on a recurring monthly schedule.",
+            cadence="monthly",
+        ),
+    )
+    state = RunState.new(current_user_message="hello", recent_thread_history=[])
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=snapshot,
+        structured_interpreter=lambda _request: StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="Continue pending strategy.",
+            candidate_strategy_draft=snapshot.pending_strategy_summary
+            or StrategySummary(),
+            assistant_response=None,
+        ),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.candidate_strategy_draft.strategy_type == "dca_accumulation"
+    assert result.decision.missing_required_fields == []
+    assert "asset" not in result.patch["assistant_response"].lower()
+
+
 def test_interpret_symbol_only_llm_response_offers_starting_paths() -> None:
     user = UserState(user_id="u1", expertise_level="beginner")
     state = RunState.new(current_user_message="tesla", recent_thread_history=[])
@@ -351,6 +417,186 @@ def test_interpret_symbol_only_llm_response_offers_starting_paths() -> None:
     assert "I can work with TSLA" in result.patch["assistant_response"]
     assert "Buy and hold TSLA" in result.patch["assistant_response"]
     assert "Tesla (TSLA)" not in result.patch["assistant_response"]
+
+
+def test_interpret_asset_reply_fills_pending_asset_need_generically(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def fake_resolve_asset(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.strip().upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", fake_resolve_asset)
+    user = UserState(user_id="u1", expertise_level="beginner")
+    snapshot = TaskSnapshot(
+        latest_task_type="strategy_drafting",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="What if I bought a fixed amount every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy a fixed amount on a recurring monthly schedule.",
+            cadence="monthly",
+        ),
+    )
+
+    for message, expected_symbol in [("AAPL", "AAPL"), ("CMG", "CMG")]:
+        state = RunState.new(
+            current_user_message=message,
+            recent_thread_history=[
+                {
+                    "role": "user",
+                    "content": "What if I bought a fixed amount every month?",
+                },
+                {"role": "assistant", "content": "Which asset should I use?"},
+            ],
+        )
+
+        result = interpret_stage(
+            state=state,
+            user=user,
+            latest_task_snapshot=snapshot,
+            structured_interpreter=lambda _request: None,
+        )
+
+        assert result.outcome == "needs_clarification"
+        assert result.decision.task_relation == "continue"
+        assert result.decision.candidate_strategy_draft.asset_universe == [
+            expected_symbol
+        ]
+        assert "asset_universe" not in result.decision.missing_required_fields
+        assert "generic_pending_asset_reply" in result.decision.reason_codes
+
+
+def test_interpret_multi_symbol_reply_fills_pending_asset_need(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.strip().upper(), "equity"),
+    )
+    user = UserState(user_id="u1", expertise_level="advanced")
+    snapshot = TaskSnapshot(
+        latest_task_type="strategy_drafting",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="What if I bought a fixed amount every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy a fixed amount on a recurring monthly schedule.",
+            cadence="monthly",
+        ),
+    )
+    state = RunState.new(
+        current_user_message="SBUX and CMG",
+        recent_thread_history=[
+            {"role": "assistant", "content": "Which asset should I use?"},
+        ],
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=snapshot,
+        structured_interpreter=lambda _request: None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["SBUX", "CMG"]
+    assert "asset_universe" not in result.decision.missing_required_fields
+
+
+def test_interpret_education_question_during_pending_draft_does_not_slot_fill() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    snapshot = TaskSnapshot(
+        latest_task_type="strategy_drafting",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="What if I bought a fixed amount every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy a fixed amount on a recurring monthly schedule.",
+            cadence="monthly",
+            asset_universe=["AAPL"],
+        ),
+    )
+    state = RunState.new(
+        current_user_message="explain what AAPL is",
+        recent_thread_history=[
+            {"role": "assistant", "content": "How much should each recurring buy be?"},
+        ],
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=snapshot,
+        structured_interpreter=lambda _request: None,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.task_relation == "continue"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert "Apple" in result.patch["assistant_response"]
+    assert "trigger the buy" not in result.patch["assistant_response"].lower()
+
+
+def test_interpret_thin_asset_explanation_is_replaced_with_real_response() -> None:
+    user = UserState(user_id="u1", expertise_level="beginner")
+    state = RunState.new(
+        current_user_message="explain what NVDA is",
+        recent_thread_history=[],
+    )
+
+    def fake_interpreter(_request: object) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="Explain Nvidia.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing="explain what NVDA is",
+                strategy_thesis="Explain Nvidia.",
+                asset_universe=["NVDA"],
+                asset_class="equity",
+            ),
+            assistant_response="NVDA",
+        )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=None,
+        structured_interpreter=fake_interpreter,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["assistant_response"] != "NVDA"
+    assert "Nvidia" in result.patch["assistant_response"]
+    assert "stock symbol" in result.patch["assistant_response"].lower()
+
+
+def test_interpret_indicator_question_is_not_treated_as_asset_symbol(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.strip().upper(), "equity"),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+    state = RunState.new(
+        current_user_message="what does RSI stand for?",
+        recent_thread_history=[],
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=None,
+        structured_interpreter=lambda _request: None,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert "momentum gauge" in result.patch["assistant_response"]
+    assert "stock symbol RSI" not in result.patch["assistant_response"]
 
 
 def test_interpret_strategy_draft_ignores_bare_llm_echo() -> None:
@@ -468,6 +714,42 @@ def test_interpret_executable_llm_strategy_ignores_fragment_assistant_response()
     assert result.outcome == "ready_for_confirmation"
     assert "assistant_response" not in result.patch
     assert result.decision.missing_required_fields == []
+
+
+def test_interpret_buy_and_hold_missing_date_does_not_become_entry_ambiguity() -> None:
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message="let's test a buy and hold strategy on SBUX and CMG",
+        recent_thread_history=[],
+    )
+
+    def fake_interpreter(_request: object) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="Buy and hold SBUX and CMG.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing="let's test a buy and hold strategy on SBUX and CMG",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold SBUX and CMG.",
+                asset_universe=["SBUX", "CMG"],
+                asset_class="equity",
+            ),
+            assistant_response="Buy and hold",
+        )
+
+    result = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=None,
+        structured_interpreter=fake_interpreter,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.missing_required_fields == ["date_range"]
+    assert result.decision.ambiguous_fields == []
+    assert "entry_logic" not in result.patch["missing_required_fields"]
 
 
 def test_interpret_buy_and_hold_is_complete_without_entry_or_exit_logic(monkeypatch) -> None:

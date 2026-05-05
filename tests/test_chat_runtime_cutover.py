@@ -196,12 +196,14 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
     period = next(row["value"] for row in card["rows"] if row["label"] == "Period")
     assert period == "past year (May 3, 2025 - May 3, 2026)"
     assert card["summary"].endswith(
-        "over past year (May 3, 2025 - May 3, 2026)."
+        "over past year, May 3, 2025 - May 3, 2026."
     )
     assert card["actions"][0] == {
         "id": "run-backtest",
         "label": "Run backtest",
-        "value": "Run backtest",
+        "type": "run_backtest",
+        "presentation": "confirmation",
+        "payload": {},
     }
 
 

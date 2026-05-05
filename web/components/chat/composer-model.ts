@@ -1,4 +1,5 @@
 import type { DiscoveryItem } from "@/lib/argus-api";
+import type { ChatMention } from "./types";
 
 export type ComposerTextSegment = {
   type: "text";
@@ -25,6 +26,20 @@ export function serializeComposerSegments(segments: ComposerSegment[]) {
     .replace(/[ \t]{2,}/g, " ")
     .replace(/ *\n */g, "\n")
     .trim();
+}
+
+export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
+  return segments
+    .filter((segment): segment is ComposerTokenSegment => segment.type === "token")
+    .map(({ token }) => ({
+      id: token.id,
+      type: token.type,
+      label: token.label,
+      symbol: token.symbol ?? null,
+      description: token.description ?? null,
+      insert_text: token.insert_text,
+      support_status: token.support_status,
+    }));
 }
 
 export function isComposerEmpty(segments: ComposerSegment[]) {

@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
-import { type ChatActionOption, Message } from "./types";
+import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
 
 type ChatMessageProps = {
@@ -105,7 +105,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
-          {getDisplayContent()}
+          <UserMessageContent content={getDisplayContent()} mentions={message.mentions ?? []} />
         </div>
       </div>
     );
@@ -230,5 +230,79 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
         </div>
       </div>
     </div>
+  );
+}
+
+function UserMessageContent({ content, mentions }: { content: string; mentions: ChatMention[] }) {
+  if (mentions.length === 0) return <>{content}</>;
+
+  const pieces: Array<string | ChatMention> = [];
+  let cursor = 0;
+  const remainingMentions = [...mentions];
+
+  while (cursor < content.length) {
+    let nextMatch:
+      | {
+          index: number;
+          mention: ChatMention;
+          text: string;
+          mentionIndex: number;
+        }
+      | null = null;
+
+    for (let mentionIndex = 0; mentionIndex < remainingMentions.length; mentionIndex++) {
+      const mention = remainingMentions[mentionIndex];
+      const candidates = [mention.insert_text, mention.symbol ?? "", mention.label]
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length);
+      for (const candidate of candidates) {
+        const index = content.indexOf(candidate, cursor);
+        if (index < 0) continue;
+        if (nextMatch === null || index < nextMatch.index) {
+          nextMatch = { index, mention, text: candidate, mentionIndex };
+        }
+      }
+    }
+
+    if (nextMatch === null) {
+      pieces.push(content.slice(cursor));
+      break;
+    }
+
+    if (nextMatch.index > cursor) {
+      pieces.push(content.slice(cursor, nextMatch.index));
+    }
+    pieces.push(nextMatch.mention);
+    cursor = nextMatch.index + nextMatch.text.length;
+    remainingMentions.splice(nextMatch.mentionIndex, 1);
+  }
+
+  return (
+    <>
+      {pieces.map((piece, index) =>
+        typeof piece === "string" ? (
+          <span key={`text-${index}`}>{piece}</span>
+        ) : (
+          <MentionText key={`${piece.id}-${index}`} mention={piece} />
+        ),
+      )}
+    </>
+  );
+}
+
+function MentionText({ mention }: { mention: ChatMention }) {
+  const label = mention.type === "asset" ? mention.insert_text : mention.label;
+  const color =
+    mention.type === "asset"
+      ? "text-[#c2a44d]"
+      : "text-[#494fdf] dark:text-[#8f93ff]";
+
+  return (
+    <span
+      className={`mx-0.5 inline-flex select-none items-baseline rounded-sm px-0.5 font-semibold ${color}`}
+      title={mention.description ?? mention.label}
+    >
+      {label}
+    </span>
   );
 }

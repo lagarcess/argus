@@ -211,6 +211,14 @@ def interpret_stage(
     if contextual_response_result is not None:
         return contextual_response_result
 
+    social_opener_result = _social_opener_stage_result_if_applicable(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+    )
+    if social_opener_result is not None:
+        return social_opener_result
+
     structured_result = _structured_stage_result(
         state=state,
         user=user,
@@ -225,6 +233,10 @@ def interpret_stage(
     signals = extract_signals(
         message=state.current_user_message,
         latest_task_snapshot=snapshot,
+    )
+    pending_asset_reply = _is_pending_asset_reply(
+        message=state.current_user_message,
+        snapshot=snapshot,
     )
     effective_profile = resolve_effective_response_profile(
         user=user,
@@ -280,6 +292,14 @@ def interpret_stage(
         signals=signals,
         arbitration=arbitration,
     )
+    if pending_asset_reply:
+        intent = "strategy_drafting"
+        task_relation = "continue"
+        missing_required_fields = missing_required_fields_for_strategy(
+            candidate_strategy,
+            extraction=extraction,
+            contract=capability_contract,
+        )
     if _completed_refinement(candidate_strategy, snapshot):
         intent = "backtest_execution"
         task_relation = "refine"
@@ -330,6 +350,7 @@ def interpret_stage(
             llm_reason_codes,
             extraction.reason_codes,
             arbitration.reason_codes,
+            ["generic_pending_asset_reply"] if pending_asset_reply else [],
             arbitration.decision.reason_codes
             if arbitration.decision is not None
             else [],
@@ -391,6 +412,11 @@ def _contextual_response_stage_result_if_applicable(
         message=state.current_user_message,
         latest_task_snapshot=snapshot,
     )
+    if _is_pending_asset_reply(
+        message=state.current_user_message,
+        snapshot=snapshot,
+    ):
+        return None
     response = _direct_conversational_response(
         message=state.current_user_message,
         signals=signals,
@@ -410,6 +436,45 @@ def _contextual_response_stage_result_if_applicable(
         confidence=0.95,
         arbitration_mode="deterministic",
         reason_codes=["contextual_followup_response"],
+        effective_response_profile=resolve_effective_response_profile(
+            user=user,
+            explicit_overrides=signals.response_profile_overrides,
+        ),
+        user_preference_overridden_for_turn=has_response_profile_overrides(signals),
+        normalized_signals=signals.to_patch_payload(),
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={"assistant_response": response},
+    )
+
+
+def _social_opener_stage_result_if_applicable(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+) -> StageResult | None:
+    response = _social_opener_response(state.current_user_message, snapshot=snapshot)
+    if response is None:
+        return None
+    signals = extract_signals(
+        message=state.current_user_message,
+        latest_task_snapshot=snapshot,
+    )
+    strategy = snapshot.pending_strategy_summary if snapshot is not None else None
+    decision = InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User opened with a greeting or social check-in.",
+        candidate_strategy_draft=strategy or StrategySummary(),
+        missing_required_fields=[],
+        optional_parameter_opportunity=[],
+        confidence=0.99,
+        arbitration_mode="deterministic",
+        reason_codes=["social_opener"],
         effective_response_profile=resolve_effective_response_profile(
             user=user,
             explicit_overrides=signals.response_profile_overrides,
@@ -465,6 +530,8 @@ def _candidate_strategy_for_turn(
     extracted = build_candidate_strategy_from_extraction(extraction)
     lowered = message.lower()
     extracted_symbols = list(extracted.asset_universe)
+    if not extracted_symbols:
+        extracted_symbols = _generic_asset_candidates(message)
 
     if extracted_symbols:
         if prior is not None and _is_symbol_replacement(lowered):
@@ -555,10 +622,12 @@ def missing_required_fields_for_strategy(
         pass
     else:
         required = ["strategy_thesis", "asset_universe", "date_range"]
+    if strategy_type == "dca_accumulation":
+        required.append("capital_amount")
     missing: list[str] = []
     payload = strategy.model_dump(mode="python")
     for field_name in required:
-        if field_name not in contract.required_fields:
+        if field_name not in contract.required_fields and field_name != "capital_amount":
             continue
         value = payload.get(field_name)
         if isinstance(value, list):
@@ -806,12 +875,19 @@ def _direct_conversational_response(
     snapshot: TaskSnapshot | None,
 ) -> str | None:
     lowered = message.lower().strip()
-    symbol_only_response = _symbol_only_guidance_response(
-        message=message,
-        signals=signals,
-    )
-    if symbol_only_response is not None:
-        return symbol_only_response
+    social_response = _social_opener_response(message, snapshot=snapshot)
+    if social_response is not None:
+        return social_response
+    asset_explanation = _asset_explanation_response(message)
+    if asset_explanation is not None:
+        return asset_explanation
+    if not _snapshot_needs_asset_target(snapshot):
+        symbol_only_response = _symbol_only_guidance_response(
+            message=message,
+            signals=signals,
+        )
+        if symbol_only_response is not None:
+            return symbol_only_response
     if re.search(r"\bwhat can you do\b", lowered):
         return (
             "I help you turn an investing idea into something you can understand and test. "
@@ -862,6 +938,21 @@ def _direct_conversational_response(
             "You can ask a question, describe a strategy, or name an asset you want to learn about."
         )
     return None
+
+
+def _social_opener_response(message: str, *, snapshot: TaskSnapshot | None) -> str | None:
+    lowered = re.sub(r"\s+", " ", message.lower().strip(" .,!?:;"))
+    if not re.fullmatch(r"(hey|hi|hello|yo|sup|good morning|good afternoon|good evening)", lowered):
+        return None
+    if snapshot is not None and snapshot.pending_strategy_summary is not None:
+        return (
+            "Hey, I'm here. We can keep going with the current idea whenever "
+            "you're ready, or you can ask me to explain something first."
+        )
+    return (
+        "Hey, I'm here. Tell me what you want to understand or test, and I'll "
+        "help shape it into something clear."
+    )
 
 
 def _structured_interpreter_reason_codes(
@@ -915,6 +1006,9 @@ def _assistant_response_is_too_thin(response: str | None) -> bool:
 
 def _educational_fallback_response(message: str) -> str | None:
     lowered = message.lower().strip()
+    asset_explanation = _asset_explanation_response(message)
+    if asset_explanation is not None:
+        return asset_explanation
     if re.search(r"\bwhat(?:'s| is)\s+dca\b|\bexplain dca\b", lowered):
         return (
             "DCA means buying a fixed amount on a regular schedule, like $500 every month. "
@@ -993,6 +1087,8 @@ def _symbol_only_strategy_response(
     strategy: StrategySummary,
     assistant_response: str | None,
 ) -> str | None:
+    if _is_asset_explanation_request(message):
+        return None
     assets = list(strategy.asset_universe)
     if not assets:
         return None
@@ -1013,14 +1109,144 @@ def _symbol_only_strategy_response(
     )
 
 
+def _is_pending_asset_reply(
+    *,
+    message: str,
+    snapshot: TaskSnapshot | None,
+) -> bool:
+    if not _snapshot_needs_asset_target(snapshot):
+        return False
+    symbols = _generic_asset_candidates(message)
+    if not symbols:
+        return False
+    remaining = message
+    for symbol in symbols:
+        remaining = re.sub(
+            rf"(?<![A-Za-z0-9]){re.escape(symbol)}(?![A-Za-z0-9])",
+            " ",
+            remaining,
+            flags=re.IGNORECASE,
+        )
+        for alias in _asset_name_aliases([symbol]):
+            remaining = re.sub(
+                rf"(?<![A-Za-z0-9]){re.escape(alias)}(?![A-Za-z0-9])",
+                " ",
+                remaining,
+                flags=re.IGNORECASE,
+            )
+    remaining = re.sub(r"\b(and|or|plus)\b|[,;/+&]", " ", remaining, flags=re.IGNORECASE)
+    remaining = re.sub(r"[^A-Za-z0-9]+", " ", remaining).strip()
+    return not remaining
+
+
+def _snapshot_needs_asset_target(snapshot: TaskSnapshot | None) -> bool:
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return False
+    return not snapshot.pending_strategy_summary.asset_universe
+
+
+def _generic_asset_candidates(message: str) -> list[str]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+    blocked_tokens = {"DCA", "RSI", "SMA", "EMA", "MACD", "VWAP", "ATR", "I"}
+
+    for symbol in _known_symbol_alias_candidates(message):
+        if symbol not in seen:
+            candidates.append(symbol)
+            seen.add(symbol)
+
+    for token in re.findall(r"\b[A-Z][A-Z0-9./-]{0,9}\b", message):
+        if token.upper() in blocked_tokens:
+            continue
+        try:
+            resolved = resolve_asset(token)
+        except Exception:
+            continue
+        symbol = resolved.canonical_symbol.upper()
+        if symbol not in seen:
+            candidates.append(symbol)
+            seen.add(symbol)
+    return candidates
+
+
+def _known_symbol_alias_candidates(message: str) -> list[str]:
+    lowered = message.lower()
+    candidates: list[str] = []
+    seen: set[str] = set()
+    alias_map = {
+        "AAPL": ("apple", "aapl"),
+        "TSLA": ("tesla", "tsla"),
+        "NVDA": ("nvidia", "nvda"),
+        "GOOG": ("google", "goog", "alphabet"),
+        "GOOGL": ("googl",),
+        "META": ("meta", "facebook"),
+        "BTC": ("bitcoin", "btc"),
+        "ETH": ("ethereum", "eth"),
+        "SOL": ("solana", "sol"),
+    }
+    for symbol, aliases in alias_map.items():
+        if any(
+            re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", lowered)
+            for alias in aliases
+        ):
+            if symbol not in seen:
+                candidates.append(symbol)
+                seen.add(symbol)
+    return candidates
+
+
+def _is_asset_explanation_request(message: str) -> bool:
+    lowered = message.lower()
+    return bool(
+        re.search(
+            r"\b(explain|what is|what's|tell me about|what can you tell me about)\b",
+            lowered,
+        )
+        and _generic_asset_candidates(message)
+    )
+
+
+def _asset_explanation_response(message: str) -> str | None:
+    if not _is_asset_explanation_request(message):
+        return None
+    symbols = _generic_asset_candidates(message)
+    if not symbols:
+        return None
+    symbol = symbols[0]
+    name = _asset_display_name(symbol)
+    asset_kind = "cryptocurrency" if symbol in {"BTC", "ETH", "SOL"} else "company"
+    symbol_kind = "ticker" if asset_kind == "cryptocurrency" else "stock symbol"
+    return (
+        f"{name} is a {asset_kind} you can refer to by the {symbol_kind} {symbol}. "
+        "In Argus, you can use it as the asset in a historical test, like a buy-and-hold run, "
+        "recurring purchases, or a supported rule-based strategy. If you want to keep this simple, "
+        f"tell me the period you care about and I can turn {symbol} into a backtest to confirm."
+    )
+
+
+def _asset_display_name(symbol: str) -> str:
+    return {
+        "AAPL": "Apple",
+        "TSLA": "Tesla",
+        "NVDA": "Nvidia",
+        "GOOG": "Alphabet",
+        "GOOGL": "Alphabet",
+        "META": "Meta",
+        "BTC": "Bitcoin",
+        "ETH": "Ethereum",
+        "SOL": "Solana",
+    }.get(symbol.upper(), symbol.upper())
+
+
 def _fragment_strategy_response(
     *,
     message: str,
     strategy: StrategySummary,
     assistant_response: str | None,
 ) -> str | None:
-    del strategy
     if not assistant_response:
+        return None
+    if executable_strategy_type(strategy) in {"buy_and_hold", "dca_accumulation"}:
         return None
     words = assistant_response.strip().split()
     if len(words) > 5:

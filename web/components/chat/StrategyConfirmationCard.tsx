@@ -1,5 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import { StrategyConfirmationPayload } from "./types";
+import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 
 type StrategyConfirmationCardProps = {
   confirmation: StrategyConfirmationPayload;
@@ -33,9 +34,7 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
               <dt className="text-[11px] uppercase tracking-[0.08em] text-black/45 dark:text-white/45">
                 {row.label}
               </dt>
-              <dd className="mt-1 whitespace-normal break-words text-[15px] font-semibold leading-snug tracking-tight text-black dark:text-white">
-                {row.value}
-              </dd>
+              <ConfirmationValue row={row} />
             </div>
           ))}
         </dl>
@@ -67,5 +66,55 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
         </div>
       )}
     </section>
+  );
+}
+
+function ConfirmationValue({
+  row,
+}: {
+  row: StrategyConfirmationPayload["rows"][number];
+}) {
+  if (row.label.toLowerCase() === "assets") {
+    return <AssetList symbols={splitSymbolList(row.value)} />;
+  }
+  if (row.label.toLowerCase() === "period") {
+    const period = splitPeriodDisplay(row.value);
+    return (
+      <dd className="mt-1 text-[15px] font-semibold leading-snug tracking-tight text-black dark:text-white">
+        <span className="block whitespace-normal break-words">{period.label}</span>
+        {period.dates && (
+          <span className="mt-0.5 block text-[13px] font-medium leading-snug text-black/58 dark:text-white/58">
+            {period.dates}
+          </span>
+        )}
+      </dd>
+    );
+  }
+  return (
+    <dd className="mt-1 whitespace-normal break-words text-[15px] font-semibold leading-snug tracking-tight text-black dark:text-white">
+      {row.value}
+    </dd>
+  );
+}
+
+function AssetList({ symbols }: { symbols: string[] }) {
+  if (symbols.length === 0) {
+    return (
+      <dd className="mt-1 text-[15px] font-semibold leading-snug tracking-tight text-black dark:text-white">
+        Selected asset
+      </dd>
+    );
+  }
+  return (
+    <dd className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
+      {symbols.map((symbol) => (
+        <span
+          key={symbol}
+          className="rounded-[5px] border border-[#c2a44d]/25 bg-[#c2a44d]/10 px-1.5 py-0.5 text-[13px] font-semibold leading-none tracking-tight text-[#8b7329] dark:border-[#c2a44d]/30 dark:bg-[#c2a44d]/12 dark:text-[#d9c574]"
+        >
+          {symbol}
+        </span>
+      ))}
+    </dd>
   );
 }

@@ -222,6 +222,81 @@ def test_buy_and_hold_adapter_returns_envelope_card_and_context(
     assert result.explanation_context["strategy_type"] == "buy_and_hold"
 
 
+def test_buy_and_hold_adapter_preserves_multi_symbol_universe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="SBUX",
+        symbols=["SBUX", "CMG"],
+        timeframe="1D",
+        date_range={"start": "2026-01-01", "end": "2026-05-04"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=100000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        lambda config: {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 25.0,
+                    "benchmark_return_pct": 5.1,
+                    "delta_vs_benchmark_pct": 19.9,
+                },
+                "risk": {"max_drawdown_pct": -14.5},
+                "efficiency": {"win_rate": 0.54},
+            },
+            "by_symbol": {
+                "SBUX": {"performance": {"benchmark_return_pct": 5.1}},
+                "CMG": {"performance": {"benchmark_return_pct": 5.1}},
+            },
+        },
+    )
+
+    seen_configs: list[dict[str, object]] = []
+
+    def fake_build_result_card(config, metrics, language="en"):
+        seen_configs.append(config)
+        return {
+            "title": "SBUX, CMG Buy and Hold",
+            "symbols": config["symbols"],
+            "strategy_label": "Buy and Hold",
+            "assumptions": ["Universe: SBUX, CMG."],
+            "rows": [],
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_card",
+        fake_build_result_card,
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert seen_configs[0]["symbols"] == ["SBUX", "CMG"]
+    assert result.envelope.resolved_strategy["asset_universe"] == ["SBUX", "CMG"]
+    assert result.result_card is not None
+    assert result.result_card["symbols"] == ["SBUX", "CMG"]
+    assert result.explanation_context is not None
+    assert result.explanation_context["symbols"] == ["SBUX", "CMG"]
+
+
 def test_buy_and_hold_adapter_converts_position_size_to_capital(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

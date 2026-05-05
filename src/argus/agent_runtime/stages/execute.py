@@ -147,7 +147,8 @@ def _launch_payload(state: RunState) -> dict[str, Any]:
     strategy = _strategy_payload(confirmation_payload, state)
     optional_parameters = _optional_parameters_payload(confirmation_payload)
     strategy_type = _resolve_strategy_type(strategy, optional_parameters)
-    symbol = _resolve_symbol(strategy)
+    symbols = _resolve_symbols(strategy)
+    symbol = symbols[0] if symbols else ""
     sizing_mode = _resolve_sizing_mode(optional_parameters)
     position_size = _resolve_position_size(optional_parameters)
     capital_amount = (
@@ -159,6 +160,7 @@ def _launch_payload(state: RunState) -> dict[str, Any]:
     return {
         "strategy_type": strategy_type,
         "symbol": symbol,
+        "symbols": symbols,
         "timeframe": _resolve_optional_value(optional_parameters, "timeframe", default="1D"),
         "date_range": _resolve_date_range(strategy.get("date_range")),
         "entry_rule": _resolve_entry_rule(strategy, strategy_type),
@@ -443,12 +445,24 @@ def _normalize_strategy_type(value: str) -> str:
 
 
 def _resolve_symbol(strategy: dict[str, Any]) -> str:
-    asset_universe = strategy.get("asset_universe")
-    if isinstance(asset_universe, list) and asset_universe:
-        return str(asset_universe[0]).strip().upper()
-    if isinstance(asset_universe, str) and asset_universe:
-        return asset_universe.strip().upper()
+    symbols = _resolve_symbols(strategy)
+    if symbols:
+        return symbols[0]
     return ""
+
+
+def _resolve_symbols(strategy: dict[str, Any]) -> list[str]:
+    asset_universe = strategy.get("asset_universe")
+    symbols: list[str] = []
+    if isinstance(asset_universe, list) and asset_universe:
+        for value in asset_universe:
+            symbol = str(value).strip().upper()
+            if symbol and symbol not in symbols:
+                symbols.append(symbol)
+        return symbols
+    if isinstance(asset_universe, str) and asset_universe:
+        return [asset_universe.strip().upper()]
+    return []
 
 
 def _resolve_date_range(value: Any) -> dict[str, str]:

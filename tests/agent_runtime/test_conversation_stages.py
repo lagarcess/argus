@@ -94,6 +94,37 @@ def test_clarify_groups_multiple_ambiguous_fields() -> None:
     assert "interpreted it as" in result.patch["assistant_prompt"].lower()
 
 
+def test_clarify_does_not_expose_raw_missing_field_scaffolding() -> None:
+    state = RunState.new(current_user_message="test", recent_thread_history=[])
+    state.requires_clarification = True
+    state.optional_parameter_status = {
+        "ambiguous_fields": [
+            {
+                "field_name": "asset_universe",
+                "raw_value": "not specified",
+                "candidate_normalized_value": None,
+                "reason_code": "missing_asset_target",
+            },
+            {
+                "field_name": "capital_amount",
+                "raw_value": "not specified",
+                "candidate_normalized_value": None,
+                "reason_code": "missing_sizing_amount",
+            },
+        ]
+    }
+
+    result = clarify_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_user_reply"
+    prompt = result.patch["assistant_prompt"].lower()
+    assert "not specified" not in prompt
+    assert "asset universe" not in prompt
+    assert "capital amount" not in prompt
+    assert "which asset" in prompt
+    assert "how much" in prompt
+
+
 def test_clarify_entry_logic_ambiguity_asks_for_rule_not_none_mapping() -> None:
     state = RunState.new(
         current_user_message="What if I bought Apple on significant dips?",

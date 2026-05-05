@@ -144,7 +144,7 @@ export function OnboardingGate({
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white dark:bg-[#141517] p-6 text-black dark:text-white transition-colors duration-300">
       <DevModeBadge />
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <h1 className="mb-2 text-4xl font-medium tracking-tight">argus</h1>
+        <h1 className="font-display mb-2 text-4xl font-medium tracking-tight">argus</h1>
 
         {step === "language" && (
           <div className="mt-8 space-y-6">

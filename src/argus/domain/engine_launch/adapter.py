@@ -83,16 +83,16 @@ def _run_indicator_threshold(
     *,
     language: str,
 ) -> LaunchExecutionAdapterResult:
-    asset = classify_symbol(request.symbol)
-    initial_price = _initial_price(request, asset_class=asset.asset_class)
+    symbols, asset_class = _resolve_request_symbols(request)
+    initial_price = _initial_price(request, asset_class=asset_class)
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
     )
     config = _build_indicator_threshold_config(
         request=request,
-        asset_class=asset.asset_class,
-        symbol=asset.symbol,
+        asset_class=asset_class,
+        symbols=symbols,
         starting_capital=starting_capital,
     )
     validate_backtest_config(config)
@@ -104,6 +104,7 @@ def _run_indicator_threshold(
         resolved_strategy={
             "strategy_type": request.strategy_type,
             "symbol": config["symbols"][0],
+            "asset_universe": config["symbols"],
             "entry_rule": request.entry_rule,
             "exit_rule": request.exit_rule,
         },
@@ -129,7 +130,7 @@ def _run_indicator_threshold(
         ],
         provider_metadata={
             "provider": "alpaca",
-            "asset_class": asset.asset_class,
+            "asset_class": asset_class,
             "timeframe": config["timeframe"],
         },
     )
@@ -149,8 +150,8 @@ def _run_dca_accumulation(
     *,
     language: str,
 ) -> LaunchExecutionAdapterResult:
-    asset = classify_symbol(request.symbol)
-    initial_price = _initial_price(request, asset_class=asset.asset_class)
+    symbols, asset_class = _resolve_request_symbols(request)
+    initial_price = _initial_price(request, asset_class=asset_class)
     recurring_allocation = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -158,8 +159,8 @@ def _run_dca_accumulation(
     cadence = resolve_dca_cadence(request.cadence)
     config = _build_periodic_config(
         request=request,
-        asset_class=asset.asset_class,
-        symbol=asset.symbol,
+        asset_class=asset_class,
+        symbols=symbols,
         starting_capital=recurring_allocation,
         cadence=cadence,
     )
@@ -172,6 +173,7 @@ def _run_dca_accumulation(
         resolved_strategy={
             "strategy_type": request.strategy_type,
             "symbol": config["symbols"][0],
+            "asset_universe": config["symbols"],
             "entry_rule": {"type": "periodic_accumulation", "cadence": cadence},
             "exit_rule": {"type": "end_of_period"},
         },
@@ -199,7 +201,7 @@ def _run_dca_accumulation(
         ],
         provider_metadata={
             "provider": "alpaca",
-            "asset_class": asset.asset_class,
+            "asset_class": asset_class,
             "timeframe": config["timeframe"],
         },
     )
@@ -219,16 +221,16 @@ def _run_buy_and_hold(
     *,
     language: str,
 ) -> LaunchExecutionAdapterResult:
-    asset = classify_symbol(request.symbol)
-    initial_price = _initial_price(request, asset_class=asset.asset_class)
+    symbols, asset_class = _resolve_request_symbols(request)
+    initial_price = _initial_price(request, asset_class=asset_class)
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
     )
     config = _build_buy_and_hold_config(
         request=request,
-        asset_class=asset.asset_class,
-        symbol=asset.symbol,
+        asset_class=asset_class,
+        symbols=symbols,
         starting_capital=starting_capital,
     )
     validate_backtest_config(config)
@@ -240,6 +242,7 @@ def _run_buy_and_hold(
         resolved_strategy={
             "strategy_type": request.strategy_type,
             "symbol": config["symbols"][0],
+            "asset_universe": config["symbols"],
             "entry_rule": {"type": "start_of_period"},
             "exit_rule": {"type": "end_of_period"},
         },
@@ -261,7 +264,7 @@ def _run_buy_and_hold(
         caveats=[f"{config['timeframe']} bars only."],
         provider_metadata={
             "provider": "alpaca",
-            "asset_class": asset.asset_class,
+            "asset_class": asset_class,
             "timeframe": config["timeframe"],
         },
     )
@@ -280,7 +283,7 @@ def _build_periodic_config(
     *,
     request: LaunchBacktestRequest,
     asset_class: str,
-    symbol: str,
+    symbols: list[str],
     starting_capital: float,
     cadence: str,
 ) -> dict[str, Any]:
@@ -291,7 +294,7 @@ def _build_periodic_config(
     return {
         "template": "dca_accumulation",
         "asset_class": asset_class,
-        "symbols": [symbol],
+        "symbols": symbols,
         "timeframe": request.timeframe,
         "start_date": request.date_range.start,
         "end_date": request.date_range.end,
@@ -326,7 +329,7 @@ def _build_buy_and_hold_config(
     *,
     request: LaunchBacktestRequest,
     asset_class: str,
-    symbol: str,
+    symbols: list[str],
     starting_capital: float,
 ) -> dict[str, Any]:
     benchmark_asset = classify_symbol(request.benchmark_symbol)
@@ -336,7 +339,7 @@ def _build_buy_and_hold_config(
     return {
         "template": "buy_and_hold",
         "asset_class": asset_class,
-        "symbols": [symbol],
+        "symbols": symbols,
         "timeframe": request.timeframe,
         "start_date": request.date_range.start,
         "end_date": request.date_range.end,
@@ -352,7 +355,7 @@ def _build_indicator_threshold_config(
     *,
     request: LaunchBacktestRequest,
     asset_class: str,
-    symbol: str,
+    symbols: list[str],
     starting_capital: float,
 ) -> dict[str, Any]:
     benchmark_asset = classify_symbol(request.benchmark_symbol)
@@ -362,7 +365,7 @@ def _build_indicator_threshold_config(
     return {
         "template": normalize_template_name(request),
         "asset_class": asset_class,
-        "symbols": [symbol],
+        "symbols": symbols,
         "timeframe": request.timeframe,
         "start_date": request.date_range.start,
         "end_date": request.date_range.end,
@@ -381,6 +384,8 @@ def _initial_price(
 ) -> float | None:
     if request.sizing_mode != "position_size":
         return None
+    if len(request.symbols) > 1:
+        raise ValueError("unsupported_multi_symbol_position_size")
 
     series = fetch_price_series(
         symbol=request.symbol,
@@ -392,6 +397,16 @@ def _initial_price(
     if series.empty:
         raise ValueError("market_data_unavailable")
     return float(series.iloc[0])
+
+
+def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
+    assets = [classify_symbol(symbol) for symbol in request.symbols]
+    if not assets:
+        raise ValueError("invalid_symbol_count")
+    asset_class = assets[0].asset_class
+    if any(asset.asset_class != asset_class for asset in assets):
+        raise ValueError("asset_class_conflict")
+    return [asset.symbol for asset in assets], asset_class
 
 
 def _blocked_result(
@@ -419,10 +434,12 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "invalid_starting_capital",
         "invalid_symbol_count",
         "position_price_required",
+        "asset_class_conflict",
     }
     unsupported = {
         "cadence_required",
         "cadence_not_applicable",
+        "unsupported_multi_symbol_position_size",
         "unsupported_timeframe",
         "unsupported_template",
         "stablecoin_not_supported",

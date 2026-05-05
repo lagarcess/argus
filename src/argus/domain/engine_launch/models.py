@@ -28,6 +28,7 @@ class DateRange(BaseModel):
 class LaunchBacktestRequest(BaseModel):
     strategy_type: LaunchStrategyType
     symbol: str
+    symbols: list[str] = Field(default_factory=list)
     timeframe: str
     date_range: DateRange
     entry_rule: dict[str, Any] | None = None
@@ -42,6 +43,9 @@ class LaunchBacktestRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_request_shape(self) -> "LaunchBacktestRequest":
+        self.symbol = self.symbol.strip().upper()
+        self.symbols = _normalize_symbols(self.symbols, fallback_symbol=self.symbol)
+
         if self.sizing_mode == "capital_amount":
             if self.capital_amount is None:
                 raise ValueError("capital_amount_required")
@@ -60,6 +64,17 @@ class LaunchBacktestRequest(BaseModel):
             raise ValueError("cadence_not_applicable")
 
         return self
+
+
+def _normalize_symbols(symbols: list[str], *, fallback_symbol: str) -> list[str]:
+    normalized: list[str] = []
+    for value in symbols:
+        symbol = str(value).strip().upper()
+        if symbol and symbol not in normalized:
+            normalized.append(symbol)
+    if not normalized and fallback_symbol:
+        normalized.append(fallback_symbol.strip().upper())
+    return normalized
 
 
 class LaunchExecutionEnvelope(BaseModel):

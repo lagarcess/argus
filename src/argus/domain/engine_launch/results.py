@@ -44,6 +44,7 @@ def build_failure_envelope(
         resolved_strategy={
             "strategy_type": request.strategy_type,
             "symbol": request.symbol,
+            "asset_universe": request.symbols,
         },
         resolved_parameters={
             "timeframe": request.timeframe,
@@ -69,8 +70,6 @@ def build_benchmark_metrics(
 ) -> dict[str, Any]:
     aggregate_performance = metrics.get("aggregate", {}).get("performance", {})
     by_symbol = metrics.get("by_symbol", {})
-    symbol_metrics = by_symbol.get(request.symbol, {})
-    symbol_performance = symbol_metrics.get("performance", {})
 
     return {
         "symbol": request.benchmark_symbol,
@@ -78,9 +77,12 @@ def build_benchmark_metrics(
             "total_return_pct": aggregate_performance.get("benchmark_return_pct"),
         },
         "by_symbol": {
-            request.symbol: {
-                "total_return_pct": symbol_performance.get("benchmark_return_pct"),
+            symbol: {
+                "total_return_pct": by_symbol.get(symbol, {})
+                .get("performance", {})
+                .get("benchmark_return_pct"),
             }
+            for symbol in request.symbols
         },
     }
 
@@ -94,6 +96,7 @@ def build_explanation_context(
     return {
         "strategy_type": request.strategy_type,
         "symbol": request.symbol,
+        "symbols": request.symbols,
         "timeframe": request.timeframe,
         "date_range": request.date_range.model_dump(mode="python"),
         "metrics": envelope.metrics,

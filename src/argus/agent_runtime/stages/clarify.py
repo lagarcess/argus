@@ -182,22 +182,43 @@ def _ambiguous_fields_prompt(ambiguous_fields: list[dict[str, object]]) -> str:
                 "I need to turn that into a specific rule. Do you want to define the dip as a percent drop, "
                 "use a supported RSI rule, or keep drafting the idea first?"
             )
+    semantic_questions = _semantic_missing_questions(ambiguous_fields)
+    if semantic_questions:
+        return "I understand the direction. " + " ".join(semantic_questions)
+
     parts = []
     for field in ambiguous_fields:
         field_name = str(field["field_name"]).replace("_", " ")
         raw_value = str(field.get("raw_value", "")).strip()
         candidate = str(field.get("candidate_normalized_value", "")).strip()
+        if raw_value.lower() in {"not specified", "none", "null", ""}:
+            continue
         if raw_value and candidate and candidate.lower() != "none":
             parts.append(
                 f"{field_name}: you said '{raw_value}', and I interpreted it as '{candidate}'"
             )
         elif raw_value:
             parts.append(f"{field_name}: you said '{raw_value}'")
+    if not parts:
+        return "I understand the direction, but I need one more detail before I can test it."
     joined = "; ".join(parts)
     return (
         "I need to clarify a couple of strategy details before I continue. "
         f"{joined}. Which of those should I use?"
     )
+
+
+def _semantic_missing_questions(ambiguous_fields: list[dict[str, object]]) -> list[str]:
+    field_names = {str(field.get("field_name", "")) for field in ambiguous_fields}
+    reason_codes = {str(field.get("reason_code", "")) for field in ambiguous_fields}
+    questions: list[str] = []
+    if "asset_universe" in field_names or "missing_asset_target" in reason_codes:
+        questions.append("Which asset should I use?")
+    if "capital_amount" in field_names or "missing_sizing_amount" in reason_codes:
+        questions.append("How much should each recurring purchase be?")
+    if "date_range" in field_names or "missing_period" in reason_codes:
+        questions.append("What time period should I test?")
+    return questions
 
 
 def _unsupported_constraint_prompt(
@@ -276,7 +297,7 @@ def _first_missing_required_field(
 ) -> str | None:
     required_fields = set(contract.required_fields)
     for field_name in missing_required_fields:
-        if field_name in required_fields:
+        if field_name in required_fields or field_name == "capital_amount":
             return field_name
     return None
 
@@ -288,5 +309,6 @@ def _required_field_prompt(*, requested_field: str, label: str) -> str:
         "entry_logic": "What should trigger the buy?",
         "exit_logic": "What should trigger the sell or exit?",
         "date_range": "What time period should I test?",
+        "capital_amount": "How much should each recurring purchase be?",
     }
     return prompts.get(requested_field, f"What {label} should I use?")
