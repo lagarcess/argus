@@ -28,9 +28,15 @@ class OpenRouterProfile:
 OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "interpretation": OpenRouterProfile("interpretation", temperature=0, max_tokens=1200),
     "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
-    "result_summary": OpenRouterProfile("result_summary", temperature=0.2, max_tokens=1600),
-    "result_breakdown": OpenRouterProfile("result_breakdown", temperature=0.2, max_tokens=2400),
-    "name_suggestion": OpenRouterProfile("name_suggestion", temperature=0, max_tokens=400),
+    "result_summary": OpenRouterProfile(
+        "result_summary", temperature=0.2, max_tokens=1600
+    ),
+    "result_breakdown": OpenRouterProfile(
+        "result_breakdown", temperature=0.2, max_tokens=2400
+    ),
+    "name_suggestion": OpenRouterProfile(
+        "name_suggestion", temperature=0, max_tokens=400
+    ),
 }
 
 

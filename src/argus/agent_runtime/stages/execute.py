@@ -59,9 +59,7 @@ def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageR
                         "failure_classification": failure_classification,
                         "assistant_prompt": _fallback_prompt(
                             error_type=failure_classification,
-                            error_message=_as_optional_str(
-                                envelope.get("error_message")
-                            ),
+                            error_message=_as_optional_str(envelope.get("error_message")),
                         ),
                         "final_response_payload": {
                             "error": _as_optional_str(envelope.get("error_message")),
@@ -87,9 +85,7 @@ def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageR
                         "failure_classification": failure_classification,
                         "assistant_prompt": _fallback_prompt(
                             error_type=failure_classification,
-                            error_message=_as_optional_str(
-                                envelope.get("error_message")
-                            ),
+                            error_message=_as_optional_str(envelope.get("error_message")),
                         ),
                         "missing_required_fields": _missing_required_fields(
                             capability_context
@@ -111,8 +107,8 @@ def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageR
                     "final_response_payload": {
                         "error": _as_optional_str(envelope.get("error_message")),
                     },
-                    },
-                )
+                },
+            )
         if error_type == "parameter_validation_error":
             payload = corrected_payload
 
@@ -161,7 +157,9 @@ def _launch_payload(state: RunState) -> dict[str, Any]:
         "strategy_type": strategy_type,
         "symbol": symbol,
         "symbols": symbols,
-        "timeframe": _resolve_optional_value(optional_parameters, "timeframe", default="1D"),
+        "timeframe": _resolve_optional_value(
+            optional_parameters, "timeframe", default="1D"
+        ),
         "date_range": _resolve_date_range(strategy.get("date_range")),
         "entry_rule": _resolve_entry_rule(strategy, strategy_type),
         "exit_rule": _resolve_exit_rule(strategy, strategy_type),

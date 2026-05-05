@@ -314,7 +314,7 @@ export default function ChatInterface() {
         setShowOnboardingGoalCards(
           stage === "language_selection" || stage === "primary_goal_selection",
         );
-        
+
         const prompts = await getStarterPrompts().catch(() => []);
         setStarterActions(prompts.map((p, i) => ({
           id: `starter-${i}`,

@@ -337,7 +337,9 @@ def _resolve_persisted_artifact_references(
     result: dict[str, Any],
     initial_state: WorkflowState,
 ) -> list[ArtifactReference]:
-    raw_references = result.get("artifact_references", initial_state.get("artifact_references", []))
+    raw_references = result.get(
+        "artifact_references", initial_state.get("artifact_references", [])
+    )
     references: list[ArtifactReference] = []
     for reference in raw_references:
         references.append(ArtifactReference.model_validate(reference))

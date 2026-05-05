@@ -14,11 +14,13 @@ async def test_conversational_ux_restoration():
     mock_response = ChatTurnIntent(
         intent="setup",
         confidence=0.9,
-        assistant_response="I've set up your Buy and Hold strategy for AAPL. It's a classic long-term approach! Ready to run the simulation?"
+        assistant_response="I've set up your Buy and Hold strategy for AAPL. It's a classic long-term approach! Ready to run the simulation?",
     )
 
-    with patch("os.getenv", return_value="fake_key"), \
-         patch("argus.domain.orchestrator._build_model") as mock_build:
+    with (
+        patch("os.getenv", return_value="fake_key"),
+        patch("argus.domain.orchestrator._build_model") as mock_build,
+    ):
         mock_model = MagicMock()
         mock_structured = MagicMock()
         mock_build.return_value = mock_model
@@ -27,16 +29,19 @@ async def test_conversational_ux_restoration():
 
         # Test intent classification
         intent = classify_chat_turn_intent(
-            message="setup buy and hold for aapl",
-            language="en"
+            message="setup buy and hold for aapl", language="en"
         )
 
-        assert intent.assistant_response == "I've set up your Buy and Hold strategy for AAPL. It's a classic long-term approach! Ready to run the simulation?"
+        assert (
+            intent.assistant_response
+            == "I've set up your Buy and Hold strategy for AAPL. It's a classic long-term approach! Ready to run the simulation?"
+        )
 
         # Test message selection
         msg = assistant_message_for_chat_turn(intent, "setup buy and hold for aapl", "en")
         assert msg == intent.assistant_response
         assert "classic long-term approach" in msg
+
 
 @pytest.mark.asyncio
 async def test_conversational_ux_fallback():
@@ -45,11 +50,13 @@ async def test_conversational_ux_fallback():
         intent="guide",
         confidence=0.1,
         educational_need="strategy_help",
-        assistant_response="I'm here to help you test strategies like Buy and Hold or DCA."
+        assistant_response="I'm here to help you test strategies like Buy and Hold or DCA.",
     )
 
-    with patch("os.getenv", return_value="fake_key"), \
-         patch("argus.domain.orchestrator._build_model") as mock_build:
+    with (
+        patch("os.getenv", return_value="fake_key"),
+        patch("argus.domain.orchestrator._build_model") as mock_build,
+    ):
         mock_model = MagicMock()
         mock_structured = MagicMock()
         mock_build.return_value = mock_model
@@ -62,6 +69,7 @@ async def test_conversational_ux_fallback():
         msg = assistant_message_for_chat_turn(intent, "help", "en")
         assert "I'm here to help you test strategies" in msg
 
+
 @pytest.mark.asyncio
 async def test_conversational_ux_template_fallback():
     # Test the hardcoded templates when intent has no LLM response (simulating manual intent object)
@@ -69,7 +77,7 @@ async def test_conversational_ux_template_fallback():
         intent="guide",
         confidence=0.0,
         educational_need="beginner_confused",
-        assistant_response="" # Empty string to trigger template
+        assistant_response="",  # Empty string to trigger template
     )
 
     msg = assistant_message_for_chat_turn(intent, "help", "en")

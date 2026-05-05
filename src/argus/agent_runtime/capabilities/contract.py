@@ -13,7 +13,10 @@ from argus.agent_runtime.state.models import IntentName, SimplificationOption
 def freeze_contract_payload(value: Any) -> Any:
     if isinstance(value, dict):
         return MappingProxyType(
-            {key: freeze_contract_payload(nested_value) for key, nested_value in value.items()}
+            {
+                key: freeze_contract_payload(nested_value)
+                for key, nested_value in value.items()
+            }
         )
     if isinstance(value, list):
         return tuple(freeze_contract_payload(item) for item in value)
@@ -117,7 +120,9 @@ class CapabilityContract(BaseModel):
     optional_parameters: dict[str, OptionalParameterSpec] = Field(default_factory=dict)
     validation_rules: tuple[ValidationRule, ...] = ()
     unsupported_combinations: tuple[UnsupportedCombination, ...] = ()
-    simplification_templates: dict[str, SimplificationTemplate] = Field(default_factory=dict)
+    simplification_templates: dict[str, SimplificationTemplate] = Field(
+        default_factory=dict
+    )
 
     @property
     def required_fields(self) -> list[str]:
@@ -186,9 +191,7 @@ class CapabilityContract(BaseModel):
             self.optional_parameters
         )
         if overlapping_fields:
-            raise ValueError(
-                "Required and optional capability fields must not overlap."
-            )
+            raise ValueError("Required and optional capability fields must not overlap.")
 
         declared_fields = set(self.required_field_descriptions).union(
             self.optional_parameters
@@ -248,8 +251,13 @@ class CapabilityContract(BaseModel):
 
         default_value = parameter.default_value
 
-        if allowed_range.allowed_values and default_value not in allowed_range.allowed_values:
-            allowed_values = ", ".join(str(value) for value in allowed_range.allowed_values)
+        if (
+            allowed_range.allowed_values
+            and default_value not in allowed_range.allowed_values
+        ):
+            allowed_values = ", ".join(
+                str(value) for value in allowed_range.allowed_values
+            )
             raise ValueError(
                 f"Optional parameter '{parameter_name}' has default '{default_value}' "
                 f"outside allowed values: {allowed_values}."

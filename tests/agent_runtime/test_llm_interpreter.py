@@ -120,7 +120,9 @@ def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) ->
     assert strategy.cadence == "weekly"
 
 
-def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(monkeypatch) -> None:
+def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(
+    monkeypatch,
+) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     monkeypatch.setattr(
@@ -374,7 +376,9 @@ def test_llm_interpreter_preserves_actual_user_phrasing_when_model_rewrites_it(
         lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
     )
 
-    user_message = "let's try a basic buy and hold on BTC from jan first last year to date"
+    user_message = (
+        "let's try a basic buy and hold on BTC from jan first last year to date"
+    )
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
     )

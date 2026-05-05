@@ -55,9 +55,7 @@ def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
                             "end": "2025-12-31",
                         },
                     },
-                    "metrics": {
-                        "aggregate": {"performance": {"total_return_pct": 12.5}}
-                    },
+                    "metrics": {"aggregate": {"performance": {"total_return_pct": 12.5}}},
                     "benchmark_metrics": {
                         "benchmark_symbol": "SPY",
                         "benchmark_return_pct": 9.2,
@@ -195,9 +193,7 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
     assert card is not None
     period = next(row["value"] for row in card["rows"] if row["label"] == "Period")
     assert period == "past year (May 3, 2025 - May 3, 2026)"
-    assert card["summary"].endswith(
-        "over past year, May 3, 2025 - May 3, 2026."
-    )
+    assert card["summary"].endswith("over past year, May 3, 2025 - May 3, 2026.")
     assert card["actions"][0] == {
         "id": "run-backtest",
         "label": "Run backtest",

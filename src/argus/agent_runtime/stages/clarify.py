@@ -4,9 +4,7 @@ from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState
 
-BEGINNER_GUIDANCE_PROMPT = (
-    "No problem. I can help you pick a starting point. We can test a simple buy-and-hold idea, a recurring investment plan, or a rule like buying when RSI is low. If you want the simplest path, name an asset and say a timeframe, like 'Tesla over 2 years'."
-)
+BEGINNER_GUIDANCE_PROMPT = "No problem. I can help you pick a starting point. We can test a simple buy-and-hold idea, a recurring investment plan, or a rule like buying when RSI is low. If you want the simplest path, name an asset and say a timeframe, like 'Tesla over 2 years'."
 AMBIGUOUS_TURN_PROMPT = (
     "Should I keep working on the current idea, or are you starting a new backtest?"
 )
@@ -81,7 +79,9 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             },
         )
 
-    optional_parameter_choices = _optional_parameter_choices(state.optional_parameter_status)
+    optional_parameter_choices = _optional_parameter_choices(
+        state.optional_parameter_status
+    )
     if optional_parameter_choices:
         return StageResult(
             outcome="await_user_reply",
@@ -114,7 +114,9 @@ def _optional_parameter_choices(
     return choices[:OPTIONAL_PARAMETER_OPT_IN_LIMIT]
 
 
-def _ambiguous_fields(optional_parameter_status: dict[str, object]) -> list[dict[str, object]]:
+def _ambiguous_fields(
+    optional_parameter_status: dict[str, object],
+) -> list[dict[str, object]]:
     ambiguous_fields = optional_parameter_status.get("ambiguous_fields", [])
     if not isinstance(ambiguous_fields, list):
         return []
@@ -174,7 +176,10 @@ def _optional_parameter_opt_in_prompt(
 
 
 def _ambiguous_fields_prompt(ambiguous_fields: list[dict[str, object]]) -> str:
-    if len(ambiguous_fields) == 1 and ambiguous_fields[0].get("field_name") == "entry_logic":
+    if (
+        len(ambiguous_fields) == 1
+        and ambiguous_fields[0].get("field_name") == "entry_logic"
+    ):
         raw_value = str(ambiguous_fields[0].get("raw_value", "")).strip()
         if raw_value:
             return (
@@ -200,7 +205,9 @@ def _ambiguous_fields_prompt(ambiguous_fields: list[dict[str, object]]) -> str:
         elif raw_value:
             parts.append(f"{field_name}: you said '{raw_value}'")
     if not parts:
-        return "I understand the direction, but I need one more detail before I can test it."
+        return (
+            "I understand the direction, but I need one more detail before I can test it."
+        )
     joined = "; ".join(parts)
     return (
         "I need to clarify a couple of strategy details before I continue. "

@@ -1,7 +1,7 @@
 # Conversational Backtest Agent Architecture
 
-**Status:** Proposed  
-**Date:** 2026-04-29  
+**Status:** Proposed
+**Date:** 2026-04-29
 **Scope:** Conversational backtest agent runtime for Argus
 
 ## 1. Purpose

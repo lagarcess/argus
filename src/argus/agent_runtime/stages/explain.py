@@ -183,9 +183,7 @@ def _build_response(
         else "I tested the confirmed strategy."
     )
     expertise_sentence = _expertise_sentence(expertise_mode)
-    assumption_sentence = (
-        f" {assumption_summary}" if assumption_summary else ""
-    )
+    assumption_sentence = f" {assumption_summary}" if assumption_summary else ""
 
     if verbosity == "low":
         return (

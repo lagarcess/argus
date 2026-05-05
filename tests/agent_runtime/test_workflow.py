@@ -193,7 +193,10 @@ def test_execute_stage_with_real_tool_surfaces_result_card_payload(
     result = execute_stage(state=state["run_state"], tool=tool, max_retries=1)
 
     assert result.outcome == "execution_succeeded"
-    assert result.patch["final_response_payload"]["result_card"]["title"] == "TSLA Buy and Hold"
+    assert (
+        result.patch["final_response_payload"]["result_card"]["title"]
+        == "TSLA Buy and Hold"
+    )
     assert (
         result.patch["final_response_payload"]["explanation_context"]["strategy_type"]
         == "buy_and_hold"
@@ -235,7 +238,9 @@ def test_build_workflow_input_seeds_selected_context_and_keeps_run_state_fresh()
         message="Explain the result",
     )
     first_input["run_state"].tool_call_records.append({"tool_name": "scratch"})
-    first_input["run_state"].confirmation_payload = {"strategy": {"asset_universe": ["TSLA"]}}
+    first_input["run_state"].confirmation_payload = {
+        "strategy": {"asset_universe": ["TSLA"]}
+    }
 
     second_input = build_workflow_input(
         session_manager=manager,
@@ -525,10 +530,7 @@ def test_internal_agent_runtime_turn_endpoint_returns_confirmation_ready_result(
     payload = response.json()
     assert payload["stage_outcome"] == "await_approval"
     assert "confirmation_payload" in payload
-    assert (
-        payload["confirmation_payload"]["strategy"]["asset_universe"]
-        == ["TSLA"]
-    )
+    assert payload["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
 
 
 def test_run_agent_turn_serializes_rich_final_response_payload() -> None:

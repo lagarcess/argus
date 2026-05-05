@@ -91,7 +91,10 @@ def missing_required_fields(params: BacktestParams) -> list[str]:
         capability = STRATEGY_CAPABILITIES.get(params.template)
         if capability:
             for key, spec in capability.parameters.items():
-                if spec.policy == "clarify_if_missing" and params.parameters.get(key) is None:
+                if (
+                    spec.policy == "clarify_if_missing"
+                    and params.parameters.get(key) is None
+                ):
                     missing.append(key)
     return missing
 
@@ -171,7 +174,9 @@ def confirmation_summary(params: BacktestParams, language: str) -> str:
     )
 
 
-def missing_field_message(missing: list[str], params: BacktestParams, language: str) -> str:
+def missing_field_message(
+    missing: list[str], params: BacktestParams, language: str
+) -> str:
     is_es = language.lower().startswith("es")
     first = missing[0]
     if first == "template":
@@ -181,7 +186,9 @@ def missing_field_message(missing: list[str], params: BacktestParams, language: 
             else "What strategy do you want to test?"
         )
     if first == "symbols":
-        template = params.template.replace("_", " ") if params.template else "that strategy"
+        template = (
+            params.template.replace("_", " ") if params.template else "that strategy"
+        )
         return (
             f"¿Con qué símbolos quieres correr {template}?"
             if is_es
@@ -251,7 +258,6 @@ def apply_backtest_turn(
 
     params = merge_params(state.params, update) if update.has_updates() else state.params
 
-
     missing = missing_required_fields(params)
     base_state = BacktestConversationState(
         params=params,
@@ -272,7 +278,9 @@ def apply_backtest_turn(
         update={"awaiting_confirmation": True, "summary": summary}
     )
 
-    confirmed = confirmation_action == "accept_and_run" or is_explicit_confirmation(message)
+    confirmed = confirmation_action == "accept_and_run" or is_explicit_confirmation(
+        message
+    )
     if state.awaiting_confirmation and not update.has_updates() and confirmed:
         return BacktestTurnResult(
             action="run_backtest",

@@ -429,7 +429,9 @@ class SupabaseGateway:
 
         if limit is None:
             runs = self._fetch_all_rows(lambda start, end: ordered_runs.range(start, end))
-            chats = self._fetch_all_rows(lambda start, end: ordered_chats.range(start, end))
+            chats = self._fetch_all_rows(
+                lambda start, end: ordered_chats.range(start, end)
+            )
             strategies = self._fetch_all_rows(
                 lambda start, end: ordered_strategies.range(start, end)
             )
@@ -492,7 +494,9 @@ class SupabaseGateway:
             collections_raw = self._fetch_all_rows(
                 lambda start, end: collections_query.range(start, end)
             )
-            runs_raw = self._fetch_all_rows(lambda start, end: runs_query.range(start, end))
+            runs_raw = self._fetch_all_rows(
+                lambda start, end: runs_query.range(start, end)
+            )
         else:
             conversations_raw = conversations_query.limit(limit).execute().data or []
             strategies_raw = strategies_query.limit(limit).execute().data or []

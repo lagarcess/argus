@@ -183,9 +183,7 @@ def test_extraction_models_capture_resolution_states() -> None:
     assert extracted.normalized_value == "exit when RSI rises above 70"
     assert ambiguous.reason_code == "negation_or_conditional_reversal"
     assert unsupported.simplification_options[0].label == "Retry with daily bars"
-    assert unsupported.simplification_options[0].replacement_values == {
-        "timeframe": "1D"
-    }
+    assert unsupported.simplification_options[0].replacement_values == {"timeframe": "1D"}
 
 
 def test_capability_contract_exposes_required_and_optional_fields() -> None:
@@ -267,20 +265,20 @@ def test_capability_contract_simplification_access_is_mutation_safe() -> None:
     )
 
     with pytest.raises(TypeError):
-        contract.simplification_templates["unsupported_strategy_logic"] = SimplificationTemplate(
-            category="unsupported_strategy_logic",
-            options=(
-                SimplificationOption(
-                    label="Mutated",
-                    replacement_values={"position_side": "short"},
+        contract.simplification_templates["unsupported_strategy_logic"] = (
+            SimplificationTemplate(
+                category="unsupported_strategy_logic",
+                options=(
+                    SimplificationOption(
+                        label="Mutated",
+                        replacement_values={"position_side": "short"},
+                    ),
                 ),
-            ),
+            )
         )
 
     with pytest.raises((TypeError, ValidationError)):
-        contract.simplification_templates[
-            "unsupported_strategy_logic"
-        ].options += (
+        contract.simplification_templates["unsupported_strategy_logic"].options += (
             SimplificationOption(
                 label="Mutated",
                 replacement_values={"position_side": "short"},
@@ -370,7 +368,9 @@ def test_capability_contract_rejects_validation_rules_for_unknown_fields() -> No
         )
 
 
-def test_capability_contract_rejects_unsupported_combinations_for_unknown_fields() -> None:
+def test_capability_contract_rejects_unsupported_combinations_for_unknown_fields() -> (
+    None
+):
     with pytest.raises(ValidationError):
         CapabilityContract(
             **{

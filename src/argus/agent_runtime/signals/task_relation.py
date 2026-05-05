@@ -133,14 +133,10 @@ def extract_signals(
     prior_strategy = None
     if snapshot is not None:
         prior_strategy = (
-            snapshot.pending_strategy_summary
-            or snapshot.confirmed_strategy_summary
+            snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
         )
     if prior_strategy is not None and prior_strategy.asset_universe:
-        prior_symbols = [
-            symbol.upper()
-            for symbol in prior_strategy.asset_universe
-        ]
+        prior_symbols = [symbol.upper() for symbol in prior_strategy.asset_universe]
 
     symbols_changed = bool(
         detected_symbols and prior_symbols and detected_symbols != prior_symbols

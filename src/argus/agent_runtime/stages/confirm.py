@@ -11,7 +11,9 @@ from argus.agent_runtime.strategy_contract import resolve_date_range
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
     strategy = _strategy_payload(state.candidate_strategy_draft)
-    missing_required_fields = _missing_required_fields(strategy=strategy, contract=contract)
+    missing_required_fields = _missing_required_fields(
+        strategy=strategy, contract=contract
+    )
     if missing_required_fields:
         return StageResult(
             outcome="needs_clarification",
@@ -202,16 +204,12 @@ def _plain_language_strategy_summary(
     strategy_type_label = _strategy_type_label(strategy_type)
 
     if strategy_type == "buy_and_hold":
-        return (
-            f"I read this as a {strategy_type_label} backtest for {assets} over {date_range}."
-        )
+        return f"I read this as a {strategy_type_label} backtest for {assets} over {date_range}."
 
     if strategy_type == "dca_accumulation":
         cadence = _resolved_cadence(strategy, optional_parameters)
         cadence_phrase = f" on a {cadence} cadence" if cadence is not None else ""
-        return (
-            f"I read this as a {strategy_type_label} backtest for {assets}{cadence_phrase} over {date_range}."
-        )
+        return f"I read this as a {strategy_type_label} backtest for {assets}{cadence_phrase} over {date_range}."
 
     entry_logic = _format_value(strategy.get("entry_logic"))
     exit_logic = _format_value(strategy.get("exit_logic"))

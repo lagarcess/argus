@@ -21,11 +21,15 @@ def normalize_template_name(raw_name: Any) -> str | None:
     for template_key, capability in STRATEGY_CAPABILITIES.items():
         # Check primary template key, aliases, and display_name
         aliases = [a.lower() for a in capability.aliases]
-        if clean == template_key or clean in aliases or clean == capability.display_name.lower():
+        if (
+            clean == template_key
+            or clean in aliases
+            or clean == capability.display_name.lower()
+        ):
             return template_key
 
-
     return None
+
 
 def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any) -> Any:
     """
@@ -59,10 +63,11 @@ def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any)
         if hasattr(spec, "value_aliases") and spec.value_aliases:
             for canonical_val, aliases in spec.value_aliases.items():
                 clean_aliases = [str(a).strip().lower() for a in aliases]
-                if clean_value == str(canonical_val).lower() or clean_value in clean_aliases:
+                if (
+                    clean_value == str(canonical_val).lower()
+                    or clean_value in clean_aliases
+                ):
                     res = canonical_val
                     break
 
     return res
-
-

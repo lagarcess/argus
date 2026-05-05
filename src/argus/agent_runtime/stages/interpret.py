@@ -102,8 +102,7 @@ class InterpretDecision(BaseModel):
                 item.model_dump(mode="python") for item in self.ambiguous_fields
             ],
             "unsupported_constraints": [
-                item.model_dump(mode="python")
-                for item in self.unsupported_constraints
+                item.model_dump(mode="python") for item in self.unsupported_constraints
             ],
         }
 
@@ -322,7 +321,9 @@ def interpret_stage(
         signals=signals,
         snapshot=snapshot,
     )
-    if assistant_response is not None and not strategy_can_be_approved(candidate_strategy):
+    if assistant_response is not None and not strategy_can_be_approved(
+        candidate_strategy
+    ):
         intent = "conversation_followup"
         task_relation = "continue"
         requires_clarification = False
@@ -351,9 +352,7 @@ def interpret_stage(
             extraction.reason_codes,
             arbitration.reason_codes,
             ["generic_pending_asset_reply"] if pending_asset_reply else [],
-            arbitration.decision.reason_codes
-            if arbitration.decision is not None
-            else [],
+            arbitration.decision.reason_codes if arbitration.decision is not None else [],
         ),
         effective_response_profile=effective_profile,
         user_preference_overridden_for_turn=has_response_profile_overrides(signals),
@@ -521,11 +520,7 @@ def _candidate_strategy_for_turn(
     snapshot: TaskSnapshot | None,
     capability_contract: Any,
 ) -> StrategySummary:
-    prior = (
-        snapshot.pending_strategy_summary
-        if snapshot is not None
-        else None
-    )
+    prior = snapshot.pending_strategy_summary if snapshot is not None else None
     strategy = prior.model_copy(deep=True) if prior is not None else StrategySummary()
     extracted = build_candidate_strategy_from_extraction(extraction)
     lowered = message.lower()
@@ -616,7 +611,13 @@ def missing_required_fields_for_strategy(
     contract: Any,
 ) -> list[str]:
     del extraction
-    required = ["strategy_thesis", "asset_universe", "entry_logic", "exit_logic", "date_range"]
+    required = [
+        "strategy_thesis",
+        "asset_universe",
+        "entry_logic",
+        "exit_logic",
+        "date_range",
+    ]
     strategy_type = executable_strategy_type(strategy)
     if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
         pass
@@ -865,9 +866,13 @@ def _structured_stage_result(
             stage_patch={"assistant_response": assistant_response},
         )
     return StageResult(
-        outcome="needs_clarification" if requires_clarification else "ready_for_confirmation",
+        outcome="needs_clarification"
+        if requires_clarification
+        else "ready_for_confirmation",
         decision=decision,
     )
+
+
 def _direct_conversational_response(
     *,
     message: str,
@@ -917,7 +922,9 @@ def _direct_conversational_response(
             "The point is to avoid trying to pick the perfect day. In Argus, I can test how that "
             "recurring-buy plan would have performed historically for a supported asset."
         )
-    if re.search(r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b", lowered):
+    if re.search(
+        r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b", lowered
+    ):
         return (
             "No problem. The simple version: Argus turns an investing idea into a historical test. "
             "If we were talking about RSI, think of it like a temperature gauge for recent price movement: "
@@ -942,7 +949,9 @@ def _direct_conversational_response(
 
 def _social_opener_response(message: str, *, snapshot: TaskSnapshot | None) -> str | None:
     lowered = re.sub(r"\s+", " ", message.lower().strip(" .,!?:;"))
-    if not re.fullmatch(r"(hey|hi|hello|yo|sup|good morning|good afternoon|good evening)", lowered):
+    if not re.fullmatch(
+        r"(hey|hi|hello|yo|sup|good morning|good afternoon|good evening)", lowered
+    ):
         return None
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         return (
@@ -1015,7 +1024,9 @@ def _educational_fallback_response(message: str) -> str | None:
             "The point is to avoid trying to pick the perfect day. In Argus, I can test how that "
             "recurring-buy plan would have performed historically for a supported asset."
         )
-    if re.search(r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b", lowered):
+    if re.search(
+        r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b", lowered
+    ):
         return (
             "No problem. The simple version: Argus turns an investing idea into a historical test. "
             "If we were talking about RSI, think of it like a temperature gauge for recent price movement: "
@@ -1284,19 +1295,24 @@ def _asset_name_aliases(assets: list[str]) -> set[str]:
 
 
 def _strategy_summary_response(strategy: StrategySummary) -> str:
-    assets = ", ".join(strategy.asset_universe) if strategy.asset_universe else "the asset"
+    assets = (
+        ", ".join(strategy.asset_universe) if strategy.asset_universe else "the asset"
+    )
     strategy_type = display_strategy_slug(strategy)
     date_range = (
         resolve_date_range(strategy.date_range).display
         if strategy.date_range
         else "the default recent period"
     )
-    assumptions = " ".join(strategy.assumptions) if strategy.assumptions else (
-        "Assumptions: long-only, daily bars by default, no fees or slippage unless stated."
+    assumptions = (
+        " ".join(strategy.assumptions)
+        if strategy.assumptions
+        else (
+            "Assumptions: long-only, daily bars by default, no fees or slippage unless stated."
+        )
     )
     return (
-        f"I’m testing {assets} as a {strategy_type} over {date_range}. "
-        f"{assumptions}"
+        f"I’m testing {assets} as a {strategy_type} over {date_range}. " f"{assumptions}"
     )
 
 
@@ -1318,7 +1334,9 @@ def _detect_strategy_type(message: str, strategy: StrategySummary) -> str | None
     lowered = message.lower()
     if "buy and hold" in lowered or "buy-and-hold" in lowered:
         return "buy_and_hold"
-    if re.search(r"\bdca\b|\bevery\s+(day|week|month|year)\b|\bweekly\b|\bmonthly\b", lowered):
+    if re.search(
+        r"\bdca\b|\bevery\s+(day|week|month|year)\b|\bweekly\b|\bmonthly\b", lowered
+    ):
         return "dca_accumulation"
     if strategy.entry_logic or strategy.exit_logic or "rsi" in lowered:
         return "indicator_threshold"
@@ -1345,7 +1363,9 @@ def _detect_capital_amount(message: str) -> float | None:
 def _detect_risk_rules(message: str) -> list[dict[str, Any]]:
     lowered = message.lower()
     rules: list[dict[str, Any]] = []
-    stop_match = re.search(r"(\d+(?:\.\d+)?)\s*percent\s+stop loss|(\d+(?:\.\d+)?)%\s+stop loss", lowered)
+    stop_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*percent\s+stop loss|(\d+(?:\.\d+)?)%\s+stop loss", lowered
+    )
     if stop_match is not None:
         value = next(group for group in stop_match.groups() if group is not None)
         rules.append({"type": "stop_loss", "value_pct": float(value)})
@@ -1379,9 +1399,14 @@ def _fallback_thesis(message: str, asset_universe: list[str]) -> str | None:
     return message.strip()
 
 
-def _strategy_assumptions(strategy: StrategySummary, capability_contract: Any) -> list[str]:
+def _strategy_assumptions(
+    strategy: StrategySummary, capability_contract: Any
+) -> list[str]:
     del capability_contract
-    assumptions = ["Long-only simulation.", "No fees or slippage unless explicitly supported."]
+    assumptions = [
+        "Long-only simulation.",
+        "No fees or slippage unless explicitly supported.",
+    ]
     if strategy.asset_class == "crypto":
         assumptions.append("Benchmark: BTC.")
     elif strategy.asset_class == "equity":
@@ -1498,7 +1523,9 @@ def build_user_goal_summary(
         and task_relation == "new_task"
         and not signals.request_is_under_specified
     ):
-        return "User is ready to confirm a new backtest with the supplied strategy details."
+        return (
+            "User is ready to confirm a new backtest with the supplied strategy details."
+        )
     if intent == "strategy_drafting" and signals.request_is_under_specified:
         return "User has a recognizable backtest goal but still needs strategy details."
     if task_relation == "continue":

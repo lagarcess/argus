@@ -151,7 +151,11 @@ def _memory_conversation(
 
 
 def _memory_message(
-    *, conversation_id: str, role: str, content: str, metadata: dict[str, Any] | None = None
+    *,
+    conversation_id: str,
+    role: str,
+    content: str,
+    metadata: dict[str, Any] | None = None,
 ) -> Message:
     message = Message(
         id=store.new_id(),
@@ -325,16 +329,31 @@ def _runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any]
     if strategy.get("cadence") and _strategy_type_uses_cadence(canonical_strategy_type):
         rows.append({"label": "Cadence", "value": str(strategy["cadence"]).title()})
     if strategy.get("entry_logic"):
-        rows.append({"label": "Buy rule", "value": _format_confirmation_value(strategy["entry_logic"])})
+        rows.append(
+            {
+                "label": "Buy rule",
+                "value": _format_confirmation_value(strategy["entry_logic"]),
+            }
+        )
     if strategy.get("exit_logic"):
-        rows.append({"label": "Exit rule", "value": _format_confirmation_value(strategy["exit_logic"])})
+        rows.append(
+            {
+                "label": "Exit rule",
+                "value": _format_confirmation_value(strategy["exit_logic"]),
+            }
+        )
     if strategy.get("capital_amount"):
         capital_label = (
             "Contribution"
             if _strategy_type_uses_cadence(canonical_strategy_type)
             else "Starting capital"
         )
-        rows.append({"label": capital_label, "value": f"${float(strategy['capital_amount']):,.0f}"})
+        rows.append(
+            {
+                "label": capital_label,
+                "value": f"${float(strategy['capital_amount']):,.0f}",
+            }
+        )
 
     assumptions = _confirmation_assumptions(
         strategy=strategy,
@@ -398,9 +417,13 @@ def _confirmation_assumptions(
         else:
             assumptions.append(f"${float(strategy_capital):,.0f} starting capital")
     initial_capital = _optional_parameter_value(optional_parameters, "initial_capital")
-    if isinstance(initial_capital, int | float) and not isinstance(strategy_capital, int | float):
+    if isinstance(initial_capital, int | float) and not isinstance(
+        strategy_capital, int | float
+    ):
         if _strategy_type_uses_cadence(strategy_type) and strategy.get("capital_amount"):
-            assumptions.append(f"${float(strategy['capital_amount']):,.0f} recurring contribution")
+            assumptions.append(
+                f"${float(strategy['capital_amount']):,.0f} recurring contribution"
+            )
         else:
             assumptions.append(f"${float(initial_capital):,.0f} starting capital")
     timeframe = _optional_parameter_value(optional_parameters, "timeframe")
@@ -572,7 +595,8 @@ def _persist_runtime_backtest_run(
     if conversation.id in store.conversations:
         store.conversations[conversation.id] = conversation.model_copy(
             update={
-                "last_message_preview": result_card.get("title") or conversation.last_message_preview,
+                "last_message_preview": result_card.get("title")
+                or conversation.last_message_preview,
                 "updated_at": utcnow(),
             }
         )
@@ -1324,7 +1348,9 @@ def create_run_from_payload(
             title="Validation Error",
             detail="Symbol is required.",
         )
-    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(symbols, request)
+    inferred_asset_class, classified_symbols = ensure_same_asset_or_raise(
+        symbols, request
+    )
     requested_asset_class = payload.get("asset_class")
     if requested_asset_class and requested_asset_class != inferred_asset_class:
         _raise_backtest_problem(
@@ -1373,8 +1399,6 @@ def create_run_from_payload(
         if user_id:
             store.backtest_run_owners[run.id] = user_id
     return run
-
-
 
 
 @app.post("/api/v1/backtests/run", response_model=BacktestRunResponse)
@@ -2574,7 +2598,9 @@ def _result_breakdown_message(run: BacktestRun | None) -> str:
             "Run the backtest again and I can break down the metrics from that result."
         )
     context = _result_breakdown_context(run)
-    return _llm_result_breakdown_message(context) or _fallback_result_breakdown_message(context)
+    return _llm_result_breakdown_message(context) or _fallback_result_breakdown_message(
+        context
+    )
 
 
 @app.post("/api/v1/chat/stream")
@@ -2664,7 +2690,11 @@ def chat_stream(
     }
 
     def events() -> Iterable[str]:
-        if onboarding_required and onboarding_goal is None and not request_message.strip():
+        if (
+            onboarding_required
+            and onboarding_goal is None
+            and not request_message.strip()
+        ):
             lang = (
                 payload.language
                 or conversation.language
@@ -2672,12 +2702,13 @@ def chat_stream(
                 or "en"
             )
             from argus.domain.orchestrator import _resolve_language
+
             is_es = _resolve_language(lang) == "es-419"
             msg = (
                 "¿Cuál es tu objetivo principal ahora? No te preocupes, "
                 "podrás cambiarlo después en Settings."
-                if is_es else
-                "What is your current primary goal? Don't worry, "
+                if is_es
+                else "What is your current primary goal? Don't worry, "
                 "you can change it later in Settings."
             )
             yield sse("status", {"status": "intent_onboarding_prompt"})
@@ -2708,6 +2739,7 @@ def chat_stream(
                 or "en"
             )
             from argus.domain.orchestrator import _resolve_language
+
             is_es = _resolve_language(lang) == "es-419"
             if is_es:
                 mapping = {
@@ -2872,7 +2904,11 @@ def chat_stream(
 
         yield sse(
             "done",
-            {"message_id": assistant_message.id if assistant_message is not None else None},
+            {
+                "message_id": assistant_message.id
+                if assistant_message is not None
+                else None
+            },
         )
 
     return StreamingResponse(

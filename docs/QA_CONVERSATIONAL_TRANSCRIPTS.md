@@ -82,4 +82,3 @@ Record:
 - Losing the prior strategy after `weekly instead`, `keep everything else`, or `use Nvidia`.
 - Showing a result card while dropping the assistant explanation.
 - Treating unsupported strategy drafting as a fresh empty session.
-

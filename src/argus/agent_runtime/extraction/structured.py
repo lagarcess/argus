@@ -225,9 +225,7 @@ def collect_reason_codes(
     unsupported_constraints: list[UnsupportedConstraint],
 ) -> list[str]:
     reason_codes = [field.reason_code for field in ambiguous_fields]
-    reason_codes.extend(
-        constraint.category for constraint in unsupported_constraints
-    )
+    reason_codes.extend(constraint.category for constraint in unsupported_constraints)
     return reason_codes
 
 

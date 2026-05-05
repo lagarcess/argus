@@ -115,7 +115,9 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                     else "I tested that idea with TSLA."
                 ),
                 strategy_draft=StrategyDraft(
-                    template=SlotValue(source="user_supplied", value="rsi_mean_reversion"),
+                    template=SlotValue(
+                        source="user_supplied", value="rsi_mean_reversion"
+                    ),
                     asset_class=SlotValue(source="user_supplied", value="equity"),
                     symbols=SlotValue(source="user_supplied", value=["TSLA"]),
                     parameters={},

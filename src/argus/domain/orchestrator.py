@@ -25,11 +25,43 @@ SUPPORTED_GOALS = {
 }
 
 NON_SYMBOLS = {
-    "WHAT", "IF", "WHENEVER", "WHEN", "BOUGHT", "BUY", "DIPPED", "HARD",
-    "THE", "AND", "FOR", "WITH", "STOCK", "CRYPTO", "I", "ME", "MY", "YOU",
-    "HOW", "WOULD", "SIMPLE", "STRATEGY", "PERFORM", "ON", "RUN", "TEST",
-    "TODAY", "YTD", "YEAR", "BACK", "FROM", "START", "END", "DATE",
-    "DCA", "RSI", "MA",
+    "WHAT",
+    "IF",
+    "WHENEVER",
+    "WHEN",
+    "BOUGHT",
+    "BUY",
+    "DIPPED",
+    "HARD",
+    "THE",
+    "AND",
+    "FOR",
+    "WITH",
+    "STOCK",
+    "CRYPTO",
+    "I",
+    "ME",
+    "MY",
+    "YOU",
+    "HOW",
+    "WOULD",
+    "SIMPLE",
+    "STRATEGY",
+    "PERFORM",
+    "ON",
+    "RUN",
+    "TEST",
+    "TODAY",
+    "YTD",
+    "YEAR",
+    "BACK",
+    "FROM",
+    "START",
+    "END",
+    "DATE",
+    "DCA",
+    "RSI",
+    "MA",
 }
 
 COMMON_NAMES = {
@@ -76,9 +108,11 @@ STARTER_PROMPTS = {
     ],
 }
 
+
 def get_starter_prompts(primary_goal: str | None) -> list[str]:
     goal = primary_goal if primary_goal in STARTER_PROMPTS else "surprise_me"
     return STARTER_PROMPTS[goal]
+
 
 # --- Models ---
 
@@ -112,8 +146,12 @@ ResultAction = Literal[
     "none",
 ]
 
+
 class ChatTurnIntent(BaseModel):
-    assistant_response: str = Field(..., description="Conversational message from Argus. Use this to be helpful, data-obsessed, and natural.")
+    assistant_response: str = Field(
+        ...,
+        description="Conversational message from Argus. Use this to be helpful, data-obsessed, and natural.",
+    )
     intent: ChatTurnIntentName = "guide"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     educational_need: EducationalNeed = "none"
@@ -122,19 +160,24 @@ class ChatTurnIntent(BaseModel):
     confirmation_action: ConfirmationAction = "none"
     result_action: ResultAction = "none"
 
+
 class NameSuggestion(BaseModel):
     name: str
 
+
 # --- Helper Logic ---
+
 
 def _resolve_language(language: str | None) -> Literal["en", "es-419"]:
     if (language or "en").lower().startswith("es"):
         return "es-419"
     return "en"
 
+
 def build_capability_prompt() -> str:
     """Generates a text summary of all supported strategies for the LLM."""
     from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+
     lines = ["SUPPORTED STRATEGIES:"]
     for cap in STRATEGY_CAPABILITIES.values():
         params = []
@@ -143,6 +186,7 @@ def build_capability_prompt() -> str:
         param_str = f" Params: {', '.join(params)}" if params else ""
         lines.append(f"- {cap.display_name} (template: {cap.template}). {param_str}")
     return "\n".join(lines)
+
 
 def parse_onboarding_goal(message: str) -> str | None:
     if message == "__ONBOARDING_SKIP__":
@@ -171,9 +215,13 @@ def assistant_message_for_chat_turn(
         else "Estoy aquí para ayudarte a validar tus ideas de inversión con datos históricos reales. ¿Qué tienes en mente?"
     )
 
+
 # --- Core API ---
 
-def normalize_backtest_update(update: BacktestParamsUpdate, pending_template: str | None = None) -> BacktestParamsUpdate:
+
+def normalize_backtest_update(
+    update: BacktestParamsUpdate, pending_template: str | None = None
+) -> BacktestParamsUpdate:
     """Canonicalizes localized values in a BacktestParamsUpdate."""
     from argus.domain.slot_normalizer import (
         normalize_parameter_value,
@@ -191,6 +239,7 @@ def normalize_backtest_update(update: BacktestParamsUpdate, pending_template: st
         update.parameters = normalized
 
     return update
+
 
 def classify_chat_turn_intent(
     *,
@@ -210,7 +259,9 @@ def classify_chat_turn_intent(
     if model is None:
         return ChatTurnIntent(
             intent="guide",
-            assistant_response="I'm here to help you validate ideas, but I'm in offline mode right now!" if not is_es else "¡Estoy aquí para ayudarte, pero estoy en modo offline ahora mismo!"
+            assistant_response="I'm here to help you validate ideas, but I'm in offline mode right now!"
+            if not is_es
+            else "¡Estoy aquí para ayudarte, pero estoy en modo offline ahora mismo!",
         )
 
     try:
@@ -250,7 +301,10 @@ def classify_chat_turn_intent(
         if isinstance(response, ChatTurnIntent):
             # BREAK THE LOOP: If the user says "yes/si/go" and we are in a pending state, force confirmation.
             lower_msg = message.lower().strip()
-            is_confirming = any(w in lower_msg for w in ["yes", "si", "ejecuta", "run", "go", "confirm", "vale", "dale"])
+            is_confirming = any(
+                w in lower_msg
+                for w in ["yes", "si", "ejecuta", "run", "go", "confirm", "vale", "dale"]
+            )
 
             if is_confirming and response.intent in ["guide", "setup", "small_talk"]:
                 # If the model missed it, but it looks like a confirmation, we nudge it.
@@ -262,8 +316,7 @@ def classify_chat_turn_intent(
                 pending_template = pending_backtest_state["params"].get("template")
 
             response.backtest_update = normalize_backtest_update(
-                response.backtest_update,
-                pending_template=pending_template
+                response.backtest_update, pending_template=pending_template
             )
             return response
 
@@ -279,8 +332,11 @@ def classify_chat_turn_intent(
             intent="guide",
             confidence=0.0,
             educational_need="beginner_confused",
-            assistant_response="I'm sorry, I'm having a bit of trouble processing that. Could you try rephrasing your idea for me?" if not is_es else "Lo siento, ¡me está costando procesar eso! ¿Podrías intentar reformular tu idea?",
+            assistant_response="I'm sorry, I'm having a bit of trouble processing that. Could you try rephrasing your idea for me?"
+            if not is_es
+            else "Lo siento, ¡me está costando procesar eso! ¿Podrías intentar reformular tu idea?",
         )
+
 
 def suggest_entity_name(
     *,

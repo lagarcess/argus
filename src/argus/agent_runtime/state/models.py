@@ -28,7 +28,10 @@ TaskRelation = Literal["new_task", "continue", "refine", "ambiguous"]
 def freeze_state_payload(value: Any) -> Any:
     if isinstance(value, dict):
         return MappingProxyType(
-            {key: freeze_state_payload(nested_value) for key, nested_value in value.items()}
+            {
+                key: freeze_state_payload(nested_value)
+                for key, nested_value in value.items()
+            }
         )
     if isinstance(value, list):
         return tuple(freeze_state_payload(item) for item in value)
@@ -102,10 +105,7 @@ class SimplificationOption(BaseModel):
 
     @field_serializer("replacement_values")
     def serialize_replacement_values(self, value: dict[str, Any]) -> dict[str, Any]:
-        return {
-            key: deepcopy(nested_value)
-            for key, nested_value in value.items()
-        }
+        return {key: deepcopy(nested_value) for key, nested_value in value.items()}
 
 
 class UnsupportedConstraint(BaseModel):

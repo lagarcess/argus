@@ -244,9 +244,10 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
 
     assert response.status_code == 200
     assert seen_messages == ["run backtest"]
-    assert "Run backtest" in client.get(
-        f"/api/v1/conversations/{conversation['id']}/messages"
-    ).text
+    assert (
+        "Run backtest"
+        in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
+    )
     assert response.text.index("event: result") < response.text.index("event: token")
     run = _stream_payloads(response.text, "result")[0]["run"]
     assert [action["type"] for action in run["conversation_result_card"]["actions"]] == [
@@ -307,7 +308,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
     assert "Total Return (%)" in breakdown
     assert "Benchmark" in breakdown
-    assert run_id in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
+    assert (
+        run_id in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
+    )
 
 
 def test_chat_stream_requires_message_or_action() -> None:
@@ -386,7 +389,9 @@ def test_discovery_endpoints_return_assets_and_indicators(
     monkeypatch.setattr(
         api_main,
         "search_indicators",
-        lambda q, limit=12: [IndicatorInfo("rsi", "RSI", "Relative Strength Index", "supported")],
+        lambda q, limit=12: [
+            IndicatorInfo("rsi", "RSI", "Relative Strength Index", "supported")
+        ],
     )
     client = _client()
 

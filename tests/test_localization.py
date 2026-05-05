@@ -25,7 +25,7 @@ def test_build_result_card_localization():
             "efficiency": {
                 "win_rate": 0.6,
                 "total_trades": 10,
-            }
+            },
         }
     }
     config["benchmark_symbol"] = "SPY"

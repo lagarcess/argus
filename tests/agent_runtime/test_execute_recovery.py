@@ -90,7 +90,9 @@ def test_execute_applies_mechanical_correction_before_retry() -> None:
     assert result.patch["tool_call_records"][0]["payload"] == {}
 
 
-def test_execute_does_not_retry_when_corrected_payload_changes_protected_intent_fields() -> None:
+def test_execute_does_not_retry_when_corrected_payload_changes_protected_intent_fields() -> (
+    None
+):
     tool = StubBacktestTool(
         responses=[
             {
@@ -329,7 +331,10 @@ def test_execute_stage_uses_real_backtest_tool_payload(
     assert result.outcome == "execution_succeeded"
     assert observed_requests[0]["strategy_type"] == "buy_and_hold"
     assert observed_requests[0]["symbol"] == "TSLA"
-    assert result.patch["final_response_payload"]["result_card"]["title"] == "TSLA Buy and Hold"
+    assert (
+        result.patch["final_response_payload"]["result_card"]["title"]
+        == "TSLA Buy and Hold"
+    )
     assert (
         result.patch["final_response_payload"]["explanation_context"]["strategy_type"]
         == "buy_and_hold"
@@ -659,7 +664,9 @@ def test_explain_stage_uses_result_payload_without_fabricating() -> None:
     assert "because" not in result.patch["assistant_response"].lower()
 
 
-def test_explain_stage_reports_incomplete_result_payload_without_inventing_numbers() -> None:
+def test_explain_stage_reports_incomplete_result_payload_without_inventing_numbers() -> (
+    None
+):
     state = RunState.new(current_user_message="why", recent_thread_history=[])
     state.effective_response_profile = ResponseProfile(
         effective_tone="concise",
@@ -680,7 +687,9 @@ def test_explain_stage_reports_incomplete_result_payload_without_inventing_numbe
 
     assert result.outcome == "ready_to_respond"
     assert "incomplete" in result.patch["assistant_response"].lower()
-    assert "cannot report observed returns yet" in result.patch["assistant_response"].lower()
+    assert (
+        "cannot report observed returns yet" in result.patch["assistant_response"].lower()
+    )
     assert "0.0%" not in result.patch["assistant_response"]
 
 
@@ -749,7 +758,9 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     assert "I tested: Test a Tesla pullback idea." in result.patch["assistant_response"]
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "User-set options: Timeframe." in result.patch["assistant_response"]
-    assert "return comparison, not causal attribution" in result.patch["assistant_response"]
+    assert (
+        "return comparison, not causal attribution" in result.patch["assistant_response"]
+    )
 
 
 def test_explain_stage_varies_with_expertise_mode() -> None:
@@ -790,10 +801,7 @@ def test_explain_stage_varies_with_expertise_mode() -> None:
         in beginner_result.patch["assistant_response"].lower()
     )
     assert "caveat:" in beginner_result.patch["assistant_response"].lower()
-    assert (
-        "return comparison only"
-        in advanced_result.patch["assistant_response"].lower()
-    )
+    assert "return comparison only" in advanced_result.patch["assistant_response"].lower()
     assert "caveat:" in advanced_result.patch["assistant_response"].lower()
 
 

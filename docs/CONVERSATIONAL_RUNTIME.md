@@ -93,4 +93,3 @@ Required model and data variables:
 - `ALPACA_SECRET_KEY`
 - `ARGUS_PERSISTENCE_MODE`
 - Supabase variables from `.env.example` when running with Supabase persistence.
-

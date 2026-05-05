@@ -160,7 +160,9 @@ def test_interpret_uses_injected_structured_arbitrator_for_gray_case() -> None:
     assert "fake_structured_decision" in result.decision.reason_codes
 
 
-def test_interpret_keeps_gray_case_ambiguous_when_structured_arbitrator_unresolved() -> None:
+def test_interpret_keeps_gray_case_ambiguous_when_structured_arbitrator_unresolved() -> (
+    None
+):
     user = UserState(user_id="u1", expertise_level="advanced")
     state = RunState.new(
         current_user_message="Should we continue this or start over?",
@@ -752,7 +754,9 @@ def test_interpret_buy_and_hold_missing_date_does_not_become_entry_ambiguity() -
     assert "entry_logic" not in result.patch["missing_required_fields"]
 
 
-def test_interpret_buy_and_hold_is_complete_without_entry_or_exit_logic(monkeypatch) -> None:
+def test_interpret_buy_and_hold_is_complete_without_entry_or_exit_logic(
+    monkeypatch,
+) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
     monkeypatch.setattr(
@@ -955,7 +959,9 @@ def test_interpret_run_backtest_action_approves_pending_strategy() -> None:
     assert result.patch["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
 
 
-def test_interpret_run_backtest_action_approves_semantically_executable_strategy_alias() -> None:
+def test_interpret_run_backtest_action_approves_semantically_executable_strategy_alias() -> (
+    None
+):
     user = UserState(user_id="u1", expertise_level="advanced")
     state = RunState.new(
         current_user_message="Run backtest",
@@ -981,10 +987,14 @@ def test_interpret_run_backtest_action_approves_semantically_executable_strategy
     result = interpret_stage(state=state, user=user, latest_task_snapshot=snapshot)
 
     assert result.outcome == "approved_for_execution"
-    assert result.patch["confirmation_payload"]["strategy"]["strategy_type"] == "dip_buying"
+    assert (
+        result.patch["confirmation_payload"]["strategy"]["strategy_type"] == "dip_buying"
+    )
 
 
-def test_interpret_run_backtest_action_does_not_approve_incomplete_pending_draft() -> None:
+def test_interpret_run_backtest_action_does_not_approve_incomplete_pending_draft() -> (
+    None
+):
     user = UserState(user_id="u1", expertise_level="advanced")
     state = RunState.new(
         current_user_message="Run backtest",
@@ -1024,7 +1034,10 @@ def test_interpret_confirmation_action_chips_ask_natural_followups() -> None:
     )
 
     cases = {
-        "Change the date range": ("date_range", "What time period should I test instead?"),
+        "Change the date range": (
+            "date_range",
+            "What time period should I test instead?",
+        ),
         "Use a different asset": ("asset_universe", "Which asset should I use instead?"),
         "Change the assumptions": (None, "Which assumption do you want to change"),
     }
@@ -1060,7 +1073,10 @@ def test_interpret_result_metric_question_does_not_become_strategy_thesis() -> N
     state = RunState.new(
         current_user_message="i don't know what im looking at what are these metrics im a complete novice",
         recent_thread_history=[
-            {"role": "assistant", "content": "Your strategy returned 134.8% versus 27.8%."},
+            {
+                "role": "assistant",
+                "content": "Your strategy returned 134.8% versus 27.8%.",
+            },
         ],
     )
 
@@ -1101,7 +1117,9 @@ def test_interpret_pending_limitations_question_does_not_change_strategy() -> No
     assert "silently falling back to past year" in result.patch["assistant_response"]
 
 
-def test_interpret_mixed_asset_request_preserves_intent_with_simplification(monkeypatch) -> None:
+def test_interpret_mixed_asset_request_preserves_intent_with_simplification(
+    monkeypatch,
+) -> None:
     from argus.agent_runtime.extraction import structured as extraction_module
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -1123,4 +1141,9 @@ def test_interpret_mixed_asset_request_preserves_intent_with_simplification(monk
     assert result.decision.candidate_strategy_draft.asset_universe == ["TSLA", "BTC"]
     assert result.decision.unsupported_constraints
     assert result.decision.unsupported_constraints[0].category == "unsupported_asset_mix"
-    assert "split" in result.patch["unsupported_constraints"][0]["simplification_options"][2]["label"].lower()
+    assert (
+        "split"
+        in result.patch["unsupported_constraints"][0]["simplification_options"][2][
+            "label"
+        ].lower()
+    )

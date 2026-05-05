@@ -32,16 +32,25 @@ def test_interpret_and_clarify_preserve_under_specified_thesis_handoff() -> None
     )
     interpreted_state.intent = interpreted.patch["intent"]
     interpreted_state.task_relation = interpreted.patch["task_relation"]
-    interpreted_state.missing_required_fields = interpreted.patch["missing_required_fields"]
-    interpreted_state.optional_parameter_status = interpreted.patch["optional_parameter_status"]
-    interpreted_state.candidate_strategy_draft = interpreted.patch["candidate_strategy_draft"]
+    interpreted_state.missing_required_fields = interpreted.patch[
+        "missing_required_fields"
+    ]
+    interpreted_state.optional_parameter_status = interpreted.patch[
+        "optional_parameter_status"
+    ]
+    interpreted_state.candidate_strategy_draft = interpreted.patch[
+        "candidate_strategy_draft"
+    ]
 
     clarified = clarify_stage(
         state=interpreted_state,
         contract=build_default_capability_contract(),
     )
 
-    assert interpreted.patch["candidate_strategy_draft"]["strategy_thesis"] == "Backtest Tesla"
+    assert (
+        interpreted.patch["candidate_strategy_draft"]["strategy_thesis"]
+        == "Backtest Tesla"
+    )
     assert interpreted.patch["missing_required_fields"] == [
         "entry_logic",
         "exit_logic",
@@ -179,7 +188,9 @@ def test_clarify_surfaces_simplification_options_for_unsupported_constraints() -
 
 
 def test_clarify_offers_optional_parameters_as_bounded_opt_in() -> None:
-    state = RunState.new(current_user_message="Use defaults unless I change them", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="Use defaults unless I change them", recent_thread_history=[]
+    )
     state.intent = "strategy_drafting"
     state.task_relation = "new_task"
     state.optional_parameter_status = {
@@ -255,7 +266,9 @@ def test_clarify_uses_distinct_prompt_for_ambiguous_non_beginner_turns() -> None
     assert "current idea" in result.patch["assistant_prompt"].lower()
     assert "new backtest" in result.patch["assistant_prompt"].lower()
     assert "one idea or market question" not in result.patch["assistant_prompt"].lower()
-    assert "user intent needs clarification" not in result.patch["assistant_prompt"].lower()
+    assert (
+        "user intent needs clarification" not in result.patch["assistant_prompt"].lower()
+    )
 
 
 def test_clarify_beginner_guidance_stays_in_idea_shaping_before_optional_opt_in() -> None:
@@ -323,18 +336,27 @@ def test_confirm_stage_includes_defaults_for_undisclosed_optional_fields() -> No
 
     assert result.outcome == "await_approval"
     assert (
-        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"]["value"]
+        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"][
+            "value"
+        ]
         == 10000.0
     )
     assert (
-        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"]["source"]
+        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"][
+            "source"
+        ]
         == "default"
     )
     assert (
-        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"]["label"]
+        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"][
+            "label"
+        ]
         == "Initial capital"
     )
-    assert "I read this as an indicator threshold backtest for TSLA" in result.patch["assistant_prompt"]
+    assert (
+        "I read this as an indicator threshold backtest for TSLA"
+        in result.patch["assistant_prompt"]
+    )
     assert "buy when RSI below 30" in result.patch["assistant_prompt"]
     assert "exit when RSI above 55" in result.patch["assistant_prompt"]
     assert "$10,000 starting capital" in result.patch["assistant_prompt"]
@@ -373,13 +395,18 @@ def test_confirm_stage_blocks_ranges_longer_than_engine_limit() -> None:
 
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "date_range"
-    assert "longer than the current backtest engine can run" in result.patch["assistant_prompt"]
+    assert (
+        "longer than the current backtest engine can run"
+        in result.patch["assistant_prompt"]
+    )
     assert "up to 3 years" in result.patch["assistant_prompt"]
     assert "January 1, 2010" not in result.patch["assistant_prompt"]
 
 
 def test_confirm_stage_blocks_since_ipo_without_past_year_fallback() -> None:
-    state = RunState.new(current_user_message="take META since IPO", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="take META since IPO", recent_thread_history=[]
+    )
     state.intent = "backtest_execution"
     state.candidate_strategy_draft = StrategySummary(
         strategy_type="indicator_threshold",
@@ -455,11 +482,15 @@ def test_confirm_stage_prefers_user_optional_values_over_defaults() -> None:
     result = confirm_stage(state=state, contract=build_default_capability_contract())
 
     assert (
-        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"]["value"]
+        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"][
+            "value"
+        ]
         == 25000.0
     )
     assert (
-        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"]["source"]
+        result.patch["confirmation_payload"]["optional_parameters"]["initial_capital"][
+            "source"
+        ]
         == "user"
     )
     assert (
@@ -473,7 +504,9 @@ def test_confirm_stage_prefers_user_optional_values_over_defaults() -> None:
 
 
 def test_next_step_stage_limits_follow_up_actions() -> None:
-    state = RunState.new(current_user_message="why did that happen?", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="why did that happen?", recent_thread_history=[]
+    )
     state.final_response_payload = {"summary": "Tesla outperformed SPY"}
 
     result = next_step_stage(state=state)

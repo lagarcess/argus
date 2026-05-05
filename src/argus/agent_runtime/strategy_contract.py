@@ -53,7 +53,9 @@ class DateRangeResolution:
 
     @property
     def display(self) -> str:
-        range_text = f"{format_display_date(self.start)} - {format_display_date(self.end)}"
+        range_text = (
+            f"{format_display_date(self.start)} - {format_display_date(self.end)}"
+        )
         if self.label in {
             range_text,
             f"{format_display_date(self.start)} to {format_display_date(self.end)}",
@@ -122,10 +124,14 @@ def strategy_can_be_approved(strategy: StrategySummary | dict[str, Any]) -> bool
     strategy_type = executable_strategy_type(payload)
     if strategy_type not in SUPPORTED_STRATEGY_TYPES:
         return False
-    if not _has_value(payload.get("asset_universe")) or not _has_value(payload.get("date_range")):
+    if not _has_value(payload.get("asset_universe")) or not _has_value(
+        payload.get("date_range")
+    ):
         return False
     if strategy_type == "indicator_threshold":
-        return _has_value(payload.get("entry_logic")) and _has_value(payload.get("exit_logic"))
+        return _has_value(payload.get("entry_logic")) and _has_value(
+            payload.get("exit_logic")
+        )
     return True
 
 
@@ -134,7 +140,8 @@ def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     extra_parameters = payload.get("extra_parameters")
     raw_type = (
         extra_parameters.get("raw_strategy_type")
-        if isinstance(extra_parameters, dict) and extra_parameters.get("raw_strategy_type")
+        if isinstance(extra_parameters, dict)
+        and extra_parameters.get("raw_strategy_type")
         else payload.get("strategy_type")
     )
     normalized = _normalize_token(raw_type)
@@ -172,7 +179,9 @@ def display_strategy_slug(strategy: StrategySummary | dict[str, Any]) -> str:
 def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeResolution:
     current_date = today or date.today()
     if isinstance(value, dict):
-        start = _parse_date_token(value.get("start") or value.get("from"), today=current_date)
+        start = _parse_date_token(
+            value.get("start") or value.get("from"), today=current_date
+        )
         end = _parse_date_token(value.get("end") or value.get("to"), today=current_date)
         if start is not None and end is not None:
             return DateRangeResolution(
@@ -337,7 +346,9 @@ def _extract_period_label_from_raw_phrase(
     ytd_match = re.search(r"\b(?:ytd|year to date)\b", normalized)
     if ytd_match is not None:
         return "year_to_date"
-    if re.search(r"\bsince (?:ipo|public listing)\b|\bmax(?:imum)? available\b", normalized):
+    if re.search(
+        r"\bsince (?:ipo|public listing)\b|\bmax(?:imum)? available\b", normalized
+    ):
         return "since_ipo"
     relative_match = re.search(
         r"\b(?:past|last) (?P<count>\d+) "

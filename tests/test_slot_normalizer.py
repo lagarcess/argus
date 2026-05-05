@@ -12,9 +12,12 @@ def test_registry_has_value_aliases():
     spec = cap.parameters["dca_cadence"]
 
     # This will fail initially because 'value_aliases' is not yet on ParameterSpec
-    assert hasattr(spec, "value_aliases"), "ParameterSpec should have value_aliases attribute"
+    assert hasattr(
+        spec, "value_aliases"
+    ), "ParameterSpec should have value_aliases attribute"
     assert "weekly" in spec.value_aliases
     assert "semanal" in spec.value_aliases["weekly"]
+
 
 def test_normalizer_exists():
     """Task 2: Normalizer module should exist and expose key functions."""
@@ -26,20 +29,36 @@ def test_normalizer_exists():
     assert hasattr(slot_normalizer, "normalize_template_name")
     assert hasattr(slot_normalizer, "normalize_parameter_value")
 
+
 def test_normalizes_locale_cadence_values():
     """Task 2: Normalizer should map Spanish terms to English canonical keys."""
     from argus.domain.slot_normalizer import normalize_parameter_value
 
     # Test DCA cadence
-    assert normalize_parameter_value("dca_accumulation", "dca_cadence", "semanal") == "weekly"
-    assert normalize_parameter_value("dca_accumulation", "dca_cadence", "diario") == "daily"
-    assert normalize_parameter_value("dca_accumulation", "dca_cadence", "mensual") == "monthly"
+    assert (
+        normalize_parameter_value("dca_accumulation", "dca_cadence", "semanal")
+        == "weekly"
+    )
+    assert (
+        normalize_parameter_value("dca_accumulation", "dca_cadence", "diario") == "daily"
+    )
+    assert (
+        normalize_parameter_value("dca_accumulation", "dca_cadence", "mensual")
+        == "monthly"
+    )
 
     # Test case insensitivity and whitespace
-    assert normalize_parameter_value("dca_accumulation", "dca_cadence", "  SEMANAL  ") == "weekly"
+    assert (
+        normalize_parameter_value("dca_accumulation", "dca_cadence", "  SEMANAL  ")
+        == "weekly"
+    )
 
     # Test unknown values (should return original or raise? Let's assume return original for now)
-    assert normalize_parameter_value("dca_accumulation", "dca_cadence", "unknown") == "unknown"
+    assert (
+        normalize_parameter_value("dca_accumulation", "dca_cadence", "unknown")
+        == "unknown"
+    )
+
 
 def test_normalizes_template_names():
     """Task 2: Normalizer should canonicalize strategy template names."""

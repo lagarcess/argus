@@ -48,4 +48,3 @@ def _has_result_or_summary(state: RunState) -> bool:
     if isinstance(payload, dict):
         return bool(payload.get("result") or payload.get("summary"))
     return bool(payload.result or payload.summary)
-

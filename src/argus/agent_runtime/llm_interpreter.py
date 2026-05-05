@@ -96,8 +96,8 @@ class OpenRouterStructuredInterpreter:
         model_name: str | None = None,
     ) -> None:
         self.contract = contract
-        self.model_name = model_name or os.getenv("AGENT_MODEL") or (
-            "google/gemini-2.0-flash-001"
+        self.model_name = (
+            model_name or os.getenv("AGENT_MODEL") or ("google/gemini-2.0-flash-001")
         )
         self.last_status: str | None = None
 
@@ -235,7 +235,9 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload["entry_logic"] = None
         payload["exit_logic"] = None
     if draft.strategy_type:
-        payload.setdefault("extra_parameters", {})["raw_strategy_type"] = draft.strategy_type
+        payload.setdefault("extra_parameters", {})["raw_strategy_type"] = (
+            draft.strategy_type
+        )
     payload["risk_rules"] = [
         rule.model_dump(mode="python") if isinstance(rule, LLMRiskRule) else rule
         for rule in draft.risk_rules
@@ -405,9 +407,14 @@ def _validate_indicator_rule_support(
 
 def _unsupported_from_llm(item: LLMUnsupportedConstraint) -> UnsupportedConstraint:
     explanation = item.explanation
-    if item.category == "unsupported_indicator_rule" and not explanation.lower().startswith("i understand"):
+    if (
+        item.category == "unsupported_indicator_rule"
+        and not explanation.lower().startswith("i understand")
+    ):
         explanation = (
-            "I understand the indicator rule, but " + explanation[0].lower() + explanation[1:]
+            "I understand the indicator rule, but "
+            + explanation[0].lower()
+            + explanation[1:]
             if explanation
             else "I understand the indicator rule, but Argus cannot execute that exact rule yet."
         )
@@ -416,7 +423,9 @@ def _unsupported_from_llm(item: LLMUnsupportedConstraint) -> UnsupportedConstrai
         raw_value=item.raw_value,
         explanation=explanation,
         simplification_options=[
-            SimplificationOption(label=_humanize_simplification_label(label), replacement_values={})
+            SimplificationOption(
+                label=_humanize_simplification_label(label), replacement_values={}
+            )
             for label in item.simplification_labels
         ],
     )
