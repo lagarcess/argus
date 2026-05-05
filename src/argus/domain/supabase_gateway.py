@@ -54,6 +54,13 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     return data
 
 
+def _message_preview(content: str, max_length: int = 180) -> str | None:
+    preview = " ".join(content.split())
+    if not preview:
+        return None
+    return preview[:max_length]
+
+
 @dataclass
 class SupabaseGateway:
     client: Client
@@ -339,6 +346,11 @@ class SupabaseGateway:
             "created_at": _now_iso(),
         }
         created = self.client.table("messages").insert(payload).execute()
+        preview = _message_preview(content)
+        if preview:
+            self.client.table("conversations").update(
+                {"last_message_preview": preview, "updated_at": _now_iso()}
+            ).eq("id", conversation_id).eq("user_id", user_id).execute()
         return Message.model_validate(_row_one(created))
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> BacktestRun:

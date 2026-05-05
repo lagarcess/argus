@@ -109,6 +109,23 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("resultCardFromConversationCard");
   });
 
+  test("chat resumes active conversation instead of creating a fresh one on reload", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
+    expect(chat).toContain("readActiveConversationId");
+    expect(chat).toContain("persistActiveConversationId");
+    expect(chat).toContain("getConversationMessages(activeConversationId");
+  });
+
+  test("history menu reuses structured conversation hydration", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("hydrateMessagesFromApi");
+    expect(chat).toContain("void loadConversation(item.id)");
+    expect(chat).not.toContain('kind: m.content.includes("result") ? "strategy_result" : "text"');
+  });
+
   test("spanish remains registered behind a feature flag", () => {
     const languages = readFileSync(join(root, "lib/language-features.ts"), "utf-8");
     const i18n = readFileSync(join(root, "lib/i18n.ts"), "utf-8");

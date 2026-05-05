@@ -220,6 +220,41 @@ def test_chat_stream_emits_structured_confirmation_actions(
     ]
 
 
+def test_chat_stream_persists_confirmation_metadata_and_preview(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import main as api_main
+
+    monkeypatch.setattr(
+        api_main,
+        "run_agent_turn",
+        lambda **_: _confirmation_runtime_result(),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Buy and hold Apple over the past year",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant = messages[-1]
+    assert assistant["role"] == "assistant"
+    assert assistant["metadata"]["confirmation_card"]["title"] == "AAPL buy and hold"
+    conversations = client.get("/api/v1/conversations").json()["items"]
+    assert conversations[0]["id"] == conversation["id"]
+    assert conversations[0]["last_message_preview"] == assistant["content"]
+    assert "AAPL" in conversations[0]["last_message_preview"]
+
+
 def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

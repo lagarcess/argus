@@ -40,6 +40,7 @@ import {
   resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
+  type ApiMessage,
   type ChatActionRequest,
   type ConversationResultCard,
   type HistoryItem,
@@ -66,6 +67,99 @@ type OnboardingChoice = {
 };
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
+const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
+
+type HydratedMessages = {
+  messages: Message[];
+  inputActions: ChatActionOption[];
+};
+
+function readActiveConversationId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistActiveConversationId(conversationId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
+function clearActiveConversationId() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
+function latestInputActions(messages: Message[]) {
+  const latestAiWithActions = [...messages]
+    .reverse()
+    .find((message) => message.role === "ai" && message.actions?.length);
+  return latestAiWithActions?.actions ?? [];
+}
+
+function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
+  const messages: Message[] = items.map((m) => {
+    const metadata = m.metadata ?? {};
+    const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
+    const resultCard = metadata.result_card as ConversationResultCard | undefined;
+    if (m.role !== "user" && resultCard && Array.isArray(resultCard.rows)) {
+      const card = resultCardFromConversationCard(resultCard, {
+        id: String(metadata.result_run_id ?? metadata.latest_run_id ?? ""),
+        strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
+      });
+      const restoredActions = (card.actions ?? []).map((action) => ({
+        ...action,
+        presentation: "result" as const,
+        payload: {
+          ...(action.payload ?? {}),
+          run_id: card.runId ?? "",
+          strategy_id: card.strategyId ?? null,
+          strategy_name: card.strategyName,
+          symbols: card.symbols ?? [],
+          template: "",
+          asset_class: "equity",
+        },
+      }));
+      return {
+        id: m.id,
+        role: "ai",
+        kind: "strategy_result",
+        content: m.content,
+        result: card,
+        actions: restoredActions,
+      };
+    }
+    if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
+      return {
+        id: m.id,
+        role: "ai",
+        kind: "strategy_confirmation",
+        content: m.content,
+        confirmation,
+        actions: confirmation.actions ?? [],
+      };
+    }
+    return {
+      id: m.id,
+      role: m.role === "user" ? "user" : "ai",
+      kind: "text",
+      content: m.content,
+    };
+  });
+
+  return { messages, inputActions: latestInputActions(messages) };
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -314,11 +408,39 @@ export default function ChatInterface() {
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);
         }
+        const stage = meResponse?.user?.onboarding?.stage;
+        const activeConversationId = readActiveConversationId();
+        if (activeConversationId) {
+          try {
+            const { items } = await getConversationMessages(activeConversationId, 50);
+            if (cancelled) return;
+            const hydrated = hydrateMessagesFromApi(items);
+            setConversationId(activeConversationId);
+            setMessages(hydrated.messages);
+            setInputActions(hydrated.inputActions);
+            setShowOnboardingGoalCards(
+              hydrated.messages.length === 0
+              && (stage === "language_selection" || stage === "primary_goal_selection"),
+            );
+
+            const prompts = await getStarterPrompts().catch(() => []);
+            if (cancelled) return;
+            setStarterActions(prompts.map((p, i) => ({
+              id: `starter-${i}`,
+              label: p,
+              value: p,
+            })));
+            return;
+          } catch {
+            clearActiveConversationId();
+          }
+        }
+
         const { conversation } = await createConversation(resolvedLanguage);
         if (cancelled) return;
+        persistActiveConversationId(conversation.id);
         setConversationId(conversation.id);
         setMessages([]);
-        const stage = meResponse?.user?.onboarding?.stage;
         setShowOnboardingGoalCards(
           stage === "language_selection" || stage === "primary_goal_selection",
         );
@@ -376,64 +498,16 @@ export default function ChatInterface() {
     setIsSidebarOpen(false);
     closeChatOptions();
     setCurrentView("chat");
+    persistActiveConversationId(convId);
     setConversationId(convId);
     setMessages([]);
     setInputActions([]);
     setStreamStatus(t('common.loading'));
     try {
       const { items } = await getConversationMessages(convId, 50);
-      const loaded: Message[] = items.map((m) => {
-        const metadata = m.metadata ?? {};
-        const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
-        const resultCard = metadata.result_card as ConversationResultCard | undefined;
-        if (m.role !== "user" && resultCard && Array.isArray(resultCard.rows)) {
-          const card = resultCardFromConversationCard(resultCard, {
-            id: String(metadata.result_run_id ?? metadata.latest_run_id ?? ""),
-            strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
-          });
-          const restoredActions = (card.actions ?? []).map((action) => ({
-            ...action,
-            presentation: "result" as const,
-            payload: {
-              ...(action.payload ?? {}),
-              run_id: card.runId ?? "",
-              strategy_id: card.strategyId ?? null,
-              strategy_name: card.strategyName,
-              symbols: [],
-              template: "",
-              asset_class: "equity",
-            },
-          }));
-          return {
-            id: m.id,
-            role: "ai",
-            kind: "strategy_result",
-            content: m.content,
-            result: card,
-            actions: restoredActions,
-          };
-        }
-        if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
-          return {
-            id: m.id,
-            role: "ai",
-            kind: "strategy_confirmation",
-            confirmation,
-            actions: confirmation.actions ?? [],
-          };
-        }
-        return {
-          id: m.id,
-          role: m.role === "user" ? "user" : "ai",
-          kind: "text",
-          content: m.content,
-        };
-      });
-      setMessages(loaded);
-      const latestAiWithActions = [...loaded]
-        .reverse()
-        .find((message) => message.role === "ai" && message.actions?.length);
-      setInputActions(latestAiWithActions?.actions ?? []);
+      const hydrated = hydrateMessagesFromApi(items);
+      setMessages(hydrated.messages);
+      setInputActions(hydrated.inputActions);
     } catch {
       setMessages([
         {
@@ -453,6 +527,7 @@ export default function ChatInterface() {
   const startNewChat = async () => {
     try {
       const { conversation } = await createConversation(i18n.language);
+      persistActiveConversationId(conversation.id);
       setConversationId(conversation.id);
       setIsSidebarOpen(false);
       setCurrentView("chat");
@@ -1248,17 +1323,7 @@ export default function ChatInterface() {
                               key={item.id}
                               type="button"
                               onClick={() => {
-                                setConversationId(item.id);
-                                getConversationMessages(item.id).then(({ items }) => {
-                                  setMessages(
-                                    items.reverse().map((m) => ({
-                                      id: m.id,
-                                      role: m.role === "user" ? "user" : "ai",
-                                      content: m.content,
-                                      kind: m.content.includes("result") ? "strategy_result" : "text",
-                                    }))
-                                  );
-                                });
+                                void loadConversation(item.id);
                                 closeChatOptions();
                               }}
                               className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"

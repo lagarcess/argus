@@ -166,7 +166,20 @@ def _memory_message(
         metadata=metadata,
     )
     store.messages.setdefault(conversation_id, []).append(message)
+    preview = _message_preview(content)
+    conversation = store.conversations.get(conversation_id)
+    if conversation and preview:
+        store.conversations[conversation_id] = conversation.model_copy(
+            update={"last_message_preview": preview, "updated_at": utcnow()}
+        )
     return message
+
+
+def _message_preview(content: str, max_length: int = 180) -> str | None:
+    preview = " ".join(content.split())
+    if not preview:
+        return None
+    return preview[:max_length]
 
 
 def _create_message(
