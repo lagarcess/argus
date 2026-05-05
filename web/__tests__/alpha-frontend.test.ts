@@ -94,6 +94,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("BaselineSeries");
     expect(chart).toContain("createSeriesMarkers");
     expect(chart).toContain("attributionLogo: true");
+    expect(chart).toContain('const CHART_POSITIVE_COLOR = "#70a38d"');
+    expect(chart).toContain('const CHART_NEGATIVE_COLOR = "#b85c5c"');
+    expect(chart).not.toContain("#315d97");
+    expect(chart).not.toContain("#a98b2d");
     expect(chart).toContain('data-testid="result-equity-chart"');
     expect(chart).toContain("normalizeChartTime");
   });

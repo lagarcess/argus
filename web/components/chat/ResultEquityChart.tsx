@@ -26,6 +26,13 @@ type TooltipState = {
   event?: string;
 };
 
+const CHART_POSITIVE_COLOR = "#70a38d";
+const CHART_NEGATIVE_COLOR = "#b85c5c";
+const CHART_POSITIVE_FILL_DARK = "rgba(112, 163, 141, 0.18)";
+const CHART_POSITIVE_FILL_LIGHT = "rgba(112, 163, 141, 0.12)";
+const CHART_NEGATIVE_FILL_DARK = "rgba(184, 92, 92, 0.14)";
+const CHART_NEGATIVE_FILL_LIGHT = "rgba(184, 92, 92, 0.10)";
+
 export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
@@ -103,12 +110,12 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
     const series = chartApi.addSeries(BaselineSeries, {
       baseValue: { type: "price", price: baseValue },
       lineWidth: 2,
-      topLineColor: isDark ? "#8bb6ff" : "#315d97",
-      bottomLineColor: isDark ? "#d9c574" : "#a98b2d",
-      topFillColor1: isDark ? "rgba(139,182,255,0.18)" : "rgba(49,93,151,0.12)",
-      topFillColor2: "rgba(49,93,151,0.00)",
-      bottomFillColor1: isDark ? "rgba(217,197,116,0.12)" : "rgba(169,139,45,0.10)",
-      bottomFillColor2: "rgba(169,139,45,0.00)",
+      topLineColor: CHART_POSITIVE_COLOR,
+      bottomLineColor: CHART_NEGATIVE_COLOR,
+      topFillColor1: isDark ? CHART_POSITIVE_FILL_DARK : CHART_POSITIVE_FILL_LIGHT,
+      topFillColor2: "rgba(112, 163, 141, 0.00)",
+      bottomFillColor1: isDark ? CHART_NEGATIVE_FILL_DARK : CHART_NEGATIVE_FILL_LIGHT,
+      bottomFillColor2: "rgba(184, 92, 92, 0.00)",
       priceLineVisible: false,
       lastValueVisible: false,
     });
@@ -118,7 +125,7 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       (chart.markers ?? []).map((marker) => ({
         time: normalizeChartTime(marker.time) as Time,
         position: marker.type === "entry" ? "belowBar" : "aboveBar",
-        color: marker.type === "entry" ? "#315d97" : "#a98b2d",
+        color: marker.type === "entry" ? CHART_POSITIVE_COLOR : CHART_NEGATIVE_COLOR,
         shape: marker.type === "entry" ? "arrowUp" : "arrowDown",
         text: marker.type === "entry" ? "Buy" : "Sell",
       })),
