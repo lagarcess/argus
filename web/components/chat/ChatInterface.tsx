@@ -103,10 +103,25 @@ function clearActiveConversationId() {
 }
 
 function latestInputActions(messages: Message[]) {
-  const latestAiWithActions = [...messages]
-    .reverse()
-    .find((message) => message.role === "ai" && message.actions?.length);
-  return (latestAiWithActions?.actions ?? []).filter((action) => action.type !== "save_strategy");
+  const latestAi = [...messages].reverse().find((message) => message.role === "ai");
+  return (latestAi?.actions ?? []).filter((action) => action.type !== "save_strategy");
+}
+
+function isBreakdownActionMetadata(metadata: Record<string, unknown>) {
+  const chatAction = metadata.chat_action;
+  return (
+    typeof chatAction === "object" &&
+    chatAction !== null &&
+    "type" in chatAction &&
+    chatAction.type === "show_breakdown"
+  );
+}
+
+function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[]) {
+  if (action.type === "show_breakdown") {
+    return actions.filter((candidate) => candidate.type !== "show_breakdown");
+  }
+  return [];
 }
 
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
@@ -114,7 +129,12 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     const metadata = m.metadata ?? {};
     const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
     const resultCard = metadata.result_card as ConversationResultCard | undefined;
-    if (m.role !== "user" && resultCard && Array.isArray(resultCard.rows)) {
+    if (
+      m.role !== "user" &&
+      !isBreakdownActionMetadata(metadata) &&
+      resultCard &&
+      Array.isArray(resultCard.rows)
+    ) {
       const card = resultCardFromConversationCard(resultCard, {
         id: String(metadata.result_run_id ?? metadata.latest_run_id ?? ""),
         strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
@@ -863,7 +883,7 @@ export default function ChatInterface() {
       });
       return;
     }
-    setInputActions([]);
+    setInputActions(consumeInputAction(action, inputActions));
     void handleSend(action.label || value, action.type ? action : undefined);
   };
 

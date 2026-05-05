@@ -347,12 +347,16 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
     assert second.status_code == 200
     assert runtime_calls == 1
+    assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
     assert "Total Return (%)" in breakdown
     assert "Benchmark" in breakdown
-    assert (
-        run_id in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
-    )
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    assert run_id in messages.text
+    assistant = messages.json()["items"][-1]
+    assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
+    assert assistant["metadata"]["result_run_id"] == run_id
+    assert "result_card" not in assistant["metadata"]
 
 
 def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
@@ -391,6 +395,26 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
     assert "Saved" in text
     strategies = client.get("/api/v1/strategies").json()["items"]
     assert [strategy["symbols"] for strategy in strategies] == [["AAPL"]]
+
+    duplicate = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "save_strategy",
+                "label": "Save strategy",
+                "presentation": "result",
+                "payload": {"run_id": run_id},
+            },
+            "language": "en",
+        },
+    )
+
+    assert duplicate.status_code == 200
+    strategies_after_duplicate = client.get("/api/v1/strategies").json()["items"]
+    assert [strategy["id"] for strategy in strategies_after_duplicate] == [
+        strategies[0]["id"]
+    ]
 
 
 def test_chat_stream_requires_message_or_action() -> None:

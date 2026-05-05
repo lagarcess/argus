@@ -136,7 +136,18 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain("metadata?: Record<string, unknown> | null");
     expect(chat).toContain("metadata.confirmation_card");
     expect(chat).toContain("metadata.result_card");
+    expect(chat).toContain("isBreakdownActionMetadata(metadata)");
+    expect(chat).toContain('chatAction.type === "show_breakdown"');
     expect(chat).toContain("resultCardFromConversationCard");
+  });
+
+  test("chat consumes result action chips after breakdown is requested", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("consumeInputAction");
+    expect(chat).toContain('action.type === "show_breakdown"');
+    expect(chat).toContain('type !== "show_breakdown"');
+    expect(chat).toContain("setInputActions(consumeInputAction(action, inputActions))");
   });
 
   test("chat resumes active conversation instead of creating a fresh one on reload", () => {

@@ -2929,7 +2929,6 @@ def chat_stream(
                 metadata["latest_run_id"] = run.id
                 metadata["result_run_id"] = run.id
                 metadata["result_strategy_id"] = run.strategy_id
-                metadata["result_card"] = run.conversation_result_card
             assistant_message = _create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
