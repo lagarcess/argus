@@ -211,4 +211,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(file).not.toContain("shadow");
   });
 
+  test("chat hides backend enum labels and technical runtime errors", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const locale = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+
+    expect(input).toContain("displayDiscoveryDescription");
+    expect(input).toContain("Currency Pair");
+    expect(chat).not.toContain("event.data.detail || t('chat.error_backtest')");
+    expect(locale).not.toContain("Check that the API is running");
+  });
 });

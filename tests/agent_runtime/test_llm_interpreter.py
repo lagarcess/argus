@@ -316,6 +316,48 @@ def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
     assert strategy.cadence == "monthly"
 
 
+def test_llm_interpreter_rejects_invented_dca_contribution_amount(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Buy Tesla every month.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="What if I bought Tesla every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Tesla every month.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=10000,
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="What if I bought Tesla every month?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.capital_amount is None
+
+
 def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(
     monkeypatch,
 ) -> None:

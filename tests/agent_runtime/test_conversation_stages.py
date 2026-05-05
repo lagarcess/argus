@@ -21,6 +21,32 @@ def test_clarify_asks_only_for_first_missing_required_field() -> None:
     assert "date range" not in result.patch["assistant_prompt"].lower()
 
 
+def test_clarify_groups_recurring_buy_missing_amount_and_period() -> None:
+    state = RunState.new(
+        current_user_message="What if I bought Tesla every month?",
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = ["date_range", "capital_amount"]
+    state.candidate_strategy_draft = {
+        "strategy_type": "dca_accumulation",
+        "strategy_thesis": "Buy Tesla on a recurring monthly schedule.",
+        "asset_universe": ["TSLA"],
+        "cadence": "monthly",
+    }
+
+    result = clarify_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] is None
+    prompt = result.patch["assistant_prompt"].lower()
+    assert "recurring" in prompt
+    assert "how much" in prompt
+    assert "time period" in prompt
+    assert "capital amount" not in prompt
+    assert "date_range" not in prompt
+
+
 def test_interpret_and_clarify_preserve_under_specified_thesis_handoff() -> None:
     user = UserState(user_id="u1", expertise_level="advanced")
     state = RunState.new(current_user_message="Backtest Tesla", recent_thread_history=[])

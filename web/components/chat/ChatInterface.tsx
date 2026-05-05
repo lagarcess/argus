@@ -645,7 +645,7 @@ export default function ChatInterface() {
               m.id === assistantId
                 ? {
                     ...m,
-                    content: event.data.detail || t('chat.error_backtest'),
+                    content: t('chat.error_backtest'),
                   }
                 : m,
             ),
@@ -765,7 +765,7 @@ export default function ChatInterface() {
               m.id === assistantId
                 ? {
                     ...m,
-                    content: event.data.detail || t('chat.error_backtest'),
+                    content: t('chat.error_backtest'),
                   }
                 : m,
             ),

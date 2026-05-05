@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -184,6 +185,10 @@ class OpenRouterStructuredInterpreter:
             "or unsupported in a way that requires the user to choose a simplification. "
             "Starting capital, timeframe, benchmark, fees, and slippage have safe defaults; "
             "do not ask for them before confirmation unless the user explicitly wants to change them. "
+            "For DCA or recurring-buy plans, the recurring contribution amount is not a "
+            "safe default. Do not invent it; if the user does not provide the amount and "
+            "there is no prior strategy amount to preserve, leave capital_amount null and "
+            "mark the amount as missing. "
             "For product questions or education, set assistant_response and do not "
             "force a backtest. Keep prose concise, no emoji, no decorative markdown, "
             "and no generic chatbot openers. For unsupported requests, acknowledge the understood "
@@ -205,7 +210,11 @@ class OpenRouterStructuredInterpreter:
         strategy = _strategy_from_llm(response.candidate_strategy_draft)
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
-        _validate_capability_boundaries(strategy=strategy, response=response)
+        _validate_capability_boundaries(
+            strategy=strategy,
+            response=response,
+            request=request,
+        )
         unsupported = [
             _unsupported_from_llm(item) for item in response.unsupported_constraints
         ]
@@ -304,6 +313,7 @@ def _validate_capability_boundaries(
     *,
     strategy: StrategySummary,
     response: LLMInterpretationResponse,
+    request: InterpretationRequest,
 ) -> None:
     symbols = [symbol.upper() for symbol in strategy.asset_universe]
     strategy.asset_universe = symbols
@@ -363,6 +373,13 @@ def _validate_capability_boundaries(
         strategy.strategy_type = canonical_type
     if canonical_type == "dca_accumulation" and not strategy.cadence:
         strategy.cadence = "monthly"
+    if (
+        canonical_type == "dca_accumulation"
+        and strategy.capital_amount is not None
+        and not _dca_amount_has_user_provenance(strategy=strategy, request=request)
+    ):
+        strategy.capital_amount = None
+        strategy.sizing_mode = None
 
 
 def _validate_indicator_rule_support(
@@ -409,6 +426,40 @@ def _validate_indicator_rule_support(
                 "Simplify to the supported RSI strategy",
                 "Compare NVDA with buy and hold",
             ],
+        )
+    )
+
+
+def _dca_amount_has_user_provenance(
+    *,
+    strategy: StrategySummary,
+    request: InterpretationRequest,
+) -> bool:
+    current_text = " ".join(
+        value
+        for value in [request.current_user_message, strategy.raw_user_phrasing]
+        if isinstance(value, str)
+    )
+    if _text_contains_amount(current_text):
+        return True
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return False
+    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    return prior is not None and prior.capital_amount is not None
+
+
+def _text_contains_amount(text: str) -> bool:
+    lowered = text.lower()
+    if re.search(
+        r"\$\s*\d|\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:dollars?|bucks?|usd|k|m)\b", lowered
+    ):
+        return True
+    return bool(
+        re.search(
+            r"\b(one|two|three|four|five|six|seven|eight|nine|ten|"
+            r"hundred|thousand|million)\b.+\b(dollars?|bucks?|usd)\b",
+            lowered,
         )
     )
 

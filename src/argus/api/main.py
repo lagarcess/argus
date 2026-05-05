@@ -2385,7 +2385,7 @@ def discovery_assets(
                     else asset.canonical_symbol
                 ),
                 symbol=asset.canonical_symbol,
-                description=asset.asset_class.title(),
+                description=_display_asset_class(asset.asset_class),
                 insert_text=asset.canonical_symbol,
                 provider="alpaca",
                 support_status="supported",
@@ -2393,6 +2393,15 @@ def discovery_assets(
             for asset in assets
         ]
     )
+
+
+def _display_asset_class(asset_class: str) -> str:
+    labels = {
+        "equity": "Stock",
+        "crypto": "Crypto",
+        "currency_pair": "Currency Pair",
+    }
+    return labels.get(asset_class, asset_class.replace("_", " ").title())
 
 
 @app.get("/api/v1/discovery/indicators", response_model=DiscoveryResponse)

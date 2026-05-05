@@ -44,6 +44,20 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
         contract=contract,
     )
 
+    grouped_prompt = _grouped_required_fields_prompt(
+        missing_required_fields=state.missing_required_fields,
+        state=state,
+    )
+    if grouped_prompt is not None:
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": grouped_prompt,
+                "requested_field": None,
+                "requested_fields": list(state.missing_required_fields),
+            },
+        )
+
     if requested_field is not None:
         field_description = contract.describe_field(requested_field)
         label = (
@@ -307,6 +321,30 @@ def _first_missing_required_field(
         if field_name in required_fields or field_name == "capital_amount":
             return field_name
     return None
+
+
+def _grouped_required_fields_prompt(
+    *,
+    missing_required_fields: list[str],
+    state: RunState,
+) -> str | None:
+    missing = set(missing_required_fields)
+    if not {"capital_amount", "date_range"}.issubset(missing):
+        return None
+
+    strategy = state.candidate_strategy_draft
+    strategy_type = ""
+    if isinstance(strategy, dict):
+        strategy_type = str(strategy.get("strategy_type") or "")
+    else:
+        strategy_type = str(getattr(strategy, "strategy_type", "") or "")
+    if strategy_type != "dca_accumulation":
+        return None
+
+    return (
+        "I read this as a recurring buy. How much should each recurring purchase "
+        "be, and what time period should I test?"
+    )
 
 
 def _required_field_prompt(*, requested_field: str, label: str) -> str:

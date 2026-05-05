@@ -1,8 +1,10 @@
 from datetime import date
 
+from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
     normalize_date_range_candidate,
     resolve_date_range,
+    strategy_can_be_approved,
 )
 
 
@@ -44,3 +46,19 @@ def test_raw_since_ipo_period_overrides_model_default() -> None:
     )
 
     assert normalized == "since_ipo"
+
+
+def test_dca_strategy_requires_explicit_recurring_amount_for_approval() -> None:
+    strategy = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy Tesla every month.",
+        asset_universe=["TSLA"],
+        date_range="past year",
+        cadence="monthly",
+    )
+
+    assert strategy_can_be_approved(strategy) is False
+
+    strategy.capital_amount = 500
+
+    assert strategy_can_be_approved(strategy) is True

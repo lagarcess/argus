@@ -128,6 +128,10 @@ def strategy_can_be_approved(strategy: StrategySummary | dict[str, Any]) -> bool
         payload.get("date_range")
     ):
         return False
+    if strategy_type == "dca_accumulation" and not _has_value(
+        payload.get("capital_amount")
+    ):
+        return False
     if strategy_type == "indicator_threshold":
         return _has_value(payload.get("entry_logic")) and _has_value(
             payload.get("exit_logic")

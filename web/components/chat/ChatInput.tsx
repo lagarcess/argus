@@ -253,7 +253,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
                       {item.label}
                     </span>
                     <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
-                      {item.description}
+                      {displayDiscoveryDescription(item)}
                     </span>
                   </span>
                   <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
@@ -385,7 +385,7 @@ function createTokenElement(item: DiscoveryItem) {
   token.dataset.tokenType = item.type;
   token.dataset.tokenLabel = item.label;
   token.dataset.tokenSymbol = item.symbol ?? "";
-  token.dataset.tokenDescription = item.description ?? "";
+  token.dataset.tokenDescription = displayDiscoveryDescription(item);
   token.dataset.tokenInsertText = item.insert_text;
   token.dataset.tokenProvider = item.provider;
   token.dataset.tokenSupportStatus = item.support_status;
@@ -396,6 +396,13 @@ function createTokenElement(item: DiscoveryItem) {
   label.textContent = item.type === "asset" ? item.insert_text : item.label;
   token.appendChild(label);
   return token;
+}
+
+function displayDiscoveryDescription(item: DiscoveryItem) {
+  const description = item.description?.trim();
+  if (!description) return item.type === "asset" ? "Asset" : "Indicator";
+  if (description.toLowerCase() === "currency_pair") return "Currency Pair";
+  return description.replaceAll("_", " ");
 }
 
 function tokenClassName(type: DiscoveryItem["type"]) {

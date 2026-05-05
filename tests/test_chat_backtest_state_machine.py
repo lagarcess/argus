@@ -482,3 +482,30 @@ def test_discovery_endpoints_return_assets_and_indicators(
     assert assets.json()["items"][0]["insert_text"] == "AAPL"
     assert indicators.status_code == 200
     assert indicators.json()["items"][0]["provider"] == "pandas-ta-classic"
+
+
+def test_discovery_assets_display_currency_pair_label(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import main as api_main
+
+    monkeypatch.setattr(
+        api_main,
+        "search_assets",
+        lambda q, limit=12: [
+            ResolvedAsset(
+                canonical_symbol="EURUSD",
+                asset_class="currency_pair",
+                name="EUR/USD",
+                raw_symbol=q,
+            )
+        ],
+    )
+    client = _client()
+
+    response = client.get("/api/v1/discovery/assets?q=eur/usd&limit=5")
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["description"] == "Currency Pair"
+    assert "currency_pair" not in item["description"]
