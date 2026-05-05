@@ -337,6 +337,56 @@ def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
     assert strategy.capital_amount is None
 
 
+def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        user_goal_summary="User wants to test Apple after big drops.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="What if I bought Apple after big drops?",
+            strategy_thesis="Buy Apple after big drops.",
+            asset_universe=["AAPL"],
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_indicator_rule",
+                raw_value="moving-average crossover",
+                explanation=(
+                    "Argus cannot execute that exact moving-average or "
+                    "compound indicator logic yet."
+                ),
+                simplification_labels=["Compare NVDA with buy and hold"],
+            )
+        ],
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="What if I bought Apple after big drops?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.candidate_strategy_draft.strategy_type == "indicator_threshold"
+    assert result.unsupported_constraints == []
+
+
 def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 

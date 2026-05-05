@@ -290,6 +290,8 @@ def _ground_strategy_in_current_turn(
         strategy.strategy_type = "buy_and_hold"
         strategy.entry_logic = None
         strategy.exit_logic = None
+    elif _current_message_describes_indicator_frame(current_message):
+        strategy.strategy_type = "indicator_threshold"
 
 
 def _merge_prior_strategy(
@@ -334,6 +336,16 @@ def _current_turn_starts_fresh_strategy(message: str) -> bool:
         )
         and re.search(
             r"\b(after|when|every|over|since|from|hold|dca|rsi|dip|drops?)\b", lowered
+        )
+    )
+
+
+def _current_message_describes_indicator_frame(message: str) -> bool:
+    lowered = message.lower()
+    return bool(
+        re.search(
+            r"\b(rsi|relative strength index|dip|dips|drops?|indicator|threshold)\b",
+            lowered,
         )
     )
 
@@ -410,6 +422,11 @@ def _validate_capability_boundaries(
     ):
         strategy.capital_amount = None
         strategy.sizing_mode = None
+    _remove_stale_indicator_constraints(
+        response=response,
+        strategy=strategy,
+        current_message=request.current_user_message,
+    )
 
 
 def _validate_indicator_rule_support(
@@ -454,6 +471,31 @@ def _validate_indicator_rule_support(
             ],
         )
     )
+
+
+def _remove_stale_indicator_constraints(
+    *,
+    response: LLMInterpretationResponse,
+    strategy: StrategySummary,
+    current_message: str,
+) -> None:
+    combined_text = " ".join(
+        value
+        for value in (
+            current_message,
+            strategy.entry_logic,
+            strategy.exit_logic,
+            strategy.strategy_thesis,
+        )
+        if isinstance(value, str)
+    ).lower()
+    if _contains_unsupported_indicator_terms(combined_text):
+        return
+    response.unsupported_constraints = [
+        item
+        for item in response.unsupported_constraints
+        if item.category != "unsupported_indicator_rule"
+    ]
 
 
 def _contains_unsupported_indicator_terms(text: str) -> bool:
