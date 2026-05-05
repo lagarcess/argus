@@ -777,11 +777,13 @@ def _structured_stage_result(
         user=user,
         explicit_overrides=None,
     )
-    missing_required_fields = missing_required_fields_for_strategy(
-        interpretation.candidate_strategy_draft,
-        extraction=None,
-        contract=capability_contract,
-    )
+    missing_required_fields: list[str] = []
+    if interpretation.intent in {"backtest_execution", "strategy_drafting"}:
+        missing_required_fields = missing_required_fields_for_strategy(
+            interpretation.candidate_strategy_draft,
+            extraction=None,
+            contract=capability_contract,
+        )
     requires_clarification = bool(
         interpretation.requires_clarification
         or interpretation.ambiguous_fields
@@ -816,11 +818,13 @@ def _structured_stage_result(
             decision=decision,
             stage_patch={"assistant_response": symbol_only_response},
         )
-    fragment_response = _fragment_strategy_response(
-        message=state.current_user_message,
-        strategy=interpretation.candidate_strategy_draft,
-        assistant_response=interpretation.assistant_response,
-    )
+    fragment_response = None
+    if interpretation.intent in {"backtest_execution", "strategy_drafting"}:
+        fragment_response = _fragment_strategy_response(
+            message=state.current_user_message,
+            strategy=interpretation.candidate_strategy_draft,
+            assistant_response=interpretation.assistant_response,
+        )
     if fragment_response is not None and not strategy_can_be_approved(
         interpretation.candidate_strategy_draft
     ):
@@ -1018,6 +1022,15 @@ def _educational_fallback_response(message: str) -> str | None:
     asset_explanation = _asset_explanation_response(message)
     if asset_explanation is not None:
         return asset_explanation
+    if re.search(
+        r"\bwhat(?:'s| is)\s+(?:a\s+)?backtest\b|\bexplain backtests?\b", lowered
+    ):
+        return (
+            "A backtest is a historical replay of an investing idea. Argus takes "
+            "the rule you describe, applies it to past market data, and shows how "
+            "that simulated strategy performed against a benchmark. It is useful "
+            "for learning from history, but it is not a prediction."
+        )
     if re.search(r"\bwhat(?:'s| is)\s+dca\b|\bexplain dca\b", lowered):
         return (
             "DCA means buying a fixed amount on a regular schedule, like $500 every month. "

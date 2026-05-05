@@ -34,7 +34,10 @@ def run_agent_turn(
         thread_id=thread_id,
         message=message,
     )
-    result = workflow.invoke(initial_state)
+    result = _apply_response_quality_gate(
+        result=workflow.invoke(initial_state),
+        message=message,
+    )
     run_state = result["run_state"]
     persisted_artifact_references = _resolve_persisted_artifact_references(
         result=result,
@@ -104,6 +107,106 @@ def _assistant_message(result: dict[str, Any]) -> str | None:
         return assistant_response
     if isinstance(assistant_prompt, str) and assistant_prompt:
         return assistant_prompt
+    return None
+
+
+def _apply_response_quality_gate(
+    *,
+    result: dict[str, Any],
+    message: str,
+) -> dict[str, Any]:
+    checked = dict(result)
+    for key in ("assistant_response", "assistant_prompt"):
+        value = checked.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        replacement = _replacement_for_low_quality_text(
+            text=value,
+            message=message,
+        )
+        if replacement is not None:
+            checked[key] = replacement
+    return checked
+
+
+def _replacement_for_low_quality_text(*, text: str, message: str) -> str | None:
+    if _contains_backend_scaffolding(text):
+        return _scaffolding_recovery_prompt(text=text, message=message)
+    if _assistant_text_is_too_thin(text):
+        return _educational_recovery_response(message)
+    return None
+
+
+def _contains_backend_scaffolding(text: str) -> bool:
+    lowered = text.lower()
+    scaffolding_markers = (
+        "not specified",
+        "asset universe",
+        "capital amount",
+        "requested_field",
+        "missing_required_fields",
+    )
+    return any(marker in lowered for marker in scaffolding_markers)
+
+
+def _assistant_text_is_too_thin(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return True
+    words = stripped.split()
+    if len(words) <= 3:
+        return True
+    return bool(
+        len(words) <= 5
+        and re.fullmatch(r"[A-Z0-9.,\s-]+", stripped)
+        and any(char.isalpha() for char in stripped)
+    )
+
+
+def _scaffolding_recovery_prompt(*, text: str, message: str) -> str:
+    combined = f"{text} {message}".lower()
+    questions: list[str] = []
+    if "asset universe" in combined or "asset" in combined:
+        questions.append("Which asset should I use?")
+    if "capital amount" in combined or "fixed amount" in combined:
+        questions.append("How much should each purchase be?")
+    if "date_range" in combined or "time period" in combined:
+        questions.append("What time period should I test?")
+    if questions:
+        return "I understand the direction. " + " ".join(questions)
+    return (
+        "I understand the direction, but I need one more detail before I can "
+        "turn it into a backtest."
+    )
+
+
+def _educational_recovery_response(message: str) -> str | None:
+    lowered = message.lower().strip()
+    if re.search(
+        r"\bwhat(?:'s| is)\s+(?:a\s+)?backtest\b|\bexplain backtests?\b", lowered
+    ):
+        return (
+            "A backtest is a historical replay of an investing idea. Argus takes "
+            "the rule you describe, applies it to past market data, and shows how "
+            "that simulated strategy performed against a benchmark. It is useful "
+            "for learning from history, but it is not a prediction."
+        )
+    if re.search(r"\bwhat(?:'s| is)\s+dca\b|\bexplain dca\b", lowered):
+        return (
+            "DCA means buying a fixed amount on a regular schedule, like $500 every month. "
+            "The point is to avoid trying to pick the perfect day. In Argus, I can test how that "
+            "recurring-buy plan would have performed historically for a supported asset."
+        )
+    if re.search(
+        r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b",
+        lowered,
+    ):
+        return (
+            "No problem. The simple version: Argus turns an investing idea into a historical test. "
+            "If we were talking about RSI, think of it like a temperature gauge for recent price movement: "
+            "low can mean the asset has been weak recently, high can mean it has been strong recently. "
+            "It is useful only as a rule to test, not as a prediction."
+        )
     return None
 
 

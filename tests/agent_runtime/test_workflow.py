@@ -8,6 +8,10 @@ from argus.agent_runtime.graph.workflow import (
 from argus.agent_runtime.runtime import build_workflow_input, run_agent_turn
 from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.stages.execute import execute_stage
+from argus.agent_runtime.stages.interpret import (
+    InterpretationRequest,
+    StructuredInterpretation,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     TaskSnapshot,
@@ -563,3 +567,56 @@ def test_run_agent_turn_serializes_rich_final_response_payload() -> None:
         result["final_response_payload"]["explanation_context"]["strategy_type"]
         == "buy_and_hold"
     )
+
+
+def test_workflow_quality_gate_repairs_thin_educational_llm_response() -> None:
+    def thin_interpreter(_request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User asked what a backtest is.",
+            assistant_response="Backtest.",
+            confidence=0.9,
+        )
+
+    workflow = build_workflow(structured_interpreter=thin_interpreter)
+    manager = InMemorySessionManager()
+
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=UserState(user_id="u1", expertise_level="beginner"),
+        thread_id="thread-thin-education",
+        message="what is a backtest?",
+    )
+
+    assert result["stage_outcome"] == "ready_to_respond"
+    response = result["assistant_response"]
+    assert len(response.split()) > 8
+    assert "historical" in response.lower()
+    assert response != "Backtest."
+
+
+def test_workflow_quality_gate_repairs_raw_backend_scaffolding_prompt() -> None:
+    workflow = FakeWorkflow(
+        {
+            "stage_outcome": "await_user_reply",
+            "assistant_prompt": "asset universe: you said 'not specified'; capital amount: you said 'not specified'. Which of those should I use?",
+        }
+    )
+    manager = InMemorySessionManager()
+
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=UserState(user_id="u1", expertise_level="beginner"),
+        thread_id="thread-raw-scaffold",
+        message="What if I bought a fixed amount every month?",
+    )
+
+    prompt = result["assistant_prompt"]
+    assert "asset universe" not in prompt.lower()
+    assert "not specified" not in prompt.lower()
+    assert "Which asset" in prompt
+    assert "How much" in prompt
