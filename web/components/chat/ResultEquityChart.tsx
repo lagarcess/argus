@@ -32,6 +32,8 @@ const CHART_POSITIVE_FILL_DARK = "rgba(112, 163, 141, 0.18)";
 const CHART_POSITIVE_FILL_LIGHT = "rgba(112, 163, 141, 0.12)";
 const CHART_NEGATIVE_FILL_DARK = "rgba(184, 92, 92, 0.14)";
 const CHART_NEGATIVE_FILL_LIGHT = "rgba(184, 92, 92, 0.10)";
+const ANNOTATION_COLOR_LIGHT = "#191c1f";
+const ANNOTATION_COLOR_DARK = "#ffffff";
 
 export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +67,8 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: isDark ? "rgba(255,255,255,0.42)" : "rgba(0,0,0,0.42)",
-        attributionLogo: true,
+        // TODO(launch): Provide correct TradingView attribution before launch.
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: "transparent" },
@@ -120,12 +123,13 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       lastValueVisible: false,
     });
     series.setData(data);
+    const annotationColor = isDark ? ANNOTATION_COLOR_DARK : ANNOTATION_COLOR_LIGHT;
     createSeriesMarkers(
       series as ISeriesApi<"Baseline", Time>,
       (chart.markers ?? []).map((marker) => ({
         time: normalizeChartTime(marker.time) as Time,
         position: marker.type === "entry" ? "belowBar" : "aboveBar",
-        color: marker.type === "entry" ? CHART_POSITIVE_COLOR : CHART_NEGATIVE_COLOR,
+        color: annotationColor,
         shape: marker.type === "entry" ? "arrowUp" : "arrowDown",
         text: marker.type === "entry" ? "Buy" : "Sell",
       })),

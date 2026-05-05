@@ -93,9 +93,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain('action.type !== "save_strategy"');
     expect(chart).toContain("BaselineSeries");
     expect(chart).toContain("createSeriesMarkers");
-    expect(chart).toContain("attributionLogo: true");
+    expect(chart).toContain("TODO(launch): Provide correct TradingView attribution before launch.");
+    expect(chart).toContain("attributionLogo: false");
     expect(chart).toContain('const CHART_POSITIVE_COLOR = "#70a38d"');
     expect(chart).toContain('const CHART_NEGATIVE_COLOR = "#b85c5c"');
+    expect(chart).toContain('const ANNOTATION_COLOR_LIGHT = "#191c1f"');
+    expect(chart).toContain('const ANNOTATION_COLOR_DARK = "#ffffff"');
+    expect(chart).toContain("const annotationColor = isDark ? ANNOTATION_COLOR_DARK : ANNOTATION_COLOR_LIGHT");
     expect(chart).not.toContain("#315d97");
     expect(chart).not.toContain("#a98b2d");
     expect(chart).toContain('data-testid="result-equity-chart"');
