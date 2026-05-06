@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  buildVisibleSeriesMarkers,
   markerBudgetForViewport,
   selectVisibleTradeMarkers,
 } from "../components/chat/ResultEquityChart";
@@ -67,5 +68,29 @@ describe("ResultEquityChart marker disclosure", () => {
     expect(markerBudgetForViewport({ chartWidth: 660, visibleBars: 360 })).toBe(12);
     expect(markerBudgetForViewport({ chartWidth: 660, visibleBars: 45 })).toBe(24);
     expect(markerBudgetForViewport({ chartWidth: 320, visibleBars: 45 })).toBeLessThan(24);
+  });
+
+  test("color codes buy and sell markers with conservative labels", () => {
+    const markers = Array.from({ length: 24 }, (_, index) =>
+      marker(index + 1, index % 2 === 0 ? "entry" : "exit"),
+    );
+
+    const seriesMarkers = buildVisibleSeriesMarkers({
+      markers,
+      visibleRange: logicalRange(0, 240),
+      chartWidth: 660,
+      dataIndexByTime: new Map(
+        markers.map((item, index) => [item.time, index]),
+      ),
+    });
+
+    expect(seriesMarkers.some((item) => item.color === "#70a38d")).toBe(true);
+    expect(seriesMarkers.some((item) => item.color === "#b85c5c")).toBe(true);
+    expect(seriesMarkers.some((item) => item.text === "Buy")).toBe(true);
+    expect(seriesMarkers.some((item) => item.text === "Sell")).toBe(true);
+    expect(seriesMarkers.filter((item) => item.text).length).toBeLessThan(
+      seriesMarkers.length,
+    );
+    expect(seriesMarkers.filter((item) => item.text).length).toBeLessThanOrEqual(4);
   });
 });

@@ -34,8 +34,8 @@ const CHART_POSITIVE_FILL_DARK = "rgba(112, 163, 141, 0.18)";
 const CHART_POSITIVE_FILL_LIGHT = "rgba(112, 163, 141, 0.12)";
 const CHART_NEGATIVE_FILL_DARK = "rgba(184, 92, 92, 0.14)";
 const CHART_NEGATIVE_FILL_LIGHT = "rgba(184, 92, 92, 0.10)";
-const ANNOTATION_COLOR_LIGHT = "#191c1f";
-const ANNOTATION_COLOR_DARK = "#ffffff";
+const BUY_POSITIVE_MARKER_COLOR = "#70a38d";
+const SELL_NEGATIVE_MARKER_COLOR = "#b85c5c";
 
 export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,26 +134,25 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       lastValueVisible: false,
     });
     series.setData(data);
-    const annotationColor = isDark ? ANNOTATION_COLOR_DARK : ANNOTATION_COLOR_LIGHT;
-    const visibleMarkers = selectVisibleTradeMarkers({
+    const visibleMarkerInput = {
       markers: chart.markers ?? [],
       visibleRange: chartApi.timeScale().getVisibleLogicalRange(),
       chartWidth: container.clientWidth,
       dataIndexByTime,
-    });
+    };
     const markersApi = createSeriesMarkers(
       series as ISeriesApi<"Baseline", Time>,
-      visibleMarkers.map((marker) => toSeriesMarker(marker, annotationColor)),
+      buildVisibleSeriesMarkers(visibleMarkerInput),
     );
     chartApi.timeScale().fitContent();
     const updateVisibleMarkers = (visibleRange: LogicalRange | null) => {
       markersApi.setMarkers(
-        selectVisibleTradeMarkers({
+        buildVisibleSeriesMarkers({
           markers: chart.markers ?? [],
           visibleRange,
           chartWidth: container.clientWidth,
           dataIndexByTime,
-        }).map((marker) => toSeriesMarker(marker, annotationColor)),
+        }),
       );
     };
     chartApi.timeScale().subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
@@ -280,14 +279,57 @@ export function selectVisibleTradeMarkers({
     .filter((marker): marker is ResultChartMarker => Boolean(marker));
 }
 
-function toSeriesMarker(
-  marker: ResultChartMarker,
-  annotationColor: string,
-): SeriesMarker<Time> {
+export function buildVisibleSeriesMarkers(
+  input: VisibleTradeMarkerInput,
+): SeriesMarker<Time>[] {
+  const visibleMarkers = selectVisibleTradeMarkers(input);
+  const labeledIndexes = selectLabeledMarkerIndexes({
+    markerCount: visibleMarkers.length,
+    visibleRange: input.visibleRange,
+    chartWidth: input.chartWidth,
+  });
+  return visibleMarkers.map((marker, index) =>
+    toSeriesMarker(marker, labeledIndexes.has(index)),
+  );
+}
+
+type LabeledMarkerInput = {
+  markerCount: number;
+  visibleRange: LogicalRange | null;
+  chartWidth: number;
+};
+
+function selectLabeledMarkerIndexes({
+  markerCount,
+  visibleRange,
+  chartWidth,
+}: LabeledMarkerInput) {
+  const indexes = new Set<number>();
+  if (markerCount === 0) return indexes;
+
+  const visibleBars = visibleRange
+    ? Math.max(1, Math.ceil(visibleRange.to) - Math.floor(visibleRange.from) + 1)
+    : markerCount;
+  const widthBudget = Math.max(2, Math.floor(chartWidth / 170));
+  const zoomBudget = visibleBars <= 45 ? 5 : visibleBars <= 90 ? 4 : 3;
+  const budget = Math.min(markerCount, widthBudget, zoomBudget);
+
+  indexes.add(0);
+  if (budget > 1) indexes.add(markerCount - 1);
+  if (budget > 2) indexes.add(Math.floor((markerCount - 1) / 2));
+  if (budget > 3) indexes.add(Math.ceil((markerCount - 1) / 3));
+  if (budget > 4) indexes.add(Math.ceil(((markerCount - 1) * 2) / 3));
+
+  return new Set([...indexes].sort((a, b) => a - b).slice(0, budget));
+}
+
+function toSeriesMarker(marker: ResultChartMarker, showLabel: boolean): SeriesMarker<Time> {
+  const isEntry = marker.type === "entry";
   return {
     time: normalizeChartTime(marker.time) as Time,
-    position: marker.type === "entry" ? "belowBar" : "aboveBar",
-    color: annotationColor,
-    shape: marker.type === "entry" ? "arrowUp" : "arrowDown",
+    position: isEntry ? "belowBar" : "aboveBar",
+    color: isEntry ? BUY_POSITIVE_MARKER_COLOR : SELL_NEGATIVE_MARKER_COLOR,
+    shape: isEntry ? "arrowUp" : "arrowDown",
+    text: showLabel ? (isEntry ? "Buy" : "Sell") : undefined,
   };
 }

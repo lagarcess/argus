@@ -93,6 +93,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain('action.type !== "save_strategy"');
     expect(chart).toContain("BaselineSeries");
     expect(chart).toContain("createSeriesMarkers");
+    expect(chart).toContain("buildVisibleSeriesMarkers");
     expect(chart).toContain("selectVisibleTradeMarkers");
     expect(chart).toContain("subscribeVisibleLogicalRangeChange");
     expect(chart).toContain("markersApi.setMarkers");
@@ -100,14 +101,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("attributionLogo: false");
     expect(chart).toContain('const CHART_POSITIVE_COLOR = "#70a38d"');
     expect(chart).toContain('const CHART_NEGATIVE_COLOR = "#b85c5c"');
-    expect(chart).toContain('const ANNOTATION_COLOR_LIGHT = "#191c1f"');
-    expect(chart).toContain('const ANNOTATION_COLOR_DARK = "#ffffff"');
-    expect(chart).toContain("const annotationColor = isDark ? ANNOTATION_COLOR_DARK : ANNOTATION_COLOR_LIGHT");
+    expect(chart).toContain('const BUY_POSITIVE_MARKER_COLOR = "#70a38d"');
+    expect(chart).toContain('const SELL_NEGATIVE_MARKER_COLOR = "#b85c5c"');
     expect(chart).not.toContain("#315d97");
     expect(chart).not.toContain("#a98b2d");
     expect(chart).toContain('data-testid="result-equity-chart"');
     expect(chart).toContain("normalizeChartTime");
-    expect(chart).not.toContain('text: marker.type === "entry" ? "Buy" : "Sell"');
   });
 
   test("chat renders structured confirmation cards with input actions", () => {
