@@ -293,10 +293,12 @@ def interpret_stage(
         semantic_turn_act=semantic_turn_act,
     )
     missing_required_fields: list[str] = []
-    if should_track_execution_requirements(
+    if _should_track_semantic_strategy_requirements(
         intent=preliminary_intent,
         task_relation=preliminary_task_relation,
         signals=signals,
+        semantic_turn_act=semantic_turn_act,
+        candidate_strategy=candidate_strategy,
     ):
         missing_required_fields = missing_required_fields_for_strategy(
             candidate_strategy,
@@ -330,10 +332,12 @@ def interpret_stage(
         or bool(extraction.ambiguous_fields)
         or bool(extraction.unsupported_constraints)
         or (
-            should_track_execution_requirements(
+            _should_track_semantic_strategy_requirements(
                 intent=intent,
                 task_relation=task_relation,
                 signals=signals,
+                semantic_turn_act=semantic_turn_act,
+                candidate_strategy=candidate_strategy,
             )
             and bool(missing_required_fields)
         )
@@ -552,20 +556,34 @@ def _resolve_semantic_turn_act(
         return "educational_question"
 
     pending_needs = _pending_needs(snapshot)
-    if pending_needs and _message_answers_pending_need(message, pending_needs):
-        return "answer_pending_need"
-    if _message_starts_new_idea(
+    starts_new_idea = _message_starts_new_idea(
         message=message,
         signals=signals,
         extraction=extraction,
         task_relation=task_relation,
+    )
+    if (
+        pending_needs
+        and starts_new_idea
+        and not _message_references_current_draft(message)
+        and not _message_answers_non_asset_pending_need(message, pending_needs)
     ):
         return "new_idea"
+    if pending_needs and _message_answers_pending_need(message, pending_needs):
+        return "answer_pending_need"
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
-        if _message_refines_pending_strategy(message):
+        if _message_refines_pending_strategy(
+            message,
+            starts_new_idea=starts_new_idea,
+        ):
             return "refine_current_idea"
-    if pending_needs and _message_refines_pending_strategy(message):
+    if pending_needs and _message_refines_pending_strategy(
+        message,
+        starts_new_idea=starts_new_idea,
+    ):
         return "refine_current_idea"
+    if starts_new_idea:
+        return "new_idea"
     if task_relation == "refine":
         return "refine_current_idea"
     if extraction.unsupported_constraints:
@@ -610,13 +628,7 @@ def _message_answers_pending_need(message: str, pending_needs: list[str]) -> boo
         is not None
     ):
         return True
-    if "asset_target" in pending_needs and _is_pending_asset_reply(
-        message=message,
-        snapshot=TaskSnapshot(
-            pending_strategy_summary=StrategySummary(),
-            pending_needs=["asset_target"],
-        ),
-    ):
+    if "asset_target" in pending_needs and _message_contains_asset_candidate(message):
         return True
     if (
         "period" in pending_needs
@@ -634,6 +646,16 @@ def _message_answers_pending_need(message: str, pending_needs: list[str]) -> boo
     return False
 
 
+def _message_answers_non_asset_pending_need(
+    message: str,
+    pending_needs: list[str],
+) -> bool:
+    return _message_answers_pending_need(
+        message,
+        [need for need in pending_needs if need != "asset_target"],
+    )
+
+
 def _message_starts_new_idea(
     *,
     message: str,
@@ -648,6 +670,8 @@ def _message_starts_new_idea(
         return True
     if signals.backtest_request_detected:
         return True
+    if _message_describes_strategy_family(lowered):
+        return True
     if re.search(r"\b(what if|backtest|test|try|simulate|bought|buy|invest)\b", lowered):
         return bool(
             _generic_asset_candidates(message)
@@ -655,14 +679,53 @@ def _message_starts_new_idea(
     return False
 
 
-def _message_refines_pending_strategy(message: str) -> bool:
+def _message_refines_pending_strategy(
+    message: str,
+    *,
+    starts_new_idea: bool = False,
+) -> bool:
     lowered = message.lower()
+    if starts_new_idea and not _message_references_current_draft(message):
+        return False
     return bool(
         re.search(
             r"\b(actually|instead|change|keep|same|make that|use|sell|exit|entry)\b",
             lowered,
         )
         or _message_contains_rule_definition(message)
+    )
+
+
+def _message_references_current_draft(message: str) -> bool:
+    lowered = message.lower()
+    return bool(
+        re.search(
+            r"\b(the strategy|that strategy|this strategy|that|this|it|same|everything else)\b",
+            lowered,
+        )
+    )
+
+
+def _message_describes_strategy_family(lowered_message: str) -> bool:
+    return bool(
+        _message_describes_buy_and_hold(lowered_message)
+        or re.search(
+            r"\bdca\b|\brecurring\b|\bfixed amount\b|\bevery\s+(day|week|month|year)\b|\bweekly\b|\bmonthly\b",
+            lowered_message,
+        )
+    )
+
+
+def _message_describes_buy_and_hold(lowered_message: str) -> bool:
+    if re.search(r"\bbuy\s*(?:and|&)?\s*hold\b|\bbuy-and-hold\b", lowered_message):
+        return True
+    if _message_contains_rule_definition(lowered_message):
+        return False
+    return bool(
+        re.search(
+            r"\b(simple|basic|plain)\s+buy\b|\bjust\s+(?:a\s+)?simple\s+buy\b|\bhold(?:ing)?\b",
+            lowered_message,
+        )
     )
 
 
@@ -804,6 +867,24 @@ def _prior_strategy_for_reducer(
     return None
 
 
+def _should_track_semantic_strategy_requirements(
+    *,
+    intent: IntentName,
+    task_relation: TaskRelation,
+    signals: ExtractedSignals,
+    semantic_turn_act: SemanticTurnAct,
+    candidate_strategy: StrategySummary,
+) -> bool:
+    if semantic_turn_act in {"new_idea", "answer_pending_need", "refine_current_idea"}:
+        if candidate_strategy.strategy_type or candidate_strategy.asset_universe:
+            return True
+    return should_track_execution_requirements(
+        intent=intent,
+        task_relation=task_relation,
+        signals=signals,
+    )
+
+
 def missing_required_fields_for_strategy(
     strategy: StrategySummary,
     *,
@@ -811,20 +892,20 @@ def missing_required_fields_for_strategy(
     contract: Any,
 ) -> list[str]:
     del extraction
-    required = [
-        "strategy_thesis",
-        "asset_universe",
-        "entry_logic",
-        "exit_logic",
-        "date_range",
-    ]
     strategy_type = executable_strategy_type(strategy)
-    if strategy_type not in {"buy_and_hold", "dca_accumulation"}:
-        pass
-    else:
-        required = ["strategy_thesis", "asset_universe", "date_range"]
     if strategy_type == "dca_accumulation":
+        required = ["strategy_thesis", "asset_universe", "date_range"]
         required.append("capital_amount")
+    elif strategy_type == "buy_and_hold":
+        required = ["asset_universe", "date_range"]
+    else:
+        required = [
+            "strategy_thesis",
+            "asset_universe",
+            "entry_logic",
+            "exit_logic",
+            "date_range",
+        ]
     missing: list[str] = []
     payload = strategy.model_dump(mode="python")
     for field_name in required:
@@ -1413,6 +1494,10 @@ def _is_pending_asset_reply(
     return not remaining
 
 
+def _message_contains_asset_candidate(message: str) -> bool:
+    return bool(_generic_asset_candidates(message))
+
+
 def _snapshot_needs_asset_target(snapshot: TaskSnapshot | None) -> bool:
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return False
@@ -1595,7 +1680,7 @@ def _is_symbol_replacement(message: str) -> bool:
 
 def _detect_strategy_type(message: str, strategy: StrategySummary) -> str | None:
     lowered = message.lower()
-    if "buy and hold" in lowered or "buy-and-hold" in lowered:
+    if _message_describes_buy_and_hold(lowered):
         return "buy_and_hold"
     if re.search(
         r"\bdca\b|\bevery\s+(day|week|month|year)\b|\bweekly\b|\bmonthly\b", lowered

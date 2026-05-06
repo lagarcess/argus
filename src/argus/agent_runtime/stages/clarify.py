@@ -39,11 +39,6 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             },
         )
 
-    requested_field = _first_missing_required_field(
-        missing_required_fields=state.missing_required_fields,
-        contract=contract,
-    )
-
     grouped_prompt = _grouped_required_fields_prompt(
         missing_required_fields=state.missing_required_fields,
         state=state,
@@ -57,6 +52,11 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
                 "requested_fields": list(state.missing_required_fields),
             },
         )
+
+    requested_field = _first_missing_required_field(
+        missing_required_fields=state.missing_required_fields,
+        contract=contract,
+    )
 
     if requested_field is not None:
         field_description = contract.describe_field(requested_field)
@@ -329,15 +329,24 @@ def _grouped_required_fields_prompt(
     state: RunState,
 ) -> str | None:
     missing = set(missing_required_fields)
-    if not {"capital_amount", "date_range"}.issubset(missing):
-        return None
-
     strategy = state.candidate_strategy_draft
     strategy_type = ""
     if isinstance(strategy, dict):
         strategy_type = str(strategy.get("strategy_type") or "")
     else:
         strategy_type = str(getattr(strategy, "strategy_type", "") or "")
+    if strategy_type == "buy_and_hold":
+        if {"asset_universe", "date_range"}.issubset(missing):
+            return "Got it. What asset and time period should I use?"
+        if "asset_universe" in missing:
+            return "Got it. Which asset should I use?"
+        if "date_range" in missing:
+            return "Got it. What time period should I test?"
+        return None
+
+    if not {"capital_amount", "date_range"}.issubset(missing):
+        return None
+
     if strategy_type != "dca_accumulation":
         return None
 

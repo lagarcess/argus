@@ -3,7 +3,12 @@ from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.interpret import interpret_stage
 from argus.agent_runtime.stages.next_step import next_step_stage
-from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
 
 
 def test_clarify_asks_only_for_first_missing_required_field() -> None:
@@ -85,6 +90,104 @@ def test_interpret_and_clarify_preserve_under_specified_thesis_handoff() -> None
     assert clarified.outcome == "await_user_reply"
     assert clarified.patch["requested_field"] == "entry_logic"
     assert "investing idea" not in clarified.patch["assistant_prompt"].lower()
+
+
+def test_buy_and_hold_without_asset_uses_strategy_frame_needs() -> None:
+    user = UserState(user_id="u1", expertise_level="advanced")
+    state = RunState.new(
+        current_user_message="Let's test a buy and hold strategy",
+        recent_thread_history=[],
+    )
+
+    interpreted = interpret_stage(state=state, user=user, latest_task_snapshot=None)
+    interpreted_state = RunState.new(
+        current_user_message=state.current_user_message,
+        recent_thread_history=[],
+    )
+    interpreted_state.intent = interpreted.patch["intent"]
+    interpreted_state.task_relation = interpreted.patch["task_relation"]
+    interpreted_state.missing_required_fields = interpreted.patch[
+        "missing_required_fields"
+    ]
+    interpreted_state.optional_parameter_status = interpreted.patch[
+        "optional_parameter_status"
+    ]
+    interpreted_state.candidate_strategy_draft = interpreted.patch[
+        "candidate_strategy_draft"
+    ]
+
+    clarified = clarify_stage(
+        state=interpreted_state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert (
+        interpreted.patch["candidate_strategy_draft"]["strategy_type"] == "buy_and_hold"
+    )
+    assert interpreted.patch["missing_required_fields"] == [
+        "asset_universe",
+        "date_range",
+    ]
+    assert clarified.outcome == "await_user_reply"
+    assert clarified.patch["requested_field"] is None
+    prompt = clarified.patch["assistant_prompt"].lower()
+    assert "asset" in prompt
+    assert "time period" in prompt
+    assert "trigger the buy" not in prompt
+    assert "starting point" not in prompt
+
+
+def test_pending_buy_and_hold_accepts_asset_and_period_followups() -> None:
+    user = UserState(user_id="u1", expertise_level="advanced")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Test a buy-and-hold strategy.",
+    )
+    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+
+    asset_turn = RunState.new(
+        current_user_message="Let's try the strategy with BTC",
+        recent_thread_history=[],
+    )
+    interpreted_asset = interpret_stage(
+        state=asset_turn,
+        user=user,
+        latest_task_snapshot=snapshot,
+    )
+
+    assert interpreted_asset.patch["candidate_strategy_draft"]["strategy_type"] == (
+        "buy_and_hold"
+    )
+    assert interpreted_asset.patch["candidate_strategy_draft"]["asset_universe"] == [
+        "BTC"
+    ]
+    assert interpreted_asset.patch["missing_required_fields"] == ["date_range"]
+    assert "entry_logic" not in interpreted_asset.patch["missing_required_fields"]
+    assert "exit_logic" not in interpreted_asset.patch["missing_required_fields"]
+
+    period_snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Test a buy-and-hold strategy.",
+            asset_universe=["BTC"],
+        )
+    )
+    period_turn = RunState.new(
+        current_user_message="just a simple buy from 2 years ago until now",
+        recent_thread_history=[],
+    )
+    interpreted_period = interpret_stage(
+        state=period_turn,
+        user=user,
+        latest_task_snapshot=period_snapshot,
+    )
+
+    strategy = interpreted_period.patch["candidate_strategy_draft"]
+    assert strategy["strategy_type"] == "buy_and_hold"
+    assert strategy["asset_universe"] == ["BTC"]
+    assert strategy["date_range"] is not None
+    assert interpreted_period.patch["missing_required_fields"] == []
+    assert interpreted_period.outcome == "ready_for_confirmation"
 
 
 def test_clarify_uses_beginner_guidance_when_no_required_field_is_selected() -> None:

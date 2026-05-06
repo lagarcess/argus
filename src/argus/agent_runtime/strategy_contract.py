@@ -361,6 +361,16 @@ def _extract_period_label_from_raw_phrase(
     )
     if relative_match is not None:
         return relative_match.group(0)
+    ago_to_now_match = re.search(
+        r"\b(?P<count>\d+) "
+        r"(?P<unit>day|days|week|weeks|month|months|year|years) ago "
+        r"(?:to|through|until|till) (?:now|today|present)\b",
+        normalized,
+    )
+    if ago_to_now_match is not None:
+        count = ago_to_now_match.group("count")
+        unit = ago_to_now_match.group("unit")
+        return f"past {count} {unit}"
     return None
 
 

@@ -94,9 +94,7 @@ def test_dca_ledger_allows_accumulating_buy_fills() -> None:
     )
 
     buy_fills = [
-        event
-        for event in ledger
-        if event.event_type == "fill" and event.side == "buy"
+        event for event in ledger if event.event_type == "fill" and event.side == "buy"
     ]
     assert [event.action for event in buy_fills] == ["open", "add", "add"]
     assert _execution_fill_count(ledger, side="buy") == 3
