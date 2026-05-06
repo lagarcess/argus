@@ -10,9 +10,11 @@ import {
   createSeriesMarkers,
   type BaselineData,
   type ISeriesApi,
+  type LogicalRange,
+  type SeriesMarker,
   type Time,
 } from "lightweight-charts";
-import { type ResultChartPayload } from "./types";
+import { type ResultChartMarker, type ResultChartPayload } from "./types";
 
 type ResultEquityChartProps = {
   chart: ResultChartPayload;
@@ -49,12 +51,21 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
     [chart.series],
   );
   const eventByTime = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, string[]>();
     for (const marker of chart.markers ?? []) {
-      map.set(normalizeChartTime(marker.time), marker.label);
+      const time = normalizeChartTime(marker.time);
+      const existing = map.get(time) ?? [];
+      map.set(time, [...existing, marker.label]);
     }
     return map;
   }, [chart.markers]);
+  const dataIndexByTime = useMemo(() => {
+    const map = new Map<string, number>();
+    data.forEach((point, index) => {
+      map.set(String(point.time), index);
+    });
+    return map;
+  }, [data]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -124,17 +135,28 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
     });
     series.setData(data);
     const annotationColor = isDark ? ANNOTATION_COLOR_DARK : ANNOTATION_COLOR_LIGHT;
-    createSeriesMarkers(
+    const visibleMarkers = selectVisibleTradeMarkers({
+      markers: chart.markers ?? [],
+      visibleRange: chartApi.timeScale().getVisibleLogicalRange(),
+      chartWidth: container.clientWidth,
+      dataIndexByTime,
+    });
+    const markersApi = createSeriesMarkers(
       series as ISeriesApi<"Baseline", Time>,
-      (chart.markers ?? []).map((marker) => ({
-        time: normalizeChartTime(marker.time) as Time,
-        position: marker.type === "entry" ? "belowBar" : "aboveBar",
-        color: annotationColor,
-        shape: marker.type === "entry" ? "arrowUp" : "arrowDown",
-        text: marker.type === "entry" ? "Buy" : "Sell",
-      })),
+      visibleMarkers.map((marker) => toSeriesMarker(marker, annotationColor)),
     );
     chartApi.timeScale().fitContent();
+    const updateVisibleMarkers = (visibleRange: LogicalRange | null) => {
+      markersApi.setMarkers(
+        selectVisibleTradeMarkers({
+          markers: chart.markers ?? [],
+          visibleRange,
+          chartWidth: container.clientWidth,
+          dataIndexByTime,
+        }).map((marker) => toSeriesMarker(marker, annotationColor)),
+      );
+    };
+    chartApi.timeScale().subscribeVisibleLogicalRangeChange(updateVisibleMarkers);
 
     chartApi.subscribeCrosshairMove((param) => {
       if (!param.point || param.time == null) {
@@ -152,15 +174,16 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
         y: param.point.y,
         time,
         value: datum.value,
-        event: eventByTime.get(time),
+        event: eventByTime.get(time)?.join(", "),
       });
     });
 
     return () => {
       setTooltip(null);
+      chartApi.timeScale().unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
       chartApi.remove();
     };
-  }, [chart, data, eventByTime, isDark]);
+  }, [chart, data, dataIndexByTime, eventByTime, isDark]);
 
   if (data.length === 0) return null;
 
@@ -196,4 +219,75 @@ function normalizeChartTime(value: string) {
   const dateOnly = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/);
   if (dateOnly) return dateOnly[1];
   return trimmed;
+}
+
+type MarkerViewportInput = {
+  chartWidth: number;
+  visibleBars: number;
+};
+
+export function markerBudgetForViewport({
+  chartWidth,
+  visibleBars,
+}: MarkerViewportInput) {
+  const widthBudget = Math.max(4, Math.ceil(chartWidth / 28));
+  const zoomBudget =
+    visibleBars <= 45 ? 24 : visibleBars <= 90 ? 18 : visibleBars <= 180 ? 14 : 12;
+  return Math.max(4, Math.min(widthBudget, zoomBudget));
+}
+
+type VisibleTradeMarkerInput = {
+  markers: ResultChartMarker[];
+  visibleRange: LogicalRange | null;
+  chartWidth: number;
+  dataIndexByTime: Map<string, number>;
+};
+
+export function selectVisibleTradeMarkers({
+  markers,
+  visibleRange,
+  chartWidth,
+  dataIndexByTime,
+}: VisibleTradeMarkerInput) {
+  if (markers.length <= 1) return markers;
+
+  const from = visibleRange ? Math.floor(visibleRange.from) : 0;
+  const to = visibleRange ? Math.ceil(visibleRange.to) : dataIndexByTime.size - 1;
+  const visibleBars = Math.max(1, to - from + 1);
+  const visibleMarkers = markers
+    .map((marker, ordinal) => ({
+      marker,
+      ordinal,
+      logicalIndex: dataIndexByTime.get(normalizeChartTime(marker.time)) ?? ordinal,
+    }))
+    .filter(({ logicalIndex }) => logicalIndex >= from && logicalIndex <= to)
+    .sort((a, b) => a.logicalIndex - b.logicalIndex || a.ordinal - b.ordinal);
+
+  const budget = markerBudgetForViewport({ chartWidth, visibleBars });
+  if (visibleMarkers.length <= budget) {
+    return visibleMarkers.map(({ marker }) => marker);
+  }
+
+  const selectedIndexes = new Set<number>();
+  const step = (visibleMarkers.length - 1) / Math.max(1, budget - 1);
+  for (let slot = 0; slot < budget; slot += 1) {
+    selectedIndexes.add(Math.round(slot * step));
+  }
+
+  return [...selectedIndexes]
+    .sort((a, b) => a - b)
+    .map((index) => visibleMarkers[index]?.marker)
+    .filter((marker): marker is ResultChartMarker => Boolean(marker));
+}
+
+function toSeriesMarker(
+  marker: ResultChartMarker,
+  annotationColor: string,
+): SeriesMarker<Time> {
+  return {
+    time: normalizeChartTime(marker.time) as Time,
+    position: marker.type === "entry" ? "belowBar" : "aboveBar",
+    color: annotationColor,
+    shape: marker.type === "entry" ? "arrowUp" : "arrowDown",
+  };
 }
