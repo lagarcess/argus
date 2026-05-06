@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any, Literal
 
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
@@ -120,6 +122,11 @@ class OpenRouterStructuredInterpreter:
         self.last_status: str | None = None
 
     def __call__(self, request: InterpretationRequest) -> StructuredInterpretation | None:
+        return asyncio.run(self.ainvoke(request))
+
+    async def ainvoke(
+        self, request: InterpretationRequest
+    ) -> StructuredInterpretation | None:
         """
         Executes the interpretation turn.
         """
@@ -130,7 +137,7 @@ class OpenRouterStructuredInterpreter:
         if model:
             try:
                 structured = model.with_structured_output(LLMInterpretationResponse)
-                response = structured.invoke(messages)
+                response = await structured.ainvoke(messages)
                 if isinstance(response, LLMInterpretationResponse):
                     self.last_status = "used"
                     return self._to_runtime_interpretation(response, request=request)
@@ -156,7 +163,7 @@ class OpenRouterStructuredInterpreter:
         if fallback_model:
             try:
                 structured = fallback_model.with_structured_output(LLMInterpretationResponse)
-                response = structured.invoke(messages)
+                response = await structured.ainvoke(messages)
                 if isinstance(response, LLMInterpretationResponse):
                     self.last_status = "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
@@ -171,33 +178,33 @@ class OpenRouterStructuredInterpreter:
 
         return None
 
-    def _messages(self, request: InterpretationRequest) -> list[dict[str, str]]:
+    def _messages(self, request: InterpretationRequest) -> list[BaseMessage]:
         prior_strategy = None
         if request.latest_task_snapshot is not None:
             prior_strategy = (
                 request.latest_task_snapshot.pending_strategy_summary
                 or request.latest_task_snapshot.confirmed_strategy_summary
             )
-        history = [
-            {
-                "role": item.role,
-                "content": item.content,
-            }
-            for item in request.recent_thread_history[-6:]
-            if hasattr(item, "role") and hasattr(item, "content")
-        ]
+        history: list[BaseMessage] = []
+        for item in request.recent_thread_history[-6:]:
+            if not hasattr(item, "role") or not hasattr(item, "content"):
+                continue
+            content = str(item.content)
+            if item.role == "assistant":
+                history.append(AIMessage(content=content))
+            elif item.role == "user":
+                history.append(HumanMessage(content=content))
         return [
-            {"role": "system", "content": self._system_prompt()},
-            {
-                "role": "system",
-                "content": (
+            SystemMessage(content=self._system_prompt()),
+            SystemMessage(
+                content=(
                     f"User language preference: {request.user.language_preference}.\n"
                     f"Prior strategy JSON, if any: "
                     f"{prior_strategy.model_dump(mode='json') if prior_strategy else 'none'}"
-                ),
-            },
+                )
+            ),
             *history,
-            {"role": "user", "content": request.current_user_message},
+            HumanMessage(content=request.current_user_message),
         ]
 
     def _system_prompt(self) -> str:

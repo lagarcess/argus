@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from argus.agent_runtime.stages.interpret import StageResult
@@ -9,6 +10,8 @@ from argus.agent_runtime.state.models import (
     ResponseProfile,
     RunState,
 )
+from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
+from langchain_core.messages import HumanMessage, SystemMessage
 
 
 def explain_stage(*, state: RunState) -> StageResult:
@@ -55,6 +58,83 @@ def explain_stage(*, state: RunState) -> StageResult:
             )
         },
     )
+
+
+async def explain_stage_async(*, state: RunState) -> StageResult:
+    fallback = explain_stage(state=state)
+    fallback_text = fallback.stage_patch.get("assistant_response")
+    if not isinstance(fallback_text, str) or not fallback_text:
+        return fallback
+
+    streamed_text = await _stream_llm_explanation(
+        state=state,
+        fallback_text=fallback_text,
+    )
+    if streamed_text is None:
+        return fallback
+    return StageResult(
+        outcome=fallback.outcome,
+        stage_patch={**fallback.stage_patch, "assistant_response": streamed_text},
+    )
+
+
+async def _stream_llm_explanation(
+    *,
+    state: RunState,
+    fallback_text: str,
+) -> str | None:
+    model = build_openrouter_model("result_summary")
+    if model is None:
+        return None
+    context = {
+        "strategy": _strategy_payload(state),
+        "result": _result_payload(state),
+        "explanation_context": _explanation_context(state),
+        "fallback_text": fallback_text,
+        "language": "use the user's current language preference if available",
+    }
+    messages = [
+        SystemMessage(
+            content=(
+                "You are Argus explaining a completed historical backtest. "
+                "Use only the supplied metrics and assumptions. Keep the response "
+                "concise, natural, and beginner-friendly. Do not invent metrics, "
+                "predictions, fees, slippage, or unsupported trading capabilities."
+            )
+        ),
+        HumanMessage(content=json.dumps(context, default=str, sort_keys=True)),
+    ]
+    chunks: list[str] = []
+    try:
+        async for chunk in model.astream(messages):
+            content = _chunk_content(chunk)
+            if content:
+                chunks.append(content)
+    except Exception as exc:
+        log_openrouter_failure(
+            task="result_summary",
+            model_name=None,
+            exc=exc,
+            message="Result explanation streaming failed; using deterministic fallback",
+        )
+        return None
+    text = "".join(chunks).strip()
+    return text or None
+
+
+def _chunk_content(chunk: Any) -> str:
+    content = getattr(chunk, "content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+        return "".join(parts)
+    return ""
 
 
 def _result_payload(state: RunState) -> dict[str, Any]:

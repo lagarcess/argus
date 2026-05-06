@@ -650,6 +650,9 @@ export default function ChatInterface() {
       if (event.event === "status") {
         setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
       }
+      if (event.event === "stage_start") {
+        setStreamStatus(t(`chat.status.${event.data.stage}`) || t('chat.status.preparing'));
+      }
       if (event.event === "token") {
         setMessages((prev) =>
           prev.map((m) =>
@@ -708,6 +711,52 @@ export default function ChatInterface() {
               : m,
           ),
         );
+      }
+      if (event.event === "final") {
+        const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
+        if (event.data.confirmation) {
+          const confirmation = event.data.confirmation as StrategyConfirmationPayload;
+          setInputActions(confirmation.actions ?? []);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    kind: "strategy_confirmation",
+                    content: undefined,
+                    confirmation,
+                  }
+                : m,
+            ),
+          );
+        } else if (event.data.run) {
+          const run = event.data.run as BacktestRun;
+          const baseCard = resultCardFromRun(run);
+          const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
+          const card = { ...baseCard, actions: resultActions };
+          setInputActions(visibleInputActions(resultActions));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                  ...m,
+                  kind: "strategy_result",
+                  content: m.content || finalText || undefined,
+                  result: card,
+                  actions: resultActions,
+                  }
+                : m,
+            ),
+          );
+        } else if (finalText) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId && !m.content
+                ? { ...m, content: finalText }
+                : m,
+            ),
+          );
+        }
       }
       if (event.event === "title") {
         setHistoryItems((prev) =>

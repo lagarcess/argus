@@ -88,13 +88,13 @@ def test_clarifier_system_prompt_enforces_user_language() -> None:
     )
 
     messages = clarifier._messages(request)
-    system_prompt = messages[0]["content"]
+    system_prompt = messages[0].content
 
     assert (
         "Respond in the user's preferred language (e.g., Spanish if language is "
         "'es-419')."
     ) in system_prompt
-    assert "es-419" in messages[1]["content"]
+    assert "es-419" in messages[1].content
 
 
 def test_clarify_stage_does_not_contain_slot_prompt_strings() -> None:

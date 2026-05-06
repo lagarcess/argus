@@ -1,23 +1,31 @@
 from __future__ import annotations
 
+import pytest
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.runtime import run_agent_turn
-from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import UserState
+from langgraph.checkpoint.memory import MemorySaver
 
 
 def _workflow_with_interpretation(response: StructuredInterpretation):
-    def interpreter(_request: InterpretationRequest) -> StructuredInterpretation:
-        return response
+    class Interpreter:
+        async def ainvoke(
+            self, _request: InterpretationRequest
+        ) -> StructuredInterpretation:
+            return response
 
-    return build_workflow(structured_interpreter=interpreter)
+    return build_workflow(
+        structured_interpreter=Interpreter(),
+        checkpointer=MemorySaver(),
+    )
 
 
-def test_conversational_ux_response_comes_from_runtime_interpreter() -> None:
+@pytest.mark.asyncio
+async def test_conversational_ux_response_comes_from_runtime_interpreter() -> None:
     workflow = _workflow_with_interpretation(
         StructuredInterpretation(
             intent="conversation_followup",
@@ -32,9 +40,8 @@ def test_conversational_ux_response_comes_from_runtime_interpreter() -> None:
         )
     )
 
-    result = run_agent_turn(
+    result = await run_agent_turn(
         workflow=workflow,
-        session_manager=InMemorySessionManager(),
         user=UserState(user_id="u1", language_preference="en"),
         thread_id="thread-ux",
         message="help",
@@ -44,7 +51,8 @@ def test_conversational_ux_response_comes_from_runtime_interpreter() -> None:
     assert "shape an investing idea" in result["assistant_response"]
 
 
-def test_conversational_ux_low_confidence_runtime_response_is_preserved() -> None:
+@pytest.mark.asyncio
+async def test_conversational_ux_low_confidence_runtime_response_is_preserved() -> None:
     workflow = _workflow_with_interpretation(
         StructuredInterpretation(
             intent="conversation_followup",
@@ -59,9 +67,8 @@ def test_conversational_ux_low_confidence_runtime_response_is_preserved() -> Non
         )
     )
 
-    result = run_agent_turn(
+    result = await run_agent_turn(
         workflow=workflow,
-        session_manager=InMemorySessionManager(),
         user=UserState(user_id="u1", language_preference="en"),
         thread_id="thread-ux-low-confidence",
         message="help",

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncIterator
 from typing import Any
 
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.state.models import ConversationMessage, StrategySummary
@@ -33,6 +36,14 @@ class OpenRouterClarificationGenerator:
         self.last_status: str | None = None
 
     def __call__(self, request: ClarificationRequest) -> str | None:
+        return asyncio.run(self.ainvoke(request))
+
+    async def ainvoke(self, request: ClarificationRequest) -> str | None:
+        chunks = [chunk async for chunk in self.astream(request)]
+        question = "".join(chunks).strip()
+        return question or None
+
+    async def astream(self, request: ClarificationRequest) -> AsyncIterator[str]:
         """
         Executes the clarification turn.
         """
@@ -41,11 +52,15 @@ class OpenRouterClarificationGenerator:
         model = build_openrouter_model("clarification", model_name=self.model_name)
         if model:
             try:
-                structured = model.with_structured_output(ClarificationResponse)
-                response = structured.invoke(messages)
-                if isinstance(response, ClarificationResponse):
+                yielded = False
+                async for chunk in model.astream(messages):
+                    content = _chunk_content(chunk)
+                    if content:
+                        yielded = True
+                        yield content
+                if yielded:
                     self.last_status = "used"
-                    return response.question.strip() or None
+                    return
             except Exception as exc:
                 log_openrouter_failure(
                     task="clarification",
@@ -60,16 +75,20 @@ class OpenRouterClarificationGenerator:
         primary_model_name = resolve_openrouter_model(model_name=self.model_name)
         if fallback_model_name == primary_model_name:
             self.last_status = "failed"
-            return None
+            return
 
         fallback_model = build_openrouter_model("clarification", model_name=fallback_model_name)
         if fallback_model:
             try:
-                structured = fallback_model.with_structured_output(ClarificationResponse)
-                response = structured.invoke(messages)
-                if isinstance(response, ClarificationResponse):
+                yielded = False
+                async for chunk in fallback_model.astream(messages):
+                    content = _chunk_content(chunk)
+                    if content:
+                        yielded = True
+                        yield content
+                if yielded:
                     self.last_status = "fallback_used"
-                    return response.question.strip() or None
+                    return
             except Exception as exc:
                 self.last_status = "failed"
                 log_openrouter_failure(
@@ -79,14 +98,18 @@ class OpenRouterClarificationGenerator:
                     message="Fallback LLM clarification failed",
                 )
 
-        return None
+        return
 
-    def _messages(self, request: ClarificationRequest) -> list[dict[str, str]]:
-        history = [
-            {"role": item.role, "content": item.content}
-            for item in request.recent_thread_history[-6:]
-            if hasattr(item, "role") and hasattr(item, "content")
-        ]
+    def _messages(self, request: ClarificationRequest) -> list[BaseMessage]:
+        history: list[BaseMessage] = []
+        for item in request.recent_thread_history[-6:]:
+            if not hasattr(item, "role") or not hasattr(item, "content"):
+                continue
+            content = str(item.content)
+            if item.role == "assistant":
+                history.append(AIMessage(content=content))
+            elif item.role == "user":
+                history.append(HumanMessage(content=content))
         context = {
             "language": request.language,
             "current_user_message": request.current_user_message,
@@ -100,20 +123,31 @@ class OpenRouterClarificationGenerator:
             "response_intent": request.response_intent,
         }
         return [
-            {
-                "role": "system",
-                "content": (
+            SystemMessage(
+                content=(
                     "Generate exactly one concise, context-aware clarifying question. "
                     "Do not expose field names such as asset_universe, capital_amount, "
                     "date_range, requested_field, or missing_required_fields. Do not "
                     "output JSON. Respond in the user's preferred language (e.g., "
                     "Spanish if language is 'es-419')."
-                ),
-            },
-            {
-                "role": "system",
-                "content": json.dumps(context, default=str, sort_keys=True),
-            },
+                )
+            ),
+            SystemMessage(content=json.dumps(context, default=str, sort_keys=True)),
             *history,
-            {"role": "user", "content": request.current_user_message},
+            HumanMessage(content=request.current_user_message),
         ]
+
+
+def _chunk_content(chunk: Any) -> str:
+    content = getattr(chunk, "content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+        return "".join(parts)
+    return ""

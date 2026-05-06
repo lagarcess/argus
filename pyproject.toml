@@ -35,6 +35,8 @@ litellm = "^1.83.7"
 langchain = "^1.2.15"
 langchain-openrouter = "^0.2.1"
 langgraph = ">=1.1.5,<1.2.0"
+langgraph-checkpoint-postgres = "^3.0.5"
+psycopg = {extras = ["binary", "pool"], version = "^3.3.4"}
 
 [build-system]
 requires = ["poetry-core"]

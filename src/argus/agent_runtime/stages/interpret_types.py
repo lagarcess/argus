@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from argus.agent_runtime.state.models import (
     AmbiguousField,
@@ -130,8 +130,14 @@ class InterpretationRequest(BaseModel):
     user: UserState
 
 
+@runtime_checkable
 class StructuredInterpreter(Protocol):
     def __call__(
+        self,
+        request: InterpretationRequest,
+    ) -> StructuredInterpretation | None: ...
+
+    async def ainvoke(
         self,
         request: InterpretationRequest,
     ) -> StructuredInterpretation | None: ...

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { resultCardFromRun } from "../lib/argus-api";
+import { parseChatStreamFrame, resultCardFromRun } from "../lib/argus-api";
 
 const root = join(import.meta.dir, "..");
 
@@ -114,11 +114,31 @@ describe("Argus Alpha frontend contract", () => {
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
-    expect(api).toContain('event: "confirmation"');
+    expect(api).toContain('event: "final"');
     expect(chat).toContain('kind: "strategy_confirmation"');
     expect(chat).toContain("setInputActions(confirmation.actions ?? [])");
     expect(chat).toContain("slide-in-from-bottom-2");
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
+  });
+
+  test("chat stream parser consumes canonical data-only SSE frames", () => {
+    const stage = parseChatStreamFrame('data: {"type":"stage_start","stage":"execute"}');
+    const token = parseChatStreamFrame('data: {"type":"token","content":"Running"}');
+    const done = parseChatStreamFrame("data: [DONE]");
+
+    expect(stage).toEqual({ event: "stage_start", data: { stage: "execute" } });
+    expect(token).toEqual({ event: "token", data: { text: "Running" } });
+    expect(done).toEqual({ event: "done", data: { message_id: null } });
+  });
+
+  test("chat status is driven by backend stage_start events", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const locale = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+
+    expect(chat).toContain('event.event === "stage_start"');
+    expect(chat).toContain("chat.status.${event.data.stage}");
+    expect(locale).toContain('"interpret": "Understanding your idea..."');
+    expect(locale).toContain('"execute": "Running backtest..."');
   });
 
   test("chat restores jump-to-latest affordance without forced reading jumps", () => {

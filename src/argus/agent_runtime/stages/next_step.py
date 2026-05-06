@@ -31,6 +31,10 @@ def next_step_stage(*, state: RunState) -> StageResult:
     )
 
 
+async def next_step_stage_async(*, state: RunState) -> StageResult:
+    return next_step_stage(state=state)
+
+
 def _resolve_next_actions(state: RunState) -> list[str]:
     if state.intent == "beginner_guidance":
         return list(BEGINNER_NEXT_ACTIONS)

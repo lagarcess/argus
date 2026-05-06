@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from copy import deepcopy
 from typing import Any
@@ -124,6 +125,17 @@ def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageR
             ),
             "final_response_payload": {"error": _retry_exhausted_message(records)},
         },
+    )
+
+
+async def execute_stage_async(
+    *, state: RunState, tool: Any, max_retries: int = 2
+) -> StageResult:
+    return await asyncio.to_thread(
+        execute_stage,
+        state=state,
+        tool=tool,
+        max_retries=max_retries,
     )
 
 

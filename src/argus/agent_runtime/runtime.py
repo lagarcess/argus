@@ -1,110 +1,157 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
-from argus.agent_runtime.graph.workflow import WorkflowState
-from argus.agent_runtime.session.manager import InMemorySessionManager
+from argus.agent_runtime.graph.workflow import WorkflowNode, WorkflowState
 from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.state.models import (
     ArtifactReference,
+    ConversationMessage,
     RunState,
-    TaskSnapshot,
     UserState,
 )
 
-SEEDED_THREAD_METADATA_KEYS = (
-    "latest_task_type",
-    "last_stage_outcome",
-)
-MAX_SEEDED_ARTIFACT_REFERENCES = 3
 MAX_RECENT_THREAD_HISTORY = 6
-
-
-def run_agent_turn(
-    *,
-    workflow: Any,
-    session_manager: InMemorySessionManager,
-    user: UserState,
-    thread_id: str,
-    message: str,
-) -> dict[str, Any]:
-    initial_state = build_workflow_input(
-        session_manager=session_manager,
-        user=user,
-        thread_id=thread_id,
-        message=message,
-    )
-    result = _compose_runtime_response(workflow.invoke(initial_state))
-    run_state = result["run_state"]
-    persisted_artifact_references = _resolve_persisted_artifact_references(
-        result=result,
-        initial_state=initial_state,
-    )
-    assistant_message = _assistant_message(result)
-
-    session_manager.append_message(
-        user_id=user.user_id,
-        thread_id=thread_id,
-        role="user",
-        content=message,
-    )
-    if assistant_message is not None:
-        session_manager.append_message(
-            user_id=user.user_id,
-            thread_id=thread_id,
-            role="assistant",
-            content=assistant_message,
-        )
-    session_manager.save_thread_context(
-        user_id=user.user_id,
-        thread_id=thread_id,
-        latest_task_snapshot=_build_task_snapshot(
-            run_state=run_state,
-            stage_outcome=result["stage_outcome"],
-            prior_task_snapshot=initial_state.get("latest_task_snapshot"),
-            artifact_references=persisted_artifact_references,
-        ),
-        artifact_references=persisted_artifact_references,
-        thread_metadata=_build_thread_metadata(
-            run_state=run_state,
-            stage_outcome=result["stage_outcome"],
-        ),
-    )
-
-    return _public_result(result)
+TOKEN_STREAM_NODES = {
+    WorkflowNode.CLARIFY.value,
+    WorkflowNode.EXPLAIN.value,
+    WorkflowNode.NEXT_STEP.value,
+}
+WORKFLOW_NODE_NAMES = {node.value for node in WorkflowNode}
 
 
 def build_workflow_input(
     *,
-    session_manager: InMemorySessionManager,
     user: UserState,
-    thread_id: str,
     message: str,
+    recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
 ) -> WorkflowState:
-    thread = session_manager.load_thread(user_id=user.user_id, thread_id=thread_id)
     normalized_message = " ".join(message.strip().split())
     return {
         "run_state": RunState.new(
             current_user_message=normalized_message,
-            recent_thread_history=_bounded_recent_thread_history(thread.message_history),
+            recent_thread_history=_bounded_recent_thread_history(
+                list(recent_thread_history or [])
+            ),
         ),
         "user": user,
-        "latest_task_snapshot": thread.latest_task_snapshot,
-        "selected_thread_metadata": _select_thread_metadata(thread.thread_metadata),
-        "artifact_references": _select_artifact_references(thread.artifact_references),
     }
 
 
-def _assistant_message(result: dict[str, Any]) -> str | None:
-    assistant_response = result.get("assistant_response")
-    assistant_prompt = result.get("assistant_prompt")
-    if isinstance(assistant_response, str) and assistant_response:
-        if isinstance(assistant_prompt, str) and assistant_prompt:
-            return f"{assistant_response}\n\n{assistant_prompt}"
-        return assistant_response
-    if isinstance(assistant_prompt, str) and assistant_prompt:
-        return assistant_prompt
+async def stream_agent_turn_events(
+    *,
+    workflow: Any,
+    user: UserState,
+    thread_id: str,
+    message: str,
+    recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
+) -> AsyncIterator[dict[str, Any]]:
+    initial_state = build_workflow_input(
+        user=user,
+        message=message,
+        recent_thread_history=recent_thread_history,
+    )
+    config = {"configurable": {"thread_id": thread_id}}
+    seen_stage_starts: set[str] = set()
+    seen_stage_outcomes: set[str] = set()
+
+    async for event in workflow.astream_events(
+        initial_state,
+        config=config,
+        version="v2",
+    ):
+        kind = event.get("event")
+        node_name = _event_node_name(event)
+        if kind == "on_chain_start" and node_name in WORKFLOW_NODE_NAMES:
+            if node_name not in seen_stage_starts:
+                seen_stage_starts.add(node_name)
+                yield {"type": "stage_start", "stage": node_name}
+            continue
+        if kind == "on_chat_model_stream" and node_name in TOKEN_STREAM_NODES:
+            content = _chunk_content(event.get("data", {}).get("chunk"))
+            if content:
+                yield {"type": "token", "content": content}
+            continue
+        if kind == "on_chain_end" and node_name in WORKFLOW_NODE_NAMES:
+            outcome = _stage_outcome_from_event(event)
+            if outcome is not None and outcome not in seen_stage_outcomes:
+                seen_stage_outcomes.add(outcome)
+                yield {"type": "stage_outcome", "outcome": outcome}
+
+    final_state = await _final_workflow_state(workflow=workflow, config=config)
+    yield {"type": "final", "payload": _public_result(final_state)}
+
+
+async def run_agent_turn(
+    *,
+    workflow: Any,
+    user: UserState,
+    thread_id: str,
+    message: str,
+    recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    final_payload: dict[str, Any] | None = None
+    async for event in stream_agent_turn_events(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message=message,
+        recent_thread_history=recent_thread_history,
+    ):
+        if event.get("type") == "final":
+            payload = event.get("payload")
+            if isinstance(payload, dict):
+                final_payload = payload
+    return final_payload or {}
+
+
+async def _final_workflow_state(*, workflow: Any, config: dict[str, Any]) -> dict[str, Any]:
+    state_snapshot = await workflow.aget_state(config)
+    values = getattr(state_snapshot, "values", None)
+    if not isinstance(values, dict):
+        return {}
+    return _compose_runtime_response(values)
+
+
+def _event_node_name(event: dict[str, Any]) -> str | None:
+    metadata = event.get("metadata")
+    if isinstance(metadata, dict):
+        node_name = metadata.get("langgraph_node")
+        if isinstance(node_name, str) and node_name in WORKFLOW_NODE_NAMES:
+            return node_name
+    name = event.get("name")
+    if isinstance(name, str) and name in WORKFLOW_NODE_NAMES:
+        return name
     return None
+
+
+def _stage_outcome_from_event(event: dict[str, Any]) -> str | None:
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return None
+    output = data.get("output")
+    if not isinstance(output, dict):
+        return None
+    outcome = output.get("stage_outcome")
+    if outcome is None:
+        return None
+    return str(getattr(outcome, "value", outcome))
+
+
+def _chunk_content(chunk: Any) -> str:
+    content = getattr(chunk, "content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+        return "".join(parts)
+    return ""
 
 
 def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
@@ -117,145 +164,6 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
     patched = dict(result)
     patched["assistant_prompt"] = composed
     return patched
-
-
-def _build_task_snapshot(
-    *,
-    run_state: RunState,
-    stage_outcome: Any,
-    prior_task_snapshot: TaskSnapshot | None,
-    artifact_references: list[ArtifactReference],
-) -> TaskSnapshot:
-    stage_outcome_value = getattr(stage_outcome, "value", stage_outcome)
-    completed_outcomes = {"execution_succeeded", "ready_to_respond", "end_run"}
-    latest_backtest_reference = _latest_artifact_reference(
-        artifact_references=artifact_references,
-        artifact_kind="backtest_result",
-    )
-    latest_collection_reference = _latest_artifact_reference(
-        artifact_references=artifact_references,
-        artifact_kind="collection_action",
-    )
-    pending_strategy_summary = (
-        run_state.candidate_strategy_draft
-        if stage_outcome_value in {"await_user_reply", "await_approval"}
-        else (
-            prior_task_snapshot.pending_strategy_summary
-            if prior_task_snapshot is not None
-            and stage_outcome_value not in completed_outcomes
-            else None
-        )
-    )
-    pending_needs = _pending_needs_from_run_state(
-        run_state=run_state,
-        stage_outcome_value=stage_outcome_value,
-        pending_strategy_summary=pending_strategy_summary,
-    )
-    field_provenance = _field_provenance_from_strategy(pending_strategy_summary)
-    return TaskSnapshot(
-        latest_task_type=run_state.intent,
-        completed=stage_outcome_value in completed_outcomes,
-        pending_strategy_summary=pending_strategy_summary,
-        confirmed_strategy_summary=(
-            run_state.candidate_strategy_draft
-            if stage_outcome_value in completed_outcomes
-            else (
-                prior_task_snapshot.confirmed_strategy_summary
-                if prior_task_snapshot is not None
-                else None
-            )
-        ),
-        pending_needs=pending_needs,
-        field_provenance=field_provenance,
-        latest_backtest_result_reference=(
-            latest_backtest_reference
-            or (
-                prior_task_snapshot.latest_backtest_result_reference
-                if prior_task_snapshot is not None
-                else None
-            )
-        ),
-        latest_collection_action_reference=(
-            latest_collection_reference
-            or (
-                prior_task_snapshot.latest_collection_action_reference
-                if prior_task_snapshot is not None
-                else None
-            )
-        ),
-        last_unresolved_follow_up=(
-            run_state.user_goal_summary
-            if stage_outcome_value in {"await_user_reply", "await_approval"}
-            else None
-        ),
-    )
-
-
-def _pending_needs_from_run_state(
-    *,
-    run_state: RunState,
-    stage_outcome_value: str,
-    pending_strategy_summary: Any,
-) -> list[str]:
-    if stage_outcome_value not in {"await_user_reply", "await_approval"}:
-        return []
-    semantic_needs: list[str] = []
-    field_map = {
-        "asset_universe": "asset_target",
-        "capital_amount": "sizing_amount",
-        "date_range": "period",
-        "entry_logic": "rule_definition",
-        "exit_logic": "rule_definition",
-    }
-    for field_name in run_state.missing_required_fields:
-        need = field_map.get(field_name)
-        if need is not None and need not in semantic_needs:
-            semantic_needs.append(need)
-    if pending_strategy_summary is not None:
-        if (
-            not pending_strategy_summary.asset_universe
-            and "asset_target" not in semantic_needs
-        ):
-            semantic_needs.append("asset_target")
-        if (
-            pending_strategy_summary.strategy_type == "dca_accumulation"
-            and pending_strategy_summary.capital_amount is None
-            and "sizing_amount" not in semantic_needs
-        ):
-            semantic_needs.append("sizing_amount")
-        if pending_strategy_summary.date_range is None and "period" not in semantic_needs:
-            semantic_needs.append("period")
-    return semantic_needs
-
-
-def _field_provenance_from_strategy(strategy: Any) -> dict[str, str]:
-    if strategy is None:
-        return {}
-    provenance: dict[str, str] = {}
-    for field_name in (
-        "asset_universe",
-        "capital_amount",
-        "date_range",
-        "cadence",
-        "entry_logic",
-        "exit_logic",
-    ):
-        value = getattr(strategy, field_name, None)
-        if value not in (None, "", [], {}):
-            provenance[field_name] = "user_or_confirmed_state"
-    return provenance
-
-
-def _build_thread_metadata(
-    *,
-    run_state: RunState,
-    stage_outcome: Any,
-) -> dict[str, Any]:
-    stage_outcome_value = getattr(stage_outcome, "value", stage_outcome)
-    return {
-        "latest_task_type": run_state.intent,
-        "last_stage_outcome": stage_outcome_value,
-    }
 
 
 def _public_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -313,52 +221,22 @@ def _serialize_public_value(key: str, value: Any) -> Any:
     return value
 
 
-def _select_thread_metadata(thread_metadata: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value
-        for key, value in thread_metadata.items()
-        if key in SEEDED_THREAD_METADATA_KEYS
-    }
-
-
-def _select_artifact_references(
-    artifact_references: list[ArtifactReference],
-) -> list[ArtifactReference]:
-    return [
-        reference.model_copy(deep=True)
-        for reference in artifact_references[-MAX_SEEDED_ARTIFACT_REFERENCES:]
-    ]
-
-
 def _bounded_recent_thread_history(
-    message_history: list[Any],
-) -> list[Any]:
-    return [
-        message.model_copy(deep=True) if hasattr(message, "model_copy") else message
-        for message in message_history[-MAX_RECENT_THREAD_HISTORY:]
-    ]
+    message_history: list[ConversationMessage | dict[str, Any]],
+) -> list[ConversationMessage]:
+    bounded: list[ConversationMessage] = []
+    for message in message_history[-MAX_RECENT_THREAD_HISTORY:]:
+        if isinstance(message, ConversationMessage):
+            bounded.append(message.model_copy(deep=True))
+        else:
+            bounded.append(ConversationMessage.model_validate(message))
+    return bounded
 
 
-def _resolve_persisted_artifact_references(
-    *,
-    result: dict[str, Any],
-    initial_state: WorkflowState,
+def resolve_persisted_artifact_references(
+    raw_references: Iterable[ArtifactReference | dict[str, Any]],
 ) -> list[ArtifactReference]:
-    raw_references = result.get(
-        "artifact_references", initial_state.get("artifact_references", [])
-    )
-    references: list[ArtifactReference] = []
-    for reference in raw_references:
-        references.append(ArtifactReference.model_validate(reference))
-    return references
-
-
-def _latest_artifact_reference(
-    *,
-    artifact_references: list[ArtifactReference],
-    artifact_kind: str,
-) -> ArtifactReference | None:
-    for reference in reversed(artifact_references):
-        if reference.artifact_kind == artifact_kind:
-            return reference.model_copy(deep=True)
-    return None
+    return [
+        ArtifactReference.model_validate(reference)
+        for reference in raw_references
+    ]

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import pytest
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.runtime import run_agent_turn
-from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import StrategySummary, UserState
+from argus.agent_runtime.state.models import (
+    ConversationMessage,
+    StrategySummary,
+    UserState,
+)
+from langgraph.checkpoint.memory import MemorySaver
 
 
 class ResolvedAssetStub:
@@ -16,7 +21,8 @@ class ResolvedAssetStub:
         self.asset_class = asset_class
 
 
-def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch) -> None:
+@pytest.mark.asyncio
+async def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch) -> None:
     from argus.agent_runtime.extraction import structured as extraction_module
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -83,35 +89,59 @@ def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch) -> N
     )
     seen_requests: list[InterpretationRequest] = []
 
-    def interpreter(request: InterpretationRequest) -> StructuredInterpretation:
-        seen_requests.append(request)
-        return next(responses)
+    class Interpreter:
+        async def ainvoke(
+            self, request: InterpretationRequest
+        ) -> StructuredInterpretation:
+            seen_requests.append(request)
+            return next(responses)
 
-    workflow = build_workflow(structured_interpreter=interpreter)
-    manager = InMemorySessionManager()
+    workflow = build_workflow(
+        structured_interpreter=Interpreter(),
+        checkpointer=MemorySaver(),
+    )
     user = UserState(user_id="u1", language_preference="es-419")
     thread_id = "thread-spanish-context"
 
-    first = run_agent_turn(
+    first = await run_agent_turn(
         workflow=workflow,
-        session_manager=manager,
         user=user,
         thread_id=thread_id,
         message="quiero probar un backtest",
     )
-    second = run_agent_turn(
+    second = await run_agent_turn(
         workflow=workflow,
-        session_manager=manager,
         user=user,
         thread_id=thread_id,
         message="quiero probar una reversion a la media con RSI",
+        recent_thread_history=[
+            ConversationMessage(role="user", content="quiero probar un backtest"),
+            ConversationMessage(
+                role="assistant",
+                content=str(first.get("assistant_prompt") or ""),
+            ),
+        ],
     )
-    third = run_agent_turn(
+    third = await run_agent_turn(
         workflow=workflow,
-        session_manager=manager,
         user=user,
         thread_id=thread_id,
         message="Quiero GOOG, con capital de 10mil, 1 anio hacia atras desde hoy",
+        recent_thread_history=[
+            ConversationMessage(role="user", content="quiero probar un backtest"),
+            ConversationMessage(
+                role="assistant",
+                content=str(first.get("assistant_prompt") or ""),
+            ),
+            ConversationMessage(
+                role="user",
+                content="quiero probar una reversion a la media con RSI",
+            ),
+            ConversationMessage(
+                role="assistant",
+                content=str(second.get("assistant_prompt") or ""),
+            ),
+        ],
     )
 
     assert first["stage_outcome"] == "await_user_reply"

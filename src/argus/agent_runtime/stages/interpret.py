@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
@@ -46,18 +48,36 @@ def interpret_stage(
     latest_task_snapshot: TaskSnapshot | dict[str, Any] | None,
     structured_interpreter: StructuredInterpreter | None = None,
 ) -> StageResult:
+    return asyncio.run(
+        interpret_stage_async(
+            state=state,
+            user=user,
+            latest_task_snapshot=latest_task_snapshot,
+            structured_interpreter=structured_interpreter,
+        )
+    )
+
+
+async def interpret_stage_async(
+    *,
+    state: RunState,
+    user: UserState,
+    latest_task_snapshot: TaskSnapshot | dict[str, Any] | None,
+    structured_interpreter: StructuredInterpreter | None = None,
+) -> StageResult:
     capability_contract = build_default_capability_contract()
     snapshot = normalize_task_snapshot(latest_task_snapshot)
     if structured_interpreter is None:
         return _offline_interpreter_unavailable_result(user=user)
 
-    interpretation = structured_interpreter(
+    interpretation = await _call_structured_interpreter(
+        structured_interpreter,
         InterpretationRequest(
             current_user_message=state.current_user_message,
             recent_thread_history=list(state.recent_thread_history),
             latest_task_snapshot=snapshot,
             user=user,
-        )
+        ),
     )
     if interpretation is None:
         return _offline_interpreter_unavailable_result(user=user)
@@ -69,6 +89,22 @@ def interpret_stage(
         interpretation=interpretation,
         capability_contract=capability_contract,
     )
+
+
+async def _call_structured_interpreter(
+    structured_interpreter: StructuredInterpreter,
+    request: InterpretationRequest,
+) -> StructuredInterpretation | None:
+    async_invoke = getattr(structured_interpreter, "ainvoke", None)
+    if async_invoke is not None:
+        result = async_invoke(request)
+        if inspect.isawaitable(result):
+            return await result
+        return result
+    result = structured_interpreter(request)
+    if inspect.isawaitable(result):
+        return await result
+    return result
 
 
 def _stage_result_from_interpretation(

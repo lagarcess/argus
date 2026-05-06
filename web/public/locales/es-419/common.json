@@ -132,6 +132,12 @@
     "simulation_complete": "Simulación completa",
       "status": {
         "understanding": "Pensando...",
+        "interpret": "Entendiendo tu idea...",
+        "clarify": "Tengo una pregunta...",
+        "confirm": "Esto es lo que encontré...",
+        "execute": "Ejecutando backtest...",
+        "explain": "Revisando resultados...",
+        "next_step": "Qué sigue...",
         "extracting_strategy": "Extrayendo estrategia",
         "running_backtest": "Ejecutando simulación",
         "calculating_metrics": "Calculando métricas",

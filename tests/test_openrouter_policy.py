@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
@@ -9,11 +10,11 @@ from argus.agent_runtime.llm_interpreter import (
     OpenRouterStructuredInterpreter,
 )
 from argus.agent_runtime.runtime import run_agent_turn
-from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.stages.interpret import InterpretationRequest
 from argus.agent_runtime.state.models import UserState
 from argus.llm import openrouter
 from argus.llm.openrouter import log_openrouter_failure
+from langgraph.checkpoint.memory import MemorySaver
 
 
 class FakeChatOpenRouter:
@@ -51,6 +52,9 @@ class FakeStructuredModel:
             assistant_response="Argus can explain ideas and help test them.",
         )
 
+    async def ainvoke(self, _messages: list[object]) -> object:
+        return self.invoke([])
+
 
 def test_openrouter_factory_applies_task_token_budget(
     monkeypatch,
@@ -65,7 +69,12 @@ def test_openrouter_factory_applies_task_token_budget(
 
     assert model is not None
     assert FakeChatOpenRouter.calls == [
-        {"model": "test/model", "temperature": 0, "max_tokens": 1200}
+        {
+            "model_name": "test/model",
+            "temperature": 0,
+            "max_tokens": 1200,
+            "openrouter_api_key": "test-key",
+        }
     ]
 
 
@@ -99,9 +108,10 @@ def test_structured_interpreter_uses_bounded_interpretation_profile(
     assert result is not None
     assert interpreter.last_status == "used"
     assert FakeChatOpenRouter.calls[0] == {
-        "model": "custom/model",
+        "model_name": "custom/model",
         "temperature": 0,
         "max_tokens": 1200,
+        "openrouter_api_key": "test-key",
     }
 
 
@@ -120,7 +130,8 @@ def test_result_breakdown_uses_bounded_profile(monkeypatch) -> None:
     assert FakeChatOpenRouter.calls[0]["max_tokens"] == 2400
 
 
-def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_composer(
+@pytest.mark.asyncio
+async def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_composer(
     monkeypatch,
 ) -> None:
     FakeChatOpenRouter.calls.clear()
@@ -139,11 +150,11 @@ def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_composer(
         structured_interpreter=OpenRouterStructuredInterpreter(
             contract=contract,
             model_name="custom/model",
-        )
+        ),
+        checkpointer=MemorySaver(),
     )
-    result = run_agent_turn(
+    result = await run_agent_turn(
         workflow=workflow,
-        session_manager=InMemorySessionManager(),
         user=UserState(user_id="u1"),
         thread_id="thread-policy",
         message="what can you do?",
@@ -153,7 +164,12 @@ def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_composer(
         "Argus can help shape and test investing ideas."
     )
     assert FakeChatOpenRouter.calls == [
-        {"model": "custom/model", "temperature": 0, "max_tokens": 1200}
+        {
+            "model_name": "custom/model",
+            "temperature": 0,
+            "max_tokens": 1200,
+            "openrouter_api_key": "test-key",
+        }
     ]
 
 

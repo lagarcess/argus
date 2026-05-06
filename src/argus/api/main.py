@@ -5,6 +5,7 @@ import binascii
 import json
 import os
 from collections.abc import Iterable
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Any
 
@@ -12,6 +13,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from langgraph.checkpoint.memory import MemorySaver
 from loguru import logger
 from pydantic import BaseModel
 
@@ -19,9 +21,8 @@ from argus.agent_runtime.capabilities.contract import build_default_capability_c
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
-from argus.agent_runtime.runtime import run_agent_turn
-from argus.agent_runtime.session.manager import InMemorySessionManager
-from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
+from argus.agent_runtime.state.models import ConversationMessage, UserState
 from argus.agent_runtime.strategy_contract import (
     display_strategy_slug,
     display_strategy_type,
@@ -84,8 +85,52 @@ from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
 
 load_dotenv()
+PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
+agent_runtime_capability_contract = build_default_capability_contract()
 
-app = FastAPI(title="Argus Alpha API", version="1.0.0-alpha")
+
+def _build_agent_runtime_workflow(*, checkpointer: Any):
+    return build_workflow(
+        contract=agent_runtime_capability_contract,
+        tool=RealBacktestTool(),
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=agent_runtime_capability_contract,
+        ),
+        clarification_generator=OpenRouterClarificationGenerator(),
+        checkpointer=checkpointer,
+    )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    checkpointer_cm = None
+    if PERSISTENCE_MODE == "supabase":
+        database_url = os.getenv("DATABASE_URL", "").strip()
+        if not database_url:
+            raise RuntimeError(
+                "DATABASE_URL is required when ARGUS_PERSISTENCE_MODE=supabase."
+            )
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+        checkpointer_cm = AsyncPostgresSaver.from_conn_string(database_url)
+        checkpointer = await checkpointer_cm.__aenter__()
+        await checkpointer.setup()
+    else:
+        checkpointer = MemorySaver()
+
+    app.state.agent_runtime_checkpointer = checkpointer
+    app.state.agent_runtime_checkpointer_cm = checkpointer_cm
+    app.state.agent_runtime_workflow = _build_agent_runtime_workflow(
+        checkpointer=checkpointer
+    )
+    try:
+        yield
+    finally:
+        if checkpointer_cm is not None:
+            await checkpointer_cm.__aexit__(None, None, None)
+
+
+app = FastAPI(title="Argus Alpha API", version="1.0.0-alpha", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -99,24 +144,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 store = AlphaStore()
-PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
-agent_runtime_session_manager = InMemorySessionManager()
-agent_runtime_capability_contract = build_default_capability_contract()
-agent_runtime_workflow = build_workflow(
-    contract=agent_runtime_capability_contract,
-    tool=RealBacktestTool(),
-    structured_interpreter=OpenRouterStructuredInterpreter(
-        contract=agent_runtime_capability_contract,
-    ),
-    clarification_generator=OpenRouterClarificationGenerator(),
-)
 
 
 class InternalAgentRuntimeTurnRequest(BaseModel):
     user_id: str
     thread_id: str
     message: str
+
+
+def _get_agent_runtime_workflow(request: Request | None = None):
+    target_app = request.app if request is not None else app
+    workflow = getattr(target_app.state, "agent_runtime_workflow", None)
+    if workflow is None:
+        checkpointer = MemorySaver()
+        target_app.state.agent_runtime_checkpointer = checkpointer
+        workflow = _build_agent_runtime_workflow(checkpointer=checkpointer)
+        target_app.state.agent_runtime_workflow = workflow
+    return workflow
 
 
 SUPPORTED_ONBOARDING_GOALS = {
@@ -832,7 +877,12 @@ def current_user(request: Request) -> User:
 @app.post("/api/v1/dev/reset", response_model=SuccessResponse)
 def dev_reset() -> SuccessResponse:
     store.reset()
-    agent_runtime_session_manager._threads.clear()
+    if PERSISTENCE_MODE != "supabase":
+        checkpointer = MemorySaver()
+        app.state.agent_runtime_checkpointer = checkpointer
+        app.state.agent_runtime_workflow = _build_agent_runtime_workflow(
+            checkpointer=checkpointer
+        )
     store.get_or_create_dev_user()
     return SuccessResponse(success=True)
 
@@ -843,12 +893,11 @@ def health() -> dict[str, str]:
 
 
 @app.post("/internal/agent-runtime/turn")
-def internal_agent_runtime_turn(
+async def internal_agent_runtime_turn(
     payload: InternalAgentRuntimeTurnRequest,
 ) -> dict[str, Any]:
-    return run_agent_turn(
-        workflow=agent_runtime_workflow,
-        session_manager=agent_runtime_session_manager,
+    return await run_agent_turn(
+        workflow=_get_agent_runtime_workflow(),
         user=UserState(user_id=payload.user_id),
         thread_id=payload.thread_id,
         message=payload.message,
@@ -2418,6 +2467,48 @@ def sse(event: str, payload: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
+def sse_data(payload: dict[str, Any]) -> str:
+    return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
+
+
+def sse_done() -> str:
+    return "data: [DONE]\n\n"
+
+
+def _load_runtime_thread_history(
+    *,
+    user_id: str,
+    conversation_id: str,
+    limit: int = 12,
+) -> list[ConversationMessage]:
+    messages: list[Message] = []
+    if supabase_gateway is not None:
+        try:
+            messages = supabase_gateway.list_messages(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                limit=limit,
+            )
+        except Exception as exc:
+            if not _dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase message history read failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    if not messages:
+        messages = list(store.messages.get(conversation_id, []))[-limit:]
+    history: list[ConversationMessage] = []
+    for message in messages:
+        if message.role not in {"user", "assistant", "system", "tool"}:
+            continue
+        history.append(
+            ConversationMessage(role=message.role, content=message.content)
+        )
+    return history
+
+
 def _count_completed_runs_for_user(user_id: str) -> int:
     if supabase_gateway is not None:
         try:
@@ -2695,7 +2786,7 @@ def _result_breakdown_message(run: BacktestRun | None) -> str:
 
 
 @app.post("/api/v1/chat/stream")
-def chat_stream(
+async def chat_stream(
     payload: ChatStreamRequest,
     request: Request,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
@@ -2767,6 +2858,10 @@ def chat_stream(
             title="Not Found",
             detail="Conversation not found.",
         )
+    recent_thread_history = _load_runtime_thread_history(
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
     if onboarding_goal is None:
         _create_message(
             user_id=user.id,
@@ -2780,7 +2875,7 @@ def chat_stream(
         "primary_goal_selection",
     }
 
-    def events() -> Iterable[str]:
+    async def events() -> Iterable[str]:
         if onboarding_required and onboarding_goal is None:
             lang = (
                 payload.language
@@ -2915,116 +3010,131 @@ def chat_stream(
             yield sse("done", {"message_id": assistant_message.id})
             return
 
+        runtime_user = UserState(
+            user_id=user.id,
+            display_name=current_user_profile.display_name,
+            language_preference=(
+                payload.language
+                or conversation.language
+                or current_user_profile.language
+                or "en"
+            ),
+        )
+        streamed_text_parts: list[str] = []
+
         try:
-            runtime_result = run_agent_turn(
-                workflow=agent_runtime_workflow,
-                session_manager=agent_runtime_session_manager,
-                user=UserState(
-                    user_id=user.id,
-                    display_name=current_user_profile.display_name,
-                    language_preference=(
-                        payload.language
-                        or conversation.language
-                        or current_user_profile.language
-                        or "en"
-                    ),
-                ),
+            async for runtime_event in stream_agent_turn_events(
+                workflow=_get_agent_runtime_workflow(request),
+                user=runtime_user,
                 thread_id=conversation.id,
                 message=request_message,
-            )
-        except Exception as exc:
+                recent_thread_history=recent_thread_history,
+            ):
+                event_type = runtime_event.get("type")
+                if event_type == "token":
+                    content = str(runtime_event.get("content") or "")
+                    if content:
+                        streamed_text_parts.append(content)
+                    yield sse_data(runtime_event)
+                    continue
+                if event_type in {"stage_start", "stage_outcome"}:
+                    yield sse_data(runtime_event)
+                    continue
+                if event_type != "final":
+                    continue
+
+                runtime_result = dict(runtime_event.get("payload") or {})
+                stage_status = _runtime_stage_status(runtime_result)
+                assistant_text = _runtime_result_message(runtime_result)
+                confirmation_card = _runtime_confirmation_card(runtime_result)
+                if confirmation_card is not None:
+                    assistant_text = str(confirmation_card["summary"])
+                result_card = _runtime_result_card(runtime_result)
+                envelope = _runtime_result_envelope(runtime_result)
+                run = None
+
+                if result_card is not None:
+                    run = _persist_runtime_backtest_run(
+                        user=user,
+                        conversation=conversation,
+                        result_card=result_card,
+                        envelope=envelope,
+                    )
+                    _persist_onboarding_update(
+                        current_user_profile,
+                        {
+                            "stage": "completed",
+                            "completed": True,
+                            "language_confirmed": True,
+                            "primary_goal": current_user_profile.onboarding.primary_goal
+                            or "surprise_me",
+                        },
+                    )
+
+                metadata: dict[str, Any] = {
+                    "conversation_mode": (
+                        "result_review"
+                        if result_card is not None
+                        else "confirm"
+                        if stage_status == "await_approval"
+                        else "setup"
+                        if stage_status == "await_user_reply"
+                        else "guide"
+                    ),
+                    "agent_runtime_stage_outcome": stage_status,
+                }
+                if confirmation_card is not None:
+                    metadata["confirmation_card"] = confirmation_card
+                    runtime_result["confirmation"] = confirmation_card
+                if result_card is not None:
+                    metadata["result_card"] = result_card
+                if run is not None:
+                    metadata["latest_run_id"] = run.id
+                    metadata["result_run_id"] = run.id
+                    metadata["result_strategy_id"] = run.strategy_id
+                    runtime_result["run"] = run.model_dump(mode="json")
+
+                persisted_text = assistant_text or "".join(streamed_text_parts).strip()
+                assistant_message = None
+                if persisted_text:
+                    assistant_message = _create_message(
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                        role="assistant",
+                        content=persisted_text,
+                        metadata=metadata,
+                    )
+
+                runtime_result["message_id"] = (
+                    assistant_message.id if assistant_message is not None else None
+                )
+                if (
+                    not streamed_text_parts
+                    and confirmation_card is None
+                    and run is None
+                    and assistant_text
+                ):
+                    yield sse_data({"type": "token", "content": assistant_text})
+                yield sse_data({"type": "final", "payload": runtime_result})
+                yield sse_done()
+                return
+        except Exception:
             logger.exception(
-                "Agent runtime chat cutover failed",
+                "Agent runtime chat streaming failed",
                 conversation_id=conversation.id,
             )
-            yield sse(
-                "error",
+            yield sse_data(
                 {
-                    "code": "internal_error",
-                    "detail": f"Chat runtime failed: {str(exc)}",
-                },
+                    "type": "error",
+                    "code": "agent_runtime_failure",
+                    "message": (
+                        "Something went wrong. Your conversation is saved. "
+                        "Please try again."
+                    ),
+                }
             )
-            yield sse("done", {"error": True})
+            yield sse_done()
             return
-
-        stage_status = _runtime_stage_status(runtime_result)
-        yield sse("status", {"status": stage_status})
-
-        assistant_text = _runtime_result_message(runtime_result)
-        confirmation_card = _runtime_confirmation_card(runtime_result)
-        if confirmation_card is not None:
-            assistant_text = str(confirmation_card["summary"])
-        result_card = _runtime_result_card(runtime_result)
-        envelope = _runtime_result_envelope(runtime_result)
-        run = None
-
-        if result_card is not None:
-            run = _persist_runtime_backtest_run(
-                user=user,
-                conversation=conversation,
-                result_card=result_card,
-                envelope=envelope,
-            )
-            _persist_onboarding_update(
-                current_user_profile,
-                {
-                    "stage": "completed",
-                    "completed": True,
-                    "language_confirmed": True,
-                    "primary_goal": current_user_profile.onboarding.primary_goal
-                    or "surprise_me",
-                },
-            )
-
-        metadata: dict[str, Any] = {
-            "conversation_mode": (
-                "result_review"
-                if result_card is not None
-                else "confirm"
-                if stage_status == "await_approval"
-                else "setup"
-                if stage_status == "await_user_reply"
-                else "guide"
-            ),
-            "agent_runtime_stage_outcome": stage_status,
-        }
-        if confirmation_card is not None:
-            metadata["confirmation_card"] = confirmation_card
-        if result_card is not None:
-            metadata["result_card"] = result_card
-        if run is not None:
-            metadata["latest_run_id"] = run.id
-            metadata["result_run_id"] = run.id
-            metadata["result_strategy_id"] = run.strategy_id
-
-        assistant_message = None
-        if assistant_text is not None:
-            assistant_message = _create_message(
-                user_id=user.id,
-                conversation_id=conversation.id,
-                role="assistant",
-                content=assistant_text,
-                metadata=metadata,
-            )
-            if confirmation_card is None and result_card is None:
-                yield sse("token", {"text": assistant_text})
-
-        if confirmation_card is not None:
-            yield sse("confirmation", {"confirmation": confirmation_card})
-
-        if run is not None:
-            yield sse("result", {"run": run.model_dump(mode="json")})
-            if assistant_text:
-                yield sse("token", {"text": assistant_text})
-
-        yield sse(
-            "done",
-            {
-                "message_id": assistant_message.id
-                if assistant_message is not None
-                else None
-            },
-        )
 
     return StreamingResponse(
         events(),

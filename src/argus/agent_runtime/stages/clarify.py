@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
@@ -16,8 +18,27 @@ OFFLINE_CLARIFICATION_FALLBACK = (
 class StructuredClarificationGenerator(Protocol):
     def __call__(self, request: ClarificationRequest) -> str | None: ...
 
+    async def ainvoke(self, request: ClarificationRequest) -> str | None: ...
+
 
 def clarify_stage(
+    *,
+    state: RunState,
+    contract: CapabilityContract,
+    clarification_generator: StructuredClarificationGenerator | None = None,
+    language: str = "en",
+) -> StageResult:
+    return asyncio.run(
+        clarify_stage_async(
+            state=state,
+            contract=contract,
+            clarification_generator=clarification_generator,
+            language=language,
+        )
+    )
+
+
+async def clarify_stage_async(
     *,
     state: RunState,
     contract: CapabilityContract,
@@ -49,7 +70,7 @@ def clarify_stage(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -77,7 +98,7 @@ def clarify_stage(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=requested_fields,
@@ -103,7 +124,7 @@ def clarify_stage(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=requested_fields,
@@ -124,7 +145,7 @@ def clarify_stage(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -144,7 +165,7 @@ def clarify_stage(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -168,7 +189,7 @@ def clarify_stage(
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": _generate_clarifying_question(
+                "assistant_prompt": await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -193,7 +214,7 @@ def clarify_stage(
     )
 
 
-def _generate_clarifying_question(
+async def _generate_clarifying_question(
     *,
     state: RunState,
     response_intent: dict[str, object],
@@ -206,19 +227,24 @@ def _generate_clarifying_question(
 ) -> str:
     if clarification_generator is None:
         return OFFLINE_CLARIFICATION_FALLBACK
-    question = clarification_generator(
-        ClarificationRequest(
-            current_user_message=state.current_user_message,
-            recent_thread_history=state.recent_thread_history,
-            candidate_strategy_draft=state.candidate_strategy_draft,
-            missing_required_fields=missing_required_fields,
-            ambiguous_fields=ambiguous_fields,
-            unsupported_constraints=unsupported_constraints,
-            optional_parameter_choices=optional_parameter_choices,
-            response_intent=response_intent,
-            language=language,
-        )
+    request = ClarificationRequest(
+        current_user_message=state.current_user_message,
+        recent_thread_history=state.recent_thread_history,
+        candidate_strategy_draft=state.candidate_strategy_draft,
+        missing_required_fields=missing_required_fields,
+        ambiguous_fields=ambiguous_fields,
+        unsupported_constraints=unsupported_constraints,
+        optional_parameter_choices=optional_parameter_choices,
+        response_intent=response_intent,
+        language=language,
     )
+    async_invoke = getattr(clarification_generator, "ainvoke", None)
+    if async_invoke is not None:
+        result = async_invoke(request)
+        question = await result if inspect.isawaitable(result) else result
+    else:
+        result = clarification_generator(request)
+        question = await result if inspect.isawaitable(result) else result
     return question or OFFLINE_CLARIFICATION_FALLBACK
 
 

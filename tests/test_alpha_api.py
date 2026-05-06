@@ -145,6 +145,20 @@ def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
     )
 
 
+async def _runtime_success_for_message_async(**kwargs: Any) -> dict[str, Any]:
+    return _runtime_success_for_message(**kwargs)
+
+
+async def _runtime_success_events(**kwargs: Any):
+    result = _runtime_success_for_message(**kwargs)
+    assistant_response = str(result.get("assistant_response") or "")
+    yield {"type": "stage_start", "stage": "interpret"}
+    yield {"type": "stage_outcome", "outcome": str(result["stage_outcome"])}
+    if assistant_response:
+        yield {"type": "token", "content": assistant_response}
+    yield {"type": "final", "payload": result}
+
+
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
@@ -184,7 +198,8 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         raising=False,
     )
-    monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message)
+    monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message_async)
+    monkeypatch.setattr(api_main, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
     monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
@@ -514,17 +529,20 @@ def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
 
     assert response.status_code == 200
     stream = response.text
-    assert "event: status" in stream
-    assert '"status":"ready_to_respond"' in stream
-    assert "event: result" in stream
-    assert "event: done" in stream
+    assert '"type":"stage_start","stage":"interpret"' in stream
+    assert '"type":"stage_outcome","outcome":"ready_to_respond"' in stream
+    assert '"type":"token"' in stream
+    assert '"type":"final"' in stream
+    assert "data: [DONE]" in stream
 
     result_line = next(
         line.removeprefix("data: ")
         for line in stream.splitlines()
         if line.startswith("data: {") and '"run"' in line
     )
-    assert json.loads(result_line)["run"]["conversation_result_card"]["status_label"]
+    assert json.loads(result_line)["payload"]["run"]["conversation_result_card"][
+        "status_label"
+    ]
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert [message["role"] for message in messages.json()["items"]] == [
@@ -549,7 +567,7 @@ def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
-    assert "event: token" in response.text
+    assert '"type":"token"' in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
@@ -573,7 +591,7 @@ def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
-    assert "event: token" in response.text
+    assert '"type":"token"' in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
@@ -598,7 +616,7 @@ def test_chat_stream_prompts_for_onboarding_before_first_run() -> None:
     assert response.status_code == 200
     stream = response.text
     assert "event: token" in stream
-    assert "event: result" not in stream
+    assert '"type":"final"' not in stream
     assert "primary goal" in stream
 
 
@@ -644,7 +662,8 @@ def test_first_successful_backtest_transitions_onboarding_to_completed() -> None
     )
 
     assert response.status_code == 200
-    assert "event: result" in response.text
+    assert '"type":"final"' in response.text
+    assert '"run"' in response.text
 
     me = client.get("/api/v1/me")
     onboarding = me.json()["user"]["onboarding"]
@@ -780,14 +799,21 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
         lambda **kwargs: None,
         raising=False,
     )
+
+    async def _missing_symbol_events(**_: Any):
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_prompt": "Which symbols do you want to test?",
+                "final_response_payload": {"error": "missing_required_input"},
+            },
+        }
+
     monkeypatch.setattr(
         api_main,
-        "run_agent_turn",
-        lambda **kwargs: {
-            "stage_outcome": "await_user_reply",
-            "assistant_prompt": "Which symbols do you want to test?",
-            "final_response_payload": {"error": "missing_required_input"},
-        },
+        "stream_agent_turn_events",
+        _missing_symbol_events,
     )
 
     response = client.post(
@@ -802,7 +828,7 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
     assert response.status_code == 200
     assert "Which symbols do you want to test?" in response.text
     assert "running_backtest" not in response.text
-    assert "event: result" not in response.text
+    assert '"run"' not in response.text
 
 
 def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None:
@@ -818,11 +844,12 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
         lambda **kwargs: None,
         raising=False,
     )
-    monkeypatch.setattr(
-        api_main,
-        "run_agent_turn",
-        lambda **kwargs: _runtime_success_result(symbol="BTC", timeframe="1h"),
-    )
+
+    async def _btc_1h_events(**_: Any):
+        result = _runtime_success_result(symbol="BTC", timeframe="1h")
+        yield {"type": "final", "payload": result}
+
+    monkeypatch.setattr(api_main, "stream_agent_turn_events", _btc_1h_events)
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -861,11 +888,15 @@ def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
 
     captured_runtime: dict[str, Any] = {}
 
-    def _fake_run_agent_turn(**kwargs: Any) -> dict[str, Any]:
+    async def _fake_stream_agent_turn_events(**kwargs: Any):
         captured_runtime.update(kwargs)
-        return _runtime_success_result(symbol="AAPL", assistant_response="ok")
+        yield {"type": "final", "payload": _runtime_success_result(symbol="AAPL", assistant_response="ok")}
 
-    monkeypatch.setattr(api_main, "run_agent_turn", _fake_run_agent_turn)
+    monkeypatch.setattr(
+        api_main,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
 
     response = client.post(
         "/api/v1/chat/stream",

@@ -185,10 +185,24 @@ export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
+  | { event: "stage_start"; data: { stage: string } }
+  | { event: "stage_outcome"; data: { outcome: string } }
+  | { event: "final"; data: ChatFinalPayload }
   | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
   | { event: "error"; data: { code?: string; detail: string } }
-  | { event: "done"; data: { message_id: string } };
+  | { event: "done"; data: { message_id: string | null } };
+
+export type ChatFinalPayload = {
+  stage_outcome?: string;
+  assistant_response?: string | null;
+  assistant_prompt?: string | null;
+  confirmation?: StrategyConfirmationPayload | null;
+  confirmation_payload?: Record<string, unknown> | null;
+  run?: BacktestRun | null;
+  next_actions?: string[];
+  message_id?: string | null;
+};
 
 export type ChatActionRequest = {
   type: NonNullable<ChatActionOption["type"]>;
@@ -620,19 +634,69 @@ export async function streamChatMessage(
     const parts = buffer.split("\n\n");
     buffer = parts.pop() ?? "";
     for (const part of parts) {
-      const eventLine = part
-        .split("\n")
-        .find((line) => line.startsWith("event: "));
-      const dataLine = part
-        .split("\n")
-        .find((line) => line.startsWith("data: "));
-      if (!eventLine || !dataLine) continue;
-      onEvent({
-        event: eventLine.replace("event: ", "") as ChatStreamEvent["event"],
-        data: JSON.parse(dataLine.replace("data: ", "")),
-      } as ChatStreamEvent);
+      const parsed = parseChatStreamFrame(part);
+      if (parsed) onEvent(parsed);
     }
   }
+}
+
+export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
+  const lines = part.split("\n");
+  const eventLine = lines.find((line) => line.startsWith("event: "));
+  const dataLine = lines.find((line) => line.startsWith("data: "));
+  if (!dataLine) return null;
+
+  const raw = dataLine.replace("data: ", "").trim();
+  if (raw === "[DONE]") {
+    return { event: "done", data: { message_id: null } };
+  }
+
+  const payload = JSON.parse(raw) as Record<string, unknown>;
+  if (eventLine) {
+    return {
+      event: eventLine.replace("event: ", "") as ChatStreamEvent["event"],
+      data: payload,
+    } as ChatStreamEvent;
+  }
+
+  const type = payload.type;
+  if (type === "stage_start") {
+    return { event: "stage_start", data: { stage: String(payload.stage ?? "") } };
+  }
+  if (type === "stage_outcome") {
+    return {
+      event: "stage_outcome",
+      data: { outcome: String(payload.outcome ?? "") },
+    };
+  }
+  if (type === "token") {
+    return {
+      event: "token",
+      data: { text: String(payload.content ?? payload.text ?? "") },
+    };
+  }
+  if (type === "final") {
+    return { event: "final", data: (payload.payload ?? {}) as ChatFinalPayload };
+  }
+  if (type === "title") {
+    return {
+      event: "title",
+      data: {
+        conversation_id: String(payload.conversation_id ?? ""),
+        title: String(payload.title ?? ""),
+      },
+    };
+  }
+  if (type === "error") {
+    return {
+      event: "error",
+      data: {
+        code: typeof payload.code === "string" ? payload.code : undefined,
+        detail: String(payload.message ?? payload.detail ?? "Chat stream failed"),
+      },
+    };
+  }
+  return null;
 }
 
 export async function searchDiscovery(
