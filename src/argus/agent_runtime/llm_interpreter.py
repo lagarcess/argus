@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import re
 from typing import Any, Literal
 
@@ -125,7 +124,7 @@ class OpenRouterStructuredInterpreter:
         Executes the interpretation turn.
         """
         messages = self._messages(request)
-        
+
         # 1. Try Primary Model
         model = build_openrouter_model("interpretation", model_name=self.model_name)
         if model:
@@ -146,7 +145,7 @@ class OpenRouterStructuredInterpreter:
         # 2. Try Fallback Model (if primary failed or was unavailable)
         from argus.llm.openrouter import resolve_openrouter_model
         fallback_model_name = resolve_openrouter_model(fallback=True)
-        
+
         # Don't retry with the same model name if resolve returned the same thing
         primary_model_name = resolve_openrouter_model(self.model_name)
         if fallback_model_name == primary_model_name:
@@ -169,7 +168,7 @@ class OpenRouterStructuredInterpreter:
                     exc=exc,
                     message="Fallback LLM interpretation failed",
                 )
-        
+
         return None
 
     def _messages(self, request: InterpretationRequest) -> list[dict[str, str]]:

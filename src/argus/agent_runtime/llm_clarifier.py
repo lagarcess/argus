@@ -37,7 +37,7 @@ class OpenRouterClarificationGenerator:
         Executes the clarification turn.
         """
         messages = self._messages(request)
-        
+
         model = build_openrouter_model("clarification", model_name=self.model_name)
         if model:
             try:
@@ -56,7 +56,7 @@ class OpenRouterClarificationGenerator:
 
         from argus.llm.openrouter import resolve_openrouter_model
         fallback_model_name = resolve_openrouter_model(fallback=True)
-        
+
         primary_model_name = resolve_openrouter_model(model_name=self.model_name)
         if fallback_model_name == primary_model_name:
             self.last_status = "failed"
@@ -78,7 +78,7 @@ class OpenRouterClarificationGenerator:
                     exc=exc,
                     message="Fallback LLM clarification failed",
                 )
-        
+
         return None
 
     def _messages(self, request: ClarificationRequest) -> list[dict[str, str]]:
