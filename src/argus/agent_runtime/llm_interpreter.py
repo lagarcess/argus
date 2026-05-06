@@ -117,35 +117,60 @@ class OpenRouterStructuredInterpreter:
         model_name: str | None = None,
     ) -> None:
         self.contract = contract
-        self.model_name = (
-            model_name or os.getenv("AGENT_MODEL") or ("google/gemini-2.0-flash-001")
-        )
+        self.model_name = model_name
         self.last_status: str | None = None
 
     def __call__(self, request: InterpretationRequest) -> StructuredInterpretation | None:
+        """
+        Executes the interpretation turn.
+        """
+        messages = self._messages(request)
+        
+        # 1. Try Primary Model
         model = build_openrouter_model("interpretation", model_name=self.model_name)
-        if model is None:
-            self.last_status = "missing_api_key"
-            return None
+        if model:
+            try:
+                structured = model.with_structured_output(LLMInterpretationResponse)
+                response = structured.invoke(messages)
+                if isinstance(response, LLMInterpretationResponse):
+                    self.last_status = "used"
+                    return self._to_runtime_interpretation(response, request=request)
+            except Exception as exc:
+                log_openrouter_failure(
+                    task="interpretation",
+                    model_name=self.model_name,
+                    exc=exc,
+                    message="Primary LLM interpretation failed; attempting fallback",
+                )
 
-        try:
-            structured = model.with_structured_output(LLMInterpretationResponse)
-            response = structured.invoke(self._messages(request))
-        except Exception as exc:
+        # 2. Try Fallback Model (if primary failed or was unavailable)
+        from argus.llm.openrouter import resolve_openrouter_model
+        fallback_model_name = resolve_openrouter_model(fallback=True)
+        
+        # Don't retry with the same model name if resolve returned the same thing
+        primary_model_name = resolve_openrouter_model(self.model_name)
+        if fallback_model_name == primary_model_name:
             self.last_status = "failed"
-            log_openrouter_failure(
-                task="interpretation",
-                model_name=self.model_name,
-                exc=exc,
-                message="LLM interpretation failed; falling back",
-            )
             return None
 
-        if not isinstance(response, LLMInterpretationResponse):
-            self.last_status = "invalid_response"
-            return None
-        self.last_status = "used"
-        return self._to_runtime_interpretation(response, request=request)
+        fallback_model = build_openrouter_model("interpretation", model_name=fallback_model_name)
+        if fallback_model:
+            try:
+                structured = fallback_model.with_structured_output(LLMInterpretationResponse)
+                response = structured.invoke(messages)
+                if isinstance(response, LLMInterpretationResponse):
+                    self.last_status = "fallback_used"
+                    return self._to_runtime_interpretation(response, request=request)
+            except Exception as exc:
+                self.last_status = "failed"
+                log_openrouter_failure(
+                    task="interpretation",
+                    model_name=fallback_model_name,
+                    exc=exc,
+                    message="Fallback LLM interpretation failed",
+                )
+        
+        return None
 
     def _messages(self, request: InterpretationRequest) -> list[dict[str, str]]:
         prior_strategy = None

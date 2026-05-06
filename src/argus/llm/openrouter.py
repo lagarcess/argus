@@ -9,13 +9,13 @@ from loguru import logger
 
 OpenRouterTask = Literal[
     "interpretation",
+    "clarification",
     "chat_composer",
     "result_summary",
     "result_breakdown",
     "name_suggestion",
 ]
 
-DEFAULT_MODEL = "google/gemini-2.0-flash-001"
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,7 @@ class OpenRouterProfile:
 
 OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "interpretation": OpenRouterProfile("interpretation", temperature=0, max_tokens=1200),
+    "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=1200),
     "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
     "result_summary": OpenRouterProfile(
         "result_summary", temperature=0.2, max_tokens=1600
@@ -40,8 +41,17 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
 }
 
 
-def resolve_openrouter_model(model_name: str | None = None) -> str:
-    return model_name or os.getenv("AGENT_MODEL") or DEFAULT_MODEL
+def resolve_openrouter_model(model_name: str | None = None, fallback: bool = False) -> str:
+    """
+    Resolves the model name to use, preferring AGENT_MODEL or AGENT_FALLBACK_MODEL.
+    """
+    if model_name:
+        return model_name
+
+    if fallback:
+        return os.getenv("AGENT_FALLBACK_MODEL", "").strip()
+
+    return os.getenv("AGENT_MODEL", "").strip()
 
 
 def build_openrouter_model(
@@ -49,15 +59,25 @@ def build_openrouter_model(
     *,
     model_name: str | None = None,
 ) -> ChatOpenRouter | None:
-    if not os.getenv("OPENROUTER_API_KEY"):
+    """
+    Builds a ChatOpenRouter instance for the given task.
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         return None
 
     profile = OPENROUTER_PROFILES[task]
+    resolved_model = resolve_openrouter_model(model_name)
+    if not resolved_model:
+        logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
+        return None
+
     return ChatOpenRouter(
-        model=resolve_openrouter_model(model_name),
+        model_name=resolved_model,
         temperature=profile.temperature,
         max_tokens=profile.max_tokens,
+        openrouter_api_key=api_key,
     )
 
 

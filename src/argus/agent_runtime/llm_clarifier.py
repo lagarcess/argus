@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -30,33 +29,57 @@ class OpenRouterClarificationGenerator:
     request_model = ClarificationRequest
 
     def __init__(self, *, model_name: str | None = None) -> None:
-        self.model_name = (
-            model_name or os.getenv("AGENT_MODEL") or "google/gemini-2.0-flash-001"
-        )
+        self.model_name = model_name
         self.last_status: str | None = None
 
     def __call__(self, request: ClarificationRequest) -> str | None:
+        """
+        Executes the clarification turn.
+        """
+        messages = self._messages(request)
+        
         model = build_openrouter_model("clarification", model_name=self.model_name)
-        if model is None:
-            self.last_status = "missing_api_key"
-            return None
-        try:
-            structured = model.with_structured_output(ClarificationResponse)
-            response = structured.invoke(self._messages(request))
-        except Exception as exc:
+        if model:
+            try:
+                structured = model.with_structured_output(ClarificationResponse)
+                response = structured.invoke(messages)
+                if isinstance(response, ClarificationResponse):
+                    self.last_status = "used"
+                    return response.question.strip() or None
+            except Exception as exc:
+                log_openrouter_failure(
+                    task="clarification",
+                    model_name=self.model_name,
+                    exc=exc,
+                    message="Primary LLM clarification failed; attempting fallback",
+                )
+
+        from argus.llm.openrouter import resolve_openrouter_model
+        fallback_model_name = resolve_openrouter_model(fallback=True)
+        
+        primary_model_name = resolve_openrouter_model(model_name=self.model_name)
+        if fallback_model_name == primary_model_name:
             self.last_status = "failed"
-            log_openrouter_failure(
-                task="clarification",
-                model_name=self.model_name,
-                exc=exc,
-                message="LLM clarification failed",
-            )
             return None
-        if not isinstance(response, ClarificationResponse):
-            self.last_status = "invalid_response"
-            return None
-        self.last_status = "used"
-        return response.question.strip() or None
+
+        fallback_model = build_openrouter_model("clarification", model_name=fallback_model_name)
+        if fallback_model:
+            try:
+                structured = fallback_model.with_structured_output(ClarificationResponse)
+                response = structured.invoke(messages)
+                if isinstance(response, ClarificationResponse):
+                    self.last_status = "fallback_used"
+                    return response.question.strip() or None
+            except Exception as exc:
+                self.last_status = "failed"
+                log_openrouter_failure(
+                    task="clarification",
+                    model_name=fallback_model_name,
+                    exc=exc,
+                    message="Fallback LLM clarification failed",
+                )
+        
+        return None
 
     def _messages(self, request: ClarificationRequest) -> list[dict[str, str]]:
         history = [
