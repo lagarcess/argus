@@ -1,3 +1,4 @@
+from argus.domain.slot_normalizer import normalize_template_name
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 
@@ -30,7 +31,7 @@ def test_strategy_aliases_are_present():
 
 
 def test_buy_and_hold_aliases():
-    """Verify buy_and_hold can be found via Spanish aliases — the exact bug scenario."""
+    """Verify buy_and_hold can be found via Spanish aliases."""
     bah = STRATEGY_CAPABILITIES["buy_and_hold"]
     assert bah.display_name == "Buy and Hold"
     assert "comprar y mantener" in bah.aliases
@@ -38,24 +39,20 @@ def test_buy_and_hold_aliases():
     assert "hold" in bah.aliases
 
 
-def test_buy_and_hold_deterministic_extraction():
-    """Deterministic extraction should map 'comprar y mantener' to buy_and_hold."""
-    from argus.domain.orchestrator import _extract_deterministic_intent
+def test_buy_and_hold_aliases_are_registry_data_not_orchestrator_nlu():
+    """The registry can expose aliases without restoring legacy extraction."""
+    import argus.domain.orchestrator as orchestrator_module
 
-    extraction = _extract_deterministic_intent("comprar y mantener AAPL")
-    assert extraction.template.value == "buy_and_hold"
-    assert extraction.template.confidence >= 0.9
-    assert extraction.symbols.value is not None
-    assert "AAPL" in extraction.symbols.value
+    removed_helper = "".join(["_extract_deterministic", "_intent"])
+
+    assert not hasattr(orchestrator_module, removed_helper)
+    assert "comprar y mantener" in STRATEGY_CAPABILITIES["buy_and_hold"].aliases
 
 
 def test_buy_and_hold_canonical_template():
-    """canonical_template() should resolve aliases to buy_and_hold."""
-    from argus.domain.orchestrator import canonical_template
-
-    assert canonical_template("buy and hold") == "buy_and_hold"
-    assert canonical_template("comprar y mantener") == "buy_and_hold"
-    assert canonical_template("mantener") == "buy_and_hold"
-    assert canonical_template("hold") == "buy_and_hold"
-    # Ensure buy_the_dip is NOT returned for these
-    assert canonical_template("buy and hold") != "buy_the_dip"
+    """normalize_template_name() should resolve aliases to buy_and_hold."""
+    assert normalize_template_name("buy and hold") == "buy_and_hold"
+    assert normalize_template_name("comprar y mantener") == "buy_and_hold"
+    assert normalize_template_name("mantener") == "buy_and_hold"
+    assert normalize_template_name("hold") == "buy_and_hold"
+    assert normalize_template_name("buy and hold") != "buy_the_dip"

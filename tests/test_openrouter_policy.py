@@ -3,13 +3,15 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
     LLMInterpretationResponse,
     OpenRouterStructuredInterpreter,
 )
+from argus.agent_runtime.runtime import run_agent_turn
+from argus.agent_runtime.session.manager import InMemorySessionManager
 from argus.agent_runtime.stages.interpret import InterpretationRequest
 from argus.agent_runtime.state.models import UserState
-from argus.domain.orchestrator import ChatTurnIntent, classify_chat_turn_intent
 from argus.llm import openrouter
 from argus.llm.openrouter import log_openrouter_failure
 
@@ -118,23 +120,41 @@ def test_result_breakdown_uses_bounded_profile(monkeypatch) -> None:
     assert FakeChatOpenRouter.calls[0]["max_tokens"] == 2400
 
 
-def test_legacy_chat_composer_uses_bounded_profile(monkeypatch) -> None:
+def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_composer(
+    monkeypatch,
+) -> None:
     FakeChatOpenRouter.calls.clear()
-    FakeChatOpenRouter.structured_response = ChatTurnIntent(
-        intent="guide",
-        assistant_response="I can help you shape and test the idea.",
+    FakeChatOpenRouter.structured_response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="new_task",
+        user_goal_summary="User asked what Argus can do.",
+        assistant_response="Argus can help shape and test investing ideas.",
+        semantic_turn_act="educational_question",
     )
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
 
-    result = classify_chat_turn_intent(message="what can you do?", language="en")
+    contract = build_default_capability_contract()
+    workflow = build_workflow(
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=contract,
+            model_name="custom/model",
+        )
+    )
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=InMemorySessionManager(),
+        user=UserState(user_id="u1"),
+        thread_id="thread-policy",
+        message="what can you do?",
+    )
 
-    assert result.assistant_response == "I can help you shape and test the idea."
-    assert FakeChatOpenRouter.calls[0] == {
-        "model": openrouter.resolve_openrouter_model(),
-        "temperature": 0.2,
-        "max_tokens": 1200,
-    }
+    assert result["assistant_response"] == (
+        "Argus can help shape and test investing ideas."
+    )
+    assert FakeChatOpenRouter.calls == [
+        {"model": "custom/model", "temperature": 0, "max_tokens": 1200}
+    ]
 
 
 def test_openrouter_failure_log_includes_visible_diagnostics(monkeypatch) -> None:

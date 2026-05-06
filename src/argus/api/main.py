@@ -66,9 +66,6 @@ from argus.api.schemas import (
     User,
     UserResponse,
 )
-from argus.domain.backtest_state_machine import (
-    BacktestConversationState,
-)
 from argus.domain.engine import (
     build_result_card,
     build_result_chart,
@@ -80,11 +77,7 @@ from argus.domain.engine import (
 )
 from argus.domain.indicators import search_indicators
 from argus.domain.market_data import search_assets
-from argus.domain.orchestrator import (
-    get_starter_prompts,
-    parse_onboarding_goal,
-    suggest_entity_name,
-)
+from argus.domain.orchestrator import get_starter_prompts, suggest_entity_name
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
@@ -118,16 +111,37 @@ agent_runtime_workflow = build_workflow(
 )
 
 
-def orchestrate_chat_turn(**kwargs: Any) -> Any:
-    from argus.domain.orchestrator import orchestrate_chat_turn as legacy_orchestrator
-
-    return legacy_orchestrator(**kwargs)
-
-
 class InternalAgentRuntimeTurnRequest(BaseModel):
     user_id: str
     thread_id: str
     message: str
+
+
+SUPPORTED_ONBOARDING_GOALS = {
+    "learn_basics",
+    "test_stock_idea",
+    "build_passive_strategy",
+    "explore_crypto",
+    "surprise_me",
+}
+
+
+def _resolve_language(language: str | None) -> str:
+    if (language or "en").lower().startswith("es"):
+        return "es-419"
+    return "en"
+
+
+def _parse_onboarding_control_message(message: str) -> str | None:
+    if message == "__ONBOARDING_SKIP__":
+        return "surprise_me"
+    prefix = "__ONBOARDING_GOAL__:"
+    if not message.startswith(prefix):
+        return None
+    goal = message.removeprefix(prefix)
+    if goal in SUPPORTED_ONBOARDING_GOALS:
+        return goal
+    return None
 
 
 def _dev_memory_fallback_enabled() -> bool:
@@ -217,46 +231,6 @@ def _create_message(
     return _memory_message(
         conversation_id=conversation_id, role=role, content=content, metadata=metadata
     )
-
-
-def _latest_backtest_state(
-    history: list[dict[str, Any]],
-) -> BacktestConversationState:
-    for message in reversed(history):
-        metadata = message.get("metadata") or {}
-        raw_state = metadata.get("backtest_state")
-        if not raw_state and metadata.get("conversation_mode") == "guide":
-            return BacktestConversationState()
-        if raw_state:
-            try:
-                return BacktestConversationState.model_validate(raw_state)
-            except Exception as exc:
-                logger.warning("Backtest state rehydration failed", error=str(exc))
-                return BacktestConversationState()
-    return BacktestConversationState()
-
-
-def _state_has_params(state: BacktestConversationState) -> bool:
-    params = state.params
-    return bool(
-        params.template
-        or params.symbols
-        or params.asset_class
-        or params.timeframe
-        or params.start_date
-        or params.end_date
-        or params.starting_capital
-        or params.parameters
-    )
-
-
-def _latest_completed_run_id(history: list[dict[str, Any]]) -> str | None:
-    for message in reversed(history):
-        metadata = message.get("metadata") or {}
-        run_id = metadata.get("latest_run_id")
-        if run_id:
-            return str(run_id)
-    return None
 
 
 def _fetch_run_metrics(user_id: str, run_id: str) -> dict[str, Any] | None:
@@ -2767,7 +2741,7 @@ def chat_stream(
 
     request_message = _chat_request_message(payload)
     display_message = _chat_display_message(payload)
-    onboarding_goal = parse_onboarding_goal(request_message)
+    onboarding_goal = _parse_onboarding_control_message(request_message)
 
     conversation = store.conversations.get(payload.conversation_id)
     if conversation is None and supabase_gateway is not None:
@@ -2812,8 +2786,6 @@ def chat_stream(
                 or current_user_profile.language
                 or "en"
             )
-            from argus.domain.orchestrator import _resolve_language
-
             is_es = _resolve_language(lang) == "es-419"
             msg = (
                 "¿Cuál es tu objetivo principal ahora? No te preocupes, "
@@ -2849,8 +2821,6 @@ def chat_stream(
                 or current_user_profile.language
                 or "en"
             )
-            from argus.domain.orchestrator import _resolve_language
-
             is_es = _resolve_language(lang) == "es-419"
             if is_es:
                 mapping = {

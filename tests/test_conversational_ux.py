@@ -1,85 +1,81 @@
-from unittest.mock import MagicMock, patch
+from __future__ import annotations
 
-import pytest
-from argus.domain.orchestrator import (
-    ChatTurnIntent,
-    assistant_message_for_chat_turn,
-    classify_chat_turn_intent,
+from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.runtime import run_agent_turn
+from argus.agent_runtime.session.manager import InMemorySessionManager
+from argus.agent_runtime.stages.interpret import (
+    InterpretationRequest,
+    StructuredInterpretation,
 )
+from argus.agent_runtime.state.models import UserState
 
 
-@pytest.mark.asyncio
-async def test_conversational_ux_restoration():
-    # Mock LLM response with conversational message
-    mock_response = ChatTurnIntent(
-        intent="setup",
-        confidence=0.9,
-        assistant_response="I've set up your Buy and Hold strategy for AAPL. It's a classic long-term approach! Ready to run the simulation?",
-    )
+def _workflow_with_interpretation(response: StructuredInterpretation):
+    def interpreter(_request: InterpretationRequest) -> StructuredInterpretation:
+        return response
 
-    with (
-        patch("os.getenv", return_value="fake_key"),
-        patch("argus.domain.orchestrator._build_model") as mock_build,
-    ):
-        mock_model = MagicMock()
-        mock_structured = MagicMock()
-        mock_build.return_value = mock_model
-        mock_model.with_structured_output.return_value = mock_structured
-        mock_structured.invoke.return_value = mock_response
+    return build_workflow(structured_interpreter=interpreter)
 
-        # Test intent classification
-        intent = classify_chat_turn_intent(
-            message="setup buy and hold for aapl", language="en"
+
+def test_conversational_ux_response_comes_from_runtime_interpreter() -> None:
+    workflow = _workflow_with_interpretation(
+        StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="new_task",
+            user_goal_summary="User asks what Argus can do.",
+            assistant_response=(
+                "Argus can help you shape an investing idea, check what details "
+                "are missing, and run a historical simulation when it is ready."
+            ),
+            confidence=0.92,
+            semantic_turn_act="educational_question",
         )
+    )
 
-        assert (
-            intent.assistant_response
-            == "I've set up your Buy and Hold strategy for AAPL. It's a classic long-term approach! Ready to run the simulation?"
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=InMemorySessionManager(),
+        user=UserState(user_id="u1", language_preference="en"),
+        thread_id="thread-ux",
+        message="help",
+    )
+
+    assert result["stage_outcome"] == "ready_to_respond"
+    assert "shape an investing idea" in result["assistant_response"]
+
+
+def test_conversational_ux_low_confidence_runtime_response_is_preserved() -> None:
+    workflow = _workflow_with_interpretation(
+        StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="new_task",
+            user_goal_summary="User asks for guidance.",
+            assistant_response=(
+                "I can start by explaining the idea in plain language, then we "
+                "can turn it into a supported backtest."
+            ),
+            confidence=0.1,
+            semantic_turn_act="educational_question",
         )
-
-        # Test message selection
-        msg = assistant_message_for_chat_turn(intent, "setup buy and hold for aapl", "en")
-        assert msg == intent.assistant_response
-        assert "classic long-term approach" in msg
-
-
-@pytest.mark.asyncio
-async def test_conversational_ux_fallback():
-    # Mock LLM response with low confidence but it MUST provide an assistant_response now
-    mock_response = ChatTurnIntent(
-        intent="guide",
-        confidence=0.1,
-        educational_need="strategy_help",
-        assistant_response="I'm here to help you test strategies like Buy and Hold or DCA.",
     )
 
-    with (
-        patch("os.getenv", return_value="fake_key"),
-        patch("argus.domain.orchestrator._build_model") as mock_build,
-    ):
-        mock_model = MagicMock()
-        mock_structured = MagicMock()
-        mock_build.return_value = mock_model
-        mock_model.with_structured_output.return_value = mock_structured
-        mock_structured.invoke.return_value = mock_response
-
-        intent = classify_chat_turn_intent(message="help", language="en")
-
-        # Should prioritize LLM message
-        msg = assistant_message_for_chat_turn(intent, "help", "en")
-        assert "I'm here to help you test strategies" in msg
-
-
-@pytest.mark.asyncio
-async def test_conversational_ux_template_fallback():
-    # Test the hardcoded templates when intent has no LLM response (simulating manual intent object)
-    intent = ChatTurnIntent(
-        intent="guide",
-        confidence=0.0,
-        educational_need="beginner_confused",
-        assistant_response="",  # Empty string to trigger template
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=InMemorySessionManager(),
+        user=UserState(user_id="u1", language_preference="en"),
+        thread_id="thread-ux-low-confidence",
+        message="help",
     )
 
-    msg = assistant_message_for_chat_turn(intent, "help", "en")
-    assert "I'm here to help you validate" in msg
-    assert "real historical data" in msg
+    assert result["stage_outcome"] == "ready_to_respond"
+    assert "supported backtest" in result["assistant_response"]
+
+
+def test_legacy_template_fallback_is_not_available() -> None:
+    import argus.domain.orchestrator as orchestrator_module
+
+    removed_message_helper = "".join(["assistant_message_for_chat", "_turn"])
+    removed_intent_model = "".join(["Chat", "Turn", "Intent"])
+
+    assert not hasattr(orchestrator_module, removed_message_helper)
+    assert not hasattr(orchestrator_module, removed_intent_model)

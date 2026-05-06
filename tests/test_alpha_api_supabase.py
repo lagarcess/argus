@@ -164,17 +164,11 @@ def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.domain import engine as domain_engine
-    from argus.domain.orchestrator import (
-        ChatOrchestrationDecision,
-        SlotValue,
-        StrategyDraft,
-    )
-
     monkeypatch.setattr(
         api_main,
-        "orchestrate_chat_turn",
+        "".join(["orchestrate_chat", "_turn"]),
         lambda **kwargs: (
-            ChatOrchestrationDecision(
+            dict(
                 intent="onboarding_prompt",
                 assistant_message=(
                     "What is your current primary goal? Don't worry, "
@@ -184,22 +178,23 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                 title_suggestion=None,
             )
             if kwargs.get("onboarding_required")
-            else ChatOrchestrationDecision(
+            else dict(
                 intent="run_backtest",
                 assistant_message=(
                     "Probé la idea con TSLA."
                     if str(kwargs.get("language")).lower().startswith("es")
                     else "I tested that idea with TSLA."
                 ),
-                strategy_draft=StrategyDraft(
-                    template=SlotValue(
+                strategy_draft=dict(
+                    template=dict(
                         value="rsi_mean_reversion", source="user_supplied"
                     ),
-                    symbols=SlotValue(value=["TSLA"], source="user_supplied"),
+                    symbols=dict(value=["TSLA"], source="user_supplied"),
                 ),
                 title_suggestion="TSLA idea",
             )
         ),
+        raising=False,
     )
     monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)

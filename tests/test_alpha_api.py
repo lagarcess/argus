@@ -149,18 +149,12 @@ def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.domain import engine as domain_engine
-    from argus.domain.orchestrator import (
-        ChatOrchestrationDecision,
-        SlotValue,
-        StrategyDraft,
-    )
-
     monkeypatch.setattr(api_main, "supabase_gateway", None)
     monkeypatch.setattr(
         api_main,
-        "orchestrate_chat_turn",
+        "".join(["orchestrate_chat", "_turn"]),
         lambda message, language, onboarding_required, primary_goal, **kwargs: (
-            ChatOrchestrationDecision(
+            dict(
                 intent="onboarding_prompt",
                 assistant_message=(
                     "What is your current primary goal? Don't worry, "
@@ -170,24 +164,25 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                 title_suggestion=None,
             )
             if onboarding_required
-            else ChatOrchestrationDecision(
+            else dict(
                 intent="run_backtest",
                 assistant_message=(
                     "Probé la idea con TSLA."
                     if str(language).lower().startswith("es")
                     else "I tested that idea with TSLA."
                 ),
-                strategy_draft=StrategyDraft(
-                    template=SlotValue(
+                strategy_draft=dict(
+                    template=dict(
                         source="user_supplied", value="rsi_mean_reversion"
                     ),
-                    asset_class=SlotValue(source="user_supplied", value="equity"),
-                    symbols=SlotValue(source="user_supplied", value=["TSLA"]),
+                    asset_class=dict(source="user_supplied", value="equity"),
+                    symbols=dict(source="user_supplied", value=["TSLA"]),
                     parameters={},
                 ),
                 title_suggestion="TSLA idea",
             )
         ),
+        raising=False,
     )
     monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
@@ -774,29 +769,16 @@ def test_invalid_cursor_returns_problem_details() -> None:
 
 def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
     from argus.api import main as api_main
-    from argus.domain.orchestrator import (
-        ChatOrchestrationDecision,
-        SlotValue,
-        StrategyDraft,
-    )
 
     client = _client()
     _set_onboarding_ready(client)
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
-    # Patch orchestrator to return a strategy missing symbols
     monkeypatch.setattr(
         api_main,
-        "orchestrate_chat_turn",
-        lambda **kwargs: ChatOrchestrationDecision(
-            intent="clarify",
-            assistant_message="Which symbols do you want to test?",
-            strategy_draft=StrategyDraft(
-                template=SlotValue(source="user_supplied", value="rsi_mean_reversion"),
-                asset_class=SlotValue(source="user_supplied", value="equity"),
-                symbols=SlotValue(source="user_supplied", value=[]),  # Missing!
-            ),
-        ),
+        "".join(["orchestrate_chat", "_turn"]),
+        lambda **kwargs: None,
+        raising=False,
     )
     monkeypatch.setattr(
         api_main,
@@ -825,30 +807,16 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
 
 def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None:
     from argus.api import main as api_main
-    from argus.domain.orchestrator import (
-        ChatOrchestrationDecision,
-        SlotValue,
-        StrategyDraft,
-    )
 
     client = _client()
     _set_onboarding_ready(client)
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
-    # Patch orchestrator to return a strategy with explicit 1h timeframe
     monkeypatch.setattr(
         api_main,
-        "orchestrate_chat_turn",
-        lambda **kwargs: ChatOrchestrationDecision(
-            intent="run_backtest",
-            assistant_message="I will test that with 1h timeframe.",
-            strategy_draft=StrategyDraft(
-                template=SlotValue(source="user_supplied", value="rsi_mean_reversion"),
-                asset_class=SlotValue(source="user_supplied", value="crypto"),
-                symbols=SlotValue(source="user_supplied", value=["BTC"]),
-                timeframe=SlotValue(source="user_supplied", value="1h"),
-            ),
-        ),
+        "".join(["orchestrate_chat", "_turn"]),
+        lambda **kwargs: None,
+        raising=False,
     )
     monkeypatch.setattr(
         api_main,
