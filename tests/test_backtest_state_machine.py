@@ -13,6 +13,23 @@ from argus.agent_runtime.state.models import (
 )
 
 
+class ResolvedAssetStub:
+    def __init__(self, canonical_symbol: str, asset_class: str) -> None:
+        self.canonical_symbol = canonical_symbol
+        self.asset_class = asset_class
+
+
+def _patch_resolve_asset(monkeypatch) -> None:
+    from argus.agent_runtime.extraction import structured as extraction_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(extraction_module, "resolve_asset", resolve_stub)
+
+
 def _interpret_with(response: StructuredInterpretation):
     def interpreter(_request: InterpretationRequest) -> StructuredInterpretation:
         return response
@@ -20,7 +37,9 @@ def _interpret_with(response: StructuredInterpretation):
     return interpreter
 
 
-def test_partial_strategy_from_mock_interpreter_waits_for_missing_fields() -> None:
+def test_partial_strategy_from_mock_interpreter_waits_for_missing_fields(monkeypatch) -> None:
+    _patch_resolve_asset(monkeypatch)
+
     result = interpret_stage(
         state=RunState.new(
             current_user_message="test RSI on Apple",
@@ -54,7 +73,9 @@ def test_partial_strategy_from_mock_interpreter_waits_for_missing_fields() -> No
     assert result.decision.missing_required_fields == ["date_range"]
 
 
-def test_ready_strategy_from_mock_interpreter_reaches_confirmation() -> None:
+def test_ready_strategy_from_mock_interpreter_reaches_confirmation(monkeypatch) -> None:
+    _patch_resolve_asset(monkeypatch)
+
     result = interpret_stage(
         state=RunState.new(
             current_user_message="test RSI on Apple last year",
@@ -87,7 +108,11 @@ def test_ready_strategy_from_mock_interpreter_reaches_confirmation() -> None:
     assert result.decision.semantic_turn_act == "new_idea"
 
 
-def test_approval_uses_llm_semantic_turn_act_not_state_machine_confirmation() -> None:
+def test_approval_uses_llm_semantic_turn_act_not_state_machine_confirmation(
+    monkeypatch,
+) -> None:
+    _patch_resolve_asset(monkeypatch)
+
     pending = StrategySummary(
         strategy_type="indicator_threshold",
         strategy_thesis="Buy Apple when RSI is oversold.",

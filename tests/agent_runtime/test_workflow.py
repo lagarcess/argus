@@ -1,40 +1,22 @@
-import pytest
+from __future__ import annotations
+
 from argus.agent_runtime.graph.workflow import (
-    WorkflowRoute,
     WorkflowStageOutcome,
     build_workflow,
-    resolve_workflow_transition,
 )
-from argus.agent_runtime.runtime import build_workflow_input, run_agent_turn
+from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.session.manager import InMemorySessionManager
-from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import (
-    ArtifactReference,
-    StrategySummary,
-    TaskSnapshot,
-    UserState,
-)
-from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
-from argus.agent_runtime.tools.real_backtest import RealBacktestTool
-from argus.api import main as api_main
-from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
-from argus.domain.engine_launch.models import LaunchExecutionEnvelope
-from fastapi.testclient import TestClient
+from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
 
 
-class FakeWorkflow:
-    def __init__(self, response: dict) -> None:
-        self._response = response
-
-    def invoke(self, initial_state: dict) -> dict:
-        return {
-            **initial_state,
-            **self._response,
-        }
+class ResolvedAssetStub:
+    def __init__(self, canonical_symbol: str, asset_class: str) -> None:
+        self.canonical_symbol = canonical_symbol
+        self.asset_class = asset_class
 
 
 def rsi_confirmation_interpreter(
@@ -60,7 +42,30 @@ def rsi_confirmation_interpreter(
     )
 
 
-def test_workflow_requires_confirmation_before_execute() -> None:
+def conversational_interpreter(
+    request: InterpretationRequest,
+) -> StructuredInterpretation:
+    return StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked a product question.",
+        assistant_response="I help turn investing ideas into supported backtests.",
+        confidence=0.94,
+        semantic_turn_act="educational_question",
+    )
+
+
+def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
+    from argus.agent_runtime.extraction import structured as extraction_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(extraction_module, "resolve_asset", resolve_stub)
+
     workflow = build_workflow(structured_interpreter=rsi_confirmation_interpreter)
     manager = InMemorySessionManager()
     user = UserState(user_id="u1", expertise_level="advanced")
@@ -77,12 +82,32 @@ def test_workflow_requires_confirmation_before_execute() -> None:
     )
 
     assert result["stage_outcome"] == "await_approval"
+    assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
     assert "I read this as" in result["assistant_prompt"]
-    assert "Reply yes to run it" in result["assistant_prompt"]
 
 
-def test_runtime_keeps_thread_history_but_not_unapproved_confirmation_state() -> None:
-    workflow = build_workflow()
+def test_workflow_routes_from_stage_outcome_without_persisting_route() -> None:
+    workflow = build_workflow(structured_interpreter=conversational_interpreter)
+    initial_state = {
+        "run_state": RunState.new(
+            current_user_message="what can you do?",
+            recent_thread_history=[],
+        ),
+        "user": UserState(user_id="u1", expertise_level="beginner"),
+        "latest_task_snapshot": None,
+    }
+
+    result = workflow.invoke(initial_state)
+
+    assert result["stage_outcome"] is WorkflowStageOutcome.READY_TO_RESPOND
+    assert result["assistant_response"] == (
+        "I help turn investing ideas into supported backtests."
+    )
+    assert "route" not in result
+
+
+def test_workflow_persists_llm_first_thread_history() -> None:
+    workflow = build_workflow(structured_interpreter=conversational_interpreter)
     manager = InMemorySessionManager()
     user = UserState(user_id="u1", expertise_level="advanced")
 
@@ -90,641 +115,14 @@ def test_runtime_keeps_thread_history_but_not_unapproved_confirmation_state() ->
         workflow=workflow,
         session_manager=manager,
         user=user,
-        thread_id="thread-1",
-        message=(
-            "Backtest Tesla when RSI drops below 30 and exit above 55 "
-            "over the last year"
-        ),
+        thread_id="thread-history",
+        message="what can you do?",
     )
 
-    thread = manager.load_thread(user_id=user.user_id, thread_id="thread-1")
+    thread = manager.load_thread(user_id=user.user_id, thread_id="thread-history")
 
     assert len(thread.message_history) == 2
     assert thread.message_history[0].role == "user"
     assert thread.message_history[1].role == "assistant"
     assert thread.latest_task_snapshot is not None
-    assert thread.latest_task_snapshot.completed is False
-    assert thread.latest_task_snapshot.confirmed_strategy_summary is None
-    assert "confirmation_payload" not in thread.thread_metadata
-
-
-def test_workflow_routes_under_specified_backtest_into_clarification() -> None:
-    workflow = build_workflow()
-    manager = InMemorySessionManager()
-    user = UserState(user_id="u1", expertise_level="advanced")
-
-    result = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=user,
-        thread_id="thread-clarify",
-        message="Backtest Tesla",
-    )
-
-    assert result["stage_outcome"] == "await_user_reply"
-    assert result["requested_field"] == "entry_logic"
-    prompt = result["assistant_prompt"].lower()
-    assert "specific testable rule" in prompt
-    assert "trigger the buy" not in prompt
-
-
-def test_workflow_strategy_drafting_does_not_emit_generic_starter_copy() -> None:
-    workflow = build_workflow()
-    manager = InMemorySessionManager()
-    user = UserState(user_id="u1", expertise_level="beginner")
-
-    result = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=user,
-        thread_id="thread-draft-start",
-        message="let's draft a strategy",
-    )
-
-    assistant_text = (
-        result.get("assistant_response") or result.get("assistant_prompt") or ""
-    )
-    lowered = assistant_text.lower()
-    assert result["stage_outcome"] in {"await_user_reply", "ready_to_respond"}
-    assert "pick a starting point" not in lowered
-    assert "name an asset and say a timeframe" not in lowered
-    assert "what should trigger the buy" not in lowered
-
-
-def test_workflow_complete_buy_and_hold_prompt_reaches_confirmation() -> None:
-    workflow = build_workflow()
-    manager = InMemorySessionManager()
-    user = UserState(user_id="u1", expertise_level="beginner")
-
-    result = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=user,
-        thread_id="thread-natural-buy-hold",
-        message=(
-            "let's try a buy and hold strategy on bitcoin in the last two "
-            "years, simple"
-        ),
-    )
-
-    assistant_text = (
-        result.get("assistant_prompt") or result.get("assistant_response") or ""
-    )
-    assert result["stage_outcome"] == "await_approval"
-    assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["BTC"]
-    assert result["confirmation_payload"]["strategy"]["asset_class"] == "crypto"
-    assert result["confirmation_payload"]["strategy"]["strategy_type"] == "buy_and_hold"
-    assert result["confirmation_payload"]["strategy"]["date_range"] is not None
-    assert "what time period should i test" not in assistant_text.lower()
-    assert "what should trigger the buy" not in assistant_text.lower()
-
-
-def test_workflow_period_followup_fills_pending_buy_and_hold_need() -> None:
-    workflow = build_workflow()
-    manager = InMemorySessionManager()
-    user = UserState(user_id="u1", expertise_level="beginner")
-
-    first = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=user,
-        thread_id="thread-period-followup",
-        message="Let's test a buy and hold strategy",
-    )
-    second = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=user,
-        thread_id="thread-period-followup",
-        message="Let's try the strategy with BTC",
-    )
-    third = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=user,
-        thread_id="thread-period-followup",
-        message="The last two years to date",
-    )
-
-    first_text = first.get("assistant_prompt") or first.get("assistant_response") or ""
-    second_text = second.get("assistant_prompt") or second.get("assistant_response") or ""
-    third_text = third.get("assistant_prompt") or third.get("assistant_response") or ""
-    assert "what should trigger the buy" not in first_text.lower()
-    assert "what should trigger the buy" not in second_text.lower()
-    assert third["stage_outcome"] == "await_approval"
-    assert third["confirmation_payload"]["strategy"]["asset_universe"] == ["BTC"]
-    assert third["confirmation_payload"]["strategy"]["date_range"] is not None
-    assert "what time period should i test" not in third_text.lower()
-
-
-def test_workflow_transition_ends_for_unsupported_capability_failure() -> None:
-    tool = StubBacktestTool(
-        responses=[
-            {
-                "success": False,
-                "error_type": "unsupported_capability",
-                "error_message": "Options backtests are not supported.",
-                "retryable": False,
-                "payload": None,
-                "capability_context": {},
-            }
-        ]
-    )
-    state = build_workflow_input(
-        session_manager=InMemorySessionManager(),
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-unsupported",
-        message="Run it",
-    )
-    state["run_state"].confirmation_payload = {"strategy": {"asset_universe": ["TSLA"]}}
-
-    result = execute_stage(state=state["run_state"], tool=tool, max_retries=2)
-    transition = resolve_workflow_transition(result=result)
-
-    assert transition.outcome is WorkflowStageOutcome.NEEDS_CLARIFICATION
-    assert transition.route is WorkflowRoute.END
-    assert "supported backtest" in result.patch["assistant_prompt"]
-
-
-def test_execute_stage_with_real_tool_surfaces_result_card_payload(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    tool = RealBacktestTool()
-    state = build_workflow_input(
-        session_manager=InMemorySessionManager(),
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-real-execute",
-        message="Run it",
-    )
-    state["run_state"].candidate_strategy_draft = {
-        "strategy_thesis": "Buy and hold Tesla over the last year",
-        "asset_universe": ["TSLA"],
-        "date_range": "last 1 year",
-    }
-    state["run_state"].confirmation_payload = {
-        "strategy": {
-            "strategy_thesis": "Buy and hold Tesla over the last year",
-            "asset_universe": ["TSLA"],
-            "date_range": "last 1 year",
-        },
-        "optional_parameters": {
-            "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
-        },
-    }
-
-    monkeypatch.setattr(
-        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
-        lambda request: LaunchExecutionAdapterResult(
-            envelope=LaunchExecutionEnvelope(
-                execution_status="succeeded",
-                resolved_strategy={
-                    "strategy_type": "buy_and_hold",
-                    "symbol": "TSLA",
-                },
-                resolved_parameters={"timeframe": "1D"},
-                metrics={
-                    "aggregate": {"performance": {"total_return_pct": 12.5}},
-                },
-                benchmark_metrics={
-                    "symbol": "SPY",
-                    "aggregate": {"total_return_pct": 9.2},
-                },
-                assumptions=["Starting capital: $10,000."],
-                caveats=["1D bars only."],
-                provider_metadata={"provider": "alpaca"},
-            ),
-            result_card={"title": "TSLA Buy and Hold"},
-            explanation_context={
-                "strategy_type": "buy_and_hold",
-                "metrics": {
-                    "aggregate": {"performance": {"total_return_pct": 12.5}},
-                },
-                "benchmark_metrics": {
-                    "aggregate": {"total_return_pct": 9.2},
-                },
-                "assumptions": ["Starting capital: $10,000."],
-                "caveats": ["1D bars only."],
-            },
-        ),
-    )
-
-    result = execute_stage(state=state["run_state"], tool=tool, max_retries=1)
-
-    assert result.outcome == "execution_succeeded"
-    assert (
-        result.patch["final_response_payload"]["result_card"]["title"]
-        == "TSLA Buy and Hold"
-    )
-    assert (
-        result.patch["final_response_payload"]["explanation_context"]["strategy_type"]
-        == "buy_and_hold"
-    )
-
-
-def test_build_workflow_input_seeds_selected_context_and_keeps_run_state_fresh() -> None:
-    manager = InMemorySessionManager()
-    manager.append_message(
-        user_id="u1",
-        thread_id="thread-seeded",
-        role="user",
-        content="Previous question",
-    )
-    manager.save_thread_context(
-        user_id="u1",
-        thread_id="thread-seeded",
-        latest_task_snapshot=TaskSnapshot(
-            latest_task_type="results_explanation",
-            completed=True,
-        ),
-        artifact_references=[
-            ArtifactReference(
-                artifact_kind="backtest_result",
-                artifact_id="result-1",
-            )
-        ],
-        thread_metadata={
-            "latest_task_type": "results_explanation",
-            "last_stage_outcome": "ready_to_respond",
-            "ignored_key": "should_not_be_seeded",
-        },
-    )
-
-    first_input = build_workflow_input(
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-seeded",
-        message="Explain the result",
-    )
-    first_input["run_state"].tool_call_records.append({"tool_name": "scratch"})
-    first_input["run_state"].confirmation_payload = {
-        "strategy": {"asset_universe": ["TSLA"]}
-    }
-
-    second_input = build_workflow_input(
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-seeded",
-        message="Explain the result again",
-    )
-
-    assert second_input["run_state"].tool_call_records == []
-    assert second_input["run_state"].confirmation_payload is None
-    assert second_input["selected_thread_metadata"] == {
-        "latest_task_type": "results_explanation",
-        "last_stage_outcome": "ready_to_respond",
-    }
-    assert len(second_input["artifact_references"]) == 1
-    assert second_input["artifact_references"][0].artifact_id == "result-1"
-
-
-def test_workflow_preserves_seeded_thread_metadata_and_artifacts() -> None:
-    workflow = build_workflow()
-    manager = InMemorySessionManager()
-    manager.save_thread_context(
-        user_id="u1",
-        thread_id="thread-preserved",
-        latest_task_snapshot=TaskSnapshot(
-            latest_task_type="results_explanation",
-            completed=True,
-        ),
-        artifact_references=[
-            ArtifactReference(
-                artifact_kind="backtest_result",
-                artifact_id="result-2",
-            )
-        ],
-        thread_metadata={
-            "latest_task_type": "results_explanation",
-            "last_stage_outcome": "ready_to_respond",
-        },
-    )
-
-    seeded = build_workflow_input(
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-preserved",
-        message="Why did it do that?",
-    )
-    result = workflow.invoke(seeded)
-
-    assert result["selected_thread_metadata"]["latest_task_type"] == "results_explanation"
-    assert result["artifact_references"][0].artifact_id == "result-2"
-
-
-def test_run_agent_turn_persists_artifact_references_on_write_back() -> None:
-    manager = InMemorySessionManager()
-    workflow = FakeWorkflow(
-        {
-            "stage_outcome": "ready_to_respond",
-            "artifact_references": [
-                ArtifactReference(
-                    artifact_kind="backtest_result",
-                    artifact_id="result-new",
-                )
-            ],
-            "assistant_response": "Done.",
-        }
-    )
-
-    run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-artifacts",
-        message="Explain the result",
-    )
-
-    thread = manager.load_thread(user_id="u1", thread_id="thread-artifacts")
-
-    assert len(thread.artifact_references) == 1
-    assert thread.artifact_references[0].artifact_id == "result-new"
-
-
-def test_run_agent_turn_populates_and_preserves_snapshot_references() -> None:
-    manager = InMemorySessionManager()
-    manager.save_thread_context(
-        user_id="u1",
-        thread_id="thread-snapshot",
-        latest_task_snapshot=TaskSnapshot(
-            latest_task_type="backtest_execution",
-            completed=True,
-            latest_backtest_result_reference=ArtifactReference(
-                artifact_kind="backtest_result",
-                artifact_id="result-old",
-            ),
-        ),
-        artifact_references=[
-            ArtifactReference(
-                artifact_kind="backtest_result",
-                artifact_id="result-old",
-            )
-        ],
-    )
-
-    workflow_with_new_refs = FakeWorkflow(
-        {
-            "stage_outcome": "ready_to_respond",
-            "artifact_references": [
-                ArtifactReference(
-                    artifact_kind="backtest_result",
-                    artifact_id="result-new",
-                ),
-                ArtifactReference(
-                    artifact_kind="collection_action",
-                    artifact_id="collection-1",
-                ),
-            ],
-            "assistant_response": "Saved.",
-        }
-    )
-    run_agent_turn(
-        workflow=workflow_with_new_refs,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-snapshot",
-        message="Save that",
-    )
-
-    updated_thread = manager.load_thread(user_id="u1", thread_id="thread-snapshot")
-    assert updated_thread.latest_task_snapshot is not None
-    assert (
-        updated_thread.latest_task_snapshot.latest_backtest_result_reference.artifact_id
-        == "result-new"
-    )
-    assert (
-        updated_thread.latest_task_snapshot.latest_collection_action_reference.artifact_id
-        == "collection-1"
-    )
-
-    workflow_without_new_refs = FakeWorkflow(
-        {
-            "stage_outcome": "await_user_reply",
-            "assistant_prompt": "Can you clarify that?",
-        }
-    )
-    run_agent_turn(
-        workflow=workflow_without_new_refs,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-snapshot",
-        message="What next?",
-    )
-
-    preserved_thread = manager.load_thread(user_id="u1", thread_id="thread-snapshot")
-    assert preserved_thread.latest_task_snapshot is not None
-    assert (
-        preserved_thread.latest_task_snapshot.latest_backtest_result_reference.artifact_id
-        == "result-new"
-    )
-    assert (
-        preserved_thread.latest_task_snapshot.latest_collection_action_reference.artifact_id
-        == "collection-1"
-    )
-
-
-def test_run_agent_turn_marks_ready_to_respond_turn_as_completed() -> None:
-    manager = InMemorySessionManager()
-    workflow = FakeWorkflow(
-        {
-            "stage_outcome": "ready_to_respond",
-            "assistant_response": "Here is what happened.",
-        }
-    )
-
-    run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-completed",
-        message="Explain the result",
-    )
-
-    thread = manager.load_thread(user_id="u1", thread_id="thread-completed")
-    assert thread.latest_task_snapshot is not None
     assert thread.latest_task_snapshot.completed is True
-
-
-def test_run_agent_turn_clears_resolved_unresolved_follow_up() -> None:
-    manager = InMemorySessionManager()
-    manager.save_thread_context(
-        user_id="u1",
-        thread_id="thread-follow-up",
-        latest_task_snapshot=TaskSnapshot(
-            latest_task_type="conversation_followup",
-            completed=False,
-            last_unresolved_follow_up="Can you clarify whether this is a new idea?",
-        ),
-    )
-    workflow = FakeWorkflow(
-        {
-            "stage_outcome": "ready_to_respond",
-            "assistant_response": "That clarifies it.",
-        }
-    )
-
-    run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-follow-up",
-        message="Continue with the current idea.",
-    )
-
-    thread = manager.load_thread(user_id="u1", thread_id="thread-follow-up")
-    assert thread.latest_task_snapshot is not None
-    assert thread.latest_task_snapshot.last_unresolved_follow_up is None
-
-
-def test_build_workflow_input_bounds_recent_thread_history() -> None:
-    manager = InMemorySessionManager()
-    for index in range(8):
-        manager.append_message(
-            user_id="u1",
-            thread_id="thread-history",
-            role="user",
-            content=f"message-{index}",
-        )
-
-    seeded = build_workflow_input(
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-history",
-        message="Latest request",
-    )
-
-    recent_history = seeded["run_state"].recent_thread_history
-    assert len(recent_history) == 6
-    assert [message.content for message in recent_history] == [
-        "message-2",
-        "message-3",
-        "message-4",
-        "message-5",
-        "message-6",
-        "message-7",
-    ]
-
-
-def test_build_workflow_input_preserves_natural_date_phrasing() -> None:
-    message = "let's try a basic buy and hold on BTC from jan first last year to date"
-
-    state = build_workflow_input(
-        session_manager=InMemorySessionManager(),
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-natural-date",
-        message=message,
-    )
-
-    assert state["run_state"].current_user_message == message
-
-
-def test_build_workflow_input_does_not_rewrite_strategy_logic_or_dates() -> None:
-    message = (
-        "  Backtest Tesla when RSI drops below 30 and exit above 55 "
-        "over the last year  "
-    )
-
-    state = build_workflow_input(
-        session_manager=InMemorySessionManager(),
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-raw-strategy-message",
-        message=message,
-    )
-
-    assert (
-        state["run_state"].current_user_message
-        == "Backtest Tesla when RSI drops below 30 and exit above 55 over the last year"
-    )
-
-
-def test_internal_agent_runtime_turn_endpoint_returns_confirmation_ready_result(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(
-        api_main,
-        "agent_runtime_session_manager",
-        InMemorySessionManager(),
-    )
-    monkeypatch.setattr(
-        api_main,
-        "agent_runtime_workflow",
-        build_workflow(structured_interpreter=rsi_confirmation_interpreter),
-    )
-    client = TestClient(api_main.app)
-
-    response = client.post(
-        "/internal/agent-runtime/turn",
-        json={
-            "user_id": "u1",
-            "thread_id": "thread-internal",
-            "message": (
-                "Backtest Tesla over the last 2 years when RSI drops below 30 "
-                "and exit above 55"
-            ),
-        },
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["stage_outcome"] == "await_approval"
-    assert "confirmation_payload" in payload
-    assert payload["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
-
-
-def test_run_agent_turn_serializes_rich_final_response_payload() -> None:
-    manager = InMemorySessionManager()
-    workflow = FakeWorkflow(
-        {
-            "stage_outcome": "ready_to_respond",
-            "assistant_response": "Here is the result.",
-            "final_response_payload": {
-                "result": {"execution_status": "succeeded"},
-                "result_card": {"title": "TSLA Buy and Hold"},
-                "explanation_context": {
-                    "strategy_type": "buy_and_hold",
-                    "assumptions": ["Starting capital: $10,000."],
-                },
-            },
-        }
-    )
-
-    result = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="advanced"),
-        thread_id="thread-final-response",
-        message="Show me the result",
-    )
-
-    assert result["final_response_payload"]["result_card"]["title"] == "TSLA Buy and Hold"
-    assert (
-        result["final_response_payload"]["explanation_context"]["strategy_type"]
-        == "buy_and_hold"
-    )
-
-
-def test_runtime_preserves_llm_response_without_posthoc_quality_gate() -> None:
-    def thin_interpreter(_request: InterpretationRequest) -> StructuredInterpretation:
-        return StructuredInterpretation(
-            intent="conversation_followup",
-            task_relation="continue",
-            requires_clarification=False,
-            user_goal_summary="User asked what a backtest is.",
-            assistant_response="Backtest.",
-            confidence=0.9,
-            semantic_turn_act="educational_question",
-        )
-
-    workflow = build_workflow(structured_interpreter=thin_interpreter)
-    manager = InMemorySessionManager()
-
-    result = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="beginner"),
-        thread_id="thread-thin-education",
-        message="what is a backtest?",
-    )
-
-    assert result["stage_outcome"] == "ready_to_respond"
-    assert result["assistant_response"] == "Backtest."

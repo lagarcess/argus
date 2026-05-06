@@ -10,7 +10,22 @@ from argus.agent_runtime.stages.interpret import (
 from argus.agent_runtime.state.models import StrategySummary, UserState
 
 
-def test_spanish_multiturn_strategy_context_uses_agent_runtime() -> None:
+class ResolvedAssetStub:
+    def __init__(self, canonical_symbol: str, asset_class: str) -> None:
+        self.canonical_symbol = canonical_symbol
+        self.asset_class = asset_class
+
+
+def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch) -> None:
+    from argus.agent_runtime.extraction import structured as extraction_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(extraction_module, "resolve_asset", resolve_stub)
+
     responses = iter(
         [
             StructuredInterpretation(

@@ -7,19 +7,19 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
-from argus.agent_runtime.stages.interpret import (
+from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
+    ResponseProfileOverrides,
     SimplificationOption,
     StrategySummary,
     UnsupportedConstraint,
 )
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
-    explicit_buy_and_hold_requested,
     normalize_date_range_candidate,
 )
 from argus.domain.indicators import (
@@ -92,6 +92,9 @@ class LLMInterpretationResponse(BaseModel):
     reason_codes: list[str] = Field(default_factory=list)
     ambiguous_fields: list[LLMAmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[LLMUnsupportedConstraint] = Field(default_factory=list)
+    response_profile_overrides: ResponseProfileOverrides = Field(
+        default_factory=ResponseProfileOverrides
+    )
     semantic_turn_act: (
         Literal[
             "new_idea",
@@ -197,6 +200,17 @@ class OpenRouterStructuredInterpreter:
             "crosses above the 200-day', preserve that as entry_logic. Do not ask what "
             "the buy trigger is. Explain that the crossover is understood but not directly "
             "executable yet, then offer to keep drafting it or simplify to a supported run.\n\n"
+            "NLU ownership: you are the only intent and extraction layer. "
+            "Extract symbols, company names, crypto assets, and currency pairs, date ranges, "
+            "DCA cadence, recurring contribution amount, entry logic, exit logic, and "
+            "refinement targets from the user message and thread context. Do not rely on "
+            "backend regex extraction. If the user writes a company name like Tesla or "
+            "Bitcoin, put that text or the ticker in asset_universe; the deterministic "
+            "validator will canonicalize it with the market data resolver. "
+            "For natural periods, return date_range as a normalized string when exact dates "
+            "are not available, or as {'start': 'YYYY-MM-DD', 'end': 'YYYY-MM-DD'} when the "
+            "user provides exact dates. For recurring buys, extract cadence as daily, weekly, "
+            "monthly, or yearly and never invent capital_amount.\n\n"
             "If the user explicitly says buy and hold, hold, or buy-and-hold, classify it as "
             "buy_and_hold even when the sentence also contains a start date like Jan 1. "
             "A start date is the backtest period, not entry logic.\n\n"
@@ -217,12 +231,16 @@ class OpenRouterStructuredInterpreter:
             "backtest_execution, task_relation to continue, requires_clarification to "
             "false, and preserve the prior strategy. Use refine_current_idea when the "
             "user asks to change dates, assets, assumptions, timeframe, capital, or "
-            "strategy details, and ask only for the changed missing detail. Greetings "
-            "and social check-ins are conversation_followup, not strategy_drafting, "
-            "unless the same message includes a real investing idea. Product or "
-            "investing concept questions are educational_question or "
-            "conversation_followup and must use assistant_response without forcing a "
-            "backtest.\n\n"
+            "strategy details, and ask only for the changed missing detail. Use new_idea "
+            "for a fresh testable idea, answer_pending_need when the user answers the "
+            "latest missing fact, educational_question for product or investing concept "
+            "questions, result_followup for questions about the latest completed run, "
+            "and unsupported_request when the user asks for unsupported capabilities. "
+            "Social turns are conversation_followup with assistant_response and no "
+            "strategy draft unless they also contain a real investing idea. "
+            "When the user explicitly asks for response style, verbosity, or expertise "
+            "for this turn, set response_profile_overrides; do not rely on backend "
+            "regex for those preferences.\n\n"
             "assistant_response must be natural user-facing prose. Never expose "
             "internal field names such as asset_universe, capital_amount, "
             "requested_field, or missing_required_fields. Never output raw JSON, "
@@ -270,7 +288,7 @@ class OpenRouterStructuredInterpreter:
             reason_codes=list(response.reason_codes),
             ambiguous_fields=ambiguous,
             unsupported_constraints=unsupported,
-            uses_latest_result_context=response.uses_latest_result_context,
+            response_profile_overrides=response.response_profile_overrides,
             semantic_turn_act=response.semantic_turn_act,
         )
 
@@ -281,13 +299,6 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         payload.get("date_range"),
         raw_user_phrasing=payload.get("raw_user_phrasing"),
     )
-    if explicit_buy_and_hold_requested(
-        payload.get("raw_user_phrasing"),
-        payload.get("strategy_thesis"),
-    ):
-        payload["strategy_type"] = "buy_and_hold"
-        payload["entry_logic"] = None
-        payload["exit_logic"] = None
     if draft.strategy_type:
         payload.setdefault("extra_parameters", {})["raw_strategy_type"] = (
             draft.strategy_type
@@ -313,18 +324,6 @@ def _ground_strategy_in_current_turn(
             strategy.date_range,
             raw_user_phrasing=current_message,
         )
-    if explicit_buy_and_hold_requested(
-        current_message,
-        strategy.strategy_thesis,
-    ):
-        strategy.strategy_type = "buy_and_hold"
-        strategy.entry_logic = None
-        strategy.exit_logic = None
-    elif _current_message_describes_indicator_frame(current_message):
-        strategy.strategy_type = "indicator_threshold"
-        _clear_recurring_purchase_fields(strategy)
-
-
 def _merge_prior_strategy(
     *,
     strategy: StrategySummary,
@@ -332,11 +331,6 @@ def _merge_prior_strategy(
     response: LLMInterpretationResponse,
 ) -> None:
     if request.latest_task_snapshot is None or response.task_relation != "refine":
-        return
-    if _current_turn_starts_fresh_strategy(request.current_user_message):
-        response.task_relation = "new_task"
-        if "semantic_boundary_new_strategy" not in response.reason_codes:
-            response.reason_codes.append("semantic_boundary_new_strategy")
         return
     prior = (
         request.latest_task_snapshot.pending_strategy_summary
@@ -354,48 +348,14 @@ def _merge_prior_strategy(
         setattr(strategy, key, value)
 
 
-def _clear_recurring_purchase_fields(strategy: StrategySummary) -> None:
-    strategy.cadence = None
-    strategy.capital_amount = None
-    strategy.sizing_mode = None
-    strategy.position_size = None
-
-
-def _current_turn_starts_fresh_strategy(message: str) -> bool:
-    lowered = " ".join(message.lower().strip().split())
-    if not lowered:
-        return False
-    if re.search(r"\b(actually|instead|keep|same|change|modify|make that)\b", lowered):
-        return False
-    return bool(
-        re.search(
-            r"\b(what if|backtest|test|try|simulate|bought|buy|invest)\b",
-            lowered,
-        )
-        and re.search(
-            r"\b(after|when|every|over|since|from|hold|dca|rsi|dip|drops?)\b", lowered
-        )
-    )
-
-
-def _current_message_describes_indicator_frame(message: str) -> bool:
-    lowered = message.lower()
-    return bool(
-        re.search(
-            r"\b(rsi|relative strength index|dip|dips|drops?|indicator|threshold)\b",
-            lowered,
-        )
-    )
-
-
 def _validate_capability_boundaries(
     *,
     strategy: StrategySummary,
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> None:
-    symbols = [symbol.upper() for symbol in strategy.asset_universe]
-    strategy.asset_universe = symbols
+    symbols = list(strategy.asset_universe)
+    canonical_symbols: list[str] = []
     asset_classes = set()
     invalid_symbols: list[str] = []
     for symbol in symbols:
@@ -404,7 +364,9 @@ def _validate_capability_boundaries(
         except Exception:
             invalid_symbols.append(symbol)
             continue
+        canonical_symbols.append(resolved.canonical_symbol)
         asset_classes.add(resolved.asset_class)
+    strategy.asset_universe = list(dict.fromkeys(canonical_symbols))
     if len(asset_classes) == 1:
         strategy.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:

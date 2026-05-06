@@ -60,7 +60,7 @@ def test_llm_interpreter_validates_asset_class_with_alpaca_resolver(monkeypatch)
         ),
     )
 
-    assert calls == ["TSLA", "BTC"]
+    assert calls == ["tsla", "btc"]
     assert result.candidate_strategy_draft.asset_universe == ["TSLA", "BTC"]
     assert result.candidate_strategy_draft.asset_class == "mixed"
     assert result.unsupported_constraints[0].category == "unsupported_asset_mix"
@@ -174,6 +174,21 @@ def test_llm_system_prompt_owns_phase_one_routing_and_quality_rules() -> None:
     assert "capital_amount" in prompt
     assert "missing_required_fields" in prompt
     assert "not specified" in prompt
+
+
+def test_llm_system_prompt_owns_phase_three_extraction_rules() -> None:
+    prompt = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._system_prompt()
+
+    assert "Extract symbols, company names, crypto assets, and currency pairs" in prompt
+    assert "Do not rely on backend regex extraction" in prompt
+    assert "date_range" in prompt
+    assert "cadence" in prompt
+    assert "semantic_turn_act is the routing source of truth" in prompt
+    assert "response_profile_overrides" in prompt
+    assert "social" in prompt.lower()
+    assert "educational" in prompt.lower()
 
 
 def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(
@@ -357,7 +372,7 @@ def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
     )
     response = LLMInterpretationResponse(
         intent="strategy_drafting",
-        task_relation="refine",
+        task_relation="new_task",
         user_goal_summary="User wants to define Apple dip buying.",
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing="What if I bought Apple after big drops?",
@@ -413,11 +428,9 @@ def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops
         user_goal_summary="User wants to test Apple after big drops.",
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing="What if I bought Apple after big drops?",
-            strategy_type="dca_accumulation",
+            strategy_type="indicator_threshold",
             strategy_thesis="Buy Apple after big drops.",
             asset_universe=["AAPL"],
-            cadence="monthly",
-            capital_amount=500,
         ),
         unsupported_constraints=[
             interpreter_module.LLMUnsupportedConstraint(
@@ -605,11 +618,10 @@ def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(
             raw_user_phrasing=(
                 "let's try a basic buy and hold on BTC from jan first last year to date"
             ),
-            strategy_type="indicator_threshold",
-            strategy_thesis="Buy Bitcoin on January 1 last year.",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Bitcoin from January 1 last year.",
             asset_universe=["BTC"],
             date_range={"start": "2024-01-01", "end": "today"},
-            entry_logic="buying on jan 1 last year",
         ),
     )
 

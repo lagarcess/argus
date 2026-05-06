@@ -102,13 +102,6 @@ def canonical_strategy_type(
     return normalized
 
 
-def explicit_buy_and_hold_requested(*values: Any) -> bool:
-    text = " ".join(str(value) for value in values if isinstance(value, str)).lower()
-    if not text:
-        return False
-    return bool(re.search(r"\bbuy\s*(?:-|and\s+)hold\b|\bbuy-and-hold\b", text))
-
-
 def executable_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     payload = _strategy_payload(strategy)
     return canonical_strategy_type(

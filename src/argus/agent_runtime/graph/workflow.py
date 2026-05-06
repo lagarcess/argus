@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypedDict, cast
 
@@ -9,13 +8,15 @@ from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
     build_default_capability_contract,
 )
-from argus.agent_runtime.stages.clarify import clarify_stage
+from argus.agent_runtime.stages.clarify import (
+    StructuredClarificationGenerator,
+    clarify_stage,
+)
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.stages.interpret import (
     StageResult,
-    StructuredArbitrator,
     StructuredInterpreter,
     interpret_stage,
 )
@@ -60,12 +61,6 @@ class WorkflowStageOutcome(str, Enum):
     END_RUN = "end_run"
 
 
-@dataclass(frozen=True)
-class WorkflowTransition:
-    outcome: WorkflowStageOutcome
-    route: WorkflowRoute
-
-
 class WorkflowState(TypedDict, total=False):
     run_state: RunState
     user: UserState
@@ -81,7 +76,6 @@ class WorkflowState(TypedDict, total=False):
     failure_classification: str | None
     final_response_payload: dict[str, Any]
     next_actions: list[str]
-    route: WorkflowRoute
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
@@ -110,8 +104,8 @@ def build_workflow(
     contract: CapabilityContract | None = None,
     tool: Any | None = None,
     max_retries: int = 2,
-    structured_arbitrator: StructuredArbitrator | None = None,
     structured_interpreter: StructuredInterpreter | None = None,
+    clarification_generator: StructuredClarificationGenerator | None = None,
 ):
     active_contract = contract or build_default_capability_contract()
     active_tool = tool or DefaultBacktestTool()
@@ -121,7 +115,6 @@ def build_workflow(
         WorkflowNode.INTERPRET.value,
         lambda state: _interpret_node(
             state,
-            structured_arbitrator=structured_arbitrator,
             structured_interpreter=structured_interpreter,
         ),
     )
@@ -132,6 +125,8 @@ def build_workflow(
             clarify_stage(
                 state=_run_state(state),
                 contract=active_contract,
+                clarification_generator=clarification_generator,
+                language=_user(state).language_preference,
             ),
         ),
     )
@@ -174,7 +169,7 @@ def build_workflow(
     graph.set_entry_point(WorkflowNode.INTERPRET.value)
     graph.add_conditional_edges(
         WorkflowNode.INTERPRET.value,
-        _route_from_state,
+        _route_from_stage_outcome,
         {
             WorkflowRoute.CLARIFY.value: WorkflowNode.CLARIFY.value,
             WorkflowRoute.CONFIRM.value: WorkflowNode.CONFIRM.value,
@@ -184,7 +179,7 @@ def build_workflow(
     )
     graph.add_conditional_edges(
         WorkflowNode.CLARIFY.value,
-        _route_from_state,
+        _route_from_stage_outcome,
         {
             WorkflowRoute.CONFIRM.value: WorkflowNode.CONFIRM.value,
             WorkflowRoute.END.value: END,
@@ -192,7 +187,7 @@ def build_workflow(
     )
     graph.add_conditional_edges(
         WorkflowNode.CONFIRM.value,
-        _route_from_state,
+        _route_from_stage_outcome,
         {
             WorkflowRoute.CLARIFY.value: WorkflowNode.CLARIFY.value,
             WorkflowRoute.EXECUTE.value: WorkflowNode.EXECUTE.value,
@@ -201,7 +196,7 @@ def build_workflow(
     )
     graph.add_conditional_edges(
         WorkflowNode.EXECUTE.value,
-        _route_from_state,
+        _route_from_stage_outcome,
         {
             WorkflowRoute.EXPLAIN.value: WorkflowNode.EXPLAIN.value,
             WorkflowRoute.END.value: END,
@@ -209,7 +204,7 @@ def build_workflow(
     )
     graph.add_conditional_edges(
         WorkflowNode.EXPLAIN.value,
-        _route_from_state,
+        _route_from_stage_outcome,
         {
             WorkflowRoute.NEXT_STEP.value: WorkflowNode.NEXT_STEP.value,
             WorkflowRoute.END.value: END,
@@ -223,7 +218,6 @@ def build_workflow(
 def _interpret_node(
     state: WorkflowState,
     *,
-    structured_arbitrator: StructuredArbitrator | None,
     structured_interpreter: StructuredInterpreter | None,
 ) -> WorkflowState:
     return _apply_stage_result(
@@ -232,7 +226,6 @@ def _interpret_node(
             state=_run_state(state),
             user=_user(state),
             latest_task_snapshot=state.get("latest_task_snapshot"),
-            structured_arbitrator=structured_arbitrator,
             structured_interpreter=structured_interpreter,
         ),
     )
@@ -242,7 +235,7 @@ def _apply_stage_result(
     state: WorkflowState,
     result: StageResult,
 ) -> WorkflowState:
-    transition = resolve_workflow_transition(result=result)
+    outcome = WorkflowStageOutcome(result.outcome)
     run_state = _patched_run_state(
         run_state=_run_state(state),
         patch=result.patch,
@@ -250,8 +243,7 @@ def _apply_stage_result(
     workflow_state: WorkflowState = {
         **state,
         "run_state": run_state,
-        "stage_outcome": transition.outcome,
-        "route": transition.route,
+        "stage_outcome": outcome,
     }
 
     for key, value in result.patch.items():
@@ -270,48 +262,21 @@ def _patched_run_state(*, run_state: RunState, patch: dict[str, Any]) -> RunStat
     return RunState.model_validate(payload)
 
 
-def resolve_workflow_transition(*, result: StageResult) -> WorkflowTransition:
-    outcome = WorkflowStageOutcome(result.outcome)
-    failure_classification = result.patch.get("failure_classification")
+def _route_from_stage_outcome(state: WorkflowState) -> str:
+    outcome = WorkflowStageOutcome(state["stage_outcome"])
+    failure_classification = state.get("failure_classification")
 
     if outcome is WorkflowStageOutcome.NEEDS_CLARIFICATION:
         if failure_classification == "unsupported_capability":
-            return WorkflowTransition(
-                outcome=outcome,
-                route=WorkflowRoute.END,
-            )
-        return WorkflowTransition(
-            outcome=outcome,
-            route=WorkflowRoute.CLARIFY,
-        )
+            return WorkflowRoute.END.value
+        return WorkflowRoute.CLARIFY.value
     if outcome is WorkflowStageOutcome.READY_FOR_CONFIRMATION:
-        return WorkflowTransition(
-            outcome=outcome,
-            route=WorkflowRoute.CONFIRM,
-        )
+        return WorkflowRoute.CONFIRM.value
     if outcome is WorkflowStageOutcome.APPROVED_FOR_EXECUTION:
-        return WorkflowTransition(
-            outcome=outcome,
-            route=WorkflowRoute.EXECUTE,
-        )
+        return WorkflowRoute.EXECUTE.value
     if outcome is WorkflowStageOutcome.EXECUTION_SUCCEEDED:
-        return WorkflowTransition(
-            outcome=outcome,
-            route=WorkflowRoute.EXPLAIN,
-        )
-    if outcome is WorkflowStageOutcome.READY_TO_RESPOND:
-        return WorkflowTransition(
-            outcome=outcome,
-            route=WorkflowRoute.END,
-        )
-    return WorkflowTransition(
-        outcome=outcome,
-        route=WorkflowRoute.END,
-    )
-
-
-def _route_from_state(state: WorkflowState) -> str:
-    return state["route"].value
+        return WorkflowRoute.EXPLAIN.value
+    return WorkflowRoute.END.value
 
 
 def _run_state(state: WorkflowState) -> RunState:

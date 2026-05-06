@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.session.manager import InMemorySessionManager
@@ -108,6 +109,7 @@ agent_runtime_workflow = build_workflow(
     structured_interpreter=OpenRouterStructuredInterpreter(
         contract=agent_runtime_capability_contract,
     ),
+    clarification_generator=OpenRouterClarificationGenerator(),
 )
 
 
