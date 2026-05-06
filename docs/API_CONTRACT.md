@@ -999,18 +999,70 @@ If the stream disconnects, the client should reconnect by re-fetching the conver
 
 **Stream Events:**
 
-- **event: token**
-  - `data`: partial ai text
-- **event: title**
-  - `data`: `{"conversation_id":"uuid","title":"Tesla Dip Strategy"}`
-- **event: status**
-  - `data`: `{"status":"extracting_strategy"}`
-- **event: status**
-  - `data`: `{"status":"running_backtest"}`
-- **event: result**
-  - `data`: `{"run": {...}}`
-- **event: done**
-  - `data`: `{"message_id":"uuid"}`
+All events follow the SSE format: `data: {json}\n\n`.
+
+Events are emitted in this order per turn:
+
+**1. `stage_start`** — emitted when each pipeline stage begins
+```json
+{ "type": "stage_start", "stage": "interpret" }
+{ "type": "stage_start", "stage": "clarify" }
+{ "type": "stage_start", "stage": "confirm" }
+{ "type": "stage_start", "stage": "execute" }
+{ "type": "stage_start", "stage": "explain" }
+{ "type": "stage_start", "stage": "next_step" }
+```
+
+The frontend maps `stage` values to human-readable progress labels:
+- `interpret` → "Understanding your idea..."
+- `clarify` → "I have a question..."
+- `confirm` → "Here's what I found..."
+- `execute` → "Running backtest..."
+- `explain` → "Reviewing results..."
+- `next_step` → "What's next..."
+
+**2. `token`** — streaming LLM response text, one chunk at a time
+```json
+{ "type": "token", "content": "Based on your idea" }
+{ "type": "token", "content", " about Tesla..." }
+```
+Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `next_step` nodes.
+
+**3. `stage_outcome`** — emitted after `interpret` completes, so the frontend can render the correct UI element before the full graph finishes
+```json
+{ "type": "stage_outcome", "outcome": "ready_for_confirmation" }
+{ "type": "stage_outcome", "outcome": "needs_clarification" }
+{ "type": "stage_outcome", "outcome": "approved_for_execution" }
+{ "type": "stage_outcome", "outcome": "ready_to_respond" }
+```
+
+**4. `title`** — AI-generated conversation title (fires once, after first meaningful turn)
+```json
+{ "type": "title", "conversation_id": "uuid", "title": "Tesla Dip Strategy" }
+```
+
+**5. `final`** — last event, carries the complete response payload
+```json
+{
+  "type": "final",
+  "payload": {
+    "stage_outcome": "execution_succeeded",
+    "assistant_response": "The strategy returned +23%...",
+    "confirmation_payload": null,
+    "run": { },
+    "next_actions": ["save_strategy", "refine_strategy", "show_breakdown"],
+    "message_id": "uuid"
+  }
+}
+```
+
+**6. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
+```
+data: [DONE]
+```
+
+> [!IMPORTANT]
+> Frontend must never use local timers to fake progress states. Progress labels must be driven by `stage_start` events from the backend. This is the binding contract between DESIGN.md Section 11 and the agent runtime pipeline.
 
 *Note: Server may include `retry: 3000` in the stream, but clients should implement their own backoff/reconnect logic.*
 

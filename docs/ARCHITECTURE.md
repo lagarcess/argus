@@ -9,6 +9,9 @@
 > [!IMPORTANT]
 > **Locked Status**: No structural architecture shifts (service ownership changes or protocol swaps) are allowed without explicit approval. Additive refinements and implementation detail documentation are permitted.
 
+> [!NOTE]
+> This document describes the **target architecture** — the intended production state of the Argus agent runtime. It is the north star for implementation. Where current code diverges from this doc, the doc is correct and the code must change.
+
 ---
 
 # 1. Architecture Philosophy
@@ -250,13 +253,14 @@ Temporary performance state. In-memory fallback (e.g. `cachetools`) is allowed f
 
 ### API Layer
 
-Request in -> response out.
+Request in -> response out. Decomposed into focused routers (`api/routers/auth`, `conversations`, `strategies`, `collections`, `backtest`, `agent`). The `api/main.py` registers routers and contains no business logic.
 
-### AI Orchestrator (Stateless)
+### AI Orchestrator (Stateless Per Request)
 
-Build prompt -> call model -> parse response.
-- **Rule**: Orchestrator memory is reconstructed per request from Supabase-backed conversation/profile state, with optional cache acceleration only.
-- No durable or required session state is stored in orchestrator processes.
+Build prompt → call LLM → parse response → validate facts → route.
+- **Rule**: Orchestrator memory is reconstructed per turn from the LangGraph checkpointer (backed by Supabase `AsyncPostgresSaver` in production, `MemorySaver` in development).
+- No in-process session state is stored outside the checkpointer. `InMemorySessionManager` is not used.
+- One LLM call per turn for intent classification. Downstream calls (explain, clarify, name suggestion) are permitted but do not reclassify intent.
 
 ### Execution Worker (Stateless)
 
@@ -358,26 +362,74 @@ Each conversation is isolated.
 > [!TIP]
 > **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
 
-## Conversational Runtime Boundary
+## Conversational Runtime Architecture
 
-The runtime must decide the user's act before any missing-field clarification can
-become visible text. Deterministic code may produce validation facts such as
-`missing_period`, `known_asset`, `unsupported_mixed_assets`, or provider-window
-limits, but those facts are not the assistant voice.
+The agent runtime is a **LangGraph `StateGraph`** executing a pipeline of named stages. The graph is the execution contract. No routing logic exists outside the graph's conditional edge functions.
 
-The active chat path uses this boundary:
+### Tool Stack
 
-1. Interpret the turn against the current thread and strategy frame.
-2. Reduce the turn into the active `StrategyFrame` or preserve the frame for
-   education/result follow-ups.
-3. Validate execution truth deterministically.
-4. Emit an internal response intent for clarification, unsupported recovery,
-   education, confirmation, or result follow-up.
-5. Compose the final assistant text from the response intent and validated state.
+| Tool | Role | Scope |
+|---|---|---|
+| **LangChain** (`langchain_openrouter`, `langchain_core`) | LLM call layer | `ChatOpenRouter`, `.with_structured_output()`, `.ainvoke()`, `SystemMessage`/`HumanMessage`/`AIMessage` types |
+| **LangGraph** (`langgraph.graph`, `langgraph.checkpoint`) | Graph execution layer | `StateGraph`, `checkpointer`, `astream_events()`, thread-scoped state |
 
-Legacy slot prompts are internal fallback facts only. The public chat stream must
-not expose raw field names, enum-style choices, repeated starter guidance, or
-slot copy before the response composer has resolved the conversational act.
+These responsibilities are absolute and do not cross. Routing is not implemented inside LangChain calls. Session persistence is not implemented outside the checkpointer.
+
+### Pipeline (Per Turn)
+
+```
+HTTP POST /api/v1/conversations/{id}/chat (SSE)
+    │
+    ▼
+[Pre-flight] Auth validation, quota check (stateless, no LLM)
+    │
+    ▼
+[LangGraph: astream_events()]
+    ├── [interpret]  LLM classifies intent, extracts strategy fields, detects semantic_turn_act.
+    │                Post-LLM validation only: symbol resolution, asset parity, date limits,
+    │                missing required fields. → streams stage_start event immediately.
+    │
+    ├── [clarify]    if needs_clarification → LLM generates context-aware question.
+    │                No hardcoded prompt templates. → streams question tokens.
+    │
+    ├── [confirm]    if ready_for_confirmation → deterministic confirmation card assembly.
+    │                → streams stage_outcome event; frontend renders card.
+    │
+    ├── [execute]    if approved_for_execution → RealBacktestTool call.
+    │                → streams stage_start event; frontend shows "Running backtest..."
+    │
+    ├── [explain]    if execution_succeeded → LLM generates result narrative from metrics.
+    │                → streams explanation tokens.
+    │
+    └── [next_step]  LLM suggests follow-up actions. → streams next-step chips.
+    │
+    ▼
+[checkpointer] Persists WorkflowState to Supabase (AsyncPostgresSaver) or memory.
+    │
+    ▼
+SSE stream: done event with final payload
+```
+
+### NLU Ownership Rule
+
+The LLM is the **only NLU layer**. Deterministic code validates facts it cannot know — it does not classify intent, detect approval signals, or generate user-facing text.
+
+| Layer | Owns |
+|---|---|
+| LLM (interpret node) | Intent, task_relation, semantic_turn_act, strategy field extraction, social/approval/education detection, assistant_response |
+| Deterministic (post-LLM) | Symbol resolution via `domain/market_data.resolve_asset()`, asset class parity check, date range limit check, missing required fields check |
+
+No regex gate intercepts a user message before the LLM sees it. No hardcoded natural language string competes with the LLM's response in any stage file.
+
+### Session State Rule
+
+`TaskSnapshot` is the authoritative in-turn state. It stores only non-derivable fields:
+- `pending_strategy_summary` — strategy under construction
+- `confirmed_strategy_summary` — strategy approved for execution
+- `last_stage_outcome` — what the runtime last did
+- `latest_backtest_result_reference` — artifact pointer to last completed run
+
+Derived state (missing fields, pending needs, field provenance) is computed fresh each turn from `pending_strategy_summary`. It is never persisted.
 
 # 12. Strategy Architecture (Alpha)
 
@@ -571,3 +623,16 @@ When choosing any technical path, ask:
 > *Does this help Argus deliver fast, trustworthy conversational idea testing with lower friction?*
 
 If not, it likely should wait.
+
+# 22. Agent Runtime Decision Filter
+
+When writing any code that touches `agent_runtime/`, ask:
+
+1. **Does this add a regex or early-return gate before the LLM call?** If yes, stop. Move the logic to the LLM system prompt instead.
+2. **Does this store derived state in `TaskSnapshot`?** If yes, stop. Compute it fresh from `pending_strategy_summary` instead.
+3. **Does this add natural language strings to a stage file?** If yes, stop. The LLM generates the response; stage files orchestrate only.
+4. **Does this use `.invoke()` on the graph in production?** If yes, stop. Use `astream_events()` instead.
+5. **Does this write session state outside the checkpointer?** If yes, stop. The checkpointer is the only session store.
+6. **Does this add a second LLM call for intent classification?** If yes, stop. One classification call per turn.
+
+If the answer to any of these is "yes", the change reintroduces the brittleness the runtime remediation exists to eliminate.

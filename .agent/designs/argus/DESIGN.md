@@ -200,7 +200,19 @@ _Design targets below are intentional for this system; if implementation keeps T
 - **Starter Prompts**: Displayed as polished, high-contrast chips or cards to reduce "blank page" friction.
 - **Streaming States**: AI responses support real-time token streaming to feel alive.
 - **Calm Progress States**: When simulating, use human-centric status language and subtle motion (pulse dots, progress shimmers).
-  - *Treatments*: "Understanding your idea" → "Fetching market data" → "Running simulation" → "Preparing results".
+  - Progress states are driven by **`stage_start` server-sent events from the agent runtime pipeline**, not local frontend timers.
+  - The frontend must map `stage` values from the backend to these display labels:
+
+    | Backend `stage` | User-facing label |
+    |---|---|
+    | `interpret` | "Understanding your idea..." |
+    | `clarify` | "I have a question..." |
+    | `confirm` | "Here's what I found..." |
+    | `execute` | "Running backtest..." |
+    | `explain` | "Reviewing results..." |
+    | `next_step` | "What's next..." |
+
+  - The frontend must **never fake these states with timers**. If no `stage_start` event has been received, show a neutral loading indicator only.
 - **Inline Results**: Backtest result cards appear directly in the flow of conversation.
 - **Minimal Actions**: Follow-up actions should be clear but few (e.g., "Save Strategy", "Add to Collection").
 
