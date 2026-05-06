@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -106,6 +107,59 @@ def _fake_fetch_price_series(
     )["close"]
 
 
+def _runtime_success_result(
+    *,
+    symbol: str = "TSLA",
+    timeframe: str = "1D",
+    language: str = "en",
+) -> dict[str, Any]:
+    return {
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": (
+            "Probé la idea con TSLA."
+            if language.lower().startswith("es")
+            else f"I tested that idea with {symbol}."
+        ),
+        "final_response_payload": {
+            "result": {
+                "execution_status": "succeeded",
+                "resolved_strategy": {
+                    "strategy_type": "rsi_mean_reversion",
+                    "asset_universe": [symbol],
+                },
+                "resolved_parameters": {
+                    "timeframe": timeframe,
+                    "date_range": {
+                        "start": "2025-01-01",
+                        "end": "2025-12-31",
+                    },
+                },
+                "metrics": {
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                    "by_symbol": {},
+                },
+                "benchmark_metrics": {
+                    "benchmark_symbol": "BTC" if symbol == "BTC" else "SPY",
+                    "benchmark_return_pct": 9.2,
+                },
+                "assumptions": ["Starting capital: $10,000."],
+                "caveats": [],
+            },
+            "result_card": {
+                "title": f"{symbol} RSI Mean Reversion",
+                "status_label": "Simulation Complete",
+                "rows": [{"label": "Total Return", "value": "+12.5%"}],
+                "assumptions": ["Starting capital: $10,000."],
+            },
+        },
+    }
+
+
+def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
+    language = str(getattr(kwargs.get("user"), "language_preference", "en"))
+    return _runtime_success_result(language=language)
+
+
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
@@ -147,6 +201,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
             )
         ),
     )
+    monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
     monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)

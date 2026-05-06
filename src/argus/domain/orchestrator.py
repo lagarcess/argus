@@ -95,16 +95,16 @@ STARTER_PROMPTS = {
         "Start with a low-maintenance idea",
     ],
     "explore_crypto": [
+        "Backtest Bitcoin halvings",
         "Hold Bitcoin for a year",
         "Compare Ethereum and Bitcoin",
         "Buy Bitcoin after big drops",
-        "Buy Bitcoin every month",
     ],
     "surprise_me": [
+        "Show me something interesting",
         "Show me a simple first idea",
         "Test a familiar stock",
         "Compare two familiar assets",
-        "Explain a result like I am new",
     ],
 }
 
@@ -165,6 +165,58 @@ class NameSuggestion(BaseModel):
     name: str
 
 
+class ExtractedSlot(BaseModel):
+    value: Any | None = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source: str = "llm"
+
+
+SlotValue = ExtractedSlot
+
+
+def _missing_slot() -> ExtractedSlot:
+    return ExtractedSlot(source="missing")
+
+
+def _missing_symbol_slot() -> ExtractedSlot:
+    return ExtractedSlot(value=[], source="missing")
+
+
+class StrategyIntentExtraction(BaseModel):
+    wants_backtest: bool = False
+    template: ExtractedSlot = Field(default_factory=_missing_slot)
+    symbols: ExtractedSlot = Field(default_factory=_missing_symbol_slot)
+    starting_capital: ExtractedSlot = Field(default_factory=_missing_slot)
+
+
+class StrategyDraft(BaseModel):
+    template: ExtractedSlot = Field(default_factory=_missing_slot)
+    asset_class: ExtractedSlot = Field(default_factory=_missing_slot)
+    symbols: ExtractedSlot = Field(default_factory=_missing_symbol_slot)
+    timeframe: ExtractedSlot = Field(default_factory=_missing_slot)
+    starting_capital: ExtractedSlot = Field(default_factory=_missing_slot)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+ChatOrchestrationIntent = Literal[
+    "clarify",
+    "confirm",
+    "respond",
+    "run_backtest",
+    "onboarding_prompt",
+]
+
+
+class ChatOrchestrationDecision(BaseModel):
+    intent: ChatOrchestrationIntent = "clarify"
+    assistant_message: str
+    strategy_draft: StrategyDraft | None = Field(default_factory=StrategyDraft)
+    title_suggestion: str | None = None
+
+
+OrchestratedChatTurn = ChatOrchestrationDecision
+
+
 # --- Helper Logic ---
 
 
@@ -198,6 +250,154 @@ def parse_onboarding_goal(message: str) -> str | None:
     return None
 
 
+def canonical_template(raw_template: str | None) -> str | None:
+    candidate = (raw_template or "").strip().lower().replace("_", " ")
+    if not candidate:
+        return None
+    for key, capability in STRATEGY_CAPABILITIES.items():
+        names = [
+            key.replace("_", " "),
+            capability.display_name.lower(),
+            *[alias.lower() for alias in capability.aliases],
+        ]
+        if candidate in names:
+            return key
+    return None
+
+
+def _extract_symbols_from_text(message: str) -> list[str]:
+    normalized = "".join(char if char.isalnum() else " " for char in message.upper())
+    symbols: list[str] = []
+    for token in normalized.split():
+        candidate = COMMON_NAMES.get(token, token)
+        if candidate in NON_SYMBOLS:
+            continue
+        if not candidate.isalpha() or not (2 <= len(candidate) <= 5):
+            continue
+        if candidate not in symbols:
+            symbols.append(candidate)
+    return symbols
+
+
+def _extract_deterministic_intent(message: str) -> StrategyIntentExtraction:
+    lower_message = message.lower()
+    template = None
+    for key, capability in STRATEGY_CAPABILITIES.items():
+        candidates = [
+            key.replace("_", " "),
+            capability.display_name.lower(),
+            *[alias.lower() for alias in capability.aliases],
+        ]
+        if any(candidate in lower_message for candidate in candidates):
+            template = key
+            break
+
+    extraction = StrategyIntentExtraction()
+    if template is not None:
+        extraction.template = ExtractedSlot(
+            value=template,
+            confidence=0.95,
+            source="deterministic",
+        )
+
+    symbols = _extract_symbols_from_text(message)
+    if symbols:
+        extraction.symbols = ExtractedSlot(
+            value=symbols,
+            confidence=0.9,
+            source="deterministic",
+        )
+    return extraction
+
+
+def _extract_strategy_intent(
+    *,
+    message: str,
+    language: str | None = None,
+    history: list[dict[str, Any]] | None = None,
+) -> StrategyIntentExtraction:
+    _ = (message, language, history)
+    return _extract_deterministic_intent(message)
+
+
+def _latest_strategy_draft(history: list[dict[str, Any]] | None) -> StrategyDraft:
+    for item in reversed(history or []):
+        metadata = item.get("metadata") or {}
+        raw_draft = metadata.get("strategy_draft")
+        if not raw_draft:
+            continue
+        try:
+            return StrategyDraft.model_validate(raw_draft)
+        except Exception:
+            continue
+    return StrategyDraft()
+
+
+def _slot_has_value(slot: ExtractedSlot) -> bool:
+    return slot.value not in (None, "", [])
+
+
+def orchestrate_chat_turn(
+    *,
+    message: str,
+    language: str | None = None,
+    history: list[dict[str, Any]] | None = None,
+) -> OrchestratedChatTurn:
+    draft = _latest_strategy_draft(history).model_copy(deep=True)
+    extraction = _extract_strategy_intent(
+        message=message,
+        language=language,
+        history=history,
+    )
+
+    if _slot_has_value(extraction.template):
+        draft.template = extraction.template
+    if _slot_has_value(extraction.symbols):
+        draft.symbols = extraction.symbols
+    if _slot_has_value(extraction.starting_capital):
+        draft.starting_capital = extraction.starting_capital
+
+    missing_template = not _slot_has_value(draft.template)
+    missing_symbols = not _slot_has_value(draft.symbols)
+    missing_capital = not _slot_has_value(draft.starting_capital)
+    is_es = _resolve_language(language) == "es-419"
+
+    if missing_template:
+        assistant_message = (
+            "Cuéntame qué regla quieres probar: por ejemplo RSI, comprar y mantener, o compras periódicas."
+            if is_es
+            else "Tell me what rule you want to test: for example RSI, buy and hold, or recurring buys."
+        )
+        return ChatOrchestrationDecision(
+            intent="clarify",
+            assistant_message=assistant_message,
+            strategy_draft=draft,
+        )
+
+    if missing_symbols or missing_capital:
+        assistant_message = (
+            "Ya tengo la lógica. Ahora dime el activo y el capital para preparar la prueba."
+            if is_es
+            else "I have the logic. Now tell me the asset and capital so I can prepare the test."
+        )
+        return ChatOrchestrationDecision(
+            intent="clarify",
+            assistant_message=assistant_message,
+            strategy_draft=draft,
+        )
+
+    assistant_message = (
+        "Ya tengo la idea suficiente para revisarla antes de ejecutarla."
+        if is_es
+        else "I have enough of the idea to review it before running it."
+    )
+    return ChatOrchestrationDecision(
+        intent="confirm",
+        assistant_message=assistant_message,
+        strategy_draft=draft,
+    )
+
+
 def assistant_message_for_chat_turn(
     intent: ChatTurnIntent,
     message: str,
@@ -217,6 +417,10 @@ def assistant_message_for_chat_turn(
 
 
 # --- Core API ---
+
+
+def _build_model(task: str, *, model_name: str | None = None) -> Any:
+    return build_openrouter_model(task, model_name=model_name)
 
 
 def normalize_backtest_update(
@@ -254,7 +458,7 @@ def classify_chat_turn_intent(
     is_es = _resolve_language(language) == "es-419"
     # Respect the AGENT_MODEL from env
     resolved_model = resolve_openrouter_model(model_name)
-    model = build_openrouter_model("chat_composer", model_name=resolved_model)
+    model = _build_model("chat_composer", model_name=resolved_model)
 
     if model is None:
         return ChatTurnIntent(

@@ -82,6 +82,69 @@ def _fake_fetch_price_series(
     )["close"]
 
 
+def _runtime_success_result(
+    *,
+    symbol: str = "TSLA",
+    timeframe: str = "1D",
+    language: str = "en",
+    assistant_response: str | None = None,
+) -> dict[str, Any]:
+    assistant_copy = assistant_response or (
+        "Probé la idea con TSLA."
+        if language.lower().startswith("es")
+        else f"I tested that idea with {symbol}."
+    )
+    return {
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": assistant_copy,
+        "final_response_payload": {
+            "result": {
+                "execution_status": "succeeded",
+                "resolved_strategy": {
+                    "strategy_type": "rsi_mean_reversion",
+                    "asset_universe": [symbol],
+                },
+                "resolved_parameters": {
+                    "timeframe": timeframe,
+                    "date_range": {
+                        "start": "2025-01-01",
+                        "end": "2025-12-31",
+                    },
+                },
+                "metrics": {
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                    "by_symbol": {},
+                },
+                "benchmark_metrics": {
+                    "benchmark_symbol": "BTC" if symbol == "BTC" else "SPY",
+                    "benchmark_return_pct": 9.2,
+                },
+                "assumptions": ["Starting capital: $10,000."],
+                "caveats": [],
+            },
+            "result_card": {
+                "title": f"{symbol} RSI Mean Reversion",
+                "status_label": "Simulation Complete",
+                "rows": [{"label": "Total Return", "value": "+12.5%"}],
+                "assumptions": ["Starting capital: $10,000."],
+            },
+        },
+    }
+
+
+def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
+    message = str(kwargs.get("message", ""))
+    language = str(getattr(kwargs.get("user"), "language_preference", "en"))
+    upper_message = message.upper()
+    symbol = "BTC" if "BTC" in upper_message or "BITCOIN" in upper_message else "TSLA"
+    timeframe = "1h" if "1h" in message.lower() else "1D"
+    return _runtime_success_result(
+        symbol=symbol,
+        timeframe=timeframe,
+        language=language,
+    )
+
+
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
@@ -126,6 +189,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
             )
         ),
     )
+    monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
     monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
@@ -456,8 +520,7 @@ def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
     assert response.status_code == 200
     stream = response.text
     assert "event: status" in stream
-    assert '"status":"extracting_strategy"' in stream
-    assert '"status":"running_backtest"' in stream
+    assert '"status":"ready_to_respond"' in stream
     assert "event: result" in stream
     assert "event: done" in stream
 
@@ -735,6 +798,15 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
             ),
         ),
     )
+    monkeypatch.setattr(
+        api_main,
+        "run_agent_turn",
+        lambda **kwargs: {
+            "stage_outcome": "await_user_reply",
+            "assistant_prompt": "Which symbols do you want to test?",
+            "final_response_payload": {"error": "missing_required_input"},
+        },
+    )
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -778,6 +850,11 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
             ),
         ),
     )
+    monkeypatch.setattr(
+        api_main,
+        "run_agent_turn",
+        lambda **kwargs: _runtime_success_result(symbol="BTC", timeframe="1h"),
+    )
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -792,13 +869,8 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
     assert '"timeframe":"1h"' in response.text or '"timeframe": "1h"' in response.text
 
 
-def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
+def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
     from argus.api import main as api_main
-    from argus.domain.orchestrator import (
-        ChatOrchestrationDecision,
-        SlotValue,
-        StrategyDraft,
-    )
 
     client = _client()
     _set_onboarding_ready(client)
@@ -819,23 +891,13 @@ def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
     )
     store.messages[conversation["id"]] = [msg1]
 
-    captured_history: list[dict[str, str]] | None = None
+    captured_runtime: dict[str, Any] = {}
 
-    def _fake_orchestrate(
-        *, history: list[dict[str, str]] | None = None, **kwargs: Any
-    ) -> ChatOrchestrationDecision:
-        nonlocal captured_history
-        captured_history = history
-        return ChatOrchestrationDecision(
-            intent="run_backtest",
-            assistant_message="ok",
-            strategy_draft=StrategyDraft(
-                template=SlotValue(value="rsi_mean_reversion", source="user_supplied"),
-                symbols=SlotValue(value=["AAPL"], source="user_supplied"),
-            ),
-        )
+    def _fake_run_agent_turn(**kwargs: Any) -> dict[str, Any]:
+        captured_runtime.update(kwargs)
+        return _runtime_success_result(symbol="AAPL", assistant_response="ok")
 
-    monkeypatch.setattr(api_main, "orchestrate_chat_turn", _fake_orchestrate)
+    monkeypatch.setattr(api_main, "run_agent_turn", _fake_run_agent_turn)
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -846,8 +908,8 @@ def test_chat_stream_passes_history_to_orchestrator(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    assert captured_history is not None
-    assert any(m["content"] == "Tell me about AAPL" for m in captured_history)
+    assert captured_runtime["thread_id"] == conversation["id"]
+    assert captured_runtime["message"] == "Backtest it"
 
 
 def test_starter_prompts_returns_personalized_suggestions() -> None:

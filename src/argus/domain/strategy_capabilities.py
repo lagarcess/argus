@@ -66,6 +66,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
                 default="rsi",
                 allowed_values=["rsi"],
                 description="Executable indicator for this threshold strategy.",
+                value_aliases={"rsi": ["rsi", "indice de fuerza relativa"]},
             ),
             "indicator_period": ParameterSpec(
                 key="indicator_period",

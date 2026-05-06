@@ -92,6 +92,18 @@ class LLMInterpretationResponse(BaseModel):
     reason_codes: list[str] = Field(default_factory=list)
     ambiguous_fields: list[LLMAmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[LLMUnsupportedConstraint] = Field(default_factory=list)
+    semantic_turn_act: (
+        Literal[
+            "new_idea",
+            "answer_pending_need",
+            "refine_current_idea",
+            "educational_question",
+            "result_followup",
+            "approval",
+            "unsupported_request",
+        ]
+        | None
+    ) = None
 
 
 class OpenRouterStructuredInterpreter:
@@ -200,6 +212,23 @@ class OpenRouterStructuredInterpreter:
             "force a backtest. Keep prose concise, no emoji, no decorative markdown, "
             "and no generic chatbot openers. For unsupported requests, acknowledge the understood "
             "intent, explain the limitation, and offer executable simplifications.\n\n"
+            "semantic_turn_act is the routing source of truth. Use approval when the "
+            "user clearly approves a pending confirmation; in that case set intent to "
+            "backtest_execution, task_relation to continue, requires_clarification to "
+            "false, and preserve the prior strategy. Use refine_current_idea when the "
+            "user asks to change dates, assets, assumptions, timeframe, capital, or "
+            "strategy details, and ask only for the changed missing detail. Greetings "
+            "and social check-ins are conversation_followup, not strategy_drafting, "
+            "unless the same message includes a real investing idea. Product or "
+            "investing concept questions are educational_question or "
+            "conversation_followup and must use assistant_response without forcing a "
+            "backtest.\n\n"
+            "assistant_response must be natural user-facing prose. Never expose "
+            "internal field names such as asset_universe, capital_amount, "
+            "requested_field, or missing_required_fields. Never output raw JSON, "
+            "'not specified', template placeholders, scaffolding labels, or backend "
+            "schema language. Avoid responses under 10 words except deliberate short "
+            "confirmations.\n\n"
             "Treat prior result state as optional context, not the active topic by default. "
             "Set uses_latest_result_context=true only when the latest user message is semantically "
             "about the latest run/result, such as metrics, return, benchmark, drawdown, assumptions "
@@ -242,6 +271,7 @@ class OpenRouterStructuredInterpreter:
             ambiguous_fields=ambiguous,
             unsupported_constraints=unsupported,
             uses_latest_result_context=response.uses_latest_result_context,
+            semantic_turn_act=response.semantic_turn_act,
         )
 
 

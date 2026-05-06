@@ -13,7 +13,6 @@ import vectorbt as vbt
 
 from argus.domain.indicators import (
     executable_indicator_spec,
-    indicator_assumption_lines,
     normalize_indicator_parameters,
 )
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series, resolve_asset
@@ -1041,9 +1040,6 @@ def build_result_card(
         ]
         if bool(realism["enabled"]):
             assumptions[4] = "Execution realism enabled (fees/slippage applied)."
-
-    if config["template"] == "rsi_mean_reversion":
-        assumptions.extend(indicator_assumption_lines(config.get("parameters") or {}))
 
     rows = [
         {

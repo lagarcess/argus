@@ -92,7 +92,7 @@ def test_interpret_and_clarify_preserve_under_specified_thesis_handoff() -> None
     assert "investing idea" not in clarified.patch["assistant_prompt"].lower()
 
 
-def test_buy_and_hold_without_asset_uses_strategy_frame_needs() -> None:
+def test_buy_and_hold_without_asset_uses_pending_strategy_summary_needs() -> None:
     user = UserState(user_id="u1", expertise_level="advanced")
     state = RunState.new(
         current_user_message="Let's test a buy and hold strategy",

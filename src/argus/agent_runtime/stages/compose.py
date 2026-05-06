@@ -21,7 +21,11 @@ def compose_response_intent(state: RunState) -> str | None:
     if intent.kind == "optional_settings":
         choices = intent.facts.get("optional_parameter_choices", [])
         labels = _human_list(
-            [_human_field_name(str(choice)) for choice in choices if isinstance(choice, str)]
+            [
+                _human_field_name(str(choice))
+                for choice in choices
+                if isinstance(choice, str)
+            ]
         )
         if labels:
             return (
@@ -65,10 +69,7 @@ def _compose_clarification(intent: ResponseIntent) -> str:
     if needs:
         questions = [_question_for_need(need) for need in needs]
         return f"{context}{' '.join(question for question in questions if question)}"
-    return (
-        f"{context}I need one more detail before I can turn this into a "
-        "backtest."
-    )
+    return f"{context}I need one more detail before I can turn this into a " "backtest."
 
 
 def _compose_unsupported_recovery(intent: ResponseIntent) -> str:
@@ -86,7 +87,9 @@ def _compose_unsupported_recovery(intent: ResponseIntent) -> str:
         if isinstance(option, dict) and str(option.get("label", "")).strip()
     ]
     if labels:
-        return f"{explanation} I can {_human_list(labels)}. Which direction should I take?"
+        return (
+            f"{explanation} I can {_human_list(labels)}. Which direction should I take?"
+        )
     return f"{explanation} I can help simplify it into something runnable."
 
 

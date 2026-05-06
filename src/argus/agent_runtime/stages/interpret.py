@@ -168,6 +168,7 @@ class StructuredInterpretation(BaseModel):
     ambiguous_fields: list[AmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[UnsupportedConstraint] = Field(default_factory=list)
     uses_latest_result_context: bool | None = None
+    semantic_turn_act: SemanticTurnAct | None = None
 
 
 class InterpretationRequest(BaseModel):
@@ -201,30 +202,6 @@ def interpret_stage(
 ) -> StageResult:
     capability_contract = build_default_capability_contract()
     snapshot = normalize_task_snapshot(latest_task_snapshot)
-
-    approval_result = _approval_stage_result_if_applicable(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-    )
-    if approval_result is not None:
-        return approval_result
-
-    confirmation_action_result = _confirmation_edit_action_stage_result_if_applicable(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-    )
-    if confirmation_action_result is not None:
-        return confirmation_action_result
-
-    social_opener_result = _social_opener_stage_result_if_applicable(
-        state=state,
-        user=user,
-        snapshot=snapshot,
-    )
-    if social_opener_result is not None:
-        return social_opener_result
 
     structured_result = _structured_stage_result(
         state=state,
@@ -479,45 +456,6 @@ def _contextual_response_stage_result_if_applicable(
     )
 
 
-def _social_opener_stage_result_if_applicable(
-    *,
-    state: RunState,
-    user: UserState,
-    snapshot: TaskSnapshot | None,
-) -> StageResult | None:
-    response = _social_opener_response(state.current_user_message, snapshot=snapshot)
-    if response is None:
-        return None
-    signals = extract_signals(
-        message=state.current_user_message,
-        latest_task_snapshot=snapshot,
-    )
-    strategy = snapshot.pending_strategy_summary if snapshot is not None else None
-    decision = InterpretDecision(
-        intent="conversation_followup",
-        task_relation="continue",
-        requires_clarification=False,
-        user_goal_summary="User opened with a greeting or social check-in.",
-        candidate_strategy_draft=strategy or StrategySummary(),
-        missing_required_fields=[],
-        optional_parameter_opportunity=[],
-        confidence=0.99,
-        arbitration_mode="deterministic",
-        reason_codes=["social_opener"],
-        effective_response_profile=resolve_effective_response_profile(
-            user=user,
-            explicit_overrides=signals.response_profile_overrides,
-        ),
-        user_preference_overridden_for_turn=has_response_profile_overrides(signals),
-        normalized_signals=signals.to_patch_payload(),
-    )
-    return StageResult(
-        outcome="ready_to_respond",
-        decision=decision,
-        stage_patch={"assistant_response": response},
-    )
-
-
 def _contextual_intent(
     message: str,
     snapshot: TaskSnapshot,
@@ -597,14 +535,10 @@ def _resolve_semantic_turn_act(
 
 
 def _pending_needs(snapshot: TaskSnapshot | None) -> list[str]:
-    if snapshot is None:
+    if snapshot is None or snapshot.pending_strategy_summary is None:
         return []
-    needs = list(snapshot.pending_needs)
-    if snapshot.strategy_frame is not None:
-        needs.extend(snapshot.strategy_frame.pending_needs)
+    needs: list[str] = []
     strategy = snapshot.pending_strategy_summary
-    if strategy is None:
-        return list(dict.fromkeys(needs))
     if not strategy.asset_universe:
         needs.append("asset_target")
     if strategy.strategy_type == "dca_accumulation" and strategy.capital_amount is None:
@@ -923,119 +857,6 @@ def missing_required_fields_for_strategy(
     return missing
 
 
-def _approval_stage_result_if_applicable(
-    *,
-    state: RunState,
-    user: UserState,
-    snapshot: TaskSnapshot | None,
-) -> StageResult | None:
-    del user
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return None
-    if not strategy_can_be_approved(snapshot.pending_strategy_summary):
-        return None
-    if not _is_approval_message(state.current_user_message):
-        return None
-    return StageResult(
-        outcome="approved_for_execution",
-        stage_patch={
-            "intent": "backtest_execution",
-            "task_relation": "continue",
-            "requires_clarification": False,
-            "user_goal_summary": "User approved the pending backtest for execution.",
-            "candidate_strategy_draft": snapshot.pending_strategy_summary.model_dump(
-                mode="python"
-            ),
-            "confirmation_payload": {
-                "strategy": snapshot.pending_strategy_summary.model_dump(mode="python"),
-                "optional_parameters": {},
-            },
-        },
-    )
-
-
-def _confirmation_edit_action_stage_result_if_applicable(
-    *,
-    state: RunState,
-    user: UserState,
-    snapshot: TaskSnapshot | None,
-) -> StageResult | None:
-    if snapshot is None or snapshot.pending_strategy_summary is None:
-        return None
-
-    action = _confirmation_edit_action(state.current_user_message)
-    if action is None:
-        return None
-
-    strategy = snapshot.pending_strategy_summary
-    effective_profile = resolve_effective_response_profile(
-        user=user,
-        explicit_overrides=None,
-    )
-    prompts = {
-        "date_range": (
-            "What time period should I test instead? You can say something like "
-            "'past 6 months', 'since 2021', or 'January 1, 2024 to today'."
-        ),
-        "asset_universe": (
-            "Which asset should I use instead? You can give me the company name, "
-            "crypto name, or ticker."
-        ),
-        "assumptions": (
-            "Which assumption do you want to change: starting capital, bar timeframe, "
-            "fees, or slippage?"
-        ),
-    }
-    missing_fields = [action] if action in {"date_range", "asset_universe"} else []
-    return StageResult(
-        outcome="await_user_reply",
-        decision=InterpretDecision(
-            intent="backtest_execution",
-            task_relation="refine",
-            requires_clarification=True,
-            user_goal_summary=f"User wants to change the pending {action.replace('_', ' ')}.",
-            candidate_strategy_draft=strategy,
-            missing_required_fields=missing_fields,
-            confidence=0.94,
-            arbitration_mode="deterministic",
-            reason_codes=["confirmation_action_chip"],
-            effective_response_profile=effective_profile,
-        ),
-        stage_patch={
-            "assistant_prompt": prompts[action],
-            "requested_field": action if action != "assumptions" else None,
-        },
-    )
-
-
-def _confirmation_edit_action(message: str) -> str | None:
-    lowered = " ".join(message.lower().strip().split())
-    if lowered in {
-        "change the date range",
-        "change dates",
-        "change date",
-        "edit dates",
-        "edit date range",
-    }:
-        return "date_range"
-    if lowered in {
-        "use a different asset",
-        "change asset",
-        "change the asset",
-        "edit asset",
-        "switch asset",
-    }:
-        return "asset_universe"
-    if lowered in {
-        "change the assumptions",
-        "change assumptions",
-        "adjust assumptions",
-        "edit assumptions",
-    }:
-        return "assumptions"
-    return None
-
-
 def _structured_stage_result(
     *,
     state: RunState,
@@ -1094,7 +915,34 @@ def _structured_stage_result(
         field_status={},
         ambiguous_fields=interpretation.ambiguous_fields,
         unsupported_constraints=interpretation.unsupported_constraints,
+        semantic_turn_act=interpretation.semantic_turn_act,
     )
+    if (
+        interpretation.semantic_turn_act == "approval"
+        and latest_task_snapshot is not None
+        and latest_task_snapshot.pending_strategy_summary is not None
+        and strategy_can_be_approved(latest_task_snapshot.pending_strategy_summary)
+    ):
+        approved_strategy = latest_task_snapshot.pending_strategy_summary
+        return StageResult(
+            outcome="approved_for_execution",
+            decision=decision.model_copy(
+                update={
+                    "intent": "backtest_execution",
+                    "task_relation": "continue",
+                    "requires_clarification": False,
+                    "candidate_strategy_draft": approved_strategy,
+                    "missing_required_fields": [],
+                    "semantic_turn_act": "approval",
+                }
+            ),
+            stage_patch={
+                "confirmation_payload": {
+                    "strategy": approved_strategy.model_dump(mode="python"),
+                    "optional_parameters": {},
+                },
+            },
+        )
     symbol_only_response = _symbol_only_strategy_response(
         message=state.current_user_message,
         strategy=interpretation.candidate_strategy_draft,
@@ -1145,17 +993,10 @@ def _structured_stage_result(
         and interpretation.intent not in {"backtest_execution", "strategy_drafting"}
     )
     if should_use_assistant_response:
-        fallback_response = _educational_fallback_response(state.current_user_message)
-        assistant_response = (
-            fallback_response
-            if _assistant_response_is_too_thin(interpretation.assistant_response)
-            and fallback_response is not None
-            else interpretation.assistant_response
-        )
         return StageResult(
             outcome="ready_to_respond",
             decision=decision,
-            stage_patch={"assistant_response": assistant_response},
+            stage_patch={"assistant_response": interpretation.assistant_response},
         )
     return StageResult(
         outcome="needs_clarification"
@@ -1294,47 +1135,6 @@ def _asset_direction_response(symbol: str) -> str:
         "or build a simple rule like buying when RSI is low. "
         "Say the direction you want, or say 'simple test' and I'll set up a basic buy-and-hold to confirm."
     )
-
-
-def _assistant_response_is_too_thin(response: str | None) -> bool:
-    if response is None:
-        return True
-    stripped = response.strip()
-    if not stripped:
-        return True
-    return len(stripped.split()) <= 3
-
-
-def _educational_fallback_response(message: str) -> str | None:
-    lowered = message.lower().strip()
-    asset_explanation = _asset_explanation_response(message)
-    if asset_explanation is not None:
-        return asset_explanation
-    if re.search(
-        r"\bwhat(?:'s| is)\s+(?:a\s+)?backtest\b|\bexplain backtests?\b", lowered
-    ):
-        return (
-            "A backtest is a historical replay of an investing idea. Argus takes "
-            "the rule you describe, applies it to past market data, and shows how "
-            "that simulated strategy performed against a benchmark. It is useful "
-            "for learning from history, but it is not a prediction."
-        )
-    if re.search(r"\bwhat(?:'s| is)\s+dca\b|\bexplain dca\b", lowered):
-        return (
-            "DCA means buying a fixed amount on a regular schedule, like $500 every month. "
-            "The point is to avoid trying to pick the perfect day. In Argus, I can test how that "
-            "recurring-buy plan would have performed historically for a supported asset."
-        )
-    if re.search(
-        r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b", lowered
-    ):
-        return (
-            "No problem. The simple version: Argus turns an investing idea into a historical test. "
-            "If we were talking about RSI, think of it like a temperature gauge for recent price movement: "
-            "low can mean the asset has been weak recently, high can mean it has been strong recently. "
-            "It is useful only as a rule to test, not as a prediction."
-        )
-    return None
 
 
 def _is_result_explanation_followup(

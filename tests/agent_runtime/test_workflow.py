@@ -14,6 +14,7 @@ from argus.agent_runtime.stages.interpret import (
 )
 from argus.agent_runtime.state.models import (
     ArtifactReference,
+    StrategySummary,
     TaskSnapshot,
     UserState,
 )
@@ -36,8 +37,31 @@ class FakeWorkflow:
         }
 
 
+def rsi_confirmation_interpreter(
+    request: InterpretationRequest,
+) -> StructuredInterpretation:
+    return StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User is ready to confirm an RSI backtest.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=request.current_user_message,
+            strategy_type="rsi_threshold",
+            strategy_thesis=request.current_user_message,
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="last year",
+            entry_logic="RSI drops below 30",
+            exit_logic="RSI rises above 55",
+        ),
+        confidence=0.94,
+        semantic_turn_act="new_idea",
+    )
+
+
 def test_workflow_requires_confirmation_before_execute() -> None:
-    workflow = build_workflow()
+    workflow = build_workflow(structured_interpreter=rsi_confirmation_interpreter)
     manager = InMemorySessionManager()
     user = UserState(user_id="u1", expertise_level="advanced")
 
@@ -594,6 +618,25 @@ def test_build_workflow_input_preserves_natural_date_phrasing() -> None:
     assert state["run_state"].current_user_message == message
 
 
+def test_build_workflow_input_does_not_rewrite_strategy_logic_or_dates() -> None:
+    message = (
+        "  Backtest Tesla when RSI drops below 30 and exit above 55 "
+        "over the last year  "
+    )
+
+    state = build_workflow_input(
+        session_manager=InMemorySessionManager(),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        thread_id="thread-raw-strategy-message",
+        message=message,
+    )
+
+    assert (
+        state["run_state"].current_user_message
+        == "Backtest Tesla when RSI drops below 30 and exit above 55 over the last year"
+    )
+
+
 def test_internal_agent_runtime_turn_endpoint_returns_confirmation_ready_result(
     monkeypatch,
 ) -> None:
@@ -605,7 +648,7 @@ def test_internal_agent_runtime_turn_endpoint_returns_confirmation_ready_result(
     monkeypatch.setattr(
         api_main,
         "agent_runtime_workflow",
-        build_workflow(),
+        build_workflow(structured_interpreter=rsi_confirmation_interpreter),
     )
     client = TestClient(api_main.app)
 
@@ -660,7 +703,7 @@ def test_run_agent_turn_serializes_rich_final_response_payload() -> None:
     )
 
 
-def test_workflow_quality_gate_repairs_thin_educational_llm_response() -> None:
+def test_runtime_preserves_llm_response_without_posthoc_quality_gate() -> None:
     def thin_interpreter(_request: InterpretationRequest) -> StructuredInterpretation:
         return StructuredInterpretation(
             intent="conversation_followup",
@@ -669,6 +712,7 @@ def test_workflow_quality_gate_repairs_thin_educational_llm_response() -> None:
             user_goal_summary="User asked what a backtest is.",
             assistant_response="Backtest.",
             confidence=0.9,
+            semantic_turn_act="educational_question",
         )
 
     workflow = build_workflow(structured_interpreter=thin_interpreter)
@@ -683,31 +727,4 @@ def test_workflow_quality_gate_repairs_thin_educational_llm_response() -> None:
     )
 
     assert result["stage_outcome"] == "ready_to_respond"
-    response = result["assistant_response"]
-    assert len(response.split()) > 8
-    assert "historical" in response.lower()
-    assert response != "Backtest."
-
-
-def test_workflow_quality_gate_repairs_raw_backend_scaffolding_prompt() -> None:
-    workflow = FakeWorkflow(
-        {
-            "stage_outcome": "await_user_reply",
-            "assistant_prompt": "asset universe: you said 'not specified'; capital amount: you said 'not specified'. Which of those should I use?",
-        }
-    )
-    manager = InMemorySessionManager()
-
-    result = run_agent_turn(
-        workflow=workflow,
-        session_manager=manager,
-        user=UserState(user_id="u1", expertise_level="beginner"),
-        thread_id="thread-raw-scaffold",
-        message="What if I bought a fixed amount every month?",
-    )
-
-    prompt = result["assistant_prompt"]
-    assert "asset universe" not in prompt.lower()
-    assert "not specified" not in prompt.lower()
-    assert "Which asset" in prompt
-    assert "How much" in prompt
+    assert result["assistant_response"] == "Backtest."

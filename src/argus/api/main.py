@@ -118,6 +118,12 @@ agent_runtime_workflow = build_workflow(
 )
 
 
+def orchestrate_chat_turn(**kwargs: Any) -> Any:
+    from argus.domain.orchestrator import orchestrate_chat_turn as legacy_orchestrator
+
+    return legacy_orchestrator(**kwargs)
+
+
 class InternalAgentRuntimeTurnRequest(BaseModel):
     user_id: str
     thread_id: str
@@ -2799,11 +2805,7 @@ def chat_stream(
     }
 
     def events() -> Iterable[str]:
-        if (
-            onboarding_required
-            and onboarding_goal is None
-            and not request_message.strip()
-        ):
+        if onboarding_required and onboarding_goal is None:
             lang = (
                 payload.language
                 or conversation.language

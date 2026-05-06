@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from argus.agent_runtime.graph.workflow import WorkflowState
@@ -9,7 +8,6 @@ from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
-    StrategyFrame,
     TaskSnapshot,
     UserState,
 )
@@ -36,10 +34,7 @@ def run_agent_turn(
         thread_id=thread_id,
         message=message,
     )
-    result = _apply_response_quality_gate(
-        result=_compose_runtime_response(workflow.invoke(initial_state)),
-        message=message,
-    )
+    result = _compose_runtime_response(workflow.invoke(initial_state))
     run_state = result["run_state"]
     persisted_artifact_references = _resolve_persisted_artifact_references(
         result=result,
@@ -87,7 +82,7 @@ def build_workflow_input(
     message: str,
 ) -> WorkflowState:
     thread = session_manager.load_thread(user_id=user.user_id, thread_id=thread_id)
-    normalized_message = _normalize_message_for_runtime_slice(message)
+    normalized_message = " ".join(message.strip().split())
     return {
         "run_state": RunState.new(
             current_user_message=normalized_message,
@@ -124,106 +119,6 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
     return patched
 
 
-def _apply_response_quality_gate(
-    *,
-    result: dict[str, Any],
-    message: str,
-) -> dict[str, Any]:
-    checked = dict(result)
-    for key in ("assistant_response", "assistant_prompt"):
-        value = checked.get(key)
-        if not isinstance(value, str) or not value.strip():
-            continue
-        replacement = _replacement_for_low_quality_text(
-            text=value,
-            message=message,
-        )
-        if replacement is not None:
-            checked[key] = replacement
-    return checked
-
-
-def _replacement_for_low_quality_text(*, text: str, message: str) -> str | None:
-    if _contains_backend_scaffolding(text):
-        return _scaffolding_recovery_prompt(text=text, message=message)
-    if _assistant_text_is_too_thin(text):
-        return _educational_recovery_response(message)
-    return None
-
-
-def _contains_backend_scaffolding(text: str) -> bool:
-    lowered = text.lower()
-    scaffolding_markers = (
-        "not specified",
-        "asset universe",
-        "capital amount",
-        "requested_field",
-        "missing_required_fields",
-    )
-    return any(marker in lowered for marker in scaffolding_markers)
-
-
-def _assistant_text_is_too_thin(text: str) -> bool:
-    stripped = text.strip()
-    if not stripped:
-        return True
-    words = stripped.split()
-    if len(words) <= 3:
-        return True
-    return bool(
-        len(words) <= 5
-        and re.fullmatch(r"[A-Z0-9.,\s-]+", stripped)
-        and any(char.isalpha() for char in stripped)
-    )
-
-
-def _scaffolding_recovery_prompt(*, text: str, message: str) -> str:
-    combined = f"{text} {message}".lower()
-    questions: list[str] = []
-    if "asset universe" in combined or "asset" in combined:
-        questions.append("Which asset should I use?")
-    if "capital amount" in combined or "fixed amount" in combined:
-        questions.append("How much should each purchase be?")
-    if "date_range" in combined or "time period" in combined:
-        questions.append("What time period should I test?")
-    if questions:
-        return "I understand the direction. " + " ".join(questions)
-    return (
-        "I understand the direction, but I need one more detail before I can "
-        "turn it into a backtest."
-    )
-
-
-def _educational_recovery_response(message: str) -> str | None:
-    lowered = message.lower().strip()
-    if re.search(
-        r"\bwhat(?:'s| is)\s+(?:a\s+)?backtest\b|\bexplain backtests?\b", lowered
-    ):
-        return (
-            "A backtest is a historical replay of an investing idea. Argus takes "
-            "the rule you describe, applies it to past market data, and shows how "
-            "that simulated strategy performed against a benchmark. It is useful "
-            "for learning from history, but it is not a prediction."
-        )
-    if re.search(r"\bwhat(?:'s| is)\s+dca\b|\bexplain dca\b", lowered):
-        return (
-            "DCA means buying a fixed amount on a regular schedule, like $500 every month. "
-            "The point is to avoid trying to pick the perfect day. In Argus, I can test how that "
-            "recurring-buy plan would have performed historically for a supported asset."
-        )
-    if re.search(
-        r"\bi do(?:n't| not) understand\b|\bexplain.*different(?:ly)?\b",
-        lowered,
-    ):
-        return (
-            "No problem. The simple version: Argus turns an investing idea into a historical test. "
-            "If we were talking about RSI, think of it like a temperature gauge for recent price movement: "
-            "low can mean the asset has been weak recently, high can mean it has been strong recently. "
-            "It is useful only as a rule to test, not as a prediction."
-        )
-    return None
-
-
 def _build_task_snapshot(
     *,
     run_state: RunState,
@@ -257,16 +152,6 @@ def _build_task_snapshot(
         pending_strategy_summary=pending_strategy_summary,
     )
     field_provenance = _field_provenance_from_strategy(pending_strategy_summary)
-    strategy_frame = (
-        StrategyFrame(
-            strategy=pending_strategy_summary,
-            pending_needs=pending_needs,
-            field_provenance=field_provenance,
-            last_assistant_question=run_state.user_goal_summary,
-        )
-        if pending_strategy_summary is not None
-        else None
-    )
     return TaskSnapshot(
         latest_task_type=run_state.intent,
         completed=stage_outcome_value in completed_outcomes,
@@ -280,7 +165,6 @@ def _build_task_snapshot(
                 else None
             )
         ),
-        strategy_frame=strategy_frame,
         pending_needs=pending_needs,
         field_provenance=field_provenance,
         latest_backtest_result_reference=(
@@ -427,75 +311,6 @@ def _serialize_public_value(key: str, value: Any) -> Any:
     ):
         return value.model_dump(mode="python")
     return value
-
-
-def _normalize_message_for_runtime_slice(message: str) -> str:
-    normalized = " ".join(message.strip().split())
-    normalized = _move_trailing_date_clause_ahead_of_strategy_logic(normalized)
-    normalized = _normalize_entry_clause(normalized)
-    normalized = _normalize_exit_clause(normalized)
-    return normalized
-
-
-def _normalize_single_unit_date_ranges(message: str) -> str:
-    patterns = {
-        r"\bover the last year\b": "over the last 1 year",
-        r"\bover the last month\b": "over the last 1 month",
-        r"\bover the last week\b": "over the last 1 week",
-        r"\bover the last day\b": "over the last 1 day",
-        r"\blast year\b": "last 1 year",
-        r"\blast month\b": "last 1 month",
-        r"\blast week\b": "last 1 week",
-        r"\blast day\b": "last 1 day",
-    }
-    normalized = message
-    for pattern, replacement in patterns.items():
-        normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
-    return normalized
-
-
-def _move_trailing_date_clause_ahead_of_strategy_logic(message: str) -> str:
-    match = re.search(
-        r"^(?P<head>.+?)\s+(?P<date>(?:over the last|last)\s+\d+\s+"
-        r"(?:day|days|week|weeks|month|months|year|years))\.?$",
-        message,
-        flags=re.IGNORECASE,
-    )
-    if match is None:
-        return message
-
-    head = match.group("head").rstrip(" ,")
-    date_clause = match.group("date")
-    if " when " not in head.lower() and " exit " not in head.lower():
-        return message
-
-    logic_start = re.search(r"\bwhen\b", head, flags=re.IGNORECASE)
-    if logic_start is None:
-        return message
-
-    prefix = head[: logic_start.start()].rstrip(" ,")
-    suffix = head[logic_start.start() :].lstrip(" ,")
-    return f"{prefix} {date_clause}, {suffix}"
-
-
-def _normalize_entry_clause(message: str) -> str:
-    if "backtest" not in message.lower():
-        return message
-    if "enter when" in message.lower():
-        return message
-    return re.sub(r"\bwhen\b", "enter when", message, count=1, flags=re.IGNORECASE)
-
-
-def _normalize_exit_clause(message: str) -> str:
-    if "exit when" in message.lower():
-        return message
-    return re.sub(
-        r"\band\s+exit\b",
-        ", exit when",
-        message,
-        count=1,
-        flags=re.IGNORECASE,
-    )
 
 
 def _select_thread_metadata(thread_metadata: dict[str, Any]) -> dict[str, Any]:

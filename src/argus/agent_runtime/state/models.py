@@ -132,14 +132,6 @@ class UnsupportedConstraint(BaseModel):
     simplification_options: list[SimplificationOption] = Field(default_factory=list)
 
 
-class StrategyFrame(BaseModel):
-    frame_id: str | None = None
-    strategy: StrategySummary = Field(default_factory=StrategySummary)
-    pending_needs: list[PendingNeedName] = Field(default_factory=list)
-    field_provenance: dict[str, str] = Field(default_factory=dict)
-    last_assistant_question: str | None = None
-
-
 class ResponseIntent(BaseModel):
     kind: ResponseIntentKind
     semantic_needs: list[PendingNeedName] = Field(default_factory=list)
@@ -159,7 +151,6 @@ class TaskSnapshot(BaseModel):
     completed: bool | None = None
     pending_strategy_summary: StrategySummary | None = None
     confirmed_strategy_summary: StrategySummary | None = None
-    strategy_frame: StrategyFrame | None = None
     pending_needs: list[PendingNeedName] = Field(default_factory=list)
     field_provenance: dict[str, str] = Field(default_factory=dict)
     latest_backtest_result_reference: ArtifactReference | None = None

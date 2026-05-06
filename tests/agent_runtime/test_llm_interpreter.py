@@ -120,6 +120,62 @@ def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) ->
     assert strategy.cadence == "weekly"
 
 
+def test_llm_interpreter_preserves_semantic_turn_act_from_response() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User approved the pending strategy.",
+        semantic_turn_act="approval",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="yes run it",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.semantic_turn_act == "approval"
+
+
+def test_llm_system_prompt_forbids_scaffolding_and_internal_field_names() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "asset_universe" in prompt
+    assert "capital_amount" in prompt
+    assert "requested_field" in prompt
+    assert "not specified" in prompt
+    assert "do not expose" in prompt or "never expose" in prompt
+
+
+def test_llm_system_prompt_owns_phase_one_routing_and_quality_rules() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "semantic_turn_act" in prompt
+    assert "approval" in prompt
+    assert "refine_current_idea" in prompt
+    assert "conversation_followup" in prompt
+    assert "educational" in prompt
+    assert "asset_universe" in prompt
+    assert "capital_amount" in prompt
+    assert "missing_required_fields" in prompt
+    assert "not specified" in prompt
+
+
 def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(
     monkeypatch,
 ) -> None:
