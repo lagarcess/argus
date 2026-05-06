@@ -14,6 +14,9 @@ Before implementation changes, the branch baseline passed:
 ## Product Gaps Closed In This Branch
 
 - Deterministic clarification copy is gated so raw fields and enums do not become the primary assistant voice.
+- Conversational runtime stabilization now routes clarification through an internal response-intent composer before text reaches chat.
+- Natural relative periods with number words, such as `last two years`, resolve before confirmation.
+- Well-known asset aliases keep provider-truth asset classes when live provider lookup is unavailable during interpretation.
 - Thin or stale LLM outputs are rejected or recomposed from current state.
 - Confirmation and result actions are separated; Save Strategy belongs inside the result card.
 - Conversation reload and history paths hydrate structured cards and latest run metadata.
@@ -60,3 +63,14 @@ No tables should be dropped for this branch. Collections should be hidden behind
 ## Acceptance Boundary
 
 This branch does not make embeddings part of launch readiness. Supabase structured state, run metadata, saved strategies, provider catalogs, and keyword search are the launch path. Add pgvector later only after semantic recall becomes a real product need.
+
+## Reopened Runtime Gap And Closure Gate
+
+The conversational runtime gap was reopened after browser QA exposed repeated starter guidance and slot prompts in normal strategy drafting. The closure gate is:
+
+- every turn resolves intent/context before clarification copy is composed;
+- clarify-stage facts are converted into response intents before user-facing text;
+- completed buy-and-hold prompts do not ask for entry, exit, or a repeated period;
+- the focused stabilization transcript gates in `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` pass in the browser.
+
+Do not mark the branch launch-ready if deterministic clarification prose appears as the visible assistant voice in the live chat.

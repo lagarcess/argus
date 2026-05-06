@@ -99,7 +99,98 @@ def test_workflow_routes_under_specified_backtest_into_clarification() -> None:
 
     assert result["stage_outcome"] == "await_user_reply"
     assert result["requested_field"] == "entry_logic"
-    assert "trigger the buy" in result["assistant_prompt"].lower()
+    prompt = result["assistant_prompt"].lower()
+    assert "specific testable rule" in prompt
+    assert "trigger the buy" not in prompt
+
+
+def test_workflow_strategy_drafting_does_not_emit_generic_starter_copy() -> None:
+    workflow = build_workflow()
+    manager = InMemorySessionManager()
+    user = UserState(user_id="u1", expertise_level="beginner")
+
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=user,
+        thread_id="thread-draft-start",
+        message="let's draft a strategy",
+    )
+
+    assistant_text = (
+        result.get("assistant_response") or result.get("assistant_prompt") or ""
+    )
+    lowered = assistant_text.lower()
+    assert result["stage_outcome"] in {"await_user_reply", "ready_to_respond"}
+    assert "pick a starting point" not in lowered
+    assert "name an asset and say a timeframe" not in lowered
+    assert "what should trigger the buy" not in lowered
+
+
+def test_workflow_complete_buy_and_hold_prompt_reaches_confirmation() -> None:
+    workflow = build_workflow()
+    manager = InMemorySessionManager()
+    user = UserState(user_id="u1", expertise_level="beginner")
+
+    result = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=user,
+        thread_id="thread-natural-buy-hold",
+        message=(
+            "let's try a buy and hold strategy on bitcoin in the last two "
+            "years, simple"
+        ),
+    )
+
+    assistant_text = (
+        result.get("assistant_prompt") or result.get("assistant_response") or ""
+    )
+    assert result["stage_outcome"] == "await_approval"
+    assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["BTC"]
+    assert result["confirmation_payload"]["strategy"]["asset_class"] == "crypto"
+    assert result["confirmation_payload"]["strategy"]["strategy_type"] == "buy_and_hold"
+    assert result["confirmation_payload"]["strategy"]["date_range"] is not None
+    assert "what time period should i test" not in assistant_text.lower()
+    assert "what should trigger the buy" not in assistant_text.lower()
+
+
+def test_workflow_period_followup_fills_pending_buy_and_hold_need() -> None:
+    workflow = build_workflow()
+    manager = InMemorySessionManager()
+    user = UserState(user_id="u1", expertise_level="beginner")
+
+    first = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=user,
+        thread_id="thread-period-followup",
+        message="Let's test a buy and hold strategy",
+    )
+    second = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=user,
+        thread_id="thread-period-followup",
+        message="Let's try the strategy with BTC",
+    )
+    third = run_agent_turn(
+        workflow=workflow,
+        session_manager=manager,
+        user=user,
+        thread_id="thread-period-followup",
+        message="The last two years to date",
+    )
+
+    first_text = first.get("assistant_prompt") or first.get("assistant_response") or ""
+    second_text = second.get("assistant_prompt") or second.get("assistant_response") or ""
+    third_text = third.get("assistant_prompt") or third.get("assistant_response") or ""
+    assert "what should trigger the buy" not in first_text.lower()
+    assert "what should trigger the buy" not in second_text.lower()
+    assert third["stage_outcome"] == "await_approval"
+    assert third["confirmation_payload"]["strategy"]["asset_universe"] == ["BTC"]
+    assert third["confirmation_payload"]["strategy"]["date_range"] is not None
+    assert "what time period should i test" not in third_text.lower()
 
 
 def test_workflow_transition_ends_for_unsupported_capability_failure() -> None:

@@ -358,6 +358,27 @@ Each conversation is isolated.
 > [!TIP]
 > **Global Rule**: Collections may mix asset classes organizationally. Backtest runs may not mix asset classes operationally.
 
+## Conversational Runtime Boundary
+
+The runtime must decide the user's act before any missing-field clarification can
+become visible text. Deterministic code may produce validation facts such as
+`missing_period`, `known_asset`, `unsupported_mixed_assets`, or provider-window
+limits, but those facts are not the assistant voice.
+
+The active chat path uses this boundary:
+
+1. Interpret the turn against the current thread and strategy frame.
+2. Reduce the turn into the active `StrategyFrame` or preserve the frame for
+   education/result follow-ups.
+3. Validate execution truth deterministically.
+4. Emit an internal response intent for clarification, unsupported recovery,
+   education, confirmation, or result follow-up.
+5. Compose the final assistant text from the response intent and validated state.
+
+Legacy slot prompts are internal fallback facts only. The public chat stream must
+not expose raw field names, enum-style choices, repeated starter guidance, or
+slot copy before the response composer has resolved the conversational act.
+
 # 12. Strategy Architecture (Alpha)
 
 ## Controlled Template System

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.stages.interpret import StageResult
-from argus.agent_runtime.state.models import RunState
+from argus.agent_runtime.state.models import PendingNeedName, ResponseIntent, RunState
 
 BEGINNER_GUIDANCE_PROMPT = "No problem. I can help you pick a starting point. We can test a simple buy-and-hold idea, a recurring investment plan, or a rule like buying when RSI is low. If you want the simplest path, name an asset and say a timeframe, like 'Tesla over 2 years'."
 AMBIGUOUS_TURN_PROMPT = (
@@ -14,17 +14,23 @@ OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
 def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     if unsupported_constraints:
+        options = _simplification_options(unsupported_constraints)
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
                 "assistant_prompt": _unsupported_constraint_prompt(
                     unsupported_constraints
                 ),
+                "response_intent": _response_intent(
+                    kind="unsupported_recovery",
+                    state=state,
+                    semantic_needs=["simplification_choice"],
+                    facts={"unsupported_constraints": unsupported_constraints},
+                    options=options,
+                ),
                 "requested_field": None,
                 "unsupported_constraints": unsupported_constraints,
-                "simplification_options": _simplification_options(
-                    unsupported_constraints
-                ),
+                "simplification_options": options,
             },
         )
 
@@ -34,6 +40,17 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             outcome="await_user_reply",
             stage_patch={
                 "assistant_prompt": _ambiguous_fields_prompt(ambiguous_fields),
+                "response_intent": _response_intent(
+                    kind="clarification",
+                    state=state,
+                    semantic_needs=_semantic_needs_from_fields(ambiguous_fields),
+                    requested_fields=[
+                        str(field.get("field_name", ""))
+                        for field in ambiguous_fields
+                        if field.get("field_name")
+                    ],
+                    facts={"ambiguous_fields": ambiguous_fields},
+                ),
                 "requested_field": None,
                 "ambiguous_fields": ambiguous_fields,
             },
@@ -48,6 +65,14 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             outcome="await_user_reply",
             stage_patch={
                 "assistant_prompt": grouped_prompt,
+                "response_intent": _response_intent(
+                    kind="clarification",
+                    state=state,
+                    semantic_needs=_semantic_needs_from_required_fields(
+                        state.missing_required_fields
+                    ),
+                    requested_fields=list(state.missing_required_fields),
+                ),
                 "requested_field": None,
                 "requested_fields": list(state.missing_required_fields),
             },
@@ -71,6 +96,14 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             outcome="await_user_reply",
             stage_patch={
                 "assistant_prompt": prompt,
+                "response_intent": _response_intent(
+                    kind="clarification",
+                    state=state,
+                    semantic_needs=_semantic_needs_from_required_fields(
+                        [requested_field]
+                    ),
+                    requested_fields=[requested_field],
+                ),
                 "requested_field": requested_field,
             },
         )
@@ -80,6 +113,10 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             outcome="await_user_reply",
             stage_patch={
                 "assistant_prompt": BEGINNER_GUIDANCE_PROMPT,
+                "response_intent": _response_intent(
+                    kind="beginner_guidance",
+                    state=state,
+                ),
                 "requested_field": None,
             },
         )
@@ -89,6 +126,10 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             outcome="await_user_reply",
             stage_patch={
                 "assistant_prompt": _ambiguous_turn_prompt(state),
+                "response_intent": _response_intent(
+                    kind="ambiguity_check",
+                    state=state,
+                ),
                 "requested_field": None,
             },
         )
@@ -104,6 +145,11 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
                     optional_parameter_choices=optional_parameter_choices,
                     contract=contract,
                 ),
+                "response_intent": _response_intent(
+                    kind="optional_settings",
+                    state=state,
+                    facts={"optional_parameter_choices": optional_parameter_choices},
+                ),
                 "requested_field": None,
                 "optional_parameter_choices": optional_parameter_choices,
             },
@@ -116,6 +162,79 @@ def clarify_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             "requested_field": None,
         },
     )
+
+
+def _response_intent(
+    *,
+    kind: str,
+    state: RunState,
+    semantic_needs: list[PendingNeedName] | None = None,
+    requested_fields: list[str] | None = None,
+    facts: dict[str, object] | None = None,
+    options: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    strategy = state.candidate_strategy_draft
+    strategy_payload = (
+        strategy.model_dump(mode="python")
+        if hasattr(strategy, "model_dump")
+        else dict(strategy or {})
+        if isinstance(strategy, dict)
+        else {}
+    )
+    payload = ResponseIntent(
+        kind=kind,
+        semantic_needs=semantic_needs or [],
+        requested_fields=requested_fields or [],
+        facts={
+            "strategy": strategy_payload,
+            "current_user_message": state.current_user_message,
+            **(facts or {}),
+        },
+        options=options or [],
+    )
+    return payload.model_dump(mode="python")
+
+
+def _semantic_needs_from_required_fields(fields: list[str]) -> list[PendingNeedName]:
+    field_map: dict[str, PendingNeedName] = {
+        "asset_universe": "asset_target",
+        "capital_amount": "sizing_amount",
+        "date_range": "period",
+        "entry_logic": "rule_definition",
+        "exit_logic": "rule_definition",
+    }
+    needs: list[PendingNeedName] = []
+    for field in fields:
+        need = field_map.get(field)
+        if need is not None and need not in needs:
+            needs.append(need)
+    return needs
+
+
+def _semantic_needs_from_fields(
+    fields: list[dict[str, object]],
+) -> list[PendingNeedName]:
+    required_fields = [
+        str(field.get("field_name", ""))
+        for field in fields
+        if isinstance(field.get("field_name"), str)
+    ]
+    needs = _semantic_needs_from_required_fields(required_fields)
+    reason_codes = {
+        str(field.get("reason_code", ""))
+        for field in fields
+        if isinstance(field.get("reason_code"), str)
+    }
+    reason_map: dict[str, PendingNeedName] = {
+        "missing_asset_target": "asset_target",
+        "missing_sizing_amount": "sizing_amount",
+        "missing_period": "period",
+        "entry_rule_needs_definition": "rule_definition",
+    }
+    for code, need in reason_map.items():
+        if code in reason_codes and need not in needs:
+            needs.append(need)
+    return needs
 
 
 def _optional_parameter_choices(

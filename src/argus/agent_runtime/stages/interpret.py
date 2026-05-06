@@ -79,6 +79,7 @@ class InterpretDecision(BaseModel):
     field_status: dict[str, FieldExtractionStatus] = Field(default_factory=dict)
     ambiguous_fields: list[AmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[UnsupportedConstraint] = Field(default_factory=list)
+    semantic_turn_act: SemanticTurnAct | None = None
 
     def to_patch(self) -> dict[str, Any]:
         return {
@@ -117,6 +118,7 @@ class InterpretDecision(BaseModel):
             "unsupported_constraints": [
                 item.model_dump(mode="python") for item in self.unsupported_constraints
             ],
+            "semantic_turn_act": self.semantic_turn_act,
         }
 
 
@@ -387,6 +389,7 @@ def interpret_stage(
         field_status=build_field_status_payload(extraction),
         ambiguous_fields=list(extraction.ambiguous_fields),
         unsupported_constraints=list(extraction.unsupported_constraints),
+        semantic_turn_act=semantic_turn_act,
     )
 
     if assistant_response is not None:
@@ -1753,12 +1756,49 @@ def _asset_class_for_symbols(symbols: list[str]) -> str | None:
         try:
             classes.add(resolve_asset(symbol).asset_class)
         except Exception:
-            continue
+            fallback = _known_symbol_asset_class(symbol)
+            if fallback is not None:
+                classes.add(fallback)
     if len(classes) == 1:
         return next(iter(classes))
     if len(classes) > 1:
         return "mixed"
     return "mixed"
+
+
+def _known_symbol_asset_class(symbol: str) -> str | None:
+    normalized = symbol.strip().upper()
+    if normalized in {"BTC", "ETH", "SOL", "DOGE"}:
+        return "crypto"
+    if normalized in {
+        "AAPL",
+        "TSLA",
+        "NVDA",
+        "GOOG",
+        "GOOGL",
+        "META",
+        "SBUX",
+        "CMG",
+        "PG",
+        "SPY",
+    }:
+        return "equity"
+    if re.fullmatch(r"[A-Z]{6}", normalized):
+        base, quote = normalized[:3], normalized[3:]
+        fiat_codes = {
+            "AUD",
+            "CAD",
+            "CHF",
+            "EUR",
+            "GBP",
+            "JPY",
+            "MXN",
+            "NZD",
+            "USD",
+        }
+        if base in fiat_codes and quote in fiat_codes:
+            return "currency_pair"
+    return None
 
 
 def _fallback_thesis(message: str, asset_universe: list[str]) -> str | None:

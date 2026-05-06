@@ -271,6 +271,29 @@ def _normalize_period_text(value: str) -> str:
     normalized = value.strip().lower()
     normalized = normalized.replace("-", "_")
     normalized = re.sub(r"\s+", " ", normalized)
+    return _normalize_period_number_words(normalized)
+
+
+def _normalize_period_number_words(value: str) -> str:
+    number_words = {
+        "one": "1",
+        "two": "2",
+        "three": "3",
+        "four": "4",
+        "five": "5",
+        "six": "6",
+        "seven": "7",
+        "eight": "8",
+        "nine": "9",
+        "ten": "10",
+    }
+    normalized = value
+    for word, digit in number_words.items():
+        normalized = re.sub(
+            rf"\b{word}\b(?=\s+(?:day|days|week|weeks|month|months|year|years))",
+            digit,
+            normalized,
+        )
     return normalized
 
 
@@ -316,6 +339,7 @@ def _date_range_from_raw_phrase(
     normalized = raw_user_phrasing.lower()
     normalized = re.sub(r"[^a-z0-9\s]+", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = _normalize_period_number_words(normalized)
     starts_at_last_year_january = re.search(
         r"\b(?:jan(?:uary)?\s*(?:1|first)|beginning of)\s+last year\b",
         normalized,
@@ -344,6 +368,7 @@ def _extract_period_label_from_raw_phrase(
     normalized = raw_user_phrasing.lower()
     normalized = re.sub(r"[^a-z0-9\s]+", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
+    normalized = _normalize_period_number_words(normalized)
     since_match = re.search(r"\bsince (?P<year>\d{4})\b", normalized)
     if since_match is not None:
         return f"since {since_match.group('year')}"

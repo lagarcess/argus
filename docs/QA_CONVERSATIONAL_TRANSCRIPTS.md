@@ -161,3 +161,26 @@ Record:
 - Result cards that drop symbols from multi-symbol runs.
 - Provider errors exposed as raw exception names without natural recovery.
 - TradingView chart attribution hidden or covered.
+- Repeating starter guidance such as `No problem. I can help you pick a starting point` after the user has already asked to draft or test a strategy.
+- Raw slot prompts such as `What should trigger the buy?` when the user's act is beginner guidance, buy-and-hold, or a complete strategy request.
+- Re-asking for a period, asset, amount, cadence, or rule after the user already supplied that field in the same active strategy frame.
+
+## Stabilization Transcript Gates
+
+Run these before PR submission whenever conversational runtime code changes:
+
+1. `Hey, I'm a beginner, what can you do?`
+   - Pass: Argus explains how to start in plain language.
+   - Reject: result metric explanations, stale run context, or generic starter reset copy.
+2. `let's draft a strategy`
+   - Pass: Argus invites a natural idea without forcing a form.
+   - Reject: `pick a starting point`, raw field names, or entry/exit prompts.
+3. `let's try a buy and hold strategy on bitcoin in the last two years, simple`
+   - Pass: Argus reaches confirmation with `BTC`, `crypto`, buy-and-hold, and the two-year period resolved.
+   - Reject: any request for entry logic, exit logic, or another period.
+4. Start with `Let's test a buy and hold strategy`, then reply `Let's try the strategy with BTC`, then `The last two years to date`.
+   - Pass: Argus applies each answer to the pending strategy frame and reaches confirmation.
+   - Reject: any repeated period prompt after the final turn.
+5. Start a DCA flow, provide the amount, then provide the period.
+   - Pass: Argus preserves the user-provided recurring amount through later turns.
+   - Reject: re-asking the amount after it was supplied.

@@ -21,6 +21,14 @@ PendingNeedName = Literal[
     "simplification_choice",
 ]
 
+ResponseIntentKind = Literal[
+    "clarification",
+    "beginner_guidance",
+    "unsupported_recovery",
+    "ambiguity_check",
+    "optional_settings",
+]
+
 IntentName = Literal[
     "beginner_guidance",
     "strategy_drafting",
@@ -132,6 +140,14 @@ class StrategyFrame(BaseModel):
     last_assistant_question: str | None = None
 
 
+class ResponseIntent(BaseModel):
+    kind: ResponseIntentKind
+    semantic_needs: list[PendingNeedName] = Field(default_factory=list)
+    requested_fields: list[str] = Field(default_factory=list)
+    facts: dict[str, Any] = Field(default_factory=dict)
+    options: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class ArtifactReference(BaseModel):
     artifact_kind: str
     artifact_id: str
@@ -215,6 +231,8 @@ class RunState(BaseModel):
     tool_call_records: list[ToolCallRecord] = Field(default_factory=list)
     failure_classification: str | None = None
     final_response_payload: FinalResponsePayload | None = None
+    response_intent: ResponseIntent | None = None
+    semantic_turn_act: str | None = None
 
     @classmethod
     def new(

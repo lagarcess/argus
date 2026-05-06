@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from argus.api.main import app
+from argus.api.schemas import BacktestRun
 from argus.domain.engine import SymbolAsset
 from argus.domain.indicators import IndicatorInfo
 from argus.domain.market_data.assets import ResolvedAsset
@@ -360,21 +361,51 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
 
 def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
+    from argus.api import main as api_main
+
     client = _client()
     conversation = _conversation(client)
-    run_response = client.post(
-        "/api/v1/backtests/run",
-        json={
-            "conversation_id": conversation["id"],
+    user_id = client.get("/api/v1/me").json()["user"]["id"]
+    run_id = api_main.store.new_id()
+    api_main.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={
             "template": "buy_and_hold",
             "asset_class": "equity",
             "symbols": ["AAPL"],
             "start_date": "2025-05-03",
             "end_date": "2026-05-03",
             "starting_capital": 10000,
+            "benchmark_symbol": "SPY",
         },
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "date_range": {
+                "start": "2025-05-03",
+                "end": "2026-05-03",
+                "display": "May 3, 2025 to May 3, 2026",
+            },
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return (%)",
+                    "value": "+12.4%",
+                }
+            ],
+        },
+        created_at=api_main.utcnow(),
+        chart=None,
+        trades=[],
     )
-    run_id = run_response.json()["run"]["id"]
+    api_main.store.backtest_run_owners[run_id] = user_id
 
     response = client.post(
         "/api/v1/chat/stream",

@@ -5,6 +5,7 @@ from typing import Any
 
 from argus.agent_runtime.graph.workflow import WorkflowState
 from argus.agent_runtime.session.manager import InMemorySessionManager
+from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
@@ -36,7 +37,7 @@ def run_agent_turn(
         message=message,
     )
     result = _apply_response_quality_gate(
-        result=workflow.invoke(initial_state),
+        result=_compose_runtime_response(workflow.invoke(initial_state)),
         message=message,
     )
     run_state = result["run_state"]
@@ -109,6 +110,18 @@ def _assistant_message(result: dict[str, Any]) -> str | None:
     if isinstance(assistant_prompt, str) and assistant_prompt:
         return assistant_prompt
     return None
+
+
+def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
+    run_state = result.get("run_state")
+    if not isinstance(run_state, RunState):
+        return result
+    composed = compose_response_intent(run_state)
+    if composed is None:
+        return result
+    patched = dict(result)
+    patched["assistant_prompt"] = composed
+    return patched
 
 
 def _apply_response_quality_gate(
