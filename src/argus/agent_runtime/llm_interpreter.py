@@ -292,6 +292,7 @@ def _ground_strategy_in_current_turn(
         strategy.exit_logic = None
     elif _current_message_describes_indicator_frame(current_message):
         strategy.strategy_type = "indicator_threshold"
+        _clear_recurring_purchase_fields(strategy)
 
 
 def _merge_prior_strategy(
@@ -321,6 +322,13 @@ def _merge_prior_strategy(
         setattr(merged, key, value)
     for key, value in merged.model_dump(mode="python").items():
         setattr(strategy, key, value)
+
+
+def _clear_recurring_purchase_fields(strategy: StrategySummary) -> None:
+    strategy.cadence = None
+    strategy.capital_amount = None
+    strategy.sizing_mode = None
+    strategy.position_size = None
 
 
 def _current_turn_starts_fresh_strategy(message: str) -> bool:

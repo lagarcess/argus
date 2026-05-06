@@ -357,8 +357,11 @@ def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops
         user_goal_summary="User wants to test Apple after big drops.",
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing="What if I bought Apple after big drops?",
+            strategy_type="dca_accumulation",
             strategy_thesis="Buy Apple after big drops.",
             asset_universe=["AAPL"],
+            cadence="monthly",
+            capital_amount=500,
         ),
         unsupported_constraints=[
             interpreter_module.LLMUnsupportedConstraint(
@@ -384,6 +387,8 @@ def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops
     )
 
     assert result.candidate_strategy_draft.strategy_type == "indicator_threshold"
+    assert result.candidate_strategy_draft.cadence is None
+    assert result.candidate_strategy_draft.capital_amount is None
     assert result.unsupported_constraints == []
 
 
