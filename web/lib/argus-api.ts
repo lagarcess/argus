@@ -187,7 +187,7 @@ export type ChatStreamEvent =
   | { event: "status"; data: { status: string } }
   | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
-  | { event: "error"; data: { detail: string } }
+  | { event: "error"; data: { code?: string; detail: string } }
   | { event: "done"; data: { message_id: string } };
 
 export type ChatActionRequest = {
@@ -196,6 +196,18 @@ export type ChatActionRequest = {
   payload?: Record<string, unknown>;
   presentation?: "confirmation" | "result";
 };
+
+export class ChatStreamError extends Error {
+  status: number;
+  code: string;
+
+  constructor(message: string, status: number, code = "unknown") {
+    super(message);
+    this.name = "ChatStreamError";
+    this.status = status;
+    this.code = code;
+  }
+}
 
 export type DiscoveryItem = {
   id: string;
@@ -581,7 +593,20 @@ export async function streamChatMessage(
     }),
   });
   if (!response.ok || !response.body) {
-    throw new Error("Chat stream failed");
+    const body = await response.json().catch(() => ({}));
+    const detail = (body as { detail?: unknown }).detail;
+    const code = (body as { code?: unknown }).code;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : typeof detail === "object" && detail !== null && "title" in detail
+          ? String((detail as { title?: unknown }).title ?? "Chat stream failed")
+          : "Chat stream failed";
+    throw new ChatStreamError(
+      message,
+      response.status,
+      typeof code === "string" ? code : "unknown",
+    );
   }
 
   const reader = response.body.getReader();

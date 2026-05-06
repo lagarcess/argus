@@ -242,5 +242,18 @@ describe("Argus Alpha frontend contract", () => {
     expect(input).toContain("Currency Pair");
     expect(chat).not.toContain("event.data.detail || t('chat.error_backtest')");
     expect(locale).not.toContain("Check that the API is running");
+    expect(locale).not.toContain("add the asset, amount, and time period");
+  });
+
+  test("chat stream errors preserve status for stale conversation recovery", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(api).toContain("class ChatStreamError");
+    expect(api).toContain("response.status");
+    expect(chat).toContain("err instanceof ChatStreamError");
+    expect(chat).toContain("err.status === 404");
+    expect(chat).toContain("clearActiveConversationId()");
+    expect(chat).toContain("await streamToConversation(conversation.id)");
   });
 });

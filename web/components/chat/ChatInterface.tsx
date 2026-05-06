@@ -42,6 +42,8 @@ import {
   streamChatMessage,
   type ApiMessage,
   type AssetClass,
+  ChatStreamError,
+  type ChatStreamEvent,
   type ChatActionRequest,
   type ConversationResultCard,
   type HistoryItem,
@@ -635,93 +637,111 @@ export default function ChatInterface() {
     setInputActions([]);
     setStreamStatus(t('chat.status.understanding'));
 
-    try {
-      const streamInput: string | ChatActionRequest = action?.type
-        ? {
-            type: action.type,
-            label: action.label,
-            payload: action.payload,
-            presentation: action.presentation,
-          }
-        : trimmed;
-      await streamChatMessage(conversationId, streamInput, i18n.language, (event) => {
-        if (event.event === "status") {
-          setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
+    const streamInput: string | ChatActionRequest = action?.type
+      ? {
+          type: action.type,
+          label: action.label,
+          payload: action.payload,
+          presentation: action.presentation,
         }
-        if (event.event === "token") {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "error") {
-          setInputActions([]);
-          setStreamStatus(null);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    content: t('chat.error_backtest'),
-                  }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "confirmation") {
-          const confirmation = event.data.confirmation as StrategyConfirmationPayload;
-          setInputActions(confirmation.actions ?? []);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    kind: "strategy_confirmation",
-                    content: undefined,
-                    confirmation,
-                  }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "result") {
-          const run = event.data.run as BacktestRun;
-          const baseCard = resultCardFromRun(run);
-          const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
-          const card = { ...baseCard, actions: resultActions };
-          setInputActions(visibleInputActions(resultActions));
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
+      : trimmed;
+
+    const handleStreamEvent = (event: ChatStreamEvent) => {
+      if (event.event === "status") {
+        setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
+      }
+      if (event.event === "token") {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+              : m,
+          ),
+        );
+      }
+      if (event.event === "error") {
+        setInputActions([]);
+        setStreamStatus(null);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
                   ...m,
-                  kind: "strategy_result",
-                  content: m.content,
-                  result: card,
-                  actions: resultActions,
-                  }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "title") {
-          setHistoryItems((prev) =>
-            prev.map((item) =>
-              item.id === event.data.conversation_id
-                ? { ...item, title: event.data.title }
-                : item
-            )
-          );
-        }
-        if (event.event === "done") {
-          setStreamStatus(null);
-          refreshHistory();
-        }
-      });
+                  content: t('chat.error_backtest'),
+                }
+              : m,
+          ),
+        );
+      }
+      if (event.event === "confirmation") {
+        const confirmation = event.data.confirmation as StrategyConfirmationPayload;
+        setInputActions(confirmation.actions ?? []);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  kind: "strategy_confirmation",
+                  content: undefined,
+                  confirmation,
+                }
+              : m,
+          ),
+        );
+      }
+      if (event.event === "result") {
+        const run = event.data.run as BacktestRun;
+        const baseCard = resultCardFromRun(run);
+        const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
+        const card = { ...baseCard, actions: resultActions };
+        setInputActions(visibleInputActions(resultActions));
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                ...m,
+                kind: "strategy_result",
+                content: m.content,
+                result: card,
+                actions: resultActions,
+                }
+              : m,
+          ),
+        );
+      }
+      if (event.event === "title") {
+        setHistoryItems((prev) =>
+          prev.map((item) =>
+            item.id === event.data.conversation_id
+              ? { ...item, title: event.data.title }
+              : item
+          )
+        );
+      }
+      if (event.event === "done") {
+        setStreamStatus(null);
+        refreshHistory();
+      }
+    };
+
+    const streamToConversation = (targetConversationId: string) =>
+      streamChatMessage(targetConversationId, streamInput, i18n.language, handleStreamEvent);
+
+    try {
+      await streamToConversation(conversationId);
     } catch (err: unknown) {
+      if (err instanceof ChatStreamError && err.status === 404 && !action?.type) {
+        try {
+          clearActiveConversationId();
+          const { conversation } = await createConversation(i18n.language);
+          persistActiveConversationId(conversation.id);
+          setConversationId(conversation.id);
+          await streamToConversation(conversation.id);
+          return;
+        } catch (retryErr) {
+          err = retryErr;
+        }
+      }
       setInputActions([]);
       setStreamStatus(null);
       const status = (err as { status?: number }).status;

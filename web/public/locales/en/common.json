@@ -105,7 +105,7 @@
     "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
     "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
     "error_load": "Could not load that conversation. Try again.",
-    "error_backtest": "I hit a runtime issue before I could finish that. Try again, or add the asset, amount, and time period so I can keep the strategy moving.",
+    "error_backtest": "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
     "new_chat_ready": "New chat ready. What idea should we test?",
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
     "try_new_strategy": "Try a new strategy",
