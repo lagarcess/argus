@@ -459,6 +459,13 @@ Every result card must include a lightweight assumptions footer to maintain inte
 
 Example: *Long-only • Equal weight • No fees/slippage • Benchmark: SPY*
 
+Result cards and explanations must describe executed backtest behavior, not raw
+strategy triggers. A strategy may produce many buy/sell signals, but Argus only
+shows trades, markers, trade counts, and win-rate inputs after the execution
+layer has applied long-only position state, cash, sizing, and policy constraints.
+Ignored signals can be explained in breakdowns when useful, but they are not
+presented as real buys or sells.
+
 ---
 
 # 20. Golden Path (Alpha)

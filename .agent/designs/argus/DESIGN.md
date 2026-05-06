@@ -207,8 +207,9 @@ _Design targets below are intentional for this system; if implementation keeps T
 ## 12. Result Card Design
 
 Result cards are the primary unit of "validation." They must be glanceable and honest.
-- **No Charts (Alpha)**: Avoid embedded charts in conversation cards to maintain speed and mobile readability.
-- **Fixed Metrics**: Show beginner-friendly metrics by default (e.g., Total Return, Win Rate).
+- **Truthful Charts**: Embedded result charts may be used when they stay calm, readable, and mobile-friendly. Markers must represent executed fills only, not raw strategy triggers.
+- **Low-Clutter Events**: Dense buy/sell activity should use progressive marker density and sparse labels so the chart reads like evidence, not a trading terminal.
+- **Fixed Metrics**: Show beginner-friendly metrics by default (e.g., Total Return, Max Drawdown, Benchmark Delta; Win Rate only when meaningful closed trades exist).
 - **Structure**: Title, date range display, status pill, metrics rows, assumptions footer, and CTAs.
 - **Assumptions Footer**: Must be visible but secondary.
   - *Example*: `Long-only • Equal weight • No fees/slippage • Benchmark: SPY`

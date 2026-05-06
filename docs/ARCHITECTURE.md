@@ -390,10 +390,19 @@ Mapped internally to:
 2. API validates request (symbol set, **asset_class parity**, and quota)
 3. AI extracts supported strategy config if needed
 4. Backend fetches market data (cache first)
-5. Engine runs simulation (using class-default benchmark)
-6. Results persisted
-7. Results streamed/rendered to user
-8. Run appears in history
+5. Strategy kernel produces raw signals
+6. Execution reducer applies long-only position state, cash, sizing, and policy
+   constraints
+7. Engine computes metrics and chart markers from executed fills only
+8. Results persisted
+9. Results streamed/rendered to user
+10. Run appears in history
+
+The execution ledger is the boundary between strategy logic and result
+presentation. Signals are diagnostics until they become order intents and fills.
+Long-only runs must ignore exit signals while flat and duplicate full-position
+entries while already long. Chart markers, trade counts, win-rate inputs, and
+user-facing trade explanations consume fills, not raw triggers.
 
 # 14. Search Architecture
 

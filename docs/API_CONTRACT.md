@@ -531,7 +531,7 @@ Immutable simulation result.
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
 - `chart.series` is the aggregate portfolio equity curve. Multi-symbol runs must use the equal-weight portfolio curve, not a symbol comparison chart.
-- `chart.markers` contains capped entry/exit events derived from executable signals.
+- `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 
 ---

@@ -40,6 +40,18 @@ class SymbolAsset:
     asset_class: AssetClass
 
 
+@dataclass(frozen=True)
+class ExecutionEvent:
+    timestamp: pd.Timestamp
+    symbol: str
+    event_type: Literal[
+        "signal", "order_intent", "fill", "ignored_signal", "position_snapshot"
+    ]
+    side: Literal["buy", "sell"] | None = None
+    action: Literal["open", "add", "close", "hold", "ignore"] | None = None
+    reason: str | None = None
+
+
 def classify_symbol(symbol: str) -> SymbolAsset:
     resolved = resolve_asset(symbol)
     return SymbolAsset(symbol=resolved.canonical_symbol, asset_class=resolved.asset_class)
@@ -415,8 +427,154 @@ def _annualized_return_pct(
     return annualized * 100.0
 
 
-def _trade_count(entries: pd.Series) -> int:
-    return int(entries.fillna(False).sum())
+def _build_long_only_execution_ledger(
+    *,
+    symbol: str,
+    entries: pd.Series,
+    exits: pd.Series,
+    allow_accumulation: bool,
+) -> list[ExecutionEvent]:
+    """Reduce raw strategy signals into executed long-only events.
+
+    Strategy signals are intent candidates. This ledger is the canonical source
+    for user-facing trade events because it applies position state and execution
+    policy before a buy/sell can appear in the UI.
+    """
+
+    normalized_entries = entries.fillna(False).astype(bool)
+    normalized_exits = exits.fillna(False).astype(bool)
+    timestamps = normalized_entries.index.union(normalized_exits.index).sort_values()
+    events: list[ExecutionEvent] = []
+    holding = False
+
+    for timestamp in timestamps:
+        ts = pd.Timestamp(timestamp)
+        has_entry = bool(normalized_entries.get(timestamp, False))
+        has_exit = bool(normalized_exits.get(timestamp, False))
+        if not has_entry and not has_exit:
+            continue
+
+        if has_exit:
+            events.append(
+                ExecutionEvent(
+                    timestamp=ts,
+                    symbol=symbol,
+                    event_type="signal",
+                    side="sell",
+                )
+            )
+            if holding:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="order_intent",
+                        side="sell",
+                        action="close",
+                    )
+                )
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="fill",
+                        side="sell",
+                        action="close",
+                    )
+                )
+                holding = False
+            else:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="ignored_signal",
+                        side="sell",
+                        action="ignore",
+                        reason="exit_signal_while_flat",
+                    )
+                )
+
+        if has_entry:
+            events.append(
+                ExecutionEvent(
+                    timestamp=ts,
+                    symbol=symbol,
+                    event_type="signal",
+                    side="buy",
+                )
+            )
+            if not holding:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="order_intent",
+                        side="buy",
+                        action="open",
+                    )
+                )
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="fill",
+                        side="buy",
+                        action="open",
+                    )
+                )
+                holding = True
+            elif allow_accumulation:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="order_intent",
+                        side="buy",
+                        action="add",
+                    )
+                )
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="fill",
+                        side="buy",
+                        action="add",
+                    )
+                )
+            else:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="ignored_signal",
+                        side="buy",
+                        action="ignore",
+                        reason="entry_signal_while_already_long",
+                    )
+                )
+
+        events.append(
+            ExecutionEvent(
+                timestamp=ts,
+                symbol=symbol,
+                event_type="position_snapshot",
+                action="hold" if holding else "close",
+            )
+        )
+
+    return events
+
+
+def _execution_fill_count(
+    execution_events: list[ExecutionEvent], *, side: str | None = None
+) -> int:
+    return sum(
+        1
+        for event in execution_events
+        if event.event_type == "fill" and (side is None or event.side == side)
+    )
 
 
 def _compute_metrics(
@@ -569,6 +727,12 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
         )
         close = bars["close"].astype(float)
         entries, exits = _build_signals(config, bars)
+        execution_events = _build_long_only_execution_ledger(
+            symbol=symbol,
+            entries=entries,
+            exits=exits,
+            allow_accumulation=is_dca,
+        )
 
         benchmark_curve = build_benchmark_curve(config, close.index)
         benchmark_normalized = pd.Series(
@@ -593,7 +757,7 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
                 benchmark_equity=benchmark_equity,
                 invested_capital=invested_capital,
                 periods_per_year=periods_per_year,
-                trade_count=_trade_count(entries),
+                trade_count=_execution_fill_count(execution_events, side="buy"),
             )
         else:
             portfolio = vbt.Portfolio.from_signals(
@@ -604,7 +768,7 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
                 slippage=float(realism["slippage"]),
                 init_cash=allocation_capital,
                 freq=_vbt_freq(config["timeframe"]),
-                accumulate=True,
+                accumulate=False,
             )
 
             symbol_equity = pd.Series(
@@ -618,7 +782,7 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
                 benchmark_returns=benchmark_returns,
                 allocation_capital=allocation_capital,
                 periods_per_year=periods_per_year,
-                trade_count=_trade_count(entries),
+                trade_count=_execution_fill_count(execution_events),
             )
 
         symbol_returns.append(strategy_returns)
@@ -681,6 +845,12 @@ def build_result_chart(config: dict[str, Any]) -> dict[str, Any]:
         )
         close = bars["close"].astype(float)
         entries, exits = _build_signals(config, bars)
+        execution_events = _build_long_only_execution_ledger(
+            symbol=symbol,
+            entries=entries,
+            exits=exits,
+            allow_accumulation=is_dca,
+        )
         if is_dca:
             symbol_equity, _ = _dca_equity_curve(
                 close=close,
@@ -696,13 +866,15 @@ def build_result_chart(config: dict[str, Any]) -> dict[str, Any]:
                 slippage=float(realism["slippage"]),
                 init_cash=allocation_capital,
                 freq=_vbt_freq(config["timeframe"]),
-                accumulate=True,
+                accumulate=False,
             )
             symbol_equity = pd.Series(
                 portfolio.value().values, index=close.index, dtype=float
             )
         symbol_equity_curves.append(symbol_equity)
-        _collect_signal_events(events, symbol=symbol, entries=entries, exits=exits)
+        _collect_execution_fill_events(
+            events, symbol=symbol, execution_events=execution_events
+        )
 
     aggregate_equity = (
         pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1).dropna()
@@ -722,19 +894,21 @@ def build_result_chart(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _collect_signal_events(
+def _collect_execution_fill_events(
     events: dict[str, dict[str, set[str]]],
     *,
     symbol: str,
-    entries: pd.Series,
-    exits: pd.Series,
+    execution_events: list[ExecutionEvent],
 ) -> None:
-    for timestamp in entries[entries.fillna(False).astype(bool)].index:
-        key = _chart_time_key(timestamp)
-        events.setdefault(key, {"entry": set(), "exit": set()})["entry"].add(symbol)
-    for timestamp in exits[exits.fillna(False).astype(bool)].index:
-        key = _chart_time_key(timestamp)
-        events.setdefault(key, {"entry": set(), "exit": set()})["exit"].add(symbol)
+    for event in execution_events:
+        if event.event_type != "fill":
+            continue
+        if event.side == "buy":
+            key = _chart_time_key(event.timestamp)
+            events.setdefault(key, {"entry": set(), "exit": set()})["entry"].add(symbol)
+        elif event.side == "sell":
+            key = _chart_time_key(event.timestamp)
+            events.setdefault(key, {"entry": set(), "exit": set()})["exit"].add(symbol)
 
 
 def _chart_time_key(timestamp: Any) -> str:
