@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,33 @@ from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
+
+
+def _stream_events(stream: str) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for part in stream.split("\n\n"):
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
+            continue
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            events.append({"type": "done"})
+            continue
+        events.append(json.loads(raw))
+    return events
+
+
+def _final_payload(stream: str) -> dict[str, Any]:
+    final_events = [
+        event for event in _stream_events(stream) if event.get("type") == "final"
+    ]
+    assert len(final_events) == 1
+    payload = final_events[0]["payload"]
+    assert isinstance(payload, dict)
+    return payload
 
 
 def _mock_profile(*, language: str = "en", stage: str = "ready") -> User:
@@ -387,8 +415,16 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     )
 
     assert response.status_code == 200
-    assert "event: result" in response.text
+    assert "event:" not in response.text
+    assert response.text.count("data: [DONE]") == 1
     mock_gateway.create_backtest_run.assert_called_once()
+    persisted_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
+    final_payload = _final_payload(response.text)
+    assert final_payload["message_id"] == "msg-1"
+    assert final_payload["run"]["id"] == persisted_run.id
+    assert final_payload["run"]["conversation_result_card"]["title"] == (
+        "TSLA RSI Mean Reversion"
+    )
 
 
 def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_gateway):
@@ -423,9 +459,18 @@ def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_ga
     )
 
     assert response.status_code == 200
-    assert "event: result" not in response.text
-    assert "event: token" in response.text
-    assert "primary goal" in response.text
+    assert "event:" not in response.text
+    assert response.text.count("data: [DONE]") == 1
+    events = _stream_events(response.text)
+    token_events = [event for event in events if event.get("type") == "token"]
+    assert len(token_events) == 1
+    assert "primary goal" in token_events[0]["content"]
+    final_payload = _final_payload(response.text)
+    assert final_payload == {
+        "stage_outcome": "await_user_reply",
+        "assistant_response": token_events[0]["content"],
+        "message_id": "msg-2",
+    }
     mock_gateway.create_backtest_run.assert_not_called()
 
 
