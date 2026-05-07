@@ -160,9 +160,20 @@ def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
     return _runtime_success_result(language=language)
 
 
+async def _runtime_success_events(**kwargs: Any):
+    result = _runtime_success_for_message(**kwargs)
+    assistant_response = str(result.get("assistant_response") or "")
+    yield {"type": "stage_start", "stage": "interpret"}
+    yield {"type": "stage_outcome", "outcome": str(result["stage_outcome"])}
+    if assistant_response:
+        yield {"type": "token", "content": assistant_response}
+    yield {"type": "final", "payload": result}
+
+
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
     monkeypatch.setattr(
         api_main,
@@ -196,7 +207,8 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         raising=False,
     )
-    monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message)
+    monkeypatch.setattr(agent_router, "run_agent_turn", _runtime_success_for_message)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
     monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
@@ -209,7 +221,7 @@ def mock_gateway():
     gateway.get_or_create_mock_user.return_value = _mock_profile()
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
-    with patch("argus.api.main.supabase_gateway", gateway):
+    with patch("argus.api.state.supabase_gateway", gateway):
         yield gateway
 
 
@@ -495,18 +507,22 @@ def test_profile_creation_on_first_login(mock_gateway):
 
 
 def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
+    import os
+
+    email = os.environ.get("MOCK_USER_EMAIL", "developer@argus.local")
+    password = os.environ.get("MOCK_USER_PASSWORD", "password")
     mock_gateway.login.return_value = {
         "session": {
             "access_token": "access-token-123",
             "refresh_token": "refresh-token-123",
             "expires_in": 3600,
         },
-        "user": {"id": "user-1", "email": "developer@argus.local"},
+        "user": {"id": "user-1", "email": email},
     }
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "developer@argus.local", "password": "password"},
+        json={"email": email, "password": password},
     )
 
     assert response.status_code == 200

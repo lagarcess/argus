@@ -56,7 +56,7 @@ class NameSuggestion(BaseModel):
     name: str
 
 
-def _resolve_language(language: str | None) -> Literal["en", "es-419"]:
+def resolve_language(language: str | None) -> Literal["en", "es-419"]:
     if (language or "en").lower().startswith("es"):
         return "es-419"
     return "en"
@@ -80,7 +80,7 @@ def suggest_entity_name(
 
     try:
         structured = model.with_structured_output(NameSuggestion)
-        resolved = _resolve_language(language)
+        resolved = resolve_language(language)
         response = structured.invoke(
             [
                 {

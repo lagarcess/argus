@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from argus.api.main import _runtime_confirmation_card
+from argus.api.chat_service import runtime_confirmation_card
 
 
 def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None:
-    card = _runtime_confirmation_card(
+    card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": {
@@ -47,7 +47,7 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
 
 
 def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> None:
-    card = _runtime_confirmation_card(
+    card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": {

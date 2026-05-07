@@ -116,14 +116,14 @@ def test_structured_interpreter_uses_bounded_interpretation_profile(
 
 
 def test_result_breakdown_uses_bounded_profile(monkeypatch) -> None:
-    from argus.api import main as api_main
+    from argus.api import chat_service
 
     FakeChatOpenRouter.calls.clear()
     FakeChatOpenRouter.structured_response = None
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
 
-    text = api_main._llm_result_breakdown_message({"title": "AAPL test"})
+    text = chat_service.llm_result_breakdown_message({"title": "AAPL test"})
 
     assert text is not None
     assert FakeChatOpenRouter.calls[0]["temperature"] == 0.2

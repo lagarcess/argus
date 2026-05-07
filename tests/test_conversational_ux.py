@@ -79,10 +79,6 @@ async def test_conversational_ux_low_confidence_runtime_response_is_preserved() 
 
 
 def test_legacy_template_fallback_is_not_available() -> None:
-    import argus.domain.orchestrator as orchestrator_module
+    import importlib.util
 
-    removed_message_helper = "".join(["assistant_message_for_chat", "_turn"])
-    removed_intent_model = "".join(["Chat", "Turn", "Intent"])
-
-    assert not hasattr(orchestrator_module, removed_message_helper)
-    assert not hasattr(orchestrator_module, removed_intent_model)
+    assert importlib.util.find_spec("argus.domain.orchestrator") is None

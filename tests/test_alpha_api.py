@@ -162,8 +162,11 @@ async def _runtime_success_events(**kwargs: Any):
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
-    monkeypatch.setattr(api_main, "supabase_gateway", None)
+
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
     monkeypatch.setattr(
         api_main,
         "".join(["orchestrate_chat", "_turn"]),
@@ -198,8 +201,8 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         raising=False,
     )
-    monkeypatch.setattr(api_main, "run_agent_turn", _runtime_success_for_message_async)
-    monkeypatch.setattr(api_main, "stream_agent_turn_events", _runtime_success_events)
+    monkeypatch.setattr(agent_router, "run_agent_turn", _runtime_success_for_message_async)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
     monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
@@ -787,18 +790,11 @@ def test_invalid_cursor_returns_problem_details() -> None:
 
 
 def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
 
     client = _client()
     _set_onboarding_ready(client)
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-
-    monkeypatch.setattr(
-        api_main,
-        "".join(["orchestrate_chat", "_turn"]),
-        lambda **kwargs: None,
-        raising=False,
-    )
 
     async def _missing_symbol_events(**_: Any):
         yield {
@@ -811,7 +807,7 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
         }
 
     monkeypatch.setattr(
-        api_main,
+        agent_router,
         "stream_agent_turn_events",
         _missing_symbol_events,
     )
@@ -832,24 +828,17 @@ def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
 
 
 def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
 
     client = _client()
     _set_onboarding_ready(client)
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
 
-    monkeypatch.setattr(
-        api_main,
-        "".join(["orchestrate_chat", "_turn"]),
-        lambda **kwargs: None,
-        raising=False,
-    )
-
     async def _btc_1h_events(**_: Any):
         result = _runtime_success_result(symbol="BTC", timeframe="1h")
         yield {"type": "final", "payload": result}
 
-    monkeypatch.setattr(api_main, "stream_agent_turn_events", _btc_1h_events)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _btc_1h_events)
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -865,7 +854,8 @@ def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None
 
 
 def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
-    from argus.api import main as api_main
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
 
     client = _client()
     _set_onboarding_ready(client)
@@ -874,7 +864,6 @@ def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
     # Insert a message into memory store manually
     from datetime import datetime, timezone
 
-    from argus.api.main import store
     from argus.api.schemas import Message
 
     msg1 = Message(
@@ -884,7 +873,7 @@ def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
         content="Tell me about AAPL",
         created_at=datetime.now(timezone.utc),
     )
-    store.messages[conversation["id"]] = [msg1]
+    api_state.store.messages[conversation["id"]] = [msg1]
 
     captured_runtime: dict[str, Any] = {}
 
@@ -893,7 +882,7 @@ def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
         yield {"type": "final", "payload": _runtime_success_result(symbol="AAPL", assistant_response="ok")}
 
     monkeypatch.setattr(
-        api_main,
+        agent_router,
         "stream_agent_turn_events",
         _fake_stream_agent_turn_events,
     )

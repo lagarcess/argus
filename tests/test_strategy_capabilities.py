@@ -41,11 +41,9 @@ def test_buy_and_hold_aliases():
 
 def test_buy_and_hold_aliases_are_registry_data_not_orchestrator_nlu():
     """The registry can expose aliases without restoring legacy extraction."""
-    import argus.domain.orchestrator as orchestrator_module
+    import importlib.util
 
-    removed_helper = "".join(["_extract_deterministic", "_intent"])
-
-    assert not hasattr(orchestrator_module, removed_helper)
+    assert importlib.util.find_spec("argus.domain.orchestrator") is None
     assert "comprar y mantener" in STRATEGY_CAPABILITIES["buy_and_hold"].aliases
 
 

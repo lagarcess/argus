@@ -17,26 +17,8 @@ def _source(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_domain_orchestrator_retains_only_non_routing_helpers() -> None:
-    source = _source("src/argus/domain/orchestrator.py")
-
-    banned_symbols = [
-        _name("classify_chat_turn", "_intent"),
-        _name("Chat", "Turn", "Intent"),
-        _name("Backtest", "Params", "Update"),
-        _name("orchestrate_chat", "_turn"),
-        _name("assistant_message_for_chat", "_turn"),
-        _name("COMMON", "_NAMES"),
-        _name("NON", "_SYMBOLS"),
-        _name("_extract_symbols", "_from_text"),
-        _name("_extract_deterministic", "_intent"),
-        _name("_extract_strategy", "_intent"),
-    ]
-    for symbol in banned_symbols:
-        assert symbol not in source
-
-    assert "def get_starter_prompts" in source
-    assert "def suggest_entity_name" in source
+def test_domain_orchestrator_is_deleted() -> None:
+    assert not (ROOT / "src/argus/domain/orchestrator.py").exists()
 
 
 def test_api_main_has_no_legacy_orchestrator_wiring() -> None:
@@ -54,6 +36,10 @@ def test_api_main_has_no_legacy_orchestrator_wiring() -> None:
     ]
     for fragment in banned_fragments:
         assert fragment not in source
+
+    naming = _source("src/argus/api/naming.py")
+    assert "def get_starter_prompts" in naming
+    assert "def suggest_entity_name" in naming
 
 
 def test_legacy_state_module_is_retired() -> None:

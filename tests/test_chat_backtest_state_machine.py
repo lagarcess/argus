@@ -9,6 +9,7 @@ from argus.api.schemas import BacktestRun
 from argus.domain.engine import SymbolAsset
 from argus.domain.indicators import IndicatorInfo
 from argus.domain.market_data.assets import ResolvedAsset
+from argus.domain.store import utcnow
 from fastapi.testclient import TestClient
 
 
@@ -142,13 +143,26 @@ def _result_runtime_result() -> dict[str, Any]:
     }
 
 
+def _stream_events_from_runtime(runtime):
+    async def _events(**kwargs: Any):
+        yield {"type": "final", "payload": runtime(**kwargs)}
+
+    return _events
+
+
 @pytest.fixture(autouse=True)
 def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import main as api_main
+    from argus.api import backtest_service, chat_service
+    from argus.api import state as api_state
 
-    monkeypatch.setattr(api_main, "supabase_gateway", None)
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
     monkeypatch.setattr(
-        api_main,
+        backtest_service,
+        "classify_symbol",
+        lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
+    )
+    monkeypatch.setattr(
+        chat_service,
         "classify_symbol",
         lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
     )
@@ -157,7 +171,7 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_chat_stream_emits_structured_confirmation_actions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
 
     seen: dict[str, Any] = {}
 
@@ -165,7 +179,11 @@ def test_chat_stream_emits_structured_confirmation_actions(
         seen.update(kwargs)
         return _confirmation_runtime_result()
 
-    monkeypatch.setattr(api_main, "run_agent_turn", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
     client = _client()
     conversation = _conversation(client)
 
@@ -224,12 +242,12 @@ def test_chat_stream_emits_structured_confirmation_actions(
 def test_chat_stream_persists_confirmation_metadata_and_preview(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
 
     monkeypatch.setattr(
-        api_main,
-        "run_agent_turn",
-        lambda **_: _confirmation_runtime_result(),
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(lambda **_: _confirmation_runtime_result()),
     )
     client = _client()
     conversation = _conversation(client)
@@ -259,7 +277,7 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
 def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
 
     seen_messages: list[str] = []
 
@@ -267,7 +285,11 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         seen_messages.append(kwargs["message"])
         return _result_runtime_result()
 
-    monkeypatch.setattr(api_main, "run_agent_turn", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
     client = _client()
     conversation = _conversation(client)
 
@@ -303,7 +325,8 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
 def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api import chat_service
+    from argus.api.routers import agent as agent_router
 
     runtime_calls = 0
 
@@ -312,8 +335,12 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         runtime_calls += 1
         return _result_runtime_result()
 
-    monkeypatch.setattr(api_main, "run_agent_turn", _runtime)
-    monkeypatch.setattr(api_main, "build_openrouter_model", lambda _task: None)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    monkeypatch.setattr(chat_service, "build_openrouter_model", lambda _task: None)
     client = _client()
     conversation = _conversation(client)
 
@@ -361,13 +388,13 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
 
 def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
-    from argus.api import main as api_main
+    from argus.api import state as api_state
 
     client = _client()
     conversation = _conversation(client)
     user_id = client.get("/api/v1/me").json()["user"]["id"]
-    run_id = api_main.store.new_id()
-    api_main.store.backtest_runs[run_id] = BacktestRun(
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
         id=run_id,
         conversation_id=conversation["id"],
         strategy_id=None,
@@ -401,11 +428,11 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
                 }
             ],
         },
-        created_at=api_main.utcnow(),
+        created_at=utcnow(),
         chart=None,
         trades=[],
     )
-    api_main.store.backtest_run_owners[run_id] = user_id
+    api_state.store.backtest_run_owners[run_id] = user_id
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -506,10 +533,10 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
 def test_discovery_endpoints_return_assets_and_indicators(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import discovery as discovery_router
 
     monkeypatch.setattr(
-        api_main,
+        discovery_router,
         "search_assets",
         lambda q, limit=12: [
             ResolvedAsset(
@@ -521,7 +548,7 @@ def test_discovery_endpoints_return_assets_and_indicators(
         ],
     )
     monkeypatch.setattr(
-        api_main,
+        discovery_router,
         "search_indicators",
         lambda q, limit=12: [
             IndicatorInfo("rsi", "RSI", "Relative Strength Index", "supported")
@@ -541,10 +568,10 @@ def test_discovery_endpoints_return_assets_and_indicators(
 def test_discovery_assets_display_currency_pair_label(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import discovery as discovery_router
 
     monkeypatch.setattr(
-        api_main,
+        discovery_router,
         "search_assets",
         lambda q, limit=12: [
             ResolvedAsset(

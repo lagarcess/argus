@@ -33,7 +33,7 @@ def _set_onboarding_ready(client: TestClient, primary_goal: str = "surprise_me")
 def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
     monkeypatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
 
     captured: dict[str, Any] = {}
 
@@ -87,7 +87,7 @@ def test_chat_stream_routes_through_agent_runtime_and_emits_result_card(
         }
 
     monkeypatch.setattr(
-        api_main,
+        agent_router,
         "stream_agent_turn_events",
         _fake_stream_agent_turn_events,
     )
@@ -147,7 +147,7 @@ def test_chat_stream_production_path_uses_astream_events_not_invoke() -> None:
 def test_chat_stream_falls_back_conversationally_for_unsupported_runtime_result(
     monkeypatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
 
     async def _fake_stream_agent_turn_events(**_: Any):
         yield {"type": "stage_start", "stage": "interpret"}
@@ -166,7 +166,7 @@ def test_chat_stream_falls_back_conversationally_for_unsupported_runtime_result(
         }
 
     monkeypatch.setattr(
-        api_main,
+        agent_router,
         "stream_agent_turn_events",
         _fake_stream_agent_turn_events,
     )
@@ -193,15 +193,15 @@ def test_chat_stream_falls_back_conversationally_for_unsupported_runtime_result(
 def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
     monkeypatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api import chat_service
 
     monkeypatch.setattr(
-        api_main,
+        chat_service,
         "_confirmation_today",
         lambda: date(2026, 5, 3),
     )
 
-    card = api_main._runtime_confirmation_card(
+    card = chat_service.runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": {
@@ -239,15 +239,15 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
 def test_runtime_confirmation_card_expands_compact_period_and_hides_indicator_cadence(
     monkeypatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api import chat_service
 
     monkeypatch.setattr(
-        api_main,
+        chat_service,
         "_confirmation_today",
         lambda: date(2026, 5, 3),
     )
 
-    card = api_main._runtime_confirmation_card(
+    card = chat_service.runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": {
@@ -276,15 +276,15 @@ def test_runtime_confirmation_card_expands_compact_period_and_hides_indicator_ca
 def test_runtime_confirmation_card_simplifies_counted_one_year_period(
     monkeypatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api import chat_service
 
     monkeypatch.setattr(
-        api_main,
+        chat_service,
         "_confirmation_today",
         lambda: date(2026, 5, 3),
     )
 
-    card = api_main._runtime_confirmation_card(
+    card = chat_service.runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": {
@@ -310,16 +310,16 @@ def test_runtime_confirmation_card_simplifies_counted_one_year_period(
 def test_runtime_confirmation_card_formats_machine_date_tokens(
     monkeypatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api import chat_service
 
     monkeypatch.setattr(
-        api_main,
+        chat_service,
         "_confirmation_today",
         lambda: date(2026, 5, 3),
     )
 
     def card_for(date_range: str) -> dict[str, Any]:
-        card = api_main._runtime_confirmation_card(
+        card = chat_service.runtime_confirmation_card(
             {
                 "stage_outcome": "await_approval",
                 "confirmation_payload": {
@@ -352,15 +352,15 @@ def test_runtime_confirmation_card_formats_machine_date_tokens(
 def test_runtime_confirmation_card_formats_structured_date_range(
     monkeypatch,
 ) -> None:
-    from argus.api import main as api_main
+    from argus.api import chat_service
 
     monkeypatch.setattr(
-        api_main,
+        chat_service,
         "_confirmation_today",
         lambda: date(2026, 5, 3),
     )
 
-    card = api_main._runtime_confirmation_card(
+    card = chat_service.runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
             "confirmation_payload": {
