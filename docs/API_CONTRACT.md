@@ -468,15 +468,33 @@ Immutable simulation result.
     "actions": [
       {
         "type": "show_breakdown",
-        "label": "Show a breakdown"
+        "label": "Show a breakdown",
+        "presentation": "result",
+        "payload": {
+          "run_id": "uuid",
+          "strategy_id": null,
+          "conversation_id": "uuid"
+        }
       },
       {
         "type": "save_strategy",
-        "label": "Save strategy"
+        "label": "Save strategy",
+        "presentation": "result",
+        "payload": {
+          "run_id": "uuid",
+          "strategy_id": null,
+          "conversation_id": "uuid"
+        }
       },
       {
         "type": "refine_strategy",
-        "label": "Refine strategy"
+        "label": "Refine strategy",
+        "presentation": "result",
+        "payload": {
+          "run_id": "uuid",
+          "strategy_id": null,
+          "conversation_id": "uuid"
+        }
       }
     ],
     "chart": {

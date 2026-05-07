@@ -166,6 +166,16 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("resultCardFromConversationCard");
   });
 
+  test("result actions carry canonical run and conversation context", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("run_id: run.id");
+    expect(chat).toContain("strategy_id: run.strategy_id ?? null");
+    expect(chat).toContain("conversation_id: run.conversation_id");
+    expect(chat).toContain("conversation_id: metadata.result_conversation_id");
+    expect(chat).toContain("presentation: \"result\"");
+  });
+
   test("chat consumes result action chips after breakdown is requested", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 

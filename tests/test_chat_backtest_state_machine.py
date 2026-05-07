@@ -309,15 +309,18 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     assert "AAPL" in conversations[0]["last_message_preview"]
 
 
-def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
+def test_confirmation_action_requires_pending_confirmation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.routers import agent as agent_router
 
-    seen_messages: list[str] = []
+    runtime_calls = 0
 
     def _runtime(**kwargs: Any) -> dict[str, Any]:
-        seen_messages.append(kwargs["message"])
+        nonlocal runtime_calls
+        if kwargs["message"] != "run backtest":
+            return _confirmation_runtime_result()
+        runtime_calls += 1
         return _result_runtime_result()
 
     monkeypatch.setattr(
@@ -342,8 +345,60 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         },
     )
 
+    assert response.status_code == 409
+    assert response.json()["code"] == "confirmation_required"
+    assert runtime_calls == 0
+
+
+def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    seen_messages: list[str] = []
+
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
+        seen_messages.append(kwargs["message"])
+        if kwargs["message"] != "run backtest":
+            return _confirmation_runtime_result()
+        return _result_runtime_result()
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    client = _client()
+    conversation = _conversation(client)
+    create_confirmation = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Buy and hold Apple over the past year",
+            "language": "en",
+        },
+    )
+    assert create_confirmation.status_code == 200
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "en",
+        },
+    )
+
     assert response.status_code == 200
-    assert seen_messages == ["run backtest"]
+    assert seen_messages == [
+        "Buy and hold Apple over the past year",
+        "run backtest",
+    ]
     assert (
         "Run backtest"
         in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
@@ -356,6 +411,11 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         "save_strategy",
         "refine_strategy",
     ]
+    for action in run["conversation_result_card"]["actions"]:
+        assert action["presentation"] == "result"
+        assert action["payload"]["run_id"] == run["id"]
+        assert action["payload"]["strategy_id"] is None
+        assert action["payload"]["conversation_id"] == conversation["id"]
 
 
 def test_result_breakdown_action_uses_stored_result_without_rerun(
@@ -366,8 +426,10 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
     runtime_calls = 0
 
-    def _runtime(**_: Any) -> dict[str, Any]:
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
         nonlocal runtime_calls
+        if kwargs["message"] != "run backtest":
+            return _confirmation_runtime_result()
         runtime_calls += 1
         return _result_runtime_result()
 
@@ -379,6 +441,15 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch.setattr(chat_service, "build_openrouter_model", lambda _task: None)
     client = _client()
     conversation = _conversation(client)
+    confirmation = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Buy and hold Apple over the past year",
+            "language": "en",
+        },
+    )
+    assert confirmation.status_code == 200
 
     first = client.post(
         "/api/v1/chat/stream",
@@ -421,6 +492,149 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
     assert "result_card" not in assistant["metadata"]
+
+
+def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    active_conversation = _conversation(client)
+    other_conversation = _conversation(client)
+    user_id = client.get("/api/v1/me").json()["user"]["id"]
+
+    other_run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[other_run_id] = BacktestRun(
+        id=other_run_id,
+        conversation_id=other_conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["MSFT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 8.2}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["MSFT"]},
+        conversation_result_card={
+            "title": "MSFT buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+8.2%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[other_run_id] = user_id
+
+    active_run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[active_run_id] = BacktestRun(
+        id=active_run_id,
+        conversation_id=active_conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+12.4%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[active_run_id] = user_id
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": active_conversation["id"],
+            "action": {
+                "type": "save_strategy",
+                "label": "Save strategy",
+                "presentation": "result",
+                "payload": {
+                    "run_id": other_run_id,
+                    "conversation_id": active_conversation["id"],
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "could not find" in text
+    assert client.get("/api/v1/strategies").json()["items"] == []
+
+
+def test_show_breakdown_action_rejects_mismatched_conversation_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import chat_service
+    from argus.api import state as api_state
+
+    monkeypatch.setattr(chat_service, "build_openrouter_model", lambda _task: None)
+    client = _client()
+    active_conversation = _conversation(client)
+    other_conversation = _conversation(client)
+    user_id = client.get("/api/v1/me").json()["user"]["id"]
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=active_conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+12.4%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[run_id] = user_id
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": active_conversation["id"],
+            "action": {
+                "type": "show_breakdown",
+                "label": "Show a breakdown",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run_id,
+                    "conversation_id": other_conversation["id"],
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "could not find" in text
+    assistant = client.get(
+        f"/api/v1/conversations/{active_conversation['id']}/messages"
+    ).json()["items"][-1]
+    assert "result_run_id" not in assistant["metadata"]
 
 
 def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
@@ -478,7 +692,10 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
                 "type": "save_strategy",
                 "label": "Save strategy",
                 "presentation": "result",
-                "payload": {"run_id": run_id},
+                "payload": {
+                    "run_id": run_id,
+                    "conversation_id": conversation["id"],
+                },
             },
             "language": "en",
         },
@@ -498,7 +715,10 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
                 "type": "save_strategy",
                 "label": "Save strategy",
                 "presentation": "result",
-                "payload": {"run_id": run_id},
+                "payload": {
+                    "run_id": run_id,
+                    "conversation_id": conversation["id"],
+                },
             },
             "language": "en",
         },

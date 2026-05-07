@@ -27,6 +27,14 @@ SUPPORTED_ONBOARDING_GOALS = {
     "surprise_me",
 }
 
+CONFIRMATION_ACTION_TYPES = {
+    "run_backtest",
+    "change_dates",
+    "change_asset",
+    "adjust_assumptions",
+    "cancel_confirmation",
+}
+
 
 def parse_onboarding_control_message(message: str) -> str | None:
     if message == "__ONBOARDING_SKIP__":
@@ -339,6 +347,42 @@ def resolved_run_symbols(resolved_strategy: dict[str, Any]) -> list[str]:
     return symbols
 
 
+def enrich_result_card_actions(
+    *,
+    result_card: dict[str, Any],
+    run_id: str,
+    strategy_id: str | None,
+    conversation_id: str,
+) -> dict[str, Any]:
+    enriched = dict(result_card)
+    actions = result_card.get("actions")
+    if not isinstance(actions, list):
+        return enriched
+
+    enriched_actions: list[dict[str, Any]] = []
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        payload = action.get("payload")
+        action_payload = dict(payload) if isinstance(payload, dict) else {}
+        action_payload.update(
+            {
+                "run_id": run_id,
+                "strategy_id": strategy_id,
+                "conversation_id": conversation_id,
+            }
+        )
+        enriched_actions.append(
+            {
+                **action,
+                "presentation": "result",
+                "payload": action_payload,
+            }
+        )
+    enriched["actions"] = enriched_actions
+    return enriched
+
+
 def build_runtime_backtest_run(
     *,
     user_id: str,
@@ -358,6 +402,13 @@ def build_runtime_backtest_run(
     if not symbols:
         return None
     symbol = symbols[0]
+    run_id = api_state.store.new_id()
+    result_card = enrich_result_card_actions(
+        result_card=result_card,
+        run_id=run_id,
+        strategy_id=None,
+        conversation_id=conversation_id,
+    )
 
     try:
         asset_class = classify_symbol(symbol).asset_class
@@ -388,7 +439,7 @@ def build_runtime_backtest_run(
     )
 
     return BacktestRun(
-        id=api_state.store.new_id(),
+        id=run_id,
         conversation_id=conversation_id,
         strategy_id=None,
         status="completed",
@@ -536,6 +587,53 @@ def chat_action_run_id(payload: ChatStreamRequest) -> str | None:
     return run_id or None
 
 
+def chat_action_conversation_id(payload: ChatStreamRequest) -> str | None:
+    if payload.action is None:
+        return None
+    raw_conversation_id = payload.action.payload.get("conversation_id")
+    if raw_conversation_id is None:
+        raw_conversation_id = payload.action.payload.get("conversationId")
+    if raw_conversation_id is None:
+        return None
+    conversation_id = str(raw_conversation_id).strip()
+    return conversation_id or None
+
+
+def is_confirmation_action(payload: ChatStreamRequest) -> bool:
+    return payload.action is not None and payload.action.type in CONFIRMATION_ACTION_TYPES
+
+
+def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
+    messages = []
+    if api_state.supabase_gateway is not None:
+        try:
+            messages = api_state.supabase_gateway.list_messages(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                limit=20,
+            )
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase confirmation state read failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    if not messages:
+        messages = list(api_state.store.messages.get(conversation_id, []))[-20:]
+
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        metadata = message.metadata
+        if metadata.get("result_card") or metadata.get("result_run_id"):
+            return False
+        if metadata.get("confirmation_card"):
+            return True
+    return False
+
+
 def latest_completed_run_for_conversation(
     *,
     user_id: str,
@@ -560,8 +658,33 @@ def run_for_result_action(
     conversation_id: str,
 ) -> BacktestRun | None:
     run_id = chat_action_run_id(payload)
-    run = api_state.store.backtest_runs.get(run_id) if run_id else None
-    if run is not None and api_state.store.backtest_run_owners.get(run.id) == user.id:
+    action_conversation_id = chat_action_conversation_id(payload)
+    if action_conversation_id and action_conversation_id != conversation_id:
+        return None
+    if run_id:
+        run = None
+        if api_state.supabase_gateway is not None:
+            try:
+                run = api_state.supabase_gateway.get_backtest_run(
+                    user_id=user.id,
+                    run_id=run_id,
+                )
+            except Exception as exc:
+                if not dev_memory_fallback_enabled():
+                    raise
+                logger.warning(
+                    "Supabase result action run read failed; using dev memory fallback",
+                    error=str(exc),
+                    run_id=run_id,
+                )
+        if run is None:
+            run = api_state.store.backtest_runs.get(run_id)
+        if run is None:
+            return None
+        if api_state.store.backtest_run_owners.get(run.id, user.id) != user.id:
+            return None
+        if run.conversation_id != conversation_id or run.status != "completed":
+            return None
         return run
     return latest_completed_run_for_conversation(
         user_id=user.id,
@@ -743,6 +866,9 @@ _persist_onboarding_update = persist_onboarding_update
 _chat_request_message = chat_request_message
 _chat_display_message = chat_display_message
 _chat_action_run_id = chat_action_run_id
+_chat_action_conversation_id = chat_action_conversation_id
+_is_confirmation_action = is_confirmation_action
+_pending_confirmation_exists = pending_confirmation_exists
 _latest_completed_run_for_conversation = latest_completed_run_for_conversation
 _run_for_result_action = run_for_result_action
 _strategy_template_from_run = strategy_template_from_run

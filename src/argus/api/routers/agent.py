@@ -14,7 +14,9 @@ from argus.api import state as api_state
 from argus.api.chat_service import (
     chat_display_message,
     chat_request_message,
+    is_confirmation_action,
     parse_onboarding_control_message,
+    pending_confirmation_exists,
     persist_onboarding_update,
     persist_runtime_backtest_run,
     result_breakdown_message,
@@ -141,6 +143,20 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
     )
+    if is_confirmation_action(payload) and not pending_confirmation_exists(
+        user_id=user.id,
+        conversation_id=conversation.id,
+    ):
+        raise problem(
+            request,
+            status_code=409,
+            code="confirmation_required",
+            title="Confirmation Required",
+            detail=(
+                "There is no pending strategy confirmation to approve. "
+                "Describe the idea again and I will prepare a fresh confirmation."
+            ),
+        )
     if onboarding_goal is None:
         create_message(
             user_id=user.id,
@@ -428,9 +444,12 @@ async def chat_stream(
                 if result_card is not None:
                     metadata["result_card"] = result_card
                 if run is not None:
+                    result_card = run.conversation_result_card
+                    metadata["result_card"] = result_card
                     metadata["latest_run_id"] = run.id
                     metadata["result_run_id"] = run.id
                     metadata["result_strategy_id"] = run.strategy_id
+                    metadata["result_conversation_id"] = run.conversation_id
                     runtime_result["run"] = run.model_dump(mode="json")
 
                 persisted_text = assistant_text or "".join(streamed_text_parts).strip()
