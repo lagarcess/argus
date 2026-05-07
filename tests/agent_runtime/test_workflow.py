@@ -88,14 +88,12 @@ class ApprovalInterpreter:
 
 @pytest.mark.asyncio
 async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
-    from argus.agent_runtime.extraction import structured as extraction_module
-    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime import resolution as resolution_module
 
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         return ResolvedAssetStub(symbol.upper(), "equity")
 
-    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
-    monkeypatch.setattr(extraction_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
 
     workflow = build_workflow(
         structured_interpreter=RsiConfirmationInterpreter(),
@@ -166,15 +164,13 @@ async def test_workflow_streams_stage_events_and_final_payload() -> None:
 
 @pytest.mark.asyncio
 async def test_workflow_uses_checkpointer_for_thread_state(monkeypatch) -> None:
-    from argus.agent_runtime.extraction import structured as extraction_module
-    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime import resolution as resolution_module
 
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         asset_class = "crypto" if symbol.upper() == "BTC" else "equity"
         return ResolvedAssetStub(symbol.upper(), asset_class)
 
-    monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
-    monkeypatch.setattr(extraction_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
 
     interpreter = ApprovalInterpreter()
     workflow = build_workflow(
