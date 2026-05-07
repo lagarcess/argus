@@ -11,6 +11,33 @@ from argus.domain.market_data.assets import ResolvedAsset
 from fastapi.testclient import TestClient
 
 
+def _stream_events(stream: str) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for part in stream.split("\n\n"):
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
+            continue
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            events.append({"type": "done"})
+            continue
+        events.append(json.loads(raw))
+    return events
+
+
+def _final_payload(stream: str) -> dict[str, Any]:
+    final_events = [
+        event for event in _stream_events(stream) if event.get("type") == "final"
+    ]
+    assert len(final_events) == 1
+    payload = final_events[0]["payload"]
+    assert isinstance(payload, dict)
+    return payload
+
+
 def _fake_resolve_asset(symbol: str) -> ResolvedAsset:
     candidate = symbol.strip().upper().replace("-", "/")
     if candidate == "TESLA":
@@ -618,9 +645,21 @@ def test_chat_stream_prompts_for_onboarding_before_first_run() -> None:
 
     assert response.status_code == 200
     stream = response.text
-    assert "event: token" in stream
-    assert '"type":"final"' not in stream
-    assert "primary goal" in stream
+    assert "event:" not in stream
+    assert stream.count("data: [DONE]") == 1
+    events = _stream_events(stream)
+    token_events = [event for event in events if event.get("type") == "token"]
+    assert len(token_events) == 1
+    assert "primary goal" in token_events[0]["content"]
+    final_payload = _final_payload(stream)
+    assert set(final_payload) == {
+        "stage_outcome",
+        "assistant_response",
+        "message_id",
+    }
+    assert final_payload["stage_outcome"] == "await_user_reply"
+    assert final_payload["assistant_response"] == token_events[0]["content"]
+    assert final_payload["message_id"]
 
 
 def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
@@ -636,7 +675,22 @@ def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
         },
     )
     assert response.status_code == 200
-    assert "event: token" in response.text
+    stream = response.text
+    assert "event:" not in stream
+    assert stream.count("data: [DONE]") == 1
+    events = _stream_events(stream)
+    token_events = [event for event in events if event.get("type") == "token"]
+    assert len(token_events) == 1
+    assert "stock idea" in token_events[0]["content"]
+    final_payload = _final_payload(stream)
+    assert set(final_payload) == {
+        "stage_outcome",
+        "assistant_response",
+        "message_id",
+    }
+    assert final_payload["stage_outcome"] == "ready_to_respond"
+    assert final_payload["assistant_response"] == token_events[0]["content"]
+    assert final_payload["message_id"]
 
     me = client.get("/api/v1/me")
     onboarding = me.json()["user"]["onboarding"]
