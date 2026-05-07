@@ -94,6 +94,8 @@ Supabase-backed persistence owns conversation continuity:
 
 Reloading or navigating away from chat must hydrate both visible messages and structured UI artifacts, including confirmation cards, result cards, latest run ids, and available actions. A reload must not turn a structured result into plain text only.
 
+Runtime memory remains checkpoint-first. If a pending confirmation action arrives after reload, the API validates the LangGraph checkpoint before execution. Message metadata may supply a conservative fallback snapshot only when it contains structured confirmation payload; otherwise the assistant asks the user to reconfirm instead of silently running incomplete state. Result follow-ups may recover the latest canonical run reference from message metadata and `backtest_runs`, but Save Strategy must still use a concrete run id from the result card.
+
 Collections remain in the schema but launch UI for collections is feature-gated with `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
 
 ## Fully Supported

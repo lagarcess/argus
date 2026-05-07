@@ -126,6 +126,51 @@ function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[
   return [];
 }
 
+function resultActionRequiresRunContext(action: ChatActionOption) {
+  return action.type === "show_breakdown" || action.type === "save_strategy";
+}
+
+function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
+  return Boolean(runId && conversationId);
+}
+
+function hydrateResultActions(
+  actions: ChatActionOption[],
+  context: {
+    runId?: string;
+    strategyId?: string | null;
+    conversationId?: string;
+    strategyName?: string;
+    symbols?: string[];
+    template?: string;
+    assetClass?: AssetClass;
+  },
+) {
+  return actions
+    .filter(
+      (action) =>
+        !resultActionRequiresRunContext(action) ||
+        hasResultActionContext(context.runId, context.conversationId),
+    )
+    .map((action) => ({
+      id: action.id || action.type || action.label,
+      label: action.label,
+      type: action.type,
+      presentation: "result" as const,
+      payload: {
+        ...(action.payload ?? {}),
+        run_id: context.runId ?? "",
+        strategy_id: context.strategyId ?? null,
+        conversation_id: context.conversationId,
+        strategy_name: context.strategyName,
+        symbols: context.symbols ?? [],
+        template: context.template ?? "",
+        asset_class: context.assetClass ?? "equity",
+      },
+      value: action.value,
+    }));
+}
+
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   const messages: Message[] = items.map((m) => {
     const metadata = m.metadata ?? {};
@@ -137,24 +182,24 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
       resultCard &&
       Array.isArray(resultCard.rows)
     ) {
+      const runId = String(metadata.result_run_id ?? metadata.latest_run_id ?? "");
+      const conversationId =
+        typeof metadata.result_conversation_id === "string"
+          ? metadata.result_conversation_id
+          : m.conversation_id;
       const card = resultCardFromConversationCard(resultCard, {
-        id: String(metadata.result_run_id ?? metadata.latest_run_id ?? ""),
+        id: runId,
         strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
       });
-      const restoredActions = (card.actions ?? []).map((action) => ({
-        ...action,
-        presentation: "result" as const,
-        payload: {
-          ...(action.payload ?? {}),
-          run_id: card.runId ?? "",
-          strategy_id: card.strategyId ?? null,
-          conversation_id: metadata.result_conversation_id,
-          strategy_name: card.strategyName,
-          symbols: card.symbols ?? [],
-          template: "",
-          asset_class: "equity",
-        },
-      }));
+      const restoredActions = hydrateResultActions(card.actions ?? [], {
+        runId: card.runId,
+        strategyId: card.strategyId,
+        conversationId,
+        strategyName: card.strategyName,
+        symbols: card.symbols ?? [],
+        template: "",
+        assetClass: "equity",
+      });
       return {
         id: m.id,
         role: "ai",
@@ -297,23 +342,15 @@ export default function ChatInterface() {
   };
 
   const hydrateResultActionsForRun = (actions: ChatActionOption[], run: BacktestRun): ChatActionOption[] =>
-    actions.map((action) => ({
-      id: action.id || action.type || action.label,
-      label: action.label,
-      type: action.type,
-      presentation: "result",
-      payload: {
-        ...(action.payload ?? {}),
-        run_id: run.id,
-        strategy_id: run.strategy_id ?? null,
-        conversation_id: run.conversation_id,
-        strategy_name: run.conversation_result_card.title,
-        symbols: run.symbols,
-        template: String(run.config_snapshot?.template ?? ""),
-        asset_class: run.asset_class,
-      },
-      value: action.value,
-    }));
+    hydrateResultActions(actions, {
+      runId: run.id,
+      strategyId: run.strategy_id ?? null,
+      conversationId: run.conversation_id ?? undefined,
+      strategyName: run.conversation_result_card.title,
+      symbols: run.symbols,
+      template: String(run.config_snapshot?.template ?? ""),
+      assetClass: run.asset_class,
+    });
 
   const visibleInputActions = (actions: ChatActionOption[]) =>
     actions.filter((action) => action.type !== "save_strategy");

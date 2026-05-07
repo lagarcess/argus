@@ -271,7 +271,8 @@ Application-facing user object.
   "conversation_id": "uuid",
   "role": "user",
   "content": "What if I bought Tesla dips?",
-  "created_at": "timestamp"
+  "created_at": "timestamp",
+  "metadata": {}
 }
 ```
 
@@ -280,6 +281,13 @@ Application-facing user object.
 - `assistant`
 - `system`
 - `tool`
+
+Assistant `metadata` may include structured continuity artifacts such as
+`confirmation_card`, `confirmation_payload`, `result_card`, `result_run_id`,
+`latest_run_id`, `result_strategy_id`, and `result_conversation_id`. Clients use
+these fields to hydrate cards and actions after reload. Runtime execution still
+validates against the LangGraph checkpoint first, and result actions that mutate
+state must reference a canonical run id.
 
 ## Strategy
 
@@ -1024,6 +1032,8 @@ AI response uses the resolved language unless the user clearly asks otherwise in
 If the stream disconnects, the client should reconnect by re-fetching the conversation messages (`GET /conversations/{id}/messages`).
 - No token-level replay is guaranteed in Alpha.
 - No `last_message_id` reconnect contract is enforced yet.
+- Hydrated confirmation actions are valid only when the runtime checkpoint still has pending confirmation state or structured metadata can safely reconstruct the pending snapshot.
+- Hydrated result actions that save or explain a run require canonical run and conversation context.
 
 **Recommended Header:**
 - `X-Accel-Buffering: no` (To prevent proxy buffering)

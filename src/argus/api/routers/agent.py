@@ -13,15 +13,20 @@ from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
 from argus.api.chat_service import (
+    RuntimeFallbackContext,
     chat_display_message,
     chat_request_message,
+    checkpoint_has_latest_result,
+    checkpoint_has_pending_confirmation,
+    confirmation_metadata_fallback_context,
     is_confirmation_action,
+    latest_result_fallback_context,
     parse_onboarding_control_message,
-    pending_confirmation_exists,
     persist_onboarding_update,
     persist_runtime_backtest_run,
     result_breakdown_message,
     run_for_result_action,
+    runtime_checkpoint_values,
     runtime_confirmation_card,
     runtime_result_card,
     runtime_result_envelope,
@@ -144,20 +149,38 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
     )
-    if is_confirmation_action(payload) and not pending_confirmation_exists(
-        user_id=user.id,
+    workflow = api_state.get_agent_runtime_workflow(request)
+    checkpoint_values = await runtime_checkpoint_values(
+        workflow=workflow,
         conversation_id=conversation.id,
-    ):
-        raise problem(
-            request,
-            status_code=409,
-            code="confirmation_required",
-            title="Confirmation Required",
-            detail=(
-                "There is no pending strategy confirmation to approve. "
-                "Describe the idea again and I will prepare a fresh confirmation."
-            ),
+    )
+    runtime_fallback = RuntimeFallbackContext()
+    if is_confirmation_action(payload):
+        if not checkpoint_has_pending_confirmation(checkpoint_values):
+            metadata_fallback = confirmation_metadata_fallback_context(
+                user_id=user.id,
+                conversation_id=conversation.id,
+            )
+            if metadata_fallback is None:
+                raise problem(
+                    request,
+                    status_code=409,
+                    code="confirmation_required",
+                    title="Confirmation Required",
+                    detail=(
+                        "There is no pending strategy confirmation to approve. "
+                        "Describe the idea again and I will prepare a fresh confirmation."
+                    ),
+                )
+            runtime_fallback = metadata_fallback
+    elif not checkpoint_has_latest_result(checkpoint_values):
+        result_fallback = latest_result_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
         )
+        if result_fallback is not None:
+            runtime_fallback = result_fallback
+
     mention_provenance = [
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
@@ -301,11 +324,43 @@ async def chat_stream(
             yield sse_done()
             return
 
+        if runtime_fallback.recovery_message:
+            assistant_text = runtime_fallback.recovery_message
+            metadata = {
+                "conversation_mode": "confirm",
+                "agent_runtime_stage_outcome": "await_user_reply",
+                "recovery_reason": "missing_confirmation_checkpoint",
+            }
+            if payload.action is not None:
+                metadata["chat_action"] = payload.action.model_dump(mode="python")
+            assistant_message = create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=assistant_text,
+                metadata=metadata,
+            )
+            yield sse_data({"type": "stage_start", "stage": "clarify"})
+            yield sse_data({"type": "token", "content": assistant_text})
+            yield sse_data(
+                {
+                    "type": "final",
+                    "payload": {
+                        "stage_outcome": "await_user_reply",
+                        "assistant_response": assistant_text,
+                        "message_id": assistant_message.id,
+                    },
+                }
+            )
+            yield sse_done()
+            return
+
         if payload.action is not None and payload.action.type == "save_strategy":
             run = run_for_result_action(
                 payload=payload,
                 user=user,
                 conversation_id=conversation.id,
+                require_run_id=True,
             )
             metadata: dict[str, Any] = {
                 "conversation_mode": "result_review",
@@ -395,7 +450,7 @@ async def chat_stream(
 
         try:
             async for runtime_event in stream_agent_turn_events(
-                workflow=api_state.get_agent_runtime_workflow(request),
+                workflow=workflow,
                 user=runtime_user,
                 thread_id=conversation.id,
                 message=request_message,
@@ -403,6 +458,12 @@ async def chat_stream(
                 context_hints=[
                     item.model_dump(mode="python") for item in mention_provenance
                 ],
+                fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
+                fallback_selected_thread_metadata=(
+                    runtime_fallback.selected_thread_metadata
+                ),
+                fallback_artifact_references=runtime_fallback.artifact_references,
+                fallback_confirmation_payload=runtime_fallback.confirmation_payload,
             ):
                 event_type = runtime_event.get("type")
                 if event_type == "token":
@@ -465,6 +526,12 @@ async def chat_stream(
                     ]
                 if confirmation_card is not None:
                     metadata["confirmation_card"] = confirmation_card
+                    if isinstance(
+                        runtime_result.get("confirmation_payload"), dict
+                    ):
+                        metadata["confirmation_payload"] = runtime_result[
+                            "confirmation_payload"
+                        ]
                     runtime_result["confirmation"] = confirmation_card
                 if result_card is not None:
                     metadata["result_card"] = result_card

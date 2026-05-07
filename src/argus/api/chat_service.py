@@ -1,20 +1,34 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
 from loguru import logger
 
+from argus.agent_runtime.state.models import (
+    ArtifactReference,
+    StrategySummary,
+    TaskSnapshot,
+)
 from argus.agent_runtime.strategy_contract import (
     display_strategy_slug,
     display_strategy_type,
     executable_strategy_type,
     resolve_date_range,
+    strategy_can_be_approved,
 )
 from argus.api import state as api_state
 from argus.api.dependencies import dev_memory_fallback_enabled
-from argus.api.schemas import BacktestRun, ChatStreamRequest, Conversation, Strategy, User
+from argus.api.schemas import (
+    BacktestRun,
+    ChatStreamRequest,
+    Conversation,
+    Message,
+    Strategy,
+    User,
+)
 from argus.domain.engine import classify_symbol, default_benchmark
 from argus.domain.store import utcnow
 from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
@@ -34,6 +48,20 @@ CONFIRMATION_ACTION_TYPES = {
     "adjust_assumptions",
     "cancel_confirmation",
 }
+
+LOST_CONFIRMATION_STATE_MESSAGE = (
+    "I lost the active confirmation state, but your conversation is saved. "
+    "I can restate the strategy so you can confirm it again."
+)
+
+
+@dataclass(frozen=True)
+class RuntimeFallbackContext:
+    latest_task_snapshot: TaskSnapshot | None = None
+    selected_thread_metadata: dict[str, Any] | None = None
+    artifact_references: list[ArtifactReference] | None = None
+    confirmation_payload: dict[str, Any] | None = None
+    recovery_message: str | None = None
 
 
 def parse_onboarding_control_message(message: str) -> str | None:
@@ -604,24 +632,11 @@ def is_confirmation_action(payload: ChatStreamRequest) -> bool:
 
 
 def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
-    messages = []
-    if api_state.supabase_gateway is not None:
-        try:
-            messages = api_state.supabase_gateway.list_messages(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                limit=20,
-            )
-        except Exception as exc:
-            if not dev_memory_fallback_enabled():
-                raise
-            logger.warning(
-                "Supabase confirmation state read failed; using dev memory fallback",
-                error=str(exc),
-                conversation_id=conversation_id,
-            )
-    if not messages:
-        messages = list(api_state.store.messages.get(conversation_id, []))[-20:]
+    messages = _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
 
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):
@@ -632,6 +647,222 @@ def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
         if metadata.get("confirmation_card"):
             return True
     return False
+
+
+def _recent_messages_for_conversation(
+    *,
+    user_id: str,
+    conversation_id: str,
+    limit: int,
+) -> list[Message]:
+    messages: list[Message] = []
+    if api_state.supabase_gateway is not None:
+        try:
+            messages = api_state.supabase_gateway.list_messages(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                limit=limit,
+            )
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase confirmation state read failed; using dev memory fallback",
+                error=str(exc),
+                conversation_id=conversation_id,
+            )
+    if not messages:
+        messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
+    return messages
+
+
+async def runtime_checkpoint_values(
+    *,
+    workflow: Any,
+    conversation_id: str,
+) -> dict[str, Any]:
+    try:
+        state_snapshot = await workflow.aget_state(
+            {"configurable": {"thread_id": conversation_id}}
+        )
+    except Exception as exc:
+        logger.warning(
+            "Agent runtime checkpoint read failed; considering metadata fallback",
+            error=str(exc),
+            conversation_id=conversation_id,
+        )
+        return {}
+    values = getattr(state_snapshot, "values", None)
+    return values if isinstance(values, dict) else {}
+
+
+def checkpoint_has_pending_confirmation(values: dict[str, Any]) -> bool:
+    stage_outcome = values.get("stage_outcome")
+    stage_outcome_value = str(getattr(stage_outcome, "value", stage_outcome or ""))
+    if stage_outcome_value != "await_approval":
+        return False
+    snapshot = _task_snapshot_from_value(values.get("latest_task_snapshot"))
+    if snapshot is not None and snapshot.pending_strategy_summary is not None:
+        return True
+    run_state = values.get("run_state")
+    return getattr(run_state, "confirmation_payload", None) is not None
+
+
+def checkpoint_has_latest_result(values: dict[str, Any]) -> bool:
+    snapshot = _task_snapshot_from_value(values.get("latest_task_snapshot"))
+    return (
+        snapshot is not None
+        and snapshot.latest_backtest_result_reference is not None
+    )
+
+
+def confirmation_metadata_fallback_context(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> RuntimeFallbackContext | None:
+    messages = _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        metadata = message.metadata
+        if metadata.get("result_card") or metadata.get("result_run_id"):
+            return None
+        if not metadata.get("confirmation_card"):
+            continue
+        payload = metadata.get("confirmation_payload")
+        if not isinstance(payload, dict):
+            return RuntimeFallbackContext(
+                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+            )
+        strategy = payload.get("strategy")
+        if not isinstance(strategy, dict):
+            return RuntimeFallbackContext(
+                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+            )
+        try:
+            pending_strategy = StrategySummary.model_validate(strategy)
+        except Exception:
+            return RuntimeFallbackContext(
+                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+            )
+        if not strategy_can_be_approved(pending_strategy):
+            return RuntimeFallbackContext(
+                recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
+            )
+        return RuntimeFallbackContext(
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="backtest_execution",
+                completed=False,
+                pending_strategy_summary=pending_strategy,
+                last_unresolved_follow_up=(
+                    pending_strategy.raw_user_phrasing
+                    or pending_strategy.strategy_thesis
+                    or pending_strategy.strategy_type
+                ),
+                resolution_provenance=list(pending_strategy.resolution_provenance),
+            ),
+            selected_thread_metadata={
+                "latest_task_type": "backtest_execution",
+                "last_stage_outcome": "await_approval",
+                "fallback_source": "message_metadata",
+            },
+            artifact_references=[],
+            confirmation_payload=payload,
+        )
+    return None
+
+
+def latest_result_fallback_context(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> RuntimeFallbackContext | None:
+    messages = _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        metadata = message.metadata
+        raw_run_id = metadata.get("result_run_id") or metadata.get("latest_run_id")
+        if raw_run_id is None:
+            continue
+        run = _run_by_id_for_user(user_id=user_id, run_id=str(raw_run_id))
+        if run is None or run.conversation_id != conversation_id:
+            continue
+        if run.status != "completed":
+            continue
+        reference = ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id=run.id,
+            metadata={
+                "conversation_id": run.conversation_id,
+                "strategy_id": run.strategy_id,
+                "asset_class": run.asset_class,
+                "symbols": list(run.symbols),
+                "benchmark_symbol": run.benchmark_symbol,
+                "metrics": run.metrics,
+                "config_snapshot": run.config_snapshot,
+                "result_card": run.conversation_result_card,
+            },
+        )
+        return RuntimeFallbackContext(
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="results_explanation",
+                completed=True,
+                latest_backtest_result_reference=reference,
+            ),
+            selected_thread_metadata={
+                "latest_task_type": "results_explanation",
+                "last_stage_outcome": "ready_to_respond",
+                "fallback_source": "message_metadata",
+            },
+            artifact_references=[reference],
+        )
+    return None
+
+
+def _task_snapshot_from_value(value: Any) -> TaskSnapshot | None:
+    if value is None:
+        return None
+    if isinstance(value, TaskSnapshot):
+        return value
+    try:
+        return TaskSnapshot.model_validate(value)
+    except Exception:
+        return None
+
+
+def _run_by_id_for_user(*, user_id: str, run_id: str) -> BacktestRun | None:
+    run = None
+    if api_state.supabase_gateway is not None:
+        try:
+            run = api_state.supabase_gateway.get_backtest_run(
+                user_id=user_id,
+                run_id=run_id,
+            )
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase backtest run read failed; using dev memory fallback",
+                error=str(exc),
+                run_id=run_id,
+            )
+    if run is None:
+        run = api_state.store.backtest_runs.get(run_id)
+    if run is None:
+        return None
+    if api_state.store.backtest_run_owners.get(run.id, user_id) != user_id:
+        return None
+    return run
 
 
 def latest_completed_run_for_conversation(
@@ -656,32 +887,17 @@ def run_for_result_action(
     payload: ChatStreamRequest,
     user: User,
     conversation_id: str,
+    require_run_id: bool = False,
 ) -> BacktestRun | None:
     run_id = chat_action_run_id(payload)
     action_conversation_id = chat_action_conversation_id(payload)
     if action_conversation_id and action_conversation_id != conversation_id:
         return None
+    if require_run_id and not run_id:
+        return None
     if run_id:
-        run = None
-        if api_state.supabase_gateway is not None:
-            try:
-                run = api_state.supabase_gateway.get_backtest_run(
-                    user_id=user.id,
-                    run_id=run_id,
-                )
-            except Exception as exc:
-                if not dev_memory_fallback_enabled():
-                    raise
-                logger.warning(
-                    "Supabase result action run read failed; using dev memory fallback",
-                    error=str(exc),
-                    run_id=run_id,
-                )
+        run = _run_by_id_for_user(user_id=user.id, run_id=run_id)
         if run is None:
-            run = api_state.store.backtest_runs.get(run_id)
-        if run is None:
-            return None
-        if api_state.store.backtest_run_owners.get(run.id, user.id) != user.id:
             return None
         if run.conversation_id != conversation_id or run.status != "completed":
             return None

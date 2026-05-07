@@ -7,9 +7,11 @@ from argus.agent_runtime.graph.workflow import WorkflowNode, WorkflowState
 from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.state.models import (
     ArtifactReference,
+    ConfirmationPayload,
     ConversationMessage,
     ResolutionProvenance,
     RunState,
+    TaskSnapshot,
     UserState,
 )
 
@@ -28,18 +30,41 @@ def build_workflow_input(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
+    fallback_selected_thread_metadata: dict[str, Any] | None = None,
+    fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
+    | None = None,
+    fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
 ) -> WorkflowState:
     normalized_message = " ".join(message.strip().split())
-    return {
-        "run_state": RunState.new(
-            current_user_message=normalized_message,
-            recent_thread_history=_bounded_recent_thread_history(
-                list(recent_thread_history or [])
-            ),
-            context_hints=list(context_hints or []),
+    run_state = RunState.new(
+        current_user_message=normalized_message,
+        recent_thread_history=_bounded_recent_thread_history(
+            list(recent_thread_history or [])
         ),
+        context_hints=list(context_hints or []),
+    )
+    if fallback_confirmation_payload is not None:
+        run_state.confirmation_payload = ConfirmationPayload.model_validate(
+            fallback_confirmation_payload
+        )
+    workflow_input: WorkflowState = {
+        "run_state": run_state,
         "user": user,
     }
+    if fallback_latest_task_snapshot is not None:
+        workflow_input["latest_task_snapshot"] = TaskSnapshot.model_validate(
+            fallback_latest_task_snapshot
+        )
+    if fallback_selected_thread_metadata:
+        workflow_input["selected_thread_metadata"] = dict(
+            fallback_selected_thread_metadata
+        )
+    if fallback_artifact_references is not None:
+        workflow_input["artifact_references"] = resolve_persisted_artifact_references(
+            fallback_artifact_references
+        )
+    return workflow_input
 
 
 async def stream_agent_turn_events(
@@ -50,12 +75,21 @@ async def stream_agent_turn_events(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
+    fallback_selected_thread_metadata: dict[str, Any] | None = None,
+    fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
+    | None = None,
+    fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     initial_state = build_workflow_input(
         user=user,
         message=message,
         recent_thread_history=recent_thread_history,
         context_hints=context_hints,
+        fallback_latest_task_snapshot=fallback_latest_task_snapshot,
+        fallback_selected_thread_metadata=fallback_selected_thread_metadata,
+        fallback_artifact_references=fallback_artifact_references,
+        fallback_confirmation_payload=fallback_confirmation_payload,
     )
     config = {"configurable": {"thread_id": thread_id}}
     seen_stage_starts: set[str] = set()
@@ -96,6 +130,11 @@ async def run_agent_turn(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
+    fallback_selected_thread_metadata: dict[str, Any] | None = None,
+    fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
+    | None = None,
+    fallback_confirmation_payload: ConfirmationPayload | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     final_payload: dict[str, Any] | None = None
     async for event in stream_agent_turn_events(
@@ -105,6 +144,10 @@ async def run_agent_turn(
         message=message,
         recent_thread_history=recent_thread_history,
         context_hints=context_hints,
+        fallback_latest_task_snapshot=fallback_latest_task_snapshot,
+        fallback_selected_thread_metadata=fallback_selected_thread_metadata,
+        fallback_artifact_references=fallback_artifact_references,
+        fallback_confirmation_payload=fallback_confirmation_payload,
     ):
         if event.get("type") == "final":
             payload = event.get("payload")

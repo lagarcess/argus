@@ -23,6 +23,7 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
+    ConfirmationPayload,
     IntentName,
     ResolutionProvenance,
     ResolutionSource,
@@ -202,6 +203,7 @@ def _stage_result_from_interpretation(
     approval_result = _approval_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
+        state=state,
     )
     if approval_result is not None:
         return approval_result
@@ -268,6 +270,7 @@ def _approval_stage_result_if_applicable(
     *,
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
+    state: RunState,
 ) -> StageResult | None:
     if decision.semantic_turn_act != "approval":
         return None
@@ -291,10 +294,23 @@ def _approval_stage_result_if_applicable(
         stage_patch={
             "confirmation_payload": {
                 "strategy": approved_strategy.model_dump(mode="python"),
-                "optional_parameters": {},
+                "optional_parameters": _approval_optional_parameters_from_state(state),
             },
         },
     )
+
+
+def _approval_optional_parameters_from_state(state: RunState) -> dict[str, Any]:
+    payload = state.confirmation_payload
+    if payload is None:
+        return {}
+    if isinstance(payload, ConfirmationPayload):
+        return dict(payload.optional_parameters)
+    if isinstance(payload, dict):
+        optional_parameters = payload.get("optional_parameters")
+        if isinstance(optional_parameters, dict):
+            return dict(optional_parameters)
+    return {}
 
 
 def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
