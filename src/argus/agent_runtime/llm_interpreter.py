@@ -232,9 +232,10 @@ class OpenRouterStructuredInterpreter:
             "confluence, and indicator rules without an executable registry spec can "
             "be understood and drafted, but are not executable yet unless the user "
             "chooses a supported simplification. Same asset class only; max 5 symbols; "
-            "equity benchmark is "
-            "SPY; crypto benchmark is BTC; no brokerage trading, shorting, mixed "
-            "equity+crypto runs, custom scripting, or real slippage/fee realism.\n\n"
+            "equity benchmark is SPY; crypto benchmark is BTC; currency pairs "
+            "are supported through Kraken; currency pair benchmark is the tested "
+            "pair itself. No brokerage trading, shorting, mixed asset-class runs, "
+            "custom scripting, or real slippage/fee realism.\n\n"
             "When the user says something like 'buy Nvidia when the 50-day moving average "
             "crosses above the 200-day', preserve that as entry_logic. Do not ask what "
             "the buy trigger is. Explain that the crossover is understood but not directly "
@@ -437,13 +438,13 @@ def _validate_capability_boundaries(
                     category="unsupported_asset_mix",
                     raw_value=", ".join(symbols),
                     explanation=(
-                        "Argus Alpha cannot run equity and crypto together in one "
-                        "simulation yet."
+                        "Argus Alpha cannot run equity, crypto, and currency pairs "
+                        "together in one simulation yet."
                     ),
                     simplification_labels=[
-                        "Run separate equity and crypto tests",
+                        "Run one asset class at a time",
                         "Run the equity symbols only",
-                        "Run the crypto symbols only",
+                        "Run the crypto or currency pair symbols only",
                     ],
                 )
             )

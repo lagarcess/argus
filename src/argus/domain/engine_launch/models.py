@@ -40,11 +40,13 @@ class LaunchBacktestRequest(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     risk_rules: list[dict[str, Any]] = Field(default_factory=list)
     benchmark_symbol: str
+    language: str = "en"
 
     @model_validator(mode="after")
     def validate_request_shape(self) -> "LaunchBacktestRequest":
         self.symbol = self.symbol.strip().upper()
         self.symbols = _normalize_symbols(self.symbols, fallback_symbol=self.symbol)
+        self.language = self.language.strip() or "en"
 
         if self.sizing_mode == "capital_amount":
             if self.capital_amount is None:

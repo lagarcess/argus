@@ -128,7 +128,7 @@ When a request is not fully executable, Argus must:
 
 Examples:
 
-- Mixed equity and crypto in one run is unsupported. Argus should offer separate runs or an asset-class choice.
+- Mixed equity, crypto, and currency pairs in one run are unsupported. Argus should offer separate runs or an asset-class choice.
 - Unverified symbols are unsupported until provider lookup succeeds.
 - Unsupported compound logic should be preserved as intent and simplified only with user approval.
 - Provider data-window limits, including Kraken's 720-candle OHLC window, must be explained as data availability limits with a concrete shorter range or wider timeframe suggestion.

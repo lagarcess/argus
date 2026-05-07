@@ -524,24 +524,6 @@ Immutable simulation result.
       "attribution": "TradingView Lightweight Charts"
     }
   },
-  "chart": {
-    "kind": "portfolio_equity",
-    "series": [
-      { "time": "2022-01-03", "value": 10000.0 },
-      { "time": "2022-01-04", "value": 10042.5 }
-    ],
-    "markers": [
-      {
-        "time": "2022-01-03",
-        "type": "entry",
-        "label": "Buy NVDA, BYD",
-        "symbols": ["NVDA", "BYD"]
-      }
-    ],
-    "currency": "USD",
-    "base_value": 10000.0,
-    "attribution": "TradingView Lightweight Charts"
-  },
   "trades": [
     {
       "time": "2022-01-03",
@@ -1065,7 +1047,7 @@ The frontend maps `stage` values to human-readable progress labels:
 **2. `token`** — streaming LLM response text, one chunk at a time
 ```json
 { "type": "token", "content": "Based on your idea" }
-{ "type": "token", "content", " about Tesla..." }
+{ "type": "token", "content": " about Tesla..." }
 ```
 Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `next_step` nodes.
 
@@ -1517,7 +1499,7 @@ Not in current contract:
 - team accounts
 - advanced quota systems
 - cross-asset strategy runs
-- custom benchmarks (Alpha uses SPY/BTC defaults)
+- custom benchmarks (Alpha uses SPY/BTC defaults, or the tested pair for currency pairs)
 
 ---
 

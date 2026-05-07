@@ -1,4 +1,5 @@
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 from argus.agent_runtime.recovery.policy import should_retry
@@ -86,7 +87,10 @@ def test_execute_applies_mechanical_correction_before_retry() -> None:
     assert result.outcome == "execution_succeeded"
     assert tool.calls[0]["strategy_type"] == "buy_and_hold"
     assert tool.calls[0]["symbol"] == "TSLA"
-    assert tool.calls[1] == {"strategy": {"asset_universe": ["TSLA"]}}
+    assert tool.calls[1] == {
+        "strategy": {"asset_universe": ["TSLA"]},
+        "language": "en",
+    }
     assert result.patch["tool_call_records"][0]["payload"] == {}
 
 
@@ -286,7 +290,10 @@ def test_execute_stage_uses_real_backtest_tool_payload(
 
     def fake_run_launch_backtest(
         request,
+        *,
+        language: str = "en",
     ) -> LaunchExecutionAdapterResult:
+        assert language == "en"
         observed_requests.append(request.model_dump(mode="python"))
         return LaunchExecutionAdapterResult(
             envelope=LaunchExecutionEnvelope(
@@ -341,6 +348,109 @@ def test_execute_stage_uses_real_backtest_tool_payload(
     )
 
 
+def test_execute_stage_passes_language_to_real_backtest_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = RealBacktestTool()
+    state = RunState.new(current_user_message="Backtest Tesla", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_thesis": "Comprar y mantener Tesla durante el ultimo ano",
+            "asset_universe": ["TSLA"],
+            "date_range": "last 1 year",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 10000.0, "source": "default"},
+        },
+    }
+
+    observed_languages: list[str] = []
+
+    def fake_run_launch_backtest(
+        request,
+        *,
+        language: str = "en",
+    ) -> LaunchExecutionAdapterResult:
+        observed_languages.append(language)
+        return LaunchExecutionAdapterResult(
+            envelope=LaunchExecutionEnvelope(
+                execution_status="succeeded",
+                resolved_strategy={
+                    "strategy_type": request.strategy_type,
+                    "symbol": request.symbol,
+                },
+                resolved_parameters={"timeframe": request.timeframe},
+                metrics={"aggregate": {"performance": {"total_return_pct": 12.5}}},
+                benchmark_metrics={"symbol": request.benchmark_symbol},
+                assumptions=[],
+                caveats=[],
+                provider_metadata={"provider": "alpaca"},
+            ),
+            result_card={"title": "TSLA comprar y mantener"},
+            explanation_context={},
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_run_launch_backtest,
+    )
+
+    result = execute_stage(
+        state=state,
+        tool=tool,
+        max_retries=1,
+        language="es-419",
+    )
+
+    assert result.outcome == "execution_succeeded"
+    assert observed_languages == ["es-419"]
+
+
+def test_execute_stage_uses_currency_pair_as_default_benchmark(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import execute as execute_module
+
+    monkeypatch.setattr(
+        execute_module,
+        "resolve_asset",
+        lambda symbol: SimpleNamespace(
+            canonical_symbol="EURUSD",
+            asset_class="currency_pair",
+        ),
+    )
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"result_card": {"title": "EUR/USD Buy and Hold"}},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            }
+        ]
+    )
+    state = RunState.new(current_user_message="Backtest EUR/USD", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_thesis": "Buy and hold EUR/USD over the last year",
+            "asset_universe": ["EUR/USD"],
+            "asset_class": "currency_pair",
+            "date_range": "last 1 year",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 10000.0, "source": "default"},
+        },
+    }
+
+    execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert tool.calls[0]["benchmark_symbol"] == "EURUSD"
+
+
 def test_execute_stage_preserves_multi_symbol_launch_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -366,7 +476,12 @@ def test_execute_stage_preserves_multi_symbol_launch_payload(
 
     observed_requests: list[dict[str, object]] = []
 
-    def fake_run_launch_backtest(request) -> LaunchExecutionAdapterResult:
+    def fake_run_launch_backtest(
+        request,
+        *,
+        language: str = "en",
+    ) -> LaunchExecutionAdapterResult:
+        assert language == "en"
         observed_requests.append(request.model_dump(mode="python"))
         return LaunchExecutionAdapterResult(
             envelope=LaunchExecutionEnvelope(

@@ -16,8 +16,14 @@ from argus.domain.indicators import detect_executable_indicator_key
 from argus.domain.market_data import resolve_asset
 
 
-def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageResult:
-    payload = _launch_payload(state)
+def execute_stage(
+    *,
+    state: RunState,
+    tool: Any,
+    max_retries: int = 2,
+    language: str = "en",
+) -> StageResult:
+    payload = _launch_payload(state, language=language)
     records: list[dict[str, Any]] = []
     last_error_type: str | None = None
 
@@ -113,6 +119,8 @@ def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageR
             )
         if error_type == "parameter_validation_error":
             payload = corrected_payload
+            if isinstance(payload, dict):
+                payload["language"] = language
 
     return StageResult(
         outcome="execution_failed_terminally",
@@ -129,13 +137,18 @@ def execute_stage(*, state: RunState, tool: Any, max_retries: int = 2) -> StageR
 
 
 async def execute_stage_async(
-    *, state: RunState, tool: Any, max_retries: int = 2
+    *,
+    state: RunState,
+    tool: Any,
+    max_retries: int = 2,
+    language: str = "en",
 ) -> StageResult:
     return await asyncio.to_thread(
         execute_stage,
         state=state,
         tool=tool,
         max_retries=max_retries,
+        language=language,
     )
 
 
@@ -148,10 +161,12 @@ def _confirmation_payload(state: RunState) -> dict[str, Any]:
     return dict(payload)
 
 
-def _launch_payload(state: RunState) -> dict[str, Any]:
+def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
     confirmation_payload = _confirmation_payload(state)
     if _is_launch_request_payload(confirmation_payload):
-        return confirmation_payload
+        payload = dict(confirmation_payload)
+        payload["language"] = language
+        return payload
 
     strategy = _strategy_payload(confirmation_payload, state)
     optional_parameters = _optional_parameters_payload(confirmation_payload)
@@ -183,6 +198,7 @@ def _launch_payload(state: RunState) -> dict[str, Any]:
         "parameters": _resolve_parameters(optional_parameters),
         "risk_rules": _resolve_risk_rules(strategy),
         "benchmark_symbol": _resolve_benchmark_symbol(symbol, optional_parameters),
+        "language": language,
     }
 
 
@@ -637,8 +653,11 @@ def _resolve_benchmark_symbol(symbol: str, optional_parameters: dict[str, Any]) 
         asset = resolve_asset(symbol)
     except Exception:
         asset = None
-    if asset is not None and asset.asset_class == "crypto":
-        return "BTC"
+    if asset is not None:
+        if asset.asset_class == "crypto":
+            return "BTC"
+        if asset.asset_class == "currency_pair":
+            return str(getattr(asset, "canonical_symbol", symbol)).strip().upper()
     return "SPY"
 
 

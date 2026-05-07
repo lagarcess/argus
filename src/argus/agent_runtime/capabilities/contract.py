@@ -394,7 +394,11 @@ def build_default_capability_contract() -> CapabilityContract:
                         replacement_values={"asset_class": "crypto"},
                     ),
                     SimplificationOption(
-                        label="Split into separate equity and crypto runs",
+                        label="Run the strategy with currency pairs only",
+                        replacement_values={"asset_class": "currency_pair"},
+                    ),
+                    SimplificationOption(
+                        label="Split into separate asset-class runs",
                         replacement_values={"split_runs": True},
                     ),
                 ),

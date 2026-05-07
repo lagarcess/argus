@@ -10,10 +10,16 @@ def test_real_backtest_tool_returns_success_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tool = RealBacktestTool()
+    observed_languages: list[str] = []
 
-    monkeypatch.setattr(
-        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
-        lambda request: LaunchExecutionAdapterResult(
+    def fake_run_launch_backtest(
+        request,
+        *,
+        language: str = "en",
+    ) -> LaunchExecutionAdapterResult:
+        assert request.symbol == "TSLA"
+        observed_languages.append(language)
+        return LaunchExecutionAdapterResult(
             envelope=LaunchExecutionEnvelope(
                 execution_status="succeeded",
                 resolved_strategy={
@@ -32,7 +38,11 @@ def test_real_backtest_tool_returns_success_payload(
                 "strategy_type": "buy_and_hold",
                 "assumptions": ["Starting capital: $10,000."],
             },
-        ),
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_run_launch_backtest,
     )
 
     result = tool.run(
@@ -50,10 +60,12 @@ def test_real_backtest_tool_returns_success_payload(
             "parameters": {},
             "risk_rules": [],
             "benchmark_symbol": "SPY",
+            "language": "es-419",
         }
     )
 
     assert result["success"] is True
+    assert observed_languages == ["es-419"]
     assert result["payload"]["envelope"]["execution_status"] == "succeeded"
     assert result["payload"]["result_card"]["title"] == "TSLA Buy and Hold"
     assert result["payload"]["explanation_context"]["strategy_type"] == "buy_and_hold"
@@ -65,9 +77,14 @@ def test_real_backtest_tool_maps_blocked_unsupported_failure(
 ) -> None:
     tool = RealBacktestTool()
 
-    monkeypatch.setattr(
-        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
-        lambda request: LaunchExecutionAdapterResult(
+    def fake_run_launch_backtest(
+        request,
+        *,
+        language: str = "en",
+    ) -> LaunchExecutionAdapterResult:
+        assert request.symbol == "TSLA"
+        assert language == "en"
+        return LaunchExecutionAdapterResult(
             envelope=LaunchExecutionEnvelope(
                 execution_status="blocked_unsupported",
                 resolved_strategy={
@@ -80,7 +97,11 @@ def test_real_backtest_tool_maps_blocked_unsupported_failure(
                 failure_category="unsupported_capability",
                 failure_reason="unsupported_indicator_threshold",
             ),
-        ),
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_run_launch_backtest,
     )
 
     result = tool.run(

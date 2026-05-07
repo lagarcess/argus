@@ -242,6 +242,7 @@ async def _execute_node_async(
             state=_run_state(state),
             tool=tool,
             max_retries=max_retries,
+            language=_user(state).language_preference,
         ),
     )
 

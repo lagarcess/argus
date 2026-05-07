@@ -21,7 +21,7 @@ class RealBacktestTool:
                 "capability_context": {},
             }
 
-        result = run_launch_backtest(request)
+        result = run_launch_backtest(request, language=request.language)
         envelope = result.envelope.model_dump(mode="python")
 
         if result.envelope.execution_status == "succeeded":

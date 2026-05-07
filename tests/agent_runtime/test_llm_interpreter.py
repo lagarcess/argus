@@ -64,6 +64,19 @@ def test_llm_interpreter_validates_asset_class_with_alpaca_resolver(monkeypatch)
     assert result.candidate_strategy_draft.asset_universe == ["TSLA", "BTC"]
     assert result.candidate_strategy_draft.asset_class == "mixed"
     assert result.unsupported_constraints[0].category == "unsupported_asset_mix"
+    assert "currency pairs" in result.unsupported_constraints[0].explanation
+
+
+def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt()
+
+    assert "currency pairs" in prompt
+    assert "currency pair benchmark is the tested pair itself" in prompt
+    assert "Kraken" in prompt
 
 
 def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) -> None:
