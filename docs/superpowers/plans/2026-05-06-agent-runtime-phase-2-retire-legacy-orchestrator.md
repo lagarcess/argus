@@ -31,7 +31,7 @@
 
 Run:
 
-```powershell
+```bash
 git branch --show-current
 git status --short
 ```
@@ -48,7 +48,7 @@ The working tree may include unrelated files. Do not revert or edit unrelated fi
 
 Run after approval, before code edits:
 
-```powershell
+```bash
 git fetch origin main
 git rebase origin/main
 ```
@@ -166,7 +166,7 @@ def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_composer(
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_openrouter_policy.py -q
 ```
 
@@ -265,7 +265,7 @@ def test_legacy_template_fallback_is_not_available() -> None:
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_conversational_ux.py -q
 ```
 
@@ -397,7 +397,7 @@ def test_spanish_multiturn_strategy_context_uses_agent_runtime() -> None:
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_alpha_orchestration_regression.py -q
 ```
 
@@ -544,7 +544,7 @@ def test_approval_uses_llm_semantic_turn_act_not_state_machine_confirmation() ->
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_backtest_state_machine.py -q
 ```
 
@@ -618,7 +618,7 @@ def test_backtest_state_machine_module_is_retired() -> None:
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_phase2_runtime_sot.py -q
 ```
 
@@ -752,7 +752,7 @@ def suggest_entity_name(
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_phase2_runtime_sot.py::test_domain_orchestrator_retains_only_non_routing_helpers -q
 ```
 
@@ -881,7 +881,7 @@ The existing calls to `_resolve_language(lang)` should then resolve to the local
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_phase2_runtime_sot.py::test_api_main_has_no_legacy_orchestrator_wiring -q
 ```
 
@@ -895,7 +895,7 @@ PASSED
 
 Run:
 
-```powershell
+```bash
 pytest tests/agent_runtime/test_workflow.py::test_internal_agent_runtime_turn_endpoint_returns_confirmation_ready_result -q
 ```
 
@@ -922,7 +922,7 @@ src/argus/domain/backtest_state_machine.py
 
 Run:
 
-```powershell
+```bash
 rg -n "BacktestConversationState|BacktestParamsUpdate|apply_backtest_turn|backtest_state_machine" src tests
 ```
 
@@ -936,7 +936,7 @@ No output.
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_phase2_runtime_sot.py::test_backtest_state_machine_module_is_retired -q
 ```
 
@@ -960,7 +960,7 @@ PASSED
 
 Run:
 
-```powershell
+```bash
 rg -n "STRATEGY_CAPABILITIES|CapabilityContract" src/argus/domain src/argus/agent_runtime tests
 ```
 
@@ -981,7 +981,7 @@ No code change. Reason: it is still used by the backtest engine and slot normali
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_strategy_capabilities.py tests/test_slot_normalizer.py -q
 ```
 
@@ -1002,7 +1002,7 @@ PASSED
 
 Run:
 
-```powershell
+```bash
 pytest tests/test_phase2_runtime_sot.py tests/test_openrouter_policy.py tests/test_conversational_ux.py tests/test_alpha_orchestration_regression.py tests/test_backtest_state_machine.py -q
 ```
 
@@ -1016,7 +1016,7 @@ PASSED
 
 Run:
 
-```powershell
+```bash
 pytest tests/agent_runtime/test_workflow.py tests/agent_runtime/test_llm_interpreter.py -q
 ```
 
@@ -1030,7 +1030,7 @@ PASSED
 
 Run:
 
-```powershell
+```bash
 rg -n "classify_chat_turn_intent|ChatTurnIntent|BacktestConversationState|BacktestParamsUpdate|apply_backtest_turn|orchestrate_chat_turn|assistant_message_for_chat_turn|parse_onboarding_goal" src tests
 ```
 
@@ -1042,7 +1042,7 @@ No output.
 
 If output appears only in this plan document, rerun with:
 
-```powershell
+```bash
 rg -n "classify_chat_turn_intent|ChatTurnIntent|BacktestConversationState|BacktestParamsUpdate|apply_backtest_turn|orchestrate_chat_turn|assistant_message_for_chat_turn|parse_onboarding_goal" src tests
 ```
 
@@ -1059,7 +1059,7 @@ The command intentionally scopes to `src tests`, so plan-document matches should
 
 Run from repo root:
 
-```powershell
+```bash
 pytest
 ```
 
@@ -1073,7 +1073,7 @@ PASSED
 
 Run from `web/`:
 
-```powershell
+```bash
 bun run lint
 ```
 
@@ -1089,7 +1089,7 @@ If lint reports existing unrelated debt outside changed files, capture the outpu
 
 Run:
 
-```powershell
+```bash
 git status --short
 git diff -- src/argus/domain/orchestrator.py src/argus/api/main.py tests/test_openrouter_policy.py tests/test_conversational_ux.py tests/test_alpha_orchestration_regression.py tests/test_backtest_state_machine.py tests/test_phase2_runtime_sot.py
 ```
@@ -1121,7 +1121,7 @@ The pre-existing untracked `diff.txt` should remain untouched.
 
 Run:
 
-```powershell
+```bash
 git add src/argus/domain/orchestrator.py src/argus/domain/backtest_state_machine.py src/argus/api/main.py tests/test_openrouter_policy.py tests/test_conversational_ux.py tests/test_alpha_orchestration_regression.py tests/test_backtest_state_machine.py tests/test_phase2_runtime_sot.py docs/superpowers/plans/2026-05-06-agent-runtime-phase-2-retire-legacy-orchestrator.md
 ```
 
@@ -1135,7 +1135,7 @@ No output.
 
 Run:
 
-```powershell
+```bash
 git commit -m "refactor(runtime): retire legacy orchestrator NLU"
 ```
 

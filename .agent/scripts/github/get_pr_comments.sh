@@ -3,8 +3,9 @@
 # Script: get_pr_comments.sh
 # Purpose: Fetch and parse Inline Review Comments from a GitHub Pull Request.
 #
-# Usage: & "C:\Program Files\Git\bin\bash.exe" .agent/scripts/github/get_pr_comments.sh <PR_NUMBER>
-# Example: & "C:\Program Files\Git\bin\bash.exe" .agent/scripts/github/get_pr_comments.sh 175
+# Usage (macOS/Linux): bash ./.agent/scripts/github/get_pr_comments.sh <PR_NUMBER>
+# Usage (Windows):     & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/get_pr_comments.sh <PR_NUMBER>
+# Example: bash ./.agent/scripts/github/get_pr_comments.sh 175
 #
 # Prerequisites:
 #   1. GitHub CLI (`gh`) must be installed and authenticated (`gh auth login`).
@@ -14,7 +15,7 @@
 # 1. Validate Input (Strict Integer Check)
 if [[ ! "$1" =~ ^[0-9]+$ ]]; then
     echo "❌ Error: PR Number must be a positive integer."
-    echo "Usage: & \"C:\\Program Files\\Git\\bin\\bash.exe\" .agent/scripts/github/get_pr_comments.sh <PR_NUMBER>"
+    echo "Usage: bash ./.agent/scripts/github/get_pr_comments.sh <PR_NUMBER>"
     exit 1
 fi
 

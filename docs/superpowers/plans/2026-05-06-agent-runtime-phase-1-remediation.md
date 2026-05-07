@@ -22,7 +22,7 @@
 - The user confirmed this is the intended branch for the remediation.
 - Before implementation starts, confirm the working tree state:
 
-```powershell
+```bash
 git status --short
 git branch --show-current
 ```
@@ -96,7 +96,7 @@ def test_build_workflow_input_does_not_rewrite_strategy_logic_or_dates() -> None
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_workflow.py::test_build_workflow_input_does_not_rewrite_strategy_logic_or_dates -q
 ```
 
@@ -277,7 +277,7 @@ Expected before implementation:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_interpret_stage.py::test_interpret_approval_uses_structured_interpreter_not_regex_gate tests/agent_runtime/test_interpret_stage.py::test_interpret_social_opener_uses_structured_interpreter_response tests/agent_runtime/test_interpret_stage.py::test_interpret_confirmation_edit_uses_structured_interpreter_not_chip_gate -q
 ```
 
@@ -364,7 +364,7 @@ def test_llm_interpreter_preserves_semantic_turn_act_from_response() -> None:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_llm_interpreter.py::test_llm_interpreter_preserves_semantic_turn_act_from_response -q
 ```
 
@@ -488,7 +488,7 @@ def test_llm_system_prompt_forbids_scaffolding_and_internal_field_names() -> Non
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_workflow.py::test_build_workflow_input_does_not_rewrite_strategy_logic_or_dates tests/agent_runtime/test_workflow.py::test_runtime_preserves_llm_response_without_posthoc_quality_gate -q
 ```
 
@@ -590,7 +590,7 @@ semantic_turn_act=interpretation.semantic_turn_act,
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_interpret_stage.py::test_interpret_approval_uses_structured_interpreter_not_regex_gate tests/agent_runtime/test_interpret_stage.py::test_interpret_social_opener_uses_structured_interpreter_response tests/agent_runtime/test_interpret_stage.py::test_interpret_confirmation_edit_uses_structured_interpreter_not_chip_gate -q
 ```
 
@@ -710,7 +710,7 @@ def test_pending_needs_ignore_stale_snapshot_pending_needs() -> None:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_conversation_stages.py::test_buy_and_hold_without_asset_uses_pending_strategy_summary_needs tests/agent_runtime/test_interpret_stage.py::test_pending_needs_ignore_stale_snapshot_pending_needs -q
 ```
 
@@ -776,7 +776,7 @@ def test_llm_system_prompt_owns_phase_one_routing_and_quality_rules() -> None:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_llm_interpreter.py::test_llm_system_prompt_owns_phase_one_routing_and_quality_rules tests/agent_runtime/test_llm_interpreter.py::test_llm_system_prompt_forbids_scaffolding_and_internal_field_names -q
 ```
 
@@ -794,7 +794,7 @@ Expected after implementation:
 
 Run:
 
-```powershell
+```bash
 rg -n "_apply_response_quality_gate|_replacement_for_low_quality_text|_normalize_entry_clause|_normalize_exit_clause|_move_trailing_date_clause_ahead_of_strategy_logic|_confirmation_edit_action_stage_result_if_applicable|_social_opener_stage_result_if_applicable|strategy_frame" src\argus\agent_runtime tests\agent_runtime
 ```
 
@@ -805,7 +805,7 @@ Expected:
 
 Run:
 
-```powershell
+```bash
 git diff -- src\argus\agent_runtime\runtime.py src\argus\agent_runtime\stages\interpret.py src\argus\agent_runtime\llm_interpreter.py | rg -n "re\.|fullmatch|search|match|regex"
 ```
 
@@ -817,7 +817,7 @@ Expected:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/agent_runtime/test_interpret_stage.py tests/agent_runtime/test_workflow.py tests/agent_runtime/test_conversation_stages.py tests/agent_runtime/test_llm_interpreter.py -q
 ```
 
@@ -828,7 +828,7 @@ Expected:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest
 ```
 
@@ -839,7 +839,7 @@ Expected:
 
 Run:
 
-```powershell
+```bash
 poetry run pre-commit run --all-files
 ```
 
@@ -852,7 +852,7 @@ If hooks modify files, inspect the diff and rerun the command.
 
 Run:
 
-```powershell
+```bash
 Set-Location web
 bun run lint
 bun test __tests__
@@ -868,7 +868,7 @@ If `bun run lint` fails on unrelated pre-existing debt, do not commit. Capture t
 
 Run:
 
-```powershell
+```bash
 git diff --stat
 git diff -- src\argus\agent_runtime\runtime.py src\argus\agent_runtime\stages\interpret.py src\argus\agent_runtime\llm_interpreter.py src\argus\agent_runtime\state\models.py tests\agent_runtime
 ```
@@ -885,7 +885,7 @@ Review checklist:
 
 After all gates pass:
 
-```powershell
+```bash
 git add src\argus\agent_runtime\runtime.py src\argus\agent_runtime\stages\interpret.py src\argus\agent_runtime\llm_interpreter.py src\argus\agent_runtime\state\models.py tests\agent_runtime\test_interpret_stage.py tests\agent_runtime\test_workflow.py tests\agent_runtime\test_conversation_stages.py tests\agent_runtime\test_llm_interpreter.py
 git commit -m "fix(agent-runtime): stop pre-llm message interception"
 ```

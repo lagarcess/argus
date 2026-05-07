@@ -229,7 +229,7 @@ def test_interpret_uses_llm_extracted_sell_synonym_and_date_range() -> None:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime\test_interpret_stage.py tests\agent_runtime\test_strategy_extractor.py -q --no-cov
 ```
 
@@ -358,7 +358,7 @@ __all__ = ["resolve_response_profile_overrides"]
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime\test_interpret_stage.py tests\agent_runtime\test_llm_interpreter.py -q --no-cov
 ```
 
@@ -467,7 +467,7 @@ They must not change `intent`, `task_relation`, or `semantic_turn_act`.
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime\test_llm_interpreter.py -q --no-cov
 ```
 
@@ -744,7 +744,7 @@ resolve_gray_case_arbitration
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime\test_interpret_stage.py -q --no-cov
 ```
 
@@ -801,7 +801,7 @@ Do not add checkpointers, `astream_events()`, or streaming changes in this phase
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime\test_workflow.py -q --no-cov
 ```
 
@@ -1005,7 +1005,7 @@ Pass it into `clarify_stage()`.
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime\test_conversation_stages.py tests\agent_runtime\test_workflow.py -q --no-cov
 ```
 
@@ -1076,7 +1076,7 @@ def test_clarify_stage_does_not_contain_slot_prompt_strings() -> None:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime\test_interpret_stage.py tests\agent_runtime\test_conversation_stages.py -q --no-cov
 ```
 
@@ -1091,7 +1091,7 @@ poetry run pytest tests\agent_runtime\test_interpret_stage.py tests\agent_runtim
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests\agent_runtime -q --no-cov
 ```
 
@@ -1101,7 +1101,7 @@ Expected: all agent runtime tests pass.
 
 Run:
 
-```powershell
+```bash
 poetry run pytest
 ```
 
@@ -1111,7 +1111,7 @@ Expected: pass. If unrelated failures appear, capture exact failing tests and do
 
 Run:
 
-```powershell
+```bash
 Push-Location web
 bun run lint
 Pop-Location
@@ -1123,7 +1123,7 @@ Expected: pass. If existing lint debt appears, capture the exact output and sepa
 
 Run:
 
-```powershell
+```bash
 (Get-Content src\argus\agent_runtime\stages\interpret.py).Count
 ```
 
@@ -1133,7 +1133,7 @@ Expected: close to 400 lines. A small overage is acceptable only if every remain
 
 Run:
 
-```powershell
+```bash
 rg -n "extract_strategy_fields|extract_signals|SYMBOL_ALIASES|COMMON_NAMES|NON_SYMBOLS|_direct_conversational_response|resolve_gray_case_arbitration|_is_educational_turn|_is_approval_message" src tests
 ```
 

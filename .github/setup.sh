@@ -17,10 +17,19 @@ export PYTHONUNBUFFERED=1
 # 2. PYTHON VERSION CHECK
 # ============================================================================
 echo "🔵 [Setup] Checking Python version..."
-PYTHON_VERSION=$(python --version 2>&1 | awk '{print $2}')
-echo "🔵 [Setup] Python version: $PYTHON_VERSION"
+if command -v python3 &> /dev/null; then
+    PYTHON_CMD=python3
+elif command -v python &> /dev/null; then
+    PYTHON_CMD=python
+else
+    echo "❌ [Setup] Python not found. Install Python 3.10+."
+    exit 1
+fi
 
-if ! python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"; then
+PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
+echo "🔵 [Setup] Python version: $PYTHON_VERSION (command: $PYTHON_CMD)"
+
+if ! $PYTHON_CMD -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"; then
     echo "❌ [Setup] Python 3.10+ required. Found: $PYTHON_VERSION"
     exit 1
 fi
@@ -60,7 +69,8 @@ poetry config virtualenvs.in-project true
 # ============================================================================
 echo "🔵 [Setup] Installing Python dependencies via Poetry..."
 poetry install --no-interaction
-poetry sync
+# poetry sync requires Poetry 2.x; skip gracefully if unavailable
+poetry sync 2>/dev/null || echo "⚠️ [Setup] poetry sync skipped (requires Poetry 2.x)"
 
 # ============================================================================
 # 7. VALIDATE PYTHON PACKAGE IMPORTS
@@ -102,7 +112,7 @@ fi
 # Check web/.env.local exists
 if [ ! -f web/.env.local ]; then
     echo "⚠️ [Setup] web/.env.local missing. Create from example:"
-    echo "   cp web/.env.example web/.env.local"
+    echo "   cp web/.env.local.example web/.env.local"
     echo "   Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY"
 else
     echo "🟢 [Setup] web/.env.local exists"
@@ -133,7 +143,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Fill in .env (backend secrets)"
 echo "  2. Fill in web/.env.local (frontend config)"
-echo "  3. Run backend:  poetry shell && uvicorn src.argus.api.main:app --reload"
+echo "  3. Run backend:  poetry run fastapi dev src/argus/api/main.py"
 echo "  4. Run frontend: cd web && bun run dev"
 echo ""
-echo "For more details, see startup.md"
+echo "For more details, see AGENTS.md"

@@ -171,7 +171,7 @@ def test_regex_nlu_artifacts_are_absent() -> None:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/test_phase6_api_structure.py -q --no-cov
 ```
 
@@ -272,7 +272,7 @@ No route or runtime module may import `argus.domain.orchestrator` after this ste
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/test_cursor_encoding.py tests/test_legacy_orchestrator_retirement.py tests/test_strategy_capabilities.py -q --no-cov
 ```
 
@@ -338,7 +338,7 @@ Tests currently importing `_runtime_confirmation_card` and `_llm_result_breakdow
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/test_runtime_confirmation_card.py tests/test_openrouter_policy.py -q --no-cov
 ```
 
@@ -424,7 +424,7 @@ Keep idempotency key behavior and Supabase quota increments unchanged.
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/test_alpha_api.py tests/test_alpha_api_supabase.py -q --no-cov
 ```
 
@@ -468,7 +468,7 @@ Move unchanged behavior for:
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/test_chat_runtime_cutover.py tests/test_chat_backtest_state_machine.py tests/test_conversational_ux.py -q --no-cov
 ```
 
@@ -547,7 +547,7 @@ Keep `store = api_state.store` as a read-only compatibility alias only if needed
 
 Use `apply_patch` delete. Then verify no import remains:
 
-```powershell
+```bash
 rg -n "domain\\.orchestrator|argus\\.domain\\.orchestrator|from argus.domain.orchestrator" src tests
 ```
 
@@ -579,7 +579,7 @@ No regex imports, symbol dictionaries, extraction helpers, or intent classifiers
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/test_phase6_api_structure.py tests/test_legacy_orchestrator_retirement.py tests/agent_runtime/test_interpret_stage.py -q --no-cov
 ```
 
@@ -638,7 +638,7 @@ assert listed.json()["items"]
 
 Run:
 
-```powershell
+```bash
 $env:NEXT_PUBLIC_MOCK_AUTH='true'; poetry run python temp/phase6_smoke.py
 ```
 
@@ -648,7 +648,7 @@ Expected: command exits 0.
 
 Use mocked Supabase gateway tests for deterministic login behavior:
 
-```powershell
+```bash
 $env:MOCK_USER_EMAIL=$env:MOCK_USER_EMAIL; $env:MOCK_USER_PASSWORD=$env:MOCK_USER_PASSWORD; poetry run pytest tests/test_alpha_api_supabase.py::test_login_sets_session_cookie_for_browser_auth -q --no-cov
 ```
 
@@ -665,7 +665,7 @@ Expected: PASS and `sb-auth-token` / `sb-refresh-token` cookies are set.
 
 Run:
 
-```powershell
+```bash
 poetry run ruff check src/argus/api src/argus/agent_runtime/extraction/structured.py src/argus/agent_runtime/signals/task_relation.py tests/test_phase6_api_structure.py --no-cache
 ```
 
@@ -675,7 +675,7 @@ Expected: PASS.
 
 Run:
 
-```powershell
+```bash
 poetry run pytest tests/test_phase6_api_structure.py tests/test_alpha_api.py tests/test_alpha_api_supabase.py tests/test_chat_runtime_cutover.py tests/test_chat_backtest_state_machine.py tests/test_legacy_orchestrator_retirement.py tests/agent_runtime/test_interpret_stage.py -q --no-cov
 ```
 
@@ -685,7 +685,7 @@ Expected: PASS.
 
 Run:
 
-```powershell
+```bash
 poetry run pytest -q --no-cov
 ```
 

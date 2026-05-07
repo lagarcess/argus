@@ -1,1 +1,38 @@
+# Git LFS tracking
 web/tests/vrt/**/*-snapshots/*.png filter=lfs diff=lfs merge=lfs -text
+
+# Auto-detect text files and normalize to LF in the repo
+* text=auto eol=lf
+
+# Force LF for shell scripts (critical for macOS execution)
+*.sh text eol=lf
+
+# Force LF for Python
+*.py text eol=lf
+
+# Force LF for JS/TS
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+
+# Force LF for config files
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# Binary files — do not touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.lockb binary

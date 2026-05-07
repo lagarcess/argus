@@ -3,8 +3,9 @@
 # Script: batch_get_issues.sh
 # Purpose: Fetch multiple GitHub issues for agents in one go.
 #
-# Usage: & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/batch_get_issues.sh <ISSUE_NUM_1> <ISSUE_NUM_2> ...
-# Example: & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/batch_get_issues.sh 181 185 188 190
+# Usage (macOS/Linux): bash ./.agent/scripts/github/batch_get_issues.sh <ISSUE_NUM_1> <ISSUE_NUM_2> ...
+# Usage (Windows):     & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/batch_get_issues.sh <ISSUE_NUM_1> <ISSUE_NUM_2> ...
+# Example: bash ./.agent/scripts/github/batch_get_issues.sh 181 185 188 190
 #
 # Prerequisites:
 #   1. GitHub CLI (`gh`) must be installed and authenticated.
@@ -13,7 +14,7 @@
 
 if [ $# -eq 0 ]; then
     echo "❌ Error: No issue numbers provided."
-    echo "Usage: & \"C:\\Program Files\\Git\\bin\\bash.exe\" ./.agent/scripts/github/batch_get_issues.sh <ISSUE_NUM_1> <ISSUE_NUM_2> ..."
+    echo "Usage: bash ./.agent/scripts/github/batch_get_issues.sh <ISSUE_NUM_1> <ISSUE_NUM_2> ..."
     exit 1
 fi
 
