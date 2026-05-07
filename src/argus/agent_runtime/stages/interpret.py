@@ -9,6 +9,10 @@ from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
+from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.resolution import (
+    resolve_asset_candidate as runtime_resolve_asset_candidate,
+)
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     InterpretDecision,
@@ -18,7 +22,10 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpreter,
 )
 from argus.agent_runtime.state.models import (
+    AmbiguousField,
     IntentName,
+    ResolutionProvenance,
+    ResolutionSource,
     ResponseProfileOverrides,
     RunState,
     StrategySummary,
@@ -31,6 +38,8 @@ from argus.agent_runtime.strategy_contract import (
     strategy_can_be_approved,
 )
 from argus.domain.market_data import resolve_asset
+
+_DEFAULT_RESOLVE_ASSET = resolve_asset
 
 STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "new_idea",
@@ -125,7 +134,17 @@ def _stage_result_from_interpretation(
         else interpretation.candidate_strategy_draft
     )
     unsupported_constraints = list(interpretation.unsupported_constraints)
+    ambiguous_fields = list(interpretation.ambiguous_fields)
     if expects_strategy_route:
+        strategy.resolution_provenance = _dedupe_resolution_provenance(
+            [*strategy.resolution_provenance, *state.context_hints]
+        )
+        ambiguous_fields = _dedupe_ambiguous_fields(
+            [
+                *ambiguous_fields,
+                *_ambiguous_fields_from_resolution(strategy.resolution_provenance),
+            ]
+        )
         unsupported_constraints = _dedupe_unsupported_constraints(
             [
                 *unsupported_constraints,
@@ -135,6 +154,10 @@ def _stage_result_from_interpretation(
                 ),
                 *_unsupported_symbol_constraints(
                     strategy=strategy,
+                    contract=capability_contract,
+                ),
+                *_unsupported_constraints_from_resolution(
+                    strategy.resolution_provenance,
                     contract=capability_contract,
                 ),
             ]
@@ -151,7 +174,7 @@ def _stage_result_from_interpretation(
     )
     requires_clarification = bool(
         interpretation.requires_clarification
-        or interpretation.ambiguous_fields
+        or ambiguous_fields
         or unsupported_constraints
         or missing_required_fields
     )
@@ -171,8 +194,9 @@ def _stage_result_from_interpretation(
             response_overrides
         ),
         normalized_signals={},
-        ambiguous_fields=list(interpretation.ambiguous_fields),
+        ambiguous_fields=ambiguous_fields,
         unsupported_constraints=unsupported_constraints,
+        resolution_provenance=list(strategy.resolution_provenance),
         semantic_turn_act=interpretation.semantic_turn_act,
     )
     approval_result = _approval_stage_result_if_applicable(
@@ -278,15 +302,21 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
     canonical_symbols: list[str] = []
     asset_classes: set[str] = set()
     invalid_symbols: list[str] = []
+    provenance: list[ResolutionProvenance] = []
 
-    for symbol in updated.asset_universe:
-        try:
-            resolved = resolve_asset(symbol)
-        except Exception:
-            invalid_symbols.append(symbol)
+    for index, symbol in enumerate(updated.asset_universe):
+        resolution = _resolve_asset_candidate(
+            symbol,
+            field=f"asset_universe[{index}]",
+            source="llm_extraction",
+        )
+        provenance.append(resolution.provenance)
+        if resolution.status != "resolved" or resolution.asset is None:
+            if resolution.status in {"unsupported", "unavailable_for_requested_run"}:
+                invalid_symbols.append(symbol)
             continue
-        canonical_symbols.append(resolved.canonical_symbol)
-        asset_classes.add(resolved.asset_class)
+        canonical_symbols.append(resolution.asset.canonical_symbol)
+        asset_classes.add(resolution.asset.asset_class)
 
     if canonical_symbols:
         updated.asset_universe = list(dict.fromkeys(canonical_symbols))
@@ -299,7 +329,39 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
             **updated.extra_parameters,
             "invalid_symbols": invalid_symbols,
         }
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [*updated.resolution_provenance, *provenance]
+    )
     return updated
+
+
+def _resolve_asset_candidate(
+    query: str,
+    *,
+    field: str,
+    source: ResolutionSource,
+) -> AssetResolution:
+    if resolve_asset is _DEFAULT_RESOLVE_ASSET:
+        return runtime_resolve_asset_candidate(query, field=field, source=source)
+    resolved = resolve_asset(query)
+    provenance = ResolutionProvenance(
+        field=field,
+        raw_text=query,
+        source=source,
+        candidate_kind="asset",
+        resolution_status="resolved",
+        canonical_symbol=resolved.canonical_symbol,
+        asset_class=resolved.asset_class,
+        validated_by="provider_catalog",
+        confidence="high",
+    )
+    return AssetResolution(
+        status="resolved",
+        raw_text=query,
+        asset=resolved,
+        candidates=(resolved,),
+        provenance=provenance,
+    )
 
 
 def _unsupported_symbol_constraints(
@@ -316,13 +378,68 @@ def _unsupported_symbol_constraints(
             raw_value=", ".join(str(symbol) for symbol in invalid_symbols),
             explanation=(
                 "I understood the asset reference, but I could not verify it in "
-                "the available market data universe for this run."
+                "the supported market data universe for this run."
             ),
             simplification_options=contract.get_simplification_options(
                 "unsupported_symbol"
             ),
         )
     ]
+
+
+def _ambiguous_fields_from_resolution(
+    provenance: list[ResolutionProvenance],
+) -> list[AmbiguousField]:
+    return [
+        AmbiguousField(
+            field_name=item.field,
+            raw_value=item.raw_text,
+            candidate_normalized_value=item.canonical_symbol,
+            reason_code=f"{item.candidate_kind}_resolution_ambiguous",
+        )
+        for item in provenance
+        if item.source == "llm_extraction" and item.resolution_status == "ambiguous"
+    ]
+
+
+def _unsupported_constraints_from_resolution(
+    provenance: list[ResolutionProvenance],
+    *,
+    contract: Any,
+) -> list[UnsupportedConstraint]:
+    constraints: list[UnsupportedConstraint] = []
+    for item in provenance:
+        if item.resolution_status not in {
+            "unsupported",
+            "unavailable_for_requested_run",
+        } or item.source != "llm_extraction":
+            continue
+        category = (
+            "unavailable_for_requested_run"
+            if item.resolution_status == "unavailable_for_requested_run"
+            else f"unsupported_{item.candidate_kind}"
+        )
+        if item.resolution_status == "unavailable_for_requested_run":
+            explanation = (
+                "I found the instrument, but the requested date range or timeframe "
+                "is not available for a supported run."
+            )
+        else:
+            explanation = (
+                "I understood the asset reference, but Argus Alpha cannot execute it "
+                "as requested yet."
+                if item.candidate_kind == "asset"
+                else "I understand that indicator, but Argus Alpha cannot execute it yet."
+            )
+        constraints.append(
+            UnsupportedConstraint(
+                category=category,
+                raw_value=item.raw_text,
+                explanation=explanation,
+                simplification_options=contract.get_simplification_options(category),
+            )
+        )
+    return constraints
 
 
 def _missing_fields_for_interpretation(
@@ -389,6 +506,37 @@ def _dedupe_unsupported_constraints(
             continue
         seen.add(key)
         deduped.append(constraint)
+    return deduped
+
+
+def _dedupe_ambiguous_fields(fields: list[AmbiguousField]) -> list[AmbiguousField]:
+    seen: set[tuple[str, str, str]] = set()
+    deduped: list[AmbiguousField] = []
+    for field in fields:
+        key = (field.field_name, field.raw_value, field.reason_code)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(field)
+    return deduped
+
+
+def _dedupe_resolution_provenance(
+    provenance: list[ResolutionProvenance],
+) -> list[ResolutionProvenance]:
+    seen: set[tuple[str, str, str, str]] = set()
+    deduped: list[ResolutionProvenance] = []
+    for item in provenance:
+        key = (
+            item.field,
+            item.raw_text,
+            item.source,
+            item.candidate_kind,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
     return deduped
 
 

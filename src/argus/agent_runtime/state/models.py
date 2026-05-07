@@ -11,6 +11,15 @@ VerbosityName = Literal["low", "medium", "high"]
 ExpertiseMode = Literal["beginner", "intermediate", "advanced"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 FieldExtractionStatus = Literal["resolved", "missing", "ambiguous", "unsupported"]
+ResolutionStatus = Literal[
+    "resolved",
+    "ambiguous",
+    "unsupported",
+    "unavailable_for_requested_run",
+]
+ResolutionSource = Literal["llm_extraction", "user_mention"]
+ResolutionCandidateKind = Literal["asset", "indicator"]
+ResolutionConfidence = Literal["high", "medium", "low"]
 PendingNeedName = Literal[
     "asset_target",
     "sizing_amount",
@@ -84,6 +93,7 @@ class StrategySummary(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
     comparison_baseline: str | None = None
     refinement_of: str | None = None
+    resolution_provenance: list["ResolutionProvenance"] = Field(default_factory=list)
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -132,6 +142,18 @@ class UnsupportedConstraint(BaseModel):
     simplification_options: list[SimplificationOption] = Field(default_factory=list)
 
 
+class ResolutionProvenance(BaseModel):
+    field: str
+    raw_text: str
+    source: ResolutionSource
+    candidate_kind: ResolutionCandidateKind
+    resolution_status: ResolutionStatus = "resolved"
+    canonical_symbol: str | None = None
+    asset_class: str | None = None
+    validated_by: str | None = None
+    confidence: ResolutionConfidence | None = None
+
+
 class ResponseIntent(BaseModel):
     kind: ResponseIntentKind
     semantic_needs: list[PendingNeedName] = Field(default_factory=list)
@@ -153,6 +175,7 @@ class TaskSnapshot(BaseModel):
     confirmed_strategy_summary: StrategySummary | None = None
     pending_needs: list[PendingNeedName] = Field(default_factory=list)
     field_provenance: dict[str, str] = Field(default_factory=dict)
+    resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
     latest_backtest_result_reference: ArtifactReference | None = None
     latest_collection_action_reference: ArtifactReference | None = None
     last_unresolved_follow_up: str | None = None
@@ -224,6 +247,8 @@ class RunState(BaseModel):
     final_response_payload: FinalResponsePayload | None = None
     response_intent: ResponseIntent | None = None
     semantic_turn_act: str | None = None
+    context_hints: list[ResolutionProvenance] = Field(default_factory=list)
+    resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
 
     @classmethod
     def new(
@@ -231,8 +256,13 @@ class RunState(BaseModel):
         *,
         current_user_message: str,
         recent_thread_history: list[ConversationMessage | dict[str, Any]],
+        context_hints: list[ResolutionProvenance | dict[str, Any]] | None = None,
     ) -> "RunState":
         return cls(
             current_user_message=current_user_message,
             recent_thread_history=deepcopy(recent_thread_history),
+            context_hints=[
+                ResolutionProvenance.model_validate(hint)
+                for hint in (context_hints or [])
+            ],
         )

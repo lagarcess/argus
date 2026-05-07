@@ -1,5 +1,9 @@
 import { getSupabaseClient } from "./supabase-client";
-import type { ChatActionOption, StrategyConfirmationPayload } from "@/components/chat/types";
+import type {
+  ChatActionOption,
+  ChatMention,
+  StrategyConfirmationPayload,
+} from "@/components/chat/types";
 import { normalizeEnabledLanguage } from "./language-features";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
@@ -578,6 +582,7 @@ export async function streamChatMessage(
   input: string | ChatActionRequest,
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
+  mentions: ChatMention[] = [],
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
@@ -603,6 +608,7 @@ export async function streamChatMessage(
     body: JSON.stringify({
       conversation_id: conversationId,
       ...(typeof input === "string" ? { message: input } : { action: input }),
+      ...(typeof input === "string" && mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
     }),
   });

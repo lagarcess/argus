@@ -8,12 +8,18 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
+from argus.agent_runtime.resolution import AssetResolution
+from argus.agent_runtime.resolution import (
+    resolve_asset_candidate as runtime_resolve_asset_candidate,
+)
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
+    ResolutionProvenance,
+    ResolutionSource,
     ResponseProfileOverrides,
     SimplificationOption,
     StrategySummary,
@@ -29,6 +35,8 @@ from argus.domain.indicators import (
 )
 from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
+
+_DEFAULT_RESOLVE_ASSET = resolve_asset
 
 
 class LLMRiskRule(BaseModel):
@@ -389,15 +397,33 @@ def _validate_capability_boundaries(
     canonical_symbols: list[str] = []
     asset_classes = set()
     invalid_symbols: list[str] = []
-    for symbol in symbols:
-        try:
-            resolved = resolve_asset(symbol)
-        except Exception:
+    resolution_provenance = []
+    for index, symbol in enumerate(symbols):
+        resolution = _resolve_asset_candidate(
+            symbol,
+            field=f"asset_universe[{index}]",
+            source="llm_extraction",
+        )
+        resolution_provenance.append(resolution.provenance)
+        if resolution.status == "ambiguous":
+            response.ambiguous_fields.append(
+                LLMAmbiguousField(
+                    field_name=f"asset_universe[{index}]",
+                    raw_value=symbol,
+                    candidate_normalized_value=None,
+                    reason_code="asset_resolution_ambiguous",
+                )
+            )
+            continue
+        if resolution.status != "resolved" or resolution.asset is None:
             invalid_symbols.append(symbol)
             continue
-        canonical_symbols.append(resolved.canonical_symbol)
-        asset_classes.add(resolved.asset_class)
+        canonical_symbols.append(resolution.asset.canonical_symbol)
+        asset_classes.add(resolution.asset.asset_class)
     strategy.asset_universe = list(dict.fromkeys(canonical_symbols))
+    strategy.resolution_provenance = _dedupe_resolution_provenance(
+        [*strategy.resolution_provenance, *resolution_provenance]
+    )
     if len(asset_classes) == 1:
         strategy.asset_class = next(iter(asset_classes))
     elif len(asset_classes) > 1:
@@ -430,7 +456,7 @@ def _validate_capability_boundaries(
                 raw_value=", ".join(invalid_symbols),
                 explanation=(
                     "I understood the symbol, but I could not verify it in the "
-                    "available Alpaca asset universe for this run."
+                    "supported market data universe for this run."
                 ),
                 simplification_labels=["Use a supported stock or crypto symbol"],
             )
@@ -457,6 +483,35 @@ def _validate_capability_boundaries(
         response=response,
         strategy=strategy,
         current_message=request.current_user_message,
+    )
+
+
+def _resolve_asset_candidate(
+    query: str,
+    *,
+    field: str,
+    source: ResolutionSource,
+) -> AssetResolution:
+    if resolve_asset is _DEFAULT_RESOLVE_ASSET:
+        return runtime_resolve_asset_candidate(query, field=field, source=source)
+    resolved = resolve_asset(query)
+    provenance = ResolutionProvenance(
+        field=field,
+        raw_text=query,
+        source=source,
+        candidate_kind="asset",
+        resolution_status="resolved",
+        canonical_symbol=resolved.canonical_symbol,
+        asset_class=resolved.asset_class,
+        validated_by="provider_catalog",
+        confidence="high",
+    )
+    return AssetResolution(
+        status="resolved",
+        raw_text=query,
+        asset=resolved,
+        candidates=(resolved,),
+        provenance=provenance,
     )
 
 
@@ -636,3 +691,17 @@ def _humanize_simplification_label(label: str) -> str:
         "dca_accumulation": "Try recurring buys",
     }
     return labels.get(normalized, label.strip())
+
+
+def _dedupe_resolution_provenance(
+    items: list[ResolutionProvenance],
+) -> list[ResolutionProvenance]:
+    seen: set[tuple[str, str, str, str]] = set()
+    deduped: list[ResolutionProvenance] = []
+    for item in items:
+        key = (item.field, item.raw_text, item.source, item.candidate_kind)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped

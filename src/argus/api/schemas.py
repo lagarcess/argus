@@ -290,10 +290,21 @@ class ChatActionPayload(BaseModel):
     presentation: Literal["confirmation", "result"] | None = None
 
 
+class ChatMentionPayload(BaseModel):
+    id: str
+    type: Literal["asset", "indicator"]
+    label: str
+    symbol: str | None = None
+    description: str | None = None
+    insert_text: str
+    support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
+
+
 class ChatStreamRequest(BaseModel):
     conversation_id: str
     message: str | None = None
     action: ChatActionPayload | None = None
+    mentions: list[ChatMentionPayload] = Field(default_factory=list)
     language: Language | None = None
 
     @model_validator(mode="after")

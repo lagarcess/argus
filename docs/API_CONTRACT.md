@@ -989,9 +989,22 @@ Soft delete conversation.
 {
   "conversation_id": "uuid",
   "message": "Quiero probar comprar cuando baja Tesla",
+  "mentions": [
+    {
+      "id": "asset:BTC",
+      "type": "asset",
+      "label": "Bitcoin",
+      "symbol": "BTC",
+      "description": "Bitcoin",
+      "insert_text": "BTC",
+      "support_status": "supported"
+    }
+  ],
   "language": "es"
 }
 ```
+
+`mentions` is optional composer provenance. It records user-selected asset or indicator hints from the input affordance, but it does not rewrite `message`, bypass LLM interpretation, or create hidden execution state. Backend resolution still validates extracted candidates after interpretation.
 
 **Required Header:**
 - `Idempotency-Key`: `uuid` (Highly recommended to prevent double-submits)

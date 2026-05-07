@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
@@ -157,12 +158,29 @@ async def chat_stream(
                 "Describe the idea again and I will prepare a fresh confirmation."
             ),
         )
+    mention_provenance = [
+        mention_to_provenance(mention.model_dump(mode="python"), index=index)
+        for index, mention in enumerate(payload.mentions)
+    ]
     if onboarding_goal is None:
+        user_metadata = (
+            {
+                "mentions": [
+                    mention.model_dump(mode="python") for mention in payload.mentions
+                ],
+                "resolution_provenance": [
+                    item.model_dump(mode="python") for item in mention_provenance
+                ],
+            }
+            if mention_provenance
+            else None
+        )
         create_message(
             user_id=user.id,
             conversation_id=conversation.id,
             role="user",
             content=display_message,
+            metadata=user_metadata,
         )
 
     onboarding_required = current_user_profile.onboarding.stage in {
@@ -382,6 +400,9 @@ async def chat_stream(
                 thread_id=conversation.id,
                 message=request_message,
                 recent_thread_history=recent_thread_history,
+                context_hints=[
+                    item.model_dump(mode="python") for item in mention_provenance
+                ],
             ):
                 event_type = runtime_event.get("type")
                 if event_type == "token":
@@ -438,6 +459,10 @@ async def chat_stream(
                     ),
                     "agent_runtime_stage_outcome": stage_status,
                 }
+                if runtime_result.get("resolution_provenance"):
+                    metadata["resolution_provenance"] = runtime_result[
+                        "resolution_provenance"
+                    ]
                 if confirmation_card is not None:
                     metadata["confirmation_card"] = confirmation_card
                     runtime_result["confirmation"] = confirmation_card

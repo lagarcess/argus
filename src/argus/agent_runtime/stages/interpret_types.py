@@ -5,6 +5,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     IntentName,
+    ResolutionProvenance,
     ResponseProfile,
     ResponseProfileOverrides,
     StrategySummary,
@@ -55,12 +56,16 @@ class InterpretDecision(BaseModel):
     normalized_signals: dict[str, Any] = Field(default_factory=dict)
     ambiguous_fields: list[AmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[UnsupportedConstraint] = Field(default_factory=list)
+    resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
     semantic_turn_act: SemanticTurnAct | None = None
 
     def to_patch(self) -> dict[str, Any]:
         ambiguous = [item.model_dump(mode="python") for item in self.ambiguous_fields]
         unsupported = [
             item.model_dump(mode="python") for item in self.unsupported_constraints
+        ]
+        resolution_provenance = [
+            item.model_dump(mode="python") for item in self.resolution_provenance
         ]
         return {
             "normalized_signals": self.normalized_signals,
@@ -88,6 +93,7 @@ class InterpretDecision(BaseModel):
             "reason_codes": list(self.reason_codes),
             "ambiguous_fields": ambiguous,
             "unsupported_constraints": unsupported,
+            "resolution_provenance": resolution_provenance,
             "semantic_turn_act": self.semantic_turn_act,
         }
 

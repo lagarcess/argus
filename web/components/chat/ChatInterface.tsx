@@ -737,7 +737,13 @@ export default function ChatInterface() {
     };
 
     const streamToConversation = (targetConversationId: string) =>
-      streamChatMessage(targetConversationId, streamInput, i18n.language, handleStreamEvent);
+      streamChatMessage(
+        targetConversationId,
+        streamInput,
+        i18n.language,
+        handleStreamEvent,
+        action?.type ? [] : mentions,
+      );
 
     try {
       await streamToConversation(conversationId);

@@ -418,6 +418,62 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         assert action["payload"]["conversation_id"] == conversation["id"]
 
 
+def test_chat_stream_passes_and_persists_composer_mention_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    seen: dict[str, Any] = {}
+
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
+        seen.update(kwargs)
+        return _confirmation_runtime_result()
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Buy and hold BTC over the past year",
+            "mentions": [
+                {
+                    "id": "asset:BTC",
+                    "type": "asset",
+                    "label": "Bitcoin",
+                    "symbol": "BTC",
+                    "description": "Crypto",
+                    "insert_text": "BTC",
+                    "support_status": "supported",
+                }
+            ],
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen["message"] == "Buy and hold BTC over the past year"
+    assert seen["context_hints"][0]["source"] == "user_mention"
+    assert seen["context_hints"][0]["canonical_symbol"] == "BTC"
+    assert seen["context_hints"][0]["asset_class"] == "crypto"
+
+    user_message = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"][0]
+    assert user_message["content"] == "Buy and hold BTC over the past year"
+    assert user_message["metadata"]["mentions"][0]["symbol"] == "BTC"
+    assert user_message["metadata"]["resolution_provenance"][0]["source"] == (
+        "user_mention"
+    )
+    assert user_message["metadata"]["resolution_provenance"][0]["raw_text"] == "BTC"
+
+
 def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

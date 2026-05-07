@@ -397,6 +397,14 @@ def _build_task_snapshot(
             if stage_outcome_value in {"await_user_reply", "await_approval"}
             else None
         ),
+        resolution_provenance=(
+            run_state.resolution_provenance
+            or (
+                prior_task_snapshot.resolution_provenance
+                if prior_task_snapshot is not None
+                else []
+            )
+        ),
     )
 
 

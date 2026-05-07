@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
+from argus.agent_runtime.resolution import resolve_asset_candidate
 from argus.agent_runtime.state.models import StrategySummary, UnsupportedConstraint
-from argus.domain.market_data import resolve_asset
 
 
 def detect_unsupported_constraints(
@@ -14,12 +14,15 @@ def detect_unsupported_constraints(
     asset_classes: dict[str, str] = {}
     unsupported_constraints: list[UnsupportedConstraint] = []
 
-    for symbol in symbols:
-        try:
-            resolved = resolve_asset(symbol)
-        except Exception:
+    for index, symbol in enumerate(symbols):
+        resolution = resolve_asset_candidate(
+            symbol,
+            field=f"asset_universe[{index}]",
+            source="llm_extraction",
+        )
+        if resolution.status != "resolved" or resolution.asset is None:
             continue
-        asset_classes[resolved.canonical_symbol] = resolved.asset_class
+        asset_classes[resolution.asset.canonical_symbol] = resolution.asset.asset_class
 
     if len(set(asset_classes.values())) > 1:
         unsupported_constraints.append(

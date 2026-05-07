@@ -62,6 +62,37 @@ describe("chat composer model", () => {
     ]);
   });
 
+  test("composer mentions preserve canonical metadata for chat request context", () => {
+    const segments: ComposerSegment[] = [
+      { type: "text", text: "Buy " },
+      { type: "token", token: goog },
+      { type: "text", text: " when " },
+      { type: "token", token: rsi },
+      { type: "text", text: " falls" },
+    ];
+
+    expect(composerMentions(segments)).toEqual([
+      {
+        id: "asset:GOOG",
+        type: "asset",
+        label: "GOOG",
+        symbol: "GOOG",
+        description: "Alphabet Class C",
+        insert_text: "GOOG",
+        support_status: "supported",
+      },
+      {
+        id: "indicator:rsi",
+        type: "indicator",
+        label: "RSI",
+        symbol: "rsi",
+        description: "Relative Strength Index",
+        insert_text: "RSI",
+        support_status: "supported",
+      },
+    ]);
+  });
+
   test("inserting another token does not replace previous inline tokens", () => {
     const withAsset = replaceRangeWithToken(
       [{ type: "text", text: "Buy @google when @relative strength index drops" }],

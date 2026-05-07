@@ -8,6 +8,7 @@ from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     ConversationMessage,
+    ResolutionProvenance,
     RunState,
     UserState,
 )
@@ -26,6 +27,7 @@ def build_workflow_input(
     user: UserState,
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
+    context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
 ) -> WorkflowState:
     normalized_message = " ".join(message.strip().split())
     return {
@@ -34,6 +36,7 @@ def build_workflow_input(
             recent_thread_history=_bounded_recent_thread_history(
                 list(recent_thread_history or [])
             ),
+            context_hints=list(context_hints or []),
         ),
         "user": user,
     }
@@ -46,11 +49,13 @@ async def stream_agent_turn_events(
     thread_id: str,
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
+    context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     initial_state = build_workflow_input(
         user=user,
         message=message,
         recent_thread_history=recent_thread_history,
+        context_hints=context_hints,
     )
     config = {"configurable": {"thread_id": thread_id}}
     seen_stage_starts: set[str] = set()
@@ -90,6 +95,7 @@ async def run_agent_turn(
     thread_id: str,
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
+    context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     final_payload: dict[str, Any] | None = None
     async for event in stream_agent_turn_events(
@@ -98,6 +104,7 @@ async def run_agent_turn(
         thread_id=thread_id,
         message=message,
         recent_thread_history=recent_thread_history,
+        context_hints=context_hints,
     ):
         if event.get("type") == "final":
             payload = event.get("payload")
@@ -177,6 +184,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "next_actions",
         "failure_classification",
         "final_response_payload",
+        "resolution_provenance",
     }
     serialized = {
         key: _serialize_public_value(key, value)
@@ -206,6 +214,14 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
             and getattr(run_state, "failure_classification", None) is not None
         ):
             serialized["failure_classification"] = run_state.failure_classification
+        if (
+            "resolution_provenance" not in serialized
+            and getattr(run_state, "resolution_provenance", None)
+        ):
+            serialized["resolution_provenance"] = [
+                item.model_dump(mode="python")
+                for item in run_state.resolution_provenance
+            ]
     stage_outcome = result.get("stage_outcome")
     if stage_outcome is not None:
         serialized["stage_outcome"] = getattr(stage_outcome, "value", stage_outcome)
