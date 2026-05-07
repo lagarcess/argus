@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import time as time_module
 from datetime import date, datetime, time, timezone
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import joblib
 import pandas as pd
@@ -14,7 +17,9 @@ from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDa
 from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
-AssetClass = Literal["equity", "crypto"]
+AssetClass = Literal["equity", "crypto", "currency_pair"]
+KRAKEN_PUBLIC_API_BASE = "https://api.kraken.com/0"
+KRAKEN_MAX_OHLC_CANDLES = 720
 
 
 def _cache_location() -> str | None:
@@ -44,11 +49,15 @@ def _to_utc_datetime(value: date, *, end_of_day: bool = False) -> datetime:
 def _normalize_asset_class(asset_class: AssetClass) -> AssetClass:
     if asset_class == "equity":
         return "equity"
+    if asset_class == "currency_pair":
+        return "currency_pair"
     return "crypto"
 
 
 def _to_alpaca_symbol(symbol: str, asset_class: AssetClass) -> str:
     candidate = symbol.strip().upper().replace("-", "/")
+    if asset_class == "currency_pair":
+        return candidate.replace("/", "")
     if asset_class == "crypto":
         if "/" in candidate:
             return candidate
@@ -71,6 +80,92 @@ def _parse_timeframe(timeframe: str) -> TimeFrame:
     if normalized not in mapping:
         raise ValueError("unsupported_timeframe")
     return mapping[normalized]
+
+
+def _kraken_interval_minutes(timeframe: str) -> int:
+    normalized = timeframe.strip().lower()
+    mapping = {
+        "1h": 60,
+        "4h": 240,
+        "1d": 1440,
+    }
+    if normalized not in mapping:
+        raise ValueError("unsupported_timeframe")
+    return mapping[normalized]
+
+
+def _expected_candle_count(
+    *, start_date: date, end_date: date, interval_minutes: int
+) -> int:
+    start_dt = _to_utc_datetime(start_date, end_of_day=False)
+    end_dt = _to_utc_datetime(end_date, end_of_day=True)
+    span_minutes = max(0, int((end_dt - start_dt).total_seconds() // 60))
+    return span_minutes // interval_minutes + 1
+
+
+def _kraken_public_get(path: str, params: dict[str, object] | None = None) -> dict:
+    query = f"?{urlencode(params)}" if params else ""
+    request = Request(
+        f"{KRAKEN_PUBLIC_API_BASE}{path}{query}",
+        headers={"User-Agent": "Argus/1.0"},
+    )
+    with urlopen(request, timeout=10) as response:  # noqa: S310 - fixed public Kraken API base
+        payload = json.loads(response.read().decode("utf-8"))
+    if payload.get("error"):
+        raise ValueError("market_data_unavailable")
+    return payload
+
+
+def fetch_kraken_system_status() -> dict[str, object]:
+    return _kraken_public_get("/public/SystemStatus")
+
+
+def fetch_kraken_ticker(pair: str) -> dict[str, object]:
+    return _kraken_public_get(
+        "/public/Ticker", {"pair": pair.strip().upper().replace("/", "")}
+    )
+
+
+def _fetch_kraken_ohlcv(
+    *,
+    symbol: str,
+    timeframe: str,
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    interval = _kraken_interval_minutes(timeframe)
+    if (
+        _expected_candle_count(
+            start_date=start_date, end_date=end_date, interval_minutes=interval
+        )
+        > KRAKEN_MAX_OHLC_CANDLES
+    ):
+        raise ValueError("kraken_ohlc_window_exceeded")
+
+    pair = symbol.strip().upper().replace("-", "").replace("/", "")
+    since = int(_to_utc_datetime(start_date, end_of_day=False).timestamp())
+    payload = _kraken_public_get(
+        "/public/OHLC", {"pair": pair, "interval": interval, "since": since}
+    )
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        raise ValueError("market_data_unavailable")
+    pair_key = next((key for key in result if key != "last"), None)
+    rows = result.get(pair_key) if pair_key else None
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("market_data_unavailable")
+
+    frame = pd.DataFrame(
+        rows,
+        columns=["timestamp", "open", "high", "low", "close", "vwap", "volume", "count"],
+    )
+    frame.index = pd.to_datetime(frame["timestamp"], unit="s", utc=True)
+    frame = frame.loc[:, ["open", "high", "low", "close", "volume"]]
+    frame = frame.astype(float)
+    start_ts = _to_utc_datetime(start_date, end_of_day=False)
+    end_ts = _to_utc_datetime(end_date, end_of_day=True)
+    frame = frame[(frame.index >= start_ts) & (frame.index <= end_ts)]
+    return _normalize_df(frame, symbol=pair)
 
 
 @lru_cache()
@@ -121,13 +216,22 @@ def _fetch_bars_core(
     end_date: date,
     cache_bin: int | None = None,  # part of cached signature
 ) -> pd.DataFrame:
+    normalized_asset_class = _normalize_asset_class(asset_class)
+    if normalized_asset_class == "currency_pair":
+        return _fetch_kraken_ohlcv(
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     timeframe_enum = _parse_timeframe(timeframe)
     start_dt = _to_utc_datetime(start_date, end_of_day=False)
     end_dt = _to_utc_datetime(end_date, end_of_day=True)
     alpaca_symbol = _to_alpaca_symbol(symbol, asset_class)
 
     try:
-        if _normalize_asset_class(asset_class) == "equity":
+        if normalized_asset_class == "equity":
             request = StockBarsRequest(
                 symbol_or_symbols=alpaca_symbol,
                 timeframe=timeframe_enum,
@@ -146,7 +250,15 @@ def _fetch_bars_core(
                 end=end_dt,
                 sort=Sort.ASC,
             )
-            bars = _crypto_client().get_crypto_bars(request).df
+            try:
+                bars = _crypto_client().get_crypto_bars(request).df
+            except Exception:
+                return _fetch_kraken_ohlcv(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
     except Exception as exc:  # pragma: no cover - network/API failure path
         raise ValueError("market_data_unavailable") from exc
 

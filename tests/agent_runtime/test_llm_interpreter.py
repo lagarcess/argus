@@ -1,0 +1,704 @@
+from dataclasses import dataclass
+from datetime import date
+
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.llm_interpreter import (
+    LLMInterpretationResponse,
+    LLMStrategyDraft,
+    OpenRouterStructuredInterpreter,
+)
+from argus.agent_runtime.stages.interpret import InterpretationRequest
+from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot, UserState
+from argus.agent_runtime.strategy_contract import resolve_date_range
+
+
+@dataclass(frozen=True)
+class ResolvedAssetStub:
+    canonical_symbol: str
+    asset_class: str
+    name: str = ""
+    raw_symbol: str = ""
+
+
+def test_llm_interpreter_validates_asset_class_with_alpaca_resolver(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        calls.append(symbol)
+        return ResolvedAssetStub(
+            canonical_symbol=symbol.upper(),
+            asset_class="crypto" if symbol.upper() == "BTC" else "equity",
+        )
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Backtest Tesla and Bitcoin together.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Backtest Tesla and Bitcoin together.",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Hold Tesla and Bitcoin together.",
+            asset_universe=["tsla", "btc"],
+            date_range="last 2 years",
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Backtest Tesla and Bitcoin together.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls == ["tsla", "btc"]
+    assert result.candidate_strategy_draft.asset_universe == ["TSLA", "BTC"]
+    assert result.candidate_strategy_draft.asset_class == "mixed"
+    assert result.unsupported_constraints[0].category == "unsupported_asset_mix"
+    assert "currency pairs" in result.unsupported_constraints[0].explanation
+
+
+def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt()
+
+    assert "currency pairs" in prompt
+    assert "currency pair benchmark is the tested pair itself" in prompt
+    assert "Kraken" in prompt
+
+
+def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="refine",
+        user_goal_summary="Make the pending DCA strategy weekly.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Actually make that weekly instead.",
+            strategy_type="dca_accumulation",
+            cadence="weekly",
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Actually make that weekly instead.",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="backtest_execution",
+                completed=False,
+                pending_strategy_summary=StrategySummary(
+                    raw_user_phrasing="Invest $500 in Bitcoin every month since 2021.",
+                    strategy_type="dca_accumulation",
+                    strategy_thesis="Invest $500 in Bitcoin every month since 2021.",
+                    asset_universe=["BTC"],
+                    asset_class="crypto",
+                    date_range="since 2021",
+                    cadence="monthly",
+                    capital_amount=500,
+                    sizing_mode="capital_amount",
+                ),
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.asset_universe == ["BTC"]
+    assert strategy.capital_amount == 500
+    assert strategy.date_range == "since 2021"
+    assert strategy.cadence == "weekly"
+
+
+def test_llm_interpreter_preserves_semantic_turn_act_from_response() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User approved the pending strategy.",
+        semantic_turn_act="approval",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="yes run it",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.semantic_turn_act == "approval"
+
+
+def test_llm_system_prompt_forbids_scaffolding_and_internal_field_names() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "asset_universe" in prompt
+    assert "capital_amount" in prompt
+    assert "requested_field" in prompt
+    assert "not specified" in prompt
+    assert "do not expose" in prompt or "never expose" in prompt
+
+
+def test_llm_system_prompt_owns_phase_one_routing_and_quality_rules() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "semantic_turn_act" in prompt
+    assert "approval" in prompt
+    assert "refine_current_idea" in prompt
+    assert "conversation_followup" in prompt
+    assert "educational" in prompt
+    assert "asset_universe" in prompt
+    assert "capital_amount" in prompt
+    assert "missing_required_fields" in prompt
+    assert "not specified" in prompt
+
+
+def test_llm_system_prompt_owns_phase_three_extraction_rules() -> None:
+    prompt = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )._system_prompt()
+
+    assert "Extract symbols, company names, crypto assets, and currency pairs" in prompt
+    assert "Do not rely on backend regex extraction" in prompt
+    assert "date_range" in prompt
+    assert "cadence" in prompt
+    assert "semantic_turn_act is the routing source of truth" in prompt
+    assert "response_profile_overrides" in prompt
+    assert "social" in prompt.lower()
+    assert "educational" in prompt.lower()
+
+
+def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Buy Nvidia on a 50/200 moving-average crossover.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Buy Nvidia when its 50-day moving average crosses above the 200-day"
+            ),
+            strategy_type="indicator_threshold",
+            strategy_thesis="Buy Nvidia on a 50/200 moving-average crossover.",
+            asset_universe=["NVDA"],
+            entry_logic="50-day moving average crosses above the 200-day moving average",
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "Buy Nvidia when its 50-day moving average crosses above the 200-day"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.candidate_strategy_draft.entry_logic == (
+        "50-day moving average crosses above the 200-day moving average"
+    )
+    assert result.unsupported_constraints[0].category == "unsupported_indicator_rule"
+
+
+def test_llm_interpreter_humanizes_unsupported_simplification_labels(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Buy Nvidia on a 50/200 moving-average crossover.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="indicator_threshold",
+            strategy_thesis="Buy Nvidia on a 50/200 moving-average crossover.",
+            asset_universe=["NVDA"],
+            entry_logic="50-day moving average crosses above the 200-day moving average",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_indicator_rule",
+                raw_value="50/200 moving-average crossover",
+                explanation="Moving-average crossovers are not directly executable.",
+                simplification_labels=["rsi_preset", "buy_and_hold", "dca_accumulation"],
+            )
+        ],
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "Buy Nvidia when its 50-day moving average crosses above the 200-day"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    labels = [
+        option.label
+        for option in result.unsupported_constraints[0].simplification_options
+    ]
+    assert labels == [
+        "Use the supported RSI rule",
+        "Compare with buy and hold",
+        "Try recurring buys",
+    ]
+    assert result.unsupported_constraints[0].explanation.startswith("I understand")
+
+
+def test_llm_interpreter_drops_stale_unsupported_copy_for_executable_rsi_threshold(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="refine",
+        user_goal_summary="Use RSI 40 for the Apple dip rule.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="buy every time rsi drops below 40",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Buy Apple when RSI drops below 40.",
+            asset_universe=["AAPL"],
+            date_range="last two years",
+            entry_logic="RSI drops below 40",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_indicator_rule",
+                raw_value="RSI below 40",
+                explanation="The only executable RSI preset is buy below 30.",
+                simplification_labels=["rsi_preset"],
+            )
+        ],
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="buy every time rsi drops below 40",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="strategy_drafting",
+                completed=False,
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="indicator_threshold",
+                    strategy_thesis="Buy Apple after big drops.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range="last two years",
+                ),
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert result.unsupported_constraints == []
+    assert strategy.entry_logic == "RSI drops below 40"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+
+
+def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        user_goal_summary="User wants to define Apple dip buying.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="What if I bought Apple after big drops?",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Buy Apple after big drops.",
+            asset_universe=["AAPL"],
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="What if I bought Apple after big drops?",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="strategy_drafting",
+                completed=False,
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="dca_accumulation",
+                    strategy_thesis="Buy a fixed amount every month.",
+                    cadence="monthly",
+                    capital_amount=500,
+                ),
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.strategy_type == "indicator_threshold"
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.cadence is None
+    assert strategy.capital_amount is None
+
+
+def test_llm_interpreter_removes_stale_indicator_limit_when_user_only_said_drops(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        user_goal_summary="User wants to test Apple after big drops.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="What if I bought Apple after big drops?",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Buy Apple after big drops.",
+            asset_universe=["AAPL"],
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_indicator_rule",
+                raw_value="moving-average crossover",
+                explanation=(
+                    "Argus cannot execute that exact moving-average or "
+                    "compound indicator logic yet."
+                ),
+                simplification_labels=["Compare NVDA with buy and hold"],
+            )
+        ],
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="What if I bought Apple after big drops?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.candidate_strategy_draft.strategy_type == "indicator_threshold"
+    assert result.candidate_strategy_draft.cadence is None
+    assert result.candidate_strategy_draft.capital_amount is None
+    assert result.unsupported_constraints == []
+
+
+def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Buy and hold Bitcoin from last year to date.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "let's try a basic buy and hold on BTC from jan first last year to date"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Bitcoin from January 1 last year to date.",
+            asset_universe=["BTC"],
+            date_range={"start": "2024-01-01", "end": "today"},
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "let's try a basic buy and hold on BTC from jan first last year to date"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2025-01-01", "end": "today"}
+    assert resolve_date_range(strategy.date_range, today=date(2026, 5, 3)).payload == {
+        "start": "2025-01-01",
+        "end": "2026-05-03",
+    }
+
+
+def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Invest $500 in Bitcoin every month since 2021.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Invest $500 in Bitcoin every month since 2021.",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Invest $500 in Bitcoin every month since 2021.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range="past year",
+            cadence="monthly",
+            capital_amount=500,
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Invest $500 in Bitcoin every month since 2021.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.date_range == "since 2021"
+    assert strategy.capital_amount == 500
+    assert strategy.cadence == "monthly"
+
+
+def test_llm_interpreter_rejects_invented_dca_contribution_amount(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Buy Tesla every month.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="What if I bought Tesla every month?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Tesla every month.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            cadence="monthly",
+            capital_amount=10000,
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="What if I bought Tesla every month?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.capital_amount is None
+
+
+def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Buy and hold Bitcoin from January 1 last year.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "let's try a basic buy and hold on BTC from jan first last year to date"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Bitcoin from January 1 last year.",
+            asset_universe=["BTC"],
+            date_range={"start": "2024-01-01", "end": "today"},
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "let's try a basic buy and hold on BTC from jan first last year to date"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.entry_logic is None
+    assert strategy.exit_logic is None
+    assert result.requires_clarification is False
+
+
+def test_llm_interpreter_preserves_actual_user_phrasing_when_model_rewrites_it(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    user_message = (
+        "let's try a basic buy and hold on BTC from jan first last year to date"
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        user_goal_summary="Buy and hold BTC.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="buy and hold on BTC from jan first last 1 year to date",
+            strategy_type="buy_and_hold",
+            asset_universe=["BTC"],
+            date_range={"start": "2024-01-01", "end": "present"},
+            capital_amount=10000,
+            comparison_baseline="BTC",
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message=user_message,
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.raw_user_phrasing == user_message
+    assert strategy.strategy_thesis == user_message
+    assert strategy.date_range == {"start": "2025-01-01", "end": "today"}

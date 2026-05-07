@@ -10,7 +10,10 @@ description: Diagnose, validate, and create high-quality GitHub issues.
 
 2. **Fetch context** (if referencing existing issues):
    ```
-   & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUM>
+   # macOS/Linux:
+   bash ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUM>
+   # Windows:
+   # & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUM>
    ```
 
 3. **Draft issue** with:

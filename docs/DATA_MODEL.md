@@ -203,7 +203,7 @@ Represents a saved, executable strategy idea backed by an engine template.
 - **Symbols**: Min 1, Max 5.
 - **Asset Class**: All symbols must share the same asset class.
 - **Side**: Long-only (Short is deferred).
-- **Asset Classes**: `equity`, `crypto`.
+- **Asset Classes**: `equity`, `crypto`, `currency_pair`.
 - **Note**: Strategies may target multiple symbols but only within the same `asset_class`.
 
 > [!TIP]
@@ -279,7 +279,10 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 
 ### Notes
 - Runs are immutable after completion.
-- `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto).
+- `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
+- `chart` stores the aggregate portfolio equity curve and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
+- `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
+- Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 ---
 
 # 12. Backtest Metrics Shape
@@ -309,6 +312,7 @@ Backtest results use a standardized nested shape.
 - Aggregate metrics for grouped symbols compare against the class benchmark:
   - Equity groups vs **SPY**
   - Crypto groups vs **BTC** (excluding stablecoins)
+  - Currency-pair groups vs the tested pair itself
 ---
 
 # 13. usage_counters
@@ -399,6 +403,8 @@ Alpha supports keyword-based search across core entities.
 
 ### Future
 Semantic search using embeddings is deferred until post-Alpha.
+- Do not add embedding or pgvector tables for the production readiness chat/backtest branch.
+- Use structured Supabase records, run metadata, saved strategies, and keyword search until Argus needs semantic recall across large histories.
 
 ---
 

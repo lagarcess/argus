@@ -212,6 +212,8 @@ Dedicated surfaces still exist for Strategies and Collections.
 
 # 8. Collections (MVP Replacement for Portfolios)
 
+Launch note: collections remain a valid product object and database model, but the dedicated collections UI is feature-gated for the first production chat/backtest launch. Use `NEXT_PUBLIC_COLLECTIONS_ENABLED=false` to hide collection navigation and collection-only controls while preserving the schema for later rollout.
+
 Collections are lightweight saved groupings of related strategies.
 
 Examples:
@@ -237,6 +239,8 @@ Future portfolio systems may evolve naturally from Collections.
 Strategies are saved executable ideas backed by supported templates.
 
 The Strategies surface gives users a quick way to evaluate performance at a glance without requiring deep chart interaction.
+
+Strategies are saved from completed result state. The chat result card owns the Save Strategy control because a saved strategy should come from a real run, not an unexecuted confirmation draft.
 
 ## Surface Goals
 
@@ -454,6 +458,13 @@ Every result card must include a lightweight assumptions footer to maintain inte
 - **Crypto** compares to **BTC**
 
 Example: *Long-only • Equal weight • No fees/slippage • Benchmark: SPY*
+
+Result cards and explanations must describe executed backtest behavior, not raw
+strategy triggers. A strategy may produce many buy/sell signals, but Argus only
+shows trades, markers, trade counts, and win-rate inputs after the execution
+layer has applied long-only position state, cash, sizing, and policy constraints.
+Ignored signals can be explained in breakdowns when useful, but they are not
+presented as real buys or sells.
 
 ---
 

@@ -39,11 +39,7 @@ import {
   type HistoryItem,
   type ApiUser,
 } from "@/lib/argus-api";
-
-const LANGUAGES = [
-  { code: "en", name: "English", translation: "English" },
-  { code: "es-419", name: "Español", translation: "Spanish" },
-];
+import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
 
 type SettingsViewProps = {
   onClose: () => void;
@@ -73,13 +69,13 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
   const [isLoading, setIsLoading] = useState(false);
 
   const currentLangLabel = useMemo(
-    () => LANGUAGES.find((entry) => entry.code.startsWith(lang))?.name ?? "English",
+    () => ENABLED_LANGUAGES.find((entry) => entry.code === normalizeEnabledLanguage(lang))?.name ?? "English",
     [lang],
   );
 
   const filteredLanguages = useMemo(
     () =>
-      LANGUAGES.filter(
+      ENABLED_LANGUAGES.filter(
         (entry) =>
           entry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           entry.translation.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -115,7 +111,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
     setSearchQuery("");
 
     try {
-      await patchMe({ language: nextLanguage as "en" | "es-419" });
+      await patchMe({ language: normalizeEnabledLanguage(nextLanguage) });
     } catch {
       // Silently ignore if not logged in
     }
@@ -496,7 +492,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                     className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
                     <span className="text-[15px] font-medium text-black dark:text-white">{entry.name}</span>
-                    {entry.code.startsWith(lang) ? (
+                    {entry.code === normalizeEnabledLanguage(lang) ? (
                       <Check className="w-4 h-4 text-black dark:text-white" />
                     ) : (
                       <span className="text-[14px] text-black/45 dark:text-white/45">{entry.translation}</span>

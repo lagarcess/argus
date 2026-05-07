@@ -54,6 +54,13 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     return data
 
 
+def _message_preview(content: str, max_length: int = 180) -> str | None:
+    preview = " ".join(content.split())
+    if not preview:
+        return None
+    return preview[:max_length]
+
+
 @dataclass
 class SupabaseGateway:
     client: Client
@@ -305,7 +312,7 @@ class SupabaseGateway:
     ) -> list[Message]:
         query = (
             self.client.table("messages")
-            .select("id,conversation_id,role,content,created_at")
+            .select("id,conversation_id,role,content,metadata,created_at")
             .eq("user_id", user_id)
             .eq("conversation_id", conversation_id)
             .order("created_at", desc=False)
@@ -317,7 +324,13 @@ class SupabaseGateway:
         return [Message.model_validate(row) for row in rows_data]
 
     def create_message(
-        self, *, user_id: str, conversation_id: str, role: str, content: str
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        role: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
     ) -> Message:
         conversation = self.get_conversation(
             user_id=user_id, conversation_id=conversation_id
@@ -329,9 +342,15 @@ class SupabaseGateway:
             "conversation_id": conversation_id,
             "role": role,
             "content": content,
+            "metadata": metadata,
             "created_at": _now_iso(),
         }
         created = self.client.table("messages").insert(payload).execute()
+        preview = _message_preview(content)
+        if preview:
+            self.client.table("conversations").update(
+                {"last_message_preview": preview, "updated_at": _now_iso()}
+            ).eq("id", conversation_id).eq("user_id", user_id).execute()
         return Message.model_validate(_row_one(created))
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> BacktestRun:
@@ -422,7 +441,9 @@ class SupabaseGateway:
 
         if limit is None:
             runs = self._fetch_all_rows(lambda start, end: ordered_runs.range(start, end))
-            chats = self._fetch_all_rows(lambda start, end: ordered_chats.range(start, end))
+            chats = self._fetch_all_rows(
+                lambda start, end: ordered_chats.range(start, end)
+            )
             strategies = self._fetch_all_rows(
                 lambda start, end: ordered_strategies.range(start, end)
             )
@@ -485,7 +506,9 @@ class SupabaseGateway:
             collections_raw = self._fetch_all_rows(
                 lambda start, end: collections_query.range(start, end)
             )
-            runs_raw = self._fetch_all_rows(lambda start, end: runs_query.range(start, end))
+            runs_raw = self._fetch_all_rows(
+                lambda start, end: runs_query.range(start, end)
+            )
         else:
             conversations_raw = conversations_query.limit(limit).execute().data or []
             strategies_raw = strategies_query.limit(limit).execute().data or []

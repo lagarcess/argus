@@ -121,6 +121,7 @@ def test_resolve_asset_aliases_and_caches_universe(
 
     assets.clear_asset_cache()
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", fake_load_assets)
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
 
     assert assets.resolve_asset("aapl").asset_class == "equity"
     assert assets.resolve_asset("btc/usd").canonical_symbol == "BTC"
@@ -145,6 +146,80 @@ def test_resolve_asset_rejects_unknown_symbol(monkeypatch: pytest.MonkeyPatch) -
 
     assets.clear_asset_cache()
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", fake_load_assets)
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
 
     with pytest.raises(ValueError, match="invalid_symbol"):
         assets.resolve_asset("NOTREAL")
+
+
+def test_kraken_currency_pairs_are_available_without_alpaca(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_kraken_get(path: str, params: dict[str, object] | None = None):
+        assert path == "/public/AssetPairs"
+        assert params is None
+        return {
+            "error": [],
+            "result": {
+                "ZEURZUSD": {
+                    "altname": "EURUSD",
+                    "wsname": "EUR/USD",
+                    "base": "ZEUR",
+                    "quote": "ZUSD",
+                    "status": "online",
+                }
+            },
+        }
+
+    assets.clear_asset_cache()
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: {})
+    monkeypatch.setattr(assets, "_kraken_public_get", fake_kraken_get)
+
+    resolved = assets.resolve_asset("EUR/USD")
+
+    assert resolved.canonical_symbol == "EURUSD"
+    assert resolved.asset_class == "currency_pair"
+    assert assets.search_assets("euro dollar")[0].canonical_symbol == "EURUSD"
+
+
+def test_fetch_kraken_ohlcv_parses_currency_pair_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_kraken_get(path: str, params: dict[str, object] | None = None):
+        assert path == "/public/OHLC"
+        assert params == {"pair": "EURUSD", "interval": 1440, "since": 1735689600}
+        return {
+            "error": [],
+            "result": {
+                "ZEURZUSD": [
+                    [1735689600, "1.0", "1.2", "0.9", "1.1", "1.05", "100", 12],
+                    [1735776000, "1.1", "1.3", "1.0", "1.2", "1.15", "150", 15],
+                ],
+                "last": 1735776000,
+            },
+        }
+
+    monkeypatch.setattr(provider, "_kraken_public_get", fake_kraken_get)
+
+    bars = provider.fetch_ohlcv(
+        symbol="EURUSD",
+        asset_class="currency_pair",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 2),
+        timeframe="1D",
+    )
+
+    assert list(bars.columns) == ["open", "high", "low", "close", "volume"]
+    assert bars["close"].tolist() == [1.1, 1.2]
+    assert str(bars.index.tz) == "UTC"
+
+
+def test_fetch_kraken_ohlcv_rejects_windows_over_720_candles() -> None:
+    with pytest.raises(ValueError, match="kraken_ohlc_window_exceeded"):
+        provider.fetch_ohlcv(
+            symbol="EURUSD",
+            asset_class="currency_pair",
+            start_date=date(2023, 1, 1),
+            end_date=date(2025, 1, 1),
+            timeframe="1D",
+        )

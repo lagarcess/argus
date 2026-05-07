@@ -1,4 +1,4 @@
-from .assets import ResolvedAsset, clear_asset_cache, resolve_asset
+from .assets import ResolvedAsset, clear_asset_cache, resolve_asset, search_assets
 from .provider import clear_market_data_cache, fetch_ohlcv, fetch_price_series
 
 __all__ = [
@@ -8,4 +8,5 @@ __all__ = [
     "fetch_ohlcv",
     "fetch_price_series",
     "resolve_asset",
+    "search_assets",
 ]

@@ -6,7 +6,7 @@ web/.env.local
 web/.env.*.local
 # Keep example files for reference (no secrets)
 !.env.example
-!web/.env.example
+!web/.env.local.example
 
 # Python cache
 __pycache__/
@@ -75,3 +75,6 @@ test-results/
 
 # Editor swap files
 **/*.swp
+
+# Git worktrees
+.worktrees/

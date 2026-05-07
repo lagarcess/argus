@@ -3,6 +3,7 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 import {
   Archive,
+  ArrowDown,
   ChevronRight,
   History,
   PanelLeft,
@@ -29,14 +30,22 @@ import {
   formatRelativeDate,
   getMe,
   getConversationMessages,
+  getStarterPrompts,
   listHistory,
   searchGlobal,
   patchCollection,
   patchConversation,
   patchMe,
   patchStrategy,
+  resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
+  type ApiMessage,
+  type AssetClass,
+  ChatStreamError,
+  type ChatStreamEvent,
+  type ChatActionRequest,
+  type ConversationResultCard,
   type HistoryItem,
   type BacktestRun,
   type PrimaryGoal,
@@ -49,7 +58,7 @@ import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
-import { type ChatActionOption, type Message } from "./types";
+import { type ChatActionOption, type ChatMention, type Message, type StrategyConfirmationPayload } from "./types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -60,28 +69,174 @@ type OnboardingChoice = {
   description: string;
 };
 
+const JUMP_TO_LATEST_THRESHOLD_PX = 240;
+const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
+
+type HydratedMessages = {
+  messages: Message[];
+  inputActions: ChatActionOption[];
+};
+
+function readActiveConversationId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistActiveConversationId(conversationId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
+function clearActiveConversationId() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
+function latestInputActions(messages: Message[]) {
+  const latestAi = [...messages].reverse().find((message) => message.role === "ai");
+  return (latestAi?.actions ?? []).filter((action) => action.type !== "save_strategy");
+}
+
+function isBreakdownActionMetadata(metadata: Record<string, unknown>) {
+  const chatAction = metadata.chat_action;
+  return (
+    typeof chatAction === "object" &&
+    chatAction !== null &&
+    "type" in chatAction &&
+    chatAction.type === "show_breakdown"
+  );
+}
+
+function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[]) {
+  if (action.type === "show_breakdown") {
+    return actions.filter((candidate) => candidate.type !== "show_breakdown");
+  }
+  return [];
+}
+
+function resultActionRequiresRunContext(action: ChatActionOption) {
+  return action.type === "show_breakdown" || action.type === "save_strategy";
+}
+
+function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
+  return Boolean(runId && conversationId);
+}
+
+function hydrateResultActions(
+  actions: ChatActionOption[],
+  context: {
+    runId?: string;
+    strategyId?: string | null;
+    conversationId?: string;
+    strategyName?: string;
+    symbols?: string[];
+    template?: string;
+    assetClass?: AssetClass;
+  },
+) {
+  return actions
+    .filter(
+      (action) =>
+        !resultActionRequiresRunContext(action) ||
+        hasResultActionContext(context.runId, context.conversationId),
+    )
+    .map((action) => ({
+      id: action.id || action.type || action.label,
+      label: action.label,
+      type: action.type,
+      presentation: "result" as const,
+      payload: {
+        ...(action.payload ?? {}),
+        run_id: context.runId ?? "",
+        strategy_id: context.strategyId ?? null,
+        conversation_id: context.conversationId,
+        strategy_name: context.strategyName,
+        symbols: context.symbols ?? [],
+        template: context.template ?? "",
+        asset_class: context.assetClass ?? "equity",
+      },
+      value: action.value,
+    }));
+}
+
+function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
+  const messages: Message[] = items.map((m) => {
+    const metadata = m.metadata ?? {};
+    const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
+    const resultCard = metadata.result_card as ConversationResultCard | undefined;
+    if (
+      m.role !== "user" &&
+      !isBreakdownActionMetadata(metadata) &&
+      resultCard &&
+      Array.isArray(resultCard.rows)
+    ) {
+      const runId = String(metadata.result_run_id ?? metadata.latest_run_id ?? "");
+      const conversationId =
+        typeof metadata.result_conversation_id === "string"
+          ? metadata.result_conversation_id
+          : m.conversation_id;
+      const card = resultCardFromConversationCard(resultCard, {
+        id: runId,
+        strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
+      });
+      const restoredActions = hydrateResultActions(card.actions ?? [], {
+        runId: card.runId,
+        strategyId: card.strategyId,
+        conversationId,
+        strategyName: card.strategyName,
+        symbols: card.symbols ?? [],
+        template: "",
+        assetClass: "equity",
+      });
+      return {
+        id: m.id,
+        role: "ai",
+        kind: "strategy_result",
+        content: m.content,
+        result: { ...card, actions: restoredActions },
+        actions: restoredActions,
+      };
+    }
+    if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
+      return {
+        id: m.id,
+        role: "ai",
+        kind: "strategy_confirmation",
+        content: m.content,
+        confirmation,
+        actions: confirmation.actions ?? [],
+      };
+    }
+    return {
+      id: m.id,
+      role: m.role === "user" ? "user" : "ai",
+      kind: "text",
+      content: m.content,
+    };
+  });
+
+  return { messages, inputActions: latestInputActions(messages) };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatInterface() {
   const { t, i18n } = useTranslation();
+  const collectionsEnabled = process.env.NEXT_PUBLIC_COLLECTIONS_ENABLED === "true";
 
-  const starterActions = useMemo<ChatActionOption[]>(() => [
-    {
-      id: "starter-tsla",
-      label: t('chat.starter_actions.tsla.label'),
-      value: t('chat.starter_actions.tsla.value'),
-    },
-    {
-      id: "starter-btc",
-      label: t('chat.starter_actions.btc.label'),
-      value: t('chat.starter_actions.btc.value'),
-    },
-    {
-      id: "starter-dca",
-      label: t('chat.starter_actions.dca.label'),
-      value: t('chat.starter_actions.dca.value'),
-    },
-  ], [t]);
+  const [starterActions, setStarterActions] = useState<ChatActionOption[]>([]);
   const onboardingChoices = useMemo<OnboardingChoice[]>(
     () => [
       {
@@ -121,6 +276,7 @@ export default function ChatInterface() {
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -145,7 +301,7 @@ export default function ChatInterface() {
     strategyName: string;
     symbols: string[];
     template: string;
-    assetClass: "equity" | "crypto";
+    assetClass: AssetClass;
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
@@ -156,11 +312,14 @@ export default function ChatInterface() {
     isOpen: boolean;
     type: "bug" | "feature" | "general" | "rating";
     rating?: "positive" | "negative";
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
   }>({ isOpen: false, type: "general" });
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const chatOptionsRef = useRef<HTMLDivElement>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
@@ -182,13 +341,29 @@ export default function ChatInterface() {
     return merged;
   };
 
+  const hydrateResultActionsForRun = (actions: ChatActionOption[], run: BacktestRun): ChatActionOption[] =>
+    hydrateResultActions(actions, {
+      runId: run.id,
+      strategyId: run.strategy_id ?? null,
+      conversationId: run.conversation_id ?? undefined,
+      strategyName: run.conversation_result_card.title,
+      symbols: run.symbols,
+      template: String(run.config_snapshot?.template ?? ""),
+      assetClass: run.asset_class,
+    });
+
+  const visibleInputActions = (actions: ChatActionOption[]) =>
+    actions.filter((action) => action.type !== "save_strategy");
+
   const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({
       limit: 30,
       cursor: nextCursor ?? undefined,
     });
     const filtered = items.filter(
-      (item) => !(item.type === "chat" && item.subtitle === "No messages yet")
+      (item) =>
+        !(item.type === "chat" && item.subtitle === "No messages yet") &&
+        (collectionsEnabled || item.type !== "collection"),
     );
     setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
     setHistoryNextCursor(next_cursor);
@@ -234,7 +409,9 @@ export default function ChatInterface() {
       searchGlobal({ q: query, limit: 20 })
         .then(({ items, next_cursor }) => {
           if (cancelled) return;
-          setSearchResults(items);
+          setSearchResults(
+            collectionsEnabled ? items : items.filter((item) => item.type !== "collection"),
+          );
           setSearchNextCursor(next_cursor);
         })
         .catch(() => {
@@ -252,7 +429,7 @@ export default function ChatInterface() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [searchText, currentView]);
+  }, [searchText, currentView, collectionsEnabled]);
 
   const loadMoreSearch = async () => {
     const query = searchText.trim();
@@ -267,7 +444,10 @@ export default function ChatInterface() {
       setSearchResults((prev) => {
         const seen = new Set(prev.map((item) => `${item.type}:${item.id}`));
         const merged = [...prev];
-        for (const item of items) {
+        const visibleItems = collectionsEnabled
+          ? items
+          : items.filter((item) => item.type !== "collection");
+        for (const item of visibleItems) {
           const key = `${item.type}:${item.id}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -293,14 +473,49 @@ export default function ChatInterface() {
         if (resolvedLanguage && resolvedLanguage !== i18n.language) {
           await i18n.changeLanguage(resolvedLanguage);
         }
+        const stage = meResponse?.user?.onboarding?.stage;
+        const activeConversationId = readActiveConversationId();
+        if (activeConversationId) {
+          try {
+            const { items } = await getConversationMessages(activeConversationId, 50);
+            if (cancelled) return;
+            const hydrated = hydrateMessagesFromApi(items);
+            setConversationId(activeConversationId);
+            setMessages(hydrated.messages);
+            setInputActions(hydrated.inputActions);
+            setShowOnboardingGoalCards(
+              hydrated.messages.length === 0
+              && (stage === "language_selection" || stage === "primary_goal_selection"),
+            );
+
+            const prompts = await getStarterPrompts().catch(() => []);
+            if (cancelled) return;
+            setStarterActions(prompts.map((p, i) => ({
+              id: `starter-${i}`,
+              label: p,
+              value: p,
+            })));
+            return;
+          } catch {
+            clearActiveConversationId();
+          }
+        }
+
         const { conversation } = await createConversation(resolvedLanguage);
         if (cancelled) return;
+        persistActiveConversationId(conversation.id);
         setConversationId(conversation.id);
         setMessages([]);
-        const stage = meResponse?.user?.onboarding?.stage;
         setShowOnboardingGoalCards(
           stage === "language_selection" || stage === "primary_goal_selection",
         );
+
+        const prompts = await getStarterPrompts().catch(() => []);
+        setStarterActions(prompts.map((p, i) => ({
+          id: `starter-${i}`,
+          label: p,
+          value: p,
+        })));
       } catch {
         if (cancelled) return;
         setMessages([
@@ -318,8 +533,28 @@ export default function ChatInterface() {
     };
   }, []);
 
+  const updateScrollPositionState = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottom = distanceFromBottom <= JUMP_TO_LATEST_THRESHOLD_PX;
+    shouldAutoScrollRef.current = isNearBottom;
+    setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD_PX);
+  };
+
+  const scrollToLatest = (behavior: ScrollBehavior = "smooth") => {
+    bottomRef.current?.scrollIntoView({ behavior });
+    shouldAutoScrollRef.current = true;
+    setShowJumpToLatest(false);
+  };
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (shouldAutoScrollRef.current) {
+      scrollToLatest("smooth");
+    } else {
+      updateScrollPositionState();
+    }
   }, [messages.length, streamStatus]);
 
   // ── Load existing conversation ─────────────────────────────────────────────
@@ -328,18 +563,16 @@ export default function ChatInterface() {
     setIsSidebarOpen(false);
     closeChatOptions();
     setCurrentView("chat");
+    persistActiveConversationId(convId);
     setConversationId(convId);
     setMessages([]);
+    setInputActions([]);
     setStreamStatus(t('common.loading'));
     try {
       const { items } = await getConversationMessages(convId, 50);
-      const loaded: Message[] = items.map((m) => ({
-        id: m.id,
-        role: m.role === "user" ? "user" : "ai",
-        kind: "text",
-        content: m.content,
-      }));
-      setMessages(loaded);
+      const hydrated = hydrateMessagesFromApi(items);
+      setMessages(hydrated.messages);
+      setInputActions(hydrated.inputActions);
     } catch {
       setMessages([
         {
@@ -359,10 +592,12 @@ export default function ChatInterface() {
   const startNewChat = async () => {
     try {
       const { conversation } = await createConversation(i18n.language);
+      persistActiveConversationId(conversation.id);
       setConversationId(conversation.id);
       setIsSidebarOpen(false);
       setCurrentView("chat");
       setMessages([]);
+      setInputActions([]);
       try {
         const me = await getMe();
         const stage = me.user.onboarding.stage;
@@ -411,17 +646,25 @@ export default function ChatInterface() {
 
   // ── Send message ───────────────────────────────────────────────────────────
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (
+    text: string,
+    mentionsOrAction?: ChatMention[] | ChatActionOption,
+    actionArg?: ChatActionOption,
+  ) => {
     const trimmed = text.trim();
     if (!trimmed || !conversationId) return;
+    const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
+    const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
 
     setIsSidebarOpen(false);
+    shouldAutoScrollRef.current = true;
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
       kind: "text",
-      content: trimmed,
+      content: action?.label ?? trimmed,
+      mentions,
     };
     const assistantId = crypto.randomUUID();
 
@@ -430,78 +673,131 @@ export default function ChatInterface() {
       userMsg,
       { id: assistantId, role: "ai", kind: "text", content: "" },
     ]);
-    setStreamStatus(t('chat.status.understanding'));
+    setInputActions([]);
+    setStreamStatus(null);
+
+    const streamInput: string | ChatActionRequest = action?.type
+      ? {
+          type: action.type,
+          label: action.label,
+          payload: action.payload,
+          presentation: action.presentation,
+        }
+      : trimmed;
+
+    const handleStreamEvent = (event: ChatStreamEvent) => {
+      if (event.event === "stage_start") {
+        setStreamStatus(t(`chat.status.${event.data.stage}`) || t('chat.status.preparing'));
+      }
+      if (event.event === "token") {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
+              : m,
+          ),
+        );
+      }
+      if (event.event === "error") {
+        setInputActions([]);
+        setStreamStatus(null);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: t('chat.error_backtest'),
+                }
+              : m,
+          ),
+        );
+      }
+      if (event.event === "final") {
+        const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
+        if (event.data.confirmation) {
+          const confirmation = event.data.confirmation as StrategyConfirmationPayload;
+          setInputActions(confirmation.actions ?? []);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    kind: "strategy_confirmation",
+                    content: undefined,
+                    confirmation,
+                  }
+                : m,
+            ),
+          );
+        } else if (event.data.run) {
+          const run = event.data.run as BacktestRun;
+          const baseCard = resultCardFromRun(run);
+          const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
+          const card = { ...baseCard, actions: resultActions };
+          setInputActions(visibleInputActions(resultActions));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                  ...m,
+                  kind: "strategy_result",
+                  content: m.content || finalText || undefined,
+                  result: card,
+                  actions: resultActions,
+                  }
+                : m,
+            ),
+          );
+        } else if (finalText) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId && !m.content
+                ? { ...m, content: finalText }
+                : m,
+            ),
+          );
+        }
+      }
+      if (event.event === "title") {
+        setHistoryItems((prev) =>
+          prev.map((item) =>
+            item.id === event.data.conversation_id
+              ? { ...item, title: event.data.title }
+              : item
+          )
+        );
+      }
+      if (event.event === "done") {
+        setStreamStatus(null);
+        refreshHistory();
+      }
+    };
+
+    const streamToConversation = (targetConversationId: string) =>
+      streamChatMessage(
+        targetConversationId,
+        streamInput,
+        i18n.language,
+        handleStreamEvent,
+        action?.type ? [] : mentions,
+      );
 
     try {
-      await streamChatMessage(conversationId, trimmed, i18n.language, (event) => {
-        if (event.event === "status") {
-          setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
-        }
-        if (event.event === "token") {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? { ...m, content: `${m.content ?? ""}${event.data.text}` }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "error") {
-          setStreamStatus(null);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    content: event.data.detail || t('chat.error_backtest'),
-                  }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "result") {
-          const run = event.data.run as BacktestRun;
-          const card = resultCardFromRun(run);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    kind: "strategy_result",
-                    content: undefined,
-                    result: card,
-                    actions: [
-                      {
-                        id: "add-to-collection",
-                        label: t('common.add_to_collection'),
-                        value: `/action:add-to-collection:${run.id}:${run.strategy_id ?? ""}:${run.symbols.join(",")}:${run.asset_class}`,
-                      },
-                      {
-                        id: "try-new",
-                        label: t('chat.try_new_strategy'),
-                        value: "/action:new-chat",
-                      },
-                    ],
-                  }
-                : m,
-            ),
-          );
-        }
-        if (event.event === "title") {
-          setHistoryItems((prev) =>
-            prev.map((item) =>
-              item.id === event.data.conversation_id
-                ? { ...item, title: event.data.title }
-                : item
-            )
-          );
-        }
-        if (event.event === "done") {
-          setStreamStatus(null);
-          refreshHistory();
-        }
-      });
+      await streamToConversation(conversationId);
     } catch (err: unknown) {
+      if (err instanceof ChatStreamError && err.status === 404 && !action?.type) {
+        try {
+          clearActiveConversationId();
+          const { conversation } = await createConversation(i18n.language);
+          persistActiveConversationId(conversation.id);
+          setConversationId(conversation.id);
+          await streamToConversation(conversation.id);
+          return;
+        } catch (retryErr) {
+          err = retryErr;
+        }
+      }
+      setInputActions([]);
       setStreamStatus(null);
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
@@ -536,6 +832,7 @@ export default function ChatInterface() {
     const assistantId = crypto.randomUUID();
 
     setMessages((prev) => {
+      shouldAutoScrollRef.current = true;
       const base = prev.map((m) => ({ ...m, actions: undefined }));
       if (isSkip) {
         return [...base, { id: assistantId, role: "ai", kind: "text", content: "" }];
@@ -563,7 +860,7 @@ export default function ChatInterface() {
               m.id === assistantId
                 ? {
                     ...m,
-                    content: event.data.detail || t('chat.error_backtest'),
+                    content: t('chat.error_backtest'),
                   }
                 : m,
             ),
@@ -583,6 +880,13 @@ export default function ChatInterface() {
           completed: false,
         },
       });
+
+      const prompts = await getStarterPrompts().catch(() => []);
+      setStarterActions(prompts.map((p, i) => ({
+        id: `starter-${i}`,
+        label: p,
+        value: p,
+      })));
     } catch {
       setStreamStatus(null);
       setMessages((prev) =>
@@ -613,18 +917,32 @@ export default function ChatInterface() {
     }
   };
 
-  const handleAction = (value: string) => {
+  const handleAction = (action: ChatActionOption) => {
+    const value = action.value ?? "";
+    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
+      if (action.payload) {
+        setCollectionPickerTarget({
+          runId: String(action.payload.run_id ?? ""),
+          strategyId: action.payload.strategy_id == null ? null : String(action.payload.strategy_id),
+          strategyName: String(action.payload.strategy_name ?? "My strategy"),
+          symbols: Array.isArray(action.payload.symbols) ? action.payload.symbols.map(String) : [],
+          template: String(action.payload.template ?? ""),
+          assetClass: (action.payload.asset_class === "crypto" ? "crypto" : "equity"),
+        });
+        return;
+      }
+    }
     if (value === "/action:new-chat") {
       void startNewChat();
       return;
     }
-    if (value.startsWith("/action:add-to-collection:")) {
+    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
       // Format: /action:add-to-collection:<runId>:<strategyId>:<symbols>:<assetClass>
       const parts = value.split(":");
       const runId = parts[2];
       const strategyId = parts[3] || null;
       const symbols = (parts[4] ?? "").split(",").filter(Boolean);
-      const assetClass = (parts[5] ?? "equity") as "equity" | "crypto";
+      const assetClass = (parts[5] ?? "equity") as AssetClass;
       // Find the result card title from messages for strategy name
       const resultMsg = messages.find(
         (m) => m.kind === "strategy_result" && m.result,
@@ -640,7 +958,8 @@ export default function ChatInterface() {
       });
       return;
     }
-    void handleSend(value);
+    setInputActions(consumeInputAction(action, inputActions));
+    void handleSend(action.label || value, action.type ? action : undefined);
   };
 
   // ── Chat options helpers ───────────────────────────────────────────────────
@@ -788,20 +1107,22 @@ export default function ChatInterface() {
             </span>
           </button>
 
-          <button
-            onClick={() => {
-              setCurrentView("collections");
-              setIsSidebarOpen(false);
-            }}
-            className={`group mb-6 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${ currentView === "collections" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
-          >
-            <div className="flex h-11 w-11 items-center justify-center">
-              <Layers className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
-            </div>
-            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-              {t('common.collections')}
-            </span>
-          </button>
+          {collectionsEnabled && (
+            <button
+              onClick={() => {
+                setCurrentView("collections");
+                setIsSidebarOpen(false);
+              }}
+              className={`group mb-6 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${ currentView === "collections" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
+            >
+              <div className="flex h-11 w-11 items-center justify-center">
+                <Layers className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+              </div>
+              <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
+                {t('common.collections')}
+              </span>
+            </button>
+          )}
 
           {/* History Accordion */}
           <div className="mb-2">
@@ -1013,7 +1334,7 @@ export default function ChatInterface() {
           <div className="w-11 md:w-32" />
 
           {/* Title (Always Centered relative to Content) */}
-          <h1 className="pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
+          <h1 className="font-display pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
             {currentView === "chat" && (messages.length > 0 ? t('common.conversation', 'Conversation') : t('chat.new_chat'))}
             {currentView === "strategies" && t('common.strategies')}
             {currentView === "collections" && t('common.collections')}
@@ -1044,14 +1365,16 @@ export default function ChatInterface() {
                           <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
                           {t('chat.new_chat')}
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleAddToCollection}
-                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                        >
-                          <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                          {t('common.add_to_collection')}
-                        </button>
+                        {collectionsEnabled && (
+                          <button
+                            type="button"
+                            onClick={handleAddToCollection}
+                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                          >
+                            <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                            {t('common.add_to_collection')}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
@@ -1100,17 +1423,7 @@ export default function ChatInterface() {
                               key={item.id}
                               type="button"
                               onClick={() => {
-                                setConversationId(item.id);
-                                getConversationMessages(item.id).then(({ items }) => {
-                                  setMessages(
-                                    items.reverse().map((m) => ({
-                                      id: m.id,
-                                      role: m.role === "user" ? "user" : "ai",
-                                      content: m.content,
-                                      kind: m.content.includes("result") ? "strategy_result" : "text",
-                                    }))
-                                  );
-                                });
+                                void loadConversation(item.id);
                                 closeChatOptions();
                               }}
                               className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
@@ -1144,7 +1457,7 @@ export default function ChatInterface() {
 
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-start px-4 pt-[35vh]">
-                <h1 className="mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
+                <h1 className="font-display mb-8 text-[40px] font-medium tracking-tight text-black dark:text-white">
                   argus
                 </h1>
 
@@ -1246,8 +1559,14 @@ export default function ChatInterface() {
                 </div>
             ) : (
               <>
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_bottom,black_48%,transparent_100%)] dark:bg-[#141517]/80" />
+
                 {/* Messages */}
-                <div className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]">
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={updateScrollPositionState}
+                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]"
+                >
                   <div className="space-y-8">
                     {messages.map((msg) => (
                       <ChatMessage
@@ -1277,6 +1596,32 @@ export default function ChatInterface() {
                 <div className="pointer-events-none absolute bottom-0 inset-x-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
                 <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 px-4">
                   <div className="pointer-events-auto mx-auto max-w-3xl rounded-full">
+                    {showJumpToLatest && (
+                      <div className="mb-3 flex justify-center">
+                        <button
+                          type="button"
+                          aria-label="Jump to latest"
+                          onClick={() => scrollToLatest("smooth")}
+                          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/90 text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                    {visibleInputActions(inputActions).length > 0 && !streamStatus && (
+                      <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {visibleInputActions(inputActions).map((action) => (
+                          <button
+                            key={action.id ?? action.type ?? action.label}
+                            type="button"
+                            onClick={() => handleAction(action)}
+                            className="min-h-11 rounded-full border border-black/10 bg-white/90 px-4 py-2 text-[14px] font-medium tracking-tight text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white dark:hover:bg-white/6"
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <ChatInput onSend={handleSend} />
                   </div>
                 </div>
@@ -1295,7 +1640,7 @@ export default function ChatInterface() {
             onTriggerPrompt={handleTriggerPrompt}
           />
         )}
-        {currentView === "collections" && (
+        {collectionsEnabled && currentView === "collections" && (
           <CollectionsView
             onMenuClick={() => setIsSidebarOpen((o) => !o)}
             onAddClick={() => handleTriggerPrompt('collection')}
@@ -1320,7 +1665,7 @@ export default function ChatInterface() {
       </section>
 
       {/* ── Collection picker sheet ── */}
-      {collectionPickerTarget && (
+      {collectionsEnabled && collectionPickerTarget && (
         <CollectionPicker
           strategyId={collectionPickerTarget.strategyId}
           strategyFallback={{

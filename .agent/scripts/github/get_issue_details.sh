@@ -3,8 +3,9 @@
 # Script: get_issue_details.sh
 # Purpose: Fetch and format GitHub Issue details for agent implementation.
 #
-# Usage: & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUMBER>
-# Example: & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/get_issue_details.sh 181
+# Usage (macOS/Linux): bash ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUMBER>
+# Usage (Windows):     & "C:\Program Files\Git\bin\bash.exe" ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUMBER>
+# Example: bash ./.agent/scripts/github/get_issue_details.sh 181
 #
 # Prerequisites:
 #   1. GitHub CLI (`gh`) must be installed and authenticated (`gh auth login`).
@@ -13,7 +14,7 @@
 
 if [ -z "$1" ]; then
     echo "❌ Error: No issue number provided."
-    echo "Usage: & \"C:\\Program Files\\Git\\bin\\bash.exe\" ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUMBER>"
+    echo "Usage: bash ./.agent/scripts/github/get_issue_details.sh <ISSUE_NUMBER>"
     exit 1
 fi
 

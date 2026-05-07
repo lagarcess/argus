@@ -3,16 +3,17 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
 Theme = Literal["dark", "light", "system"]
-AssetClass = Literal["equity", "crypto"]
+AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 StrategyTemplate = Literal[
+    "buy_and_hold",
     "buy_the_dip",
     "rsi_mean_reversion",
     "moving_average_crossover",
@@ -108,6 +109,7 @@ class Message(BaseModel):
     role: MessageRole
     content: str
     created_at: datetime
+    metadata: dict[str, Any] | None = None
 
 
 class PaginatedMessages(BaseModel):
@@ -269,10 +271,64 @@ class PaginatedSearch(BaseModel):
     next_cursor: str | None = None
 
 
+ChatActionType = Literal[
+    "run_backtest",
+    "change_dates",
+    "change_asset",
+    "adjust_assumptions",
+    "cancel_confirmation",
+    "show_breakdown",
+    "refine_strategy",
+    "save_strategy",
+]
+
+
+class ChatActionPayload(BaseModel):
+    type: ChatActionType
+    label: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    presentation: Literal["confirmation", "result"] | None = None
+
+
+class ChatMentionPayload(BaseModel):
+    id: str
+    type: Literal["asset", "indicator"]
+    label: str
+    symbol: str | None = None
+    description: str | None = None
+    insert_text: str
+    support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
+
+
 class ChatStreamRequest(BaseModel):
     conversation_id: str
-    message: str
+    message: str | None = None
+    action: ChatActionPayload | None = None
+    mentions: list[ChatMentionPayload] = Field(default_factory=list)
     language: Language | None = None
+
+    @model_validator(mode="after")
+    def require_message_or_action(self) -> "ChatStreamRequest":
+        if self.action is not None:
+            return self
+        if self.message is not None and self.message.strip():
+            return self
+        raise ValueError("message_or_action_required")
+
+
+class DiscoveryItem(BaseModel):
+    id: str
+    type: Literal["asset", "indicator"]
+    label: str
+    symbol: str | None = None
+    description: str | None = None
+    insert_text: str
+    provider: str
+    support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
+
+
+class DiscoveryResponse(BaseModel):
+    items: list[DiscoveryItem]
 
 
 class FeedbackRequest(BaseModel):
@@ -295,3 +351,7 @@ class LoginRequest(BaseModel):
 
 class SuccessResponse(BaseModel):
     success: bool
+
+
+class StarterPromptsResponse(BaseModel):
+    prompts: list[str]

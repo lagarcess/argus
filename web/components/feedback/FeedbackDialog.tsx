@@ -10,7 +10,7 @@ interface FeedbackDialogProps {
   onClose: () => void;
   type: "bug" | "feature" | "general" | "rating";
   rating?: "positive" | "negative";
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 export default function FeedbackDialog({ isOpen, onClose, type, rating, context }: FeedbackDialogProps) {

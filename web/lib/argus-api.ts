@@ -1,8 +1,14 @@
 import { getSupabaseClient } from "./supabase-client";
+import type {
+  ChatActionOption,
+  ChatMention,
+  StrategyConfirmationPayload,
+} from "@/components/chat/types";
+import { normalizeEnabledLanguage } from "./language-features";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
-export type AssetClass = "equity" | "crypto";
+export type AssetClass = "equity" | "crypto" | "currency_pair";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
@@ -26,8 +32,24 @@ export type ApiMetricRow = {
   value: string;
 };
 
+export type ResultChartPayload = {
+  kind: "portfolio_equity";
+  series: Array<{ time: string; value: number }>;
+  markers?: Array<{
+    time: string;
+    type: "entry" | "exit";
+    label: string;
+    symbols?: string[];
+  }>;
+  currency?: string;
+  base_value?: number | null;
+  attribution?: string;
+};
+
 export type ConversationResultCard = {
   title: string;
+  symbols?: string[];
+  strategy_label?: string;
   date_range: {
     start: string;
     end: string;
@@ -37,7 +59,8 @@ export type ConversationResultCard = {
   rows: ApiMetricRow[];
   benchmark_note?: string;
   assumptions: string[];
-  actions: Array<{ type: string; label: string }>;
+  actions: ChatActionOption[];
+  chart?: ResultChartPayload | null;
 };
 
 // ─── Domain objects ──────────────────────────────────────────────────────────
@@ -57,6 +80,8 @@ export type BacktestRun = {
   };
   config_snapshot: Record<string, unknown>;
   conversation_result_card: ConversationResultCard;
+  chart?: ResultChartPayload | null;
+  trades?: Record<string, unknown>[] | null;
   created_at: string;
 };
 
@@ -94,6 +119,7 @@ export type ApiMessage = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type StrategySurfaceMetricRow = {
@@ -163,9 +189,54 @@ export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
+  | { event: "stage_start"; data: { stage: string } }
+  | { event: "stage_outcome"; data: { outcome: string } }
+  | { event: "final"; data: ChatFinalPayload }
+  | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
-  | { event: "error"; data: { detail: string } }
-  | { event: "done"; data: { message_id: string } };
+  | { event: "error"; data: { code?: string; detail: string } }
+  | { event: "done"; data: { message_id: string | null } };
+
+export type ChatFinalPayload = {
+  stage_outcome?: string;
+  assistant_response?: string | null;
+  assistant_prompt?: string | null;
+  confirmation?: StrategyConfirmationPayload | null;
+  confirmation_payload?: Record<string, unknown> | null;
+  run?: BacktestRun | null;
+  next_actions?: string[];
+  message_id?: string | null;
+};
+
+export type ChatActionRequest = {
+  type: NonNullable<ChatActionOption["type"]>;
+  label?: string;
+  payload?: Record<string, unknown>;
+  presentation?: "confirmation" | "result";
+};
+
+export class ChatStreamError extends Error {
+  status: number;
+  code: string;
+
+  constructor(message: string, status: number, code = "unknown") {
+    super(message);
+    this.name = "ChatStreamError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export type DiscoveryItem = {
+  id: string;
+  type: "asset" | "indicator";
+  label: string;
+  symbol?: string | null;
+  description?: string | null;
+  insert_text: string;
+  provider: string;
+  support_status: "supported" | "draft_only" | "unavailable";
+};
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -183,25 +254,32 @@ export type ApiLanguage = "en" | "es-419";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-export function resultCardFromRun(run: BacktestRun) {
-  const card = run.conversation_result_card;
+export function resultCardFromConversationCard(
+  card: ConversationResultCard,
+  run?: Pick<BacktestRun, "id" | "strategy_id">,
+) {
   return {
     strategyName: card.title,
+    strategyLabel: card.strategy_label,
+    symbols: card.symbols,
     period: card.date_range.display,
     statusLabel: card.status_label,
     metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
     benchmarkNote: card.benchmark_note,
     assumptions: card.assumptions,
-    runId: run.id,
-    strategyId: run.strategy_id ?? null,
+    runId: run?.id,
+    strategyId: run?.strategy_id ?? null,
+    actions: card.actions,
+    chart: card.chart ?? null,
   };
 }
 
+export function resultCardFromRun(run: BacktestRun) {
+  return resultCardFromConversationCard(run.conversation_result_card, run);
+}
+
 export function normalizeApiLanguage(language?: string | null): ApiLanguage {
-  if (language?.toLowerCase().startsWith("es")) {
-    return "es-419";
-  }
-  return "en";
+  return normalizeEnabledLanguage(language);
 }
 
 /**
@@ -296,6 +374,10 @@ export async function patchMe(patch: ProfilePatch) {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+}
+
+export async function getStarterPrompts() {
+  return apiFetch<string[]>("/onboarding/starter-prompts");
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -497,9 +579,10 @@ export async function runBacktest(payload: {
 
 export async function streamChatMessage(
   conversationId: string,
-  message: string,
+  input: string | ChatActionRequest,
   language: string | null | undefined,
   onEvent: (event: ChatStreamEvent) => void,
+  mentions: ChatMention[] = [],
 ) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   const authHeaders: Record<string, string> = {};
@@ -524,12 +607,26 @@ export async function streamChatMessage(
     },
     body: JSON.stringify({
       conversation_id: conversationId,
-      message,
+      ...(typeof input === "string" ? { message: input } : { action: input }),
+      ...(typeof input === "string" && mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
     }),
   });
   if (!response.ok || !response.body) {
-    throw new Error("Chat stream failed");
+    const body = await response.json().catch(() => ({}));
+    const detail = (body as { detail?: unknown }).detail;
+    const code = (body as { code?: unknown }).code;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : typeof detail === "object" && detail !== null && "title" in detail
+          ? String((detail as { title?: unknown }).title ?? "Chat stream failed")
+          : "Chat stream failed";
+    throw new ChatStreamError(
+      message,
+      response.status,
+      typeof code === "string" ? code : "unknown",
+    );
   }
 
   const reader = response.body.getReader();
@@ -543,19 +640,80 @@ export async function streamChatMessage(
     const parts = buffer.split("\n\n");
     buffer = parts.pop() ?? "";
     for (const part of parts) {
-      const eventLine = part
-        .split("\n")
-        .find((line) => line.startsWith("event: "));
-      const dataLine = part
-        .split("\n")
-        .find((line) => line.startsWith("data: "));
-      if (!eventLine || !dataLine) continue;
-      onEvent({
-        event: eventLine.replace("event: ", "") as ChatStreamEvent["event"],
-        data: JSON.parse(dataLine.replace("data: ", "")),
-      } as ChatStreamEvent);
+      const parsed = parseChatStreamFrame(part);
+      if (parsed) onEvent(parsed);
     }
   }
+}
+
+export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
+  const lines = part.split("\n");
+  const eventLine = lines.find((line) => line.startsWith("event: "));
+  const dataLine = lines.find((line) => line.startsWith("data: "));
+  if (!dataLine) return null;
+
+  const raw = dataLine.replace("data: ", "").trim();
+  if (raw === "[DONE]") {
+    return { event: "done", data: { message_id: null } };
+  }
+
+  const payload = JSON.parse(raw) as Record<string, unknown>;
+  if (eventLine) {
+    return {
+      event: eventLine.replace("event: ", "") as ChatStreamEvent["event"],
+      data: payload,
+    } as ChatStreamEvent;
+  }
+
+  const type = payload.type;
+  if (type === "stage_start") {
+    return { event: "stage_start", data: { stage: String(payload.stage ?? "") } };
+  }
+  if (type === "stage_outcome") {
+    return {
+      event: "stage_outcome",
+      data: { outcome: String(payload.outcome ?? "") },
+    };
+  }
+  if (type === "token") {
+    return {
+      event: "token",
+      data: { text: String(payload.content ?? payload.text ?? "") },
+    };
+  }
+  if (type === "final") {
+    return { event: "final", data: (payload.payload ?? {}) as ChatFinalPayload };
+  }
+  if (type === "title") {
+    return {
+      event: "title",
+      data: {
+        conversation_id: String(payload.conversation_id ?? ""),
+        title: String(payload.title ?? ""),
+      },
+    };
+  }
+  if (type === "error") {
+    return {
+      event: "error",
+      data: {
+        code: typeof payload.code === "string" ? payload.code : undefined,
+        detail: String(payload.message ?? payload.detail ?? "Chat stream failed"),
+      },
+    };
+  }
+  return null;
+}
+
+export async function searchDiscovery(
+  kind: "assets" | "indicators",
+  query: string,
+  limit = 8,
+) {
+  const searchParams = new URLSearchParams({ q: query, limit: String(limit) });
+  return apiFetch<{ items: DiscoveryItem[] }>(
+    `/discovery/${kind}?${searchParams.toString()}`,
+  );
 }
 
 export async function postFeedback(payload: {

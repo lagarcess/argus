@@ -113,6 +113,7 @@ Every API response should include rate-limit headers where applicable:
 ## Asset Classes (Alpha Enum)
 - `equity`
 - `crypto`
+- `currency_pair`
 
 ## Backtest Status (Alpha Enum)
 - `queued`
@@ -270,7 +271,8 @@ Application-facing user object.
   "conversation_id": "uuid",
   "role": "user",
   "content": "What if I bought Tesla dips?",
-  "created_at": "timestamp"
+  "created_at": "timestamp",
+  "metadata": {}
 }
 ```
 
@@ -279,6 +281,13 @@ Application-facing user object.
 - `assistant`
 - `system`
 - `tool`
+
+Assistant `metadata` may include structured continuity artifacts such as
+`confirmation_card`, `confirmation_payload`, `result_card`, `result_run_id`,
+`latest_run_id`, `result_strategy_id`, and `result_conversation_id`. Clients use
+these fields to hydrate cards and actions after reload. Runtime execution still
+validates against the LangGraph checkpoint first, and result actions that mutate
+state must reference a canonical run id.
 
 ## Strategy
 
@@ -361,7 +370,7 @@ A saved executable idea backed by a supported template.
 - One strategy may apply to one symbol or multiple symbols.
 - Maximum 5 symbols.
 - All symbols must be from the same asset class.
-- Mixed equity + crypto backtests return **422 Unprocessable Content**.
+- Mixed equity + crypto + currency-pair backtests return **422 Unprocessable Content**.
 - Cross-asset strategies are deferred.
 - Strategy surface metric preferences apply only to strategy surface displays.
 - Symbol-level strategy surface rows should be derived from the most recent or selected run, represented by `as_of_run_id`.
@@ -466,18 +475,72 @@ Immutable simulation result.
     ],
     "actions": [
       {
-        "type": "add_to_collection",
-        "label": "Add strategy to collection"
+        "type": "show_breakdown",
+        "label": "Show a breakdown",
+        "presentation": "result",
+        "payload": {
+          "run_id": "uuid",
+          "strategy_id": null,
+          "conversation_id": "uuid"
+        }
       },
       {
-        "type": "try_new_strategy",
-        "label": "Try a new strategy"
+        "type": "save_strategy",
+        "label": "Save strategy",
+        "presentation": "result",
+        "payload": {
+          "run_id": "uuid",
+          "strategy_id": null,
+          "conversation_id": "uuid"
+        }
+      },
+      {
+        "type": "refine_strategy",
+        "label": "Refine strategy",
+        "presentation": "result",
+        "payload": {
+          "run_id": "uuid",
+          "strategy_id": null,
+          "conversation_id": "uuid"
+        }
       }
-    ]
+    ],
+    "chart": {
+      "kind": "portfolio_equity",
+      "series": [
+        { "time": "2022-01-03", "value": 10000.0 },
+        { "time": "2022-01-04", "value": 10042.5 }
+      ],
+      "markers": [
+        {
+          "time": "2022-01-03",
+          "type": "entry",
+          "label": "Buy NVDA, BYD",
+          "symbols": ["NVDA", "BYD"]
+        }
+      ],
+      "currency": "USD",
+      "base_value": 10000.0,
+      "attribution": "TradingView Lightweight Charts"
+    }
   },
+  "trades": [
+    {
+      "time": "2022-01-03",
+      "type": "entry",
+      "label": "Buy NVDA, BYD",
+      "symbols": ["NVDA", "BYD"]
+    }
+  ],
   "created_at": "timestamp"
 }
 ```
+
+**Result chart contract:**
+- `chart.kind` is currently `portfolio_equity`.
+- `chart.series` is the aggregate portfolio equity curve. Multi-symbol runs must use the equal-weight portfolio curve, not a symbol comparison chart.
+- `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
+- The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 
 ---
 
@@ -525,6 +588,7 @@ Metrics are grouped into categories.
 ## Benchmark Defaults
 - **equity** -> `SPY`
 - **crypto** -> `BTC`
+- **currency_pair** -> the tested pair itself, for example `EURUSD`
 
 **Notes on units:**
 - `_pct` means percent value (e.g., `18.4` = 18.4%).
@@ -570,7 +634,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - `side`: "long"
 - `starting_capital`: 10000
 - `allocation_method`: "equal_weight"
-- `benchmark_symbol`: `SPY` (equity), `BTC` (crypto)
+- `benchmark_symbol`: `SPY` (equity), `BTC` (crypto), tested pair (`currency_pair`)
 - `parameters`: Template-specific defaults
 
 ## Constraints & Validation (Alpha MVP)
@@ -592,6 +656,12 @@ The canonical backtest config used by the engine for execution and reproducibili
 - **Maximum:** 5 symbols
 - **Rules:** Same asset class required. Cross-asset multi-symbol backtests are deferred.
 - *Return 422 for violations.*
+
+### Provider Availability
+- **Equity:** Alpaca is the primary availability and OHLC provider.
+- **Crypto:** Alpaca is primary; Kraken public OHLC may be used as fallback when available.
+- **Currency pairs:** Kraken public market data is the provider. The UI may label this asset class as "Currency" or "Forex".
+- **Kraken OHLC limit:** Kraken returns only the latest 720 candles for a requested interval. Requests outside that provider window must return a natural recovery response asking the user to shorten the date range or use a wider timeframe.
 
 ### Timeframe & Lookback
 - **Supported:** "1h", "2h", "4h", "6h", "12h", "1D"
@@ -909,9 +979,22 @@ Soft delete conversation.
 {
   "conversation_id": "uuid",
   "message": "Quiero probar comprar cuando baja Tesla",
+  "mentions": [
+    {
+      "id": "asset:BTC",
+      "type": "asset",
+      "label": "Bitcoin",
+      "symbol": "BTC",
+      "description": "Bitcoin",
+      "insert_text": "BTC",
+      "support_status": "supported"
+    }
+  ],
   "language": "es"
 }
 ```
+
+`mentions` is optional composer provenance. It records user-selected asset or indicator hints from the input affordance, but it does not rewrite `message`, bypass LLM interpretation, or create hidden execution state. Backend resolution still validates extracted candidates after interpretation.
 
 **Required Header:**
 - `Idempotency-Key`: `uuid` (Highly recommended to prevent double-submits)
@@ -931,24 +1014,78 @@ AI response uses the resolved language unless the user clearly asks otherwise in
 If the stream disconnects, the client should reconnect by re-fetching the conversation messages (`GET /conversations/{id}/messages`).
 - No token-level replay is guaranteed in Alpha.
 - No `last_message_id` reconnect contract is enforced yet.
+- Hydrated confirmation actions are valid only when the runtime checkpoint still has pending confirmation state or structured metadata can safely reconstruct the pending snapshot.
+- Hydrated result actions that save or explain a run require canonical run and conversation context.
 
 **Recommended Header:**
 - `X-Accel-Buffering: no` (To prevent proxy buffering)
 
 **Stream Events:**
 
-- **event: token**
-  - `data`: partial ai text
-- **event: title**
-  - `data`: `{"conversation_id":"uuid","title":"Tesla Dip Strategy"}`
-- **event: status**
-  - `data`: `{"status":"extracting_strategy"}`
-- **event: status**
-  - `data`: `{"status":"running_backtest"}`
-- **event: result**
-  - `data`: `{"run": {...}}`
-- **event: done**
-  - `data`: `{"message_id":"uuid"}`
+All events follow the SSE format: `data: {json}\n\n`.
+
+Events are emitted in this order per turn:
+
+**1. `stage_start`** — emitted when each pipeline stage begins
+```json
+{ "type": "stage_start", "stage": "interpret" }
+{ "type": "stage_start", "stage": "clarify" }
+{ "type": "stage_start", "stage": "confirm" }
+{ "type": "stage_start", "stage": "execute" }
+{ "type": "stage_start", "stage": "explain" }
+{ "type": "stage_start", "stage": "next_step" }
+```
+
+The frontend maps `stage` values to human-readable progress labels:
+- `interpret` → "Understanding your idea..."
+- `clarify` → "I have a question..."
+- `confirm` → "Here's what I found..."
+- `execute` → "Running backtest..."
+- `explain` → "Reviewing results..."
+- `next_step` → "What's next..."
+
+**2. `token`** — streaming LLM response text, one chunk at a time
+```json
+{ "type": "token", "content": "Based on your idea" }
+{ "type": "token", "content": " about Tesla..." }
+```
+Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `next_step` nodes.
+
+**3. `stage_outcome`** — emitted after `interpret` completes, so the frontend can render the correct UI element before the full graph finishes
+```json
+{ "type": "stage_outcome", "outcome": "ready_for_confirmation" }
+{ "type": "stage_outcome", "outcome": "needs_clarification" }
+{ "type": "stage_outcome", "outcome": "approved_for_execution" }
+{ "type": "stage_outcome", "outcome": "ready_to_respond" }
+```
+
+**4. `title`** — AI-generated conversation title (fires once, after first meaningful turn)
+```json
+{ "type": "title", "conversation_id": "uuid", "title": "Tesla Dip Strategy" }
+```
+
+**5. `final`** — last event, carries the complete response payload
+```json
+{
+  "type": "final",
+  "payload": {
+    "stage_outcome": "execution_succeeded",
+    "assistant_response": "The strategy returned +23%...",
+    "confirmation_payload": null,
+    "run": { },
+    "next_actions": ["save_strategy", "refine_strategy", "show_breakdown"],
+    "message_id": "uuid"
+  }
+}
+```
+
+**6. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
+```
+data: [DONE]
+```
+
+> [!IMPORTANT]
+> Frontend must never use local timers to fake progress states. Progress labels must be driven by `stage_start` events from the backend. This is the binding contract between DESIGN.md Section 11 and the agent runtime pipeline.
 
 *Note: Server may include `retry: 3000` in the stream, but clients should implement their own backoff/reconnect logic.*
 
@@ -1024,6 +1161,8 @@ Soft delete.
 ---
 
 # 14. Collections
+
+Launch flag: collection endpoints remain part of the API contract and the tables remain in Supabase, but dedicated collection UI should be hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`. Strategy saving from chat must use result/run state and should not depend on collections being visible.
 
 ## `GET /collections`
 
@@ -1216,7 +1355,7 @@ Mixed recent activity feed.
 - `limit`
 - `cursor`
 - `type=all|chat|strategy|collection|run`
-- `asset_class=equity|crypto` (Optional filter)
+- `asset_class=equity|crypto|currency_pair` (Optional filter)
 
 **Response:**
 ```json
@@ -1360,7 +1499,7 @@ Not in current contract:
 - team accounts
 - advanced quota systems
 - cross-asset strategy runs
-- custom benchmarks (Alpha uses SPY/BTC defaults)
+- custom benchmarks (Alpha uses SPY/BTC defaults, or the tested pair for currency pairs)
 
 ---
 

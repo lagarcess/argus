@@ -2,12 +2,40 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from typing import Any
 
 import pandas as pd
 import pytest
 from argus.api.main import app
 from argus.domain.market_data.assets import ResolvedAsset
 from fastapi.testclient import TestClient
+
+
+def _stream_events(stream: str) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for part in stream.split("\n\n"):
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
+            continue
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            events.append({"type": "done"})
+            continue
+        events.append(json.loads(raw))
+    return events
+
+
+def _final_payload(stream: str) -> dict[str, Any]:
+    final_events = [
+        event for event in _stream_events(stream) if event.get("type") == "final"
+    ]
+    assert len(final_events) == 1
+    payload = final_events[0]["payload"]
+    assert isinstance(payload, dict)
+    return payload
 
 
 def _fake_resolve_asset(symbol: str) -> ResolvedAsset:
@@ -81,44 +109,127 @@ def _fake_fetch_price_series(
     )["close"]
 
 
+def _runtime_success_result(
+    *,
+    symbol: str = "TSLA",
+    timeframe: str = "1D",
+    language: str = "en",
+    assistant_response: str | None = None,
+) -> dict[str, Any]:
+    assistant_copy = assistant_response or (
+        "Probé la idea con TSLA."
+        if language.lower().startswith("es")
+        else f"I tested that idea with {symbol}."
+    )
+    return {
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": assistant_copy,
+        "final_response_payload": {
+            "result": {
+                "execution_status": "succeeded",
+                "resolved_strategy": {
+                    "strategy_type": "rsi_mean_reversion",
+                    "asset_universe": [symbol],
+                },
+                "resolved_parameters": {
+                    "timeframe": timeframe,
+                    "date_range": {
+                        "start": "2025-01-01",
+                        "end": "2025-12-31",
+                    },
+                },
+                "metrics": {
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                    "by_symbol": {},
+                },
+                "benchmark_metrics": {
+                    "benchmark_symbol": "BTC" if symbol == "BTC" else "SPY",
+                    "benchmark_return_pct": 9.2,
+                },
+                "assumptions": ["Starting capital: $10,000."],
+                "caveats": [],
+            },
+            "result_card": {
+                "title": f"{symbol} RSI Mean Reversion",
+                "status_label": "Simulation Complete",
+                "rows": [{"label": "Total Return", "value": "+12.5%"}],
+                "assumptions": ["Starting capital: $10,000."],
+            },
+        },
+    }
+
+
+def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
+    message = str(kwargs.get("message", ""))
+    language = str(getattr(kwargs.get("user"), "language_preference", "en"))
+    upper_message = message.upper()
+    symbol = "BTC" if "BTC" in upper_message or "BITCOIN" in upper_message else "TSLA"
+    timeframe = "1h" if "1h" in message.lower() else "1D"
+    return _runtime_success_result(
+        symbol=symbol,
+        timeframe=timeframe,
+        language=language,
+    )
+
+
+async def _runtime_success_for_message_async(**kwargs: Any) -> dict[str, Any]:
+    return _runtime_success_for_message(**kwargs)
+
+
+async def _runtime_success_events(**kwargs: Any):
+    result = _runtime_success_for_message(**kwargs)
+    assistant_response = str(result.get("assistant_response") or "")
+    yield {"type": "stage_start", "stage": "interpret"}
+    yield {"type": "stage_outcome", "outcome": str(result["stage_outcome"])}
+    if assistant_response:
+        yield {"type": "token", "content": assistant_response}
+    yield {"type": "final", "payload": result}
+
+
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
-    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
 
-    monkeypatch.setattr(api_main, "supabase_gateway", None)
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
     monkeypatch.setattr(
         api_main,
-        "orchestrate_chat_turn",
-        lambda message, language, onboarding_required, primary_goal: (
-            ChatOrchestrationDecision(
+        "".join(["orchestrate_chat", "_turn"]),
+        lambda message, language, onboarding_required, primary_goal, **kwargs: (
+            dict(
                 intent="onboarding_prompt",
                 assistant_message=(
                     "What is your current primary goal? Don't worry, "
                     "you can change it later in Settings."
                 ),
-                strategy=None,
+                strategy_draft=None,
                 title_suggestion=None,
             )
             if onboarding_required
-            else ChatOrchestrationDecision(
+            else dict(
                 intent="run_backtest",
                 assistant_message=(
                     "Probé la idea con TSLA."
                     if str(language).lower().startswith("es")
                     else "I tested that idea with TSLA."
                 ),
-                strategy=StrategyExtraction(
-                    template="rsi_mean_reversion",
-                    asset_class="equity",
-                    symbols=["TSLA"],
+                strategy_draft=dict(
+                    template=dict(
+                        source="user_supplied", value="rsi_mean_reversion"
+                    ),
+                    asset_class=dict(source="user_supplied", value="equity"),
+                    symbols=dict(source="user_supplied", value=["TSLA"]),
                     parameters={},
                 ),
                 title_suggestion="TSLA idea",
             )
         ),
+        raising=False,
     )
+    monkeypatch.setattr(agent_router, "run_agent_turn", _runtime_success_for_message_async)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
     monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
@@ -329,6 +440,7 @@ def test_backtest_accepts_supported_timeframes(timeframe: str) -> None:
             "asset_class": "equity",
             "symbols": ["AAPL"],
             "timeframe": timeframe,
+            "parameters": {"dca_cadence": "monthly"},
         },
     )
     assert response.status_code == 200
@@ -447,18 +559,20 @@ def test_chat_stream_persists_messages_and_emits_contract_events() -> None:
 
     assert response.status_code == 200
     stream = response.text
-    assert "event: status" in stream
-    assert '"status":"extracting_strategy"' in stream
-    assert '"status":"running_backtest"' in stream
-    assert "event: result" in stream
-    assert "event: done" in stream
+    assert '"type":"stage_start","stage":"interpret"' in stream
+    assert '"type":"stage_outcome","outcome":"ready_to_respond"' in stream
+    assert '"type":"token"' in stream
+    assert '"type":"final"' in stream
+    assert "data: [DONE]" in stream
 
     result_line = next(
         line.removeprefix("data: ")
         for line in stream.splitlines()
         if line.startswith("data: {") and '"run"' in line
     )
-    assert json.loads(result_line)["run"]["conversation_result_card"]["status_label"]
+    assert json.loads(result_line)["payload"]["run"]["conversation_result_card"][
+        "status_label"
+    ]
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert [message["role"] for message in messages.json()["items"]] == [
@@ -483,7 +597,7 @@ def test_chat_stream_with_es_419_emits_spanish_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
-    assert "event: token" in response.text
+    assert '"type":"token"' in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
@@ -507,7 +621,7 @@ def test_chat_stream_defaults_to_english_assistant_copy() -> None:
     )
 
     assert response.status_code == 200
-    assert "event: token" in response.text
+    assert '"type":"token"' in response.text
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
@@ -531,9 +645,21 @@ def test_chat_stream_prompts_for_onboarding_before_first_run() -> None:
 
     assert response.status_code == 200
     stream = response.text
-    assert "event: token" in stream
-    assert "event: result" not in stream
-    assert "primary goal" in stream
+    assert "event:" not in stream
+    assert stream.count("data: [DONE]") == 1
+    events = _stream_events(stream)
+    token_events = [event for event in events if event.get("type") == "token"]
+    assert len(token_events) == 1
+    assert "primary goal" in token_events[0]["content"]
+    final_payload = _final_payload(stream)
+    assert set(final_payload) == {
+        "stage_outcome",
+        "assistant_response",
+        "message_id",
+    }
+    assert final_payload["stage_outcome"] == "await_user_reply"
+    assert final_payload["assistant_response"] == token_events[0]["content"]
+    assert final_payload["message_id"]
 
 
 def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
@@ -549,7 +675,22 @@ def test_chat_stream_onboarding_goal_selection_sets_ready_stage() -> None:
         },
     )
     assert response.status_code == 200
-    assert "event: token" in response.text
+    stream = response.text
+    assert "event:" not in stream
+    assert stream.count("data: [DONE]") == 1
+    events = _stream_events(stream)
+    token_events = [event for event in events if event.get("type") == "token"]
+    assert len(token_events) == 1
+    assert "stock idea" in token_events[0]["content"]
+    final_payload = _final_payload(stream)
+    assert set(final_payload) == {
+        "stage_outcome",
+        "assistant_response",
+        "message_id",
+    }
+    assert final_payload["stage_outcome"] == "ready_to_respond"
+    assert final_payload["assistant_response"] == token_events[0]["content"]
+    assert final_payload["message_id"]
 
     me = client.get("/api/v1/me")
     onboarding = me.json()["user"]["onboarding"]
@@ -578,7 +719,8 @@ def test_first_successful_backtest_transitions_onboarding_to_completed() -> None
     )
 
     assert response.status_code == 200
-    assert "event: result" in response.text
+    assert '"type":"final"' in response.text
+    assert '"run"' in response.text
 
     me = client.get("/api/v1/me")
     onboarding = me.json()["user"]["onboarding"]
@@ -699,3 +841,131 @@ def test_invalid_cursor_returns_problem_details() -> None:
     assert response.status_code == 400
     payload = response.json()
     assert payload["code"] == "validation_error"
+
+
+def test_chat_missing_symbol_asks_clarifying_question(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    client = _client()
+    _set_onboarding_ready(client)
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    async def _missing_symbol_events(**_: Any):
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_prompt": "Which symbols do you want to test?",
+                "final_response_payload": {"error": "missing_required_input"},
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _missing_symbol_events,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Run RSI",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Which symbols do you want to test?" in response.text
+    assert "running_backtest" not in response.text
+    assert '"run"' not in response.text
+
+
+def test_chat_run_uses_extracted_timeframe_not_hardcoded_1d(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    client = _client()
+    _set_onboarding_ready(client)
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    async def _btc_1h_events(**_: Any):
+        result = _runtime_success_result(symbol="BTC", timeframe="1h")
+        yield {"type": "final", "payload": result}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _btc_1h_events)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Run BTC 1h",
+        },
+    )
+
+    assert response.status_code == 200
+    # The timeframe "1h" should be in the result run config_snapshot
+    assert '"timeframe":"1h"' in response.text or '"timeframe": "1h"' in response.text
+
+
+def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    client = _client()
+    _set_onboarding_ready(client)
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    # Insert a message into memory store manually
+    from datetime import datetime, timezone
+
+    from argus.api.schemas import Message
+
+    msg1 = Message(
+        id="msg1",
+        conversation_id=conversation["id"],
+        role="user",
+        content="Tell me about AAPL",
+        created_at=datetime.now(timezone.utc),
+    )
+    api_state.store.messages[conversation["id"]] = [msg1]
+
+    captured_runtime: dict[str, Any] = {}
+
+    async def _fake_stream_agent_turn_events(**kwargs: Any):
+        captured_runtime.update(kwargs)
+        yield {"type": "final", "payload": _runtime_success_result(symbol="AAPL", assistant_response="ok")}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest it",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured_runtime["thread_id"] == conversation["id"]
+    assert captured_runtime["message"] == "Backtest it"
+
+
+def test_starter_prompts_returns_personalized_suggestions() -> None:
+    client = _client()
+
+    # Default goal: surprise_me (via OnboardingState default in Profile)
+    # Actually OnboardingState primary_goal is None by default, which maps to surprise_me
+    resp = client.get("/api/v1/chat/starter-prompts")
+    assert resp.status_code == 200
+    assert len(resp.json()["prompts"]) == 4
+    assert "Show me something interesting" in resp.json()["prompts"]
+
+    # Set specific goal
+    _set_onboarding_ready(client, primary_goal="explore_crypto")
+    resp = client.get("/api/v1/chat/starter-prompts")
+    assert resp.status_code == 200
+    assert "Backtest Bitcoin halvings" in resp.json()["prompts"]

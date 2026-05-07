@@ -11,6 +11,10 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 
+from argus.domain.indicators import (
+    executable_indicator_spec,
+    normalize_indicator_parameters,
+)
 from argus.domain.market_data import fetch_ohlcv, fetch_price_series, resolve_asset
 
 try:  # noqa: SIM105
@@ -18,16 +22,11 @@ try:  # noqa: SIM105
 except Exception:  # pragma: no cover - accessor may already be available
     pass
 
-AssetClass = Literal["equity", "crypto"]
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
-ALLOWED_TEMPLATES = {
-    "buy_the_dip",
-    "rsi_mean_reversion",
-    "moving_average_crossover",
-    "dca_accumulation",
-    "momentum_breakout",
-    "trend_follow",
-}
+AssetClass = Literal["equity", "crypto", "currency_pair"]
+
+ALLOWED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys())
 
 ALLOWED_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
 
@@ -40,13 +39,29 @@ class SymbolAsset:
     asset_class: AssetClass
 
 
+@dataclass(frozen=True)
+class ExecutionEvent:
+    timestamp: pd.Timestamp
+    symbol: str
+    event_type: Literal[
+        "signal", "order_intent", "fill", "ignored_signal", "position_snapshot"
+    ]
+    side: Literal["buy", "sell"] | None = None
+    action: Literal["open", "add", "close", "hold", "ignore"] | None = None
+    reason: str | None = None
+
+
 def classify_symbol(symbol: str) -> SymbolAsset:
     resolved = resolve_asset(symbol)
     return SymbolAsset(symbol=resolved.canonical_symbol, asset_class=resolved.asset_class)
 
 
-def default_benchmark(asset_class: AssetClass) -> str:
-    return "SPY" if asset_class == "equity" else "BTC"
+def default_benchmark(asset_class: AssetClass, symbols: list[str] | None = None) -> str:
+    if asset_class == "equity":
+        return "SPY"
+    if asset_class == "currency_pair":
+        return symbols[0] if symbols else "EURUSD"
+    return "BTC"
 
 
 def _normalize_timeframe(timeframe: str | None) -> str:
@@ -72,7 +87,9 @@ def _normalize_timeframe(timeframe: str | None) -> str:
     return mapping[normalized]
 
 
-def _to_date(value: date | datetime) -> date:
+def _to_date(value: str | date | datetime) -> date:
+    if isinstance(value, str):
+        return date.fromisoformat(value)
     if isinstance(value, datetime):
         return value.date()
     return value
@@ -120,8 +137,20 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
     end_default = today - timedelta(days=1)
     end = _to_date(payload.get("end_date") or end_default)
     start = _to_date(payload.get("start_date") or (end - timedelta(days=365)))
-    asset_class = payload["asset_class"]
-    symbols = [classify_symbol(symbol).symbol for symbol in payload["symbols"]]
+    requested_asset_class = payload.get("asset_class")
+    classified = [classify_symbol(s) for s in payload["symbols"]]
+
+    actual_classes = {c.asset_class for c in classified}
+    if len(actual_classes) > 1:
+        raise ValueError("mixed_asset_not_supported")
+
+    inferred_class = next(iter(actual_classes)) if actual_classes else "equity"
+    asset_class = requested_asset_class or inferred_class
+
+    if asset_class != inferred_class:
+        raise ValueError("asset_class_conflict")
+
+    symbols = [c.symbol for c in classified]
     timeframe = _normalize_timeframe(payload.get("timeframe"))
 
     benchmark_input = payload.get("benchmark_symbol")
@@ -131,7 +160,7 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("invalid_benchmark_symbol")
         benchmark_symbol = benchmark_asset.symbol
     else:
-        benchmark_symbol = default_benchmark(asset_class)
+        benchmark_symbol = default_benchmark(asset_class, symbols)
 
     config = {
         "template": payload["template"],
@@ -150,6 +179,12 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
         config["_execution_realism"] = _normalize_execution_realism(
             payload.get("_execution_realism")
         )
+
+    # Task 3: Handle DCA cadence
+    if config["template"] == "dca_accumulation":
+        cadence = (payload.get("parameters") or {}).get("dca_cadence") or "weekly"
+        config["parameters"]["dca_cadence"] = cadence.lower()
+
     return config
 
 
@@ -179,8 +214,26 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
     if any(symbol in STABLECOINS for symbol in config["symbols"]):
         raise ValueError("stablecoin_not_supported")
 
-    if config.get("parameters"):
+    # Registry-driven parameter validation (Task 10)
+    params = dict(config.get("parameters") or {})
+    template_name = config["template"]
+    if template_name == "rsi_mean_reversion":
+        params = normalize_indicator_parameters(
+            str(params.get("indicator") or "rsi"),
+            params,
+        )
+        config["parameters"] = params
+    capability = STRATEGY_CAPABILITIES[template_name]
+
+    allowed_params = set(capability.parameters.keys())
+    unknown = set(params.keys()) - allowed_params
+    if unknown:
         raise ValueError("unsupported_parameters")
+
+    for key, value in params.items():
+        spec = capability.parameters[key]
+        if spec.allowed_values and value not in spec.allowed_values:
+            raise ValueError(f"unsupported_parameter_value_{key}")
 
 
 def _resolve_indicator_series(
@@ -193,7 +246,8 @@ def _resolve_indicator_series(
     if fallback_col not in data.columns:
         raise ValueError("market_data_unavailable")
 
-    name = indicator.strip().lower()
+    spec = executable_indicator_spec(indicator)
+    name = spec.key if spec is not None else indicator.strip().lower()
     ta_accessor = getattr(data, "ta", None)
     if ta_accessor is None:
         raise ValueError("unsupported_indicator")
@@ -219,10 +273,16 @@ def _resolve_indicator_series(
 
     accessor(**kwargs)
 
-    upper = indicator.upper()
-    candidates = [
-        col for col in data.columns if upper in col.upper() and str(period) in col
-    ]
+    candidates: list[str] = []
+    if spec is not None:
+        selector = spec.output_selector.format(period=period).upper()
+        candidates = [col for col in data.columns if selector == col.upper()]
+
+    upper = name.upper()
+    if not candidates:
+        candidates = [
+            col for col in data.columns if upper in col.upper() and str(period) in col
+        ]
     if not candidates:
         candidates = [col for col in data.columns if upper in col.upper()]
     if not candidates:
@@ -237,16 +297,47 @@ def _build_signals(
     template = config["template"]
     index = close.index
 
-    if template == "dca_accumulation":
+    if template == "buy_and_hold":
         entries = pd.Series(False, index=index, dtype=bool)
         entries.iloc[0] = True
         exits = pd.Series(False, index=index, dtype=bool)
-        return entries, exits
+        return entries.astype(bool), exits.astype(bool)
+
+    if template == "dca_accumulation":
+        cadence = config.get("parameters", {}).get("dca_cadence", "weekly").lower()
+        entries = pd.Series(False, index=index, dtype=bool)
+
+        if cadence == "daily":
+            entries[:] = True
+        elif cadence == "weekly":
+            # Entry on the first day of each week present in data
+            weeks = _index_period_series(index, freq="W")
+            entries = weeks != weeks.shift(1)
+        elif cadence == "monthly":
+            # Entry on the first day of each month present in data
+            months = _index_period_series(index, freq="M")
+            entries = months != months.shift(1)
+        elif cadence == "quarterly":
+            entries.iloc[::3] = True
+        else:
+            # Fallback to single entry if unknown cadence
+            entries.iloc[0] = True
+
+        exits = pd.Series(False, index=index, dtype=bool)
+        return entries.astype(bool), exits.astype(bool)
 
     if template == "rsi_mean_reversion":
-        rsi = _resolve_indicator_series(data, indicator="rsi", period=14)
-        entries = (rsi <= 30).fillna(False)
-        exits = (rsi >= 55).fillna(False)
+        indicator_params = normalize_indicator_parameters(
+            "rsi",
+            config.get("parameters"),
+        )
+        rsi = _resolve_indicator_series(
+            data,
+            indicator=str(indicator_params["indicator"]),
+            period=int(indicator_params["indicator_period"]),
+        )
+        entries = (rsi <= float(indicator_params["entry_threshold"])).fillna(False)
+        exits = (rsi >= float(indicator_params["exit_threshold"])).fillna(False)
         return entries.astype(bool), exits.astype(bool)
 
     if template == "moving_average_crossover":
@@ -276,6 +367,13 @@ def _build_signals(
         return entries.astype(bool), exits.astype(bool)
 
     raise ValueError("unsupported_template")
+
+
+def _index_period_series(index: pd.Index, *, freq: str) -> pd.Series:
+    datetime_index = pd.DatetimeIndex(index)
+    if datetime_index.tz is not None:
+        datetime_index = datetime_index.tz_convert(None)
+    return pd.Series(datetime_index.to_period(freq), index=index)
 
 
 def _execution_realism_settings(config: dict[str, Any]) -> dict[str, float | bool]:
@@ -328,8 +426,154 @@ def _annualized_return_pct(
     return annualized * 100.0
 
 
-def _trade_count(entries: pd.Series) -> int:
-    return int(entries.fillna(False).sum())
+def _build_long_only_execution_ledger(
+    *,
+    symbol: str,
+    entries: pd.Series,
+    exits: pd.Series,
+    allow_accumulation: bool,
+) -> list[ExecutionEvent]:
+    """Reduce raw strategy signals into executed long-only events.
+
+    Strategy signals are intent candidates. This ledger is the canonical source
+    for user-facing trade events because it applies position state and execution
+    policy before a buy/sell can appear in the UI.
+    """
+
+    normalized_entries = entries.fillna(False).astype(bool)
+    normalized_exits = exits.fillna(False).astype(bool)
+    timestamps = normalized_entries.index.union(normalized_exits.index).sort_values()
+    events: list[ExecutionEvent] = []
+    holding = False
+
+    for timestamp in timestamps:
+        ts = pd.Timestamp(timestamp)
+        has_entry = bool(normalized_entries.get(timestamp, False))
+        has_exit = bool(normalized_exits.get(timestamp, False))
+        if not has_entry and not has_exit:
+            continue
+
+        if has_exit:
+            events.append(
+                ExecutionEvent(
+                    timestamp=ts,
+                    symbol=symbol,
+                    event_type="signal",
+                    side="sell",
+                )
+            )
+            if holding:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="order_intent",
+                        side="sell",
+                        action="close",
+                    )
+                )
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="fill",
+                        side="sell",
+                        action="close",
+                    )
+                )
+                holding = False
+            else:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="ignored_signal",
+                        side="sell",
+                        action="ignore",
+                        reason="exit_signal_while_flat",
+                    )
+                )
+
+        if has_entry:
+            events.append(
+                ExecutionEvent(
+                    timestamp=ts,
+                    symbol=symbol,
+                    event_type="signal",
+                    side="buy",
+                )
+            )
+            if not holding:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="order_intent",
+                        side="buy",
+                        action="open",
+                    )
+                )
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="fill",
+                        side="buy",
+                        action="open",
+                    )
+                )
+                holding = True
+            elif allow_accumulation:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="order_intent",
+                        side="buy",
+                        action="add",
+                    )
+                )
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="fill",
+                        side="buy",
+                        action="add",
+                    )
+                )
+            else:
+                events.append(
+                    ExecutionEvent(
+                        timestamp=ts,
+                        symbol=symbol,
+                        event_type="ignored_signal",
+                        side="buy",
+                        action="ignore",
+                        reason="entry_signal_while_already_long",
+                    )
+                )
+
+        events.append(
+            ExecutionEvent(
+                timestamp=ts,
+                symbol=symbol,
+                event_type="position_snapshot",
+                action="hold" if holding else "close",
+            )
+        )
+
+    return events
+
+
+def _execution_fill_count(
+    execution_events: list[ExecutionEvent], *, side: str | None = None
+) -> int:
+    return sum(
+        1
+        for event in execution_events
+        if event.event_type == "fill" and (side is None or event.side == side)
+    )
 
 
 def _compute_metrics(
@@ -378,6 +622,65 @@ def _compute_metrics(
     }
 
 
+def _compute_metrics_from_equity(
+    *,
+    strategy_equity: pd.Series,
+    benchmark_equity: pd.Series,
+    invested_capital: float,
+    periods_per_year: float,
+    trade_count: int,
+) -> dict[str, Any]:
+    strategy_returns = strategy_equity.pct_change().fillna(0.0)
+    total_return = float(strategy_equity.iloc[-1] / invested_capital - 1.0)
+    benchmark_return = float(benchmark_equity.iloc[-1] / invested_capital - 1.0)
+    total_return_pct = total_return * 100.0
+    benchmark_return_pct = benchmark_return * 100.0
+    volatility_pct = float(strategy_returns.std() * sqrt(periods_per_year) * 100.0)
+    active = strategy_returns[strategy_returns != 0]
+    win_rate = float((active > 0).mean()) if not active.empty else 0.0
+
+    return {
+        "performance": {
+            "total_return_pct": round(total_return_pct, 2),
+            "benchmark_return_pct": round(benchmark_return_pct, 2),
+            "delta_vs_benchmark_pct": round(total_return_pct - benchmark_return_pct, 2),
+            "profit": round(strategy_equity.iloc[-1] - invested_capital, 2),
+            "annualized_return_pct": round(
+                _annualized_return_pct(
+                    total_return, len(strategy_returns), periods_per_year
+                ),
+                2,
+            ),
+        },
+        "risk": {
+            "max_drawdown_pct": round(_max_drawdown_pct(strategy_equity), 2),
+            "volatility_pct": round(abs(volatility_pct), 2),
+        },
+        "efficiency": {
+            "win_rate": round(win_rate, 2),
+            "total_trades": trade_count,
+            "profit_factor": round(_compute_profit_factor(strategy_returns), 2),
+            "sharpe_ratio": round(_compute_sharpe(strategy_returns, periods_per_year), 2),
+        },
+    }
+
+
+def _dca_equity_curve(
+    *,
+    close: pd.Series,
+    entries: pd.Series,
+    contribution: float,
+) -> tuple[pd.Series, float]:
+    entry_mask = entries.reindex(close.index).fillna(False).astype(bool)
+    shares_bought = (contribution / close).where(entry_mask, 0.0)
+    cumulative_shares = shares_bought.cumsum()
+    equity = cumulative_shares * close
+    invested_capital = float(entry_mask.sum()) * contribution
+    if invested_capital <= 0:
+        invested_capital = contribution
+    return equity.astype(float), invested_capital
+
+
 def build_benchmark_curve(
     config: dict[str, Any], target_index: pd.DatetimeIndex
 ) -> dict[str, Any]:
@@ -411,6 +714,7 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
     end = date.fromisoformat(config["end_date"])
     allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
     realism = _execution_realism_settings(config)
+    is_dca = config["template"] == "dca_accumulation"
 
     for symbol in config["symbols"]:
         bars = fetch_ohlcv(
@@ -422,41 +726,68 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
         )
         close = bars["close"].astype(float)
         entries, exits = _build_signals(config, bars)
-
-        portfolio = vbt.Portfolio.from_signals(
-            close=close,
+        execution_events = _build_long_only_execution_ledger(
+            symbol=symbol,
             entries=entries,
             exits=exits,
-            fees=float(realism["fees"]),
-            slippage=float(realism["slippage"]),
-            init_cash=allocation_capital,
-            freq=_vbt_freq(config["timeframe"]),
+            allow_accumulation=is_dca,
         )
-
-        symbol_equity = pd.Series(
-            portfolio.value().values, index=close.index, dtype=float
-        )
-        strategy_returns = symbol_equity.pct_change().fillna(0.0)
 
         benchmark_curve = build_benchmark_curve(config, close.index)
         benchmark_normalized = pd.Series(
             benchmark_curve["equity_curve"], index=close.index, dtype=float
         )
-        benchmark_equity = benchmark_normalized * allocation_capital
-        benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
+        if is_dca:
+            symbol_equity, invested_capital = _dca_equity_curve(
+                close=close,
+                entries=entries,
+                contribution=allocation_capital,
+            )
+            benchmark_equity, benchmark_invested_capital = _dca_equity_curve(
+                close=benchmark_normalized,
+                entries=entries,
+                contribution=allocation_capital,
+            )
+            invested_capital = max(invested_capital, benchmark_invested_capital)
+            strategy_returns = symbol_equity.pct_change().fillna(0.0)
+            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
+            by_symbol[symbol] = _compute_metrics_from_equity(
+                strategy_equity=symbol_equity,
+                benchmark_equity=benchmark_equity,
+                invested_capital=invested_capital,
+                periods_per_year=periods_per_year,
+                trade_count=_execution_fill_count(execution_events, side="buy"),
+            )
+        else:
+            portfolio = vbt.Portfolio.from_signals(
+                close=close,
+                entries=entries,
+                exits=exits,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
+                init_cash=allocation_capital,
+                freq=_vbt_freq(config["timeframe"]),
+                accumulate=False,
+            )
+
+            symbol_equity = pd.Series(
+                portfolio.value().values, index=close.index, dtype=float
+            )
+            strategy_returns = symbol_equity.pct_change().fillna(0.0)
+            benchmark_equity = benchmark_normalized * allocation_capital
+            benchmark_returns = benchmark_equity.pct_change().fillna(0.0)
+            by_symbol[symbol] = _compute_metrics(
+                strategy_returns=strategy_returns,
+                benchmark_returns=benchmark_returns,
+                allocation_capital=allocation_capital,
+                periods_per_year=periods_per_year,
+                trade_count=_execution_fill_count(execution_events),
+            )
 
         symbol_returns.append(strategy_returns)
         benchmark_returns_aligned.append(benchmark_returns)
         symbol_equity_curves.append(symbol_equity)
         benchmark_equity_curves.append(benchmark_equity)
-
-        by_symbol[symbol] = _compute_metrics(
-            strategy_returns=strategy_returns,
-            benchmark_returns=benchmark_returns,
-            allocation_capital=allocation_capital,
-            periods_per_year=periods_per_year,
-            trade_count=_trade_count(entries),
-        )
 
     aggregate_strategy_equity = (
         pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1)
@@ -467,13 +798,24 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
     aggregate_strategy_returns = aggregate_strategy_equity.pct_change().fillna(0.0)
     aggregate_benchmark_returns = aggregate_benchmark_equity.pct_change().fillna(0.0)
 
-    aggregate_metrics = _compute_metrics(
-        strategy_returns=aggregate_strategy_returns,
-        benchmark_returns=aggregate_benchmark_returns,
-        allocation_capital=float(config["starting_capital"]),
-        periods_per_year=periods_per_year,
-        trade_count=sum(row["efficiency"]["total_trades"] for row in by_symbol.values()),
-    )
+    trade_count = sum(row["efficiency"]["total_trades"] for row in by_symbol.values())
+    if is_dca:
+        aggregate_invested = allocation_capital * max(trade_count, 1)
+        aggregate_metrics = _compute_metrics_from_equity(
+            strategy_equity=aggregate_strategy_equity,
+            benchmark_equity=aggregate_benchmark_equity,
+            invested_capital=aggregate_invested,
+            periods_per_year=periods_per_year,
+            trade_count=trade_count,
+        )
+    else:
+        aggregate_metrics = _compute_metrics(
+            strategy_returns=aggregate_strategy_returns,
+            benchmark_returns=aggregate_benchmark_returns,
+            allocation_capital=float(config["starting_capital"]),
+            periods_per_year=periods_per_year,
+            trade_count=trade_count,
+        )
 
     return {
         "aggregate": aggregate_metrics,
@@ -481,8 +823,154 @@ def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_result_chart(config: dict[str, Any]) -> dict[str, Any]:
+    """Build a compact aggregate equity curve for result-card display."""
+
+    start = date.fromisoformat(config["start_date"])
+    end = date.fromisoformat(config["end_date"])
+    allocation_capital = float(config["starting_capital"]) / len(config["symbols"])
+    realism = _execution_realism_settings(config)
+    is_dca = config["template"] == "dca_accumulation"
+    symbol_equity_curves: list[pd.Series] = []
+    events: dict[str, dict[str, set[str]]] = {}
+
+    for symbol in config["symbols"]:
+        bars = fetch_ohlcv(
+            symbol=symbol,
+            asset_class=config["asset_class"],
+            start_date=start,
+            end_date=end,
+            timeframe=config["timeframe"],
+        )
+        close = bars["close"].astype(float)
+        entries, exits = _build_signals(config, bars)
+        execution_events = _build_long_only_execution_ledger(
+            symbol=symbol,
+            entries=entries,
+            exits=exits,
+            allow_accumulation=is_dca,
+        )
+        if is_dca:
+            symbol_equity, _ = _dca_equity_curve(
+                close=close,
+                entries=entries,
+                contribution=allocation_capital,
+            )
+        else:
+            portfolio = vbt.Portfolio.from_signals(
+                close=close,
+                entries=entries,
+                exits=exits,
+                fees=float(realism["fees"]),
+                slippage=float(realism["slippage"]),
+                init_cash=allocation_capital,
+                freq=_vbt_freq(config["timeframe"]),
+                accumulate=False,
+            )
+            symbol_equity = pd.Series(
+                portfolio.value().values, index=close.index, dtype=float
+            )
+        symbol_equity_curves.append(symbol_equity)
+        _collect_execution_fill_events(
+            events, symbol=symbol, execution_events=execution_events
+        )
+
+    aggregate_equity = (
+        pd.concat(symbol_equity_curves, axis=1).ffill().bfill().sum(axis=1).dropna()
+    )
+    series = [
+        {"time": _chart_time_key(ts), "value": round(float(value), 2)}
+        for ts, value in aggregate_equity.items()
+    ]
+    markers = _thin_chart_markers(_chart_markers_from_events(events), limit=80)
+    return {
+        "kind": "portfolio_equity",
+        "series": series,
+        "markers": markers,
+        "currency": "USD",
+        "base_value": series[0]["value"] if series else None,
+        "attribution": "TradingView Lightweight Charts",
+    }
+
+
+def _collect_execution_fill_events(
+    events: dict[str, dict[str, set[str]]],
+    *,
+    symbol: str,
+    execution_events: list[ExecutionEvent],
+) -> None:
+    for event in execution_events:
+        if event.event_type != "fill":
+            continue
+        if event.side == "buy":
+            key = _chart_time_key(event.timestamp)
+            events.setdefault(key, {"entry": set(), "exit": set()})["entry"].add(symbol)
+        elif event.side == "sell":
+            key = _chart_time_key(event.timestamp)
+            events.setdefault(key, {"entry": set(), "exit": set()})["exit"].add(symbol)
+
+
+def _chart_time_key(timestamp: Any) -> str:
+    ts = pd.Timestamp(timestamp)
+    if ts.hour == 0 and ts.minute == 0 and ts.second == 0:
+        return ts.strftime("%Y-%m-%d")
+    return ts.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _chart_markers_from_events(
+    events: dict[str, dict[str, set[str]]],
+) -> list[dict[str, Any]]:
+    markers: list[dict[str, Any]] = []
+    for time_key in sorted(events):
+        entry_symbols = sorted(events[time_key].get("entry", set()))
+        exit_symbols = sorted(events[time_key].get("exit", set()))
+        if entry_symbols:
+            markers.append(
+                {
+                    "time": time_key,
+                    "type": "entry",
+                    "label": _event_label("Buy", entry_symbols),
+                    "symbols": entry_symbols,
+                }
+            )
+        if exit_symbols:
+            markers.append(
+                {
+                    "time": time_key,
+                    "type": "exit",
+                    "label": _event_label("Sell", exit_symbols),
+                    "symbols": exit_symbols,
+                }
+            )
+    return markers
+
+
+def _event_label(prefix: str, symbols: list[str]) -> str:
+    if len(symbols) <= 3:
+        return f"{prefix} {', '.join(symbols)}"
+    return f"{prefix} {len(symbols)} symbols"
+
+
+def _thin_chart_markers(
+    markers: list[dict[str, Any]], *, limit: int
+) -> list[dict[str, Any]]:
+    if len(markers) <= limit:
+        return markers
+    indexes = sorted({round(i) for i in np.linspace(0, len(markers) - 1, limit)})
+    return [markers[i] for i in indexes]
+
+
+def _format_money(value: float) -> str:
+    if abs(value) >= 1000:
+        return f"${value / 1000:.1f}k"
+    return f"${value:,.0f}"
+
+
 def build_result_card(
-    config: dict[str, Any], metrics: dict[str, Any], language: str = "en"
+    config: dict[str, Any],
+    metrics: dict[str, Any],
+    language: str = "en",
+    chart: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     aggregate = metrics["aggregate"]
     performance = aggregate["performance"]
@@ -491,11 +979,20 @@ def build_result_card(
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
     symbols = ", ".join(config["symbols"])
-    ending_capital = config["starting_capital"] + performance["profit"]
+    is_dca = config["template"] == "dca_accumulation"
+    capital_basis = float(config["starting_capital"])
+    if is_dca:
+        capital_basis = (
+            float(config["starting_capital"])
+            / max(len(config["symbols"]), 1)
+            * max(int(efficiency.get("total_trades", 0)), 1)
+        )
+    ending_capital = capital_basis + performance["profit"]
     realism = _execution_realism_settings(config)
 
     is_es = language.startswith("es")
     template_names = {
+        "buy_and_hold": "Comprar y Mantener" if is_es else "Buy and Hold",
         "buy_the_dip": "Comprar la Caída" if is_es else "Buy the Dip",
         "rsi_mean_reversion": "Reversión a la Media RSI"
         if is_es
@@ -532,7 +1029,11 @@ def build_result_card(
         assumptions = [
             f"Universe: {symbols}.",
             "Simulation uses long-only preset.",
-            f"Starting capital: ${config['starting_capital']:,.0f}.",
+            (
+                f"Recurring contribution: ${config['starting_capital']:,.0f}."
+                if is_dca
+                else f"Starting capital: ${config['starting_capital']:,.0f}."
+            ),
             "Allocation: equal weight.",
             "No slippage or fees included.",
             f"Benchmark: {config['benchmark_symbol']}.",
@@ -548,8 +1049,16 @@ def build_result_card(
         },
         {
             "key": "cash_value",
-            "label": "Valor en Efectivo ($)" if is_es else "Cash Value ($)",
-            "value": f"${config['starting_capital'] / 1000:.0f}k -> ${ending_capital / 1000:.1f}k",
+            "label": (
+                "Valor Final ($)"
+                if is_es and is_dca
+                else "Valor en Efectivo ($)"
+                if is_es
+                else "Final Value ($)"
+                if is_dca
+                else "Cash Value ($)"
+            ),
+            "value": f"{_format_money(capital_basis)} -> {_format_money(ending_capital)}",
         },
         {
             "key": "max_drawdown_pct",
@@ -557,19 +1066,47 @@ def build_result_card(
             "value": f"{risk['max_drawdown_pct']:.1f}%",
         },
         {
-            "key": "win_rate",
-            "label": "Tasa de Acierto" if is_es else "Win Rate",
-            "value": f"{efficiency['win_rate'] * 100:.1f}%",
-        },
-        {
             "key": "benchmark_delta",
-            "label": "Referencia" if is_es else "Benchmark",
-            "value": f"{performance['delta_vs_benchmark_pct']:+.1f}% vs {config['benchmark_symbol']}",
+            "label": "Vs referencia" if is_es else "Vs benchmark",
+            "value": f"{performance['delta_vs_benchmark_pct']:+.1f} pts vs {config['benchmark_symbol']}",
         },
     ]
+    if _should_show_win_rate(config, efficiency):
+        rows.append(
+            {
+                "key": "win_rate",
+                "label": "Tasa de Acierto" if is_es else "Win Rate",
+                "value": f"{efficiency['win_rate'] * 100:.1f}%",
+            }
+        )
 
+    actions = [
+        {
+            "id": "show-breakdown",
+            "type": "show_breakdown",
+            "label": "Ver desglose" if is_es else "Show a breakdown",
+            "presentation": "result",
+            "payload": {},
+        },
+        {
+            "id": "save-strategy",
+            "type": "save_strategy",
+            "label": "Guardar estrategia" if is_es else "Save strategy",
+            "presentation": "result",
+            "payload": {},
+        },
+        {
+            "id": "refine-strategy",
+            "type": "refine_strategy",
+            "label": "Refinar estrategia" if is_es else "Refine strategy",
+            "presentation": "result",
+            "payload": {},
+        },
+    ]
     return {
         "title": f"{symbols} {template_display}",
+        "symbols": list(config["symbols"]),
+        "strategy_label": template_display,
         "date_range": {
             "start": config["start_date"],
             "end": config["end_date"],
@@ -581,16 +1118,12 @@ def build_result_card(
         "rows": rows,
         "assumptions": assumptions,
         "benchmark_note": benchmark_note,
-        "actions": [
-            {
-                "type": "add_to_collection",
-                "label": "Añadir estrategia a colección"
-                if is_es
-                else "Add strategy to collection",
-            },
-            {
-                "type": "try_new_strategy",
-                "label": "Probar nueva estrategia" if is_es else "Try a new strategy",
-            },
-        ],
+        "actions": actions,
+        "chart": chart,
     }
+
+
+def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) -> bool:
+    if config["template"] in {"buy_and_hold", "dca_accumulation"}:
+        return False
+    return int(efficiency.get("total_trades", 0) or 0) > 1

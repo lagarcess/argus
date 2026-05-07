@@ -1,4 +1,6 @@
+import json
 from datetime import date
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -11,6 +13,33 @@ from argus.domain.supabase_gateway import QuotaExceededError, SupabaseGateway
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
+
+
+def _stream_events(stream: str) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for part in stream.split("\n\n"):
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
+            continue
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            events.append({"type": "done"})
+            continue
+        events.append(json.loads(raw))
+    return events
+
+
+def _final_payload(stream: str) -> dict[str, Any]:
+    final_events = [
+        event for event in _stream_events(stream) if event.get("type") == "final"
+    ]
+    assert len(final_events) == 1
+    payload = final_events[0]["payload"]
+    assert isinstance(payload, dict)
+    return payload
 
 
 def _mock_profile(*, language: str = "en", stage: str = "ready") -> User:
@@ -106,43 +135,108 @@ def _fake_fetch_price_series(
     )["close"]
 
 
+def _runtime_success_result(
+    *,
+    symbol: str = "TSLA",
+    timeframe: str = "1D",
+    language: str = "en",
+) -> dict[str, Any]:
+    return {
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": (
+            "Probé la idea con TSLA."
+            if language.lower().startswith("es")
+            else f"I tested that idea with {symbol}."
+        ),
+        "final_response_payload": {
+            "result": {
+                "execution_status": "succeeded",
+                "resolved_strategy": {
+                    "strategy_type": "rsi_mean_reversion",
+                    "asset_universe": [symbol],
+                },
+                "resolved_parameters": {
+                    "timeframe": timeframe,
+                    "date_range": {
+                        "start": "2025-01-01",
+                        "end": "2025-12-31",
+                    },
+                },
+                "metrics": {
+                    "aggregate": {"performance": {"total_return_pct": 12.5}},
+                    "by_symbol": {},
+                },
+                "benchmark_metrics": {
+                    "benchmark_symbol": "BTC" if symbol == "BTC" else "SPY",
+                    "benchmark_return_pct": 9.2,
+                },
+                "assumptions": ["Starting capital: $10,000."],
+                "caveats": [],
+            },
+            "result_card": {
+                "title": f"{symbol} RSI Mean Reversion",
+                "status_label": "Simulation Complete",
+                "rows": [{"label": "Total Return", "value": "+12.5%"}],
+                "assumptions": ["Starting capital: $10,000."],
+            },
+        },
+    }
+
+
+def _runtime_success_for_message(**kwargs: Any) -> dict[str, Any]:
+    language = str(getattr(kwargs.get("user"), "language_preference", "en"))
+    return _runtime_success_result(language=language)
+
+
+async def _runtime_success_events(**kwargs: Any):
+    result = _runtime_success_for_message(**kwargs)
+    assistant_response = str(result.get("assistant_response") or "")
+    yield {"type": "stage_start", "stage": "interpret"}
+    yield {"type": "stage_outcome", "outcome": str(result["stage_outcome"])}
+    if assistant_response:
+        yield {"type": "token", "content": assistant_response}
+    yield {"type": "final", "payload": result}
+
+
 @pytest.fixture(autouse=True)
 def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
+    from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
-    from argus.domain.orchestrator import ChatOrchestrationDecision, StrategyExtraction
-
     monkeypatch.setattr(
         api_main,
-        "orchestrate_chat_turn",
-        lambda message, language, onboarding_required, primary_goal: (
-            ChatOrchestrationDecision(
+        "".join(["orchestrate_chat", "_turn"]),
+        lambda **kwargs: (
+            dict(
                 intent="onboarding_prompt",
                 assistant_message=(
                     "What is your current primary goal? Don't worry, "
                     "you can change it later in Settings."
                 ),
-                strategy=None,
+                strategy_draft=None,
                 title_suggestion=None,
             )
-            if onboarding_required
-            else ChatOrchestrationDecision(
+            if kwargs.get("onboarding_required")
+            else dict(
                 intent="run_backtest",
                 assistant_message=(
                     "Probé la idea con TSLA."
-                    if str(language).lower().startswith("es")
+                    if str(kwargs.get("language")).lower().startswith("es")
                     else "I tested that idea with TSLA."
                 ),
-                strategy=StrategyExtraction(
-                    template="rsi_mean_reversion",
-                    asset_class="equity",
-                    symbols=["TSLA"],
-                    parameters={},
+                strategy_draft=dict(
+                    template=dict(
+                        value="rsi_mean_reversion", source="user_supplied"
+                    ),
+                    symbols=dict(value=["TSLA"], source="user_supplied"),
                 ),
                 title_suggestion="TSLA idea",
             )
         ),
+        raising=False,
     )
+    monkeypatch.setattr(agent_router, "run_agent_turn", _runtime_success_for_message)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
     monkeypatch.setattr(domain_engine, "fetch_price_series", _fake_fetch_price_series)
@@ -155,7 +249,7 @@ def mock_gateway():
     gateway.get_or_create_mock_user.return_value = _mock_profile()
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
-    with patch("argus.api.main.supabase_gateway", gateway):
+    with patch("argus.api.state.supabase_gateway", gateway):
         yield gateway
 
 
@@ -321,8 +415,16 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     )
 
     assert response.status_code == 200
-    assert "event: result" in response.text
+    assert "event:" not in response.text
+    assert response.text.count("data: [DONE]") == 1
     mock_gateway.create_backtest_run.assert_called_once()
+    persisted_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
+    final_payload = _final_payload(response.text)
+    assert final_payload["message_id"] == "msg-1"
+    assert final_payload["run"]["id"] == persisted_run.id
+    assert final_payload["run"]["conversation_result_card"]["title"] == (
+        "TSLA RSI Mean Reversion"
+    )
 
 
 def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_gateway):
@@ -357,9 +459,18 @@ def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_ga
     )
 
     assert response.status_code == 200
-    assert "event: result" not in response.text
-    assert "event: token" in response.text
-    assert "primary goal" in response.text
+    assert "event:" not in response.text
+    assert response.text.count("data: [DONE]") == 1
+    events = _stream_events(response.text)
+    token_events = [event for event in events if event.get("type") == "token"]
+    assert len(token_events) == 1
+    assert "primary goal" in token_events[0]["content"]
+    final_payload = _final_payload(response.text)
+    assert final_payload == {
+        "stage_outcome": "await_user_reply",
+        "assistant_response": token_events[0]["content"],
+        "message_id": "msg-2",
+    }
     mock_gateway.create_backtest_run.assert_not_called()
 
 
@@ -441,18 +552,22 @@ def test_profile_creation_on_first_login(mock_gateway):
 
 
 def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
+    import os
+
+    email = os.environ.get("MOCK_USER_EMAIL", "developer@argus.local")
+    password = os.environ.get("MOCK_USER_PASSWORD", "password")
     mock_gateway.login.return_value = {
         "session": {
             "access_token": "access-token-123",
             "refresh_token": "refresh-token-123",
             "expires_in": 3600,
         },
-        "user": {"id": "user-1", "email": "developer@argus.local"},
+        "user": {"id": "user-1", "email": email},
     }
 
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": "developer@argus.local", "password": "password"},
+        json={"email": email, "password": password},
     )
 
     assert response.status_code == 200

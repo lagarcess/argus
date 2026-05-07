@@ -69,6 +69,34 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
+# 🧭 Argus Philosophy & Runtime Principles
+
+Argus is chat-first, AI-first, and trust-first. The assistant should help a normal person move from a rough investing idea to a clear historical test with as little friction as possible, while being honest about assumptions, limitations, and supported execution.
+
+## Product Philosophy
+
+- **Conversation is the product**: The chat thread is the primary workspace. Forms, dashboards, and dense configuration screens are secondary and should not replace conversational progressive disclosure.
+- **The backtesting engine is critical infrastructure**: Results must be reproducible, grounded in real engine outputs, and presented with clear assumptions.
+- **Simplicity beats breadth**: Prefer the smallest supported path that lets the user test an idea safely and understand the result.
+- **Trust through clarity**: Never hide defaults, unsupported behavior, missing data, or asset-class constraints. Explain limitations in product language, not provider plumbing.
+- **Beginner-friendly by default**: Use plain language, small follow-up choices, and honest educational context. Avoid trading-terminal complexity unless the user explicitly asks for more depth.
+- **Chat-first continuity**: Confirmation cards, result cards, saved strategies, and follow-up actions must remain attached to the conversation flow and hydrate correctly after reload.
+
+## Runtime Migration Principles
+
+These principles come from the recent modular monolith / LangGraph migration plans in `docs/superpowers/plans/` and must not regress:
+
+- **LLM-first interpretation**: Normal user language must reach the structured LLM interpreter before routing decisions. Do not add regex, hardcoded language gates, or legacy NLU shortcuts before the interpreter.
+- **Deterministic guardrails after interpretation**: Code validates facts the LLM cannot own: asset resolution, provider availability, same-asset constraints, max symbol limits, date/data windows, executable indicator support, benchmark defaults, and required fields.
+- **One active chat brain**: The LangGraph runtime is the only active conversational runtime. Do not restore or recreate a parallel legacy orchestrator, state machine, or second intent taxonomy.
+- **LangGraph owns runtime memory**: Runtime thread state belongs in the LangGraph checkpointer using `thread_id == conversation_id`. Supabase owns product persistence such as messages, conversations, backtest runs, strategies, collections, feedback, and usage counters.
+- **Supabase product records are durable artifacts**: Messages store assistant/user text and structured metadata. Backtest runs store immutable result truth. Strategies are saved from canonical run/result state, not reconstructed frontend prose.
+- **Canonical SSE is data-only**: Production chat streaming should emit canonical `data: {"type": ...}` frames: `stage_start`, `token`, `stage_outcome`, `final`, then `[DONE]`. Legacy named `event:` parsing may be tolerated by the frontend during migration, but new backend paths should not depend on it.
+- **Thin FastAPI routers**: API routes perform auth, quota checks, request validation, transport, persistence, and error shaping. They must not become a second conversational orchestrator.
+- **Frontend renders, it does not invent**: The web app renders backend-provided stages, cards, actions, and persisted metadata. It should not fake progress states, reconstruct strategies from text, or infer hidden run context.
+- **No Alpha RAG/vector overreach**: Do not add embeddings, pgvector, semantic memory, or agentic RAG for the launch chat/backtest loop. Use provider catalogs, structured state, run metadata, saved strategies, and text search until a concrete Beta need exists.
+- **Provider details stay internal**: Users should hear capability truth ("I can test BTC over that period" or "that data range is not available for this instrument"), not vendor-specific implementation details unless the product explicitly decides otherwise.
+
 ---
 
 ## 🛡️ Rules (`.agent/rules/`) — Always-Follow Guidelines
