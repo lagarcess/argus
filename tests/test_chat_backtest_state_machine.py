@@ -33,10 +33,45 @@ def _client() -> TestClient:
 def _stream_payloads(stream: str, event_name: str) -> list[dict[str, Any]]:
     payloads = []
     for part in stream.split("\n\n"):
-        if f"event: {event_name}" not in part:
+        data_line = next(
+            (line for line in part.splitlines() if line.startswith("data: ")),
+            None,
+        )
+        if data_line is None:
             continue
-        data_line = next(line for line in part.splitlines() if line.startswith("data: "))
-        payloads.append(json.loads(data_line.removeprefix("data: ")))
+        raw = data_line.removeprefix("data: ").strip()
+        if raw == "[DONE]":
+            continue
+        payload = json.loads(raw)
+        event_line = next(
+            (line for line in part.splitlines() if line.startswith("event: ")),
+            None,
+        )
+        if event_line == f"event: {event_name}":
+            payloads.append(payload)
+            continue
+        if payload.get("type") == event_name:
+            if event_name == "token":
+                payloads.append(
+                    {"text": payload.get("content") or payload.get("text") or ""}
+                )
+            else:
+                payloads.append(payload)
+            continue
+        if payload.get("type") != "final":
+            continue
+        final_payload = payload.get("payload")
+        if not isinstance(final_payload, dict):
+            continue
+        if event_name == "confirmation" and isinstance(
+            final_payload.get("confirmation"), dict
+        ):
+            payloads.append({"confirmation": final_payload["confirmation"]})
+        if event_name == "result" and isinstance(final_payload.get("run"), dict):
+            run = final_payload["run"]
+            payloads.append({"run": run, "payload": {"run": run}})
+        if event_name == "final":
+            payloads.append(final_payload)
     return payloads
 
 
@@ -313,7 +348,8 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         "Run backtest"
         in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
     )
-    assert response.text.index("event: result") < response.text.index("event: token")
+    assert "event:" not in response.text
+    assert response.text.count("data: [DONE]") == 1
     run = _stream_payloads(response.text, "result")[0]["run"]
     assert [action["type"] for action in run["conversation_result_card"]["actions"]] == [
         "show_breakdown",

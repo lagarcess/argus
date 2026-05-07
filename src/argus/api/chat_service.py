@@ -40,10 +40,6 @@ def parse_onboarding_control_message(message: str) -> str | None:
     return None
 
 
-def sse(event: str, payload: dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
-
-
 def sse_data(payload: dict[str, Any]) -> str:
     return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
 

@@ -117,6 +117,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain('event: "final"');
     expect(chat).toContain('kind: "strategy_confirmation"');
     expect(chat).toContain("setInputActions(confirmation.actions ?? [])");
+    expect(chat).not.toContain('event.event === "confirmation"');
+    expect(chat).not.toContain('event.event === "result"');
     expect(chat).toContain("slide-in-from-bottom-2");
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
   });

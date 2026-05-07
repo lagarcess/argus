@@ -635,7 +635,7 @@ export default function ChatInterface() {
       { id: assistantId, role: "ai", kind: "text", content: "" },
     ]);
     setInputActions([]);
-    setStreamStatus(t('chat.status.understanding'));
+    setStreamStatus(null);
 
     const streamInput: string | ChatActionRequest = action?.type
       ? {
@@ -647,9 +647,6 @@ export default function ChatInterface() {
       : trimmed;
 
     const handleStreamEvent = (event: ChatStreamEvent) => {
-      if (event.event === "status") {
-        setStreamStatus(t(`chat.status.${event.data.status}`) || t('chat.status.preparing'));
-      }
       if (event.event === "stage_start") {
         setStreamStatus(t(`chat.status.${event.data.stage}`) || t('chat.status.preparing'));
       }
@@ -671,42 +668,6 @@ export default function ChatInterface() {
               ? {
                   ...m,
                   content: t('chat.error_backtest'),
-                }
-              : m,
-          ),
-        );
-      }
-      if (event.event === "confirmation") {
-        const confirmation = event.data.confirmation as StrategyConfirmationPayload;
-        setInputActions(confirmation.actions ?? []);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  kind: "strategy_confirmation",
-                  content: undefined,
-                  confirmation,
-                }
-              : m,
-          ),
-        );
-      }
-      if (event.event === "result") {
-        const run = event.data.run as BacktestRun;
-        const baseCard = resultCardFromRun(run);
-        const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
-        const card = { ...baseCard, actions: resultActions };
-        setInputActions(visibleInputActions(resultActions));
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? {
-                ...m,
-                kind: "strategy_result",
-                content: m.content,
-                result: card,
-                actions: resultActions,
                 }
               : m,
           ),

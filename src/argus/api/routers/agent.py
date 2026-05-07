@@ -25,7 +25,6 @@ from argus.api.chat_service import (
     runtime_result_message,
     runtime_stage_status,
     save_strategy_from_run,
-    sse,
     sse_data,
     sse_done,
 )
@@ -171,15 +170,25 @@ async def chat_stream(
                 else "What is your current primary goal? Don't worry, "
                 "you can change it later in Settings."
             )
-            yield sse("status", {"status": "intent_onboarding_prompt"})
+            yield sse_data({"type": "stage_start", "stage": "clarify"})
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
                 role="assistant",
                 content=msg,
             )
-            yield sse("token", {"text": msg})
-            yield sse("done", {"message_id": assistant_message.id})
+            yield sse_data({"type": "token", "content": msg})
+            yield sse_data(
+                {
+                    "type": "final",
+                    "payload": {
+                        "stage_outcome": "await_user_reply",
+                        "assistant_response": msg,
+                        "message_id": assistant_message.id,
+                    },
+                }
+            )
+            yield sse_done()
             return
 
         if onboarding_goal is not None:
@@ -243,8 +252,19 @@ async def chat_stream(
                 role="assistant",
                 content=follow_up,
             )
-            yield sse("token", {"text": follow_up})
-            yield sse("done", {"message_id": assistant_message.id})
+            yield sse_data({"type": "stage_start", "stage": "next_step"})
+            yield sse_data({"type": "token", "content": follow_up})
+            yield sse_data(
+                {
+                    "type": "final",
+                    "payload": {
+                        "stage_outcome": "ready_to_respond",
+                        "assistant_response": follow_up,
+                        "message_id": assistant_message.id,
+                    },
+                }
+            )
+            yield sse_done()
             return
 
         if payload.action is not None and payload.action.type == "save_strategy":
@@ -275,9 +295,19 @@ async def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
-            yield sse("status", {"status": "ready_to_respond"})
-            yield sse("token", {"text": assistant_text})
-            yield sse("done", {"message_id": assistant_message.id})
+            yield sse_data({"type": "stage_start", "stage": "next_step"})
+            yield sse_data({"type": "token", "content": assistant_text})
+            yield sse_data(
+                {
+                    "type": "final",
+                    "payload": {
+                        "stage_outcome": "ready_to_respond",
+                        "assistant_response": assistant_text,
+                        "message_id": assistant_message.id,
+                    },
+                }
+            )
+            yield sse_done()
             return
 
         if payload.action is not None and payload.action.type == "show_breakdown":
@@ -302,9 +332,19 @@ async def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
-            yield sse("status", {"status": "ready_to_respond"})
-            yield sse("token", {"text": assistant_text})
-            yield sse("done", {"message_id": assistant_message.id})
+            yield sse_data({"type": "stage_start", "stage": "explain"})
+            yield sse_data({"type": "token", "content": assistant_text})
+            yield sse_data(
+                {
+                    "type": "final",
+                    "payload": {
+                        "stage_outcome": "ready_to_respond",
+                        "assistant_response": assistant_text,
+                        "message_id": assistant_message.id,
+                    },
+                }
+            )
+            yield sse_done()
             return
 
         runtime_user = UserState(
@@ -407,23 +447,12 @@ async def chat_stream(
                 runtime_result["message_id"] = (
                     assistant_message.id if assistant_message is not None else None
                 )
-                if confirmation_card is not None:
-                    yield sse("confirmation", {"confirmation": confirmation_card})
-                if run is not None:
-                    run_payload = run.model_dump(mode="json")
-                    yield sse(
-                        "result",
-                        {"run": run_payload, "payload": {"run": run_payload}},
-                    )
-                    if not streamed_text_parts and assistant_text:
-                        yield sse("token", {"text": assistant_text})
                 if (
                     not streamed_text_parts
                     and confirmation_card is None
                     and run is None
                     and assistant_text
                 ):
-                    yield sse("token", {"text": assistant_text})
                     yield sse_data({"type": "token", "content": assistant_text})
                 yield sse_data({"type": "final", "payload": runtime_result})
                 yield sse_done()
