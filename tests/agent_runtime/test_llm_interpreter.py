@@ -7,8 +7,13 @@ from argus.agent_runtime.llm_interpreter import (
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
 )
-from argus.agent_runtime.stages.interpret import InterpretationRequest
-from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot, UserState
+from argus.agent_runtime.stages.interpret import InterpretationRequest, interpret_stage
+from argus.agent_runtime.state.models import (
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
 from argus.agent_runtime.strategy_contract import resolve_date_range
 
 
@@ -81,15 +86,36 @@ def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
 
 def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.stages import interpret as interpret_module
 
     monkeypatch.setattr(
         interpreter_module,
         "resolve_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
     )
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
 
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
+    )
+    snapshot = TaskSnapshot(
+        latest_task_type="backtest_execution",
+        completed=False,
+        pending_strategy_summary=StrategySummary(
+            raw_user_phrasing="Invest $500 in Bitcoin every month since 2021.",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Invest $500 in Bitcoin every month since 2021.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range="since 2021",
+            cadence="monthly",
+            capital_amount=500,
+            sizing_mode="capital_amount",
+        ),
     )
     response = LLMInterpretationResponse(
         intent="backtest_execution",
@@ -102,31 +128,26 @@ def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) ->
         ),
     )
 
-    result = interpreter._to_runtime_interpretation(
+    interpretation = interpreter._to_runtime_interpretation(
         response,
         request=InterpretationRequest(
             current_user_message="Actually make that weekly instead.",
             recent_thread_history=[],
-            latest_task_snapshot=TaskSnapshot(
-                latest_task_type="backtest_execution",
-                completed=False,
-                pending_strategy_summary=StrategySummary(
-                    raw_user_phrasing="Invest $500 in Bitcoin every month since 2021.",
-                    strategy_type="dca_accumulation",
-                    strategy_thesis="Invest $500 in Bitcoin every month since 2021.",
-                    asset_universe=["BTC"],
-                    asset_class="crypto",
-                    date_range="since 2021",
-                    cadence="monthly",
-                    capital_amount=500,
-                    sizing_mode="capital_amount",
-                ),
-            ),
+            latest_task_snapshot=snapshot,
             user=UserState(user_id="u1"),
         ),
     )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Actually make that weekly instead.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        structured_interpreter=lambda request: interpretation,
+    )
 
-    strategy = result.candidate_strategy_draft
+    strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["BTC"]
     assert strategy.capital_amount == 500
     assert strategy.date_range == "since 2021"

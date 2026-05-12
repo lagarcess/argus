@@ -370,22 +370,8 @@ def _merge_prior_strategy(
     request: InterpretationRequest,
     response: LLMInterpretationResponse,
 ) -> None:
-    if request.latest_task_snapshot is None or response.task_relation != "refine":
-        return
-    prior = (
-        request.latest_task_snapshot.pending_strategy_summary
-        or request.latest_task_snapshot.confirmed_strategy_summary
-    )
-    if prior is None:
-        return
-    merged = prior.model_copy(deep=True)
-    incoming = strategy.model_dump(mode="python")
-    for key, value in incoming.items():
-        if value in (None, "", [], {}):
-            continue
-        setattr(merged, key, value)
-    for key, value in merged.model_dump(mode="python").items():
-        setattr(strategy, key, value)
+    del strategy, request, response
+    return None
 
 
 def _validate_capability_boundaries(

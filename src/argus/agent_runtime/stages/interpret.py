@@ -50,6 +50,11 @@ STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "unsupported_request",
 }
 
+CONTEXTUAL_PATCH_TURN_ACTS = {
+    "answer_pending_need",
+    "refine_current_idea",
+}
+
 CONFIRMATION_EDIT_ACTION_FIELDS = {
     "change_asset": ("asset_universe", "What asset should I use instead?"),
     "change_dates": ("date_range", "What date range should I use instead?"),
@@ -150,10 +155,16 @@ def _stage_result_from_interpretation(
         intent=interpretation.intent,
         semantic_turn_act=interpretation.semantic_turn_act,
     )
+    incoming_strategy = _strategy_with_contextual_merge(
+        strategy=interpretation.candidate_strategy_draft,
+        snapshot=snapshot,
+        semantic_turn_act=interpretation.semantic_turn_act,
+        task_relation=interpretation.task_relation,
+    )
     strategy = (
-        _canonicalized_strategy(interpretation.candidate_strategy_draft)
+        _canonicalized_strategy(incoming_strategy)
         if expects_strategy_route
-        else interpretation.candidate_strategy_draft
+        else incoming_strategy
     )
     unsupported_constraints = list(interpretation.unsupported_constraints)
     ambiguous_fields = list(interpretation.ambiguous_fields)
@@ -437,6 +448,36 @@ def _approval_optional_parameters_from_state(state: RunState) -> dict[str, Any]:
         if isinstance(optional_parameters, dict):
             return dict(optional_parameters)
     return {}
+
+
+def _strategy_with_contextual_merge(
+    *,
+    strategy: StrategySummary,
+    snapshot: TaskSnapshot | None,
+    semantic_turn_act: str | None,
+    task_relation: str,
+) -> StrategySummary:
+    if snapshot is None:
+        return strategy
+    if (
+        semantic_turn_act not in CONTEXTUAL_PATCH_TURN_ACTS
+        and task_relation != "refine"
+    ):
+        return strategy
+    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    if prior is None:
+        return strategy
+    merged = prior.model_copy(deep=True)
+    incoming = strategy.model_dump(mode="python")
+    for key, value in incoming.items():
+        if key in {"raw_user_phrasing", "strategy_thesis"}:
+            continue
+        if value in (None, "", [], {}):
+            continue
+        setattr(merged, key, value)
+    if strategy.raw_user_phrasing:
+        merged.raw_user_phrasing = strategy.raw_user_phrasing
+    return merged
 
 
 def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:

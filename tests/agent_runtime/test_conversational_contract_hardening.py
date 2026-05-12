@@ -93,6 +93,46 @@ def test_answer_pending_need_preserves_prior_strategy_fields(monkeypatch) -> Non
     assert strategy.capital_amount == 10000
 
 
+def test_refine_current_idea_preserves_prior_date_and_capital(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        capital_amount=10000,
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User changed the asset to Nvidia.",
+        candidate_strategy_draft=StrategySummary(asset_universe=["NVDA"]),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    result, _ = _interpret(
+        message="actually make it NVDA",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == "past year"
+    assert strategy.capital_amount == 10000
+
+
 def test_natural_language_approval_does_not_execute_from_missing_field_state(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
