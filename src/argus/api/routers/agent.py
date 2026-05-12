@@ -564,6 +564,8 @@ async def chat_stream(
                 runtime_result["message_id"] = (
                     assistant_message.id if assistant_message is not None else None
                 )
+                if assistant_text and not runtime_result.get("assistant_response"):
+                    runtime_result["assistant_response"] = assistant_text
                 if (
                     not streamed_text_parts
                     and confirmation_card is None
