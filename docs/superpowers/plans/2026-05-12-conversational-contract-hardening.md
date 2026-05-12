@@ -1409,7 +1409,7 @@ git commit -m "docs(agent): clarify conversational action contract"
 **Files:**
 - No new files.
 
-- [ ] **Step 1: Run backend focused runtime suite**
+- [x] **Step 1: Run backend focused runtime suite**
 
 Run:
 
@@ -1419,7 +1419,7 @@ poetry run pytest tests/agent_runtime/test_conversational_contract_hardening.py 
 
 Expected: PASS.
 
-- [ ] **Step 2: Run frontend tests**
+- [x] **Step 2: Run frontend tests**
 
 Run:
 
@@ -1429,7 +1429,7 @@ cd web && bun test __tests__
 
 Expected: PASS.
 
-- [ ] **Step 3: Run lint**
+- [x] **Step 3: Run lint**
 
 Run:
 
@@ -1458,7 +1458,14 @@ Verify these flows at `http://localhost:3000/chat`:
 6. `what assumptions are you using?` after result -> answers from latest run context.
 7. `Show a breakdown` -> concise interpretive response without duplicate result card.
 
-- [ ] **Step 5: Commit final verification updates**
+Blocked on local frontend startup: `NEXT_PUBLIC_MOCK_AUTH=true bun run dev`
+failed because macOS rejected the local `@next/swc-darwin-arm64` binary with
+`mapping process and mapped file (non-platform) have different Team IDs`, and
+no WASM fallback package was installed. Backend startup reached
+`http://127.0.0.1:8000`; browser flow verification could not proceed because
+`http://localhost:3000` never became available.
+
+- [x] **Step 5: Commit final verification updates**
 
 ```bash
 git status --short
