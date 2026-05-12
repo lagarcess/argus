@@ -268,3 +268,28 @@ def test_change_asset_action_prompts_for_replacement_without_llm() -> None:
     assert result.patch["missing_required_fields"] == ["asset_universe"]
     assert "asset" in result.patch["assistant_prompt"].lower()
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
+
+
+def test_model_unavailable_recovery_mentions_active_pending_draft() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        capital_amount=10000,
+    )
+
+    result, interpreter = _interpret(
+        message="actually make it NVDA",
+        response=None,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_to_respond"
+    assert "AAPL" in result.patch["assistant_response"]
+    assert "draft" in result.patch["assistant_response"].lower()
+    assert "try again" in result.patch["assistant_response"].lower()
+    assert "interpretation model" not in result.patch["assistant_response"].lower()

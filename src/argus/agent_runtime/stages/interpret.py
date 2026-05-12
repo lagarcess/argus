@@ -104,7 +104,7 @@ async def interpret_stage_async(
     if structured_action_result is not None:
         return structured_action_result
     if structured_interpreter is None:
-        return _offline_interpreter_unavailable_result(user=user)
+        return _offline_interpreter_unavailable_result(user=user, snapshot=snapshot)
 
     interpretation = await _call_structured_interpreter(
         structured_interpreter,
@@ -117,7 +117,7 @@ async def interpret_stage_async(
         ),
     )
     if interpretation is None:
-        return _offline_interpreter_unavailable_result(user=user)
+        return _offline_interpreter_unavailable_result(user=user, snapshot=snapshot)
 
     return _stage_result_from_interpretation(
         state=state,
@@ -271,7 +271,11 @@ def _stage_result_from_interpretation(
     )
 
 
-def _offline_interpreter_unavailable_result(*, user: UserState) -> StageResult:
+def _offline_interpreter_unavailable_result(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None = None,
+) -> StageResult:
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -294,11 +298,30 @@ def _offline_interpreter_unavailable_result(*, user: UserState) -> StageResult:
         outcome="ready_to_respond",
         decision=decision,
         stage_patch={
-            "assistant_response": (
-                "I could not reach the interpretation model for this turn. "
-                "Your message is saved; please try again."
-            )
+            "assistant_response": _offline_recovery_message(snapshot),
         },
+    )
+
+
+def _offline_recovery_message(snapshot: TaskSnapshot | None) -> str:
+    if snapshot is not None and snapshot.pending_strategy_summary is not None:
+        strategy = snapshot.pending_strategy_summary
+        assets = ", ".join(strategy.asset_universe) or "the current asset"
+        strategy_label = (strategy.strategy_type or "strategy").replace("_", " ")
+        return (
+            f"I still have the {assets} {strategy_label} draft in this chat, "
+            "but I could not process that last change. Try again with the change "
+            "in one sentence, "
+            "or use the visible action chip to adjust the draft."
+        )
+    if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
+        return (
+            "I still have the latest result in this chat, but I could not process that "
+            "follow-up. Try the question again in one sentence."
+        )
+    return (
+        "I could not process that turn. Your message is saved; please try again "
+        "in one sentence."
     )
 
 
