@@ -974,6 +974,16 @@ Soft delete conversation.
 
 # 12. Chat Streaming Endpoint
 
+### Structured Action Semantics
+
+`action` payloads are structured product operations, not plain user text.
+
+- `run_backtest` is valid only when the latest runtime state or safe metadata fallback contains a pending strategy that has already been shown as a confirmation card.
+- `change_asset`, `change_dates`, and `adjust_assumptions` patch the active pending strategy by asking for the replacement field while preserving all other known fields.
+- Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
+- A runnable draft produced after a missing-field answer must emit confirmation before execution.
+- `show_breakdown` and `save_strategy` require canonical result run context.
+
 **Request:**
 ```json
 {

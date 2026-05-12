@@ -8,11 +8,20 @@ Argus treats conversation as the product surface and backtesting as an execution
 
 The model proposes meaning. Argus validates it. The user confirms it. The engine executes it.
 
+## Conversational Artifact Contract
+
+Each active chat turn is grounded in one conversational artifact:
+
+- a pending strategy draft awaiting clarification or confirmation, or
+- a completed result awaiting follow-up.
+
+Every user turn must start a draft, patch the pending draft, answer a pending field, ask about the draft, confirm the draft, ask about the latest result, or recover the latest failed turn. Argus should not restart from blank state when a prior artifact clearly exists, and it must not execute a completed draft until the user has seen and approved the confirmation state.
+
 This separation is intentional:
 
 - LLM interpretation is used for natural language understanding, strategy type inference, structured strategy drafting, ambiguity detection, correction-aware follow-ups, conversational unsupported handling, confirmation wording, and result explanation.
 - Deterministic code is used for capability truth, provider availability, asset class validation, required-field gating, same-asset restrictions, execution defaults, benchmark selection, indicator execution specs, backtest execution, result envelopes, persistence, and stream event shape.
-- The LLM cannot silently mark unsupported behavior as executable, invent asset availability, change symbols, bypass confirmation, or fabricate result metrics.
+- The LLM cannot silently mark unsupported behavior as executable, invent asset availability, change symbols, skip required confirmation, or fabricate result metrics.
 - Deterministic fallback cannot become the normal assistant voice. If the LLM fails, Argus may preserve truth internally, but user-facing copy must be natural recovery language rather than raw fields, enums, or starter prompts.
 
 ## Voice Boundary

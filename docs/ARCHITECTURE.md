@@ -378,7 +378,7 @@ These responsibilities are absolute and do not cross. Routing is not implemented
 ### Pipeline (Per Turn)
 
 ```
-HTTP POST /api/v1/conversations/{id}/chat (SSE)
+HTTP POST /api/v1/chat/stream (SSE)
     │
     ▼
 [Pre-flight] Auth validation, quota check (stateless, no LLM)
@@ -413,6 +413,8 @@ SSE stream: done event with final payload
 ### NLU Ownership Rule
 
 The LLM is the **only NLU layer**. Deterministic code validates facts it cannot know — it does not classify intent, detect approval signals, or generate user-facing text.
+
+Structured action chips are not natural-language NLU shortcuts. They enter LangGraph as explicit product operations attached to the current confirmation or result artifact. Normal user text still reaches the structured LLM interpreter before routing decisions.
 
 | Layer | Owns |
 |---|---|
