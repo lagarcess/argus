@@ -208,6 +208,7 @@ async def _interpret_node_async(
             state=_run_state(state),
             user=_user(state),
             latest_task_snapshot=state.get("latest_task_snapshot"),
+            selected_thread_metadata=state.get("selected_thread_metadata", {}),
             structured_interpreter=structured_interpreter,
         ),
     )

@@ -446,6 +446,11 @@ async def chat_stream(
                 or "en"
             ),
         )
+        action_context = (
+            payload.action.model_dump(mode="python")
+            if payload.action is not None
+            else None
+        )
         streamed_text_parts: list[str] = []
 
         try:
@@ -458,6 +463,7 @@ async def chat_stream(
                 context_hints=[
                     item.model_dump(mode="python") for item in mention_provenance
                 ],
+                action_context=action_context,
                 fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
                 fallback_selected_thread_metadata=(
                     runtime_fallback.selected_thread_metadata

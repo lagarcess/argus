@@ -56,6 +56,7 @@ def interpret_stage(
     state: RunState,
     user: UserState,
     latest_task_snapshot: TaskSnapshot | dict[str, Any] | None,
+    selected_thread_metadata: dict[str, Any] | None = None,
     structured_interpreter: StructuredInterpreter | None = None,
 ) -> StageResult:
     return asyncio.run(
@@ -63,6 +64,7 @@ def interpret_stage(
             state=state,
             user=user,
             latest_task_snapshot=latest_task_snapshot,
+            selected_thread_metadata=selected_thread_metadata,
             structured_interpreter=structured_interpreter,
         )
     )
@@ -73,6 +75,7 @@ async def interpret_stage_async(
     state: RunState,
     user: UserState,
     latest_task_snapshot: TaskSnapshot | dict[str, Any] | None,
+    selected_thread_metadata: dict[str, Any] | None = None,
     structured_interpreter: StructuredInterpreter | None = None,
 ) -> StageResult:
     capability_contract = build_default_capability_contract()
@@ -86,6 +89,7 @@ async def interpret_stage_async(
             current_user_message=state.current_user_message,
             recent_thread_history=list(state.recent_thread_history),
             latest_task_snapshot=snapshot,
+            selected_thread_metadata=dict(selected_thread_metadata or {}),
             user=user,
         ),
     )

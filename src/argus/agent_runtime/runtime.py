@@ -30,6 +30,7 @@ def build_workflow_input(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    action_context: dict[str, Any] | None = None,
     fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
     fallback_selected_thread_metadata: dict[str, Any] | None = None,
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
@@ -43,6 +44,7 @@ def build_workflow_input(
             list(recent_thread_history or [])
         ),
         context_hints=list(context_hints or []),
+        action_context=action_context,
     )
     if fallback_confirmation_payload is not None:
         run_state.confirmation_payload = ConfirmationPayload.model_validate(
@@ -75,6 +77,7 @@ async def stream_agent_turn_events(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    action_context: dict[str, Any] | None = None,
     fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
     fallback_selected_thread_metadata: dict[str, Any] | None = None,
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
@@ -86,6 +89,7 @@ async def stream_agent_turn_events(
         message=message,
         recent_thread_history=recent_thread_history,
         context_hints=context_hints,
+        action_context=action_context,
         fallback_latest_task_snapshot=fallback_latest_task_snapshot,
         fallback_selected_thread_metadata=fallback_selected_thread_metadata,
         fallback_artifact_references=fallback_artifact_references,
@@ -130,6 +134,7 @@ async def run_agent_turn(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    action_context: dict[str, Any] | None = None,
     fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
     fallback_selected_thread_metadata: dict[str, Any] | None = None,
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
@@ -144,6 +149,7 @@ async def run_agent_turn(
         message=message,
         recent_thread_history=recent_thread_history,
         context_hints=context_hints,
+        action_context=action_context,
         fallback_latest_task_snapshot=fallback_latest_task_snapshot,
         fallback_selected_thread_metadata=fallback_selected_thread_metadata,
         fallback_artifact_references=fallback_artifact_references,
