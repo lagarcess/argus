@@ -50,6 +50,15 @@ STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "unsupported_request",
 }
 
+CONFIRMATION_EDIT_ACTION_FIELDS = {
+    "change_asset": ("asset_universe", "What asset should I use instead?"),
+    "change_dates": ("date_range", "What date range should I use instead?"),
+    "adjust_assumptions": (
+        "assumption",
+        "Which assumption do you want to adjust: starting capital, timeframe, fees, or slippage?",
+    ),
+}
+
 
 def interpret_stage(
     *,
@@ -80,6 +89,14 @@ async def interpret_stage_async(
 ) -> StageResult:
     capability_contract = build_default_capability_contract()
     snapshot = normalize_task_snapshot(latest_task_snapshot)
+    structured_action_result = _structured_action_stage_result_if_applicable(
+        state=state,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata or {},
+        user=user,
+    )
+    if structured_action_result is not None:
+        return structured_action_result
     if structured_interpreter is None:
         return _offline_interpreter_unavailable_result(user=user)
 
@@ -268,6 +285,111 @@ def _offline_interpreter_unavailable_result(*, user: UserState) -> StageResult:
             )
         },
     )
+
+
+def _structured_action_stage_result_if_applicable(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    user: UserState,
+) -> StageResult | None:
+    del user
+    action = state.structured_action
+    if action is None or action.presentation != "confirmation":
+        return None
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": (
+                    "I do not have an active confirmation to change. "
+                    "Describe the investing idea again and I will prepare a fresh draft."
+                ),
+                "requested_field": None,
+                "missing_required_fields": [],
+            },
+        )
+
+    pending = snapshot.pending_strategy_summary.model_copy(deep=True)
+    action_type = action.type
+    if action_type == "run_backtest":
+        if not _prior_stage_was_await_approval(selected_thread_metadata):
+            return StageResult(
+                outcome="ready_for_confirmation",
+                stage_patch={
+                    "candidate_strategy_draft": pending.model_dump(mode="python"),
+                    "assistant_prompt": None,
+                },
+            )
+        approved = _canonicalized_strategy(pending)
+        if not strategy_can_be_approved(approved):
+            return StageResult(
+                outcome="needs_clarification",
+                stage_patch={
+                    "candidate_strategy_draft": approved.model_dump(mode="python"),
+                    "missing_required_fields": missing_required_fields_for_strategy(
+                        approved,
+                        contract=build_default_capability_contract(),
+                    ),
+                },
+            )
+        return StageResult(
+            outcome="approved_for_execution",
+            stage_patch={
+                "candidate_strategy_draft": approved.model_dump(mode="python"),
+                "confirmation_payload": {
+                    "strategy": approved.model_dump(mode="python"),
+                    "optional_parameters": {},
+                },
+            },
+        )
+
+    if action_type in CONFIRMATION_EDIT_ACTION_FIELDS:
+        requested_field, prompt = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "candidate_strategy_draft": pending.model_dump(mode="python"),
+                "assistant_prompt": prompt,
+                "requested_field": requested_field,
+                "missing_required_fields": [requested_field],
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": [_semantic_need_for_action(action_type)],
+                    "requested_fields": [requested_field],
+                    "facts": {
+                        "strategy": pending.model_dump(mode="python"),
+                        "current_user_message": state.current_user_message,
+                        "structured_action": action.model_dump(mode="python"),
+                    },
+                    "options": [],
+                },
+            },
+        )
+
+    if action_type == "cancel_confirmation":
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "candidate_strategy_draft": StrategySummary().model_dump(mode="python"),
+                "assistant_response": "No problem. I will leave that draft unrun.",
+            },
+        )
+    return None
+
+
+def _prior_stage_was_await_approval(metadata: dict[str, Any]) -> bool:
+    return str(metadata.get("last_stage_outcome") or "") == "await_approval"
+
+
+def _semantic_need_for_action(action_type: str) -> str:
+    mapping = {
+        "change_asset": "asset_target",
+        "change_dates": "period",
+        "adjust_assumptions": "assumption",
+    }
+    return mapping[action_type]
 
 
 def _approval_stage_result_if_applicable(

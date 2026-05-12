@@ -162,3 +162,69 @@ def test_natural_language_approval_executes_only_after_confirmation_card(monkeyp
 
     assert result.outcome == "approved_for_execution"
     assert result.patch["confirmation_payload"]["strategy"]["asset_universe"] == ["AAPL"]
+
+
+def test_run_backtest_action_approves_pending_confirmation_without_llm(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        capital_amount=10000,
+    )
+
+    result, interpreter = _interpret(
+        message="run backtest",
+        response=None,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        action_context={
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "approved_for_execution"
+    assert result.patch["confirmation_payload"]["strategy"]["asset_universe"] == ["AAPL"]
+
+
+def test_change_asset_action_prompts_for_replacement_without_llm() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        capital_amount=10000,
+    )
+
+    result, interpreter = _interpret(
+        message="change asset",
+        response=None,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        action_context={
+            "type": "change_asset",
+            "label": "Change asset",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "asset_universe"
+    assert result.patch["missing_required_fields"] == ["asset_universe"]
+    assert "asset" in result.patch["assistant_prompt"].lower()
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
