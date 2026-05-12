@@ -52,6 +52,7 @@ STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
 
 CONTEXTUAL_PATCH_TURN_ACTS = {
     "answer_pending_need",
+    "approval",
     "refine_current_idea",
 }
 
@@ -124,6 +125,7 @@ async def interpret_stage_async(
         snapshot=snapshot,
         interpretation=interpretation,
         capability_contract=capability_contract,
+        selected_thread_metadata=dict(selected_thread_metadata or {}),
     )
 
 
@@ -150,6 +152,7 @@ def _stage_result_from_interpretation(
     snapshot: TaskSnapshot | None,
     interpretation: StructuredInterpretation,
     capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
     expects_strategy_route = _strategy_route_expected(
         intent=interpretation.intent,
@@ -236,6 +239,7 @@ def _stage_result_from_interpretation(
         decision=decision,
         snapshot=snapshot,
         state=state,
+        selected_thread_metadata=selected_thread_metadata,
     )
     if approval_result is not None:
         return approval_result
@@ -408,8 +412,11 @@ def _approval_stage_result_if_applicable(
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
     state: RunState,
+    selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
     if decision.semantic_turn_act != "approval":
+        return None
+    if not _prior_stage_was_await_approval(selected_thread_metadata):
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
