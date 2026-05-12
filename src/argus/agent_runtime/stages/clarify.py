@@ -181,27 +181,11 @@ async def clarify_stage_async(
         )
 
     if optional_parameter_choices:
-        response_intent = _response_intent(
-            kind="optional_settings",
-            state=state,
-            facts={"optional_parameter_choices": optional_parameter_choices},
-        )
         return StageResult(
-            outcome="await_user_reply",
+            outcome="ready_for_confirmation",
             stage_patch={
-                "assistant_prompt": await _generate_clarifying_question(
-                    state=state,
-                    response_intent=response_intent,
-                    missing_required_fields=[],
-                    ambiguous_fields=[],
-                    unsupported_constraints=[],
-                    optional_parameter_choices=optional_parameter_choices,
-                    clarification_generator=clarification_generator,
-                    language=language,
-                ),
-                "response_intent": response_intent,
                 "requested_field": None,
-                "optional_parameter_choices": optional_parameter_choices,
+                "assistant_prompt": None,
             },
         )
 

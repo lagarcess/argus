@@ -92,7 +92,7 @@ def _confirmation_runtime_result() -> dict[str, Any]:
             },
             "optional_parameters": {
                 "initial_capital": {
-                    "value": 10000.0,
+                    "value": 1000.0,
                     "source": "default",
                     "label": "Initial capital",
                     "description": "Starting cash",
@@ -106,6 +106,25 @@ def _confirmation_runtime_result() -> dict[str, Any]:
                 "fees": {"value": 0.0, "source": "default", "label": "Fees"},
                 "slippage": {"value": 0.0, "source": "default", "label": "Slippage"},
             },
+        },
+    }
+
+
+def _pending_runtime_result() -> dict[str, Any]:
+    return {
+        "stage_outcome": "await_user_reply",
+        "assistant_prompt": "What asset should I use instead?",
+        "requested_field": "asset_universe",
+        "pending_strategy": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold Apple.",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+                "date_range": "past year",
+            },
+            "requested_field": "asset_universe",
+            "missing_required_fields": ["asset_universe"],
         },
     }
 
@@ -307,6 +326,44 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     assert conversations[0]["id"] == conversation["id"]
     assert conversations[0]["last_message_preview"] == assistant["content"]
     assert "AAPL" in conversations[0]["last_message_preview"]
+
+
+def test_chat_stream_persists_pending_strategy_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(lambda **_: _pending_runtime_result()),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "change asset",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["pending_strategy"]["requested_field"] == "asset_universe"
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant = messages[-1]
+    assert assistant["role"] == "assistant"
+    assert assistant["metadata"]["pending_strategy"]["strategy"]["asset_universe"] == [
+        "AAPL"
+    ]
+    assert assistant["metadata"]["pending_strategy"]["requested_field"] == (
+        "asset_universe"
+    )
 
 
 def test_confirmation_action_requires_pending_confirmation(

@@ -353,14 +353,14 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     assert response.status_code == 200
     run = response.json()["run"]
     assert run["config_snapshot"]["side"] == "long"
-    assert run["config_snapshot"]["starting_capital"] == 10000
+    assert run["config_snapshot"]["starting_capital"] == 1000
     assert run["config_snapshot"]["benchmark_symbol"] == "SPY"
     assert "_execution_realism" not in run["config_snapshot"]
     assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY."
     mock_gateway.create_backtest_run.assert_called_once()
     called_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
     assert isinstance(called_run, BacktestRun)
-    assert called_run.config_snapshot["starting_capital"] == 10000
+    assert called_run.config_snapshot["starting_capital"] == 1000
 
 
 def test_get_backtest_supabase_reads_from_gateway(mock_gateway):

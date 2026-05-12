@@ -716,6 +716,11 @@ def checkpoint_has_latest_result(values: dict[str, Any]) -> bool:
     )
 
 
+def checkpoint_has_pending_strategy(values: dict[str, Any]) -> bool:
+    snapshot = _task_snapshot_from_value(values.get("latest_task_snapshot"))
+    return snapshot is not None and snapshot.pending_strategy_summary is not None
+
+
 def confirmation_metadata_fallback_context(
     *,
     user_id: str,
@@ -782,6 +787,82 @@ def _metadata_invalidates_confirmation(metadata: dict[str, Any]) -> bool:
         return True
     action = metadata.get("chat_action")
     return isinstance(action, dict) and action.get("type") == "cancel_confirmation"
+
+
+def pending_strategy_metadata_fallback_context(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> RuntimeFallbackContext | None:
+    messages = _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    for message in reversed(messages):
+        if message.role != "assistant":
+            continue
+        if not isinstance(message.metadata, dict):
+            return None
+        metadata = message.metadata
+        if _metadata_invalidates_pending_strategy(metadata):
+            return None
+        pending_payload = metadata.get("pending_strategy")
+        if not isinstance(pending_payload, dict):
+            return None
+        strategy_payload = pending_payload.get("strategy")
+        if not isinstance(strategy_payload, dict):
+            continue
+        try:
+            pending_strategy = StrategySummary.model_validate(strategy_payload)
+        except Exception:
+            continue
+        requested_field = pending_payload.get("requested_field")
+        stage_outcome = str(
+            metadata.get("agent_runtime_stage_outcome") or "await_user_reply"
+        )
+        selected_thread_metadata: dict[str, Any] = {
+            "latest_task_type": "backtest_execution",
+            "last_stage_outcome": stage_outcome,
+            "fallback_source": "pending_strategy_metadata",
+        }
+        if isinstance(requested_field, str) and requested_field:
+            selected_thread_metadata["requested_field"] = requested_field
+        return RuntimeFallbackContext(
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="backtest_execution",
+                completed=False,
+                pending_strategy_summary=pending_strategy,
+                last_unresolved_follow_up=(
+                    pending_strategy.raw_user_phrasing
+                    or pending_strategy.strategy_thesis
+                    or pending_strategy.strategy_type
+                ),
+                resolution_provenance=list(pending_strategy.resolution_provenance),
+            ),
+            selected_thread_metadata=selected_thread_metadata,
+            artifact_references=[],
+            confirmation_payload=(
+                metadata.get("confirmation_payload")
+                if isinstance(metadata.get("confirmation_payload"), dict)
+                else None
+            ),
+        )
+    return None
+
+
+def _metadata_invalidates_pending_strategy(metadata: dict[str, Any]) -> bool:
+    if metadata.get("result_card") or metadata.get("result_run_id"):
+        return True
+    action = metadata.get("chat_action")
+    if isinstance(action, dict) and action.get("type") == "cancel_confirmation":
+        return True
+    stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "")
+    return stage_outcome in {
+        "execution_succeeded",
+        "ready_to_respond",
+        "end_run",
+    }
 
 
 def latest_result_fallback_context(

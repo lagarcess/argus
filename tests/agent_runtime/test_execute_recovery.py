@@ -282,7 +282,7 @@ def test_execute_stage_uses_real_backtest_tool_payload(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -361,7 +361,7 @@ def test_execute_stage_passes_language_to_real_backtest_tool(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -442,7 +442,7 @@ def test_execute_stage_uses_currency_pair_as_default_benchmark(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -470,7 +470,7 @@ def test_execute_stage_preserves_multi_symbol_launch_payload(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -679,7 +679,7 @@ def test_execute_stage_uses_strategy_contribution_for_dca(
             "sizing_mode": "capital_amount",
         },
         "optional_parameters": {
-            "initial_capital": {"value": 10000, "source": "default"},
+            "initial_capital": {"value": 1000, "source": "default"},
             "timeframe": {"value": "1D", "source": "default"},
         },
     }

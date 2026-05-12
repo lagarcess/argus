@@ -11,6 +11,7 @@ from argus.agent_runtime.state.models import (
     ConversationMessage,
     ResolutionProvenance,
     RunState,
+    StrategySummary,
     TaskSnapshot,
     UserState,
 )
@@ -228,6 +229,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "assistant_prompt",
         "assistant_response",
         "requested_field",
+        "pending_strategy",
         "optional_parameter_choices",
         "confirmation_payload",
         "next_actions",
@@ -271,10 +273,75 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
                 item.model_dump(mode="python")
                 for item in run_state.resolution_provenance
             ]
+        if "pending_strategy" not in serialized:
+            pending_strategy = _pending_strategy_payload(result, run_state=run_state)
+            if pending_strategy is not None:
+                serialized["pending_strategy"] = pending_strategy
     stage_outcome = result.get("stage_outcome")
     if stage_outcome is not None:
         serialized["stage_outcome"] = getattr(stage_outcome, "value", stage_outcome)
     return serialized
+
+
+def _pending_strategy_payload(
+    result: dict[str, Any],
+    *,
+    run_state: RunState,
+) -> dict[str, Any] | None:
+    stage_outcome = result.get("stage_outcome")
+    stage_outcome_value = str(getattr(stage_outcome, "value", stage_outcome or ""))
+    if stage_outcome_value not in {
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval",
+    }:
+        return None
+    snapshot = _task_snapshot_from_value(result.get("latest_task_snapshot"))
+    strategy = (
+        snapshot.pending_strategy_summary
+        if snapshot is not None and snapshot.pending_strategy_summary is not None
+        else run_state.candidate_strategy_draft
+    )
+    if not _strategy_summary_has_content(strategy):
+        return None
+    missing_required_fields = result.get("missing_required_fields")
+    if not isinstance(missing_required_fields, list):
+        missing_required_fields = list(run_state.missing_required_fields)
+    requested_field = result.get("requested_field")
+    return {
+        "strategy": strategy.model_dump(mode="python"),
+        "requested_field": (
+            str(requested_field)
+            if requested_field not in (None, "")
+            else None
+        ),
+        "missing_required_fields": [
+            str(field) for field in missing_required_fields if isinstance(field, str)
+        ],
+    }
+
+
+def _task_snapshot_from_value(value: Any) -> TaskSnapshot | None:
+    if value is None:
+        return None
+    if isinstance(value, TaskSnapshot):
+        return value
+    try:
+        return TaskSnapshot.model_validate(value)
+    except Exception:
+        return None
+
+
+def _strategy_summary_has_content(strategy: Any) -> bool:
+    if not isinstance(strategy, StrategySummary):
+        try:
+            strategy = StrategySummary.model_validate(strategy)
+        except Exception:
+            return False
+    return any(
+        value not in (None, "", [], {})
+        for value in strategy.model_dump(mode="python").values()
+    )
 
 
 def _serialize_public_value(key: str, value: Any) -> Any:

@@ -116,3 +116,13 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
     text = final["assistant_response"] or final.get("assistant_prompt") or ""
     assert "asset" in text.lower()
     assert final["stage_outcome"] == "await_user_reply"
+    assert final["pending_strategy"]["requested_field"] == "asset_universe"
+    messages = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"]
+    user_message = messages[-2]
+    assistant_message = messages[-1]
+    assert user_message["metadata"]["chat_action"]["type"] == "change_asset"
+    assert assistant_message["metadata"]["pending_strategy"]["requested_field"] == (
+        "asset_universe"
+    )

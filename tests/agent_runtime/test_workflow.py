@@ -39,6 +39,39 @@ class RsiConfirmationInterpreter:
         )
 
 
+class RunnableDraftClarifyingInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="User supplied the missing asset for a runnable draft.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold Apple.",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                date_range="last year",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
+class AssetAnswerInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User supplied the replacement asset.",
+            candidate_strategy_draft=StrategySummary(asset_universe=["TSLA"]),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
 class ConversationalInterpreter:
     async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
         return StructuredInterpretation(
@@ -113,7 +146,109 @@ async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> Non
 
     assert result["stage_outcome"] == "await_approval"
     assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
+    assert result["pending_strategy"]["strategy"]["asset_universe"] == ["TSLA"]
+    assert result["pending_strategy"]["missing_required_fields"] == []
     assert "I read this as" in result["assistant_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_workflow_confirms_runnable_draft_instead_of_optional_settings_prompt(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=RunnableDraftClarifyingInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id="thread-optional-defaults",
+        message="yes AAPL stock",
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold Apple stock for one year.",
+                asset_class="equity",
+                date_range="last year",
+            )
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_user_reply"},
+    )
+
+    assert result["stage_outcome"] == "await_approval"
+    assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["AAPL"]
+    assert result["confirmation_payload"]["optional_parameters"]["initial_capital"][
+        "value"
+    ] == 1000.0
+    assert "optional_parameter_choices" not in result
+
+
+@pytest.mark.asyncio
+async def test_workflow_clears_requested_field_after_chip_answer_confirmation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=AssetAnswerInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Nvidia.",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        date_range="last year",
+    )
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id="thread-chip-answer",
+        message="Change asset",
+        action_context={
+            "type": "change_asset",
+            "label": "Change asset",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "asset_universe"
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id="thread-chip-answer",
+        message="TSLA",
+    )
+
+    assert answer_result["stage_outcome"] == "await_approval"
+    assert answer_result["confirmation_payload"]["strategy"]["asset_universe"] == [
+        "TSLA"
+    ]
+    assert answer_result["pending_strategy"]["requested_field"] is None
+    assert answer_result["pending_strategy"]["missing_required_fields"] == []
 
 
 @pytest.mark.asyncio

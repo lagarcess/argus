@@ -170,7 +170,7 @@ def normalize_backtest_config(payload: dict[str, Any]) -> dict[str, Any]:
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
         "side": payload.get("side") or "long",
-        "starting_capital": payload.get("starting_capital") or 10000,
+        "starting_capital": payload.get("starting_capital") or 1000,
         "allocation_method": payload.get("allocation_method") or "equal_weight",
         "benchmark_symbol": benchmark_symbol,
         "parameters": payload.get("parameters") or {},

@@ -21,7 +21,7 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
                     "initial_capital": {
                         "label": "Initial capital",
                         "source": "default",
-                        "value": 10000.0,
+                        "value": 1000.0,
                     },
                     "timeframe": {
                         "label": "Timeframe",
@@ -63,7 +63,7 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
                     "initial_capital": {
                         "label": "Initial capital",
                         "source": "default",
-                        "value": 10000.0,
+                        "value": 1000.0,
                     },
                     "timeframe": {
                         "label": "Timeframe",

@@ -174,8 +174,18 @@ function hydrateResultActions(
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   const messages: Message[] = items.map((m) => {
     const metadata = m.metadata ?? {};
+    const chatAction = metadata.chat_action as ChatActionOption | undefined;
     const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
     const resultCard = metadata.result_card as ConversationResultCard | undefined;
+    if (m.role === "user" && chatAction && typeof chatAction === "object") {
+      return {
+        id: m.id,
+        role: "user",
+        kind: "action",
+        content: m.content,
+        selectedAction: chatAction,
+      };
+    }
     if (
       m.role !== "user" &&
       !isBreakdownActionMetadata(metadata) &&
@@ -228,6 +238,10 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   });
 
   return { messages, inputActions: latestInputActions(messages) };
+}
+
+function chatStreamErrorText(detail: string | undefined, fallback: string) {
+  return detail || fallback;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -662,9 +676,10 @@ export default function ChatInterface() {
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      kind: "text",
+      kind: action?.type ? "action" : "text",
       content: action?.label ?? trimmed,
       mentions,
+      selectedAction: action,
     };
     const assistantId = crypto.randomUUID();
 
@@ -706,7 +721,10 @@ export default function ChatInterface() {
             m.id === assistantId
               ? {
                   ...m,
-                  content: t('chat.error_backtest'),
+                  content: chatStreamErrorText(
+                    event.data.detail,
+                    t('chat.error_backtest'),
+                  ),
                 }
               : m,
           ),
@@ -801,6 +819,10 @@ export default function ChatInterface() {
       setStreamStatus(null);
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
+      const fallbackMessage =
+        err instanceof ChatStreamError && err.message
+          ? err.message
+          : t('chat.error_backtest');
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -808,7 +830,7 @@ export default function ChatInterface() {
                 ...m,
                 content: isRateLimit
                   ? t('chat.rate_limit_error')
-                  : t('chat.error_backtest'),
+                  : fallbackMessage,
               }
             : m,
         ),

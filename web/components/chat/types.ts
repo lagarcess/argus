@@ -83,9 +83,10 @@ export type StrategyConfirmationPayload = {
 export type Message = {
   id: string;
   role: "user" | "ai";
-  kind?: "text" | "strategy_result" | "strategy_confirmation";
+  kind?: "text" | "strategy_result" | "strategy_confirmation" | "action";
   content?: string;
   mentions?: ChatMention[];
+  selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
   confirmation?: StrategyConfirmationPayload;
   isLoadingResult?: boolean;

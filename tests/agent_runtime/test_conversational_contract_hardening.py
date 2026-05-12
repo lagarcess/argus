@@ -99,6 +99,151 @@ def test_answer_pending_need_preserves_prior_strategy_fields(monkeypatch) -> Non
     assert strategy.capital_amount == 10000
 
 
+def test_non_dca_capital_answer_updates_initial_capital_assumption(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the requested starting capital.",
+        candidate_strategy_draft=StrategySummary(capital_amount=10000),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="ten thousand",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "initial_capital",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range == "past year"
+    assert strategy.capital_amount is None
+    assert result.patch["optional_parameter_status"]["initial_capital"] == 10000
+
+
+def test_buy_and_hold_without_capital_is_ready_for_confirmation(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to buy and hold Apple over the past year.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Apple.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range="past year",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="let's try a buy and hold on apple over the last year",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.missing_required_fields == []
+    assert result.decision.candidate_strategy_draft.capital_amount is None
+
+
+def test_buy_and_hold_ignores_spurious_missing_capital(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to buy and hold Apple over the past year.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Apple.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range="past year",
+        ),
+        missing_required_fields=["capital_amount"],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="let's try a buy and hold on apple over the last year",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.missing_required_fields == []
+    assert result.decision.candidate_strategy_draft.capital_amount is None
+
+
+def test_dca_without_recurring_amount_still_requires_amount(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants recurring Apple buys.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple every month.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range="past year",
+            cadence="monthly",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="buy Apple every month over the past year",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.missing_required_fields == ["capital_amount"]
+
+
 def test_refine_current_idea_preserves_prior_date_and_capital(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -115,6 +260,19 @@ def test_refine_current_idea_preserves_prior_date_and_capital(monkeypatch) -> No
         date_range="past year",
         capital_amount=10000,
     )
+    pending.resolution_provenance = [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "AAPL",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "AAPL",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        }
+    ]
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="refine",
@@ -137,6 +295,51 @@ def test_refine_current_idea_preserves_prior_date_and_capital(monkeypatch) -> No
     assert strategy.asset_class == "equity"
     assert strategy.date_range == "past year"
     assert strategy.capital_amount == 10000
+    assert all(
+        not isinstance(item, dict) for item in strategy.resolution_provenance
+    )
+
+
+def test_change_asset_answer_patches_requested_field_only(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the replacement asset.",
+        candidate_strategy_draft=StrategySummary(asset_universe=["NVDA"]),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="NVDA",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.date_range == "past year"
+    assert strategy.capital_amount is None
 
 
 def test_natural_language_approval_does_not_execute_from_missing_field_state(monkeypatch) -> None:
@@ -243,6 +446,34 @@ def test_run_backtest_action_approves_pending_confirmation_without_llm(monkeypat
     assert interpreter.requests == []
     assert result.outcome == "approved_for_execution"
     assert result.patch["confirmation_payload"]["strategy"]["asset_universe"] == ["AAPL"]
+
+
+def test_run_backtest_action_from_missing_field_state_returns_confirmation() -> None:
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+
+    result, interpreter = _interpret(
+        message="run backtest",
+        response=None,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_user_reply"},
+        action_context={
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "ready_for_confirmation"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
 
 
 def test_change_asset_action_prompts_for_replacement_without_llm() -> None:

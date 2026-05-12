@@ -10,6 +10,35 @@
 
 ---
 
+## 2026-05-12 Implementation Amendment: Pending-Strategy Refinement Only
+
+This branch is currently implementing one production-readiness gap from the
+larger hardening plan: **Pending-strategy refinement**. Browser verification is
+not marked complete until the live `/chat` flow proves the acceptance cases.
+
+Active scope:
+
+- Set the global drafted-strategy default `initial_capital` to `$1,000`.
+- Keep `StrategySummary.capital_amount` semantics intact for explicit
+  user-provided strategy amounts, especially DCA recurring contributions.
+- Do not write default starting capital into `StrategySummary.capital_amount`.
+- Expose `pending_strategy` on final SSE payloads while pending, ready for
+  confirmation, or awaiting approval.
+- Persist `pending_strategy` on assistant messages and recover it from recent
+  metadata when the LangGraph checkpoint is unavailable.
+- Treat `Change asset`, `Change dates`, and `Adjust assumptions` as structured
+  refinement affordances attached to the active pending draft.
+- Keep `Run backtest` confirmation-only; it must not execute from
+  `await_user_reply`.
+- Render selected action chips as action transcript items instead of normal
+  typed user bubbles.
+
+Still out of scope for this implementation pass: result breakdown depth, stale
+result-card cleanup, quotas, Spanish expansion, fees, unequal allocations, new
+strategy types, custom indicators, and RAG/vector memory.
+
+---
+
 ## Source Of Truth Read Before Planning
 
 - `AGENTS.md`
@@ -85,7 +114,7 @@ Modify:
 - `docs/CONVERSATIONAL_RUNTIME.md` - document the conversational artifact transition contract.
 - `docs/ARCHITECTURE.md` - fix stale chat route wording and clarify that structured actions are product operations entering LangGraph.
 
-Do not modify:
+Do not modify, except where listed in the amendment above:
 
 - `src/argus/domain/engine.py`
 - `src/argus/domain/engine_launch/**`

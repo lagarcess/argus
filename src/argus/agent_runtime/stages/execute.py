@@ -575,7 +575,7 @@ def _resolve_capital_amount(
             return nested_capital
     value = _resolve_optional_value(optional_parameters, "initial_capital")
     if value is None:
-        return 10000.0
+        return 1000.0
     return _as_optional_float(value)
 
 

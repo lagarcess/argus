@@ -123,6 +123,34 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
   });
 
+  test("chat final payload accepts pending strategy metadata", () => {
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(api).toContain("pending_strategy?");
+    expect(api).toContain("missing_required_fields?: string[]");
+    expect(api).toContain("strategy: Record<string, unknown>");
+  });
+
+  test("confirmation action chips render as action transcript items", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
+
+    expect(types).toContain('"action"');
+    expect(chat).toContain('kind: action?.type ? "action" : "text"');
+    expect(chat).toContain("selectedAction: action");
+    expect(chat).toContain("metadata.chat_action");
+    expect(message).toContain('message.kind === "action"');
+  });
+
+  test("streaming backend errors keep backend detail when provided", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("chatStreamErrorText(");
+    expect(chat).toContain("event.data.detail");
+    expect(chat).toContain("err instanceof ChatStreamError && err.message");
+  });
+
   test("chat stream parser consumes canonical data-only SSE frames", () => {
     const stage = parseChatStreamFrame('data: {"type":"stage_start","stage":"execute"}');
     const token = parseChatStreamFrame('data: {"type":"token","content":"Running"}');

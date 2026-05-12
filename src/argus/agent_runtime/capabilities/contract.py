@@ -314,7 +314,7 @@ def build_default_capability_contract() -> CapabilityContract:
         },
         optional_parameters={
             "initial_capital": OptionalParameterSpec(
-                default_value=10000.0,
+                default_value=1000.0,
                 description=FieldDescription(
                     label="Initial capital",
                     description="Starting cash for the simulated backtest.",

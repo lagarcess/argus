@@ -387,7 +387,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert run["asset_class"] == "equity"
     assert run["benchmark_symbol"] == "SPY"
     assert run["config_snapshot"]["side"] == "long"
-    assert run["config_snapshot"]["starting_capital"] == 10000
+    assert run["config_snapshot"]["starting_capital"] == 1000
     assert "_execution_realism" not in run["config_snapshot"]
     assert "summary" not in run
     assert set(run["metrics"]) == {"aggregate", "by_symbol"}
@@ -397,7 +397,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert run["conversation_result_card"]["assumptions"] == [
         "Universe: TSLA.",
         "Simulation uses long-only preset.",
-        "Starting capital: $10,000.",
+        "Starting capital: $1,000.",
         "Allocation: equal weight.",
         "No slippage or fees included.",
         "Benchmark: SPY.",

@@ -282,12 +282,15 @@ Application-facing user object.
 - `system`
 - `tool`
 
-Assistant `metadata` may include structured continuity artifacts such as
-`confirmation_card`, `confirmation_payload`, `result_card`, `result_run_id`,
-`latest_run_id`, `result_strategy_id`, and `result_conversation_id`. Clients use
-these fields to hydrate cards and actions after reload. Runtime execution still
-validates against the LangGraph checkpoint first, and result actions that mutate
-state must reference a canonical run id.
+Message `metadata` may include structured continuity artifacts. Assistant
+messages may store `pending_strategy`, `confirmation_card`,
+`confirmation_payload`, `result_card`, `result_run_id`, `latest_run_id`,
+`result_strategy_id`, and `result_conversation_id`. User messages created by
+action chips may store `chat_action` so the transcript can hydrate the selected
+chip as an action item after reload. Clients use these fields to hydrate cards
+and actions after reload. Runtime execution still validates against the
+LangGraph checkpoint first, and result actions that mutate state must reference a
+canonical run id.
 
 ## Strategy
 
@@ -420,7 +423,7 @@ Immutable simulation result.
     "start_date": "2022-01-01",
     "end_date": "2024-12-31",
     "side": "long",
-    "starting_capital": 10000,
+    "starting_capital": 1000,
     "allocation_method": "equal_weight",
     "benchmark_symbol": "SPY",
     "parameters": {}
@@ -615,7 +618,7 @@ The canonical backtest config used by the engine for execution and reproducibili
   "start_date": "2025-04-23",
   "end_date": "2026-04-23",
   "side": "long",
-  "starting_capital": 10000,
+  "starting_capital": 1000,
   "allocation_method": "equal_weight",
   "benchmark_symbol": "SPY",
   "parameters": {}
@@ -632,7 +635,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - `start_date`: Rolling 12 months before `end_date`
 - `end_date`: Latest available market date
 - `side`: "long"
-- `starting_capital`: 10000
+- `starting_capital`: 1000
 - `allocation_method`: "equal_weight"
 - `benchmark_symbol`: `SPY` (equity), `BTC` (crypto), tested pair (`currency_pair`)
 - `parameters`: Template-specific defaults
@@ -645,11 +648,11 @@ The canonical backtest config used by the engine for execution and reproducibili
 - *Return 422 for unsupported values.*
 
 ### Starting Capital
-- **Default:** 10000
+- **Default:** 1000
 - **Allowed Range:** 1,000 to 100,000,000
 - *Return 422 for values outside range.*
 - > [!NOTE]
-  > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance.
+  > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance. The global default is `$1,000` for runnable drafts. DCA/recurring-buy contribution amounts are strategy-specific user inputs and remain separate from default starting capital.
 
 ### Symbol Constraints
 - **Minimum:** 1 symbol
@@ -981,6 +984,7 @@ Soft delete conversation.
 - `run_backtest` is valid only when the latest runtime state or safe metadata fallback contains a pending strategy that has already been shown as a confirmation card.
 - `change_asset`, `change_dates`, and `adjust_assumptions` patch the active pending strategy by asking for the replacement field while preserving all other known fields.
 - Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
+- `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
 - A runnable draft produced after a missing-field answer must emit confirmation before execution.
 - `show_breakdown` and `save_strategy` require canonical result run context.
 
@@ -1085,6 +1089,24 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
     "run": { },
     "next_actions": ["save_strategy", "refine_strategy", "show_breakdown"],
     "message_id": "uuid"
+  }
+}
+```
+
+When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
+or `await_approval`, the final payload may include:
+
+```json
+{
+  "pending_strategy": {
+    "strategy": {
+      "strategy_type": "buy_and_hold",
+      "asset_universe": ["AAPL"],
+      "asset_class": "equity",
+      "date_range": "past year"
+    },
+    "requested_field": "asset_universe",
+    "missing_required_fields": ["asset_universe"]
   }
 }
 ```
@@ -1258,7 +1280,7 @@ Run directly from saved strategy or inline config.
   "timeframe": "1D",
   "start_date": "2025-04-23",
   "end_date": "2026-04-23",
-  "starting_capital": 10000
+  "starting_capital": 1000
 }
 ```
 
@@ -1273,7 +1295,7 @@ Run directly from saved strategy or inline config.
   "start_date": "2025-04-23",
   "end_date": "2026-04-23",
   "side": "long",
-  "starting_capital": 10000,
+  "starting_capital": 1000,
   "allocation_method": "equal_weight",
   "parameters": {},
   "benchmark_symbol": "SPY"

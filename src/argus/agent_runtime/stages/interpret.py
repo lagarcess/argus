@@ -170,6 +170,10 @@ def _stage_result_from_interpretation(
         if expects_strategy_route
         else incoming_strategy
     )
+    strategy, optional_parameter_values = _route_contextual_money_answer(
+        strategy=strategy,
+        selected_thread_metadata=selected_thread_metadata,
+    )
     unsupported_constraints = list(interpretation.unsupported_constraints)
     ambiguous_fields = list(interpretation.ambiguous_fields)
     if expects_strategy_route:
@@ -236,6 +240,10 @@ def _stage_result_from_interpretation(
         resolution_provenance=list(strategy.resolution_provenance),
         semantic_turn_act=interpretation.semantic_turn_act,
     )
+    optional_parameter_stage_patch = _optional_parameter_stage_patch(
+        decision=decision,
+        values=optional_parameter_values,
+    )
     approval_result = _approval_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -258,18 +266,59 @@ def _stage_result_from_interpretation(
             stage_patch={"assistant_response": interpretation.assistant_response},
         )
     if requires_clarification:
-        return StageResult(outcome="needs_clarification", decision=decision)
+        return StageResult(
+            outcome="needs_clarification",
+            decision=decision,
+            stage_patch=optional_parameter_stage_patch,
+        )
     if expects_strategy_route:
-        return StageResult(outcome="ready_for_confirmation", decision=decision)
+        return StageResult(
+            outcome="ready_for_confirmation",
+            decision=decision,
+            stage_patch=optional_parameter_stage_patch,
+        )
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
         stage_patch=(
-            {"assistant_response": interpretation.assistant_response}
+            {
+                **optional_parameter_stage_patch,
+                "assistant_response": interpretation.assistant_response,
+            }
             if interpretation.assistant_response
-            else {}
+            else optional_parameter_stage_patch
         ),
     )
+
+
+def _route_contextual_money_answer(
+    *,
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+) -> tuple[StrategySummary, dict[str, Any]]:
+    requested_field = str(selected_thread_metadata.get("requested_field") or "")
+    if requested_field not in {"initial_capital", "capital_amount"}:
+        return strategy, {}
+    if strategy.capital_amount is None:
+        return strategy, {}
+    if executable_strategy_type(strategy) == "dca_accumulation":
+        return strategy, {}
+    updated = strategy.model_copy(deep=True)
+    initial_capital = updated.capital_amount
+    updated.capital_amount = None
+    return updated, {"initial_capital": initial_capital}
+
+
+def _optional_parameter_stage_patch(
+    *,
+    decision: InterpretDecision,
+    values: dict[str, Any],
+) -> dict[str, Any]:
+    if not values:
+        return {}
+    optional_parameter_status = dict(decision.to_patch()["optional_parameter_status"])
+    optional_parameter_status.update(values)
+    return {"optional_parameter_status": optional_parameter_status}
 
 
 def _offline_interpreter_unavailable_result(
@@ -784,10 +833,13 @@ def _missing_fields_for_interpretation(
         semantic_turn_act=interpretation.semantic_turn_act,
     ):
         return []
+    allowed_missing_fields = set(
+        missing_required_fields_for_strategy(strategy, contract=contract)
+    )
     missing = [
         field
         for field in interpretation.missing_required_fields
-        if isinstance(field, str) and field
+        if isinstance(field, str) and field and field in allowed_missing_fields
     ]
     missing.extend(missing_required_fields_for_strategy(strategy, contract=contract))
     return list(dict.fromkeys(missing))
@@ -800,8 +852,14 @@ def missing_required_fields_for_strategy(
 ) -> list[str]:
     strategy_type = executable_strategy_type(strategy)
     required = list(contract.required_fields)
-    if strategy_type == "dca_accumulation" and strategy.capital_amount is None:
-        required.append("capital_amount")
+    if strategy_type == "dca_accumulation":
+        required = [
+            field_name
+            for field_name in required
+            if field_name not in {"entry_logic", "exit_logic"}
+        ]
+        if strategy.capital_amount is None:
+            required.append("capital_amount")
     if strategy_type == "buy_and_hold":
         required = ["asset_universe", "date_range"]
     missing: list[str] = []
@@ -853,11 +911,18 @@ def _dedupe_ambiguous_fields(fields: list[AmbiguousField]) -> list[AmbiguousFiel
 
 
 def _dedupe_resolution_provenance(
-    provenance: list[ResolutionProvenance],
+    provenance: list[ResolutionProvenance | dict[str, Any]],
 ) -> list[ResolutionProvenance]:
     seen: set[tuple[str, str, str, str]] = set()
     deduped: list[ResolutionProvenance] = []
-    for item in provenance:
+    for raw_item in provenance:
+        if isinstance(raw_item, ResolutionProvenance):
+            item = raw_item
+        else:
+            try:
+                item = ResolutionProvenance.model_validate(raw_item)
+            except (TypeError, ValueError):
+                continue
         key = (
             item.field,
             item.raw_text,

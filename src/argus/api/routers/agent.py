@@ -18,10 +18,12 @@ from argus.api.chat_service import (
     chat_request_message,
     checkpoint_has_latest_result,
     checkpoint_has_pending_confirmation,
+    checkpoint_has_pending_strategy,
     confirmation_metadata_fallback_context,
     is_confirmation_action,
     latest_result_fallback_context,
     parse_onboarding_control_message,
+    pending_strategy_metadata_fallback_context,
     persist_onboarding_update,
     persist_runtime_backtest_run,
     result_breakdown_message,
@@ -173,6 +175,20 @@ async def chat_stream(
                     ),
                 )
             runtime_fallback = metadata_fallback
+    elif not checkpoint_has_pending_strategy(checkpoint_values):
+        pending_fallback = pending_strategy_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if pending_fallback is not None:
+            runtime_fallback = pending_fallback
+        elif not checkpoint_has_latest_result(checkpoint_values):
+            result_fallback = latest_result_fallback_context(
+                user_id=user.id,
+                conversation_id=conversation.id,
+            )
+            if result_fallback is not None:
+                runtime_fallback = result_fallback
     elif not checkpoint_has_latest_result(checkpoint_values):
         result_fallback = latest_result_fallback_context(
             user_id=user.id,
@@ -186,24 +202,22 @@ async def chat_stream(
         for index, mention in enumerate(payload.mentions)
     ]
     if onboarding_goal is None:
-        user_metadata = (
-            {
-                "mentions": [
-                    mention.model_dump(mode="python") for mention in payload.mentions
-                ],
-                "resolution_provenance": [
-                    item.model_dump(mode="python") for item in mention_provenance
-                ],
-            }
-            if mention_provenance
-            else None
-        )
+        user_metadata: dict[str, Any] = {}
+        if mention_provenance:
+            user_metadata["mentions"] = [
+                mention.model_dump(mode="python") for mention in payload.mentions
+            ]
+            user_metadata["resolution_provenance"] = [
+                item.model_dump(mode="python") for item in mention_provenance
+            ]
+        if payload.action is not None:
+            user_metadata["chat_action"] = payload.action.model_dump(mode="python")
         create_message(
             user_id=user.id,
             conversation_id=conversation.id,
             role="user",
             content=display_message,
-            metadata=user_metadata,
+            metadata=user_metadata or None,
         )
 
     onboarding_required = current_user_profile.onboarding.stage in {
@@ -532,6 +546,8 @@ async def chat_stream(
                     metadata["resolution_provenance"] = runtime_result[
                         "resolution_provenance"
                     ]
+                if isinstance(runtime_result.get("pending_strategy"), dict):
+                    metadata["pending_strategy"] = runtime_result["pending_strategy"]
                 if confirmation_card is not None:
                     metadata["confirmation_card"] = confirmation_card
                     if isinstance(

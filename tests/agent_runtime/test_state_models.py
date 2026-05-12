@@ -199,7 +199,7 @@ def test_capability_contract_exposes_required_and_optional_fields() -> None:
         "exit_logic",
         "date_range",
     ]
-    assert contract.optional_defaults["initial_capital"] == 10000.0
+    assert contract.optional_defaults["initial_capital"] == 1000.0
     assert contract.optional_defaults["timeframe"] == "1D"
     assert "engine_options" in contract.optional_defaults
     assert contract.get_optional_parameter("initial_capital").description.label == (
