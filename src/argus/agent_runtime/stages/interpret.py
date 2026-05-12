@@ -23,6 +23,7 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
+    ArtifactReference,
     ConfirmationPayload,
     IntentName,
     ResolutionProvenance,
@@ -334,7 +335,14 @@ def _structured_action_stage_result_if_applicable(
 ) -> StageResult | None:
     del user
     action = state.structured_action
-    if action is None or action.presentation != "confirmation":
+    if action is None:
+        return None
+    if action.presentation == "result":
+        return _result_action_stage_result_if_applicable(
+            state=state,
+            snapshot=snapshot,
+        )
+    if action.presentation != "confirmation":
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return StageResult(
@@ -415,6 +423,116 @@ def _structured_action_stage_result_if_applicable(
             },
         )
     return None
+
+
+def _result_action_stage_result_if_applicable(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+) -> StageResult | None:
+    action = state.structured_action
+    if action is None or action.type != "refine_strategy":
+        return None
+    reference = (
+        snapshot.latest_backtest_result_reference
+        if snapshot is not None
+        else None
+    )
+    if reference is None:
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "assistant_response": (
+                    "I do not have a completed result to refine. Run a strategy "
+                    "first, then use Refine strategy from the result card."
+                ),
+            },
+        )
+    strategy = _strategy_from_result_action_snapshot(snapshot=snapshot)
+    latest_run_id = _latest_run_id_for_action(
+        action_payload=action.payload,
+        reference=reference,
+    )
+    return StageResult(
+        outcome="await_user_reply",
+        stage_patch={
+            "candidate_strategy_draft": strategy.model_dump(mode="python"),
+            "assistant_prompt": "What would you like to change about this strategy?",
+            "requested_field": "refinement",
+            "missing_required_fields": ["refinement"],
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": [],
+                "requested_fields": ["refinement"],
+                "facts": {
+                    "strategy": strategy.model_dump(mode="python"),
+                    "current_user_message": state.current_user_message,
+                    "structured_action": action.model_dump(mode="python"),
+                    "latest_run_id": latest_run_id,
+                    "latest_result_reference": reference.model_dump(mode="python"),
+                },
+                "options": [],
+            },
+        },
+    )
+
+
+def _strategy_from_result_action_snapshot(
+    *,
+    snapshot: TaskSnapshot | None,
+) -> StrategySummary:
+    if snapshot is not None and snapshot.confirmed_strategy_summary is not None:
+        return snapshot.confirmed_strategy_summary.model_copy(deep=True)
+    if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
+        return _strategy_from_result_reference(snapshot.latest_backtest_result_reference)
+    return StrategySummary()
+
+
+def _latest_run_id_for_action(
+    *,
+    action_payload: dict[str, Any],
+    reference: ArtifactReference,
+) -> str:
+    raw_run_id = action_payload.get("run_id") or action_payload.get("runId")
+    if raw_run_id is not None:
+        run_id = str(raw_run_id).strip()
+        if run_id:
+            return run_id
+    return reference.artifact_id
+
+
+def _strategy_from_result_reference(reference: ArtifactReference) -> StrategySummary:
+    metadata = dict(reference.metadata)
+    config = metadata.get("config_snapshot")
+    config_snapshot = dict(config) if isinstance(config, dict) else {}
+    resolved_strategy = config_snapshot.get("resolved_strategy")
+    payload = dict(resolved_strategy) if isinstance(resolved_strategy, dict) else {}
+    resolved_parameters = config_snapshot.get("resolved_parameters")
+    parameters = dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
+
+    if not payload.get("strategy_type") and config_snapshot.get("template"):
+        payload["strategy_type"] = config_snapshot["template"]
+    if not payload.get("asset_class") and metadata.get("asset_class"):
+        payload["asset_class"] = metadata["asset_class"]
+    if not payload.get("asset_universe"):
+        symbols = payload.get("symbols") or config_snapshot.get("symbols")
+        if isinstance(symbols, list):
+            payload["asset_universe"] = [str(symbol) for symbol in symbols if symbol]
+    if not payload.get("date_range"):
+        payload["date_range"] = parameters.get("date_range") or config_snapshot.get(
+            "date_range"
+        )
+
+    allowed_fields = set(StrategySummary.model_fields)
+    strategy_payload = {
+        key: value
+        for key, value in payload.items()
+        if key in allowed_fields and value not in (None, "", [], {})
+    }
+    try:
+        return StrategySummary.model_validate(strategy_payload)
+    except Exception:
+        return StrategySummary()
 
 
 def _prior_stage_was_await_approval(metadata: dict[str, Any]) -> bool:

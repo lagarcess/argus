@@ -642,7 +642,7 @@ def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
         if message.role != "assistant" or not isinstance(message.metadata, dict):
             continue
         metadata = message.metadata
-        if metadata.get("result_card") or metadata.get("result_run_id"):
+        if _metadata_invalidates_confirmation(metadata):
             return False
         if metadata.get("confirmation_card"):
             return True
@@ -730,7 +730,7 @@ def confirmation_metadata_fallback_context(
         if message.role != "assistant" or not isinstance(message.metadata, dict):
             continue
         metadata = message.metadata
-        if metadata.get("result_card") or metadata.get("result_run_id"):
+        if _metadata_invalidates_confirmation(metadata):
             return None
         if not metadata.get("confirmation_card"):
             continue
@@ -775,6 +775,13 @@ def confirmation_metadata_fallback_context(
             confirmation_payload=payload,
         )
     return None
+
+
+def _metadata_invalidates_confirmation(metadata: dict[str, Any]) -> bool:
+    if metadata.get("result_card") or metadata.get("result_run_id"):
+        return True
+    action = metadata.get("chat_action")
+    return isinstance(action, dict) and action.get("type") == "cancel_confirmation"
 
 
 def latest_result_fallback_context(

@@ -231,6 +231,62 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
     assert "confirm it again" in text
 
 
+def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "ready_to_respond"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=_confirmation_metadata(),
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="No problem. I will leave that draft unrun.",
+        metadata={
+            "conversation_mode": "guide",
+            "agent_runtime_stage_outcome": "ready_to_respond",
+            "chat_action": {
+                "type": "cancel_confirmation",
+                "label": "Cancel",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 409
+    assert runtime_calls == 0
+
+
 def test_result_followup_after_reload_carries_latest_run_reference(
     monkeypatch,
 ) -> None:

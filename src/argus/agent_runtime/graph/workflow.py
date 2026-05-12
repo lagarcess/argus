@@ -24,6 +24,7 @@ from argus.agent_runtime.stages.next_step import next_step_stage_async
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
+    StrategySummary,
     TaskSnapshot,
     UserState,
 )
@@ -355,28 +356,42 @@ def _build_task_snapshot(
         artifact_references=artifact_references,
         artifact_kind="collection_action",
     )
+    preserve_pending_strategy = _should_preserve_pending_strategy(
+        run_state=run_state,
+        stage_outcome_value=stage_outcome_value,
+        prior_task_snapshot=prior_task_snapshot,
+        latest_backtest_reference=latest_backtest_reference,
+        latest_collection_reference=latest_collection_reference,
+    )
+    completed = stage_outcome_value in completed_outcomes and not preserve_pending_strategy
     pending_strategy_summary = (
-        run_state.candidate_strategy_draft
-        if stage_outcome_value in {"await_user_reply", "await_approval"}
+        prior_task_snapshot.pending_strategy_summary
+        if preserve_pending_strategy and prior_task_snapshot is not None
         else (
-            prior_task_snapshot.pending_strategy_summary
-            if prior_task_snapshot is not None
-            and stage_outcome_value not in completed_outcomes
-            else None
+            run_state.candidate_strategy_draft
+            if stage_outcome_value in {"await_user_reply", "await_approval"}
+            else (
+                prior_task_snapshot.pending_strategy_summary
+                if prior_task_snapshot is not None
+                and stage_outcome_value not in completed_outcomes
+                else None
+            )
         )
+    )
+    prior_confirmed_strategy = (
+        prior_task_snapshot.confirmed_strategy_summary
+        if prior_task_snapshot is not None
+        else None
     )
     return TaskSnapshot(
         latest_task_type=run_state.intent,
-        completed=stage_outcome_value in completed_outcomes,
+        completed=completed,
         pending_strategy_summary=pending_strategy_summary,
         confirmed_strategy_summary=(
             run_state.candidate_strategy_draft
-            if stage_outcome_value in completed_outcomes
-            else (
-                prior_task_snapshot.confirmed_strategy_summary
-                if prior_task_snapshot is not None
-                else None
-            )
+            if completed
+            and _strategy_summary_has_content(run_state.candidate_strategy_draft)
+            else prior_confirmed_strategy
         ),
         latest_backtest_result_reference=(
             latest_backtest_reference
@@ -407,6 +422,31 @@ def _build_task_snapshot(
                 else []
             )
         ),
+    )
+
+
+def _should_preserve_pending_strategy(
+    *,
+    run_state: RunState,
+    stage_outcome_value: str,
+    prior_task_snapshot: TaskSnapshot | None,
+    latest_backtest_reference: ArtifactReference | None,
+    latest_collection_reference: ArtifactReference | None,
+) -> bool:
+    if stage_outcome_value != "ready_to_respond":
+        return False
+    if prior_task_snapshot is None or prior_task_snapshot.pending_strategy_summary is None:
+        return False
+    if latest_backtest_reference is not None or latest_collection_reference is not None:
+        return False
+    action = run_state.structured_action
+    return action is None or action.type != "cancel_confirmation"
+
+
+def _strategy_summary_has_content(strategy: StrategySummary) -> bool:
+    return any(
+        value not in (None, "", [], {})
+        for value in strategy.model_dump(mode="python").values()
     )
 
 

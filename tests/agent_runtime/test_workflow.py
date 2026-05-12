@@ -7,7 +7,7 @@ from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import StrategySummary, UserState
+from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot, UserState
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -160,6 +160,43 @@ async def test_workflow_streams_stage_events_and_final_payload() -> None:
     assert events[-1]["payload"]["assistant_response"] == (
         "I help turn investing ideas into supported backtests."
     )
+
+
+@pytest.mark.asyncio
+async def test_workflow_preserves_pending_draft_after_interpreter_recovery() -> None:
+    workflow = build_workflow(checkpointer=MemorySaver())
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        capital_amount=10000,
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", expertise_level="beginner"),
+        thread_id="thread-recovery",
+        message="actually make it NVDA",
+        fallback_latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert result["stage_outcome"] == "ready_to_respond"
+    assert "AAPL" in result["assistant_response"]
+    state_snapshot = await workflow.aget_state(
+        {"configurable": {"thread_id": "thread-recovery"}}
+    )
+    snapshot = state_snapshot.values["latest_task_snapshot"]
+    assert snapshot.completed is False
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+    assert snapshot.confirmed_strategy_summary is None
 
 
 @pytest.mark.asyncio

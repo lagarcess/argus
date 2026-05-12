@@ -5,6 +5,7 @@ from typing import Any
 
 from argus.agent_runtime.stages.interpret import StructuredInterpretation, interpret_stage
 from argus.agent_runtime.state.models import (
+    ArtifactReference,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -298,3 +299,56 @@ def test_model_unavailable_recovery_mentions_active_pending_draft() -> None:
     assert "draft" in result.patch["assistant_response"].lower()
     assert "try again" in result.patch["assistant_response"].lower()
     assert "interpretation model" not in result.patch["assistant_response"].lower()
+
+
+def test_refine_strategy_result_action_prompts_for_change_without_llm() -> None:
+    confirmed = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Microsoft.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-1",
+        metadata={
+            "asset_class": "equity",
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "symbols": ["AAPL"],
+                "date_range": "past year",
+                "resolved_strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": "past year",
+                },
+            },
+        },
+    )
+
+    result, interpreter = _interpret(
+        message="refine this strategy",
+        response=None,
+        snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            confirmed_strategy_summary=confirmed,
+            latest_backtest_result_reference=reference,
+        ),
+        action_context={
+            "type": "refine_strategy",
+            "label": "Refine strategy",
+            "presentation": "result",
+            "payload": {"run_id": "run-1"},
+        },
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "refinement"
+    assert "change" in result.patch["assistant_prompt"].lower()
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["MSFT"]
+    assert result.patch["response_intent"]["facts"]["latest_run_id"] == "run-1"

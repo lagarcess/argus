@@ -526,6 +526,8 @@ async def chat_stream(
                     ),
                     "agent_runtime_stage_outcome": stage_status,
                 }
+                if payload.action is not None:
+                    metadata["chat_action"] = payload.action.model_dump(mode="python")
                 if runtime_result.get("resolution_provenance"):
                     metadata["resolution_provenance"] = runtime_result[
                         "resolution_provenance"
