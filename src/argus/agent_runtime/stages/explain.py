@@ -99,7 +99,9 @@ async def _stream_llm_explanation(
                 "You are Argus explaining a completed historical backtest. "
                 "Use only the supplied metrics and assumptions. Keep the response "
                 "concise, natural, and beginner-friendly. Do not invent metrics, "
-                "predictions, fees, slippage, or unsupported trading capabilities."
+                "predictions, fees, slippage, or unsupported trading capabilities. "
+                "Keep the answer under 90 words. Do not restate every result-card "
+                "metric; interpret what matters and name the main caveat."
             )
         ),
         HumanMessage(content=json.dumps(context, default=str, sort_keys=True)),

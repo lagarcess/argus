@@ -991,6 +991,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "assumptions": card.get("assumptions") if isinstance(card, dict) else None,
         "benchmark_note": card.get("benchmark_note") if isinstance(card, dict) else None,
         "config_snapshot": run.config_snapshot,
+        "raw_metrics": run.metrics,
     }
 
 
@@ -1008,7 +1009,9 @@ def llm_result_breakdown_message(context: dict[str, Any]) -> str | None:
                         "backtest result for a novice using only the supplied JSON. Do not "
                         "invent causes, trades, prices, support, or missing metrics. Explain "
                         "what the metrics mean, the benchmark comparison, assumptions, and "
-                        "caveats. Keep it concise and conversational."
+                        "caveats. Keep the answer under 90 words. Do not restate every "
+                        "result-card metric. Interpret what matters, name the main caveat, "
+                        "and use only supplied run data."
                     ),
                 },
                 {
@@ -1027,33 +1030,116 @@ def llm_result_breakdown_message(context: dict[str, Any]) -> str | None:
         return None
     content = getattr(response, "content", "")
     text = content.strip() if isinstance(content, str) else ""
-    return text if len(text.split()) >= 12 else None
+    words = text.split()
+    if len(words) < 12 or len(words) > 95:
+        return None
+    if "not a prediction" not in text.lower():
+        return None
+    return text
 
 
 def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
-    metrics = context.get("metrics")
-    metric_lines = []
-    if isinstance(metrics, list):
-        for row in metrics:
-            if isinstance(row, dict):
-                label = str(row.get("label") or "").strip()
-                value = str(row.get("value") or "").strip()
-                if label and value:
-                    metric_lines.append(f"{label}: {value}")
-    metric_summary = "; ".join(metric_lines[:5])
+    total_return = _result_breakdown_metric(
+        context,
+        "total_return_pct",
+        row_keys=("total_return_pct", "total_return"),
+    )
+    benchmark_return = _result_breakdown_metric(
+        context,
+        "benchmark_return_pct",
+        row_keys=("benchmark_return_pct", "benchmark_return"),
+    )
+    max_drawdown = _result_breakdown_metric(
+        context,
+        "max_drawdown_pct",
+        row_keys=("max_drawdown_pct", "max_drawdown"),
+    )
     assumptions = context.get("assumptions")
-    assumption_summary = (
-        " ".join(str(item).strip() for item in assumptions[:4] if str(item).strip())
+    assumption_text = (
+        " ".join(str(item).strip() for item in assumptions[:3] if str(item).strip())
         if isinstance(assumptions, list)
         else ""
-    )
+    ) or "the stored run settings"
     benchmark = str(context.get("benchmark_symbol") or "").strip()
-    title = str(context.get("title") or "this backtest")
-    return (
-        f"Here is the breakdown for {title}. {metric_summary}. "
-        f"The benchmark is {benchmark}, so the comparison is against that reference over the run period. "
-        f"{assumption_summary} This is historical evidence from the simulation, not a prediction or a reason to trade."
+    symbols = context.get("symbols")
+    symbols_text = (
+        ", ".join(str(symbol).strip() for symbol in symbols if str(symbol).strip())
+        if isinstance(symbols, list)
+        else ""
+    ) or "The available result"
+    return_text = (
+        f"with a {_format_result_breakdown_percent(total_return)} total return"
+        if total_return is not None
+        else "with the available result"
     )
+    benchmark_text = (
+        f"{benchmark} at {_format_result_breakdown_percent(benchmark_return)}"
+        if benchmark and benchmark_return is not None
+        else benchmark or "the benchmark"
+    )
+    drawdown_text = (
+        _format_result_breakdown_percent(max_drawdown)
+        if max_drawdown is not None
+        else "the available risk data"
+    )
+    return (
+        f"{symbols_text} finished {return_text} versus {benchmark_text}. "
+        f"The main risk shown here was max drawdown of {drawdown_text}. "
+        f"Assumptions: {assumption_text}. "
+        "This is historical simulation evidence, not a prediction or trading recommendation."
+    )
+
+
+def _result_breakdown_metric(
+    context: dict[str, Any],
+    metric_key: str,
+    *,
+    row_keys: tuple[str, ...],
+) -> float | None:
+    raw_metrics = context.get("raw_metrics")
+    value = _nested_result_breakdown_number(
+        raw_metrics,
+        ("aggregate", "performance", metric_key),
+    )
+    if value is not None:
+        return value
+
+    rows = context.get("metrics")
+    if isinstance(rows, list):
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            key = str(row.get("key") or "").strip()
+            if key not in row_keys:
+                continue
+            return _coerce_result_breakdown_number(row.get("value"))
+    return None
+
+
+def _nested_result_breakdown_number(
+    payload: Any,
+    path: tuple[str, ...],
+) -> float | None:
+    current = payload
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return _coerce_result_breakdown_number(current)
+
+
+def _coerce_result_breakdown_number(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(str(value).strip().rstrip("%"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_result_breakdown_percent(value: float) -> str:
+    sign = "+" if value > 0 else ""
+    return f"{sign}{value:.1f}%"
 
 
 def result_breakdown_message(run: BacktestRun | None) -> str:

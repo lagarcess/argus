@@ -35,7 +35,7 @@ class FakeChatOpenRouter:
             {
                 "content": (
                     "This breakdown explains the stored metrics, benchmark, assumptions, "
-                    "and caveats without inventing any missing result data."
+                    "and caveats without inventing data. It is not a prediction."
                 )
             },
         )()
@@ -128,6 +128,61 @@ def test_result_breakdown_uses_bounded_profile(monkeypatch) -> None:
     assert text is not None
     assert FakeChatOpenRouter.calls[0]["temperature"] == 0.2
     assert FakeChatOpenRouter.calls[0]["max_tokens"] == 2400
+
+
+def test_result_breakdown_is_concise_and_not_card_duplicate() -> None:
+    from argus.api.chat_service import result_breakdown_message
+    from argus.api.schemas import BacktestRun
+    from argus.domain.store import utcnow
+
+    run = BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 39.5,
+                    "benchmark_return_pct": 25.6,
+                    "delta_vs_benchmark_pct": 13.9,
+                    "max_drawdown_pct": -13.8,
+                }
+            },
+            "by_symbol": {},
+        },
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "benchmark_symbol": "SPY",
+        },
+        conversation_result_card={
+            "title": "AAPL Buy and Hold",
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return (%)",
+                    "value": "+39.5%",
+                },
+                {"key": "max_drawdown", "label": "Max Drawdown", "value": "-13.8%"},
+            ],
+            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+    text = result_breakdown_message(run)
+
+    assert len(text.split()) <= 95
+    assert "not a prediction" in text.lower()
+    assert text.lower().count("total return") <= 1
 
 
 @pytest.mark.asyncio
