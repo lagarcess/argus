@@ -20,7 +20,11 @@ def explain_stage(*, state: RunState) -> StageResult:
     profile = _response_profile(state)
     strategy = _strategy_payload(state)
     optional_parameters = _optional_parameters(state)
-    thesis = _thesis(strategy)
+    tested_summary = _tested_summary(
+        strategy=strategy,
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
     assumption_summary = _assumption_summary(
         optional_parameters=optional_parameters,
         explanation_context=explanation_context,
@@ -37,7 +41,7 @@ def explain_stage(*, state: RunState) -> StageResult:
             stage_patch={
                 "assistant_response": _build_incomplete_result_response(
                     profile=profile,
-                    thesis=thesis,
+                    tested_summary=tested_summary,
                     assumption_summary=assumption_summary,
                     caveat=caveat,
                 )
@@ -52,7 +56,7 @@ def explain_stage(*, state: RunState) -> StageResult:
                 benchmark_return=benchmark_return,
                 same_period=same_period,
                 profile=profile,
-                thesis=thesis,
+                tested_summary=tested_summary,
                 assumption_summary=assumption_summary,
                 caveat=caveat,
             )
@@ -86,10 +90,18 @@ async def _stream_llm_explanation(
     model = build_openrouter_model("result_summary")
     if model is None:
         return None
+    strategy = _strategy_payload(state)
+    result_payload = _result_payload(state)
+    explanation_context = _explanation_context(state)
     context = {
-        "strategy": _strategy_payload(state),
-        "result": _result_payload(state),
-        "explanation_context": _explanation_context(state),
+        "tested_summary": _tested_summary(
+            strategy=strategy,
+            result_payload=result_payload,
+            explanation_context=explanation_context,
+        ),
+        "strategy": _canonical_strategy_context(strategy),
+        "result": result_payload,
+        "explanation_context": explanation_context,
         "fallback_text": fallback_text,
         "language": "use the user's current language preference if available",
     }
@@ -100,6 +112,8 @@ async def _stream_llm_explanation(
                 "Use only the supplied metrics and assumptions. Keep the response "
                 "concise, natural, and beginner-friendly. Do not invent metrics, "
                 "predictions, fees, slippage, or unsupported trading capabilities. "
+                "Describe the tested strategy from tested_summary, not from raw "
+                "user wording or strategy_thesis. "
                 "Keep the answer under 90 words. Do not restate every result-card "
                 "metric; interpret what matters and name the main caveat."
             )
@@ -198,6 +212,76 @@ def _thesis(strategy: dict[str, Any]) -> str | None:
     return thesis_text or None
 
 
+def _tested_summary(
+    *,
+    strategy: dict[str, Any],
+    result_payload: dict[str, Any],
+    explanation_context: dict[str, Any],
+) -> str | None:
+    assets = _asset_summary(strategy)
+    strategy_label = _strategy_label(
+        strategy.get("strategy_type") or explanation_context.get("strategy_type")
+    )
+    period = _period_summary(
+        strategy.get("date_range")
+        or explanation_context.get("date_range")
+        or result_payload.get("date_range")
+    )
+    if assets and strategy_label and period:
+        return f"{assets} {strategy_label} over {period}"
+    if assets and strategy_label:
+        return f"{assets} {strategy_label}"
+    if assets and period:
+        return f"{assets} over {period}"
+    thesis = _thesis(strategy)
+    return f"the confirmed strategy: {thesis}" if thesis else None
+
+
+def _canonical_strategy_context(strategy: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in strategy.items()
+        if key not in {"raw_user_phrasing", "strategy_thesis"}
+    }
+
+
+def _asset_summary(strategy: dict[str, Any]) -> str | None:
+    assets = strategy.get("asset_universe")
+    if isinstance(assets, list):
+        symbols = [str(symbol).strip() for symbol in assets if str(symbol).strip()]
+        return ", ".join(symbols) if symbols else None
+    if isinstance(assets, str) and assets.strip():
+        return assets.strip()
+    return None
+
+
+def _strategy_label(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    labels = {
+        "buy_and_hold": "buy and hold",
+        "dca_accumulation": "DCA accumulation",
+        "indicator_threshold": "indicator threshold",
+    }
+    return labels.get(normalized, normalized.replace("_", " "))
+
+
+def _period_summary(value: Any) -> str | None:
+    if isinstance(value, str):
+        period = value.strip()
+        return period or None
+    if isinstance(value, dict):
+        display = value.get("display")
+        if isinstance(display, str) and display.strip():
+            return display.strip()
+        start = value.get("start")
+        end = value.get("end")
+        if start and end:
+            return f"{start} to {end}"
+    return None
+
+
 def _assumption_summary(
     *,
     optional_parameters: dict[str, Any],
@@ -245,7 +329,7 @@ def _build_response(
     benchmark_return: float,
     same_period: bool,
     profile: ResponseProfile | None,
-    thesis: str | None,
+    tested_summary: str | None,
     assumption_summary: str,
     caveat: str,
 ) -> str:
@@ -259,9 +343,9 @@ def _build_response(
         f"Your strategy returned {total_return:.1f}% versus {benchmark_return:.1f}% "
         f"{_benchmark_scope_phrase(same_period)}."
     )
-    thesis_sentence = (
-        f"I tested: {thesis}."
-        if thesis is not None
+    tested_sentence = (
+        f"I tested {tested_summary}."
+        if tested_summary is not None
         else "I tested the confirmed strategy."
     )
     expertise_sentence = _expertise_sentence(expertise_mode)
@@ -269,19 +353,19 @@ def _build_response(
 
     if verbosity == "low":
         return (
-            f"{comparison_sentence} {thesis_sentence} "
+            f"{comparison_sentence} {tested_sentence} "
             f"{expertise_sentence}{assumption_sentence} Caveat: {caveat}"
         )
 
     tone_prefix = _tone_result_prefix(tone)
     if verbosity == "high":
         return (
-            f"{tone_prefix}{comparison_sentence} {thesis_sentence} {expertise_sentence}"
+            f"{tone_prefix}{comparison_sentence} {tested_sentence} {expertise_sentence}"
             f"{assumption_sentence} Caveat: {caveat}"
         )
 
     return (
-        f"{tone_prefix}{comparison_sentence} {thesis_sentence} {expertise_sentence}"
+        f"{tone_prefix}{comparison_sentence} {tested_sentence} {expertise_sentence}"
         f"{assumption_sentence} Caveat: {caveat}"
     )
 
@@ -309,7 +393,7 @@ def _benchmark_scope_phrase(same_period: bool) -> str:
 def _build_incomplete_result_response(
     *,
     profile: ResponseProfile | None,
-    thesis: str | None,
+    tested_summary: str | None,
     assumption_summary: str,
     caveat: str,
 ) -> str:
@@ -318,15 +402,15 @@ def _build_incomplete_result_response(
     expertise_mode = (
         profile.effective_expertise_mode if profile is not None else "beginner"
     )
-    thesis_sentence = (
-        f"This applies to your thesis: {thesis}."
-        if thesis is not None
+    tested_sentence = (
+        f"This applies to {tested_summary}."
+        if tested_summary is not None
         else "This applies to the confirmed strategy."
     )
     expertise_sentence = _expertise_sentence(expertise_mode)
     base = (
         "The result payload is incomplete, so I cannot report observed returns yet. "
-        f"{thesis_sentence} {expertise_sentence}"
+        f"{tested_sentence} {expertise_sentence}"
     )
     if verbosity == "high":
         if tone == "friendly":

@@ -364,6 +364,70 @@ def test_stale_confirmation_card_without_structured_payload_returns_recovery(
     assert "confirm it again" in text
 
 
+def test_stale_confirmation_action_id_does_not_execute(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    runtime_calls = 0
+
+    async def _runtime(**_: Any):
+        nonlocal runtime_calls
+        runtime_calls += 1
+        yield {"type": "final", "payload": {"stage_outcome": "approved_for_execution"}}
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    old_metadata = _confirmation_metadata()
+    old_metadata["confirmation_card"]["confirmation_id"] = "confirm-old"
+    old_metadata["confirmation_card"]["confirmation_state"] = "active"
+    old_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-old"
+    }
+    new_metadata = _confirmation_metadata()
+    new_metadata["confirmation_card"]["confirmation_id"] = "confirm-new"
+    new_metadata["confirmation_card"]["confirmation_state"] = "active"
+    new_metadata["confirmation_card"]["title"] = "NVDA buy and hold"
+    new_metadata["confirmation_card"]["actions"][0]["payload"] = {
+        "confirmation_id": "confirm-new"
+    }
+    new_metadata["confirmation_payload"]["strategy"]["asset_universe"] = ["NVDA"]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=old_metadata,
+    )
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as NVDA using a buy and hold approach.",
+        metadata=new_metadata,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-old"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert runtime_calls == 0
+    text = _stream_payloads(response.text, "token")[0]["content"]
+    assert "confirmation was updated" in text.lower()
+    assert "latest" in text.lower()
+
+
 def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 

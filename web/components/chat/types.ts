@@ -72,6 +72,8 @@ export type StrategyConfirmationRow = {
 };
 
 export type StrategyConfirmationPayload = {
+  confirmation_id?: string;
+  confirmation_state?: "active" | "superseded";
   title: string;
   statusLabel: string;
   summary: string;

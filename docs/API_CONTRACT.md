@@ -289,8 +289,10 @@ messages may store `pending_strategy`, `confirmation_card`,
 action chips may store `chat_action` so the transcript can hydrate the selected
 chip as an action item after reload. Clients use these fields to hydrate cards
 and actions after reload. Runtime execution still validates against the
-LangGraph checkpoint first, and result actions that mutate state must reference a
-canonical run id.
+LangGraph checkpoint first. A confirmation card may include
+`confirmation_id` and `confirmation_state`; only the latest active confirmation
+can execute, and older cards are transcript history. Result actions that mutate
+state must reference a canonical run id.
 
 ## Strategy
 
@@ -982,11 +984,13 @@ Soft delete conversation.
 `action` payloads are structured product operations, not plain user text.
 
 - `run_backtest` is valid only when the latest runtime state or safe metadata fallback contains a pending strategy that has already been shown as a confirmation card.
+- `run_backtest` actions may include `payload.confirmation_id`; if supplied, the backend must reject stale ids instead of executing an older draft.
 - `change_asset`, `change_dates`, and `adjust_assumptions` patch the active pending strategy by asking for the replacement field while preserving all other known fields.
 - Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
 - `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
 - A runnable draft produced after a missing-field answer must emit confirmation before execution.
 - `show_breakdown` and `save_strategy` require canonical result run context.
+- `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose.
 
 **Request:**
 ```json
@@ -1106,10 +1110,21 @@ or `await_approval`, the final payload may include:
       "date_range": "past year"
     },
     "requested_field": "asset_universe",
-    "missing_required_fields": ["asset_universe"]
+    "missing_required_fields": ["asset_universe"],
+    "pending_resolution": {
+      "field": "asset_universe",
+      "raw_value": "Apple",
+      "candidate_normalized_value": "AAPL",
+      "asset_class": "equity"
+    }
   }
 }
 ```
+
+When `pending_resolution` is present, it represents the candidate behind a
+specific clarification prompt. A short affirmative answer such as "yes" may
+accept that candidate only for that pending field; it does not bypass normal LLM
+interpretation for unrelated turns.
 
 **6. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
 ```

@@ -342,6 +342,70 @@ def test_change_asset_answer_patches_requested_field_only(monkeypatch) -> None:
     assert strategy.capital_amount is None
 
 
+def test_affirmative_asset_clarification_uses_pending_resolution_candidate(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["Apple"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    pending.resolution_provenance = [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Apple",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "ambiguous",
+            "canonical_symbol": "AAPL",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "medium",
+        }
+    ]
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User affirmed the pending asset clarification.",
+        candidate_strategy_draft=StrategySummary(),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="yes",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+            "pending_resolution": {
+                "field": "asset_universe",
+                "raw_value": "Apple",
+                "candidate_normalized_value": "AAPL",
+                "asset_class": "equity",
+            },
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == "past year"
+    assert result.decision.missing_required_fields == []
+    assert result.decision.requires_clarification is False
+
+
 def test_natural_language_approval_does_not_execute_from_missing_field_state(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 

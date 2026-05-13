@@ -37,6 +37,7 @@ from argus.api.chat_service import (
     save_strategy_from_run,
     sse_data,
     sse_done,
+    stale_confirmation_action_message,
 )
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import create_message, load_runtime_thread_history
@@ -157,7 +158,16 @@ async def chat_stream(
         conversation_id=conversation.id,
     )
     runtime_fallback = RuntimeFallbackContext()
-    if is_confirmation_action(payload):
+    stale_confirmation_message = stale_confirmation_action_message(
+        payload=payload,
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
+    if stale_confirmation_message is not None:
+        runtime_fallback = RuntimeFallbackContext(
+            recovery_message=stale_confirmation_message
+        )
+    elif is_confirmation_action(payload):
         if not checkpoint_has_pending_confirmation(checkpoint_values):
             metadata_fallback = confirmation_metadata_fallback_context(
                 user_id=user.id,
@@ -501,7 +511,10 @@ async def chat_stream(
                 runtime_result = dict(runtime_event.get("payload") or {})
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
-                confirmation_card = runtime_confirmation_card(runtime_result)
+                confirmation_card = runtime_confirmation_card(
+                    runtime_result,
+                    confirmation_id=api_state.store.new_id(),
+                )
                 if confirmation_card is not None:
                     assistant_text = str(confirmation_card["summary"])
                 result_card = runtime_result_card(runtime_result)

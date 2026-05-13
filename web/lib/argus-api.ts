@@ -207,6 +207,7 @@ export type ChatFinalPayload = {
     strategy: Record<string, unknown>;
     requested_field?: string | null;
     missing_required_fields?: string[];
+    pending_resolution?: Record<string, unknown> | null;
   } | null;
   run?: BacktestRun | null;
   next_actions?: string[];

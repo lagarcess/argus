@@ -292,6 +292,7 @@ def _apply_stage_result(
         artifact_references=artifact_references,
     )
     workflow_state["selected_thread_metadata"] = _build_thread_metadata(
+        workflow_state=workflow_state,
         run_state=run_state,
         stage_outcome=outcome,
     )
@@ -452,14 +453,50 @@ def _strategy_summary_has_content(strategy: StrategySummary) -> bool:
 
 def _build_thread_metadata(
     *,
+    workflow_state: WorkflowState,
     run_state: RunState,
     stage_outcome: Any,
 ) -> dict[str, Any]:
     stage_outcome_value = getattr(stage_outcome, "value", stage_outcome)
-    return {
+    metadata: dict[str, Any] = {
         "latest_task_type": run_state.intent,
         "last_stage_outcome": stage_outcome_value,
     }
+    requested_field = workflow_state.get("requested_field")
+    if isinstance(requested_field, str) and requested_field:
+        metadata["requested_field"] = requested_field
+    pending_resolution = _pending_resolution_candidate(workflow_state=workflow_state)
+    if pending_resolution is not None:
+        metadata["pending_resolution"] = pending_resolution
+    return metadata
+
+
+def _pending_resolution_candidate(
+    *,
+    workflow_state: WorkflowState,
+) -> dict[str, Any] | None:
+    ambiguous_fields = workflow_state.get("ambiguous_fields")
+    if not isinstance(ambiguous_fields, list):
+        return None
+    for field in ambiguous_fields:
+        if not isinstance(field, dict):
+            continue
+        field_name = str(field.get("field_name") or "")
+        if field_name.split("[", 1)[0] != "asset_universe":
+            continue
+        candidate = field.get("candidate_normalized_value")
+        if not isinstance(candidate, str) or not candidate.strip():
+            continue
+        pending_resolution: dict[str, Any] = {
+            "field": "asset_universe",
+            "raw_value": str(field.get("raw_value") or "").strip(),
+            "candidate_normalized_value": candidate.strip(),
+        }
+        strategy = _run_state(workflow_state).candidate_strategy_draft
+        if strategy.asset_class:
+            pending_resolution["asset_class"] = strategy.asset_class
+        return pending_resolution
+    return None
 
 
 def _resolve_artifact_references(state: WorkflowState) -> list[ArtifactReference]:

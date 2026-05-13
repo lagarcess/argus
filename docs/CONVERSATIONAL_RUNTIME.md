@@ -105,6 +105,18 @@ Reloading or navigating away from chat must hydrate both visible messages and st
 
 Runtime memory remains checkpoint-first. If a pending confirmation action arrives after reload, the API validates the LangGraph checkpoint before execution. Message metadata may supply a conservative fallback snapshot only when it contains structured confirmation payload; otherwise the assistant asks the user to reconfirm instead of silently running incomplete state. Result follow-ups may recover the latest canonical run reference from message metadata and `backtest_runs`, but Save Strategy must still use a concrete run id from the result card.
 
+Confirmation cards are durable transcript artifacts, but only the latest active
+confirmation is executable. New refinement confirmations supersede older cards,
+and a completed result also makes prior confirmation cards historical. The UI may
+render superseded cards as muted `Updated` cards, but backend execution still
+checks the active confirmation identity before running.
+
+Clarification prompts may persist a single pending resolution candidate, such as
+Apple Inc. (`AAPL`) for an ambiguous "Apple" request. If the next user turn is a
+short affirmative answer, deterministic guardrails may accept only that stored
+candidate for that stored field after LLM interpretation. This keeps ordinary
+language LLM-first while preventing repeated binary clarifications.
+
 Collections remain in the schema but launch UI for collections is feature-gated with `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
 
 ## Fully Supported
@@ -147,10 +159,20 @@ Examples:
 Result presentation is a single product moment:
 
 1. Render the result card first.
-2. Show a short grounded summary from the same result payload.
+2. Show a short grounded summary from canonical run/result context, not stale
+   original user wording.
 3. Offer result actions.
 
 The main card shows only high-signal metrics: total return, final value, max drawdown, and benchmark delta. Win rate appears only when closed trades make it meaningful. Secondary metrics and caveats belong in the breakdown.
+
+`Show breakdown` is an educational follow-up, not a second source of result
+truth. The preferred path is an LLM-authored markdown explanation that can vary
+its headings and framing so the conversation does not feel templated. The
+backend derives an internal fact bank from the stored run/result context, asks
+the LLM to structure sections with fact references, then renders those facts
+deterministically. If the generated breakdown is malformed or references facts
+outside that bank, Argus should fall back to the deterministic grounded
+breakdown.
 
 The chart is a TradingView Lightweight Charts baseline chart using the aggregate portfolio equity curve. Multi-symbol runs must show the portfolio curve, not a cluttered symbol comparison. Entry and exit markers may be capped for readability. TradingView attribution must remain visible.
 

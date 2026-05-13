@@ -165,6 +165,15 @@ def _stage_result_from_interpretation(
         semantic_turn_act=interpretation.semantic_turn_act,
         task_relation=interpretation.task_relation,
     )
+    incoming_strategy, pending_resolution_applied = (
+        _strategy_with_pending_resolution_affirmation(
+            strategy=incoming_strategy,
+            explicit_strategy=interpretation.candidate_strategy_draft,
+            selected_thread_metadata=selected_thread_metadata,
+            current_user_message=state.current_user_message,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
+    )
     strategy = (
         _canonicalized_strategy(incoming_strategy)
         if expects_strategy_route
@@ -176,6 +185,12 @@ def _stage_result_from_interpretation(
     )
     unsupported_constraints = list(interpretation.unsupported_constraints)
     ambiguous_fields = list(interpretation.ambiguous_fields)
+    if pending_resolution_applied:
+        ambiguous_fields = [
+            field
+            for field in ambiguous_fields
+            if _field_base(field.field_name) != "asset_universe"
+        ]
     if expects_strategy_route:
         strategy.resolution_provenance = _dedupe_resolution_provenance(
             [*strategy.resolution_provenance, *state.context_hints]
@@ -214,7 +229,7 @@ def _stage_result_from_interpretation(
         explicit_overrides=response_overrides,
     )
     requires_clarification = bool(
-        interpretation.requires_clarification
+        (interpretation.requires_clarification and not pending_resolution_applied)
         or ambiguous_fields
         or unsupported_constraints
         or missing_required_fields
@@ -229,7 +244,15 @@ def _stage_result_from_interpretation(
         optional_parameter_opportunity=list(capability_contract.optional_defaults),
         confidence=interpretation.confidence,
         arbitration_mode="structured_arbitration",
-        reason_codes=["llm_interpreter_used", *interpretation.reason_codes],
+        reason_codes=[
+            "llm_interpreter_used",
+            *(
+                ["pending_resolution_candidate_affirmed"]
+                if pending_resolution_applied
+                else []
+            ),
+            *interpretation.reason_codes,
+        ],
         effective_response_profile=effective_profile,
         user_preference_overridden_for_turn=has_response_profile_overrides(
             response_overrides
@@ -307,6 +330,81 @@ def _route_contextual_money_answer(
     initial_capital = updated.capital_amount
     updated.capital_amount = None
     return updated, {"initial_capital": initial_capital}
+
+
+def _strategy_with_pending_resolution_affirmation(
+    *,
+    strategy: StrategySummary,
+    explicit_strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    current_user_message: str,
+    semantic_turn_act: str | None,
+) -> tuple[StrategySummary, bool]:
+    if semantic_turn_act != "answer_pending_need":
+        return strategy, False
+    pending_resolution = selected_thread_metadata.get("pending_resolution")
+    if not isinstance(pending_resolution, dict):
+        return strategy, False
+    field = _field_base(str(pending_resolution.get("field") or ""))
+    if field != "asset_universe":
+        return strategy, False
+    if explicit_strategy.asset_universe:
+        return strategy, False
+    if not _is_affirmative_pending_resolution_reply(current_user_message):
+        return strategy, False
+    candidate = (
+        pending_resolution.get("candidate_normalized_value")
+        or pending_resolution.get("canonical_symbol")
+    )
+    if not isinstance(candidate, str) or not candidate.strip():
+        return strategy, False
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = [candidate.strip().upper()]
+    asset_class = pending_resolution.get("asset_class")
+    if isinstance(asset_class, str) and asset_class.strip():
+        updated.asset_class = asset_class.strip()
+    updated.resolution_provenance = [
+        item
+        for item in updated.resolution_provenance
+        if not _is_ambiguous_asset_resolution(item)
+    ]
+    return updated, True
+
+
+def _is_ambiguous_asset_resolution(item: ResolutionProvenance | dict[str, Any]) -> bool:
+    if not isinstance(item, ResolutionProvenance):
+        try:
+            item = ResolutionProvenance.model_validate(item)
+        except (TypeError, ValueError):
+            return False
+    return (
+        item.source == "llm_extraction"
+        and item.resolution_status == "ambiguous"
+        and _field_base(item.field) == "asset_universe"
+    )
+
+
+def _is_affirmative_pending_resolution_reply(message: str) -> bool:
+    normalized = " ".join(message.lower().strip().split())
+    return normalized in {
+        "yes",
+        "yeah",
+        "yep",
+        "correct",
+        "right",
+        "that's right",
+        "that is right",
+        "yes please",
+        "sure",
+        "ok",
+        "okay",
+        "use that",
+        "that one",
+    }
+
+
+def _field_base(field_name: str) -> str:
+    return field_name.split("[", 1)[0]
 
 
 def _optional_parameter_stage_patch(

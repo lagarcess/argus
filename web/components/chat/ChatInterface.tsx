@@ -237,7 +237,58 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     };
   });
 
-  return { messages, inputActions: latestInputActions(messages) };
+  const normalized = normalizeConfirmationHistory(messages);
+  return { messages: normalized, inputActions: latestInputActions(normalized) };
+}
+
+function normalizeConfirmationHistory(messages: Message[]): Message[] {
+  const lastResultIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_result" ? index : latest,
+    -1,
+  );
+  const latestConfirmationIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_confirmation" && index > lastResultIndex
+        ? index
+        : latest,
+    -1,
+  );
+  return messages.map((message, index) => {
+    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+      return message;
+    }
+    const shouldSupersede =
+      index < lastResultIndex ||
+      (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex);
+    if (!shouldSupersede) {
+      return {
+        ...message,
+        confirmation: {
+          ...message.confirmation,
+          confirmation_state: "active",
+        },
+        actions: message.confirmation.actions ?? message.actions,
+      };
+    }
+    return supersedePriorConfirmations(message);
+  });
+}
+
+function supersedePriorConfirmations(message: Message): Message {
+  if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+    return message;
+  }
+  return {
+    ...message,
+    confirmation: {
+      ...message.confirmation,
+      confirmation_state: "superseded",
+      statusLabel: "Updated",
+      actions: [],
+    },
+    actions: [],
+  };
 }
 
 function chatStreamErrorText(detail: string | undefined, fallback: string) {
@@ -736,15 +787,17 @@ export default function ChatInterface() {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
           setInputActions(confirmation.actions ?? []);
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    kind: "strategy_confirmation",
-                    content: undefined,
-                    confirmation,
-                  }
-                : m,
+            normalizeConfirmationHistory(
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      kind: "strategy_confirmation",
+                      content: undefined,
+                      confirmation,
+                    }
+                  : m,
+              ),
             ),
           );
         } else if (event.data.run) {
@@ -754,16 +807,18 @@ export default function ChatInterface() {
           const card = { ...baseCard, actions: resultActions };
           setInputActions(visibleInputActions(resultActions));
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                  ...m,
-                  kind: "strategy_result",
-                  content: m.content || finalText || undefined,
-                  result: card,
-                  actions: resultActions,
-                  }
-                : m,
+            normalizeConfirmationHistory(
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                    ...m,
+                    kind: "strategy_result",
+                    content: m.content || finalText || undefined,
+                    result: card,
+                    actions: resultActions,
+                    }
+                  : m,
+              ),
             ),
           );
         } else if (finalText) {

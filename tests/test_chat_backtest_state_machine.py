@@ -254,41 +254,50 @@ def test_chat_stream_emits_structured_confirmation_actions(
     assert seen["thread_id"] == conversation["id"]
     assert seen["message"] == "Buy and hold Apple over the past year"
     confirmation = _stream_payloads(response.text, "confirmation")[0]["confirmation"]
+    confirmation_id = confirmation["confirmation_id"]
+    assert confirmation["confirmation_state"] == "active"
+    assert [action["type"] for action in confirmation["actions"]] == [
+        "run_backtest",
+        "change_dates",
+        "change_asset",
+        "adjust_assumptions",
+        "cancel_confirmation",
+    ]
     assert confirmation["actions"] == [
         {
             "id": "run-backtest",
             "type": "run_backtest",
             "label": "Run backtest",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "change-dates",
             "type": "change_dates",
             "label": "Change dates",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "change-asset",
             "type": "change_asset",
             "label": "Change asset",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "adjust-assumptions",
             "type": "adjust_assumptions",
             "label": "Adjust assumptions",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "cancel-confirmation",
             "type": "cancel_confirmation",
             "label": "Cancel",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
     ]
 
@@ -896,7 +905,7 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
     second_text = _stream_payloads(second.text, "token")[0]["text"]
     assert "help you choose a sensible next step" in first_text
     assert "What should trigger the buy?" not in second_text
-    assert "could not reach the interpretation model" in second_text
+    assert "could not process that turn" in second_text
 
 
 def test_discovery_endpoints_return_assets_and_indicators(

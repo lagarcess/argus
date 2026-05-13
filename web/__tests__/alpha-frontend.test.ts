@@ -123,12 +123,26 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
   });
 
+  test("chat supersedes older confirmation cards when a newer draft appears", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const card = readFileSync(join(root, "components/chat/StrategyConfirmationCard.tsx"), "utf-8");
+    const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
+
+    expect(types).toContain('confirmation_state?: "active" | "superseded"');
+    expect(types).toContain("confirmation_id?: string");
+    expect(chat).toContain("supersedePriorConfirmations");
+    expect(chat).toContain("normalizeConfirmationHistory");
+    expect(card).toContain('confirmation.confirmation_state === "superseded"');
+    expect(card).toContain('confirmation.statusLabel || "Updated"');
+  });
+
   test("chat final payload accepts pending strategy metadata", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
     expect(api).toContain("pending_strategy?");
     expect(api).toContain("missing_required_fields?: string[]");
     expect(api).toContain("strategy: Record<string, unknown>");
+    expect(api).toContain("pending_resolution?");
   });
 
   test("confirmation action chips render as action transcript items", () => {

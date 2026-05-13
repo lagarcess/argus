@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, Literal
+from uuid import uuid4
 
 from loguru import logger
+from pydantic import BaseModel, Field, ValidationError
 
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -54,6 +56,11 @@ LOST_CONFIRMATION_STATE_MESSAGE = (
     "I can restate the strategy so you can confirm it again."
 )
 
+STALE_CONFIRMATION_ACTION_MESSAGE = (
+    "That confirmation was updated. Use the latest Ready to run card before "
+    "running the backtest."
+)
+
 
 @dataclass(frozen=True)
 class RuntimeFallbackContext:
@@ -62,6 +69,21 @@ class RuntimeFallbackContext:
     artifact_references: list[ArtifactReference] | None = None
     confirmation_payload: dict[str, Any] | None = None
     recovery_message: str | None = None
+
+
+class ResultBreakdownPart(BaseModel):
+    kind: Literal["text", "fact"]
+    text: str = ""
+    fact_id: str | None = None
+
+
+class ResultBreakdownSection(BaseModel):
+    heading: str
+    parts: list[ResultBreakdownPart] = Field(default_factory=list)
+
+
+class ResultBreakdownDraft(BaseModel):
+    sections: list[ResultBreakdownSection] = Field(default_factory=list)
 
 
 def parse_onboarding_control_message(message: str) -> str | None:
@@ -145,7 +167,11 @@ def runtime_result_card(runtime_result: dict[str, Any]) -> dict[str, Any] | None
     return None
 
 
-def runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any] | None:
+def runtime_confirmation_card(
+    runtime_result: dict[str, Any],
+    *,
+    confirmation_id: str | None = None,
+) -> dict[str, Any] | None:
     if runtime_result.get("stage_outcome") != "await_approval":
         return None
     payload = runtime_result.get("confirmation_payload")
@@ -213,7 +239,10 @@ def runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any] 
         f"I read this as {assets} using {_article_for(strategy_type)} "
         f"{strategy_type} approach over {summary_period}."
     )
+    active_confirmation_id = confirmation_id or f"confirmation-{uuid4()}"
     return {
+        "confirmation_id": active_confirmation_id,
+        "confirmation_state": "active",
         "title": title,
         "statusLabel": "Ready to run",
         "summary": summary,
@@ -225,35 +254,35 @@ def runtime_confirmation_card(runtime_result: dict[str, Any]) -> dict[str, Any] 
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": active_confirmation_id},
             },
             {
                 "id": "change-dates",
                 "type": "change_dates",
                 "label": "Change dates",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": active_confirmation_id},
             },
             {
                 "id": "change-asset",
                 "type": "change_asset",
                 "label": "Change asset",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": active_confirmation_id},
             },
             {
                 "id": "adjust-assumptions",
                 "type": "adjust_assumptions",
                 "label": "Adjust assumptions",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": active_confirmation_id},
             },
             {
                 "id": "cancel-confirmation",
                 "type": "cancel_confirmation",
                 "label": "Cancel",
                 "presentation": "confirmation",
-                "payload": {},
+                "payload": {"confirmation_id": active_confirmation_id},
             },
         ],
     }
@@ -649,6 +678,71 @@ def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
     return False
 
 
+def stale_confirmation_action_message(
+    *,
+    payload: ChatStreamRequest,
+    user_id: str,
+    conversation_id: str,
+) -> str | None:
+    if (
+        payload.action is None
+        or payload.action.type != "run_backtest"
+        or payload.action.presentation != "confirmation"
+    ):
+        return None
+    action_confirmation_id = _confirmation_id_from_action_payload(
+        payload.action.payload
+    )
+    if action_confirmation_id is None:
+        return None
+    latest_confirmation_id = latest_active_confirmation_id(
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
+    if latest_confirmation_id is None or latest_confirmation_id == action_confirmation_id:
+        return None
+    return STALE_CONFIRMATION_ACTION_MESSAGE
+
+
+def latest_active_confirmation_id(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> str | None:
+    messages = _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        metadata = message.metadata
+        if _metadata_invalidates_confirmation(metadata):
+            return None
+        card = metadata.get("confirmation_card")
+        if not isinstance(card, dict):
+            continue
+        return _confirmation_id_from_card(card)
+    return None
+
+
+def _confirmation_id_from_action_payload(payload: dict[str, Any]) -> str | None:
+    raw_value = payload.get("confirmation_id") or payload.get("confirmationId")
+    if raw_value is None:
+        return None
+    value = str(raw_value).strip()
+    return value or None
+
+
+def _confirmation_id_from_card(card: dict[str, Any]) -> str | None:
+    raw_value = card.get("confirmation_id") or card.get("confirmationId")
+    if raw_value is None:
+        return None
+    value = str(raw_value).strip()
+    return value or None
+
+
 def _recent_messages_for_conversation(
     *,
     user_id: str,
@@ -828,6 +922,9 @@ def pending_strategy_metadata_fallback_context(
         }
         if isinstance(requested_field, str) and requested_field:
             selected_thread_metadata["requested_field"] = requested_field
+        pending_resolution = pending_payload.get("pending_resolution")
+        if isinstance(pending_resolution, dict):
+            selected_thread_metadata["pending_resolution"] = dict(pending_resolution)
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
                 latest_task_type="backtest_execution",
@@ -1087,24 +1184,36 @@ def llm_result_breakdown_message(context: dict[str, Any]) -> str | None:
     model = build_openrouter_model("result_breakdown")
     if model is None:
         return None
+    fact_bank = result_breakdown_fact_bank(context)
+    required_fact_ids = _required_result_breakdown_fact_ids(fact_bank)
     try:
-        response = model.invoke(
+        structured_model = model.with_structured_output(ResultBreakdownDraft)
+        response = structured_model.invoke(
             [
                 {
                     "role": "system",
                     "content": (
                         "You are Argus, an investing backtest copilot. Explain the stored "
-                        "backtest result for a novice using only the supplied JSON. Do not "
-                        "invent causes, trades, prices, support, or missing metrics. Explain "
-                        "what the metrics mean, the benchmark comparison, assumptions, and "
-                        "caveats. Keep the answer under 90 words. Do not restate every "
-                        "result-card metric. Interpret what matters, name the main caveat, "
-                        "and use only supplied run data."
+                        "backtest result using only the supplied fact_bank. Return flexible, "
+                        "non-template sections and vary the section headings. Build each "
+                        "section from text parts and fact reference parts. Use fact reference "
+                        "parts for every run-specific symbol, date, percentage, benchmark, "
+                        "assumption, and caveat; use text parts only for educational framing. "
+                        "Do not invent causes, trades, prices, support, missing metrics, "
+                        "unsupported strategy mechanics, predictions, or investment advice. "
+                        "Cover what was tested, what happened, benchmark comparison, risk or "
+                        "drawdown, assumptions, caveats, and one useful next test."
                     ),
                 },
                 {
                     "role": "user",
-                    "content": json.dumps(context, default=str),
+                    "content": json.dumps(
+                        {
+                            "fact_bank": fact_bank,
+                            "required_fact_ids": sorted(required_fact_ids),
+                        },
+                        default=str,
+                    ),
                 },
             ]
         )
@@ -1116,14 +1225,185 @@ def llm_result_breakdown_message(context: dict[str, Any]) -> str | None:
             message="LLM result breakdown failed; using deterministic fallback",
         )
         return None
-    content = getattr(response, "content", "")
-    text = content.strip() if isinstance(content, str) else ""
-    words = text.split()
-    if len(words) < 12 or len(words) > 95:
+    draft = _coerce_result_breakdown_draft(response)
+    if draft is None:
         return None
-    if "not a prediction" not in text.lower():
+    return _render_result_breakdown_draft(
+        draft=draft,
+        fact_bank=fact_bank,
+        required_fact_ids=required_fact_ids,
+    )
+
+
+def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
+    fact_bank: dict[str, str] = {}
+    title = str(context.get("title") or "").strip()
+    if title:
+        fact_bank["title"] = title
+
+    symbols = context.get("symbols")
+    symbols_text = (
+        ", ".join(str(symbol).strip() for symbol in symbols if str(symbol).strip())
+        if isinstance(symbols, list)
+        else ""
+    )
+    if symbols_text:
+        fact_bank["symbols"] = symbols_text
+
+    date_range = _format_result_breakdown_date_range(context.get("date_range"))
+    if date_range:
+        fact_bank["date_range"] = date_range
+
+    benchmark = str(context.get("benchmark_symbol") or "").strip()
+    if benchmark:
+        fact_bank["benchmark_symbol"] = benchmark
+
+    total_return = _result_breakdown_metric(
+        context,
+        "total_return_pct",
+        row_keys=("total_return_pct", "total_return"),
+    )
+    if total_return is not None:
+        fact_bank["total_return"] = _format_result_breakdown_percent(total_return)
+
+    benchmark_return = _result_breakdown_metric(
+        context,
+        "benchmark_return_pct",
+        row_keys=("benchmark_return_pct", "benchmark_return"),
+    )
+    if benchmark_return is not None:
+        fact_bank["benchmark_return"] = _format_result_breakdown_percent(
+            benchmark_return
+        )
+
+    delta_vs_benchmark = _result_breakdown_metric(
+        context,
+        "delta_vs_benchmark_pct",
+        row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
+    )
+    if delta_vs_benchmark is not None:
+        fact_bank["benchmark_delta"] = _format_result_breakdown_percent(
+            delta_vs_benchmark
+        )
+
+    max_drawdown = _result_breakdown_metric(
+        context,
+        "max_drawdown_pct",
+        row_keys=("max_drawdown_pct", "max_drawdown"),
+    )
+    if max_drawdown is not None:
+        fact_bank["max_drawdown"] = _format_result_breakdown_percent(max_drawdown)
+
+    starting_capital = _result_breakdown_starting_capital(context)
+    if starting_capital:
+        fact_bank["starting_capital"] = starting_capital
+
+    assumptions = context.get("assumptions")
+    assumption_text = (
+        " ".join(str(item).strip() for item in assumptions if str(item).strip())
+        if isinstance(assumptions, list)
+        else ""
+    )
+    if assumption_text:
+        fact_bank["assumptions"] = assumption_text
+
+    fact_bank["caveat"] = (
+        "This is historical simulation evidence, not a prediction or trading "
+        "recommendation."
+    )
+    return fact_bank
+
+
+def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:
+    if isinstance(value, ResultBreakdownDraft):
+        return value
+    try:
+        return ResultBreakdownDraft.model_validate(value)
+    except (TypeError, ValidationError):
         return None
-    return text
+
+
+def _render_result_breakdown_draft(
+    *,
+    draft: ResultBreakdownDraft,
+    fact_bank: dict[str, str],
+    required_fact_ids: set[str],
+) -> str | None:
+    if not draft.sections or len(draft.sections) > 6:
+        return None
+
+    used_fact_ids: set[str] = set()
+    rendered_sections: list[str] = []
+    for section in draft.sections:
+        heading = _clean_result_breakdown_heading(section.heading)
+        if not heading or not section.parts:
+            return None
+        rendered_parts: list[str] = []
+        for part in section.parts:
+            if part.kind == "text":
+                rendered_parts.append(part.text)
+                continue
+            fact_id = str(part.fact_id or "").strip()
+            if fact_id not in fact_bank:
+                return None
+            rendered_parts.append(fact_bank[fact_id])
+            used_fact_ids.add(fact_id)
+        body = "".join(rendered_parts).strip()
+        if not body:
+            return None
+        rendered_sections.append(f"### {heading}\n{body}")
+
+    if not required_fact_ids.issubset(used_fact_ids):
+        return None
+
+    rendered_text = "\n\n".join(rendered_sections).strip()
+    if len(rendered_text.split()) > 520:
+        return None
+    return rendered_text
+
+
+def _required_result_breakdown_fact_ids(fact_bank: dict[str, str]) -> set[str]:
+    required: set[str] = {"caveat"}
+    for fact_id in (
+        "title",
+        "symbols",
+        "date_range",
+        "total_return",
+        "benchmark_symbol",
+        "max_drawdown",
+        "assumptions",
+    ):
+        if fact_id in fact_bank:
+            required.add(fact_id)
+    if "benchmark_return" in fact_bank:
+        required.add("benchmark_return")
+    if "benchmark_delta" in fact_bank:
+        required.add("benchmark_delta")
+    return required
+
+
+def _clean_result_breakdown_heading(value: str) -> str:
+    return str(value or "").strip().lstrip("#").strip()
+
+
+def _result_breakdown_starting_capital(context: dict[str, Any]) -> str:
+    config_snapshot = context.get("config_snapshot")
+    if isinstance(config_snapshot, dict):
+        raw_value = config_snapshot.get("initial_capital") or config_snapshot.get(
+            "starting_capital"
+        )
+        if isinstance(raw_value, (int, float)) and raw_value > 0:
+            return f"${raw_value:,.0f}"
+        if isinstance(raw_value, str) and raw_value.strip():
+            return raw_value.strip()
+
+    assumptions = context.get("assumptions")
+    if isinstance(assumptions, list):
+        for assumption in assumptions:
+            text = str(assumption).strip()
+            if text.lower().startswith("starting capital"):
+                return text.split(":", 1)[-1].strip().rstrip(".")
+    return ""
 
 
 def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
@@ -1142,12 +1422,17 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
         "max_drawdown_pct",
         row_keys=("max_drawdown_pct", "max_drawdown"),
     )
+    delta_vs_benchmark = _result_breakdown_metric(
+        context,
+        "delta_vs_benchmark_pct",
+        row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
+    )
     assumptions = context.get("assumptions")
-    assumption_text = (
-        " ".join(str(item).strip() for item in assumptions[:3] if str(item).strip())
+    assumption_lines = (
+        [str(item).strip() for item in assumptions[:5] if str(item).strip()]
         if isinstance(assumptions, list)
-        else ""
-    ) or "the stored run settings"
+        else []
+    ) or ["The stored run settings were used."]
     benchmark = str(context.get("benchmark_symbol") or "").strip()
     symbols = context.get("symbols")
     symbols_text = (
@@ -1155,26 +1440,50 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
         if isinstance(symbols, list)
         else ""
     ) or "The available result"
-    return_text = (
-        f"with a {_format_result_breakdown_percent(total_return)} total return"
+    title = str(context.get("title") or "").strip() or f"{symbols_text} backtest"
+    date_range = _format_result_breakdown_date_range(context.get("date_range"))
+    total_return_text = (
+        _format_result_breakdown_percent(total_return)
         if total_return is not None
-        else "with the available result"
+        else "the available return"
     )
     benchmark_text = (
-        f"{benchmark} at {_format_result_breakdown_percent(benchmark_return)}"
+        _format_result_breakdown_percent(benchmark_return)
         if benchmark and benchmark_return is not None
-        else benchmark or "the benchmark"
+        else "the available benchmark return"
+    )
+    delta_text = (
+        _format_result_breakdown_percent(delta_vs_benchmark)
+        if delta_vs_benchmark is not None
+        else "the stored benchmark spread"
     )
     drawdown_text = (
         _format_result_breakdown_percent(max_drawdown)
         if max_drawdown is not None
         else "the available risk data"
     )
+    assumption_bullets = "\n".join(f"- {line}" for line in assumption_lines)
+    period_sentence = f" over {date_range}" if date_range else ""
     return (
-        f"{symbols_text} finished {return_text} versus {benchmark_text}. "
-        f"The main risk shown here was max drawdown of {drawdown_text}. "
-        f"Assumptions: {assumption_text}. "
-        "This is historical simulation evidence, not a prediction or trading recommendation."
+        f"### What was tested\n"
+        f"{title} tested {symbols_text}{period_sentence} using the stored backtest configuration.\n\n"
+        f"### What happened\n"
+        f"Total Return (%): {total_return_text}. This is the headline portfolio change "
+        f"for the selected period, before treating it as a future expectation.\n\n"
+        f"### Benchmark comparison\n"
+        f"The benchmark was {benchmark or 'the stored benchmark'} at {benchmark_text}. "
+        f"The strategy finished {delta_text} versus that benchmark, so the card is "
+        f"showing relative performance as well as absolute return.\n\n"
+        f"### Risk and drawdown\n"
+        f"Max drawdown was {drawdown_text}. That marks the largest peak-to-trough "
+        f"decline during the simulation and is the first risk number to compare "
+        f"against the return.\n\n"
+        f"### Assumptions\n"
+        f"{assumption_bullets}\n\n"
+        f"### What to try next\n"
+        f"Use this as historical simulation evidence, not a prediction or trading "
+        f"recommendation. A useful next check is changing the date range or benchmark "
+        f"to see whether the conclusion depends on this exact window."
     )
 
 
@@ -1228,6 +1537,20 @@ def _coerce_result_breakdown_number(value: Any) -> float | None:
 def _format_result_breakdown_percent(value: float) -> str:
     sign = "+" if value > 0 else ""
     return f"{sign}{value:.1f}%"
+
+
+def _format_result_breakdown_date_range(value: Any) -> str:
+    if isinstance(value, dict):
+        display = value.get("display")
+        if isinstance(display, str) and display.strip():
+            return display.strip()
+        start = value.get("start")
+        end = value.get("end")
+        if start and end:
+            return f"{start} to {end}"
+    if isinstance(value, str):
+        return value.strip()
+    return ""
 
 
 def result_breakdown_message(run: BacktestRun | None) -> str:

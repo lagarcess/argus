@@ -308,7 +308,7 @@ def _pending_strategy_payload(
     if not isinstance(missing_required_fields, list):
         missing_required_fields = list(run_state.missing_required_fields)
     requested_field = result.get("requested_field")
-    return {
+    payload = {
         "strategy": strategy.model_dump(mode="python"),
         "requested_field": (
             str(requested_field)
@@ -319,6 +319,12 @@ def _pending_strategy_payload(
             str(field) for field in missing_required_fields if isinstance(field, str)
         ],
     }
+    selected_thread_metadata = result.get("selected_thread_metadata")
+    if isinstance(selected_thread_metadata, dict):
+        pending_resolution = selected_thread_metadata.get("pending_resolution")
+        if isinstance(pending_resolution, dict):
+            payload["pending_resolution"] = dict(pending_resolution)
+    return payload
 
 
 def _task_snapshot_from_value(value: Any) -> TaskSnapshot | None:
