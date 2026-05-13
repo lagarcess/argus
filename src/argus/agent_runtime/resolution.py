@@ -228,10 +228,7 @@ def mention_to_provenance(
 ) -> ResolutionProvenance:
     candidate_kind = "indicator" if mention.get("type") == "indicator" else "asset"
     raw_text = str(
-        mention.get("symbol")
-        or mention.get("insert_text")
-        or mention.get("label")
-        or ""
+        mention.get("symbol") or mention.get("insert_text") or mention.get("label") or ""
     ).strip()
     canonical = raw_text.upper() if candidate_kind == "asset" else raw_text.lower()
     support_status = str(mention.get("support_status") or "supported")

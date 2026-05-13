@@ -43,8 +43,8 @@ def test_api_main_has_no_legacy_orchestrator_wiring() -> None:
 
 
 def test_legacy_state_module_is_retired() -> None:
-    retired_path = ROOT / "src/argus/domain" / (
-        _module_path("backtest", "state", "machine") + ".py"
+    retired_path = (
+        ROOT / "src/argus/domain" / (_module_path("backtest", "state", "machine") + ".py")
     )
 
     assert not retired_path.exists()

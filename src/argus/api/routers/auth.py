@@ -54,7 +54,9 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             detail="Supabase persistence is required for authentication.",
         )
     try:
-        result = api_state.supabase_gateway.login(email=body.email, password=body.password)
+        result = api_state.supabase_gateway.login(
+            email=body.email, password=body.password
+        )
         return auth_response(request, result)
     except Exception:
         raise problem(

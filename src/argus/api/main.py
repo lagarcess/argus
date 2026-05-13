@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from langgraph.checkpoint.memory import MemorySaver
 
 from argus.api import chat_service, pagination, search_utils
 from argus.api import state as api_state
@@ -43,7 +42,7 @@ async def lifespan(app: FastAPI):
         checkpointer = await checkpointer_cm.__aenter__()
         await checkpointer.setup()
     else:
-        checkpointer = MemorySaver()
+        checkpointer = api_state.build_agent_runtime_checkpointer()
 
     app.state.agent_runtime_checkpointer = checkpointer
     app.state.agent_runtime_checkpointer_cm = checkpointer_cm

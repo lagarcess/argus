@@ -159,6 +159,7 @@ class OpenRouterStructuredInterpreter:
 
         # 2. Try Fallback Model (if primary failed or was unavailable)
         from argus.llm.openrouter import resolve_openrouter_model
+
         fallback_model_name = resolve_openrouter_model(fallback=True)
 
         # Don't retry with the same model name if resolve returned the same thing
@@ -167,10 +168,14 @@ class OpenRouterStructuredInterpreter:
             self.last_status = "failed"
             return None
 
-        fallback_model = build_openrouter_model("interpretation", model_name=fallback_model_name)
+        fallback_model = build_openrouter_model(
+            "interpretation", model_name=fallback_model_name
+        )
         if fallback_model:
             try:
-                structured = fallback_model.with_structured_output(LLMInterpretationResponse)
+                structured = fallback_model.with_structured_output(
+                    LLMInterpretationResponse
+                )
                 response = await structured.ainvoke(messages)
                 if isinstance(response, LLMInterpretationResponse):
                     self.last_status = "fallback_used"
@@ -364,28 +369,16 @@ def _ground_strategy_in_current_turn(
             strategy.date_range,
             raw_user_phrasing=current_message,
         )
+
+
 def _merge_prior_strategy(
     *,
     strategy: StrategySummary,
     request: InterpretationRequest,
     response: LLMInterpretationResponse,
 ) -> None:
-    if request.latest_task_snapshot is None or response.task_relation != "refine":
-        return
-    prior = (
-        request.latest_task_snapshot.pending_strategy_summary
-        or request.latest_task_snapshot.confirmed_strategy_summary
-    )
-    if prior is None:
-        return
-    merged = prior.model_copy(deep=True)
-    incoming = strategy.model_dump(mode="python")
-    for key, value in incoming.items():
-        if value in (None, "", [], {}):
-            continue
-        setattr(merged, key, value)
-    for key, value in merged.model_dump(mode="python").items():
-        setattr(strategy, key, value)
+    del strategy, request, response
+    return None
 
 
 def _validate_capability_boundaries(

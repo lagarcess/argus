@@ -24,6 +24,7 @@ from argus.agent_runtime.stages.next_step import next_step_stage_async
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
+    StrategySummary,
     TaskSnapshot,
     UserState,
 )
@@ -208,6 +209,7 @@ async def _interpret_node_async(
             state=_run_state(state),
             user=_user(state),
             latest_task_snapshot=state.get("latest_task_snapshot"),
+            selected_thread_metadata=state.get("selected_thread_metadata", {}),
             structured_interpreter=structured_interpreter,
         ),
     )
@@ -290,6 +292,7 @@ def _apply_stage_result(
         artifact_references=artifact_references,
     )
     workflow_state["selected_thread_metadata"] = _build_thread_metadata(
+        workflow_state=workflow_state,
         run_state=run_state,
         stage_outcome=outcome,
     )
@@ -354,28 +357,44 @@ def _build_task_snapshot(
         artifact_references=artifact_references,
         artifact_kind="collection_action",
     )
+    preserve_pending_strategy = _should_preserve_pending_strategy(
+        run_state=run_state,
+        stage_outcome_value=stage_outcome_value,
+        prior_task_snapshot=prior_task_snapshot,
+        latest_backtest_reference=latest_backtest_reference,
+        latest_collection_reference=latest_collection_reference,
+    )
+    completed = (
+        stage_outcome_value in completed_outcomes and not preserve_pending_strategy
+    )
     pending_strategy_summary = (
-        run_state.candidate_strategy_draft
-        if stage_outcome_value in {"await_user_reply", "await_approval"}
+        prior_task_snapshot.pending_strategy_summary
+        if preserve_pending_strategy and prior_task_snapshot is not None
         else (
-            prior_task_snapshot.pending_strategy_summary
-            if prior_task_snapshot is not None
-            and stage_outcome_value not in completed_outcomes
-            else None
+            run_state.candidate_strategy_draft
+            if stage_outcome_value in {"await_user_reply", "await_approval"}
+            else (
+                prior_task_snapshot.pending_strategy_summary
+                if prior_task_snapshot is not None
+                and stage_outcome_value not in completed_outcomes
+                else None
+            )
         )
+    )
+    prior_confirmed_strategy = (
+        prior_task_snapshot.confirmed_strategy_summary
+        if prior_task_snapshot is not None
+        else None
     )
     return TaskSnapshot(
         latest_task_type=run_state.intent,
-        completed=stage_outcome_value in completed_outcomes,
+        completed=completed,
         pending_strategy_summary=pending_strategy_summary,
         confirmed_strategy_summary=(
             run_state.candidate_strategy_draft
-            if stage_outcome_value in completed_outcomes
-            else (
-                prior_task_snapshot.confirmed_strategy_summary
-                if prior_task_snapshot is not None
-                else None
-            )
+            if completed
+            and _strategy_summary_has_content(run_state.candidate_strategy_draft)
+            else prior_confirmed_strategy
         ),
         latest_backtest_result_reference=(
             latest_backtest_reference
@@ -409,16 +428,80 @@ def _build_task_snapshot(
     )
 
 
+def _should_preserve_pending_strategy(
+    *,
+    run_state: RunState,
+    stage_outcome_value: str,
+    prior_task_snapshot: TaskSnapshot | None,
+    latest_backtest_reference: ArtifactReference | None,
+    latest_collection_reference: ArtifactReference | None,
+) -> bool:
+    if stage_outcome_value != "ready_to_respond":
+        return False
+    if (
+        prior_task_snapshot is None
+        or prior_task_snapshot.pending_strategy_summary is None
+    ):
+        return False
+    if latest_backtest_reference is not None or latest_collection_reference is not None:
+        return False
+    action = run_state.structured_action
+    return action is None or action.type != "cancel_confirmation"
+
+
+def _strategy_summary_has_content(strategy: StrategySummary) -> bool:
+    return any(
+        value not in (None, "", [], {})
+        for value in strategy.model_dump(mode="python").values()
+    )
+
+
 def _build_thread_metadata(
     *,
+    workflow_state: WorkflowState,
     run_state: RunState,
     stage_outcome: Any,
 ) -> dict[str, Any]:
     stage_outcome_value = getattr(stage_outcome, "value", stage_outcome)
-    return {
+    metadata: dict[str, Any] = {
         "latest_task_type": run_state.intent,
         "last_stage_outcome": stage_outcome_value,
     }
+    requested_field = workflow_state.get("requested_field")
+    if isinstance(requested_field, str) and requested_field:
+        metadata["requested_field"] = requested_field
+    pending_resolution = _pending_resolution_candidate(workflow_state=workflow_state)
+    if pending_resolution is not None:
+        metadata["pending_resolution"] = pending_resolution
+    return metadata
+
+
+def _pending_resolution_candidate(
+    *,
+    workflow_state: WorkflowState,
+) -> dict[str, Any] | None:
+    ambiguous_fields = workflow_state.get("ambiguous_fields")
+    if not isinstance(ambiguous_fields, list):
+        return None
+    for field in ambiguous_fields:
+        if not isinstance(field, dict):
+            continue
+        field_name = str(field.get("field_name") or "")
+        if field_name.split("[", 1)[0] != "asset_universe":
+            continue
+        candidate = field.get("candidate_normalized_value")
+        if not isinstance(candidate, str) or not candidate.strip():
+            continue
+        pending_resolution: dict[str, Any] = {
+            "field": "asset_universe",
+            "raw_value": str(field.get("raw_value") or "").strip(),
+            "candidate_normalized_value": candidate.strip(),
+        }
+        strategy = _run_state(workflow_state).candidate_strategy_draft
+        if strategy.asset_class:
+            pending_resolution["asset_class"] = strategy.asset_class
+        return pending_resolution
+    return None
 
 
 def _resolve_artifact_references(state: WorkflowState) -> list[ArtifactReference]:

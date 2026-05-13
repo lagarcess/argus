@@ -101,4 +101,3 @@ def test_macd_is_searchable_but_not_executable() -> None:
     assert result.status == "unsupported"
     assert result.provenance.canonical_symbol == "macd"
     assert result.provenance.validated_by == "indicator_registry"
-

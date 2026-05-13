@@ -18,10 +18,12 @@ from argus.api.chat_service import (
     chat_request_message,
     checkpoint_has_latest_result,
     checkpoint_has_pending_confirmation,
+    checkpoint_has_pending_strategy,
     confirmation_metadata_fallback_context,
     is_confirmation_action,
     latest_result_fallback_context,
     parse_onboarding_control_message,
+    pending_strategy_metadata_fallback_context,
     persist_onboarding_update,
     persist_runtime_backtest_run,
     result_breakdown_message,
@@ -35,6 +37,7 @@ from argus.api.chat_service import (
     save_strategy_from_run,
     sse_data,
     sse_done,
+    stale_confirmation_action_message,
 )
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import create_message, load_runtime_thread_history
@@ -155,7 +158,16 @@ async def chat_stream(
         conversation_id=conversation.id,
     )
     runtime_fallback = RuntimeFallbackContext()
-    if is_confirmation_action(payload):
+    stale_confirmation_message = stale_confirmation_action_message(
+        payload=payload,
+        user_id=user.id,
+        conversation_id=conversation.id,
+    )
+    if stale_confirmation_message is not None:
+        runtime_fallback = RuntimeFallbackContext(
+            recovery_message=stale_confirmation_message
+        )
+    elif is_confirmation_action(payload):
         if not checkpoint_has_pending_confirmation(checkpoint_values):
             metadata_fallback = confirmation_metadata_fallback_context(
                 user_id=user.id,
@@ -173,6 +185,20 @@ async def chat_stream(
                     ),
                 )
             runtime_fallback = metadata_fallback
+    elif not checkpoint_has_pending_strategy(checkpoint_values):
+        pending_fallback = pending_strategy_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if pending_fallback is not None:
+            runtime_fallback = pending_fallback
+        elif not checkpoint_has_latest_result(checkpoint_values):
+            result_fallback = latest_result_fallback_context(
+                user_id=user.id,
+                conversation_id=conversation.id,
+            )
+            if result_fallback is not None:
+                runtime_fallback = result_fallback
     elif not checkpoint_has_latest_result(checkpoint_values):
         result_fallback = latest_result_fallback_context(
             user_id=user.id,
@@ -186,24 +212,22 @@ async def chat_stream(
         for index, mention in enumerate(payload.mentions)
     ]
     if onboarding_goal is None:
-        user_metadata = (
-            {
-                "mentions": [
-                    mention.model_dump(mode="python") for mention in payload.mentions
-                ],
-                "resolution_provenance": [
-                    item.model_dump(mode="python") for item in mention_provenance
-                ],
-            }
-            if mention_provenance
-            else None
-        )
+        user_metadata: dict[str, Any] = {}
+        if mention_provenance:
+            user_metadata["mentions"] = [
+                mention.model_dump(mode="python") for mention in payload.mentions
+            ]
+            user_metadata["resolution_provenance"] = [
+                item.model_dump(mode="python") for item in mention_provenance
+            ]
+        if payload.action is not None:
+            user_metadata["chat_action"] = payload.action.model_dump(mode="python")
         create_message(
             user_id=user.id,
             conversation_id=conversation.id,
             role="user",
             content=display_message,
-            metadata=user_metadata,
+            metadata=user_metadata or None,
         )
 
     onboarding_required = current_user_profile.onboarding.stage in {
@@ -405,6 +429,7 @@ async def chat_stream(
                 user=user,
                 conversation_id=conversation.id,
             )
+            yield sse_data({"type": "stage_start", "stage": "explain"})
             assistant_text = result_breakdown_message(run)
             metadata = {
                 "conversation_mode": "result_review",
@@ -421,7 +446,6 @@ async def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
-            yield sse_data({"type": "stage_start", "stage": "explain"})
             yield sse_data({"type": "token", "content": assistant_text})
             yield sse_data(
                 {
@@ -446,6 +470,11 @@ async def chat_stream(
                 or "en"
             ),
         )
+        action_context = (
+            payload.action.model_dump(mode="python")
+            if payload.action is not None
+            else None
+        )
         streamed_text_parts: list[str] = []
 
         try:
@@ -458,6 +487,7 @@ async def chat_stream(
                 context_hints=[
                     item.model_dump(mode="python") for item in mention_provenance
                 ],
+                action_context=action_context,
                 fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
                 fallback_selected_thread_metadata=(
                     runtime_fallback.selected_thread_metadata
@@ -481,7 +511,10 @@ async def chat_stream(
                 runtime_result = dict(runtime_event.get("payload") or {})
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
-                confirmation_card = runtime_confirmation_card(runtime_result)
+                confirmation_card = runtime_confirmation_card(
+                    runtime_result,
+                    confirmation_id=api_state.store.new_id(),
+                )
                 if confirmation_card is not None:
                     assistant_text = str(confirmation_card["summary"])
                 result_card = runtime_result_card(runtime_result)
@@ -520,15 +553,17 @@ async def chat_stream(
                     ),
                     "agent_runtime_stage_outcome": stage_status,
                 }
+                if payload.action is not None:
+                    metadata["chat_action"] = payload.action.model_dump(mode="python")
                 if runtime_result.get("resolution_provenance"):
                     metadata["resolution_provenance"] = runtime_result[
                         "resolution_provenance"
                     ]
+                if isinstance(runtime_result.get("pending_strategy"), dict):
+                    metadata["pending_strategy"] = runtime_result["pending_strategy"]
                 if confirmation_card is not None:
                     metadata["confirmation_card"] = confirmation_card
-                    if isinstance(
-                        runtime_result.get("confirmation_payload"), dict
-                    ):
+                    if isinstance(runtime_result.get("confirmation_payload"), dict):
                         metadata["confirmation_payload"] = runtime_result[
                             "confirmation_payload"
                         ]
@@ -558,6 +593,8 @@ async def chat_stream(
                 runtime_result["message_id"] = (
                     assistant_message.id if assistant_message is not None else None
                 )
+                if assistant_text and not runtime_result.get("assistant_response"):
+                    runtime_result["assistant_response"] = assistant_text
                 if (
                     not streamed_text_parts
                     and confirmation_card is None

@@ -123,6 +123,57 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
   });
 
+  test("chat supersedes older confirmation cards when a newer draft appears", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const card = readFileSync(join(root, "components/chat/StrategyConfirmationCard.tsx"), "utf-8");
+    const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
+
+    expect(types).toContain('confirmation_state?: "active" | "superseded"');
+    expect(types).toContain("confirmation_id?: string");
+    expect(chat).toContain("supersedePriorConfirmations");
+    expect(chat).toContain("normalizeConfirmationHistory");
+    expect(card).toContain('confirmation.confirmation_state === "superseded"');
+    expect(card).toContain('confirmation.statusLabel || "Updated"');
+  });
+
+  test("chat supersedes active confirmations when a later turn asks for recovery", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("supersedeOpenConfirmations");
+    expect(chat).toContain("finalStageOutcome");
+    expect(chat).toContain('finalStageOutcome === "await_user_reply"');
+    expect(chat).toContain('finalStageOutcome === "needs_clarification"');
+  });
+
+  test("chat final payload accepts pending strategy metadata", () => {
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+
+    expect(api).toContain("pending_strategy?");
+    expect(api).toContain("missing_required_fields?: string[]");
+    expect(api).toContain("strategy: Record<string, unknown>");
+    expect(api).toContain("pending_resolution?");
+  });
+
+  test("confirmation action chips render as action transcript items", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
+
+    expect(types).toContain('"action"');
+    expect(chat).toContain('kind: action?.type ? "action" : "text"');
+    expect(chat).toContain("selectedAction: action");
+    expect(chat).toContain("metadata.chat_action");
+    expect(message).toContain('message.kind === "action"');
+  });
+
+  test("streaming backend errors keep backend detail when provided", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("chatStreamErrorText(");
+    expect(chat).toContain("event.data.detail");
+    expect(chat).toContain("err instanceof ChatStreamError && err.message");
+  });
+
   test("chat stream parser consumes canonical data-only SSE frames", () => {
     const stage = parseChatStreamFrame('data: {"type":"stage_start","stage":"execute"}');
     const token = parseChatStreamFrame('data: {"type":"token","content":"Running"}');
@@ -141,6 +192,18 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("chat.status.${event.data.stage}");
     expect(locale).toContain('"interpret": "Understanding your idea..."');
     expect(locale).toContain('"execute": "Running backtest..."');
+  });
+
+  test("latest pending assistant response hides feedback before stage_start arrives", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+
+    expect(chat).toContain("latestAiIndex");
+    expect(chat).toContain("isWorkingMessage");
+    expect(chat).toContain('(msg.content ?? "") === ""');
+    expect(chat).toContain("isStreaming={isWorkingMessage}");
+    expect(message).toContain("{!isUser && !isStreaming && (");
+    expect(message).toContain("{!isStreaming && (");
   });
 
   test("chat restores jump-to-latest affordance without forced reading jumps", () => {

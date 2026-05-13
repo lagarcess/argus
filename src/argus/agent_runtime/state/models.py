@@ -168,6 +168,25 @@ class ArtifactReference(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+StructuredActionType = Literal[
+    "run_backtest",
+    "change_dates",
+    "change_asset",
+    "adjust_assumptions",
+    "cancel_confirmation",
+    "show_breakdown",
+    "refine_strategy",
+    "save_strategy",
+]
+
+
+class StructuredActionContext(BaseModel):
+    type: StructuredActionType
+    label: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    presentation: Literal["confirmation", "result"] | None = None
+
+
 class TaskSnapshot(BaseModel):
     latest_task_type: IntentName | None = None
     completed: bool | None = None
@@ -249,6 +268,7 @@ class RunState(BaseModel):
     semantic_turn_act: str | None = None
     context_hints: list[ResolutionProvenance] = Field(default_factory=list)
     resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
+    structured_action: StructuredActionContext | None = None
 
     @classmethod
     def new(
@@ -257,7 +277,13 @@ class RunState(BaseModel):
         current_user_message: str,
         recent_thread_history: list[ConversationMessage | dict[str, Any]],
         context_hints: list[ResolutionProvenance | dict[str, Any]] | None = None,
+        action_context: StructuredActionContext | dict[str, Any] | None = None,
     ) -> "RunState":
+        structured_action = (
+            StructuredActionContext.model_validate(action_context)
+            if action_context is not None
+            else None
+        )
         return cls(
             current_user_message=current_user_message,
             recent_thread_history=deepcopy(recent_thread_history),
@@ -265,4 +291,5 @@ class RunState(BaseModel):
                 ResolutionProvenance.model_validate(hint)
                 for hint in (context_hints or [])
             ],
+            structured_action=structured_action,
         )

@@ -282,11 +282,16 @@ Application-facing user object.
 - `system`
 - `tool`
 
-Assistant `metadata` may include structured continuity artifacts such as
-`confirmation_card`, `confirmation_payload`, `result_card`, `result_run_id`,
-`latest_run_id`, `result_strategy_id`, and `result_conversation_id`. Clients use
-these fields to hydrate cards and actions after reload. Runtime execution still
-validates against the LangGraph checkpoint first, and result actions that mutate
+Message `metadata` may include structured continuity artifacts. Assistant
+messages may store `pending_strategy`, `confirmation_card`,
+`confirmation_payload`, `result_card`, `result_run_id`, `latest_run_id`,
+`result_strategy_id`, and `result_conversation_id`. User messages created by
+action chips may store `chat_action` so the transcript can hydrate the selected
+chip as an action item after reload. Clients use these fields to hydrate cards
+and actions after reload. Runtime execution still validates against the
+LangGraph checkpoint first. A confirmation card may include
+`confirmation_id` and `confirmation_state`; only the latest active confirmation
+can execute, and older cards are transcript history. Result actions that mutate
 state must reference a canonical run id.
 
 ## Strategy
@@ -420,7 +425,7 @@ Immutable simulation result.
     "start_date": "2022-01-01",
     "end_date": "2024-12-31",
     "side": "long",
-    "starting_capital": 10000,
+    "starting_capital": 1000,
     "allocation_method": "equal_weight",
     "benchmark_symbol": "SPY",
     "parameters": {}
@@ -615,7 +620,7 @@ The canonical backtest config used by the engine for execution and reproducibili
   "start_date": "2025-04-23",
   "end_date": "2026-04-23",
   "side": "long",
-  "starting_capital": 10000,
+  "starting_capital": 1000,
   "allocation_method": "equal_weight",
   "benchmark_symbol": "SPY",
   "parameters": {}
@@ -632,7 +637,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 - `start_date`: Rolling 12 months before `end_date`
 - `end_date`: Latest available market date
 - `side`: "long"
-- `starting_capital`: 10000
+- `starting_capital`: 1000
 - `allocation_method`: "equal_weight"
 - `benchmark_symbol`: `SPY` (equity), `BTC` (crypto), tested pair (`currency_pair`)
 - `parameters`: Template-specific defaults
@@ -645,11 +650,19 @@ The canonical backtest config used by the engine for execution and reproducibili
 - *Return 422 for unsupported values.*
 
 ### Starting Capital
-- **Default:** 10000
+- **Default:** 1000
 - **Allowed Range:** 1,000 to 100,000,000
 - *Return 422 for values outside range.*
 - > [!NOTE]
-  > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance.
+  > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance. The global default is `$1,000` for runnable drafts. DCA/recurring-buy contribution amounts are strategy-specific user inputs and remain separate from default starting capital.
+
+### DCA / Recurring-Buy Amount Semantics
+- **Current executable amount:** one recurring contribution amount.
+- **Stored field:** `StrategySummary.capital_amount` continues to mean the recurring contribution for DCA / recurring-buy drafts.
+- **Not currently executable in DCA:** separate starting principal, total capital budget, contribution ceiling, or maximum invested cap.
+- If the user supplies both a recurring contribution and a starting/total capital amount, Argus must preserve the distinction conversationally, but must not show `Ready to run` as if both amounts will execute in the DCA engine.
+- The supported recovery path is to ask whether the user wants to run the recurring-buy simulation only, adjust the recurring contribution, or switch to a supported buy-and-hold style test using starting capital.
+- TODO(dca-engine): Add explicit support for DCA starting principal, contribution ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation card display, result assumptions, and model capability wording.
 
 ### Symbol Constraints
 - **Minimum:** 1 symbol
@@ -671,7 +684,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 ### Date Range
 - **Format:** ISO 8601 (YYYY-MM-DD)
 - **Rules:** `start_date` must be before `end_date`. `end_date` cannot be in the future beyond latest market data.
-- *Normalization:* Backend computes rolling 12 months if dates are omitted.
+- *Normalization:* Backend computes rolling 12 months only when dates are omitted. If the user supplies an explicit temporal phrase, that phrase must be normalized, preserved, or clarified before confirmation; it must not silently fall back to the 12-month default.
 
 ## Reality Gap (Deferred)
 Argus Alpha is a "perfect world" simulation. The following are explicitly excluded from Alpha MVP:
@@ -974,6 +987,23 @@ Soft delete conversation.
 
 # 12. Chat Streaming Endpoint
 
+### Structured Action Semantics
+
+`action` payloads are structured product operations, not plain user text.
+
+- `run_backtest` is valid only when the latest runtime state or safe metadata fallback contains a pending strategy that has already been shown as a confirmation card.
+- `run_backtest` actions may include `payload.confirmation_id`; if supplied, the backend must reject stale ids instead of executing an older draft.
+- `change_asset`, `change_dates`, and `adjust_assumptions` patch the active pending strategy by asking for the replacement field while preserving all other known fields.
+- Missing-field answers patch only the requested field and must preserve prior known fields from the pending strategy.
+- Confirmation eligibility requires semantic conservation: explicit date, asset, cadence, and money-role constraints from the user must survive interpretation, normalization, and default application.
+- Defaults fill absent fields only. They do not override explicit user constraints.
+- For DCA/recurring-buy drafts, `capital_amount` means the recurring contribution. Starting or total capital may be understood as user intent, but current DCA execution does not support it as a separate executable input. It must not overwrite the recurring contribution or be silently treated as an investment ceiling.
+- A DCA draft that contains unsupported starting principal / total capital semantics must route to clarification or simplification, not to a confident `Ready to run` card for both amounts.
+- `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
+- A runnable draft produced after a missing-field answer must emit confirmation before execution.
+- `show_breakdown` and `save_strategy` require canonical result run context.
+- `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose.
+
 **Request:**
 ```json
 {
@@ -1078,6 +1108,35 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
   }
 }
 ```
+
+When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
+or `await_approval`, the final payload may include:
+
+```json
+{
+  "pending_strategy": {
+    "strategy": {
+      "strategy_type": "buy_and_hold",
+      "asset_universe": ["AAPL"],
+      "asset_class": "equity",
+      "date_range": "past year"
+    },
+    "requested_field": "asset_universe",
+    "missing_required_fields": ["asset_universe"],
+    "pending_resolution": {
+      "field": "asset_universe",
+      "raw_value": "Apple",
+      "candidate_normalized_value": "AAPL",
+      "asset_class": "equity"
+    }
+  }
+}
+```
+
+When `pending_resolution` is present, it represents the candidate behind a
+specific clarification prompt. A short affirmative answer such as "yes" may
+accept that candidate only for that pending field; it does not bypass normal LLM
+interpretation for unrelated turns.
 
 **6. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
 ```
@@ -1248,7 +1307,7 @@ Run directly from saved strategy or inline config.
   "timeframe": "1D",
   "start_date": "2025-04-23",
   "end_date": "2026-04-23",
-  "starting_capital": 10000
+  "starting_capital": 1000
 }
 ```
 
@@ -1263,7 +1322,7 @@ Run directly from saved strategy or inline config.
   "start_date": "2025-04-23",
   "end_date": "2026-04-23",
   "side": "long",
-  "starting_capital": 10000,
+  "starting_capital": 1000,
   "allocation_method": "equal_weight",
   "parameters": {},
   "benchmark_symbol": "SPY"
@@ -1500,6 +1559,7 @@ Not in current contract:
 - advanced quota systems
 - cross-asset strategy runs
 - custom benchmarks (Alpha uses SPY/BTC defaults, or the tested pair for currency pairs)
+- DCA starting principal, total capital budgets, contribution ceilings, and recurring contribution combinations
 
 ---
 

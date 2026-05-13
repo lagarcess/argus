@@ -217,7 +217,7 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
                 },
                 "optional_parameters": {
                     "timeframe": {"value": "1D", "source": "default"},
-                    "initial_capital": {"value": 10000.0, "source": "default"},
+                    "initial_capital": {"value": 1000.0, "source": "default"},
                 },
             },
         }

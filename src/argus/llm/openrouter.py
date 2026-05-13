@@ -17,7 +17,6 @@ OpenRouterTask = Literal[
 ]
 
 
-
 @dataclass(frozen=True)
 class OpenRouterProfile:
     task: OpenRouterTask
@@ -41,7 +40,9 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
 }
 
 
-def resolve_openrouter_model(model_name: str | None = None, fallback: bool = False) -> str:
+def resolve_openrouter_model(
+    model_name: str | None = None, fallback: bool = False
+) -> str:
     """
     Resolves the model name to use, preferring AGENT_MODEL or AGENT_FALLBACK_MODEL.
     """

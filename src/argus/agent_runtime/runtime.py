@@ -11,6 +11,7 @@ from argus.agent_runtime.state.models import (
     ConversationMessage,
     ResolutionProvenance,
     RunState,
+    StrategySummary,
     TaskSnapshot,
     UserState,
 )
@@ -30,6 +31,7 @@ def build_workflow_input(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    action_context: dict[str, Any] | None = None,
     fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
     fallback_selected_thread_metadata: dict[str, Any] | None = None,
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
@@ -43,6 +45,7 @@ def build_workflow_input(
             list(recent_thread_history or [])
         ),
         context_hints=list(context_hints or []),
+        action_context=action_context,
     )
     if fallback_confirmation_payload is not None:
         run_state.confirmation_payload = ConfirmationPayload.model_validate(
@@ -75,6 +78,7 @@ async def stream_agent_turn_events(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    action_context: dict[str, Any] | None = None,
     fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
     fallback_selected_thread_metadata: dict[str, Any] | None = None,
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
@@ -86,6 +90,7 @@ async def stream_agent_turn_events(
         message=message,
         recent_thread_history=recent_thread_history,
         context_hints=context_hints,
+        action_context=action_context,
         fallback_latest_task_snapshot=fallback_latest_task_snapshot,
         fallback_selected_thread_metadata=fallback_selected_thread_metadata,
         fallback_artifact_references=fallback_artifact_references,
@@ -130,6 +135,7 @@ async def run_agent_turn(
     message: str,
     recent_thread_history: Iterable[ConversationMessage | dict[str, Any]] | None = None,
     context_hints: Iterable[ResolutionProvenance | dict[str, Any]] | None = None,
+    action_context: dict[str, Any] | None = None,
     fallback_latest_task_snapshot: TaskSnapshot | dict[str, Any] | None = None,
     fallback_selected_thread_metadata: dict[str, Any] | None = None,
     fallback_artifact_references: Iterable[ArtifactReference | dict[str, Any]]
@@ -144,6 +150,7 @@ async def run_agent_turn(
         message=message,
         recent_thread_history=recent_thread_history,
         context_hints=context_hints,
+        action_context=action_context,
         fallback_latest_task_snapshot=fallback_latest_task_snapshot,
         fallback_selected_thread_metadata=fallback_selected_thread_metadata,
         fallback_artifact_references=fallback_artifact_references,
@@ -156,7 +163,9 @@ async def run_agent_turn(
     return final_payload or {}
 
 
-async def _final_workflow_state(*, workflow: Any, config: dict[str, Any]) -> dict[str, Any]:
+async def _final_workflow_state(
+    *, workflow: Any, config: dict[str, Any]
+) -> dict[str, Any]:
     state_snapshot = await workflow.aget_state(config)
     values = getattr(state_snapshot, "values", None)
     if not isinstance(values, dict):
@@ -222,6 +231,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "assistant_prompt",
         "assistant_response",
         "requested_field",
+        "pending_strategy",
         "optional_parameter_choices",
         "confirmation_payload",
         "next_actions",
@@ -257,18 +267,86 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
             and getattr(run_state, "failure_classification", None) is not None
         ):
             serialized["failure_classification"] = run_state.failure_classification
-        if (
-            "resolution_provenance" not in serialized
-            and getattr(run_state, "resolution_provenance", None)
+        if "resolution_provenance" not in serialized and getattr(
+            run_state, "resolution_provenance", None
         ):
             serialized["resolution_provenance"] = [
-                item.model_dump(mode="python")
-                for item in run_state.resolution_provenance
+                item.model_dump(mode="python") for item in run_state.resolution_provenance
             ]
+        if "pending_strategy" not in serialized:
+            pending_strategy = _pending_strategy_payload(result, run_state=run_state)
+            if pending_strategy is not None:
+                serialized["pending_strategy"] = pending_strategy
     stage_outcome = result.get("stage_outcome")
     if stage_outcome is not None:
         serialized["stage_outcome"] = getattr(stage_outcome, "value", stage_outcome)
     return serialized
+
+
+def _pending_strategy_payload(
+    result: dict[str, Any],
+    *,
+    run_state: RunState,
+) -> dict[str, Any] | None:
+    stage_outcome = result.get("stage_outcome")
+    stage_outcome_value = str(getattr(stage_outcome, "value", stage_outcome or ""))
+    if stage_outcome_value not in {
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval",
+        "execution_failed_recoverably",
+    }:
+        return None
+    snapshot = _task_snapshot_from_value(result.get("latest_task_snapshot"))
+    strategy = (
+        snapshot.pending_strategy_summary
+        if snapshot is not None and snapshot.pending_strategy_summary is not None
+        else run_state.candidate_strategy_draft
+    )
+    if not _strategy_summary_has_content(strategy):
+        return None
+    missing_required_fields = result.get("missing_required_fields")
+    if not isinstance(missing_required_fields, list):
+        missing_required_fields = list(run_state.missing_required_fields)
+    requested_field = result.get("requested_field")
+    payload = {
+        "strategy": strategy.model_dump(mode="python"),
+        "requested_field": (
+            str(requested_field) if requested_field not in (None, "") else None
+        ),
+        "missing_required_fields": [
+            str(field) for field in missing_required_fields if isinstance(field, str)
+        ],
+    }
+    selected_thread_metadata = result.get("selected_thread_metadata")
+    if isinstance(selected_thread_metadata, dict):
+        pending_resolution = selected_thread_metadata.get("pending_resolution")
+        if isinstance(pending_resolution, dict):
+            payload["pending_resolution"] = dict(pending_resolution)
+    return payload
+
+
+def _task_snapshot_from_value(value: Any) -> TaskSnapshot | None:
+    if value is None:
+        return None
+    if isinstance(value, TaskSnapshot):
+        return value
+    try:
+        return TaskSnapshot.model_validate(value)
+    except Exception:
+        return None
+
+
+def _strategy_summary_has_content(strategy: Any) -> bool:
+    if not isinstance(strategy, StrategySummary):
+        try:
+            strategy = StrategySummary.model_validate(strategy)
+        except Exception:
+            return False
+    return any(
+        value not in (None, "", [], {})
+        for value in strategy.model_dump(mode="python").values()
+    )
 
 
 def _serialize_public_value(key: str, value: Any) -> Any:
@@ -295,7 +373,4 @@ def _bounded_recent_thread_history(
 def resolve_persisted_artifact_references(
     raw_references: Iterable[ArtifactReference | dict[str, Any]],
 ) -> list[ArtifactReference]:
-    return [
-        ArtifactReference.model_validate(reference)
-        for reference in raw_references
-    ]
+    return [ArtifactReference.model_validate(reference) for reference in raw_references]

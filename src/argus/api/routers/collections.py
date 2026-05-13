@@ -72,9 +72,13 @@ def list_collections(
         items = api_state.supabase_gateway.list_collections(user_id=user.id, limit=None)
     else:
         items = [
-            item for item in api_state.store.collections.values() if item.deleted_at is None
+            item
+            for item in api_state.store.collections.values()
+            if item.deleted_at is None
         ]
-    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    items.sort(
+        key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True
+    )
     filtered = items
     if cursor:
         cursor_updated_at, cursor_id = decode_cursor(cursor, request)
@@ -82,7 +86,9 @@ def list_collections(
             cursor_dt = datetime.fromisoformat(cursor_updated_at)
         except ValueError:
             raise invalid_cursor_problem(request) from None
-        cursor_pinned = next((item.pinned for item in items if item.id == cursor_id), False)
+        cursor_pinned = next(
+            (item.pinned for item in items if item.id == cursor_id), False
+        )
         cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
         filtered = [
             item

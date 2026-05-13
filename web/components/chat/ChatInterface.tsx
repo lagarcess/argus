@@ -174,8 +174,18 @@ function hydrateResultActions(
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   const messages: Message[] = items.map((m) => {
     const metadata = m.metadata ?? {};
+    const chatAction = metadata.chat_action as ChatActionOption | undefined;
     const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
     const resultCard = metadata.result_card as ConversationResultCard | undefined;
+    if (m.role === "user" && chatAction && typeof chatAction === "object") {
+      return {
+        id: m.id,
+        role: "user",
+        kind: "action",
+        content: m.content,
+        selectedAction: chatAction,
+      };
+    }
     if (
       m.role !== "user" &&
       !isBreakdownActionMetadata(metadata) &&
@@ -227,7 +237,75 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     };
   });
 
-  return { messages, inputActions: latestInputActions(messages) };
+  const normalized = normalizeConfirmationHistory(messages);
+  return { messages: normalized, inputActions: latestInputActions(normalized) };
+}
+
+function normalizeConfirmationHistory(messages: Message[]): Message[] {
+  const lastResultIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_result" ? index : latest,
+    -1,
+  );
+  const latestConfirmationIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_confirmation" && index > lastResultIndex
+        ? index
+        : latest,
+    -1,
+  );
+  return messages.map((message, index) => {
+    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+      return message;
+    }
+    const shouldSupersede =
+      index < lastResultIndex ||
+      (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex);
+    if (!shouldSupersede) {
+      return {
+        ...message,
+        confirmation: {
+          ...message.confirmation,
+          confirmation_state: "active",
+        },
+        actions: message.confirmation.actions ?? message.actions,
+      };
+    }
+    return supersedePriorConfirmations(message);
+  });
+}
+
+function supersedePriorConfirmations(message: Message): Message {
+  if (message.kind !== "strategy_confirmation" || !message.confirmation) {
+    return message;
+  }
+  return {
+    ...message,
+    confirmation: {
+      ...message.confirmation,
+      confirmation_state: "superseded",
+      statusLabel: "Updated",
+      actions: [],
+    },
+    actions: [],
+  };
+}
+
+function supersedeOpenConfirmations(messages: Message[]): Message[] {
+  const lastResultIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_result" ? index : latest,
+    -1,
+  );
+  return messages.map((message, index) =>
+    message.kind === "strategy_confirmation" && index > lastResultIndex
+      ? supersedePriorConfirmations(message)
+      : message,
+  );
+}
+
+function chatStreamErrorText(detail: string | undefined, fallback: string) {
+  return detail || fallback;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -662,9 +740,10 @@ export default function ChatInterface() {
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      kind: "text",
+      kind: action?.type ? "action" : "text",
       content: action?.label ?? trimmed,
       mentions,
+      selectedAction: action,
     };
     const assistantId = crypto.randomUUID();
 
@@ -706,7 +785,10 @@ export default function ChatInterface() {
             m.id === assistantId
               ? {
                   ...m,
-                  content: t('chat.error_backtest'),
+                  content: chatStreamErrorText(
+                    event.data.detail,
+                    t('chat.error_backtest'),
+                  ),
                 }
               : m,
           ),
@@ -714,19 +796,22 @@ export default function ChatInterface() {
       }
       if (event.event === "final") {
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
+        const finalStageOutcome = event.data.stage_outcome;
         if (event.data.confirmation) {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
           setInputActions(confirmation.actions ?? []);
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    kind: "strategy_confirmation",
-                    content: undefined,
-                    confirmation,
-                  }
-                : m,
+            normalizeConfirmationHistory(
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      kind: "strategy_confirmation",
+                      content: undefined,
+                      confirmation,
+                    }
+                  : m,
+              ),
             ),
           );
         } else if (event.data.run) {
@@ -736,26 +821,35 @@ export default function ChatInterface() {
           const card = { ...baseCard, actions: resultActions };
           setInputActions(visibleInputActions(resultActions));
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                  ...m,
-                  kind: "strategy_result",
-                  content: m.content || finalText || undefined,
-                  result: card,
-                  actions: resultActions,
-                  }
-                : m,
+            normalizeConfirmationHistory(
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                    ...m,
+                    kind: "strategy_result",
+                    content: m.content || finalText || undefined,
+                    result: card,
+                    actions: resultActions,
+                    }
+                  : m,
+              ),
             ),
           );
         } else if (finalText) {
-          setMessages((prev) =>
-            prev.map((m) =>
+          setMessages((prev) => {
+            const nextMessages = prev.map((m) =>
               m.id === assistantId && !m.content
                 ? { ...m, content: finalText }
                 : m,
-            ),
-          );
+            );
+            if (
+              finalStageOutcome === "await_user_reply" ||
+              finalStageOutcome === "needs_clarification"
+            ) {
+              return supersedeOpenConfirmations(nextMessages);
+            }
+            return nextMessages;
+          });
         }
       }
       if (event.event === "title") {
@@ -801,6 +895,10 @@ export default function ChatInterface() {
       setStreamStatus(null);
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
+      const fallbackMessage =
+        err instanceof ChatStreamError && err.message
+          ? err.message
+          : t('chat.error_backtest');
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -808,7 +906,7 @@ export default function ChatInterface() {
                 ...m,
                 content: isRateLimit
                   ? t('chat.rate_limit_error')
-                  : t('chat.error_backtest'),
+                  : fallbackMessage,
               }
             : m,
         ),
@@ -1568,19 +1666,27 @@ export default function ChatInterface() {
                   className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]"
                 >
                   <div className="space-y-8">
-                    {messages.map((msg) => (
-                      <ChatMessage
-                        key={msg.id}
-                        message={msg}
-                        onAction={handleAction}
-                        onFeedback={(type, context, rating) => {
-                          setFeedbackState({ isOpen: true, type, context, rating });
-                          setIsSidebarOpen(false);
-                        }}
-                        isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
-                        isStreaming={!!streamStatus && msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
-                      />
-                    ))}
+                    {messages.map((msg, index) => {
+                      const latestAiIndex = messages.findLastIndex((m) => m.role === "ai");
+                      const isLatestAi = msg.role === "ai" && latestAiIndex === index;
+                      const isWorkingMessage =
+                        isLatestAi &&
+                        msg.kind === "text" &&
+                        (!!streamStatus || (msg.content ?? "") === "");
+                      return (
+                        <ChatMessage
+                          key={msg.id}
+                          message={msg}
+                          onAction={handleAction}
+                          onFeedback={(type, context, rating) => {
+                            setFeedbackState({ isOpen: true, type, context, rating });
+                            setIsSidebarOpen(false);
+                          }}
+                          isLatest={isLatestAi}
+                          isStreaming={isWorkingMessage}
+                        />
+                      );
+                    })}
                     {streamStatus && (
                       <div className="ml-12">
                         <span className="animate-ethereal-shimmer text-[13px] text-black/45 dark:text-white/45">

@@ -216,9 +216,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                     else "I tested that idea with TSLA."
                 ),
                 strategy_draft=dict(
-                    template=dict(
-                        source="user_supplied", value="rsi_mean_reversion"
-                    ),
+                    template=dict(source="user_supplied", value="rsi_mean_reversion"),
                     asset_class=dict(source="user_supplied", value="equity"),
                     symbols=dict(source="user_supplied", value=["TSLA"]),
                     parameters={},
@@ -228,7 +226,9 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         raising=False,
     )
-    monkeypatch.setattr(agent_router, "run_agent_turn", _runtime_success_for_message_async)
+    monkeypatch.setattr(
+        agent_router, "run_agent_turn", _runtime_success_for_message_async
+    )
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
@@ -387,7 +387,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert run["asset_class"] == "equity"
     assert run["benchmark_symbol"] == "SPY"
     assert run["config_snapshot"]["side"] == "long"
-    assert run["config_snapshot"]["starting_capital"] == 10000
+    assert run["config_snapshot"]["starting_capital"] == 1000
     assert "_execution_realism" not in run["config_snapshot"]
     assert "summary" not in run
     assert set(run["metrics"]) == {"aggregate", "by_symbol"}
@@ -397,7 +397,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert run["conversation_result_card"]["assumptions"] == [
         "Universe: TSLA.",
         "Simulation uses long-only preset.",
-        "Starting capital: $10,000.",
+        "Starting capital: $1,000.",
         "Allocation: equal weight.",
         "No slippage or fees included.",
         "Benchmark: SPY.",
@@ -933,7 +933,10 @@ def test_chat_stream_passes_thread_context_to_runtime(monkeypatch) -> None:
 
     async def _fake_stream_agent_turn_events(**kwargs: Any):
         captured_runtime.update(kwargs)
-        yield {"type": "final", "payload": _runtime_success_result(symbol="AAPL", assistant_response="ok")}
+        yield {
+            "type": "final",
+            "payload": _runtime_success_result(symbol="AAPL", assistant_response="ok"),
+        }
 
     monkeypatch.setattr(
         agent_router,

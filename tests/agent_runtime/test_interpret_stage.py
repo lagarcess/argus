@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
@@ -43,6 +44,7 @@ def run_interpret_with_llm(
     user: UserState | None = None,
     snapshot: TaskSnapshot | None = None,
     history: list[dict[str, str]] | None = None,
+    selected_thread_metadata: dict[str, Any] | None = None,
 ):
     interpreter = RecordingInterpreter(response)
     state = RunState.new(
@@ -53,6 +55,7 @@ def run_interpret_with_llm(
         state=state,
         user=user or UserState(user_id="u1", expertise_level="advanced"),
         latest_task_snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata or {},
         structured_interpreter=interpreter,
     )
     return result, interpreter
@@ -162,6 +165,7 @@ def test_interpret_approval_uses_semantic_turn_act() -> None:
         message="Run backtest",
         response=response,
         snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
         history=[
             {"role": "user", "content": "Buy and hold Tesla over the past year."},
             {"role": "assistant", "content": "Please confirm this backtest."},

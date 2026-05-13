@@ -133,6 +133,7 @@ class InterpretationRequest(BaseModel):
     current_user_message: str
     recent_thread_history: list[Any] = Field(default_factory=list)
     latest_task_snapshot: TaskSnapshot | None = None
+    selected_thread_metadata: dict[str, Any] = Field(default_factory=dict)
     user: UserState
 
 

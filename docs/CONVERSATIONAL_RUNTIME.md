@@ -8,11 +8,22 @@ Argus treats conversation as the product surface and backtesting as an execution
 
 The model proposes meaning. Argus validates it. The user confirms it. The engine executes it.
 
+## Conversational Artifact Contract
+
+Each active chat turn is grounded in one conversational artifact:
+
+- a pending strategy draft awaiting clarification or confirmation, or
+- a completed result awaiting follow-up.
+
+Every user turn must start a draft, patch the pending draft, answer a pending field, ask about the draft, confirm the draft, ask about the latest result, or recover the latest failed turn. Argus should not restart from blank state when a prior artifact clearly exists, and it must not execute a completed draft until the user has seen and approved the confirmation state.
+
 This separation is intentional:
 
 - LLM interpretation is used for natural language understanding, strategy type inference, structured strategy drafting, ambiguity detection, correction-aware follow-ups, conversational unsupported handling, confirmation wording, and result explanation.
 - Deterministic code is used for capability truth, provider availability, asset class validation, required-field gating, same-asset restrictions, execution defaults, benchmark selection, indicator execution specs, backtest execution, result envelopes, persistence, and stream event shape.
-- The LLM cannot silently mark unsupported behavior as executable, invent asset availability, change symbols, bypass confirmation, or fabricate result metrics.
+- The LLM cannot silently mark unsupported behavior as executable, invent asset availability, change symbols, skip required confirmation, or fabricate result metrics.
+- Before confirmation, Argus runs semantic conservation checks so explicit user constraints outrank defaults. If a user-supplied date, cadence, asset, or money role cannot be preserved or normalized, Argus clarifies instead of emitting a confident `Ready to run` card.
+- For DCA / recurring accumulation, `capital_amount` is the recurring contribution. Current DCA execution supports that one executable dollar amount only. Starting principal, total capital budgets, and contribution ceilings may be acknowledged as user intent, but they are future engine capabilities and must not overwrite the contribution amount.
 - Deterministic fallback cannot become the normal assistant voice. If the LLM fails, Argus may preserve truth internally, but user-facing copy must be natural recovery language rather than raw fields, enums, or starter prompts.
 
 ## Voice Boundary
@@ -96,13 +107,25 @@ Reloading or navigating away from chat must hydrate both visible messages and st
 
 Runtime memory remains checkpoint-first. If a pending confirmation action arrives after reload, the API validates the LangGraph checkpoint before execution. Message metadata may supply a conservative fallback snapshot only when it contains structured confirmation payload; otherwise the assistant asks the user to reconfirm instead of silently running incomplete state. Result follow-ups may recover the latest canonical run reference from message metadata and `backtest_runs`, but Save Strategy must still use a concrete run id from the result card.
 
+Confirmation cards are durable transcript artifacts, but only the latest active
+confirmation is executable. New refinement confirmations supersede older cards,
+and a completed result also makes prior confirmation cards historical. The UI may
+render superseded cards as muted `Updated` cards, but backend execution still
+checks the active confirmation identity before running.
+
+Clarification prompts may persist a single pending resolution candidate, such as
+Apple Inc. (`AAPL`) for an ambiguous "Apple" request. If the next user turn is a
+short affirmative answer, deterministic guardrails may accept only that stored
+candidate for that stored field after LLM interpretation. This keeps ordinary
+language LLM-first while preventing repeated binary clarifications.
+
 Collections remain in the schema but launch UI for collections is feature-gated with `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
 
 ## Fully Supported
 
 - Basic product and education questions.
 - Buy and hold for same-asset supported symbols.
-- DCA / recurring accumulation with monthly or weekly cadence.
+- DCA / recurring accumulation with monthly or weekly cadence and one recurring contribution amount.
 - Indicator threshold strategies when the indicator registry marks the indicator executable.
 - Single-asset-class backtests with up to 5 symbols.
 - Equity benchmark default: `SPY`.
@@ -115,6 +138,9 @@ Collections remain in the schema but launch UI for collections is feature-gated 
 - Compound indicator/price/volume confluence can be drafted and preserved, but execution may require simplification to an executable subset.
 - Risk overlays such as stop loss, trailing stop, take profit, and partial/full exits are captured in the strategy object. They are only executable where the engine adapter supports the semantics.
 - Strategy comparisons are interpreted conversationally. Execution should run supported strategies separately and explain the comparison from real result payloads.
+- DCA requests that include separate starting principal, total capital budget, or investment ceiling are understood conversationally, but those modifiers are not executable in the current DCA engine. Argus should offer a recurring-only run, an adjusted recurring contribution, or a buy-and-hold style test using starting capital.
+
+TODO(dca-engine): Add first-class support for DCA starting principal, investment ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation cards, result assumptions, and model capability wording.
 
 ## Unsupported Handling
 
@@ -138,10 +164,27 @@ Examples:
 Result presentation is a single product moment:
 
 1. Render the result card first.
-2. Show a short grounded summary from the same result payload.
+2. Show a short grounded summary from canonical run/result context, not stale
+   original user wording.
 3. Offer result actions.
 
 The main card shows only high-signal metrics: total return, final value, max drawdown, and benchmark delta. Win rate appears only when closed trades make it meaningful. Secondary metrics and caveats belong in the breakdown.
+
+`Show breakdown` is an educational follow-up, not a second source of result
+truth. The preferred path is an LLM-authored markdown explanation that can vary
+its headings and framing so the conversation does not feel templated. The
+backend derives an internal fact bank from the stored run/result context, asks
+the LLM to structure sections with fact references, then renders those facts
+deterministically. If the generated breakdown is malformed or references facts
+outside that bank, Argus should fall back to the deterministic grounded
+breakdown.
+
+Breakdown suggestions must respect capability truth. The assistant may suggest
+tests that are runnable now, ideas it can help draft, or future engine
+capabilities, but it must not imply unsupported strategies are executable today.
+Structured breakdown actions should emit an `explain` stage before final text so
+the UI can show a clear working state while preserving canonical SSE frame
+types.
 
 The chart is a TradingView Lightweight Charts baseline chart using the aggregate portfolio equity curve. Multi-symbol runs must show the portfolio curve, not a cluttered symbol comparison. Entry and exit markers may be capped for readability. TradingView attribution must remain visible.
 

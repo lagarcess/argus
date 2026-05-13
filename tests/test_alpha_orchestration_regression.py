@@ -52,9 +52,7 @@ async def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch
                 requires_clarification=True,
                 user_goal_summary="El usuario eligio una regla RSI.",
                 candidate_strategy_draft=StrategySummary(
-                    raw_user_phrasing=(
-                        "quiero probar una reversion a la media con RSI"
-                    ),
+                    raw_user_phrasing=("quiero probar una reversion a la media con RSI"),
                     strategy_type="indicator_threshold",
                     strategy_thesis="Comprar cuando RSI indica sobreventa.",
                     entry_logic="RSI drops below 30",

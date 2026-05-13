@@ -149,6 +149,11 @@ def _human_option_label(label: str) -> str:
         "max available": "use the maximum available history",
         "maximum available": "use the maximum available history",
         "since ipo": "start at the IPO date",
+        "run recurring buys only": "run the recurring-buy simulation only",
+        "adjust recurring contribution": "adjust the recurring contribution",
+        "use buy and hold with starting capital": (
+            "switch to buy and hold with the starting capital"
+        ),
     }
     return labels.get(normalized, label.strip().replace("_", " "))
 

@@ -21,7 +21,7 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
                     "initial_capital": {
                         "label": "Initial capital",
                         "source": "default",
-                        "value": 10000.0,
+                        "value": 1000.0,
                     },
                     "timeframe": {
                         "label": "Timeframe",
@@ -63,7 +63,7 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
                     "initial_capital": {
                         "label": "Initial capital",
                         "source": "default",
-                        "value": 10000.0,
+                        "value": 1000.0,
                     },
                     "timeframe": {
                         "label": "Timeframe",
@@ -79,3 +79,36 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
     assert {"label": "Starting capital", "value": "$100,000"} in card["rows"]
     assert "$100,000 starting capital" in card["assumptions"]
     assert "$10,000 starting capital" not in card["assumptions"]
+
+
+def test_runtime_confirmation_card_carries_active_confirmation_identity() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": "past year",
+                },
+                "optional_parameters": {
+                    "initial_capital": {
+                        "label": "Initial capital",
+                        "source": "default",
+                        "value": 1000.0,
+                    },
+                },
+            },
+        },
+        confirmation_id="confirm-1",
+    )
+
+    assert card is not None
+    assert card["confirmation_id"] == "confirm-1"
+    assert card["confirmation_state"] == "active"
+    run_action = next(
+        action for action in card["actions"] if action["type"] == "run_backtest"
+    )
+    assert run_action["payload"]["confirmation_id"] == "confirm-1"

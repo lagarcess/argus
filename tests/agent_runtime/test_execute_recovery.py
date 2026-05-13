@@ -214,6 +214,59 @@ def test_execute_preserves_last_failure_class_when_retries_are_exhausted() -> No
     assert "try later" in result.patch["assistant_prompt"]
 
 
+def test_execute_recovers_visible_dca_confirmation_when_market_data_is_unavailable() -> (
+    None
+):
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": "Invest $20,000 in BTC every week for 6 months.",
+            "asset_universe": ["BTC"],
+            "asset_class": "crypto",
+            "date_range": {"start": "2025-11-12", "end": "2026-05-12"},
+            "cadence": "weekly",
+            "capital_amount": 20000,
+            "sizing_mode": "capital_amount",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 1000, "source": "default"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=2)
+
+    assert result.outcome == "execution_failed_recoverably"
+    assert result.patch["failure_classification"] == "upstream_dependency_error"
+    prompt = result.patch["assistant_prompt"]
+    assert "BTC recurring-buys draft" in prompt
+    assert "market data" in prompt
+    assert "try again" in prompt.lower()
+    assert "market_data_unavailable" not in prompt
+    assert result.patch["final_response_payload"]["error"] == prompt
+
+
 def test_execute_missing_required_input_returns_to_conversation() -> None:
     tool = StubBacktestTool(
         responses=[
@@ -282,7 +335,7 @@ def test_execute_stage_uses_real_backtest_tool_payload(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -361,7 +414,7 @@ def test_execute_stage_passes_language_to_real_backtest_tool(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -432,7 +485,9 @@ def test_execute_stage_uses_currency_pair_as_default_benchmark(
             }
         ]
     )
-    state = RunState.new(current_user_message="Backtest EUR/USD", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="Backtest EUR/USD", recent_thread_history=[]
+    )
     state.confirmation_payload = {
         "strategy": {
             "strategy_thesis": "Buy and hold EUR/USD over the last year",
@@ -442,7 +497,7 @@ def test_execute_stage_uses_currency_pair_as_default_benchmark(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -470,7 +525,7 @@ def test_execute_stage_preserves_multi_symbol_launch_payload(
         },
         "optional_parameters": {
             "timeframe": {"value": "1D", "source": "default"},
-            "initial_capital": {"value": 10000.0, "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
         },
     }
 
@@ -679,7 +734,7 @@ def test_execute_stage_uses_strategy_contribution_for_dca(
             "sizing_mode": "capital_amount",
         },
         "optional_parameters": {
-            "initial_capital": {"value": 10000, "source": "default"},
+            "initial_capital": {"value": 1000, "source": "default"},
             "timeframe": {"value": "1D", "source": "default"},
         },
     }
@@ -850,6 +905,58 @@ def test_explain_stage_uses_execution_envelope_context() -> None:
     assert "1D bars only." in result.patch["assistant_response"]
 
 
+def test_explain_stage_describes_canonical_run_not_stale_original_thesis() -> None:
+    state = RunState.new(current_user_message="run backtest", recent_thread_history=[])
+    state.effective_response_profile = ResponseProfile(
+        effective_tone="friendly",
+        effective_verbosity="medium",
+        effective_expertise_mode="beginner",
+    )
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Test buying and holding Apple over the past year.",
+            "asset_universe": ["NVDA"],
+            "asset_class": "equity",
+            "date_range": "past 6 months",
+        },
+        "optional_parameters": {
+            "initial_capital": {
+                "label": "Initial capital",
+                "source": "default",
+                "value": 1000.0,
+            },
+        },
+    }
+    state.final_response_payload = {
+        "result": {
+            "total_return": 0.139,
+            "benchmark_return": 0.08,
+            "comparable_same_period": False,
+        },
+        "result_card": {
+            "title": "NVDA Buy and Hold",
+            "date_range": {
+                "start": "2025-11-12",
+                "end": "2026-05-12",
+                "display": "November 12, 2025 to May 12, 2026",
+            },
+        },
+        "explanation_context": {
+            "strategy_type": "buy_and_hold",
+            "assumptions": ["Starting capital: $1,000.", "Benchmark: SPY."],
+        },
+    }
+
+    result = explain_stage(state=state)
+    text = result.patch["assistant_response"]
+
+    assert "NVDA buy and hold over past 6 months" in text
+    assert "Apple" not in text
+    assert "past year" not in text
+    assert "I tested:" not in text
+
+
 def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     state = RunState.new(current_user_message="why", recent_thread_history=[])
     state.effective_response_profile = ResponseProfile(
@@ -872,7 +979,10 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
 
     assert result.outcome == "ready_to_respond"
     assert result.patch["assistant_response"].startswith("Here is the readout.")
-    assert "I tested: Test a Tesla pullback idea." in result.patch["assistant_response"]
+    assert (
+        "I tested the confirmed strategy: Test a Tesla pullback idea."
+        in result.patch["assistant_response"]
+    )
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "User-set options: Timeframe." in result.patch["assistant_response"]
     assert (

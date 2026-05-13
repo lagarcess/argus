@@ -9,9 +9,13 @@ type StrategyConfirmationCardProps = {
 export default function StrategyConfirmationCard({ confirmation }: StrategyConfirmationCardProps) {
   const primaryRows = confirmation.rows.slice(0, 3);
   const detailRows = confirmation.rows.slice(3);
+  const isSuperseded = confirmation.confirmation_state === "superseded";
+  const statusLabel = isSuperseded
+    ? confirmation.statusLabel || "Updated"
+    : confirmation.statusLabel;
 
   return (
-    <section className="argus-confirmation-reveal w-full rounded-[20px] border border-black/12 bg-white dark:border-white/12 dark:bg-[#1d2023] overflow-hidden">
+    <section className={`argus-confirmation-reveal w-full rounded-[20px] border border-black/12 bg-white dark:border-white/12 dark:bg-[#1d2023] overflow-hidden ${isSuperseded ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-3.5 dark:border-white/8 sm:px-5">
         <div className="min-w-0">
           <p className="text-[14px] font-medium leading-snug tracking-tight text-black dark:text-white sm:text-[15px]">
@@ -21,9 +25,13 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
             {confirmation.summary}
           </p>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70">
+        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${
+          isSuperseded
+            ? "border-black/8 bg-black/[0.02] text-black/45 dark:border-white/8 dark:bg-white/[0.03] dark:text-white/45"
+            : "border-black/10 bg-black/[0.03] text-black/70 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70"
+        }`}>
           <CheckCircle2 className="h-3 w-3" />
-          {confirmation.statusLabel}
+          {statusLabel}
         </span>
       </div>
 

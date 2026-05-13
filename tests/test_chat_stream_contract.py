@@ -46,7 +46,9 @@ def _data_events(stream: str) -> list[dict[str, Any]]:
 
 
 def _final_payload(stream: str) -> dict[str, Any]:
-    final_events = [event for event in _data_events(stream) if event.get("type") == "final"]
+    final_events = [
+        event for event in _data_events(stream) if event.get("type") == "final"
+    ]
     assert len(final_events) == 1
     payload = final_events[0]["payload"]
     assert isinstance(payload, dict)
@@ -155,9 +157,7 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
                         },
                         "resolved_parameters": {"timeframe": "1D"},
                         "metrics": {
-                            "aggregate": {
-                                "performance": {"total_return_pct": 12.4}
-                            }
+                            "aggregate": {"performance": {"total_return_pct": 12.4}}
                         },
                         "benchmark_metrics": {"benchmark_symbol": "SPY"},
                     },

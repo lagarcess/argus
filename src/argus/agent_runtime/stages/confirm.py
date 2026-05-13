@@ -51,6 +51,8 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
                 strategy=strategy,
                 optional_parameters=optional_parameters,
             ),
+            "requested_field": None,
+            "missing_required_fields": [],
         },
     )
 

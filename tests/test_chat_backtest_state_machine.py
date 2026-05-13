@@ -92,7 +92,7 @@ def _confirmation_runtime_result() -> dict[str, Any]:
             },
             "optional_parameters": {
                 "initial_capital": {
-                    "value": 10000.0,
+                    "value": 1000.0,
                     "source": "default",
                     "label": "Initial capital",
                     "description": "Starting cash",
@@ -106,6 +106,25 @@ def _confirmation_runtime_result() -> dict[str, Any]:
                 "fees": {"value": 0.0, "source": "default", "label": "Fees"},
                 "slippage": {"value": 0.0, "source": "default", "label": "Slippage"},
             },
+        },
+    }
+
+
+def _pending_runtime_result() -> dict[str, Any]:
+    return {
+        "stage_outcome": "await_user_reply",
+        "assistant_prompt": "What asset should I use instead?",
+        "requested_field": "asset_universe",
+        "pending_strategy": {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold Apple.",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+                "date_range": "past year",
+            },
+            "requested_field": "asset_universe",
+            "missing_required_fields": ["asset_universe"],
         },
     }
 
@@ -235,41 +254,50 @@ def test_chat_stream_emits_structured_confirmation_actions(
     assert seen["thread_id"] == conversation["id"]
     assert seen["message"] == "Buy and hold Apple over the past year"
     confirmation = _stream_payloads(response.text, "confirmation")[0]["confirmation"]
+    confirmation_id = confirmation["confirmation_id"]
+    assert confirmation["confirmation_state"] == "active"
+    assert [action["type"] for action in confirmation["actions"]] == [
+        "run_backtest",
+        "change_dates",
+        "change_asset",
+        "adjust_assumptions",
+        "cancel_confirmation",
+    ]
     assert confirmation["actions"] == [
         {
             "id": "run-backtest",
             "type": "run_backtest",
             "label": "Run backtest",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "change-dates",
             "type": "change_dates",
             "label": "Change dates",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "change-asset",
             "type": "change_asset",
             "label": "Change asset",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "adjust-assumptions",
             "type": "adjust_assumptions",
             "label": "Adjust assumptions",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
         {
             "id": "cancel-confirmation",
             "type": "cancel_confirmation",
             "label": "Cancel",
             "presentation": "confirmation",
-            "payload": {},
+            "payload": {"confirmation_id": confirmation_id},
         },
     ]
 
@@ -307,6 +335,44 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     assert conversations[0]["id"] == conversation["id"]
     assert conversations[0]["last_message_preview"] == assistant["content"]
     assert "AAPL" in conversations[0]["last_message_preview"]
+
+
+def test_chat_stream_persists_pending_strategy_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(lambda **_: _pending_runtime_result()),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "change asset",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["pending_strategy"]["requested_field"] == "asset_universe"
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant = messages[-1]
+    assert assistant["role"] == "assistant"
+    assert assistant["metadata"]["pending_strategy"]["strategy"]["asset_universe"] == [
+        "AAPL"
+    ]
+    assert assistant["metadata"]["pending_strategy"]["requested_field"] == (
+        "asset_universe"
+    )
 
 
 def test_confirmation_action_requires_pending_confirmation(
@@ -540,14 +606,28 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert runtime_calls == 1
     assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
-    assert "Total Return (%)" in breakdown
-    assert "Benchmark" in breakdown
+    assert "### What Happened" in breakdown
+    assert "**Total return:**" in breakdown
+    assert "### Benchmark Context" in breakdown
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert run_id in messages.text
     assistant = messages.json()["items"][-1]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
     assert "result_card" not in assistant["metadata"]
+
+
+def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
+    from pathlib import Path
+
+    source = Path("src/argus/api/routers/agent.py").read_text()
+    action_block = source.split('payload.action.type == "show_breakdown"', 1)[1].split(
+        "runtime_user = UserState", 1
+    )[0]
+
+    assert action_block.index(
+        'yield sse_data({"type": "stage_start", "stage": "explain"})'
+    ) < action_block.index("assistant_text = result_breakdown_message(run)")
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:
@@ -839,7 +919,7 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
     second_text = _stream_payloads(second.text, "token")[0]["text"]
     assert "help you choose a sensible next step" in first_text
     assert "What should trigger the buy?" not in second_text
-    assert "could not reach the interpretation model" in second_text
+    assert "could not process that turn" in second_text
 
 
 def test_discovery_endpoints_return_assets_and_indicators(

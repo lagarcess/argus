@@ -13,6 +13,7 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.semantic_integrity import conserve_semantic_constraints
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     InterpretDecision,
@@ -23,6 +24,7 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
+    ArtifactReference,
     ConfirmationPayload,
     IntentName,
     ResolutionProvenance,
@@ -50,12 +52,28 @@ STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "unsupported_request",
 }
 
+CONTEXTUAL_PATCH_TURN_ACTS = {
+    "answer_pending_need",
+    "approval",
+    "refine_current_idea",
+}
+
+CONFIRMATION_EDIT_ACTION_FIELDS = {
+    "change_asset": ("asset_universe", "What asset should I use instead?"),
+    "change_dates": ("date_range", "What date range should I use instead?"),
+    "adjust_assumptions": (
+        "assumption",
+        "Which assumption do you want to adjust: starting capital, timeframe, fees, or slippage?",
+    ),
+}
+
 
 def interpret_stage(
     *,
     state: RunState,
     user: UserState,
     latest_task_snapshot: TaskSnapshot | dict[str, Any] | None,
+    selected_thread_metadata: dict[str, Any] | None = None,
     structured_interpreter: StructuredInterpreter | None = None,
 ) -> StageResult:
     return asyncio.run(
@@ -63,6 +81,7 @@ def interpret_stage(
             state=state,
             user=user,
             latest_task_snapshot=latest_task_snapshot,
+            selected_thread_metadata=selected_thread_metadata,
             structured_interpreter=structured_interpreter,
         )
     )
@@ -73,12 +92,21 @@ async def interpret_stage_async(
     state: RunState,
     user: UserState,
     latest_task_snapshot: TaskSnapshot | dict[str, Any] | None,
+    selected_thread_metadata: dict[str, Any] | None = None,
     structured_interpreter: StructuredInterpreter | None = None,
 ) -> StageResult:
     capability_contract = build_default_capability_contract()
     snapshot = normalize_task_snapshot(latest_task_snapshot)
+    structured_action_result = _structured_action_stage_result_if_applicable(
+        state=state,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata or {},
+        user=user,
+    )
+    if structured_action_result is not None:
+        return structured_action_result
     if structured_interpreter is None:
-        return _offline_interpreter_unavailable_result(user=user)
+        return _offline_interpreter_unavailable_result(user=user, snapshot=snapshot)
 
     interpretation = await _call_structured_interpreter(
         structured_interpreter,
@@ -86,11 +114,12 @@ async def interpret_stage_async(
             current_user_message=state.current_user_message,
             recent_thread_history=list(state.recent_thread_history),
             latest_task_snapshot=snapshot,
+            selected_thread_metadata=dict(selected_thread_metadata or {}),
             user=user,
         ),
     )
     if interpretation is None:
-        return _offline_interpreter_unavailable_result(user=user)
+        return _offline_interpreter_unavailable_result(user=user, snapshot=snapshot)
 
     return _stage_result_from_interpretation(
         state=state,
@@ -98,6 +127,7 @@ async def interpret_stage_async(
         snapshot=snapshot,
         interpretation=interpretation,
         capability_contract=capability_contract,
+        selected_thread_metadata=dict(selected_thread_metadata or {}),
     )
 
 
@@ -124,18 +154,55 @@ def _stage_result_from_interpretation(
     snapshot: TaskSnapshot | None,
     interpretation: StructuredInterpretation,
     capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
     expects_strategy_route = _strategy_route_expected(
         intent=interpretation.intent,
         semantic_turn_act=interpretation.semantic_turn_act,
     )
-    strategy = (
-        _canonicalized_strategy(interpretation.candidate_strategy_draft)
-        if expects_strategy_route
-        else interpretation.candidate_strategy_draft
+    incoming_strategy = _strategy_with_contextual_merge(
+        strategy=interpretation.candidate_strategy_draft,
+        snapshot=snapshot,
+        semantic_turn_act=interpretation.semantic_turn_act,
+        task_relation=interpretation.task_relation,
     )
-    unsupported_constraints = list(interpretation.unsupported_constraints)
+    incoming_strategy, pending_resolution_applied = (
+        _strategy_with_pending_resolution_affirmation(
+            strategy=incoming_strategy,
+            explicit_strategy=interpretation.candidate_strategy_draft,
+            selected_thread_metadata=selected_thread_metadata,
+            current_user_message=state.current_user_message,
+            semantic_turn_act=interpretation.semantic_turn_act,
+        )
+    )
+    strategy = (
+        _canonicalized_strategy(incoming_strategy)
+        if expects_strategy_route
+        else incoming_strategy
+    )
+    strategy, optional_parameter_values = _route_contextual_money_answer(
+        strategy=strategy,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    integrity_report = conserve_semantic_constraints(
+        strategy=strategy,
+        current_user_message=state.current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+        optional_parameter_values=optional_parameter_values,
+    )
+    strategy = integrity_report.strategy
+    optional_parameter_values = integrity_report.optional_parameter_values
+    unsupported_constraints = [
+        *interpretation.unsupported_constraints,
+        *integrity_report.unsupported_constraints,
+    ]
     ambiguous_fields = list(interpretation.ambiguous_fields)
+    if pending_resolution_applied:
+        ambiguous_fields = [
+            field
+            for field in ambiguous_fields
+            if _field_base(field.field_name) != "asset_universe"
+        ]
     if expects_strategy_route:
         strategy.resolution_provenance = _dedupe_resolution_provenance(
             [*strategy.resolution_provenance, *state.context_hints]
@@ -168,13 +235,28 @@ def _stage_result_from_interpretation(
         strategy=strategy,
         contract=capability_contract,
     )
+    missing_required_fields = list(
+        dict.fromkeys(
+            [*missing_required_fields, *integrity_report.blocking_missing_fields]
+        )
+    )
     response_overrides = interpretation.response_profile_overrides
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=response_overrides,
     )
-    requires_clarification = bool(
+    llm_clarification_blocks = (
         interpretation.requires_clarification
+        and not pending_resolution_applied
+        and not _strategy_is_semantically_confirmable(
+            expects_strategy_route=expects_strategy_route,
+            ambiguous_fields=ambiguous_fields,
+            unsupported_constraints=unsupported_constraints,
+            missing_required_fields=missing_required_fields,
+        )
+    )
+    requires_clarification = bool(
+        llm_clarification_blocks
         or ambiguous_fields
         or unsupported_constraints
         or missing_required_fields
@@ -189,7 +271,16 @@ def _stage_result_from_interpretation(
         optional_parameter_opportunity=list(capability_contract.optional_defaults),
         confidence=interpretation.confidence,
         arbitration_mode="structured_arbitration",
-        reason_codes=["llm_interpreter_used", *interpretation.reason_codes],
+        reason_codes=[
+            "llm_interpreter_used",
+            *(
+                ["pending_resolution_candidate_affirmed"]
+                if pending_resolution_applied
+                else []
+            ),
+            *integrity_report.reason_codes,
+            *interpretation.reason_codes,
+        ],
         effective_response_profile=effective_profile,
         user_preference_overridden_for_turn=has_response_profile_overrides(
             response_overrides
@@ -200,10 +291,15 @@ def _stage_result_from_interpretation(
         resolution_provenance=list(strategy.resolution_provenance),
         semantic_turn_act=interpretation.semantic_turn_act,
     )
+    optional_parameter_stage_patch = _optional_parameter_stage_patch(
+        decision=decision,
+        values=optional_parameter_values,
+    )
     approval_result = _approval_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
         state=state,
+        selected_thread_metadata=selected_thread_metadata,
     )
     if approval_result is not None:
         return approval_result
@@ -221,21 +317,140 @@ def _stage_result_from_interpretation(
             stage_patch={"assistant_response": interpretation.assistant_response},
         )
     if requires_clarification:
-        return StageResult(outcome="needs_clarification", decision=decision)
+        return StageResult(
+            outcome="needs_clarification",
+            decision=decision,
+            stage_patch=optional_parameter_stage_patch,
+        )
     if expects_strategy_route:
-        return StageResult(outcome="ready_for_confirmation", decision=decision)
+        return StageResult(
+            outcome="ready_for_confirmation",
+            decision=decision,
+            stage_patch=optional_parameter_stage_patch,
+        )
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
         stage_patch=(
-            {"assistant_response": interpretation.assistant_response}
+            {
+                **optional_parameter_stage_patch,
+                "assistant_response": interpretation.assistant_response,
+            }
             if interpretation.assistant_response
-            else {}
+            else optional_parameter_stage_patch
         ),
     )
 
 
-def _offline_interpreter_unavailable_result(*, user: UserState) -> StageResult:
+def _route_contextual_money_answer(
+    *,
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+) -> tuple[StrategySummary, dict[str, Any]]:
+    requested_field = str(selected_thread_metadata.get("requested_field") or "")
+    if requested_field not in {"initial_capital", "capital_amount"}:
+        return strategy, {}
+    if strategy.capital_amount is None:
+        return strategy, {}
+    if executable_strategy_type(strategy) == "dca_accumulation":
+        return strategy, {}
+    updated = strategy.model_copy(deep=True)
+    initial_capital = updated.capital_amount
+    updated.capital_amount = None
+    return updated, {"initial_capital": initial_capital}
+
+
+def _strategy_with_pending_resolution_affirmation(
+    *,
+    strategy: StrategySummary,
+    explicit_strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    current_user_message: str,
+    semantic_turn_act: str | None,
+) -> tuple[StrategySummary, bool]:
+    if semantic_turn_act != "answer_pending_need":
+        return strategy, False
+    pending_resolution = selected_thread_metadata.get("pending_resolution")
+    if not isinstance(pending_resolution, dict):
+        return strategy, False
+    field = _field_base(str(pending_resolution.get("field") or ""))
+    if field != "asset_universe":
+        return strategy, False
+    if explicit_strategy.asset_universe:
+        return strategy, False
+    if not _is_affirmative_pending_resolution_reply(current_user_message):
+        return strategy, False
+    candidate = pending_resolution.get(
+        "candidate_normalized_value"
+    ) or pending_resolution.get("canonical_symbol")
+    if not isinstance(candidate, str) or not candidate.strip():
+        return strategy, False
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = [candidate.strip().upper()]
+    asset_class = pending_resolution.get("asset_class")
+    if isinstance(asset_class, str) and asset_class.strip():
+        updated.asset_class = asset_class.strip()
+    updated.resolution_provenance = [
+        item
+        for item in updated.resolution_provenance
+        if not _is_ambiguous_asset_resolution(item)
+    ]
+    return updated, True
+
+
+def _is_ambiguous_asset_resolution(item: ResolutionProvenance | dict[str, Any]) -> bool:
+    if not isinstance(item, ResolutionProvenance):
+        try:
+            item = ResolutionProvenance.model_validate(item)
+        except (TypeError, ValueError):
+            return False
+    return (
+        item.source == "llm_extraction"
+        and item.resolution_status == "ambiguous"
+        and _field_base(item.field) == "asset_universe"
+    )
+
+
+def _is_affirmative_pending_resolution_reply(message: str) -> bool:
+    normalized = " ".join(message.lower().strip().split())
+    return normalized in {
+        "yes",
+        "yeah",
+        "yep",
+        "correct",
+        "right",
+        "that's right",
+        "that is right",
+        "yes please",
+        "sure",
+        "ok",
+        "okay",
+        "use that",
+        "that one",
+    }
+
+
+def _field_base(field_name: str) -> str:
+    return field_name.split("[", 1)[0]
+
+
+def _optional_parameter_stage_patch(
+    *,
+    decision: InterpretDecision,
+    values: dict[str, Any],
+) -> dict[str, Any]:
+    if not values:
+        return {}
+    optional_parameter_status = dict(decision.to_patch()["optional_parameter_status"])
+    optional_parameter_status.update(values)
+    return {"optional_parameter_status": optional_parameter_status}
+
+
+def _offline_interpreter_unavailable_result(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None = None,
+) -> StageResult:
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -258,12 +473,255 @@ def _offline_interpreter_unavailable_result(*, user: UserState) -> StageResult:
         outcome="ready_to_respond",
         decision=decision,
         stage_patch={
-            "assistant_response": (
-                "I could not reach the interpretation model for this turn. "
-                "Your message is saved; please try again."
-            )
+            "assistant_response": _offline_recovery_message(snapshot),
         },
     )
+
+
+def _offline_recovery_message(snapshot: TaskSnapshot | None) -> str:
+    if snapshot is not None and snapshot.pending_strategy_summary is not None:
+        strategy = snapshot.pending_strategy_summary
+        assets = ", ".join(strategy.asset_universe) or "the current asset"
+        strategy_label = (strategy.strategy_type or "strategy").replace("_", " ")
+        return (
+            f"I still have the {assets} {strategy_label} draft in this chat, "
+            "but I could not process that last change. Try again with the change "
+            "in one sentence, "
+            "or use the visible action chip to adjust the draft."
+        )
+    if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
+        return (
+            "I still have the latest result in this chat, but I could not process that "
+            "follow-up. Try the question again in one sentence."
+        )
+    return (
+        "I could not process that turn. Your message is saved; please try again "
+        "in one sentence."
+    )
+
+
+def _structured_action_stage_result_if_applicable(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    user: UserState,
+) -> StageResult | None:
+    del user
+    action = state.structured_action
+    if action is None:
+        return None
+    if action.presentation == "result":
+        return _result_action_stage_result_if_applicable(
+            state=state,
+            snapshot=snapshot,
+        )
+    if action.presentation != "confirmation":
+        return None
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": (
+                    "I do not have an active confirmation to change. "
+                    "Describe the investing idea again and I will prepare a fresh draft."
+                ),
+                "requested_field": None,
+                "missing_required_fields": [],
+            },
+        )
+
+    pending = snapshot.pending_strategy_summary.model_copy(deep=True)
+    action_type = action.type
+    if action_type == "run_backtest":
+        if not _prior_stage_was_await_approval(selected_thread_metadata):
+            return StageResult(
+                outcome="ready_for_confirmation",
+                stage_patch={
+                    "candidate_strategy_draft": pending.model_dump(mode="python"),
+                    "assistant_prompt": None,
+                },
+            )
+        approved = _canonicalized_strategy(pending)
+        if not strategy_can_be_approved(approved):
+            return StageResult(
+                outcome="needs_clarification",
+                stage_patch={
+                    "candidate_strategy_draft": approved.model_dump(mode="python"),
+                    "missing_required_fields": missing_required_fields_for_strategy(
+                        approved,
+                        contract=build_default_capability_contract(),
+                    ),
+                },
+            )
+        return StageResult(
+            outcome="approved_for_execution",
+            stage_patch={
+                "candidate_strategy_draft": approved.model_dump(mode="python"),
+                "confirmation_payload": {
+                    "strategy": approved.model_dump(mode="python"),
+                    "optional_parameters": _approval_optional_parameters_from_state(
+                        state
+                    ),
+                },
+            },
+        )
+
+    if action_type in CONFIRMATION_EDIT_ACTION_FIELDS:
+        requested_field, prompt = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "candidate_strategy_draft": pending.model_dump(mode="python"),
+                "assistant_prompt": prompt,
+                "requested_field": requested_field,
+                "missing_required_fields": [requested_field],
+                "response_intent": {
+                    "kind": "clarification",
+                    "semantic_needs": [_semantic_need_for_action(action_type)],
+                    "requested_fields": [requested_field],
+                    "facts": {
+                        "strategy": pending.model_dump(mode="python"),
+                        "current_user_message": state.current_user_message,
+                        "structured_action": action.model_dump(mode="python"),
+                    },
+                    "options": [],
+                },
+            },
+        )
+
+    if action_type == "cancel_confirmation":
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "candidate_strategy_draft": StrategySummary().model_dump(mode="python"),
+                "assistant_response": "No problem. I will leave that draft unrun.",
+            },
+        )
+    return None
+
+
+def _result_action_stage_result_if_applicable(
+    *,
+    state: RunState,
+    snapshot: TaskSnapshot | None,
+) -> StageResult | None:
+    action = state.structured_action
+    if action is None or action.type != "refine_strategy":
+        return None
+    reference = (
+        snapshot.latest_backtest_result_reference if snapshot is not None else None
+    )
+    if reference is None:
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={
+                "assistant_response": (
+                    "I do not have a completed result to refine. Run a strategy "
+                    "first, then use Refine strategy from the result card."
+                ),
+            },
+        )
+    strategy = _strategy_from_result_action_snapshot(snapshot=snapshot)
+    latest_run_id = _latest_run_id_for_action(
+        action_payload=action.payload,
+        reference=reference,
+    )
+    return StageResult(
+        outcome="await_user_reply",
+        stage_patch={
+            "candidate_strategy_draft": strategy.model_dump(mode="python"),
+            "assistant_prompt": "What would you like to change about this strategy?",
+            "requested_field": "refinement",
+            "missing_required_fields": ["refinement"],
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": [],
+                "requested_fields": ["refinement"],
+                "facts": {
+                    "strategy": strategy.model_dump(mode="python"),
+                    "current_user_message": state.current_user_message,
+                    "structured_action": action.model_dump(mode="python"),
+                    "latest_run_id": latest_run_id,
+                    "latest_result_reference": reference.model_dump(mode="python"),
+                },
+                "options": [],
+            },
+        },
+    )
+
+
+def _strategy_from_result_action_snapshot(
+    *,
+    snapshot: TaskSnapshot | None,
+) -> StrategySummary:
+    if snapshot is not None and snapshot.confirmed_strategy_summary is not None:
+        return snapshot.confirmed_strategy_summary.model_copy(deep=True)
+    if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
+        return _strategy_from_result_reference(snapshot.latest_backtest_result_reference)
+    return StrategySummary()
+
+
+def _latest_run_id_for_action(
+    *,
+    action_payload: dict[str, Any],
+    reference: ArtifactReference,
+) -> str:
+    raw_run_id = action_payload.get("run_id") or action_payload.get("runId")
+    if raw_run_id is not None:
+        run_id = str(raw_run_id).strip()
+        if run_id:
+            return run_id
+    return reference.artifact_id
+
+
+def _strategy_from_result_reference(reference: ArtifactReference) -> StrategySummary:
+    metadata = dict(reference.metadata)
+    config = metadata.get("config_snapshot")
+    config_snapshot = dict(config) if isinstance(config, dict) else {}
+    resolved_strategy = config_snapshot.get("resolved_strategy")
+    payload = dict(resolved_strategy) if isinstance(resolved_strategy, dict) else {}
+    resolved_parameters = config_snapshot.get("resolved_parameters")
+    parameters = (
+        dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
+    )
+
+    if not payload.get("strategy_type") and config_snapshot.get("template"):
+        payload["strategy_type"] = config_snapshot["template"]
+    if not payload.get("asset_class") and metadata.get("asset_class"):
+        payload["asset_class"] = metadata["asset_class"]
+    if not payload.get("asset_universe"):
+        symbols = payload.get("symbols") or config_snapshot.get("symbols")
+        if isinstance(symbols, list):
+            payload["asset_universe"] = [str(symbol) for symbol in symbols if symbol]
+    if not payload.get("date_range"):
+        payload["date_range"] = parameters.get("date_range") or config_snapshot.get(
+            "date_range"
+        )
+
+    allowed_fields = set(StrategySummary.model_fields)
+    strategy_payload = {
+        key: value
+        for key, value in payload.items()
+        if key in allowed_fields and value not in (None, "", [], {})
+    }
+    try:
+        return StrategySummary.model_validate(strategy_payload)
+    except Exception:
+        return StrategySummary()
+
+
+def _prior_stage_was_await_approval(metadata: dict[str, Any]) -> bool:
+    return str(metadata.get("last_stage_outcome") or "") == "await_approval"
+
+
+def _semantic_need_for_action(action_type: str) -> str:
+    mapping = {
+        "change_asset": "asset_target",
+        "change_dates": "period",
+        "adjust_assumptions": "assumption",
+    }
+    return mapping[action_type]
 
 
 def _approval_stage_result_if_applicable(
@@ -271,8 +729,11 @@ def _approval_stage_result_if_applicable(
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
     state: RunState,
+    selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
     if decision.semantic_turn_act != "approval":
+        return None
+    if not _prior_stage_was_await_approval(selected_thread_metadata):
         return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
@@ -311,6 +772,33 @@ def _approval_optional_parameters_from_state(state: RunState) -> dict[str, Any]:
         if isinstance(optional_parameters, dict):
             return dict(optional_parameters)
     return {}
+
+
+def _strategy_with_contextual_merge(
+    *,
+    strategy: StrategySummary,
+    snapshot: TaskSnapshot | None,
+    semantic_turn_act: str | None,
+    task_relation: str,
+) -> StrategySummary:
+    if snapshot is None:
+        return strategy
+    if semantic_turn_act not in CONTEXTUAL_PATCH_TURN_ACTS and task_relation != "refine":
+        return strategy
+    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    if prior is None:
+        return strategy
+    merged = prior.model_copy(deep=True)
+    incoming = strategy.model_dump(mode="python")
+    for key, value in incoming.items():
+        if key in {"raw_user_phrasing", "strategy_thesis"}:
+            continue
+        if value in (None, "", [], {}):
+            continue
+        setattr(merged, key, value)
+    if strategy.raw_user_phrasing:
+        merged.raw_user_phrasing = strategy.raw_user_phrasing
+    return merged
 
 
 def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
@@ -425,10 +913,14 @@ def _unsupported_constraints_from_resolution(
 ) -> list[UnsupportedConstraint]:
     constraints: list[UnsupportedConstraint] = []
     for item in provenance:
-        if item.resolution_status not in {
-            "unsupported",
-            "unavailable_for_requested_run",
-        } or item.source != "llm_extraction":
+        if (
+            item.resolution_status
+            not in {
+                "unsupported",
+                "unavailable_for_requested_run",
+            }
+            or item.source != "llm_extraction"
+        ):
             continue
         category = (
             "unavailable_for_requested_run"
@@ -469,10 +961,13 @@ def _missing_fields_for_interpretation(
         semantic_turn_act=interpretation.semantic_turn_act,
     ):
         return []
+    allowed_missing_fields = set(
+        missing_required_fields_for_strategy(strategy, contract=contract)
+    )
     missing = [
         field
         for field in interpretation.missing_required_fields
-        if isinstance(field, str) and field
+        if isinstance(field, str) and field and field in allowed_missing_fields
     ]
     missing.extend(missing_required_fields_for_strategy(strategy, contract=contract))
     return list(dict.fromkeys(missing))
@@ -485,8 +980,14 @@ def missing_required_fields_for_strategy(
 ) -> list[str]:
     strategy_type = executable_strategy_type(strategy)
     required = list(contract.required_fields)
-    if strategy_type == "dca_accumulation" and strategy.capital_amount is None:
-        required.append("capital_amount")
+    if strategy_type == "dca_accumulation":
+        required = [
+            field_name
+            for field_name in required
+            if field_name not in {"entry_logic", "exit_logic"}
+        ]
+        if strategy.capital_amount is None:
+            required.append("capital_amount")
     if strategy_type == "buy_and_hold":
         required = ["asset_universe", "date_range"]
     missing: list[str] = []
@@ -499,6 +1000,21 @@ def missing_required_fields_for_strategy(
         elif value is None or value == "":
             missing.append(field_name)
     return list(dict.fromkeys(missing))
+
+
+def _strategy_is_semantically_confirmable(
+    *,
+    expects_strategy_route: bool,
+    ambiguous_fields: list[AmbiguousField],
+    unsupported_constraints: list[UnsupportedConstraint],
+    missing_required_fields: list[str],
+) -> bool:
+    return (
+        expects_strategy_route
+        and not ambiguous_fields
+        and not unsupported_constraints
+        and not missing_required_fields
+    )
 
 
 def _strategy_route_expected(
@@ -538,11 +1054,18 @@ def _dedupe_ambiguous_fields(fields: list[AmbiguousField]) -> list[AmbiguousFiel
 
 
 def _dedupe_resolution_provenance(
-    provenance: list[ResolutionProvenance],
+    provenance: list[ResolutionProvenance | dict[str, Any]],
 ) -> list[ResolutionProvenance]:
     seen: set[tuple[str, str, str, str]] = set()
     deduped: list[ResolutionProvenance] = []
-    for item in provenance:
+    for raw_item in provenance:
+        if isinstance(raw_item, ResolutionProvenance):
+            item = raw_item
+        else:
+            try:
+                item = ResolutionProvenance.model_validate(raw_item)
+            except (TypeError, ValueError):
+                continue
         key = (
             item.field,
             item.raw_text,

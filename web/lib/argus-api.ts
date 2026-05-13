@@ -203,6 +203,12 @@ export type ChatFinalPayload = {
   assistant_prompt?: string | null;
   confirmation?: StrategyConfirmationPayload | null;
   confirmation_payload?: Record<string, unknown> | null;
+  pending_strategy?: {
+    strategy: Record<string, unknown>;
+    requested_field?: string | null;
+    missing_required_fields?: string[];
+    pending_resolution?: Record<string, unknown> | null;
+  } | null;
   run?: BacktestRun | null;
   next_actions?: string[];
   message_id?: string | null;

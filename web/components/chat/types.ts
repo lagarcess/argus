@@ -72,6 +72,8 @@ export type StrategyConfirmationRow = {
 };
 
 export type StrategyConfirmationPayload = {
+  confirmation_id?: string;
+  confirmation_state?: "active" | "superseded";
   title: string;
   statusLabel: string;
   summary: string;
@@ -83,9 +85,10 @@ export type StrategyConfirmationPayload = {
 export type Message = {
   id: string;
   role: "user" | "ai";
-  kind?: "text" | "strategy_result" | "strategy_confirmation";
+  kind?: "text" | "strategy_result" | "strategy_confirmation" | "action";
   content?: string;
   mentions?: ChatMention[];
+  selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
   confirmation?: StrategyConfirmationPayload;
   isLoadingResult?: boolean;
