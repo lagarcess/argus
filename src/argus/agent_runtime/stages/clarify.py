@@ -135,7 +135,9 @@ async def clarify_stage_async(
                     language=language,
                 ),
                 "response_intent": response_intent,
-                "requested_field": requested_fields[0] if len(requested_fields) == 1 else None,
+                "requested_field": requested_fields[0]
+                if len(requested_fields) == 1
+                else None,
                 "requested_fields": requested_fields,
             },
         )

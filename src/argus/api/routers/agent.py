@@ -429,6 +429,7 @@ async def chat_stream(
                 user=user,
                 conversation_id=conversation.id,
             )
+            yield sse_data({"type": "stage_start", "stage": "explain"})
             assistant_text = result_breakdown_message(run)
             metadata = {
                 "conversation_mode": "result_review",
@@ -445,7 +446,6 @@ async def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
-            yield sse_data({"type": "stage_start", "stage": "explain"})
             yield sse_data({"type": "token", "content": assistant_text})
             yield sse_data(
                 {
@@ -563,9 +563,7 @@ async def chat_stream(
                     metadata["pending_strategy"] = runtime_result["pending_strategy"]
                 if confirmation_card is not None:
                     metadata["confirmation_card"] = confirmation_card
-                    if isinstance(
-                        runtime_result.get("confirmation_payload"), dict
-                    ):
+                    if isinstance(runtime_result.get("confirmation_payload"), dict):
                         metadata["confirmation_payload"] = runtime_result[
                             "confirmation_payload"
                         ]

@@ -291,6 +291,19 @@ function supersedePriorConfirmations(message: Message): Message {
   };
 }
 
+function supersedeOpenConfirmations(messages: Message[]): Message[] {
+  const lastResultIndex = messages.reduce(
+    (latest, message, index) =>
+      message.kind === "strategy_result" ? index : latest,
+    -1,
+  );
+  return messages.map((message, index) =>
+    message.kind === "strategy_confirmation" && index > lastResultIndex
+      ? supersedePriorConfirmations(message)
+      : message,
+  );
+}
+
 function chatStreamErrorText(detail: string | undefined, fallback: string) {
   return detail || fallback;
 }
@@ -783,6 +796,7 @@ export default function ChatInterface() {
       }
       if (event.event === "final") {
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
+        const finalStageOutcome = event.data.stage_outcome;
         if (event.data.confirmation) {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
           setInputActions(confirmation.actions ?? []);
@@ -822,13 +836,20 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalText) {
-          setMessages((prev) =>
-            prev.map((m) =>
+          setMessages((prev) => {
+            const nextMessages = prev.map((m) =>
               m.id === assistantId && !m.content
                 ? { ...m, content: finalText }
                 : m,
-            ),
-          );
+            );
+            if (
+              finalStageOutcome === "await_user_reply" ||
+              finalStageOutcome === "needs_clarification"
+            ) {
+              return supersedeOpenConfirmations(nextMessages);
+            }
+            return nextMessages;
+          });
         }
       }
       if (event.event === "title") {
@@ -1645,19 +1666,27 @@ export default function ChatInterface() {
                   className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]"
                 >
                   <div className="space-y-8">
-                    {messages.map((msg) => (
-                      <ChatMessage
-                        key={msg.id}
-                        message={msg}
-                        onAction={handleAction}
-                        onFeedback={(type, context, rating) => {
-                          setFeedbackState({ isOpen: true, type, context, rating });
-                          setIsSidebarOpen(false);
-                        }}
-                        isLatest={msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
-                        isStreaming={!!streamStatus && msg.role === 'ai' && messages.findLastIndex(m => m.role === 'ai') === messages.indexOf(msg)}
-                      />
-                    ))}
+                    {messages.map((msg, index) => {
+                      const latestAiIndex = messages.findLastIndex((m) => m.role === "ai");
+                      const isLatestAi = msg.role === "ai" && latestAiIndex === index;
+                      const isWorkingMessage =
+                        isLatestAi &&
+                        msg.kind === "text" &&
+                        (!!streamStatus || (msg.content ?? "") === "");
+                      return (
+                        <ChatMessage
+                          key={msg.id}
+                          message={msg}
+                          onAction={handleAction}
+                          onFeedback={(type, context, rating) => {
+                            setFeedbackState({ isOpen: true, type, context, rating });
+                            setIsSidebarOpen(false);
+                          }}
+                          isLatest={isLatestAi}
+                          isStreaming={isWorkingMessage}
+                        />
+                      );
+                    })}
                     {streamStatus && (
                       <div className="ml-12">
                         <span className="animate-ethereal-shimmer text-[13px] text-black/45 dark:text-white/45">

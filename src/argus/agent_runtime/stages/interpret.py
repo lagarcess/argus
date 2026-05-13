@@ -13,6 +13,7 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.semantic_integrity import conserve_semantic_constraints
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
     InterpretDecision,
@@ -183,7 +184,18 @@ def _stage_result_from_interpretation(
         strategy=strategy,
         selected_thread_metadata=selected_thread_metadata,
     )
-    unsupported_constraints = list(interpretation.unsupported_constraints)
+    integrity_report = conserve_semantic_constraints(
+        strategy=strategy,
+        current_user_message=state.current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+        optional_parameter_values=optional_parameter_values,
+    )
+    strategy = integrity_report.strategy
+    optional_parameter_values = integrity_report.optional_parameter_values
+    unsupported_constraints = [
+        *interpretation.unsupported_constraints,
+        *integrity_report.unsupported_constraints,
+    ]
     ambiguous_fields = list(interpretation.ambiguous_fields)
     if pending_resolution_applied:
         ambiguous_fields = [
@@ -223,13 +235,28 @@ def _stage_result_from_interpretation(
         strategy=strategy,
         contract=capability_contract,
     )
+    missing_required_fields = list(
+        dict.fromkeys(
+            [*missing_required_fields, *integrity_report.blocking_missing_fields]
+        )
+    )
     response_overrides = interpretation.response_profile_overrides
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=response_overrides,
     )
+    llm_clarification_blocks = (
+        interpretation.requires_clarification
+        and not pending_resolution_applied
+        and not _strategy_is_semantically_confirmable(
+            expects_strategy_route=expects_strategy_route,
+            ambiguous_fields=ambiguous_fields,
+            unsupported_constraints=unsupported_constraints,
+            missing_required_fields=missing_required_fields,
+        )
+    )
     requires_clarification = bool(
-        (interpretation.requires_clarification and not pending_resolution_applied)
+        llm_clarification_blocks
         or ambiguous_fields
         or unsupported_constraints
         or missing_required_fields
@@ -251,6 +278,7 @@ def _stage_result_from_interpretation(
                 if pending_resolution_applied
                 else []
             ),
+            *integrity_report.reason_codes,
             *interpretation.reason_codes,
         ],
         effective_response_profile=effective_profile,
@@ -352,10 +380,9 @@ def _strategy_with_pending_resolution_affirmation(
         return strategy, False
     if not _is_affirmative_pending_resolution_reply(current_user_message):
         return strategy, False
-    candidate = (
-        pending_resolution.get("candidate_normalized_value")
-        or pending_resolution.get("canonical_symbol")
-    )
+    candidate = pending_resolution.get(
+        "candidate_normalized_value"
+    ) or pending_resolution.get("canonical_symbol")
     if not isinstance(candidate, str) or not candidate.strip():
         return strategy, False
     updated = strategy.model_copy(deep=True)
@@ -533,7 +560,9 @@ def _structured_action_stage_result_if_applicable(
                 "candidate_strategy_draft": approved.model_dump(mode="python"),
                 "confirmation_payload": {
                     "strategy": approved.model_dump(mode="python"),
-                    "optional_parameters": {},
+                    "optional_parameters": _approval_optional_parameters_from_state(
+                        state
+                    ),
                 },
             },
         )
@@ -581,9 +610,7 @@ def _result_action_stage_result_if_applicable(
     if action is None or action.type != "refine_strategy":
         return None
     reference = (
-        snapshot.latest_backtest_result_reference
-        if snapshot is not None
-        else None
+        snapshot.latest_backtest_result_reference if snapshot is not None else None
     )
     if reference is None:
         return StageResult(
@@ -655,7 +682,9 @@ def _strategy_from_result_reference(reference: ArtifactReference) -> StrategySum
     resolved_strategy = config_snapshot.get("resolved_strategy")
     payload = dict(resolved_strategy) if isinstance(resolved_strategy, dict) else {}
     resolved_parameters = config_snapshot.get("resolved_parameters")
-    parameters = dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
+    parameters = (
+        dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
+    )
 
     if not payload.get("strategy_type") and config_snapshot.get("template"):
         payload["strategy_type"] = config_snapshot["template"]
@@ -754,10 +783,7 @@ def _strategy_with_contextual_merge(
 ) -> StrategySummary:
     if snapshot is None:
         return strategy
-    if (
-        semantic_turn_act not in CONTEXTUAL_PATCH_TURN_ACTS
-        and task_relation != "refine"
-    ):
+    if semantic_turn_act not in CONTEXTUAL_PATCH_TURN_ACTS and task_relation != "refine":
         return strategy
     prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
     if prior is None:
@@ -887,10 +913,14 @@ def _unsupported_constraints_from_resolution(
 ) -> list[UnsupportedConstraint]:
     constraints: list[UnsupportedConstraint] = []
     for item in provenance:
-        if item.resolution_status not in {
-            "unsupported",
-            "unavailable_for_requested_run",
-        } or item.source != "llm_extraction":
+        if (
+            item.resolution_status
+            not in {
+                "unsupported",
+                "unavailable_for_requested_run",
+            }
+            or item.source != "llm_extraction"
+        ):
             continue
         category = (
             "unavailable_for_requested_run"
@@ -970,6 +1000,21 @@ def missing_required_fields_for_strategy(
         elif value is None or value == "":
             missing.append(field_name)
     return list(dict.fromkeys(missing))
+
+
+def _strategy_is_semantically_confirmable(
+    *,
+    expects_strategy_route: bool,
+    ambiguous_fields: list[AmbiguousField],
+    unsupported_constraints: list[UnsupportedConstraint],
+    missing_required_fields: list[str],
+) -> bool:
+    return (
+        expects_strategy_route
+        and not ambiguous_fields
+        and not unsupported_constraints
+        and not missing_required_fields
+    )
 
 
 def _strategy_route_expected(

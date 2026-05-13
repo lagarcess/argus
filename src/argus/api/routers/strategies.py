@@ -92,7 +92,9 @@ def list_strategies(
                     continue
             items.append(item)
 
-    items.sort(key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True)
+    items.sort(
+        key=lambda item: (int(item.pinned), item.updated_at, item.id), reverse=True
+    )
     filtered = items
     if cursor:
         cursor_updated_at, cursor_id = decode_cursor(cursor, request)
@@ -100,7 +102,9 @@ def list_strategies(
             cursor_dt = datetime.fromisoformat(cursor_updated_at)
         except ValueError:
             raise invalid_cursor_problem(request) from None
-        cursor_pinned = next((item.pinned for item in items if item.id == cursor_id), False)
+        cursor_pinned = next(
+            (item.pinned for item in items if item.id == cursor_id), False
+        )
         cursor_key = (int(bool(cursor_pinned)), cursor_dt, cursor_id)
         filtered = [
             item

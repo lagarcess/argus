@@ -103,6 +103,24 @@ def execute_stage(
                         },
                     },
                 )
+            recovery_prompt = _recoverable_execution_prompt(
+                payload=payload,
+                error_type=failure_classification,
+                error_message=_as_optional_str(envelope.get("error_message")),
+                records=records,
+            )
+            if recovery_prompt is not None:
+                return StageResult(
+                    outcome="execution_failed_recoverably",
+                    stage_patch={
+                        "tool_call_records": records,
+                        "failure_classification": failure_classification,
+                        "assistant_prompt": recovery_prompt,
+                        "final_response_payload": {
+                            "error": recovery_prompt,
+                        },
+                    },
+                )
             return StageResult(
                 outcome="execution_failed_terminally",
                 stage_patch={
@@ -122,6 +140,24 @@ def execute_stage(
             if isinstance(payload, dict):
                 payload["language"] = language
 
+    retry_exhausted = _retry_exhausted_message(records)
+    recovery_prompt = _recoverable_execution_prompt(
+        payload=payload,
+        error_type=last_error_type,
+        error_message=retry_exhausted,
+        records=records,
+    )
+    if recovery_prompt is not None:
+        return StageResult(
+            outcome="execution_failed_recoverably",
+            stage_patch={
+                "tool_call_records": records,
+                "failure_classification": last_error_type,
+                "assistant_prompt": recovery_prompt,
+                "final_response_payload": {"error": recovery_prompt},
+            },
+        )
+
     return StageResult(
         outcome="execution_failed_terminally",
         stage_patch={
@@ -129,9 +165,9 @@ def execute_stage(
             "failure_classification": last_error_type,
             "assistant_prompt": _fallback_prompt(
                 error_type=last_error_type,
-                error_message=_retry_exhausted_message(records),
+                error_message=retry_exhausted,
             ),
-            "final_response_payload": {"error": _retry_exhausted_message(records)},
+            "final_response_payload": {"error": retry_exhausted},
         },
     )
 
@@ -279,6 +315,59 @@ def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> st
             "Should I keep working on the current idea, or are you starting a new backtest?"
         )
     return error_message
+
+
+def _recoverable_execution_prompt(
+    *,
+    payload: dict[str, Any],
+    error_type: str | None,
+    error_message: str | None,
+    records: list[dict[str, Any]],
+) -> str | None:
+    if error_type != "upstream_dependency_error":
+        return None
+    if not _is_market_data_unavailable_error(
+        error_message=error_message,
+        records=records,
+    ):
+        return None
+
+    draft_label = _draft_label_from_payload(payload)
+    return (
+        f"I still have the {draft_label}, but I could not get market data for that "
+        "run right now. Try again, change the dates, or choose a different supported "
+        "asset and I will keep the draft intact."
+    )
+
+
+def _is_market_data_unavailable_error(
+    *,
+    error_message: str | None,
+    records: list[dict[str, Any]],
+) -> bool:
+    values = [error_message or ""]
+    values.extend(
+        str(record.get("error_message") or "")
+        for record in records
+        if isinstance(record, dict)
+    )
+    return any("market_data_unavailable" in value for value in values)
+
+
+def _draft_label_from_payload(payload: dict[str, Any]) -> str:
+    symbols = _resolve_symbols(_strategy_fields(payload))
+    symbol = symbols[0] if symbols else str(payload.get("symbol") or "").strip().upper()
+    symbol_prefix = f"{symbol} " if symbol else ""
+    strategy_type = _normalize_strategy_type(
+        str(payload.get("strategy_type") or "strategy")
+    )
+    if strategy_type == "dca_accumulation":
+        return f"{symbol_prefix}recurring-buys draft".strip()
+    if strategy_type == "buy_and_hold":
+        return f"{symbol_prefix}buy-and-hold draft".strip()
+    if strategy_type == "indicator_threshold":
+        return f"{symbol_prefix}indicator-rule draft".strip()
+    return f"{symbol_prefix}strategy draft".strip()
 
 
 def _is_lookback_limit_error(error_message: str | None) -> bool:

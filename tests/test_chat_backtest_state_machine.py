@@ -606,14 +606,28 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert runtime_calls == 1
     assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
-    assert "Total Return (%)" in breakdown
-    assert "Benchmark" in breakdown
+    assert "### What Happened" in breakdown
+    assert "**Total return:**" in breakdown
+    assert "### Benchmark Context" in breakdown
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert run_id in messages.text
     assistant = messages.json()["items"][-1]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
     assert "result_card" not in assistant["metadata"]
+
+
+def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
+    from pathlib import Path
+
+    source = Path("src/argus/api/routers/agent.py").read_text()
+    action_block = source.split('payload.action.type == "show_breakdown"', 1)[1].split(
+        "runtime_user = UserState", 1
+    )[0]
+
+    assert action_block.index(
+        'yield sse_data({"type": "stage_start", "stage": "explain"})'
+    ) < action_block.index("assistant_text = result_breakdown_message(run)")
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:

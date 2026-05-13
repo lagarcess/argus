@@ -6,6 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
@@ -20,9 +21,7 @@ load_dotenv()
 PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
 agent_runtime_capability_contract = build_default_capability_contract()
 store = AlphaStore()
-supabase_gateway = (
-    SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
-)
+supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
 
 
 def build_agent_runtime_workflow(*, checkpointer: Any):
@@ -37,15 +36,31 @@ def build_agent_runtime_workflow(*, checkpointer: Any):
     )
 
 
+def build_agent_runtime_checkpointer() -> MemorySaver:
+    # Runtime checkpoints are process-local and may include Pydantic state
+    # objects that LangGraph's default msgpack serializer cannot encode.
+    return MemorySaver(
+        serde=JsonPlusSerializer(
+            pickle_fallback=True,
+            allowed_msgpack_modules=[
+                ("argus.agent_runtime.graph.workflow", "WorkflowStageOutcome"),
+                ("argus.agent_runtime.state.models", "RunState"),
+                ("argus.agent_runtime.state.models", "TaskSnapshot"),
+                ("argus.agent_runtime.state.models", "UserState"),
+            ],
+        )
+    )
+
+
 def get_agent_runtime_workflow(request: Request | None = None):
     target_app = request.app if request is not None else None
     if target_app is None:
-        checkpointer = MemorySaver()
+        checkpointer = build_agent_runtime_checkpointer()
         return build_agent_runtime_workflow(checkpointer=checkpointer)
 
     workflow = getattr(target_app.state, "agent_runtime_workflow", None)
     if workflow is None:
-        checkpointer = MemorySaver()
+        checkpointer = build_agent_runtime_checkpointer()
         target_app.state.agent_runtime_checkpointer = checkpointer
         workflow = build_agent_runtime_workflow(checkpointer=checkpointer)
         target_app.state.agent_runtime_workflow = workflow
@@ -53,7 +68,7 @@ def get_agent_runtime_workflow(request: Request | None = None):
 
 
 def reset_agent_runtime_workflow(app: FastAPI) -> None:
-    checkpointer = MemorySaver()
+    checkpointer = build_agent_runtime_checkpointer()
     app.state.agent_runtime_checkpointer = checkpointer
     app.state.agent_runtime_workflow = build_agent_runtime_workflow(
         checkpointer=checkpointer

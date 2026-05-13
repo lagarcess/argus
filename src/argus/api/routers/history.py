@@ -103,7 +103,11 @@ def history(
                     )
                 )
         for strategy in api_state.store.strategies.values():
-            if strategy.deleted_at is not None if deleted else strategy.deleted_at is None:
+            if (
+                strategy.deleted_at is not None
+                if deleted
+                else strategy.deleted_at is None
+            ):
                 items.append(
                     HistoryItem(
                         type="strategy",

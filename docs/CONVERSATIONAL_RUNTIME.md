@@ -22,6 +22,8 @@ This separation is intentional:
 - LLM interpretation is used for natural language understanding, strategy type inference, structured strategy drafting, ambiguity detection, correction-aware follow-ups, conversational unsupported handling, confirmation wording, and result explanation.
 - Deterministic code is used for capability truth, provider availability, asset class validation, required-field gating, same-asset restrictions, execution defaults, benchmark selection, indicator execution specs, backtest execution, result envelopes, persistence, and stream event shape.
 - The LLM cannot silently mark unsupported behavior as executable, invent asset availability, change symbols, skip required confirmation, or fabricate result metrics.
+- Before confirmation, Argus runs semantic conservation checks so explicit user constraints outrank defaults. If a user-supplied date, cadence, asset, or money role cannot be preserved or normalized, Argus clarifies instead of emitting a confident `Ready to run` card.
+- For DCA / recurring accumulation, `capital_amount` is the recurring contribution. Current DCA execution supports that one executable dollar amount only. Starting principal, total capital budgets, and contribution ceilings may be acknowledged as user intent, but they are future engine capabilities and must not overwrite the contribution amount.
 - Deterministic fallback cannot become the normal assistant voice. If the LLM fails, Argus may preserve truth internally, but user-facing copy must be natural recovery language rather than raw fields, enums, or starter prompts.
 
 ## Voice Boundary
@@ -123,7 +125,7 @@ Collections remain in the schema but launch UI for collections is feature-gated 
 
 - Basic product and education questions.
 - Buy and hold for same-asset supported symbols.
-- DCA / recurring accumulation with monthly or weekly cadence.
+- DCA / recurring accumulation with monthly or weekly cadence and one recurring contribution amount.
 - Indicator threshold strategies when the indicator registry marks the indicator executable.
 - Single-asset-class backtests with up to 5 symbols.
 - Equity benchmark default: `SPY`.
@@ -136,6 +138,9 @@ Collections remain in the schema but launch UI for collections is feature-gated 
 - Compound indicator/price/volume confluence can be drafted and preserved, but execution may require simplification to an executable subset.
 - Risk overlays such as stop loss, trailing stop, take profit, and partial/full exits are captured in the strategy object. They are only executable where the engine adapter supports the semantics.
 - Strategy comparisons are interpreted conversationally. Execution should run supported strategies separately and explain the comparison from real result payloads.
+- DCA requests that include separate starting principal, total capital budget, or investment ceiling are understood conversationally, but those modifiers are not executable in the current DCA engine. Argus should offer a recurring-only run, an adjusted recurring contribution, or a buy-and-hold style test using starting capital.
+
+TODO(dca-engine): Add first-class support for DCA starting principal, investment ceilings, and recurring contribution combinations across engine config, launch request models, LangGraph semantic contracts, confirmation cards, result assumptions, and model capability wording.
 
 ## Unsupported Handling
 
@@ -173,6 +178,13 @@ the LLM to structure sections with fact references, then renders those facts
 deterministically. If the generated breakdown is malformed or references facts
 outside that bank, Argus should fall back to the deterministic grounded
 breakdown.
+
+Breakdown suggestions must respect capability truth. The assistant may suggest
+tests that are runnable now, ideas it can help draft, or future engine
+capabilities, but it must not imply unsupported strategies are executable today.
+Structured breakdown actions should emit an `explain` stage before final text so
+the UI can show a clear working state while preserving canonical SSE frame
+types.
 
 The chart is a TradingView Lightweight Charts baseline chart using the aggregate portfolio equity curve. Multi-symbol runs must show the portfolio curve, not a cluttered symbol comparison. Entry and exit markers may be capped for readability. TradingView attribution must remain visible.
 

@@ -37,7 +37,9 @@ def _interpret_with(response: StructuredInterpretation):
     return interpreter
 
 
-def test_partial_strategy_from_mock_interpreter_waits_for_missing_fields(monkeypatch) -> None:
+def test_partial_strategy_from_mock_interpreter_waits_for_missing_fields(
+    monkeypatch,
+) -> None:
     _patch_resolve_asset(monkeypatch)
 
     result = interpret_stage(

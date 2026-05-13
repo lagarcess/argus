@@ -163,7 +163,9 @@ async def run_agent_turn(
     return final_payload or {}
 
 
-async def _final_workflow_state(*, workflow: Any, config: dict[str, Any]) -> dict[str, Any]:
+async def _final_workflow_state(
+    *, workflow: Any, config: dict[str, Any]
+) -> dict[str, Any]:
     state_snapshot = await workflow.aget_state(config)
     values = getattr(state_snapshot, "values", None)
     if not isinstance(values, dict):
@@ -265,13 +267,11 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
             and getattr(run_state, "failure_classification", None) is not None
         ):
             serialized["failure_classification"] = run_state.failure_classification
-        if (
-            "resolution_provenance" not in serialized
-            and getattr(run_state, "resolution_provenance", None)
+        if "resolution_provenance" not in serialized and getattr(
+            run_state, "resolution_provenance", None
         ):
             serialized["resolution_provenance"] = [
-                item.model_dump(mode="python")
-                for item in run_state.resolution_provenance
+                item.model_dump(mode="python") for item in run_state.resolution_provenance
             ]
         if "pending_strategy" not in serialized:
             pending_strategy = _pending_strategy_payload(result, run_state=run_state)
@@ -294,6 +294,7 @@ def _pending_strategy_payload(
         "await_user_reply",
         "ready_for_confirmation",
         "await_approval",
+        "execution_failed_recoverably",
     }:
         return None
     snapshot = _task_snapshot_from_value(result.get("latest_task_snapshot"))
@@ -311,9 +312,7 @@ def _pending_strategy_payload(
     payload = {
         "strategy": strategy.model_dump(mode="python"),
         "requested_field": (
-            str(requested_field)
-            if requested_field not in (None, "")
-            else None
+            str(requested_field) if requested_field not in (None, "") else None
         ),
         "missing_required_fields": [
             str(field) for field in missing_required_fields if isinstance(field, str)
@@ -374,7 +373,4 @@ def _bounded_recent_thread_history(
 def resolve_persisted_artifact_references(
     raw_references: Iterable[ArtifactReference | dict[str, Any]],
 ) -> list[ArtifactReference]:
-    return [
-        ArtifactReference.model_validate(reference)
-        for reference in raw_references
-    ]
+    return [ArtifactReference.model_validate(reference) for reference in raw_references]

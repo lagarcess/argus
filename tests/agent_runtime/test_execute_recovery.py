@@ -214,6 +214,59 @@ def test_execute_preserves_last_failure_class_when_retries_are_exhausted() -> No
     assert "try later" in result.patch["assistant_prompt"]
 
 
+def test_execute_recovers_visible_dca_confirmation_when_market_data_is_unavailable() -> (
+    None
+):
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": "Invest $20,000 in BTC every week for 6 months.",
+            "asset_universe": ["BTC"],
+            "asset_class": "crypto",
+            "date_range": {"start": "2025-11-12", "end": "2026-05-12"},
+            "cadence": "weekly",
+            "capital_amount": 20000,
+            "sizing_mode": "capital_amount",
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 1000, "source": "default"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=2)
+
+    assert result.outcome == "execution_failed_recoverably"
+    assert result.patch["failure_classification"] == "upstream_dependency_error"
+    prompt = result.patch["assistant_prompt"]
+    assert "BTC recurring-buys draft" in prompt
+    assert "market data" in prompt
+    assert "try again" in prompt.lower()
+    assert "market_data_unavailable" not in prompt
+    assert result.patch["final_response_payload"]["error"] == prompt
+
+
 def test_execute_missing_required_input_returns_to_conversation() -> None:
     tool = StubBacktestTool(
         responses=[
@@ -432,7 +485,9 @@ def test_execute_stage_uses_currency_pair_as_default_benchmark(
             }
         ]
     )
-    state = RunState.new(current_user_message="Backtest EUR/USD", recent_thread_history=[])
+    state = RunState.new(
+        current_user_message="Backtest EUR/USD", recent_thread_history=[]
+    )
     state.confirmation_payload = {
         "strategy": {
             "strategy_thesis": "Buy and hold EUR/USD over the last year",

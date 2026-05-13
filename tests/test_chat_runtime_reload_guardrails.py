@@ -139,9 +139,7 @@ def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missi
                         },
                         "resolved_parameters": {"timeframe": "1D"},
                         "metrics": {
-                            "aggregate": {
-                                "performance": {"total_return_pct": 11.5}
-                            },
+                            "aggregate": {"performance": {"total_return_pct": 11.5}},
                             "by_symbol": {},
                         },
                         "benchmark_metrics": {"benchmark_symbol": "SPY"},
@@ -162,9 +160,7 @@ def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missi
                             }
                         ],
                         "assumptions": ["Benchmark: SPY"],
-                        "actions": [
-                            {"type": "save_strategy", "label": "Save strategy"}
-                        ],
+                        "actions": [{"type": "save_strategy", "label": "Save strategy"}],
                     },
                 },
             },
@@ -580,9 +576,12 @@ def test_result_followup_after_reload_carries_latest_run_reference(
     reference = snapshot.latest_backtest_result_reference
     assert reference is not None
     assert reference.artifact_id == run_id
-    assert reference.metadata["metrics"]["aggregate"]["performance"][
-        "delta_vs_benchmark_pct"
-    ] == -4.2
+    assert (
+        reference.metadata["metrics"]["aggregate"]["performance"][
+            "delta_vs_benchmark_pct"
+        ]
+        == -4.2
+    )
     assert reference.metadata["conversation_id"] == conversation["id"]
 
 

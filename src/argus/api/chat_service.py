@@ -690,9 +690,7 @@ def stale_confirmation_action_message(
         or payload.action.presentation != "confirmation"
     ):
         return None
-    action_confirmation_id = _confirmation_id_from_action_payload(
-        payload.action.payload
-    )
+    action_confirmation_id = _confirmation_id_from_action_payload(payload.action.payload)
     if action_confirmation_id is None:
         return None
     latest_confirmation_id = latest_active_confirmation_id(
@@ -804,10 +802,7 @@ def checkpoint_has_pending_confirmation(values: dict[str, Any]) -> bool:
 
 def checkpoint_has_latest_result(values: dict[str, Any]) -> bool:
     snapshot = _task_snapshot_from_value(values.get("latest_task_snapshot"))
-    return (
-        snapshot is not None
-        and snapshot.latest_backtest_result_reference is not None
-    )
+    return snapshot is not None and snapshot.latest_backtest_result_reference is not None
 
 
 def checkpoint_has_pending_strategy(values: dict[str, Any]) -> bool:
@@ -1195,14 +1190,20 @@ def llm_result_breakdown_message(context: dict[str, Any]) -> str | None:
                     "content": (
                         "You are Argus, an investing backtest copilot. Explain the stored "
                         "backtest result using only the supplied fact_bank. Return flexible, "
-                        "non-template sections and vary the section headings. Build each "
-                        "section from text parts and fact reference parts. Use fact reference "
+                        "non-template professional markdown sections and vary the section "
+                        "headings. Build each section from text parts and fact reference "
+                        "parts. Use text parts for educational framing and fact reference "
                         "parts for every run-specific symbol, date, percentage, benchmark, "
-                        "assumption, and caveat; use text parts only for educational framing. "
-                        "Do not invent causes, trades, prices, support, missing metrics, "
-                        "unsupported strategy mechanics, predictions, or investment advice. "
-                        "Cover what was tested, what happened, benchmark comparison, risk or "
-                        "drawdown, assumptions, caveats, and one useful next test."
+                        "assumption, and caveat. Fact references render as polished canonical "
+                        "callouts, so do not try to manually copy or decorate the fact values "
+                        "inside text parts. Keep the writing polished, conversational, and "
+                        "cohesive rather than fragmented. Respect capability truth in next "
+                        "steps: runnable ideas must come from runnable_next_tests, while "
+                        "draft-only or future ideas must be clearly labeled that way. Do not "
+                        "invent causes, trades, prices, support, missing metrics, unsupported "
+                        "strategy mechanics, predictions, or investment advice. Cover what "
+                        "was tested, what happened, benchmark comparison, risk or drawdown, "
+                        "assumptions, caveats, and one useful next test."
                     ),
                 },
                 {
@@ -1272,9 +1273,7 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
         row_keys=("benchmark_return_pct", "benchmark_return"),
     )
     if benchmark_return is not None:
-        fact_bank["benchmark_return"] = _format_result_breakdown_percent(
-            benchmark_return
-        )
+        fact_bank["benchmark_return"] = _format_result_breakdown_percent(benchmark_return)
 
     delta_vs_benchmark = _result_breakdown_metric(
         context,
@@ -1311,6 +1310,14 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
         "This is historical simulation evidence, not a prediction or trading "
         "recommendation."
     )
+    fact_bank["runnable_next_tests"] = (
+        "Runnable now: change the date range, change the benchmark, or test the "
+        "same supported strategy on a different single asset."
+    )
+    fact_bank["draft_only_or_future_tests"] = (
+        "Draft-only or future support: DCA with separate starting principal, "
+        "investment ceilings, and unsupported custom rules."
+    )
     return fact_bank
 
 
@@ -1338,19 +1345,13 @@ def _render_result_breakdown_draft(
         heading = _clean_result_breakdown_heading(section.heading)
         if not heading or not section.parts:
             return None
-        rendered_parts: list[str] = []
-        for part in section.parts:
-            if part.kind == "text":
-                rendered_parts.append(part.text)
-                continue
-            fact_id = str(part.fact_id or "").strip()
-            if fact_id not in fact_bank:
-                return None
-            rendered_parts.append(fact_bank[fact_id])
-            used_fact_ids.add(fact_id)
-        body = "".join(rendered_parts).strip()
+        body, section_fact_ids = _render_result_breakdown_parts(
+            section.parts,
+            fact_bank=fact_bank,
+        )
         if not body:
             return None
+        used_fact_ids.update(section_fact_ids)
         rendered_sections.append(f"### {heading}\n{body}")
 
     if not required_fact_ids.issubset(used_fact_ids):
@@ -1360,6 +1361,161 @@ def _render_result_breakdown_draft(
     if len(rendered_text.split()) > 520:
         return None
     return rendered_text
+
+
+def _render_result_breakdown_parts(
+    parts: list[ResultBreakdownPart],
+    *,
+    fact_bank: dict[str, str],
+) -> tuple[str | None, set[str]]:
+    body = ""
+    fact_ids: list[str] = []
+    used_fact_ids: set[str] = set()
+    for part in parts:
+        if part.kind == "text":
+            body = _append_result_breakdown_piece(body, part.text)
+            continue
+        fact_id = str(part.fact_id or "").strip()
+        if fact_id not in fact_bank:
+            return None, used_fact_ids
+        if fact_id not in used_fact_ids:
+            fact_ids.append(fact_id)
+            used_fact_ids.add(fact_id)
+    body = _normalize_result_breakdown_body(body)
+    fact_block = _render_result_breakdown_fact_block(fact_ids, fact_bank=fact_bank)
+    if _result_breakdown_body_is_fragmentary(body, fact_ids):
+        body = ""
+    if body and fact_block:
+        return f"{body}\n\n{fact_block}", used_fact_ids
+    return (body or fact_block or None), used_fact_ids
+
+
+def _render_result_breakdown_fact_block(
+    fact_ids: list[str],
+    *,
+    fact_bank: dict[str, str],
+) -> str:
+    if not fact_ids:
+        return ""
+    remaining = list(fact_ids)
+    lines: list[str] = []
+
+    def _has(*ids: str) -> bool:
+        return any(fact_id in remaining for fact_id in ids)
+
+    def _consume(*ids: str) -> None:
+        for fact_id in ids:
+            if fact_id in remaining:
+                remaining.remove(fact_id)
+
+    if _has("title", "symbols", "date_range"):
+        title = _sentence_fragment(fact_bank.get("title") or "Stored backtest")
+        symbols = _sentence_fragment(fact_bank.get("symbols") or "")
+        date_range = _sentence_fragment(fact_bank.get("date_range") or "")
+        test_text = title
+        if symbols and symbols.lower() not in title.lower():
+            test_text = f"{test_text} on {symbols}"
+        if date_range:
+            test_text = f"{test_text}, {date_range}"
+        lines.append(f"**Test:** {test_text}.")
+        _consume("title", "symbols", "date_range")
+
+    if _has(
+        "total_return",
+        "benchmark_symbol",
+        "benchmark_return",
+        "benchmark_delta",
+    ):
+        performance_parts: list[str] = []
+        if "total_return" in remaining:
+            performance_parts.append(f"total return {fact_bank['total_return']}")
+        benchmark = _sentence_fragment(fact_bank.get("benchmark_symbol") or "")
+        if "benchmark_return" in remaining and benchmark:
+            performance_parts.append(
+                f"{benchmark} benchmark return {fact_bank['benchmark_return']}"
+            )
+        elif "benchmark_symbol" in remaining and benchmark:
+            performance_parts.append(f"benchmark {benchmark}")
+        if "benchmark_delta" in remaining:
+            performance_parts.append(
+                f"relative performance {fact_bank['benchmark_delta']}"
+            )
+        if performance_parts:
+            lines.append(f"**Performance:** {'; '.join(performance_parts)}.")
+        _consume(
+            "total_return",
+            "benchmark_symbol",
+            "benchmark_return",
+            "benchmark_delta",
+        )
+
+    if _has("max_drawdown"):
+        lines.append(f"**Risk marker:** max drawdown {fact_bank['max_drawdown']}.")
+        _consume("max_drawdown")
+
+    if _has("starting_capital"):
+        lines.append(f"**Starting capital:** {fact_bank['starting_capital']}.")
+        _consume("starting_capital")
+
+    if _has("assumptions"):
+        lines.append(f"**Assumptions:** {fact_bank['assumptions']}")
+        _consume("assumptions")
+
+    if _has("caveat"):
+        lines.append(f"**Caveat:** {fact_bank['caveat']}")
+        _consume("caveat")
+
+    if _has("runnable_next_tests"):
+        lines.append(fact_bank["runnable_next_tests"])
+        _consume("runnable_next_tests")
+
+    if _has("draft_only_or_future_tests"):
+        lines.append(fact_bank["draft_only_or_future_tests"])
+        _consume("draft_only_or_future_tests")
+
+    for fact_id in remaining:
+        value = fact_bank.get(fact_id)
+        if value:
+            lines.append(_ensure_sentence(value))
+
+    return "\n\n".join(_ensure_sentence(line) for line in lines if line.strip())
+
+
+def _append_result_breakdown_piece(current: str, piece: str) -> str:
+    cleaned = " ".join(str(piece or "").split())
+    if not cleaned:
+        return current
+    if not current:
+        return cleaned
+    if cleaned[:1] in {".", ",", ";", ":", "!", "?", ")", "%"}:
+        return current.rstrip() + cleaned
+    if current[-1:] in {"(", "$", "/", "-"}:
+        return current.rstrip() + cleaned
+    return current.rstrip() + " " + cleaned
+
+
+def _normalize_result_breakdown_body(value: str) -> str:
+    return " ".join(str(value or "").split()).strip()
+
+
+def _result_breakdown_body_is_fragmentary(body: str, fact_ids: list[str]) -> bool:
+    if not body or not fact_ids:
+        return False
+    word_count = len([word for word in body.split(" ") if word.strip()])
+    return word_count < 12
+
+
+def _sentence_fragment(value: str) -> str:
+    return str(value or "").strip().rstrip(".")
+
+
+def _ensure_sentence(value: str) -> str:
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        return ""
+    if cleaned[-1:] in {".", "!", "?"}:
+        return cleaned
+    return f"{cleaned}."
 
 
 def _required_result_breakdown_fact_ids(fact_bank: dict[str, str]) -> set[str]:
@@ -1465,25 +1621,26 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
     assumption_bullets = "\n".join(f"- {line}" for line in assumption_lines)
     period_sentence = f" over {date_range}" if date_range else ""
     return (
-        f"### What was tested\n"
-        f"{title} tested {symbols_text}{period_sentence} using the stored backtest configuration.\n\n"
-        f"### What happened\n"
-        f"Total Return (%): {total_return_text}. This is the headline portfolio change "
-        f"for the selected period, before treating it as a future expectation.\n\n"
-        f"### Benchmark comparison\n"
+        f"### What Was Tested\n"
+        f"{title} tested {symbols_text}{period_sentence} using the stored "
+        f"backtest configuration.\n\n"
+        f"### What Happened\n"
+        f"**Total return:** {total_return_text}. This is the headline portfolio "
+        f"change for the selected period, before treating it as a future expectation.\n\n"
+        f"### Benchmark Context\n"
         f"The benchmark was {benchmark or 'the stored benchmark'} at {benchmark_text}. "
         f"The strategy finished {delta_text} versus that benchmark, so the card is "
         f"showing relative performance as well as absolute return.\n\n"
-        f"### Risk and drawdown\n"
-        f"Max drawdown was {drawdown_text}. That marks the largest peak-to-trough "
+        f"### Risk Read\n"
+        f"**Max drawdown:** {drawdown_text}. This marks the largest peak-to-trough "
         f"decline during the simulation and is the first risk number to compare "
-        f"against the return.\n\n"
+        f"against the return profile.\n\n"
         f"### Assumptions\n"
         f"{assumption_bullets}\n\n"
-        f"### What to try next\n"
+        f"### What To Try Next\n"
         f"Use this as historical simulation evidence, not a prediction or trading "
-        f"recommendation. A useful next check is changing the date range or benchmark "
-        f"to see whether the conclusion depends on this exact window."
+        f"recommendation. A runnable next check is changing the date range or "
+        f"benchmark to see whether the conclusion depends on this exact window."
     )
 
 

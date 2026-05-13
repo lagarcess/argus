@@ -186,9 +186,10 @@ async def test_workflow_confirms_runnable_draft_instead_of_optional_settings_pro
 
     assert result["stage_outcome"] == "await_approval"
     assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["AAPL"]
-    assert result["confirmation_payload"]["optional_parameters"]["initial_capital"][
-        "value"
-    ] == 1000.0
+    assert (
+        result["confirmation_payload"]["optional_parameters"]["initial_capital"]["value"]
+        == 1000.0
+    )
     assert "optional_parameter_choices" not in result
 
 
@@ -244,9 +245,7 @@ async def test_workflow_clears_requested_field_after_chip_answer_confirmation(
     )
 
     assert answer_result["stage_outcome"] == "await_approval"
-    assert answer_result["confirmation_payload"]["strategy"]["asset_universe"] == [
-        "TSLA"
-    ]
+    assert answer_result["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
     assert answer_result["pending_strategy"]["requested_field"] is None
     assert answer_result["pending_strategy"]["missing_required_fields"] == []
 

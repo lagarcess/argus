@@ -46,6 +46,7 @@ class DateRangeResolution:
     label: str
     start: date
     end: date
+    used_default: bool = False
 
     @property
     def payload(self) -> dict[str, str]:
@@ -215,7 +216,12 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
             return natural_explicit
 
     start = _add_months(current_date, -12)
-    return DateRangeResolution(label="past year", start=start, end=current_date)
+    return DateRangeResolution(
+        label="past year",
+        start=start,
+        end=current_date,
+        used_default=True,
+    )
 
 
 def normalize_date_range_candidate(
@@ -372,6 +378,8 @@ def _extract_period_label_from_raw_phrase(
         r"\bsince (?:ipo|public listing)\b|\bmax(?:imum)? available\b", normalized
     ):
         return "since_ipo"
+    if re.search(r"\b(?:past|last) year\b", normalized):
+        return "past year"
     relative_match = re.search(
         r"\b(?:past|last) (?P<count>\d+) "
         r"(?P<unit>day|days|week|weeks|month|months|year|years)\b",
@@ -379,6 +387,12 @@ def _extract_period_label_from_raw_phrase(
     )
     if relative_match is not None:
         return relative_match.group(0)
+    singular_relative_match = re.search(
+        r"\b(?:past|last) (?P<unit>day|week|month|quarter)\b",
+        normalized,
+    )
+    if singular_relative_match is not None:
+        return singular_relative_match.group(0)
     ago_to_now_match = re.search(
         r"\b(?P<count>\d+) "
         r"(?P<unit>day|days|week|weeks|month|months|year|years) ago "
@@ -525,11 +539,29 @@ def _relative_period(value: str, *, today: date) -> DateRangeResolution | None:
             start=_add_months(today, -12),
             end=today,
         )
+    singular_periods = {
+        "past day": ("day", 1),
+        "last day": ("day", 1),
+        "past week": ("week", 1),
+        "last week": ("week", 1),
+        "past month": ("month", 1),
+        "last month": ("month", 1),
+        "past quarter": ("quarter", 1),
+        "last quarter": ("quarter", 1),
+    }
+    singular_period = singular_periods.get(value)
+    if singular_period is not None:
+        unit, count = singular_period
+        return DateRangeResolution(
+            label=f"past {unit}",
+            start=_subtract_period(today, count=count, unit=unit),
+            end=today,
+        )
 
     patterns = [
-        r"(?:over the )?(?:past|last) (?P<count>\d+) (?P<unit>day|days|week|weeks|month|months|year|years)",
-        r"(?:past|last)_(?P<count>\d+)_(?P<unit>day|days|week|weeks|month|months|year|years)",
-        r"(?P<count>\d+)\s*(?P<unit>d|w|m|mo|y)",
+        r"(?:over the )?(?:past|last) (?P<count>\d+) (?P<unit>day|days|week|weeks|month|months|quarter|quarters|year|years)",
+        r"(?:past|last)_(?P<count>\d+)_(?P<unit>day|days|week|weeks|month|months|quarter|quarters|year|years)",
+        r"(?P<count>\d+)\s*(?P<unit>d|w|m|mo|q|y)",
     ]
     for pattern in patterns:
         match = re.fullmatch(pattern, value)
@@ -551,6 +583,7 @@ def _relative_label(*, count: int, unit: str) -> str:
         "w": "week",
         "m": "month",
         "mo": "month",
+        "q": "quarter",
         "y": "year",
     }.get(unit, unit.removesuffix("s"))
     return f"past {unit_name}" if count == 1 else f"past {count} {unit_name}s"
@@ -563,6 +596,8 @@ def _subtract_period(today: date, *, count: int, unit: str) -> date:
         return today - timedelta(days=count * 7)
     if unit in {"m", "mo", "month", "months"}:
         return _add_months(today, -count)
+    if unit in {"q", "quarter", "quarters"}:
+        return _add_months(today, -(count * 3))
     return _add_months(today, -(count * 12))
 
 

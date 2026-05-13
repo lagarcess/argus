@@ -364,7 +364,9 @@ def _build_task_snapshot(
         latest_backtest_reference=latest_backtest_reference,
         latest_collection_reference=latest_collection_reference,
     )
-    completed = stage_outcome_value in completed_outcomes and not preserve_pending_strategy
+    completed = (
+        stage_outcome_value in completed_outcomes and not preserve_pending_strategy
+    )
     pending_strategy_summary = (
         prior_task_snapshot.pending_strategy_summary
         if preserve_pending_strategy and prior_task_snapshot is not None
@@ -436,7 +438,10 @@ def _should_preserve_pending_strategy(
 ) -> bool:
     if stage_outcome_value != "ready_to_respond":
         return False
-    if prior_task_snapshot is None or prior_task_snapshot.pending_strategy_summary is None:
+    if (
+        prior_task_snapshot is None
+        or prior_task_snapshot.pending_strategy_summary is None
+    ):
         return False
     if latest_backtest_reference is not None or latest_collection_reference is not None:
         return False

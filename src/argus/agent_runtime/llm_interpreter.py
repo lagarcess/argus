@@ -159,6 +159,7 @@ class OpenRouterStructuredInterpreter:
 
         # 2. Try Fallback Model (if primary failed or was unavailable)
         from argus.llm.openrouter import resolve_openrouter_model
+
         fallback_model_name = resolve_openrouter_model(fallback=True)
 
         # Don't retry with the same model name if resolve returned the same thing
@@ -167,10 +168,14 @@ class OpenRouterStructuredInterpreter:
             self.last_status = "failed"
             return None
 
-        fallback_model = build_openrouter_model("interpretation", model_name=fallback_model_name)
+        fallback_model = build_openrouter_model(
+            "interpretation", model_name=fallback_model_name
+        )
         if fallback_model:
             try:
-                structured = fallback_model.with_structured_output(LLMInterpretationResponse)
+                structured = fallback_model.with_structured_output(
+                    LLMInterpretationResponse
+                )
                 response = await structured.ainvoke(messages)
                 if isinstance(response, LLMInterpretationResponse):
                     self.last_status = "fallback_used"
@@ -364,6 +369,8 @@ def _ground_strategy_in_current_turn(
             strategy.date_range,
             raw_user_phrasing=current_message,
         )
+
+
 def _merge_prior_strategy(
     *,
     strategy: StrategySummary,

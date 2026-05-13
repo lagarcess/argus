@@ -48,6 +48,37 @@ def test_raw_since_ipo_period_overrides_model_default() -> None:
     assert normalized == "since_ipo"
 
 
+def test_singular_relative_periods_do_not_fall_back_to_past_year() -> None:
+    cases = {
+        "last month": ("past month", "2026-04-03", "2026-05-03"),
+        "past month": ("past month", "2026-04-03", "2026-05-03"),
+        "last week": ("past week", "2026-04-26", "2026-05-03"),
+        "past week": ("past week", "2026-04-26", "2026-05-03"),
+        "last quarter": ("past quarter", "2026-02-03", "2026-05-03"),
+    }
+
+    for phrase, (label, start, end) in cases.items():
+        normalized = normalize_date_range_candidate(
+            "past year",
+            raw_user_phrasing=f"try buy and hold BABA for the {phrase}",
+            today=date(2026, 5, 3),
+        )
+        resolved = resolve_date_range(normalized, today=date(2026, 5, 3))
+
+        assert normalized == phrase
+        assert resolved.label == label
+        assert resolved.payload == {"start": start, "end": end}
+        assert resolved.used_default is False
+
+
+def test_resolve_date_range_exposes_default_fallback() -> None:
+    resolved = resolve_date_range("the previous market mood", today=date(2026, 5, 3))
+
+    assert resolved.label == "past year"
+    assert resolved.payload == {"start": "2025-05-03", "end": "2026-05-03"}
+    assert resolved.used_default is True
+
+
 def test_dca_strategy_requires_explicit_recurring_amount_for_approval() -> None:
     strategy = StrategySummary(
         strategy_type="dca_accumulation",

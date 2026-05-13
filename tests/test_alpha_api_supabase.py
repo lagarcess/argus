@@ -203,6 +203,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import main as api_main
     from argus.api.routers import agent as agent_router
     from argus.domain import engine as domain_engine
+
     monkeypatch.setattr(
         api_main,
         "".join(["orchestrate_chat", "_turn"]),
@@ -225,9 +226,7 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
                     else "I tested that idea with TSLA."
                 ),
                 strategy_draft=dict(
-                    template=dict(
-                        value="rsi_mean_reversion", source="user_supplied"
-                    ),
+                    template=dict(value="rsi_mean_reversion", source="user_supplied"),
                     symbols=dict(value=["TSLA"], source="user_supplied"),
                 ),
                 title_suggestion="TSLA idea",

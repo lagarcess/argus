@@ -136,6 +136,15 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain('confirmation.statusLabel || "Updated"');
   });
 
+  test("chat supersedes active confirmations when a later turn asks for recovery", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("supersedeOpenConfirmations");
+    expect(chat).toContain("finalStageOutcome");
+    expect(chat).toContain('finalStageOutcome === "await_user_reply"');
+    expect(chat).toContain('finalStageOutcome === "needs_clarification"');
+  });
+
   test("chat final payload accepts pending strategy metadata", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
@@ -183,6 +192,18 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("chat.status.${event.data.stage}");
     expect(locale).toContain('"interpret": "Understanding your idea..."');
     expect(locale).toContain('"execute": "Running backtest..."');
+  });
+
+  test("latest pending assistant response hides feedback before stage_start arrives", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+
+    expect(chat).toContain("latestAiIndex");
+    expect(chat).toContain("isWorkingMessage");
+    expect(chat).toContain('(msg.content ?? "") === ""');
+    expect(chat).toContain("isStreaming={isWorkingMessage}");
+    expect(message).toContain("{!isUser && !isStreaming && (");
+    expect(message).toContain("{!isStreaming && (");
   });
 
   test("chat restores jump-to-latest affordance without forced reading jumps", () => {

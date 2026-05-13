@@ -77,7 +77,10 @@ class FakeStructuredModel:
                     {
                         "heading": "Benchmark and risk context",
                         "parts": [
-                            {"kind": "text", "text": "Use the card metrics as the source of truth."},
+                            {
+                                "kind": "text",
+                                "text": "Use the card metrics as the source of truth.",
+                            },
                         ],
                     },
                 ]
@@ -191,12 +194,12 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
             "raw_metrics": {
                 "aggregate": {
                     "performance": {
-                            "total_return_pct": 39.5,
-                            "benchmark_return_pct": 25.6,
-                            "delta_vs_benchmark_pct": 13.9,
-                            "max_drawdown_pct": -13.8,
-                        }
+                        "total_return_pct": 39.5,
+                        "benchmark_return_pct": 25.6,
+                        "delta_vs_benchmark_pct": 13.9,
+                        "max_drawdown_pct": -13.8,
                     }
+                }
             },
         }
     )
@@ -206,7 +209,11 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
     assert "non-template" in system_prompt.lower()
     assert "vary the section headings" in system_prompt.lower()
     assert "fact reference" in system_prompt.lower()
+    assert "professional markdown" in system_prompt.lower()
+    assert "capability truth" in system_prompt.lower()
     assert "fact_bank" in user_payload
+    assert "runnable_next_tests" in user_payload
+    assert "draft_only_or_future_tests" in user_payload
 
 
 def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
@@ -283,13 +290,13 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
             "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
             "raw_metrics": {
                 "aggregate": {
-                        "performance": {
-                            "total_return_pct": 39.5,
-                            "benchmark_return_pct": 25.6,
-                            "delta_vs_benchmark_pct": 13.9,
-                            "max_drawdown_pct": -13.8,
-                        }
+                    "performance": {
+                        "total_return_pct": 39.5,
+                        "benchmark_return_pct": 25.6,
+                        "delta_vs_benchmark_pct": 13.9,
+                        "max_drawdown_pct": -13.8,
                     }
+                }
             },
         }
     )
@@ -306,6 +313,95 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     assert "-13.8%" in text
     assert "Universe: AAPL." in text
     assert "not a prediction" in text.lower()
+
+
+def test_result_breakdown_fact_parts_join_with_professional_spacing(
+    monkeypatch,
+) -> None:
+    from argus.api import chat_service
+
+    FakeChatOpenRouter.calls.clear()
+    FakeChatOpenRouter.invoked_messages.clear()
+    FakeChatOpenRouter.structured_invoked_messages.clear()
+    FakeChatOpenRouter.structured_response = {
+        "sections": [
+            {
+                "heading": "Reading this run",
+                "parts": [
+                    {"kind": "text", "text": "The tested idea was"},
+                    {"kind": "fact", "fact_id": "title"},
+                    {"kind": "text", "text": "over"},
+                    {"kind": "fact", "fact_id": "date_range"},
+                    {"kind": "text", "text": "and returned"},
+                    {"kind": "fact", "fact_id": "total_return"},
+                    {"kind": "text", "text": "."},
+                ],
+            },
+            {
+                "heading": "Benchmark context",
+                "parts": [
+                    {"kind": "fact", "fact_id": "symbols"},
+                    {"kind": "text", "text": "was compared with"},
+                    {"kind": "fact", "fact_id": "benchmark_symbol"},
+                    {"kind": "text", "text": "at"},
+                    {"kind": "fact", "fact_id": "benchmark_return"},
+                    {"kind": "text", "text": "for a relative spread of"},
+                    {"kind": "fact", "fact_id": "benchmark_delta"},
+                    {"kind": "text", "text": "."},
+                ],
+            },
+            {
+                "heading": "Risk, assumptions, and next step",
+                "parts": [
+                    {"kind": "text", "text": "The max drawdown was"},
+                    {"kind": "fact", "fact_id": "max_drawdown"},
+                    {"kind": "text", "text": ". Assumptions:"},
+                    {"kind": "fact", "fact_id": "assumptions"},
+                    {"kind": "text", "text": "Next runnable checks:"},
+                    {"kind": "fact", "fact_id": "runnable_next_tests"},
+                    {"kind": "text", "text": "."},
+                    {"kind": "fact", "fact_id": "caveat"},
+                ],
+            },
+        ]
+    }
+    FakeChatOpenRouter.invoke_content = None
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+
+    text = chat_service.llm_result_breakdown_message(
+        {
+            "title": "BABA Buy and Hold",
+            "symbols": ["BABA"],
+            "benchmark_symbol": "SPY",
+            "date_range": "last month",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 1.7,
+                        "benchmark_return_pct": 26.6,
+                        "delta_vs_benchmark_pct": -24.9,
+                        "max_drawdown_pct": -36.8,
+                    }
+                }
+            },
+            "assumptions": ["Universe: BABA.", "Benchmark: SPY."],
+        }
+    )
+
+    assert text is not None
+    assert "**Test:** BABA Buy and Hold, last month." in text
+    assert "**Performance:** total return +1.7%." in text
+    assert (
+        "**Performance:** SPY benchmark return +26.6%; relative performance -24.9%."
+        in text
+    )
+    assert "**Risk marker:** max drawdown -36.8%." in text
+    assert "The tested idea was over and returned." not in text
+    assert "wasBABA" not in text
+    assert "Holdover" not in text
+    assert "returned+1.7%" not in text
+    assert "BABA Buy and Hold BABA last month" not in text
 
 
 def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> None:
@@ -458,12 +554,13 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
 
     text = result_breakdown_message(run)
 
-    assert "### What was tested" in text
-    assert "### What happened" in text
-    assert "### Benchmark comparison" in text
-    assert "### Risk and drawdown" in text
+    assert "### What Was Tested" in text
+    assert "### What Happened" in text
+    assert "### Benchmark Context" in text
+    assert "### Risk Read" in text
     assert "### Assumptions" in text
-    assert "### What to try next" in text
+    assert "### What To Try Next" in text
+    assert "**Total return:** +39.5%." in text
     assert "AAPL Buy and Hold" in text
     assert "+39.5%" in text
     assert "SPY" in text
