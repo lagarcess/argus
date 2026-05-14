@@ -18,34 +18,23 @@ def test_resolve_date_range_accepts_month_name_ranges() -> None:
     assert resolved.display == "January 1, 2010 - December 31, 2020"
 
 
-def test_normalize_date_range_reads_month_name_ranges_from_raw_phrase() -> None:
+def test_normalize_date_range_preserves_structured_month_name_ranges() -> None:
     normalized = normalize_date_range_candidate(
-        None,
-        raw_user_phrasing="Can we see Feb 7 2020 till Feb 7 2024?",
+        {"start": "2020-02-07", "end": "2024-02-07"},
         today=date(2026, 5, 3),
     )
 
     assert normalized == {"start": "2020-02-07", "end": "2024-02-07"}
 
 
-def test_raw_since_year_period_overrides_model_default() -> None:
+def test_raw_phrase_no_longer_overrides_structured_date_range() -> None:
     normalized = normalize_date_range_candidate(
         "past year",
         raw_user_phrasing="Invest $500 in Bitcoin every month since 2021.",
         today=date(2026, 5, 3),
     )
 
-    assert normalized == "since 2021"
-
-
-def test_raw_since_ipo_period_overrides_model_default() -> None:
-    normalized = normalize_date_range_candidate(
-        "past year",
-        raw_user_phrasing="take META since IPO",
-        today=date(2026, 5, 3),
-    )
-
-    assert normalized == "since_ipo"
+    assert normalized == "past year"
 
 
 def test_singular_relative_periods_do_not_fall_back_to_past_year() -> None:
@@ -59,8 +48,7 @@ def test_singular_relative_periods_do_not_fall_back_to_past_year() -> None:
 
     for phrase, (label, start, end) in cases.items():
         normalized = normalize_date_range_candidate(
-            "past year",
-            raw_user_phrasing=f"try buy and hold BABA for the {phrase}",
+            phrase,
             today=date(2026, 5, 3),
         )
         resolved = resolve_date_range(normalized, today=date(2026, 5, 3))
@@ -69,6 +57,17 @@ def test_singular_relative_periods_do_not_fall_back_to_past_year() -> None:
         assert resolved.label == label
         assert resolved.payload == {"start": start, "end": end}
         assert resolved.used_default is False
+
+
+def test_embedded_singular_relative_periods_are_not_default_fallback() -> None:
+    resolved = resolve_date_range(
+        "use the past year instead",
+        today=date(2026, 5, 3),
+    )
+
+    assert resolved.label == "past year"
+    assert resolved.payload == {"start": "2025-05-03", "end": "2026-05-03"}
+    assert resolved.used_default is False
 
 
 def test_resolve_date_range_exposes_default_fallback() -> None:

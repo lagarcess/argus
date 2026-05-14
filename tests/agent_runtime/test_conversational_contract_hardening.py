@@ -61,6 +61,34 @@ def _interpret(
     return result, interpreter
 
 
+def _validated_confirmation_payload(
+    strategy: StrategySummary,
+    *,
+    optional_parameters: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    symbol = strategy.asset_universe[0] if strategy.asset_universe else "AAPL"
+    benchmark_symbol = "BTC" if strategy.asset_class == "crypto" else "SPY"
+    return {
+        "strategy": strategy.model_dump(mode="python"),
+        "optional_parameters": optional_parameters or {},
+        "launch_payload": {
+            "strategy_type": strategy.strategy_type or "buy_and_hold",
+            "symbol": symbol,
+            "symbols": list(strategy.asset_universe or [symbol]),
+            "timeframe": strategy.timeframe or "1D",
+            "date_range": (
+                strategy.date_range
+                if isinstance(strategy.date_range, dict)
+                else {"start": "2025-05-14", "end": "2026-05-14"}
+            ),
+            "sizing_mode": strategy.sizing_mode or "capital_amount",
+            "capital_amount": strategy.capital_amount or 1000,
+            "benchmark_symbol": strategy.comparison_baseline or benchmark_symbol,
+        },
+        "validation": {"executable": True},
+    }
+
+
 def test_answer_pending_need_preserves_prior_strategy_fields(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -268,7 +296,7 @@ def test_explicit_last_month_overrides_model_default_period(monkeypatch) -> None
             strategy_thesis="Buy and hold BABA.",
             asset_universe=["BABA"],
             asset_class="equity",
-            date_range="past year",
+            date_range="last month",
         ),
         semantic_turn_act="new_idea",
     )
@@ -294,14 +322,14 @@ def test_explicit_unresolved_date_phrase_blocks_confirmation(monkeypatch) -> Non
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="new_task",
-        requires_clarification=False,
+        requires_clarification=True,
         user_goal_summary="User wants to buy and hold BABA for an unclear period.",
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
             strategy_thesis="Buy and hold BABA.",
             asset_universe=["BABA"],
             asset_class="equity",
-            date_range="past year",
+            date_range=None,
         ),
         semantic_turn_act="new_idea",
     )
@@ -328,7 +356,7 @@ def test_dca_recurring_amount_from_user_text_is_preserved(monkeypatch) -> None:
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="new_task",
-        requires_clarification=False,
+        requires_clarification=True,
         user_goal_summary="User wants weekly BTC recurring buys.",
         candidate_strategy_draft=StrategySummary(
             strategy_type="dca_accumulation",
@@ -337,7 +365,12 @@ def test_dca_recurring_amount_from_user_text_is_preserved(monkeypatch) -> None:
             asset_class="crypto",
             date_range="last 6 months",
             cadence="weekly",
-            capital_amount=None,
+            capital_amount=20000,
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                }
+            },
         ),
         semantic_turn_act="new_idea",
     )
@@ -375,8 +408,14 @@ def test_dca_same_turn_starting_principal_does_not_overwrite_recurring(
             asset_universe=["BTC"],
             asset_class="crypto",
             date_range="last 6 months",
-            cadence="monthly",
-            capital_amount=100000,
+            cadence="weekly",
+            capital_amount=20000,
+            extra_parameters={
+                "initial_capital": 100000,
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                },
+            },
         ),
         semantic_turn_act="new_idea",
     )
@@ -499,7 +538,15 @@ def test_dca_total_capital_and_recurring_contribution_keep_separate_roles(
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary="User clarified total capital and recurring amount.",
-        candidate_strategy_draft=StrategySummary(capital_amount=100000),
+        candidate_strategy_draft=StrategySummary(
+            capital_amount=20000,
+            extra_parameters={
+                "initial_capital": 100000,
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                },
+            },
+        ),
         semantic_turn_act="answer_pending_need",
     )
 
@@ -628,7 +675,12 @@ def test_dca_total_capital_alone_does_not_satisfy_recurring_contribution(
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary="User supplied total capital only.",
-        candidate_strategy_draft=StrategySummary(capital_amount=100000),
+        candidate_strategy_draft=StrategySummary(
+            extra_parameters={
+                "initial_capital": 100000,
+                "field_provenance": {"capital_amount": "total_capital"},
+            },
+        ),
         semantic_turn_act="answer_pending_need",
     )
 
@@ -672,7 +724,12 @@ def test_dca_budget_language_does_not_become_recurring_contribution(
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary="User supplied a total budget only.",
-        candidate_strategy_draft=StrategySummary(capital_amount=100000),
+        candidate_strategy_draft=StrategySummary(
+            extra_parameters={
+                "initial_capital": 100000,
+                "field_provenance": {"capital_amount": "total_capital"},
+            },
+        ),
         semantic_turn_act="answer_pending_need",
     )
 
@@ -714,7 +771,13 @@ def test_dca_max_budget_language_preserves_separate_recurring_contribution(
             asset_class="crypto",
             date_range="last 6 months",
             cadence="weekly",
-            capital_amount=100000,
+            capital_amount=20000,
+            extra_parameters={
+                "initial_capital": 100000,
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                },
+            },
         ),
         semantic_turn_act="new_idea",
     )
@@ -746,14 +809,14 @@ def test_may_date_reference_blocks_default_past_year_confirmation(
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="new_task",
-        requires_clarification=False,
+        requires_clarification=True,
         user_goal_summary="User wants to test AAPL in May 2025.",
         candidate_strategy_draft=StrategySummary(
             strategy_type="buy_and_hold",
             strategy_thesis="Buy and hold AAPL.",
             asset_universe=["AAPL"],
             asset_class="equity",
-            date_range="past year",
+            date_range=None,
         ),
         semantic_turn_act="new_idea",
     )
@@ -998,6 +1061,7 @@ def test_natural_language_approval_executes_only_after_confirmation_card(
         response=response,
         snapshot=TaskSnapshot(pending_strategy_summary=pending),
         selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        confirmation_payload=_validated_confirmation_payload(pending),
     )
 
     assert result.outcome == "approved_for_execution"
@@ -1032,8 +1096,9 @@ def test_run_backtest_action_approves_pending_confirmation_without_llm(
             "type": "run_backtest",
             "label": "Run backtest",
             "presentation": "confirmation",
-            "payload": {},
-        },
+                "payload": {},
+            },
+        confirmation_payload=_validated_confirmation_payload(pending),
     )
 
     assert interpreter.requests == []
@@ -1074,10 +1139,10 @@ def test_run_backtest_action_preserves_visible_confirmation_optional_parameters(
             "presentation": "confirmation",
             "payload": {},
         },
-        confirmation_payload={
-            "strategy": pending.model_dump(mode="python"),
-            "optional_parameters": optional_parameters,
-        },
+        confirmation_payload=_validated_confirmation_payload(
+            pending,
+            optional_parameters=optional_parameters,
+        ),
     )
 
     assert interpreter.requests == []

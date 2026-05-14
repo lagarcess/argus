@@ -11,7 +11,9 @@ router = APIRouter(prefix="/api/v1", tags=["dev"])
 @router.post("/dev/reset", response_model=SuccessResponse)
 def dev_reset(request: Request) -> SuccessResponse:
     api_state.store.reset()
-    if api_state.PERSISTENCE_MODE != "supabase":
+    if api_state.supabase_gateway is not None:
+        api_state.supabase_gateway.reset_dev_data()
+    if api_state.CHECKPOINTER_MODE != "postgres":
         api_state.reset_agent_runtime_workflow(request.app)
     api_state.store.get_or_create_dev_user()
     return SuccessResponse(success=True)

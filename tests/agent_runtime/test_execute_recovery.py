@@ -2,15 +2,25 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.recovery.policy import should_retry
+from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.execute import execute_stage
 from argus.agent_runtime.stages.explain import explain_stage
-from argus.agent_runtime.state.models import ResponseProfile, RunState
+from argus.agent_runtime.stages.interpret import InterpretationRequest
+from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+from argus.agent_runtime.state.models import (
+    ResponseProfile,
+    RunState,
+    StrategySummary,
+    UserState,
+)
 from argus.agent_runtime.strategy_contract import resolve_date_range
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
 from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
 from argus.domain.engine_launch.models import LaunchExecutionEnvelope
+from langgraph.checkpoint.memory import MemorySaver
 
 
 def test_parameter_validation_retries_only_for_mechanical_intent_preserving_fix() -> None:
@@ -210,8 +220,9 @@ def test_execute_preserves_last_failure_class_when_retries_are_exhausted() -> No
 
     assert result.outcome == "execution_failed_terminally"
     assert result.patch["failure_classification"] == "upstream_dependency_error"
-    assert "try later" in result.patch["final_response_payload"]["error"]
-    assert "try later" in result.patch["assistant_prompt"]
+    assert "try later" not in result.patch["final_response_payload"]["error"]
+    assert "try later" not in result.patch["assistant_prompt"]
+    assert "temporary data or service issue" in result.patch["assistant_prompt"]
 
 
 def test_execute_recovers_visible_dca_confirmation_when_market_data_is_unavailable() -> (
@@ -265,6 +276,17 @@ def test_execute_recovers_visible_dca_confirmation_when_market_data_is_unavailab
     assert "try again" in prompt.lower()
     assert "market_data_unavailable" not in prompt
     assert result.patch["final_response_payload"]["error"] == prompt
+    failed_reference = result.patch["latest_failed_action_reference"]
+    assert failed_reference["artifact_kind"] == "failed_action"
+    assert failed_reference["artifact_status"] == "failed"
+    assert failed_reference["metadata"]["action_type"] == "run_backtest"
+    assert failed_reference["metadata"]["failure_classification"] == (
+        "upstream_dependency_error"
+    )
+    assert failed_reference["metadata"]["launch_payload"]["strategy_type"] == (
+        "dca_accumulation"
+    )
+    assert failed_reference["metadata"]["launch_payload"]["symbol"] == "BTC"
 
 
 def test_execute_missing_required_input_returns_to_conversation() -> None:
@@ -287,9 +309,60 @@ def test_execute_missing_required_input_returns_to_conversation() -> None:
 
     assert result.outcome == "needs_clarification"
     assert result.patch["failure_classification"] == "missing_required_input"
-    assert result.patch["assistant_prompt"] == "I still need entry logic."
+    assert "one more executable detail" in result.patch["assistant_prompt"]
+    assert "I still need entry logic" not in result.patch["assistant_prompt"]
     assert result.patch["missing_required_fields"] == ["entry_logic"]
     assert len(result.patch["tool_call_records"]) == 1
+
+
+def test_real_backtest_tool_maps_failure_codes_to_user_safe_messages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_launch_backtest(request: object, *, language: str = "en") -> object:
+        return LaunchExecutionAdapterResult(
+            envelope=LaunchExecutionEnvelope(
+                execution_status="blocked_invalid_input",
+                resolved_strategy={"strategy_type": "signal_strategy", "symbol": "TSLA"},
+                resolved_parameters={},
+                metrics={},
+                benchmark_metrics={},
+                assumptions=[],
+                caveats=[],
+                artifact_references=[],
+                provider_metadata={},
+                failure_category="parameter_validation_error",
+                failure_reason="missing_rule_group",
+            )
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.tools.real_backtest.run_launch_backtest",
+        fake_launch_backtest,
+    )
+
+    result = RealBacktestTool().run(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbol": "TSLA",
+            "symbols": ["TSLA"],
+            "timeframe": "1D",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000,
+            "position_size": None,
+            "cadence": None,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+        }
+    )
+
+    assert result["success"] is False
+    assert result["error_message"] != "missing_rule_group"
+    assert "complete executable entry and exit rule" in result["error_message"]
+    assert result["capability_context"]["failure_reason"] == "missing_rule_group"
 
 
 def test_execute_ambiguous_user_intent_returns_to_conversation() -> None:
@@ -399,6 +472,69 @@ def test_execute_stage_uses_real_backtest_tool_payload(
         result.patch["final_response_payload"]["explanation_context"]["strategy_type"]
         == "buy_and_hold"
     )
+
+
+def test_execute_stage_normalizes_persisted_launch_payload_assumption_defaults() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"result_card": {"title": "TSLA RSI Mean Reversion"}},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "indicator_threshold",
+            "asset_universe": ["TSLA"],
+            "date_range": "past 3 months",
+        },
+        "optional_parameters": {
+            "fees": {"value": 0.0, "source": "default"},
+            "slippage": {"value": 0.0, "source": "default"},
+            "engine_options": {"value": {}, "source": "default"},
+        },
+        "launch_payload": {
+            "strategy_type": "indicator_threshold",
+            "symbol": "TSLA",
+            "symbols": ["TSLA"],
+            "timeframe": "1D",
+            "date_range": {"start": "2026-02-13", "end": "2026-05-13"},
+            "entry_rule": {
+                "indicator": "rsi",
+                "operator": "below",
+                "threshold": 20.0,
+            },
+            "exit_rule": {
+                "indicator": "rsi",
+                "operator": "above",
+                "threshold": 60.0,
+            },
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000.0,
+            "position_size": None,
+            "cadence": None,
+            "parameters": {
+                "fees": 0.0,
+                "slippage": 0.0,
+                "engine_options": {},
+            },
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "language": "en",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert tool.calls[0]["parameters"] == {}
 
 
 def test_execute_stage_passes_language_to_real_backtest_tool(
@@ -599,6 +735,14 @@ def test_execute_stage_normalizes_user_facing_strategy_type_aliases() -> None:
             "date_range": "past year",
             "entry_logic": "Buy when RSI(14) drops to 30 or below",
             "exit_logic": "Sell when RSI(14) rises to 55 or above",
+            "extra_parameters": {
+                "indicator": "rsi",
+                "indicator_parameters": {
+                    "indicator": "rsi",
+                    "entry_threshold": 30,
+                    "exit_threshold": 55,
+                },
+            },
         },
         "optional_parameters": {},
     }
@@ -609,6 +753,63 @@ def test_execute_stage_normalizes_user_facing_strategy_type_aliases() -> None:
     assert tool.calls[0]["strategy_type"] == "indicator_threshold"
     assert tool.calls[0]["entry_rule"]["threshold"] == 30.0
     assert tool.calls[0]["exit_rule"]["threshold"] == 55.0
+
+
+def test_execute_stage_promotes_moving_average_crossover_to_signal_strategy() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"total_return": 0.14, "benchmark_return": 0.09},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "indicator_threshold",
+            "strategy_thesis": "Buy Nvidia on a 50/200 moving-average crossover.",
+            "asset_universe": ["NVDA"],
+            "date_range": "past year",
+            "entry_logic": (
+                "50-day moving average crosses above the 200-day moving average"
+            ),
+            "entry_rule": {
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+        },
+        "optional_parameters": {},
+    }
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_succeeded"
+    assert tool.calls[0]["strategy_type"] == "signal_strategy"
+    assert tool.calls[0]["entry_rule"] == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    assert tool.calls[0]["exit_rule"] == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
 
 
 def test_execute_stage_normalizes_dip_buying_and_machine_date_tokens(
@@ -751,6 +952,80 @@ def test_execute_stage_uses_strategy_contribution_for_dca(
     }
 
 
+class RetryApprovalInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User approved retrying the failed action.",
+            candidate_strategy_draft=StrategySummary(),
+            semantic_turn_act="retry_failed_action",
+        )
+
+
+@pytest.mark.asyncio
+async def test_workflow_preserves_latest_failed_action_reference_for_retry() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "upstream_dependency_error",
+                "error_message": "market_data_unavailable",
+                "retryable": True,
+                "payload": None,
+                "capability_context": {},
+            },
+        ]
+    )
+    workflow = build_workflow(
+        structured_interpreter=RetryApprovalInterpreter(),
+        tool=tool,
+        max_retries=1,
+        checkpointer=MemorySaver(),
+    )
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+        "language": "en",
+    }
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", language_preference="en"),
+        thread_id="thread-retry-failed-action",
+        message="Can you try again?",
+        fallback_latest_task_snapshot={
+            "latest_failed_action_reference": {
+                "artifact_kind": "failed_action",
+                "artifact_id": "failed-action-1",
+                "artifact_status": "failed",
+                "metadata": {
+                    "action_type": "run_backtest",
+                    "launch_payload": launch_payload,
+                    "failure_classification": "upstream_dependency_error",
+                    "error": "market_data_unavailable",
+                },
+            }
+        },
+    )
+
+    assert result["stage_outcome"] == "execution_failed_recoverably"
+    state_snapshot = await workflow.aget_state(
+        {"configurable": {"thread_id": "thread-retry-failed-action"}}
+    )
+    snapshot = state_snapshot.values["latest_task_snapshot"]
+    reference = snapshot.latest_failed_action_reference
+    assert reference is not None
+    assert reference.metadata["launch_payload"]["symbol"] == "MSFT"
+
+
 def test_execute_stage_translates_lookback_limit_to_human_recovery() -> None:
     tool = StubBacktestTool(
         responses=[
@@ -804,6 +1079,9 @@ def test_execute_maps_unknown_tool_errors_into_runtime_taxonomy() -> None:
 
     assert result.outcome == "execution_failed_terminally"
     assert result.patch["failure_classification"] == "tool_execution_error"
+    assert "worker stopped unexpectedly" not in result.patch["assistant_prompt"]
+    assert "worker stopped unexpectedly" not in result.patch["final_response_payload"]["error"]
+    assert "backtest could not complete" in result.patch["assistant_prompt"]
 
 
 def test_explain_stage_uses_result_payload_without_fabricating() -> None:
@@ -830,7 +1108,7 @@ def test_explain_stage_uses_result_payload_without_fabricating() -> None:
     assert "9.0%" in result.patch["assistant_response"]
     assert "Buy Tesla on pullbacks" in result.patch["assistant_response"]
     assert "return comparison only" in result.patch["assistant_response"]
-    assert "Caveat:" in result.patch["assistant_response"]
+    assert "**Caveat:**" in result.patch["assistant_response"]
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "same period" not in result.patch["assistant_response"].lower()
     assert "because" not in result.patch["assistant_response"].lower()
@@ -957,6 +1235,70 @@ def test_explain_stage_describes_canonical_run_not_stale_original_thesis() -> No
     assert "I tested:" not in text
 
 
+def test_explain_stage_mentions_flat_signal_result_when_no_trades_executed() -> None:
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    state.effective_response_profile = ResponseProfile(
+        effective_tone="friendly",
+        effective_verbosity="medium",
+        effective_expertise_mode="beginner",
+    )
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "indicator_threshold",
+            "strategy_thesis": "Test TSLA with RSI thresholds.",
+            "asset_universe": ["TSLA"],
+            "asset_class": "equity",
+            "date_range": "last 3 months",
+            "entry_logic": "Buy when RSI(14) drops to 20 or below",
+            "exit_logic": "Sell when RSI(14) rises to 60 or above",
+        },
+        "optional_parameters": {
+            "initial_capital": {
+                "label": "Initial capital",
+                "source": "default",
+                "value": 1000.0,
+            },
+        },
+    }
+    state.final_response_payload = {
+        "result": {
+            "resolved_strategy": {"strategy_type": "indicator_threshold"},
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 0.0,
+                        "benchmark_return_pct": 8.9,
+                    },
+                    "efficiency": {"total_trades": 0},
+                }
+            },
+            "benchmark_metrics": {"aggregate": {"total_return_pct": 8.9}},
+        },
+        "explanation_context": {
+            "strategy_type": "indicator_threshold",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 0.0,
+                        "benchmark_return_pct": 8.9,
+                    },
+                    "efficiency": {"total_trades": 0},
+                }
+            },
+            "benchmark_metrics": {"aggregate": {"total_return_pct": 8.9}},
+            "assumptions": ["Starting capital: $1,000.", "Benchmark: SPY."],
+        },
+    }
+
+    result = explain_stage(state=state)
+    text = result.patch["assistant_response"]
+
+    assert "returned 0.0%" in text
+    assert "no position was opened" in text
+    assert "Next check" in text
+    assert "stayed in cash" in text
+
+
 def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     state = RunState.new(current_user_message="why", recent_thread_history=[])
     state.effective_response_profile = ResponseProfile(
@@ -978,9 +1320,9 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     result = explain_stage(state=state)
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("Here is the readout.")
+    assert result.patch["assistant_response"].startswith("**Readout**")
     assert (
-        "I tested the confirmed strategy: Test a Tesla pullback idea."
+        "**Test:** the confirmed strategy: Test a Tesla pullback idea."
         in result.patch["assistant_response"]
     )
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
@@ -1020,16 +1362,14 @@ def test_explain_stage_varies_with_expertise_mode() -> None:
     beginner_result = explain_stage(state=beginner_state)
     advanced_result = explain_stage(state=advanced_state)
 
-    assert not beginner_result.patch["assistant_response"].startswith(
-        "Here is the readout."
-    )
+    assert beginner_result.patch["assistant_response"].startswith("**Readout**")
     assert (
-        "simple benchmark comparison"
+        "evidence check"
         in beginner_result.patch["assistant_response"].lower()
     )
-    assert "caveat:" in beginner_result.patch["assistant_response"].lower()
+    assert "**caveat:**" in beginner_result.patch["assistant_response"].lower()
     assert "return comparison only" in advanced_result.patch["assistant_response"].lower()
-    assert "caveat:" in advanced_result.patch["assistant_response"].lower()
+    assert "**caveat:**" in advanced_result.patch["assistant_response"].lower()
 
 
 def test_explain_stage_uses_same_period_only_when_context_supports_it() -> None:

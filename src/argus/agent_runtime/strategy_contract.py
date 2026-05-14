@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
@@ -11,6 +10,7 @@ SUPPORTED_STRATEGY_TYPES = {
     "buy_and_hold",
     "dca_accumulation",
     "indicator_threshold",
+    "signal_strategy",
 }
 
 MONTH_ALIASES = {
@@ -72,6 +72,7 @@ def canonical_strategy_type(
     exit_logic: Any = None,
     cadence: Any = None,
 ) -> str:
+    del entry_logic, exit_logic
     normalized = _normalize_token(raw_type)
     aliases = {
         "buy_hold": "buy_and_hold",
@@ -93,18 +94,24 @@ def canonical_strategy_type(
         "indicator": "indicator_threshold",
         "indicator_threshold": "indicator_threshold",
         "rule_based": "indicator_threshold",
+        "signal": "signal_strategy",
+        "signal_strategy": "signal_strategy",
+        "moving_average_crossover": "signal_strategy",
+        "ma_crossover": "signal_strategy",
+        "golden_cross": "signal_strategy",
+        "death_cross": "signal_strategy",
     }
     if normalized in aliases:
         return aliases[normalized]
     if _has_value(cadence):
         return "dca_accumulation"
-    if _has_value(entry_logic) or _has_value(exit_logic):
-        return "indicator_threshold"
     return normalized
 
 
 def executable_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     payload = _strategy_payload(strategy)
+    if _has_structured_moving_average_rule(payload):
+        return "signal_strategy"
     return canonical_strategy_type(
         payload.get("strategy_type"),
         entry_logic=payload.get("entry_logic"),
@@ -130,6 +137,8 @@ def strategy_can_be_approved(strategy: StrategySummary | dict[str, Any]) -> bool
         return _has_value(payload.get("entry_logic")) and _has_value(
             payload.get("exit_logic")
         )
+    if strategy_type == "signal_strategy":
+        return _has_executable_signal_rule(payload)
     return True
 
 
@@ -166,9 +175,9 @@ def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
         "buy_and_hold": "Buy and Hold",
         "dca_accumulation": "Recurring Buys",
         "indicator_threshold": "Indicator Threshold",
+        "signal_strategy": "Signal Strategy",
     }
     return labels.get(canonical, str(raw_type or "Strategy").replace("_", " ").title())
-
 
 def display_strategy_slug(strategy: StrategySummary | dict[str, Any]) -> str:
     return display_strategy_type(strategy).lower()
@@ -189,6 +198,9 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
             )
 
     if isinstance(value, str):
+        explicit = _explicit_iso_range(value)
+        if explicit is not None:
+            return explicit
         normalized = _normalize_period_text(value)
         if normalized in {"since_ipo", "since ipo", "max_available", "maximum available"}:
             return DateRangeResolution(
@@ -208,9 +220,6 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         relative = _relative_period(normalized, today=current_date)
         if relative is not None:
             return relative
-        explicit = _explicit_iso_range(normalized)
-        if explicit is not None:
-            return explicit
         natural_explicit = _explicit_natural_range(normalized)
         if natural_explicit is not None:
             return natural_explicit
@@ -230,17 +239,7 @@ def normalize_date_range_candidate(
     raw_user_phrasing: str | None = None,
     today: date | None = None,
 ) -> Any:
-    current_date = today or date.today()
-    raw_period = _date_range_from_raw_phrase(raw_user_phrasing, today=current_date)
-    if raw_period is not None:
-        return raw_period
-    if isinstance(raw_user_phrasing, str):
-        raw_period_label = _extract_period_label_from_raw_phrase(
-            raw_user_phrasing,
-            today=current_date,
-        )
-        if raw_period_label is not None:
-            return raw_period_label
+    del raw_user_phrasing, today
     if isinstance(value, dict):
         return {
             key: nested_value
@@ -263,13 +262,21 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
 def _normalize_token(value: Any) -> str:
     if not isinstance(value, str):
         return ""
-    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    parts: list[str] = []
+    previous_was_separator = True
+    for char in value.strip().lower():
+        if char.isalnum():
+            parts.append(char)
+            previous_was_separator = False
+            continue
+        if not previous_was_separator:
+            parts.append("_")
+            previous_was_separator = True
+    return "".join(parts).strip("_")
 
 
 def _normalize_period_text(value: str) -> str:
-    normalized = value.strip().lower()
-    normalized = normalized.replace("-", "_")
-    normalized = re.sub(r"\s+", " ", normalized)
+    normalized = _tokens_to_text(value)
     return _normalize_period_number_words(normalized)
 
 
@@ -286,14 +293,27 @@ def _normalize_period_number_words(value: str) -> str:
         "nine": "9",
         "ten": "10",
     }
-    normalized = value
-    for word, digit in number_words.items():
-        normalized = re.sub(
-            rf"\b{word}\b(?=\s+(?:day|days|week|weeks|month|months|year|years))",
-            digit,
-            normalized,
-        )
-    return normalized
+    period_units = {
+        "day",
+        "days",
+        "week",
+        "weeks",
+        "month",
+        "months",
+        "quarter",
+        "quarters",
+        "year",
+        "years",
+    }
+    tokens = _tokens(value)
+    normalized: list[str] = []
+    for index, token in enumerate(tokens):
+        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
+        if token in number_words and next_token in period_units:
+            normalized.append(number_words[token])
+        else:
+            normalized.append(token)
+    return " ".join(normalized)
 
 
 def _has_value(value: Any) -> bool:
@@ -302,6 +322,36 @@ def _has_value(value: Any) -> bool:
     if isinstance(value, list):
         return bool(value)
     return True
+
+
+def _has_structured_moving_average_rule(payload: dict[str, Any]) -> bool:
+    for field_name in ("entry_rule", "exit_rule"):
+        rule = payload.get(field_name)
+        if isinstance(rule, dict) and rule.get("type") == "moving_average_crossover":
+            return True
+    extra_parameters = payload.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return False
+    for field_name in ("entry_rule", "exit_rule"):
+        rule = extra_parameters.get(field_name)
+        if isinstance(rule, dict) and rule.get("type") == "moving_average_crossover":
+            return True
+    return False
+
+
+def _has_executable_signal_rule(payload: dict[str, Any]) -> bool:
+    if isinstance(payload.get("entry_rule"), dict) and payload["entry_rule"]:
+        return True
+    if isinstance(payload.get("rule_spec"), dict) and payload["rule_spec"]:
+        return True
+    extra_parameters = payload.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return False
+    return any(
+        isinstance(extra_parameters.get(field_name), dict)
+        and bool(extra_parameters[field_name])
+        for field_name in ("entry_rule", "rule_spec")
+    )
 
 
 def _parse_iso_date(value: Any) -> date | None:
@@ -328,93 +378,18 @@ def _parse_date_token(value: Any, *, today: date) -> date | None:
     return None
 
 
-def _date_range_from_raw_phrase(
-    raw_user_phrasing: str | None,
-    *,
-    today: date,
-) -> dict[str, str] | None:
-    if not isinstance(raw_user_phrasing, str) or not raw_user_phrasing.strip():
-        return None
-    normalized = raw_user_phrasing.lower()
-    normalized = re.sub(r"[^a-z0-9\s]+", " ", normalized)
-    normalized = re.sub(r"\s+", " ", normalized).strip()
-    normalized = _normalize_period_number_words(normalized)
-    starts_at_last_year_january = re.search(
-        r"\b(?:jan(?:uary)?\s*(?:1|first)|beginning of)\s+last year\b",
-        normalized,
-    )
-    ends_at_current_date = re.search(
-        r"\b(?:to date|through today|until today|to today|to now|through now)\b",
-        normalized,
-    )
-    if starts_at_last_year_january and ends_at_current_date:
-        return {"start": date(today.year - 1, 1, 1).isoformat(), "end": "today"}
-    natural_explicit = _explicit_natural_range(normalized)
-    if natural_explicit is not None:
-        return {
-            "start": natural_explicit.start.isoformat(),
-            "end": natural_explicit.end.isoformat(),
-        }
-    return None
-
-
-def _extract_period_label_from_raw_phrase(
-    raw_user_phrasing: str,
-    *,
-    today: date,
-) -> str | None:
-    del today
-    normalized = raw_user_phrasing.lower()
-    normalized = re.sub(r"[^a-z0-9\s]+", " ", normalized)
-    normalized = re.sub(r"\s+", " ", normalized).strip()
-    normalized = _normalize_period_number_words(normalized)
-    since_match = re.search(r"\bsince (?P<year>\d{4})\b", normalized)
-    if since_match is not None:
-        return f"since {since_match.group('year')}"
-    ytd_match = re.search(r"\b(?:ytd|year to date)\b", normalized)
-    if ytd_match is not None:
-        return "year_to_date"
-    if re.search(
-        r"\bsince (?:ipo|public listing)\b|\bmax(?:imum)? available\b", normalized
-    ):
-        return "since_ipo"
-    if re.search(r"\b(?:past|last) year\b", normalized):
-        return "past year"
-    relative_match = re.search(
-        r"\b(?:past|last) (?P<count>\d+) "
-        r"(?P<unit>day|days|week|weeks|month|months|year|years)\b",
-        normalized,
-    )
-    if relative_match is not None:
-        return relative_match.group(0)
-    singular_relative_match = re.search(
-        r"\b(?:past|last) (?P<unit>day|week|month|quarter)\b",
-        normalized,
-    )
-    if singular_relative_match is not None:
-        return singular_relative_match.group(0)
-    ago_to_now_match = re.search(
-        r"\b(?P<count>\d+) "
-        r"(?P<unit>day|days|week|weeks|month|months|year|years) ago "
-        r"(?:to|through|until|till) (?:now|today|present)\b",
-        normalized,
-    )
-    if ago_to_now_match is not None:
-        count = ago_to_now_match.group("count")
-        unit = ago_to_now_match.group("unit")
-        return f"past {count} {unit}"
-    return None
-
-
 def _explicit_iso_range(value: str) -> DateRangeResolution | None:
-    match = re.fullmatch(
-        r"(?P<start>\d{4}-\d{2}-\d{2})\s+(?:to|through|until)\s+(?P<end>\d{4}-\d{2}-\d{2})",
-        value,
-    )
-    if match is None:
-        return None
-    start = _parse_iso_date(match.group("start"))
-    end = _parse_iso_date(match.group("end"))
+    collapsed = _collapse_spaces(value.lower())
+    start: date | None = None
+    end: date | None = None
+    for connector in (" to ", " through ", " until ", " till "):
+        if connector not in collapsed:
+            continue
+        start_text, end_text = collapsed.split(connector, 1)
+        start = _parse_iso_date(start_text.strip())
+        end = _parse_iso_date(end_text.strip())
+        if start is not None and end is not None:
+            break
     if start is None or end is None:
         return None
     return DateRangeResolution(
@@ -425,29 +400,31 @@ def _explicit_iso_range(value: str) -> DateRangeResolution | None:
 
 
 def _explicit_natural_range(value: str) -> DateRangeResolution | None:
-    match = re.search(
-        r"(?P<start_month>[a-z]{3,9})\s+"
-        r"(?P<start_day>\d{1,2}|first)\s+"
-        r"(?P<start_year>\d{4})\s+"
-        r"(?:to|through|until|till|-)\s+"
-        r"(?P<end_month>[a-z]{3,9})\s+"
-        r"(?P<end_day>\d{1,2}|first)\s+"
-        r"(?P<end_year>\d{4})",
-        value,
-    )
-    if match is None:
-        return None
-    groups = match.groupdict()
-    start = _build_natural_date(
-        groups.get("start_month"),
-        groups.get("start_day"),
-        groups.get("start_year"),
-    )
-    end = _build_natural_date(
-        groups.get("end_month"),
-        groups.get("end_day"),
-        groups.get("end_year"),
-    )
+    tokens = _tokens(value)
+    start: date | None = None
+    end: date | None = None
+    connectors = {"to", "through", "until", "till"}
+    for index in range(0, max(len(tokens) - 5, 0)):
+        candidate_start = _build_natural_date(
+            tokens[index],
+            tokens[index + 1],
+            tokens[index + 2],
+        )
+        if candidate_start is None:
+            continue
+        end_index = index + 4 if tokens[index + 3] in connectors else index + 3
+        if end_index + 2 >= len(tokens):
+            continue
+        candidate_end = _build_natural_date(
+            tokens[end_index],
+            tokens[end_index + 1],
+            tokens[end_index + 2],
+        )
+        if candidate_end is None:
+            continue
+        start = candidate_start
+        end = candidate_end
+        break
     if start is None or end is None:
         return None
     return DateRangeResolution(
@@ -458,17 +435,10 @@ def _explicit_natural_range(value: str) -> DateRangeResolution | None:
 
 
 def _parse_natural_date(value: str) -> date | None:
-    match = re.fullmatch(
-        r"(?P<month>[a-z]{3,9})\s+(?P<day>\d{1,2}|first)\s+(?P<year>\d{4})",
-        value.strip().lower(),
-    )
-    if match is None:
+    tokens = _tokens(value)
+    if len(tokens) != 3:
         return None
-    return _build_natural_date(
-        match.group("month"),
-        match.group("day"),
-        match.group("year"),
-    )
+    return _build_natural_date(tokens[0], tokens[1], tokens[2])
 
 
 def _build_natural_date(
@@ -508,10 +478,10 @@ def _year_to_date(value: str, *, today: date) -> DateRangeResolution | None:
 
 
 def _since_year(value: str, *, today: date) -> DateRangeResolution | None:
-    match = re.fullmatch(r"since (?P<year>\d{4})", value)
-    if match is None:
+    tokens = _tokens(value)
+    if len(tokens) != 2 or tokens[0] != "since" or not _is_four_digit_year(tokens[1]):
         return None
-    year = int(match.group("year"))
+    year = int(tokens[1])
     return DateRangeResolution(
         label=f"since {year}",
         start=date(year, 1, 1),
@@ -533,7 +503,8 @@ def _beginning_last_year(value: str, *, today: date) -> DateRangeResolution | No
 
 
 def _relative_period(value: str, *, today: date) -> DateRangeResolution | None:
-    if value in {"past_year", "last_year", "past year", "last year"}:
+    tokens = _tokens(value)
+    if tokens in (["past", "year"], ["last", "year"]):
         return DateRangeResolution(
             label="past year",
             start=_add_months(today, -12),
@@ -549,7 +520,7 @@ def _relative_period(value: str, *, today: date) -> DateRangeResolution | None:
         "past quarter": ("quarter", 1),
         "last quarter": ("quarter", 1),
     }
-    singular_period = singular_periods.get(value)
+    singular_period = singular_periods.get(" ".join(tokens))
     if singular_period is not None:
         unit, count = singular_period
         return DateRangeResolution(
@@ -558,23 +529,143 @@ def _relative_period(value: str, *, today: date) -> DateRangeResolution | None:
             end=today,
         )
 
-    patterns = [
-        r"(?:over the )?(?:past|last) (?P<count>\d+) (?P<unit>day|days|week|weeks|month|months|quarter|quarters|year|years)",
-        r"(?:past|last)_(?P<count>\d+)_(?P<unit>day|days|week|weeks|month|months|quarter|quarters|year|years)",
-        r"(?P<count>\d+)\s*(?P<unit>d|w|m|mo|q|y)",
-    ]
-    for pattern in patterns:
-        match = re.fullmatch(pattern, value)
-        if match is None:
-            continue
-        count = int(match.group("count"))
-        unit = match.group("unit")
+    relative_label = _extract_relative_period_label(tokens)
+    if relative_label is not None:
+        parts = relative_label.split()
+        if len(parts) == 2:
+            _, unit = parts
+            return DateRangeResolution(
+                label=_relative_label(count=1, unit=unit),
+                start=_subtract_period(today, count=1, unit=unit),
+                end=today,
+            )
+        if len(parts) != 3 or not parts[1].isdigit():
+            return None
+        count = int(parts[1])
+        unit = parts[2]
+        return DateRangeResolution(
+            label=_relative_label(count=count, unit=unit),
+            start=_subtract_period(today, count=count, unit=unit),
+            end=today,
+        )
+
+    compact = _split_compact_period_token(value)
+    if compact is not None:
+        count, unit = compact
         return DateRangeResolution(
             label=_relative_label(count=count, unit=unit),
             start=_subtract_period(today, count=count, unit=unit),
             end=today,
         )
     return None
+
+
+def _tokens(value: Any) -> list[str]:
+    if not isinstance(value, str):
+        return []
+    tokens: list[str] = []
+    current: list[str] = []
+    for char in value.lower():
+        if char.isalnum():
+            current.append(char)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
+
+
+def _tokens_to_text(value: str) -> str:
+    return " ".join(_tokens(value))
+
+
+def _collapse_spaces(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _contains_any_phrase(value: str, phrases: set[str]) -> bool:
+    return any(_contains_phrase(value, phrase) for phrase in phrases)
+
+
+def _contains_phrase(value: str, phrase: str) -> bool:
+    tokens = _tokens(value)
+    phrase_tokens = _tokens(phrase)
+    if not phrase_tokens:
+        return False
+    if len(phrase_tokens) > len(tokens):
+        return False
+    for index in range(0, len(tokens) - len(phrase_tokens) + 1):
+        if tokens[index : index + len(phrase_tokens)] == phrase_tokens:
+            return True
+    return False
+
+
+def _find_since_year(tokens: list[str]) -> str | None:
+    for index, token in enumerate(tokens[:-1]):
+        if token == "since" and _is_four_digit_year(tokens[index + 1]):
+            return tokens[index + 1]
+    return None
+
+
+def _extract_relative_period_label(tokens: list[str]) -> str | None:
+    period_units = {
+        "day",
+        "days",
+        "week",
+        "weeks",
+        "month",
+        "months",
+        "quarter",
+        "quarters",
+        "year",
+        "years",
+    }
+    singular_units = {"day", "week", "month", "quarter", "year"}
+    for index, token in enumerate(tokens):
+        if token not in {"past", "last"}:
+            continue
+        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
+        following_token = tokens[index + 2] if index + 2 < len(tokens) else None
+        if next_token is not None and next_token.isdigit() and following_token in period_units:
+            return f"{token} {next_token} {following_token}"
+        if next_token in singular_units:
+            return f"{token} {next_token}"
+    return None
+
+
+def _extract_ago_to_now_label(tokens: list[str]) -> tuple[str, str] | None:
+    units = {"day", "days", "week", "weeks", "month", "months", "year", "years"}
+    connectors = {"to", "through", "until", "till"}
+    endpoints = {"now", "today", "present"}
+    for index in range(0, max(len(tokens) - 4, 0)):
+        count = tokens[index]
+        unit = tokens[index + 1]
+        if not count.isdigit() or unit not in units or tokens[index + 2] != "ago":
+            continue
+        if tokens[index + 3] in connectors and tokens[index + 4] in endpoints:
+            return count, unit
+    return None
+
+
+def _split_compact_period_token(value: str) -> tuple[int, str] | None:
+    tokens = _tokens(value)
+    if len(tokens) != 1:
+        return None
+    token = tokens[0]
+    unit_aliases = ("mo", "d", "w", "m", "q", "y")
+    for unit in unit_aliases:
+        if not token.endswith(unit):
+            continue
+        count_text = token[: -len(unit)]
+        if count_text.isdigit():
+            return int(count_text), unit
+    return None
+
+
+def _is_four_digit_year(value: str) -> bool:
+    return len(value) == 4 and value.isdigit()
 
 
 def _relative_label(*, count: int, unit: str) -> str:

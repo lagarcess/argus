@@ -281,7 +281,12 @@ export function resultCardFromConversationCard(
 }
 
 export function resultCardFromRun(run: BacktestRun) {
-  return resultCardFromConversationCard(run.conversation_result_card, run);
+  return {
+    ...resultCardFromConversationCard(run.conversation_result_card, run),
+    symbols: run.symbols,
+    template: String(run.config_snapshot?.template ?? ""),
+    assetClass: run.asset_class,
+  };
 }
 
 export function normalizeApiLanguage(language?: string | null): ApiLanguage {
@@ -383,7 +388,8 @@ export async function patchMe(patch: ProfilePatch) {
 }
 
 export async function getStarterPrompts() {
-  return apiFetch<string[]>("/onboarding/starter-prompts");
+  const response = await apiFetch<{ prompts: string[] }>("/chat/starter-prompts");
+  return response.prompts;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -579,6 +585,10 @@ export async function runBacktest(payload: {
     },
     body: JSON.stringify(payload),
   });
+}
+
+export async function getBacktestRun(runId: string) {
+  return apiFetch<{ run: BacktestRun }>(`/backtests/${runId}`);
 }
 
 // ─── Chat stream ──────────────────────────────────────────────────────────────

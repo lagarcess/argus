@@ -24,7 +24,9 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
+  const [copyFeedback, setCopyFeedback] = useState<"success" | "failed" | null>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
+  const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toggleOptions = (e: React.MouseEvent) => {
     if (!showOptions) {
@@ -63,6 +65,14 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
     };
   }, [showOptions]);
 
+  useEffect(() => {
+    return () => {
+      if (copyFeedbackTimeoutRef.current) {
+        clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleRating = (newRating: "positive" | "negative") => {
     if (rating === newRating) {
       setRating(null);
@@ -80,13 +90,62 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
   };
 
   const getCopyText = () => {
+    if (message.copyText) {
+      return message.copyText;
+    }
     if (message.kind === "strategy_result" && message.result) {
+      if (message.result.copyText) {
+        return message.result.copyText;
+      }
       const rows = message.result.metrics.map((metric) => `${metric.label}: ${metric.value}`);
-      const header = `${message.result.strategyName} (${message.result.period})`;
-      const note = message.result.benchmarkNote ? `\n${message.result.benchmarkNote}` : "";
-      return `${header}\n${rows.join("\n")}${note}`;
+      const symbols = message.result.symbols?.length
+        ? `Symbols: ${message.result.symbols.join(", ")}`
+        : null;
+      const assumptions = message.result.assumptions?.length
+        ? `Assumptions: ${message.result.assumptions.join(" • ")}`
+        : null;
+      return [
+        message.result.strategyName,
+        symbols,
+        `Period: ${message.result.period}`,
+        rows.join("\n"),
+        message.result.benchmarkNote,
+        assumptions,
+        message.content ? `Assistant explanation:\n${message.content}` : null,
+      ].filter(Boolean).join("\n");
+    }
+    if (message.kind === "strategy_confirmation" && message.confirmation) {
+      if (message.confirmation.copyText) {
+        return message.confirmation.copyText;
+      }
+      const rows = message.confirmation.rows.map((row) => `${row.label}: ${row.value}`);
+      const assumptions = message.confirmation.assumptions?.length
+        ? `Assumptions: ${message.confirmation.assumptions.join(" • ")}`
+        : null;
+      return [
+        message.confirmation.title,
+        message.confirmation.summary,
+        rows.join("\n"),
+        assumptions,
+      ].filter(Boolean).join("\n");
     }
     return message.content ?? "";
+  };
+
+  const handleCopy = async (text = getCopyText()) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback("success");
+    } catch {
+      setCopyFeedback("failed");
+    }
+    if (copyFeedbackTimeoutRef.current) {
+      clearTimeout(copyFeedbackTimeoutRef.current);
+    }
+    copyFeedbackTimeoutRef.current = setTimeout(() => {
+      setCopyFeedback(null);
+      copyFeedbackTimeoutRef.current = null;
+    }, 2000);
   };
 
   const getDisplayContent = () => {
@@ -126,7 +185,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
       {!isUser && !isStreaming && (
         <button
           onClick={() => {
-            navigator.clipboard.writeText(getCopyText());
+            void handleCopy();
           }}
           className="absolute -left-10 top-1 opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black dark:text-white"
           title={t('chat.copy_plaintext')}
@@ -134,23 +193,30 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
           <Copy className="w-4 h-4" />
         </button>
       )}
+      {!isUser && !isStreaming && copyFeedback && (
+        <span
+          role="status"
+          aria-live="polite"
+          className="absolute -left-12 top-10 rounded-full border border-black/10 bg-white px-2.5 py-1 text-[11px] font-medium text-black/70 dark:border-white/10 dark:bg-[#1f2225] dark:text-white/70"
+        >
+          {t(copyFeedback === "success" ? "chat.copy_success" : "chat.copy_failed")}
+        </span>
+      )}
       <div className="flex flex-col max-w-[85%]">
         <div className="flex flex-col mt-1.5">
           {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard result={message.result} onAction={onAction} />
               {message.content && (
-                <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {message.content}
-                  </ReactMarkdown>
-                </div>
+                <ResultReadout content={message.content} />
               )}
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
             <div className="w-full max-w-[min(100%,660px)]">
-              <StrategyConfirmationCard confirmation={message.confirmation} />
+              <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
             </div>
+          ) : message.contentPresentation === "result_breakdown" ? (
+            <ResultBreakdown content={message.content ?? ""} />
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -212,14 +278,14 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
                   <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                      onClick={() => { navigator.clipboard.writeText(getCopyText()); setShowOptions(false); }}
+                      onClick={() => { void handleCopy(); setShowOptions(false); }}
                     >
                       <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
                       {t('chat.copy_plaintext')}
                     </button>
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                      onClick={() => { navigator.clipboard.writeText(message.id); setShowOptions(false); }}
+                      onClick={() => { void handleCopy(message.id); setShowOptions(false); }}
                     >
                       <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
                       {t('chat.copy_id')}
@@ -240,6 +306,32 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
         </div>
       </div>
     </div>
+  );
+}
+
+function ResultReadout({ content }: { content: string }) {
+  return (
+    <section
+      className="argus-result-readout prose dark:prose-invert max-w-none"
+      aria-label="Result readout"
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {content}
+      </ReactMarkdown>
+    </section>
+  );
+}
+
+function ResultBreakdown({ content }: { content: string }) {
+  return (
+    <section
+      className="argus-result-breakdown prose dark:prose-invert max-w-none"
+      aria-label="Result breakdown"
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {content}
+      </ReactMarkdown>
+    </section>
   );
 }
 

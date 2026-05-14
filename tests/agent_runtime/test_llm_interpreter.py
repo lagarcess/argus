@@ -84,6 +84,113 @@ def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
     assert "Kraken" in prompt
 
 
+def test_llm_interpreter_maps_indicator_threshold_fields_to_strategy_parameters(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        user_goal_summary="User supplied RSI thresholds.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Use RSI: enter at 20 and exit at 60.",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Use RSI thresholds for TSLA.",
+            asset_universe=["TSLA"],
+            indicator="rsi",
+            entry_threshold=20,
+            exit_threshold=60,
+            date_range="past 3 months",
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Use RSI: enter at 20 and exit at 60.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    parameters = result.candidate_strategy_draft.extra_parameters[
+        "indicator_parameters"
+    ]
+    assert parameters["indicator"] == "rsi"
+    assert parameters["entry_threshold"] == 20
+    assert parameters["exit_threshold"] == 60
+
+
+def test_llm_interpreter_promotes_typed_indicator_values_from_extra_parameters(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        user_goal_summary="User supplied RSI thresholds.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Use RSI entry 20 exit 60.",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Use RSI thresholds for TSLA.",
+            asset_universe=["TSLA"],
+            date_range="past 3 months",
+            indicator="rsi",
+            extra_parameters={
+                "entry_threshold": 20,
+                "exit_threshold": 60,
+                "field_provenance": {
+                    "entry_threshold": "user",
+                    "exit_threshold": "user",
+                },
+                "indicator_parameters": {
+                    "indicator": "rsi",
+                    "entry_threshold": 30,
+                    "exit_threshold": 55,
+                },
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Use RSI entry 20 exit 60.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    parameters = strategy.extra_parameters["indicator_parameters"]
+    assert parameters["entry_threshold"] == 20.0
+    assert parameters["exit_threshold"] == 60.0
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 20 or below"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 60 or above"
+
+
 def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -216,7 +323,7 @@ def test_llm_system_prompt_owns_phase_three_extraction_rules() -> None:
     )._system_prompt()
 
     assert "Extract symbols, company names, crypto assets, and currency pairs" in prompt
-    assert "Do not rely on backend regex extraction" in prompt
+    assert "Do not rely on backend text-pattern extraction" in prompt
     assert "date_range" in prompt
     assert "cadence" in prompt
     assert "semantic_turn_act is the routing source of truth" in prompt
@@ -225,7 +332,7 @@ def test_llm_system_prompt_owns_phase_three_extraction_rules() -> None:
     assert "educational" in prompt.lower()
 
 
-def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(
+def test_llm_interpreter_treats_moving_average_crossover_as_executable_signal(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -251,6 +358,14 @@ def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(
             strategy_thesis="Buy Nvidia on a 50/200 moving-average crossover.",
             asset_universe=["NVDA"],
             entry_logic="50-day moving average crosses above the 200-day moving average",
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
         ),
     )
 
@@ -269,7 +384,11 @@ def test_llm_interpreter_marks_moving_average_crossover_as_unsupported(
     assert result.candidate_strategy_draft.entry_logic == (
         "50-day moving average crosses above the 200-day moving average"
     )
-    assert result.unsupported_constraints[0].category == "unsupported_indicator_rule"
+    assert result.candidate_strategy_draft.strategy_type == "signal_strategy"
+    assert result.candidate_strategy_draft.exit_logic == (
+        "50-day SMA crosses below 200-day SMA"
+    )
+    assert result.unsupported_constraints == []
 
 
 def test_llm_interpreter_humanizes_unsupported_simplification_labels(monkeypatch) -> None:
@@ -287,18 +406,18 @@ def test_llm_interpreter_humanizes_unsupported_simplification_labels(monkeypatch
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
-        user_goal_summary="Buy Nvidia on a 50/200 moving-average crossover.",
+        user_goal_summary="Buy Nvidia when MACD crosses above its signal line.",
         candidate_strategy_draft=LLMStrategyDraft(
             strategy_type="indicator_threshold",
-            strategy_thesis="Buy Nvidia on a 50/200 moving-average crossover.",
+            strategy_thesis="Buy Nvidia when MACD crosses above its signal line.",
             asset_universe=["NVDA"],
-            entry_logic="50-day moving average crosses above the 200-day moving average",
+            entry_logic="MACD crosses above its signal line",
         ),
         unsupported_constraints=[
             interpreter_module.LLMUnsupportedConstraint(
                 category="unsupported_indicator_rule",
-                raw_value="50/200 moving-average crossover",
-                explanation="Moving-average crossovers are not directly executable.",
+                raw_value="MACD signal-line crossover",
+                explanation="MACD signal-line crossovers are not directly executable.",
                 simplification_labels=["rsi_preset", "buy_and_hold", "dca_accumulation"],
             )
         ],
@@ -308,7 +427,7 @@ def test_llm_interpreter_humanizes_unsupported_simplification_labels(monkeypatch
         response,
         request=InterpretationRequest(
             current_user_message=(
-                "Buy Nvidia when its 50-day moving average crosses above the 200-day"
+                "Buy Nvidia when MACD crosses above its signal line."
             ),
             recent_thread_history=[],
             latest_task_snapshot=None,
@@ -353,6 +472,8 @@ def test_llm_interpreter_drops_stale_unsupported_copy_for_executable_rsi_thresho
             asset_universe=["AAPL"],
             date_range="last two years",
             entry_logic="RSI drops below 40",
+            indicator="rsi",
+            entry_threshold=40,
         ),
         unsupported_constraints=[
             interpreter_module.LLMUnsupportedConstraint(
@@ -386,7 +507,7 @@ def test_llm_interpreter_drops_stale_unsupported_copy_for_executable_rsi_thresho
 
     strategy = result.candidate_strategy_draft
     assert result.unsupported_constraints == []
-    assert strategy.entry_logic == "RSI drops below 40"
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 40 or below"
     assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
 
 
@@ -518,7 +639,7 @@ def test_llm_interpreter_accepts_structured_date_ranges(monkeypatch) -> None:
             strategy_type="buy_and_hold",
             strategy_thesis="Buy and hold Bitcoin from January 1 last year to date.",
             asset_universe=["BTC"],
-            date_range={"start": "2024-01-01", "end": "today"},
+            date_range={"start": "2025-01-01", "end": "today"},
         ),
     )
 
@@ -566,9 +687,10 @@ def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
             strategy_thesis="Invest $500 in Bitcoin every month since 2021.",
             asset_universe=["BTC"],
             asset_class="crypto",
-            date_range="past year",
+            date_range="since 2021",
             cadence="monthly",
             capital_amount=500,
+            field_provenance={"capital_amount": "recurring_contribution"},
         ),
     )
 
@@ -703,7 +825,7 @@ def test_llm_interpreter_preserves_actual_user_phrasing_when_model_rewrites_it(
             raw_user_phrasing="buy and hold on BTC from jan first last 1 year to date",
             strategy_type="buy_and_hold",
             asset_universe=["BTC"],
-            date_range={"start": "2024-01-01", "end": "present"},
+            date_range={"start": "2025-01-01", "end": "today"},
             capital_amount=10000,
             comparison_baseline="BTC",
         ),

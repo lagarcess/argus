@@ -128,7 +128,11 @@
     "more_actions": "More Actions",
     "copy_plaintext": "Copy Plaintext",
     "copy_id": "Copy ID",
+    "copy_success": "Copied",
+    "copy_failed": "Copy failed",
     "report_issue": "Report Issue",
+    "saved": "Saved",
+    "saving": "Saving",
     "simulation_complete": "Simulation Complete",
       "status": {
         "understanding": "Thinking...",

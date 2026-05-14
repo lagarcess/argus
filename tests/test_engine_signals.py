@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 from argus.domain.engine import _build_signals, build_result_card, compute_alpha_metrics
 
 
@@ -116,3 +117,24 @@ def test_buy_and_hold_signals():
     assert not entries.iloc[1:].any()
     # Zero exits — hold through end_date
     assert exits.sum() == 0
+
+
+def test_rsi_warmup_short_window_raises_data_insufficient() -> None:
+    index = pd.date_range("2024-01-01", periods=10, freq="D")
+    data = pd.DataFrame(
+        {
+            "open": range(100, 110),
+            "high": range(101, 111),
+            "low": range(99, 109),
+            "close": range(100, 110),
+            "volume": [1_000_000] * 10,
+        },
+        index=index,
+    )
+    config = {
+        "template": "rsi_mean_reversion",
+        "parameters": {"indicator_period": 14},
+    }
+
+    with pytest.raises(ValueError, match="indicator_data_insufficient"):
+        _build_signals(config, data)

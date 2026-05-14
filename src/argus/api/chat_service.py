@@ -28,7 +28,11 @@ from argus.api.chat.recovery import (
 )
 from argus.api.schemas import BacktestRun, ChatStreamRequest, Conversation, Strategy, User
 from argus.domain.engine import classify_symbol, default_benchmark
-from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
+from argus.llm.openrouter import (
+    build_openrouter_model,
+    invoke_openrouter_json_schema_sync,
+    log_openrouter_failure,
+)
 
 __all__ = [
     "Any",
@@ -424,10 +428,14 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
     return _breakdown.result_breakdown_context(run)
 
 
-def llm_result_breakdown_message(context: dict[str, Any]) -> str | None:
+def llm_result_breakdown_message(
+    context: dict[str, Any],
+    *,
+    invoke_json_schema_func=invoke_openrouter_json_schema_sync,
+) -> str | None:
     return _breakdown.llm_result_breakdown_message(
         context,
-        build_openrouter_model_func=build_openrouter_model,
+        invoke_json_schema_func=invoke_json_schema_func,
         log_openrouter_failure_func=log_openrouter_failure,
     )
 

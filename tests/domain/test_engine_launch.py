@@ -68,6 +68,49 @@ def test_launch_request_supports_three_strategy_types() -> None:
     assert threshold_request.strategy_type == "indicator_threshold"
 
 
+def test_launch_request_supports_signal_strategy_with_rule_spec() -> None:
+    rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "price", "field": "close"},
+                    "operator": "gt",
+                    "right": {"kind": "indicator", "key": "ema", "period": 20},
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "price", "field": "close"},
+                    "operator": "lt",
+                    "right": {"kind": "indicator", "key": "ema", "period": 20},
+                }
+            ]
+        },
+    }
+
+    request = LaunchBacktestRequest(
+        strategy_type="signal_strategy",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        rule_spec=rule_spec,
+        sizing_mode="capital_amount",
+        capital_amount=10000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    assert request.strategy_type == "signal_strategy"
+    assert request.rule_spec == rule_spec
+
+
 def test_launch_request_requires_matching_sizing_field() -> None:
     with pytest.raises(ValueError, match="capital_amount_required"):
         LaunchBacktestRequest(
@@ -517,7 +560,288 @@ def test_adapter_accepts_registry_bounded_indicator_threshold_shape(
     assert result.envelope.resolved_parameters["indicator"] == "rsi"
     assert result.envelope.resolved_parameters["entry_threshold"] == 25.0
     assert result.envelope.resolved_parameters["exit_threshold"] == 60.0
+    assert (
+        "Only the confirmed RSI threshold rule was simulated; no extra filters were added."
+        in result.envelope.caveats
+    )
+    assert not any(
+        "executable indicator registry" in caveat
+        for caveat in result.envelope.caveats
+    )
     assert captured["config"]["parameters"]["entry_threshold"] == 25.0
+    assert "rule_spec" in captured["config"]["parameters"]
+
+
+def test_adapter_uses_indicator_period_from_threshold_rules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="indicator_threshold",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule={
+            "indicator": "rsi",
+            "operator": "below",
+            "period": 7,
+            "threshold": 25,
+        },
+        exit_rule={
+            "indicator": "rsi",
+            "operator": "above",
+            "period": 7,
+            "threshold": 60,
+        },
+        sizing_mode="capital_amount",
+        capital_amount=10000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    captured: dict[str, object] = {}
+
+    def compute_metrics_stub(config: dict[str, object]) -> dict[str, object]:
+        captured["config"] = config
+        return {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 11.0,
+                    "benchmark_return_pct": 7.5,
+                }
+            },
+            "by_symbol": {},
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        compute_metrics_stub,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_card",
+        lambda config, metrics, language="en": {
+            "title": "TSLA RSI Mean Reversion",
+            "assumptions": [],
+            "rows": [],
+        },
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert result.envelope.resolved_parameters["indicator_period"] == 7
+    assert captured["config"]["parameters"]["indicator_period"] == 7
+    assert captured["config"]["parameters"]["rule_spec"]["entry"]["conditions"][0][
+        "left"
+    ]["period"] == 7
+
+
+def test_adapter_adds_no_trade_note_to_signal_result_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="indicator_threshold",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule={"indicator": "rsi", "operator": "below", "threshold": 20},
+        exit_rule={"indicator": "rsi", "operator": "above", "threshold": 60},
+        sizing_mode="capital_amount",
+        capital_amount=10000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        lambda config: {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 0.0,
+                    "benchmark_return_pct": 8.9,
+                },
+                "efficiency": {"total_trades": 0},
+            },
+            "by_symbol": {},
+        },
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_card",
+        lambda config, metrics, language="en": {
+            "title": "TSLA RSI Mean Reversion",
+            "assumptions": [],
+            "rows": [],
+        },
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert result.result_card is not None
+    assert (
+        "No entry trades were executed; the strategy stayed in cash because the "
+        "entry condition did not trigger in that window."
+    ) in result.result_card["assumptions"]
+
+
+def test_adapter_maps_common_crossover_payload_to_rule_spec(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="signal_strategy",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule={
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 20,
+            "slow_indicator": "sma",
+            "slow_period": 50,
+            "direction": "bullish",
+        },
+        exit_rule={
+            "type": "moving_average_crossover",
+            "fast_indicator": "sma",
+            "fast_period": 20,
+            "slow_indicator": "sma",
+            "slow_period": 50,
+            "direction": "bearish",
+        },
+        sizing_mode="capital_amount",
+        capital_amount=10000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    captured: dict[str, object] = {}
+
+    def compute_metrics_stub(config: dict[str, object]) -> dict[str, object]:
+        captured["config"] = config
+        return {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 11.0,
+                    "benchmark_return_pct": 7.5,
+                }
+            },
+            "by_symbol": {},
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        compute_metrics_stub,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_card",
+        lambda config, metrics, language="en": {
+            "title": "TSLA Signal Strategy",
+            "assumptions": [],
+            "rows": [],
+        },
+    )
+
+    result = run_launch_backtest(request)
+
+    config = captured["config"]
+    rule_spec = config["parameters"]["rule_spec"]
+    assert result.envelope.execution_status == "succeeded"
+    assert config["template"] == "signal_strategy"
+    assert rule_spec["entry"]["conditions"][0]["operator"] == "cross_above"
+    assert rule_spec["exit"]["conditions"][0]["operator"] == "cross_below"
+
+
+def test_adapter_classifies_rule_warmup_failure_as_invalid_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="signal_strategy",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-01-10"},
+        entry_rule=None,
+        exit_rule=None,
+        rule_spec={
+            "entry": {
+                "conditions": [
+                    {
+                        "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                        "operator": "lte",
+                        "right": 30,
+                    }
+                ]
+            },
+            "exit": {
+                "conditions": [
+                    {
+                        "left": {"kind": "indicator", "key": "rsi", "period": 14},
+                        "operator": "gte",
+                        "right": 55,
+                    }
+                ]
+            },
+        },
+        sizing_mode="capital_amount",
+        capital_amount=10000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        lambda config: (_ for _ in ()).throw(
+            ValueError("indicator_data_insufficient")
+        ),
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "blocked_invalid_input"
+    assert result.envelope.failure_category == "parameter_validation_error"
+    assert result.envelope.failure_reason == "indicator_data_insufficient"
 
 
 def test_adapter_maps_market_data_failure_to_upstream_dependency(

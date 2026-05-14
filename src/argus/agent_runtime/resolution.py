@@ -14,7 +14,7 @@ from argus.domain.indicators import (
     normalize_indicator_parameters,
     search_indicators,
 )
-from argus.domain.market_data import ResolvedAsset
+from argus.domain.market_data import ResolvedAsset, is_ticker_like_query
 from argus.domain.market_data import resolve_asset as resolve_market_asset
 from argus.domain.market_data import search_assets as search_market_assets
 
@@ -91,6 +91,16 @@ def resolve_asset_candidate(
             confidence="high",
         )
     except Exception:
+        if is_ticker_like_query(raw_text):
+            return _asset_resolution(
+                status="unsupported",
+                raw_text=raw_text,
+                field=field,
+                source=source,
+                asset=None,
+                candidates=(),
+                confidence="high",
+            )
         candidates = _search_assets_safely(raw_text, limit=5)
 
     unique = _unique_assets(candidates)

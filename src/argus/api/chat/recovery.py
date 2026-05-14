@@ -5,6 +5,10 @@ from typing import Any
 
 from loguru import logger
 
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_artifact_reference,
+    confirmation_id_from_payload,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     StrategySummary,
@@ -12,6 +16,10 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.api import state as api_state
+from argus.api.chat.artifacts import (
+    result_reference_from_run,
+    saved_strategy_metadata_from_sources,
+)
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import BacktestRun, Message
 
@@ -137,11 +145,27 @@ def confirmation_metadata_fallback_context(
             return RuntimeFallbackContext(
                 recovery_message=LOST_CONFIRMATION_STATE_MESSAGE
             )
+        card = metadata.get("confirmation_card")
+        confirmation_id = confirmation_id_from_payload(
+            payload,
+            fallback=(
+                str(card.get("confirmation_id"))
+                if isinstance(card, dict) and card.get("confirmation_id")
+                else None
+            ),
+        )
+        confirmation_reference = confirmation_artifact_reference(
+            confirmation_id=confirmation_id,
+            confirmation_payload=payload,
+            confirmation_card=card if isinstance(card, dict) else None,
+        )
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
                 latest_task_type="backtest_execution",
                 completed=False,
                 pending_strategy_summary=pending_strategy,
+                active_confirmation_reference=confirmation_reference,
+                artifact_references=[confirmation_reference],
                 last_unresolved_follow_up=(
                     pending_strategy.raw_user_phrasing
                     or pending_strategy.strategy_thesis
@@ -154,7 +178,7 @@ def confirmation_metadata_fallback_context(
                 "last_stage_outcome": "await_approval",
                 "fallback_source": "message_metadata",
             },
-            artifact_references=[],
+            artifact_references=[confirmation_reference],
             confirmation_payload=payload,
         )
     return None
@@ -268,19 +292,12 @@ def latest_result_fallback_context(
             continue
         if run.status != "completed":
             continue
-        reference = ArtifactReference(
-            artifact_kind="backtest_result",
-            artifact_id=run.id,
-            metadata={
-                "conversation_id": run.conversation_id,
-                "strategy_id": run.strategy_id,
-                "asset_class": run.asset_class,
-                "symbols": list(run.symbols),
-                "benchmark_symbol": run.benchmark_symbol,
-                "metrics": run.metrics,
-                "config_snapshot": run.config_snapshot,
-                "result_card": run.conversation_result_card,
-            },
+        reference = result_reference_from_run(run)
+        reference.metadata.update(
+            saved_strategy_metadata_from_sources(
+                run=run,
+                message_metadata=metadata,
+            )
         )
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
@@ -296,6 +313,79 @@ def latest_result_fallback_context(
             artifact_references=[reference],
         )
     return None
+
+
+def failed_action_metadata_fallback_context(
+    *,
+    user_id: str,
+    conversation_id: str,
+) -> RuntimeFallbackContext | None:
+    messages = _recent_messages_for_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        if _metadata_supersedes_failed_action(message.metadata):
+            return None
+        reference = _failed_action_reference_from_metadata(
+            metadata=message.metadata,
+            fallback_id=f"failed-action-{message.id}",
+        )
+        if reference is None:
+            continue
+        return RuntimeFallbackContext(
+            latest_task_snapshot=TaskSnapshot(
+                latest_task_type="backtest_execution",
+                completed=False,
+                latest_failed_action_reference=reference,
+                artifact_references=[reference],
+            ),
+            selected_thread_metadata={
+                "latest_task_type": "backtest_execution",
+                "last_stage_outcome": "execution_failed_recoverably",
+                "fallback_source": "failed_action_metadata",
+            },
+            artifact_references=[reference],
+        )
+    return None
+
+
+def _metadata_supersedes_failed_action(metadata: dict[str, Any]) -> bool:
+    return bool(
+        metadata.get("result_card")
+        or metadata.get("result_run_id")
+        or metadata.get("latest_run_id")
+        or metadata.get("confirmation_card")
+        or metadata.get("pending_strategy")
+    )
+
+
+def _failed_action_reference_from_metadata(
+    *,
+    metadata: dict[str, Any],
+    fallback_id: str,
+) -> ArtifactReference | None:
+    raw_reference = metadata.get("latest_failed_action_reference")
+    if isinstance(raw_reference, dict):
+        try:
+            return ArtifactReference.model_validate(raw_reference)
+        except Exception:
+            return None
+    failed_action = metadata.get("failed_action")
+    if not isinstance(failed_action, dict):
+        return None
+    launch_payload = failed_action.get("launch_payload")
+    if not isinstance(launch_payload, dict):
+        return None
+    return ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id=str(failed_action.get("artifact_id") or fallback_id),
+        artifact_status=str(failed_action.get("artifact_status") or "failed"),
+        metadata=dict(failed_action),
+    )
 
 
 def _task_snapshot_from_value(value: Any) -> TaskSnapshot | None:

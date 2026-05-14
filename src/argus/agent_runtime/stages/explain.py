@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -10,7 +11,17 @@ from argus.agent_runtime.state.models import (
     ResponseProfile,
     RunState,
 )
-from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
+from argus.domain.engine_launch.result_facts import (
+    execution_note as result_execution_note,
+)
+from argus.domain.engine_launch.result_facts import (
+    resolved_rule_summary as result_rule_summary,
+)
+from argus.llm.openrouter import (
+    build_openrouter_model,
+    log_openrouter_failure,
+    openrouter_task_timeout_seconds,
+)
 from langchain_core.messages import HumanMessage, SystemMessage
 
 
@@ -30,6 +41,13 @@ def explain_stage(*, state: RunState) -> StageResult:
         explanation_context=explanation_context,
     )
     caveat = _caveat_summary(explanation_context)
+    result_facts = _result_facts_for_explanation(
+        strategy=strategy,
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    execution_note = result_execution_note(result_facts)
+    rule_summary = result_rule_summary(result_facts)
 
     total_return, benchmark_return, same_period = _resolved_return_metrics(
         result_payload=result_payload,
@@ -44,6 +62,8 @@ def explain_stage(*, state: RunState) -> StageResult:
                     tested_summary=tested_summary,
                     assumption_summary=assumption_summary,
                     caveat=caveat,
+                    execution_note=execution_note,
+                    rule_summary=rule_summary,
                 )
             },
         )
@@ -59,6 +79,8 @@ def explain_stage(*, state: RunState) -> StageResult:
                 tested_summary=tested_summary,
                 assumption_summary=assumption_summary,
                 caveat=caveat,
+                execution_note=execution_note,
+                rule_summary=rule_summary,
             )
         },
     )
@@ -93,12 +115,19 @@ async def _stream_llm_explanation(
     strategy = _strategy_payload(state)
     result_payload = _result_payload(state)
     explanation_context = _explanation_context(state)
+    result_facts = _result_facts_for_explanation(
+        strategy=strategy,
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
     context = {
         "tested_summary": _tested_summary(
             strategy=strategy,
             result_payload=result_payload,
             explanation_context=explanation_context,
         ),
+        "execution_note": result_execution_note(result_facts),
+        "rule_summary": result_rule_summary(result_facts),
         "strategy": _canonical_strategy_context(strategy),
         "result": result_payload,
         "explanation_context": explanation_context,
@@ -114,18 +143,25 @@ async def _stream_llm_explanation(
                 "predictions, fees, slippage, or unsupported trading capabilities. "
                 "Describe the tested strategy from tested_summary, not from raw "
                 "user wording or strategy_thesis. "
-                "Keep the answer under 90 words. Do not restate every result-card "
-                "metric; interpret what matters and name the main caveat."
+                "If rule_summary is present, include it in the Test bullet. "
+                "If execution_note is present, include it because it explains a "
+                "flat or no-trade result. "
+                "Format the answer as markdown: a bold 'Readout' label, one short "
+                "takeaway paragraph, then 3 to 5 bullets for Test, Signal when "
+                "execution_note is present, Next check for no-trade results, "
+                "Assumptions, and Caveat. Keep it under 120 words. "
+                "For no-trade results, say the strategy stayed in cash instead of "
+                "using dramatic market timing language. "
+                "Do not restate every result-card metric; interpret what matters."
             )
         ),
         HumanMessage(content=json.dumps(context, default=str, sort_keys=True)),
     ]
-    chunks: list[str] = []
     try:
-        async for chunk in model.astream(messages):
-            content = _chunk_content(chunk)
-            if content:
-                chunks.append(content)
+        chunks = await asyncio.wait_for(
+            _collect_stream_chunks(model, messages),
+            timeout=openrouter_task_timeout_seconds("result_summary"),
+        )
     except Exception as exc:
         log_openrouter_failure(
             task="result_summary",
@@ -136,6 +172,15 @@ async def _stream_llm_explanation(
         return None
     text = "".join(chunks).strip()
     return text or None
+
+
+async def _collect_stream_chunks(model: Any, messages: list[Any]) -> list[str]:
+    chunks: list[str] = []
+    async for chunk in model.astream(messages):
+        content = _chunk_content(chunk)
+        if content:
+            chunks.append(content)
+    return chunks
 
 
 def _chunk_content(chunk: Any) -> str:
@@ -189,6 +234,36 @@ def _strategy_payload(state: RunState) -> dict[str, Any]:
     if isinstance(strategy, dict):
         return dict(strategy)
     return {}
+
+
+def _result_facts_for_explanation(
+    *,
+    strategy: dict[str, Any],
+    result_payload: dict[str, Any],
+    explanation_context: dict[str, Any],
+) -> dict[str, Any]:
+    facts = dict(result_payload)
+    if "metrics" not in facts and isinstance(explanation_context.get("metrics"), dict):
+        facts["metrics"] = explanation_context["metrics"]
+    if "benchmark_metrics" not in facts and isinstance(
+        explanation_context.get("benchmark_metrics"),
+        dict,
+    ):
+        facts["benchmark_metrics"] = explanation_context["benchmark_metrics"]
+    if "resolved_strategy" not in facts:
+        facts["resolved_strategy"] = {
+            "strategy_type": strategy.get("strategy_type")
+            or explanation_context.get("strategy_type"),
+            "asset_universe": strategy.get("asset_universe"),
+            "entry_rule": strategy.get("entry_rule"),
+            "exit_rule": strategy.get("exit_rule"),
+        }
+    if "resolved_parameters" not in facts and isinstance(
+        explanation_context.get("resolved_parameters"),
+        dict,
+    ):
+        facts["resolved_parameters"] = explanation_context["resolved_parameters"]
+    return facts
 
 
 def _optional_parameters(state: RunState) -> dict[str, Any]:
@@ -332,6 +407,8 @@ def _build_response(
     tested_summary: str | None,
     assumption_summary: str,
     caveat: str,
+    execution_note: str | None,
+    rule_summary: str | None,
 ) -> str:
     tone = profile.effective_tone if profile is not None else "friendly"
     verbosity = profile.effective_verbosity if profile is not None else "medium"
@@ -339,41 +416,153 @@ def _build_response(
         profile.effective_expertise_mode if profile is not None else "beginner"
     )
 
-    comparison_sentence = (
-        f"Your strategy returned {total_return:.1f}% versus {benchmark_return:.1f}% "
-        f"{_benchmark_scope_phrase(same_period)}."
-    )
-    tested_sentence = (
-        f"I tested {tested_summary}."
-        if tested_summary is not None
-        else "I tested the confirmed strategy."
-    )
     expertise_sentence = _expertise_sentence(expertise_mode)
-    assumption_sentence = f" {assumption_summary}" if assumption_summary else ""
 
     if verbosity == "low":
-        return (
-            f"{comparison_sentence} {tested_sentence} "
-            f"{expertise_sentence}{assumption_sentence} Caveat: {caveat}"
+        return _result_readout_markdown(
+            total_return=total_return,
+            benchmark_return=benchmark_return,
+            same_period=same_period,
+            tested_summary=tested_summary,
+            interpretation=expertise_sentence,
+            assumption_summary=assumption_summary,
+            caveat=caveat,
+            execution_note=execution_note,
+            rule_summary=rule_summary,
+            compact=True,
         )
 
-    tone_prefix = _tone_result_prefix(tone)
-    if verbosity == "high":
-        return (
-            f"{tone_prefix}{comparison_sentence} {tested_sentence} {expertise_sentence}"
-            f"{assumption_sentence} Caveat: {caveat}"
-        )
-
-    return (
-        f"{tone_prefix}{comparison_sentence} {tested_sentence} {expertise_sentence}"
-        f"{assumption_sentence} Caveat: {caveat}"
+    return _result_readout_markdown(
+        total_return=total_return,
+        benchmark_return=benchmark_return,
+        same_period=same_period,
+        tested_summary=tested_summary,
+        interpretation=expertise_sentence,
+        assumption_summary=assumption_summary,
+        caveat=caveat,
+        execution_note=execution_note,
+        rule_summary=rule_summary,
+        compact=tone == "concise" and verbosity != "high",
     )
 
 
-def _tone_result_prefix(tone: str) -> str:
-    if tone == "friendly":
-        return "Here is the readout. "
-    return ""
+def _result_readout_markdown(
+    *,
+    total_return: float,
+    benchmark_return: float,
+    same_period: bool,
+    tested_summary: str | None,
+    interpretation: str,
+    assumption_summary: str,
+    caveat: str,
+    execution_note: str | None,
+    rule_summary: str | None,
+    compact: bool,
+) -> str:
+    delta = total_return - benchmark_return
+    takeaway = _readout_takeaway(
+        total_return=total_return,
+        benchmark_return=benchmark_return,
+        same_period=same_period,
+        delta=delta,
+        execution_note=execution_note,
+    )
+    tested = _tested_readout_line(tested_summary, rule_summary)
+    lines = [
+        "**Readout**",
+        "",
+        takeaway,
+        "",
+        f"- **Test:** {tested}.",
+    ]
+    if execution_note:
+        lines.append(f"- **Signal:** {_compact_execution_note(execution_note)}")
+    else:
+        lines.append(f"- **Interpretation:** {interpretation}")
+    next_check = _next_check_line(execution_note=execution_note)
+    if next_check:
+        lines.append(f"- **Next check:** {next_check}")
+    if assumption_summary:
+        lines.append(f"- **Assumptions:** {_strip_leading_label(assumption_summary)}")
+    lines.append(f"- **Caveat:** {caveat}")
+    return "\n".join(lines)
+
+
+def _readout_takeaway(
+    *,
+    total_return: float,
+    benchmark_return: float,
+    same_period: bool,
+    delta: float,
+    execution_note: str | None,
+) -> str:
+    benchmark_context = _benchmark_context_phrase(same_period)
+    relative = _relative_performance_sentence(delta)
+    if execution_note and abs(total_return) < 0.05:
+        return (
+            "No trade opened. The strategy stayed in cash because its entry "
+            f"condition never fired; it returned {total_return:.1f}% while the "
+            f"benchmark returned {benchmark_return:.1f}% {benchmark_context}; "
+            f"it {relative}"
+        )
+    return (
+        f"The strategy returned {total_return:.1f}% while the benchmark returned "
+        f"{benchmark_return:.1f}% {benchmark_context}, so it {relative}"
+    )
+
+
+def _relative_performance_sentence(delta: float) -> str:
+    if abs(delta) < 0.05:
+        return "was effectively in line with the benchmark."
+    direction = "outperformed" if delta > 0 else "lagged"
+    return f"{direction} by {abs(delta):.1f} percentage points."
+
+
+def _tested_readout_line(
+    tested_summary: str | None,
+    rule_summary: str | None,
+) -> str:
+    tested = (tested_summary or "the confirmed strategy").strip().rstrip(".")
+    if not rule_summary:
+        return tested
+    rule = rule_summary.strip()
+    if not rule:
+        return tested
+    return f"{tested}. {rule.rstrip('.')}"
+
+
+def _compact_execution_note(execution_note: str) -> str:
+    note = execution_note.strip()
+    if note.startswith("No entry trades were executed") and (
+        "entry condition did not trigger" in note
+    ):
+        return (
+            "The entry condition did not trigger in this window, so no position "
+            "was opened."
+        )
+    return note
+
+
+def _next_check_line(*, execution_note: str | None) -> str | None:
+    if execution_note and execution_note.startswith("No entry trades were executed"):
+        return (
+            "Loosen the entry threshold or widen the window before judging the "
+            "idea."
+        )
+    return None
+
+
+def _benchmark_context_phrase(same_period: bool) -> str:
+    if same_period:
+        return "over the same period"
+    return "for the comparison window"
+
+
+def _strip_leading_label(value: str) -> str:
+    text = value.strip()
+    if text.startswith("Assumptions:"):
+        return text[len("Assumptions:") :].strip()
+    return text
 
 
 def _expertise_sentence(expertise_mode: str) -> str:
@@ -381,7 +570,7 @@ def _expertise_sentence(expertise_mode: str) -> str:
         return "This is a return comparison only, without causal attribution."
     if expertise_mode == "intermediate":
         return "Use this as a direct benchmark comparison before deciding on refinements."
-    return "This gives a simple benchmark comparison for the confirmed idea."
+    return "Use this as an evidence check for the confirmed rule before refining it."
 
 
 def _benchmark_scope_phrase(same_period: bool) -> str:
@@ -396,6 +585,8 @@ def _build_incomplete_result_response(
     tested_summary: str | None,
     assumption_summary: str,
     caveat: str,
+    execution_note: str | None,
+    rule_summary: str | None,
 ) -> str:
     tone = profile.effective_tone if profile is not None else "friendly"
     verbosity = profile.effective_verbosity if profile is not None else "medium"
@@ -412,15 +603,16 @@ def _build_incomplete_result_response(
         "The result payload is incomplete, so I cannot report observed returns yet. "
         f"{tested_sentence} {expertise_sentence}"
     )
+    execution_sentence = f" {execution_note}" if execution_note else ""
     if verbosity == "high":
         if tone == "friendly":
-            return f"Here is the current status. {base} Assumptions and caveats: {assumption_summary} {caveat}"
-        return f"{base} Assumptions and caveats: {assumption_summary} {caveat}"
+            return f"Here is the current status. {base}{execution_sentence} Assumptions and caveats: {assumption_summary} {caveat}"
+        return f"{base}{execution_sentence} Assumptions and caveats: {assumption_summary} {caveat}"
     if verbosity == "low":
-        return f"{base} Caveat: {assumption_summary} {caveat}"
+        return f"{base}{execution_sentence} Caveat: {assumption_summary} {caveat}"
     if tone == "concise":
-        return f"{base} Caveat: {assumption_summary} {caveat}"
-    return f"{base} Assumptions and caveat: {assumption_summary} {caveat}"
+        return f"{base}{execution_sentence} Caveat: {assumption_summary} {caveat}"
+    return f"{base}{execution_sentence} Assumptions and caveat: {assumption_summary} {caveat}"
 
 
 def _compact_sentence_list(values: list[Any], *, limit: int) -> str:

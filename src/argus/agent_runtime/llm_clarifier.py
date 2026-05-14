@@ -9,7 +9,11 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.state.models import ConversationMessage, StrategySummary
-from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
+from argus.llm.openrouter import (
+    build_openrouter_model,
+    log_openrouter_failure,
+    openrouter_task_timeout_seconds,
+)
 
 
 class ClarificationRequest(BaseModel):
@@ -52,13 +56,13 @@ class OpenRouterClarificationGenerator:
         model = build_openrouter_model("clarification", model_name=self.model_name)
         if model:
             try:
-                yielded = False
-                async for chunk in model.astream(messages):
-                    content = _chunk_content(chunk)
-                    if content:
-                        yielded = True
+                chunks = await asyncio.wait_for(
+                    _collect_stream_chunks(model, messages),
+                    timeout=openrouter_task_timeout_seconds("clarification"),
+                )
+                if chunks:
+                    for content in chunks:
                         yield content
-                if yielded:
                     self.last_status = "used"
                     return
             except Exception as exc:
@@ -74,7 +78,7 @@ class OpenRouterClarificationGenerator:
         fallback_model_name = resolve_openrouter_model(fallback=True)
 
         primary_model_name = resolve_openrouter_model(model_name=self.model_name)
-        if fallback_model_name == primary_model_name:
+        if not fallback_model_name or fallback_model_name == primary_model_name:
             self.last_status = "failed"
             return
 
@@ -83,13 +87,13 @@ class OpenRouterClarificationGenerator:
         )
         if fallback_model:
             try:
-                yielded = False
-                async for chunk in fallback_model.astream(messages):
-                    content = _chunk_content(chunk)
-                    if content:
-                        yielded = True
+                chunks = await asyncio.wait_for(
+                    _collect_stream_chunks(fallback_model, messages),
+                    timeout=openrouter_task_timeout_seconds("clarification"),
+                )
+                if chunks:
+                    for content in chunks:
                         yield content
-                if yielded:
                     self.last_status = "fallback_used"
                     return
             except Exception as exc:
@@ -139,6 +143,15 @@ class OpenRouterClarificationGenerator:
             *history,
             HumanMessage(content=request.current_user_message),
         ]
+
+
+async def _collect_stream_chunks(model: Any, messages: list[BaseMessage]) -> list[str]:
+    chunks: list[str] = []
+    async for chunk in model.astream(messages):
+        content = _chunk_content(chunk)
+        if content:
+            chunks.append(content)
+    return chunks
 
 
 def _chunk_content(chunk: Any) -> str:

@@ -1,4 +1,4 @@
-import { Save } from "lucide-react";
+import { ListTree, PencilLine, Save } from "lucide-react";
 import { StrategyResultPayload } from "./types";
 import { useTranslation } from "react-i18next";
 import { splitPeriodDisplay } from "./card-formatting";
@@ -14,7 +14,24 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
   const { t } = useTranslation();
   const period = splitPeriodDisplay(result.period);
   const symbols = result.symbols ?? [];
-  const saveAction = result.actions?.find((action) => action.type === "save_strategy");
+  const resultActions = result.actions ?? [];
+  const showBreakdownAction = resultActions.find((action) => action.type === "show_breakdown");
+  const refineStrategyAction = resultActions.find((action) => action.type === "refine_strategy");
+  const saveAction = resultActions.find((action) => action.type === "save_strategy");
+  const orderedActions = [
+    showBreakdownAction,
+    refineStrategyAction,
+    saveAction,
+    ...resultActions.filter(
+      (action) =>
+        action.type !== "show_breakdown" &&
+        action.type !== "refine_strategy" &&
+        action.type !== "save_strategy",
+    ),
+  ].filter((action): action is ChatActionOption => Boolean(action));
+  const renderedActions = result.savedStrategyId || result.savingStrategy
+    ? orderedActions.filter((action) => action.type !== "save_strategy")
+    : orderedActions;
   const returnMetric = result.metrics.find((metric) => metric.label.toLowerCase().includes("return"));
   const isNegative = returnMetric?.value.trim().startsWith("-");
   const revealClass = isNegative ? "argus-result-reveal-caution" : "argus-result-reveal-positive";
@@ -40,16 +57,6 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {saveAction && (
-            <button
-              type="button"
-              onClick={() => onAction?.(saveAction)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-2.5 text-[11px] font-medium tracking-tight text-black/72 transition-colors hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/72 dark:hover:bg-white/[0.08]"
-            >
-              <Save className="h-3.5 w-3.5" />
-              {saveAction.label}
-            </button>
-          )}
           <span className="rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:text-white/70">
             {result.statusLabel || t('chat.simulation_complete')}
           </span>
@@ -82,6 +89,32 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
         </dl>
       </div>
 
+      {(renderedActions.length > 0 || result.savedStrategyId || result.savingStrategy) && (
+        <div className="flex flex-wrap gap-2 border-t border-black/8 px-4 py-3 dark:border-white/8 sm:px-5">
+          {renderedActions.map((action) => (
+            <button
+              key={action.id ?? action.type ?? action.label}
+              type="button"
+              onClick={() => onAction?.(action)}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:bg-white/[0.08]"
+            >
+              <ResultActionIcon action={action} />
+              {action.label}
+            </button>
+          ))}
+          {(result.savedStrategyId || result.savingStrategy) && (
+            <button
+              type="button"
+              disabled
+              className="inline-flex min-h-9 cursor-default items-center gap-1.5 rounded-full border border-[#70a38d]/25 bg-[#70a38d]/10 px-3 py-1.5 text-[12px] font-medium tracking-tight text-[#4f806d] dark:border-[#70a38d]/30 dark:bg-[#70a38d]/12 dark:text-[#9bc6b4]"
+            >
+              <Save className="h-3.5 w-3.5" />
+              {result.savedStrategyId ? t("chat.saved") : t("chat.saving")}
+            </button>
+          )}
+        </div>
+      )}
+
       {(result.benchmarkNote || (result.assumptions && result.assumptions.length > 0)) && (
         <div className="px-4 sm:px-5 py-3 border-t border-black/8 dark:border-white/8 flex flex-col gap-1.5">
           {result.benchmarkNote && (
@@ -103,6 +136,19 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
       )}
     </section>
   );
+}
+
+function ResultActionIcon({ action }: { action: ChatActionOption }) {
+  if (action.type === "show_breakdown") {
+    return <ListTree className="h-3.5 w-3.5" />;
+  }
+  if (action.type === "refine_strategy") {
+    return <PencilLine className="h-3.5 w-3.5" />;
+  }
+  if (action.type === "save_strategy") {
+    return <Save className="h-3.5 w-3.5" />;
+  }
+  return null;
 }
 
 function AssetSymbols({ symbols }: { symbols: string[] }) {

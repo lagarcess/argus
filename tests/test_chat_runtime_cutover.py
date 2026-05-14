@@ -219,6 +219,16 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
                     "timeframe": {"value": "1D", "source": "default"},
                     "initial_capital": {"value": 1000.0, "source": "default"},
                 },
+                "launch_payload": {
+                    "strategy_type": "indicator_threshold",
+                    "symbol": "GOOGL",
+                    "symbols": ["GOOGL"],
+                    "timeframe": "1D",
+                    "date_range": "past year",
+                    "sizing_mode": "initial_capital",
+                    "benchmark_symbol": "SPY",
+                },
+                "validation": {"executable": True},
             },
         }
     )
@@ -232,7 +242,7 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
         "label": "Run backtest",
         "type": "run_backtest",
         "presentation": "confirmation",
-        "payload": {},
+        "payload": {"confirmation_id": card["confirmation_id"]},
     }
 
 

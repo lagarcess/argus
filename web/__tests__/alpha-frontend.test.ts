@@ -82,6 +82,32 @@ describe("Argus Alpha frontend contract", () => {
     );
   });
 
+  test("result readouts use a structured editorial treatment", () => {
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const css = readFileSync(join(root, "app/globals.css"), "utf-8");
+
+    expect(message).toContain("function ResultReadout");
+    expect(message).toContain('aria-label="Result readout"');
+    expect(css).toContain(".argus-result-readout::before");
+    expect(css).toContain("text-wrap: pretty");
+    expect(css).not.toContain("argus-result-readout shadow");
+  });
+
+  test("result breakdowns render as a distinct fact-grounded surface", () => {
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const css = readFileSync(join(root, "app/globals.css"), "utf-8");
+
+    expect(message).toContain("function ResultBreakdown");
+    expect(message).toContain('aria-label="Result breakdown"');
+    expect(message).toContain('message.contentPresentation === "result_breakdown"');
+    expect(chat).toContain('action?.type === "show_breakdown"');
+    expect(chat).toContain('contentPresentation:');
+    expect(css).toContain(".argus-result-breakdown::before");
+    expect(css).toContain('content: "Breakdown"');
+    expect(css).not.toContain("argus-result-breakdown shadow");
+  });
+
   test("result card renders save inside the card and charts portfolio equity", () => {
     const card = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
     const chart = readFileSync(join(root, "components/chat/ResultEquityChart.tsx"), "utf-8");
@@ -109,18 +135,23 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("normalizeChartTime");
   });
 
-  test("chat renders structured confirmation cards with input actions", () => {
+  test("chat renders structured confirmation cards with card-scoped actions only", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
     expect(api).toContain('event: "final"');
     expect(chat).toContain('kind: "strategy_confirmation"');
-    expect(chat).toContain("setInputActions(confirmation.actions ?? [])");
+    expect(chat).toContain('latestAi?.kind === "strategy_confirmation"');
+    expect(chat).toContain("isCardScopedAction");
+    expect(chat).toContain("hasActiveArtifactActionSet(messages)");
+    expect(chat).toContain("visibleComposerActions(inputActions)");
+    expect(chat).not.toContain("setInputActions(confirmation.actions ?? [])");
+    expect(chat).not.toContain("visibleInputActions(inputActions).map");
     expect(chat).not.toContain('event.event === "confirmation"');
     expect(chat).not.toContain('event.event === "result"');
     expect(chat).toContain("slide-in-from-bottom-2");
-    expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} />");
+    expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />");
   });
 
   test("chat supersedes older confirmation cards when a newer draft appears", () => {
@@ -237,18 +268,103 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("strategyId: run.strategy_id ?? null");
     expect(chat).toContain("conversationId: run.conversation_id ?? undefined");
     expect(chat).toContain("metadata.result_conversation_id");
+    expect(chat).toContain("resultActionContextFromMetadata(metadata, card)");
+    expect(chat).toContain("assetClassOrUndefined(factBank?.asset_class)");
+    expect(chat).not.toContain('template: "",\n        assetClass: "equity"');
     expect(chat).toContain("resultActionRequiresRunContext");
     expect(chat).toContain("hasResultActionContext(context.runId, context.conversationId)");
     expect(chat).toContain("presentation: \"result\"");
+  });
+
+  test("artifact actions stay attached to historical cards", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("markComposerActionsInactive");
+    expect(chat).not.toContain("prev.map((m) => ({ ...m, actions: undefined }))");
+    expect(chat).toContain("message.result.actions");
+    expect(chat).toContain("message.confirmation.actions");
+  });
+
+  test("confirmation cards render active artifact actions", () => {
+    const card = readFileSync(join(root, "components/chat/StrategyConfirmationCard.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+
+    expect(card).toContain("onAction?: (action: ChatActionOption) => void");
+    expect(card).toContain("confirmation.actions");
+    expect(card).toContain('confirmation.confirmation_state !== "superseded"');
+    expect(card).not.toContain("ArrowRight");
+    expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />");
+  });
+
+  test("result cards render artifact scoped actions and saved state", () => {
+    const card = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
+    const locale = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+
+    expect(card).toContain('action.type === "show_breakdown"');
+    expect(card).toContain('action.type === "refine_strategy"');
+    expect(card).toContain('action.type === "save_strategy"');
+    expect(card).toContain("result.savedStrategyId");
+    expect(card).toContain("chat.saved");
+    expect(locale).toContain('"saved": "Saved"');
+  });
+
+  test("chat updates saved state from save strategy final payloads", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
+
+    expect(types).toContain("savedStrategyId?: string | null");
+    expect(chat).toContain("handleSaveStrategyAction");
+    expect(chat).toContain("hiddenSaveActionMessageIdsFromApi");
+    expect(chat).toContain("markResultCardSaved");
+    expect(chat).toContain("saved_strategy_id");
+    expect(chat).toContain("result_strategy_id");
+    expect(chat).toContain('action.type === "save_strategy"');
+  });
+
+  test("saved result state is not inferred from plain result strategy linkage", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    const metadataHelper = chat.slice(
+      chat.indexOf("function savedStrategyIdFromMetadata"),
+      chat.indexOf("function savedStrategyIdFromFinalPayload"),
+    );
+    const finalPayloadHelper = chat.slice(
+      chat.indexOf("function savedStrategyIdFromFinalPayload"),
+      chat.indexOf("function resultRunIdFromFinalPayload"),
+    );
+
+    expect(metadataHelper).toContain("saved_strategy_id");
+    expect(metadataHelper).not.toContain("result_strategy_id");
+    expect(finalPayloadHelper).toContain("saved_strategy_id");
+    expect(finalPayloadHelper).not.toContain("result_strategy_id");
+  });
+
+  test("assistant copy is artifact aware and visibly confirmed", () => {
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+
+    expect(message).toContain("await navigator.clipboard.writeText");
+    expect(message).toContain("copyFeedback");
+    expect(message).toContain("chat.copy_success");
+    expect(message).toContain("chat.copy_failed");
+    expect(message).toContain('message.kind === "strategy_confirmation"');
+    expect(en).toContain('"copy_success": "Copied"');
+    expect(es).toContain('"copy_failed": "No se pudo copiar"');
   });
 
   test("chat consumes result action chips after breakdown is requested", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
     expect(chat).toContain("consumeInputAction");
+    expect(chat).toContain("consumeResultActionOnMessages");
+    expect(chat).toContain("consumedResultActionsFromApi");
+    expect(chat).toContain("applyConsumedResultActions");
     expect(chat).toContain('action.type === "show_breakdown"');
     expect(chat).toContain('type !== "show_breakdown"');
     expect(chat).toContain("setInputActions(consumeInputAction(action, inputActions))");
+    expect(chat).toContain('latestAi?.kind === "strategy_result"');
+    expect(chat).toContain("setInputActions([])");
   });
 
   test("chat resumes active conversation instead of creating a fresh one on reload", () => {
@@ -262,9 +378,13 @@ describe("Argus Alpha frontend contract", () => {
 
   test("history menu reuses structured conversation hydration", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
     expect(chat).toContain("hydrateMessagesFromApi");
     expect(chat).toContain("void loadConversation(item.id)");
+    expect(chat).toContain("loadConversationForRun");
+    expect(chat).toContain("getBacktestRun(item.id)");
+    expect(api).toContain("export async function getBacktestRun");
     expect(chat).not.toContain('kind: m.content.includes("result") ? "strategy_result" : "text"');
   });
 

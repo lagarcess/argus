@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-import inspect
 from typing import Any
 
 import pandas as pd
 
+from argus.domain.backtesting.rules import compile_rule_signals, resolve_series
 from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
 )
-
-try:  # noqa: SIM105
-    import pandas_ta_classic  # noqa: F401
-except Exception:  # pragma: no cover - accessor may already be available
-    pass
 
 
 def _resolve_indicator_series(
@@ -27,47 +22,17 @@ def _resolve_indicator_series(
         raise ValueError("market_data_unavailable")
 
     spec = executable_indicator_spec(indicator)
-    name = spec.key if spec is not None else indicator.strip().lower()
-    ta_accessor = getattr(data, "ta", None)
-    if ta_accessor is None:
+    if spec is None:
         raise ValueError("unsupported_indicator")
-    accessor = getattr(ta_accessor, name, None)
-    if accessor is None:
-        raise ValueError("unsupported_indicator")
-
-    kwargs: dict[str, Any] = {"append": True}
-    try:
-        params = inspect.signature(accessor).parameters
-    except (TypeError, ValueError):
-        params = {}
-
-    if "length" in params:
-        kwargs["length"] = period
-    elif "window" in params:
-        kwargs["window"] = period
-    elif "period" in params:
-        kwargs["period"] = period
-
-    if "close" in params:
-        kwargs["close"] = data[fallback_col]
-
-    accessor(**kwargs)
-
-    candidates: list[str] = []
-    if spec is not None:
-        selector = spec.output_selector.format(period=period).upper()
-        candidates = [col for col in data.columns if selector == col.upper()]
-
-    upper = name.upper()
-    if not candidates:
-        candidates = [
-            col for col in data.columns if upper in col.upper() and str(period) in col
-        ]
-    if not candidates:
-        candidates = [col for col in data.columns if upper in col.upper()]
-    if not candidates:
-        raise ValueError("unsupported_indicator")
-    return data[candidates[-1]].astype(float)
+    return resolve_series(
+        data,
+        {
+            "kind": "indicator",
+            "key": spec.key,
+            "period": period,
+            "field": fallback_col,
+        },
+    )
 
 
 def _build_signals(
@@ -114,14 +79,22 @@ def _build_signals(
             "rsi",
             config.get("parameters"),
         )
-        rsi = resolve_indicator_series_func(
-            data,
-            indicator=str(indicator_params["indicator"]),
-            period=int(indicator_params["indicator_period"]),
+        rule_spec = indicator_params.get("rule_spec") or _legacy_rsi_rule_spec(
+            indicator_params
         )
-        entries = (rsi <= float(indicator_params["entry_threshold"])).fillna(False)
-        exits = (rsi >= float(indicator_params["exit_threshold"])).fillna(False)
-        return entries.astype(bool), exits.astype(bool)
+        return compile_rule_signals(
+            rule_spec,
+            data=data,
+            indicator_resolver=resolve_indicator_series_func,
+        )
+
+    if template == "signal_strategy":
+        rule_spec = (config.get("parameters") or {}).get("rule_spec")
+        return compile_rule_signals(
+            rule_spec,
+            data=data,
+            indicator_resolver=resolve_indicator_series_func,
+        )
 
     if template == "moving_average_crossover":
         fast = resolve_indicator_series_func(data, indicator="sma", period=20)
@@ -150,6 +123,39 @@ def _build_signals(
         return entries.astype(bool), exits.astype(bool)
 
     raise ValueError("unsupported_template")
+
+
+def _legacy_rsi_rule_spec(indicator_params: dict[str, Any]) -> dict[str, Any]:
+    indicator = str(indicator_params["indicator"])
+    period = int(indicator_params["indicator_period"])
+    return {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {
+                        "kind": "indicator",
+                        "key": indicator,
+                        "period": period,
+                    },
+                    "operator": "lte",
+                    "right": float(indicator_params["entry_threshold"]),
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {
+                        "kind": "indicator",
+                        "key": indicator,
+                        "period": period,
+                    },
+                    "operator": "gte",
+                    "right": float(indicator_params["exit_threshold"]),
+                }
+            ]
+        },
+    }
 
 
 def _index_period_series(index: pd.Index, *, freq: str) -> pd.Series:

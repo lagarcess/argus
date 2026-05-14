@@ -4,9 +4,18 @@ from datetime import date, timedelta
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_artifact_reference,
+    new_confirmation_id,
+)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
-from argus.agent_runtime.strategy_contract import resolve_date_range
+from argus.agent_runtime.strategy_contract import (
+    canonical_strategy_type,
+    resolve_date_range,
+)
+from argus.domain.engine_launch.models import LaunchBacktestRequest
+from argus.domain.engine_launch.strategies import validate_launch_supported
 
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
@@ -37,24 +46,135 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
         contract=contract,
         optional_parameter_status=state.optional_parameter_status,
     )
+    unsupported_assumption = _unsupported_execution_assumption(optional_parameters)
+    if unsupported_assumption is not None:
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch=unsupported_assumption,
+        )
+    card_assumptions = _visible_card_assumptions(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+    )
+    strategy_with_assumptions = {
+        **strategy,
+        "assumptions": card_assumptions,
+    }
     confirmation_payload = {
-        "strategy": strategy,
+        "strategy": strategy_with_assumptions,
         "optional_parameters": optional_parameters,
     }
+    confirmation_id = new_confirmation_id()
+    validation_result = _validated_launch_payload(
+        state=state,
+        confirmation_payload=confirmation_payload,
+    )
+    if validation_result["outcome"] != "ready_to_confirm":
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": validation_result["assistant_prompt"],
+                "missing_required_fields": validation_result["missing_required_fields"],
+                "requested_field": validation_result["requested_field"],
+            },
+        )
+    confirmation_payload["confirmation_id"] = confirmation_id
+    confirmation_payload["artifact_id"] = confirmation_id
+    confirmation_payload["launch_payload"] = validation_result["launch_payload"]
+    confirmation_payload["validation"] = {
+        "status": "ready_to_run",
+        "executable": True,
+    }
+    confirmation_reference = confirmation_artifact_reference(
+        confirmation_id=confirmation_id,
+        confirmation_payload=confirmation_payload,
+    )
 
     return StageResult(
         outcome="await_approval",
         stage_patch={
+            "candidate_strategy_draft": strategy_with_assumptions,
             "confirmation_payload": confirmation_payload,
+            "artifact_references": [confirmation_reference.model_dump(mode="python")],
             "assistant_prompt": _build_confirmation_prompt(
                 contract=contract,
-                strategy=strategy,
+                strategy=strategy_with_assumptions,
                 optional_parameters=optional_parameters,
             ),
             "requested_field": None,
             "missing_required_fields": [],
         },
     )
+
+
+def _validated_launch_payload(
+    *,
+    state: RunState,
+    confirmation_payload: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        from argus.agent_runtime.stages.execute import _launch_payload
+
+        launch_state = state.model_copy(
+            update={"confirmation_payload": confirmation_payload}
+        )
+        launch_payload = _launch_payload(launch_state)
+        request = LaunchBacktestRequest.model_validate(launch_payload)
+        validate_launch_supported(request)
+    except ValueError as exc:
+        return _launch_validation_failure(str(exc))
+    except Exception:
+        return _launch_validation_failure("missing_rule_group")
+    return {
+        "outcome": "ready_to_confirm",
+        "launch_payload": launch_payload,
+        "missing_required_fields": [],
+        "requested_field": None,
+        "assistant_prompt": None,
+    }
+
+
+def _launch_validation_failure(error_code: str) -> dict[str, Any]:
+    if error_code == "indicator_data_insufficient":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["date_range"],
+            "requested_field": "date_range",
+            "assistant_prompt": (
+                "That rule needs more historical bars than the selected window "
+                "can provide. Choose a longer date range, or use a shorter "
+                "indicator period so the backtest has enough data to evaluate "
+                "the signal."
+            ),
+        }
+    if error_code in {
+        "missing_rule_group",
+        "unsupported_rule_operator",
+        "unsupported_indicator",
+        "unsupported_indicator_threshold",
+    }:
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["entry_logic"],
+            "requested_field": "entry_logic",
+            "assistant_prompt": (
+                "I understand the direction, but I need you to define the entry "
+                "rule in executable terms before I can make this ready to run. "
+                "For example: a percentage move, price above a moving average, "
+                "a moving-average crossover, an RSI threshold, a MACD crossover, "
+                "or a Bollinger Band touch."
+            ),
+        }
+    return {
+        "outcome": "needs_clarification",
+        "missing_required_fields": [],
+        "requested_field": None,
+        "assistant_prompt": (
+            "I understand the idea, but one part is not executable yet. Tell me "
+            "which rule, asset, or date range you want to adjust and I will keep "
+            "the draft intact."
+        ),
+    }
 
 
 def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, Any]:
@@ -77,6 +197,10 @@ def _missing_required_fields(
             continue
         if value is None or value == "":
             missing_fields.append(field_name)
+    if _resolve_strategy_type(strategy, {}) == "signal_strategy" and not _has_signal_rule(
+        strategy
+    ):
+        missing_fields.append("entry_logic")
     return missing_fields
 
 
@@ -91,7 +215,28 @@ def _required_fields_for_strategy(
             for field_name in contract.required_fields
             if field_name not in {"entry_logic", "exit_logic"}
         ]
+    if strategy_type == "signal_strategy":
+        return [
+            field_name
+            for field_name in contract.required_fields
+            if field_name != "exit_logic"
+        ]
     return list(contract.required_fields)
+
+
+def _has_signal_rule(strategy: dict[str, Any]) -> bool:
+    for field_name in ("entry_rule", "rule_spec"):
+        value = strategy.get(field_name)
+        if isinstance(value, dict) and value:
+            return True
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return False
+    return any(
+        isinstance(extra_parameters.get(field_name), dict)
+        and bool(extra_parameters[field_name])
+        for field_name in ("entry_rule", "rule_spec")
+    )
 
 
 def _date_limit_prompt(strategy: dict[str, Any]) -> str | None:
@@ -160,6 +305,56 @@ def _resolve_optional_parameters(
             ),
         }
     return resolved
+
+
+def _unsupported_execution_assumption(
+    optional_parameters: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    fees = _parameter_value(optional_parameters, "fees")
+    if not _is_zero_assumption(fees):
+        return {
+            "assistant_prompt": (
+                "I can show this with no-fee assumptions, but the current backtest "
+                "engine does not apply custom trading fees yet. Should I keep no "
+                "fees, or adjust another part of the strategy?"
+            ),
+            "requested_field": "fees",
+            "missing_required_fields": ["fees"],
+        }
+
+    slippage = _parameter_value(optional_parameters, "slippage")
+    if not _is_zero_assumption(slippage):
+        return {
+            "assistant_prompt": (
+                "I can show this with no-slippage assumptions, but the current "
+                "backtest engine does not simulate custom slippage yet. Should I "
+                "keep no slippage, or adjust another part of the strategy?"
+            ),
+            "requested_field": "slippage",
+            "missing_required_fields": ["slippage"],
+        }
+
+    engine_options = _parameter_value(optional_parameters, "engine_options")
+    if isinstance(engine_options, dict) and engine_options:
+        return {
+            "assistant_prompt": (
+                "Those engine options are not executable in the current backtest "
+                "engine. Tell me the strategy rule, asset, or date range you want "
+                "to adjust and I will keep the draft intact."
+            ),
+            "requested_field": "engine_options",
+            "missing_required_fields": ["engine_options"],
+        }
+    return None
+
+
+def _is_zero_assumption(value: Any) -> bool:
+    if value in (None, "", 0, 0.0, "0", "0.0"):
+        return True
+    try:
+        return float(value) == 0.0
+    except (TypeError, ValueError):
+        return False
 
 
 def _build_confirmation_prompt(
@@ -249,6 +444,54 @@ def _format_optional_assumption(
     return None
 
 
+def _visible_card_assumptions(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, dict[str, Any]],
+) -> list[str]:
+    assumptions: list[str] = []
+    strategy_type = _resolve_strategy_type(strategy, optional_parameters)
+    strategy_capital = _strategy_capital_amount(strategy)
+    if strategy_capital is not None:
+        if strategy_type == "dca_accumulation":
+            assumptions.append(f"${strategy_capital:,.0f} recurring contribution")
+        else:
+            assumptions.append(f"${strategy_capital:,.0f} starting capital")
+    else:
+        initial_capital = _parameter_value(optional_parameters, "initial_capital")
+        if isinstance(initial_capital, int | float):
+            assumptions.append(f"${float(initial_capital):,.0f} starting capital")
+
+    timeframe = _parameter_value(optional_parameters, "timeframe")
+    if timeframe:
+        assumptions.append(f"{timeframe} bars")
+
+    fees = _parameter_value(optional_parameters, "fees")
+    if fees in (0, 0.0, "0", "0.0"):
+        assumptions.append("No fees")
+
+    slippage = _parameter_value(optional_parameters, "slippage")
+    if slippage in (0, 0.0, "0", "0.0"):
+        assumptions.append("No slippage")
+
+    asset_class = strategy.get("asset_class")
+    if asset_class == "crypto":
+        assumptions.append("Benchmark: BTC")
+    elif asset_class == "equity":
+        assumptions.append("Benchmark: SPY")
+    return assumptions
+
+
+def _parameter_value(
+    optional_parameters: dict[str, dict[str, Any]],
+    field_name: str,
+) -> Any:
+    parameter = optional_parameters.get(field_name)
+    if not isinstance(parameter, dict):
+        return None
+    return parameter.get("value")
+
+
 def _strategy_capital_amount(strategy: dict[str, Any]) -> float | None:
     value = strategy.get("capital_amount")
     if isinstance(value, int | float):
@@ -268,13 +511,23 @@ def _resolve_strategy_type(
 ) -> str:
     explicit_strategy_type = strategy.get("strategy_type")
     if isinstance(explicit_strategy_type, str) and explicit_strategy_type:
-        return explicit_strategy_type
+        return canonical_strategy_type(
+            explicit_strategy_type,
+            entry_logic=strategy.get("entry_logic"),
+            exit_logic=strategy.get("exit_logic"),
+            cadence=strategy.get("cadence"),
+        )
 
     extra_parameters = strategy.get("extra_parameters")
     if isinstance(extra_parameters, dict):
         nested_strategy_type = extra_parameters.get("strategy_type")
         if isinstance(nested_strategy_type, str) and nested_strategy_type:
-            return nested_strategy_type
+            return canonical_strategy_type(
+                nested_strategy_type,
+                entry_logic=strategy.get("entry_logic"),
+                exit_logic=strategy.get("exit_logic"),
+                cadence=strategy.get("cadence"),
+            )
         if extra_parameters.get("cadence"):
             return "dca_accumulation"
 
@@ -312,6 +565,7 @@ def _strategy_type_label(strategy_type: str) -> str:
         "buy_and_hold": "buy-and-hold",
         "dca_accumulation": "DCA accumulation",
         "indicator_threshold": "indicator threshold",
+        "signal_strategy": "signal strategy",
     }
     return labels.get(strategy_type, strategy_type.replace("_", " "))
 

@@ -29,6 +29,7 @@ def save_strategy_from_run(*, user: User, run: BacktestRun) -> Strategy:
             else api_state.store.strategies.get(run.strategy_id)
         )
         if existing is not None:
+            _mark_run_saved(run=run, strategy_id=existing.id)
             return existing
 
     now = utcnow()
@@ -72,4 +73,23 @@ def save_strategy_from_run(*, user: User, run: BacktestRun) -> Strategy:
         )
         api_state.store.strategies[strategy.id] = strategy
     run.strategy_id = strategy.id
+    _mark_run_saved(run=run, strategy_id=strategy.id)
     return strategy
+
+
+def _mark_run_saved(*, run: BacktestRun, strategy_id: str) -> None:
+    run.strategy_id = strategy_id
+    card = dict(run.conversation_result_card)
+    card["saved_strategy_id"] = strategy_id
+    card["saved_state"] = {"status": "saved", "strategy_id": strategy_id}
+    actions = card.get("actions")
+    if isinstance(actions, list):
+        card["actions"] = [
+            action
+            for action in actions
+            if not (
+                isinstance(action, dict)
+                and action.get("type") == "save_strategy"
+            )
+        ]
+    run.conversation_result_card = card

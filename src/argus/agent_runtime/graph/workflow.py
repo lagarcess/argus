@@ -8,6 +8,10 @@ from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
     build_default_capability_contract,
 )
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_artifact_reference,
+    confirmation_id_from_payload,
+)
 from argus.agent_runtime.stages.clarify import (
     StructuredClarificationGenerator,
     clarify_stage_async,
@@ -76,6 +80,7 @@ class WorkflowState(TypedDict, total=False):
     confirmation_payload: dict[str, Any]
     failure_classification: str | None
     final_response_payload: dict[str, Any]
+    latest_failed_action_reference: ArtifactReference | dict[str, Any]
     next_actions: list[str]
 
 
@@ -238,10 +243,15 @@ async def _execute_node_async(
     tool: Any,
     max_retries: int,
 ) -> WorkflowState:
+    run_state = _run_state(state)
+    launch_payload = state.get("confirmation_payload")
+    if _is_launch_request_payload(launch_payload):
+        run_state = run_state.model_copy(deep=True)
+        run_state.confirmation_payload = dict(launch_payload)
     return _apply_stage_result(
         state,
         await execute_stage_async(
-            state=_run_state(state),
+            state=run_state,
             tool=tool,
             max_retries=max_retries,
             language=_user(state).language_preference,
@@ -279,7 +289,9 @@ def _apply_stage_result(
     }
 
     for key, value in result.patch.items():
-        if key in RUN_STATE_FIELD_NAMES:
+        if key in RUN_STATE_FIELD_NAMES and not (
+            key == "confirmation_payload" and _is_launch_request_payload(value)
+        ):
             continue
         workflow_state[key] = value
 
@@ -303,6 +315,8 @@ def _apply_stage_result(
 def _patched_run_state(*, run_state: RunState, patch: dict[str, Any]) -> RunState:
     payload = run_state.model_dump(mode="python")
     for key, value in patch.items():
+        if key == "confirmation_payload" and _is_launch_request_payload(value):
+            continue
         if key in RUN_STATE_FIELD_NAMES:
             payload[key] = value
     return RunState.model_validate(payload)
@@ -357,6 +371,16 @@ def _build_task_snapshot(
         artifact_references=artifact_references,
         artifact_kind="collection_action",
     )
+    latest_failed_action_reference = _latest_artifact_reference(
+        artifact_references=artifact_references,
+        artifact_kind="failed_action",
+    )
+    active_confirmation_reference = _active_confirmation_reference(
+        run_state=run_state,
+        artifact_references=artifact_references,
+        prior_task_snapshot=prior_task_snapshot,
+        stage_outcome_value=str(stage_outcome_value),
+    )
     preserve_pending_strategy = _should_preserve_pending_strategy(
         run_state=run_state,
         stage_outcome_value=stage_outcome_value,
@@ -410,6 +434,35 @@ def _build_task_snapshot(
                 prior_task_snapshot.latest_collection_action_reference
                 if prior_task_snapshot is not None
                 else None
+            )
+        ),
+        latest_failed_action_reference=(
+            latest_failed_action_reference
+            or (
+                prior_task_snapshot.latest_failed_action_reference
+                if prior_task_snapshot is not None
+                else None
+            )
+        ),
+        active_draft_reference=(
+            prior_task_snapshot.active_draft_reference
+            if prior_task_snapshot is not None
+            else None
+        ),
+        active_confirmation_reference=(
+            active_confirmation_reference
+        ),
+        saved_strategy_reference=(
+            prior_task_snapshot.saved_strategy_reference
+            if prior_task_snapshot is not None
+            else None
+        ),
+        artifact_references=(
+            artifact_references
+            or (
+                prior_task_snapshot.artifact_references
+                if prior_task_snapshot is not None
+                else []
             )
         ),
         last_unresolved_follow_up=(
@@ -509,7 +562,86 @@ def _resolve_artifact_references(state: WorkflowState) -> list[ArtifactReference
     references: list[ArtifactReference] = []
     for reference in raw_references:
         references.append(ArtifactReference.model_validate(reference))
-    return references
+    latest_failed = state.get("latest_failed_action_reference")
+    if latest_failed is not None:
+        references.append(ArtifactReference.model_validate(latest_failed))
+    return _dedupe_artifact_references(references)
+
+
+def _active_confirmation_reference(
+    *,
+    run_state: RunState,
+    artifact_references: list[ArtifactReference],
+    prior_task_snapshot: TaskSnapshot | None,
+    stage_outcome_value: str,
+) -> ArtifactReference | None:
+    if stage_outcome_value == "await_approval":
+        existing = _latest_artifact_reference(
+            artifact_references=artifact_references,
+            artifact_kind="confirmation",
+        )
+        if existing is not None:
+            return existing
+        payload = _confirmation_payload_dict(run_state.confirmation_payload)
+        if payload:
+            confirmation_id = confirmation_id_from_payload(payload)
+            return confirmation_artifact_reference(
+                confirmation_id=confirmation_id,
+                confirmation_payload=payload,
+            )
+    if stage_outcome_value in {
+        "approved_for_execution",
+        "execution_succeeded",
+        "execution_failed_recoverably",
+        "execution_failed_terminally",
+        "ready_to_respond",
+        "end_run",
+    }:
+        return None
+    return (
+        prior_task_snapshot.active_confirmation_reference
+        if prior_task_snapshot is not None
+        else None
+    )
+
+
+def _confirmation_payload_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if value is None:
+        return {}
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(mode="python")
+        return dict(dumped) if isinstance(dumped, dict) else {}
+    return {}
+
+
+def _dedupe_artifact_references(
+    references: list[ArtifactReference],
+) -> list[ArtifactReference]:
+    seen: set[tuple[str, str]] = set()
+    deduped: list[ArtifactReference] = []
+    for reference in references:
+        key = (reference.artifact_kind, reference.artifact_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(reference)
+    return deduped
+
+
+def _is_launch_request_payload(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    required_fields = {
+        "strategy_type",
+        "symbol",
+        "timeframe",
+        "date_range",
+        "sizing_mode",
+        "benchmark_symbol",
+    }
+    return required_fields.issubset(value)
 
 
 def _latest_artifact_reference(

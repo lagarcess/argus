@@ -59,6 +59,13 @@ def _compose_clarification(intent: ResponseIntent) -> str:
         )
     if set(needs) == {"asset_target", "period"}:
         return f"{context}What asset and time period should I use?"
+    if set(needs) == {"period", "rule_definition"}:
+        return (
+            f"{context}What time period should I test, and what specific "
+            "testable rule should define the signal? For example: a percentage "
+            "move, a moving-average crossover, price above an average, or an "
+            "RSI threshold."
+        )
     if set(needs) == {"sizing_amount", "period"}:
         return (
             f"{context}How much should each recurring purchase be, and what "

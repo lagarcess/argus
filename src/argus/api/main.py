@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from loguru import logger
 
 from argus.api import chat_service, pagination, search_utils
 from argus.api import state as api_state
@@ -28,20 +29,18 @@ from argus.api.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     checkpointer_cm = None
-    if api_state.PERSISTENCE_MODE == "supabase":
-        import os
-
-        database_url = os.getenv("DATABASE_URL", "").strip()
-        if not database_url:
-            raise RuntimeError(
-                "DATABASE_URL is required when ARGUS_PERSISTENCE_MODE=supabase."
-            )
+    if api_state.CHECKPOINTER_MODE == "postgres":
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-        checkpointer_cm = AsyncPostgresSaver.from_conn_string(database_url)
+        checkpointer_cm = AsyncPostgresSaver.from_conn_string(api_state.DATABASE_URL)
         checkpointer = await checkpointer_cm.__aenter__()
         await checkpointer.setup()
     else:
+        if api_state.PERSISTENCE_MODE == "supabase":
+            logger.info(
+                "Using Supabase product persistence with memory LangGraph checkpointer",
+                checkpointer_mode=api_state.CHECKPOINTER_MODE,
+            )
         checkpointer = api_state.build_agent_runtime_checkpointer()
 
     app.state.agent_runtime_checkpointer = checkpointer

@@ -26,6 +26,32 @@ This separation is intentional:
 - For DCA / recurring accumulation, `capital_amount` is the recurring contribution. Current DCA execution supports that one executable dollar amount only. Starting principal, total capital budgets, and contribution ceilings may be acknowledged as user intent, but they are future engine capabilities and must not overwrite the contribution amount.
 - Deterministic fallback cannot become the normal assistant voice. If the LLM fails, Argus may preserve truth internally, but user-facing copy must be natural recovery language rather than raw fields, enums, or starter prompts.
 
+### Artifact Metadata Spine
+
+Runtime snapshots and message metadata may carry lightweight artifact references
+for the active draft, active confirmation, latest completed result, latest failed
+action, and saved strategy state. These references are additive continuity
+metadata: they help Argus select and hydrate the visible artifact, but they do
+not replace LangGraph runtime memory or Supabase product records.
+
+Result references are derived from immutable `backtest_runs` records. The
+runtime may expose a result fact bank containing the run id, conversation id,
+strategy id, asset class, symbols, benchmark, metrics, config snapshot, result
+card, chart, and trades so follow-up answers can use actual run facts after
+reload. Engine metrics and `backtest_runs.config_snapshot` remain the canonical
+truth; the fact bank is a transport/context projection.
+
+Failed-action references preserve recoverable action context such as the action
+type, launch payload, failure classification, and user-safe error. They exist so
+"try again" can bind to the latest failed visible action without restarting the
+thread from blank. Deterministic code still validates capability, stale state,
+and authorization before any retry executes.
+
+Saved-strategy metadata, including `saved_strategy_id`, is result artifact state.
+It makes Save Strategy idempotent and allows reload to show that a result was
+already saved. Saving still uses a concrete run id and canonical result state,
+not frontend prose or regenerated assistant text.
+
 ## Voice Boundary
 
 Every user turn is routed by intent and conversation context before slot or field logic can speak.
@@ -201,8 +227,21 @@ Frontend package management uses Bun.
 Required model and data variables:
 
 - `OPENROUTER_API_KEY`
-- `AGENT_MODEL` or `AGENT_FALLBACK_MODEL`
+- `AGENT_MODEL`: primary low-cost conversational model for normal chat,
+  clarification, education, and flexible prose.
+- `AGENT_STRUCTURED_MODEL`: optional model for durable JSON-schema artifact
+  interpretation. Leave unset in low-cost development mode unless live QA proves
+  the primary/fallback pair cannot produce complete artifacts.
+- `AGENT_FALLBACK_MODEL`: secondary model tried when the primary configured
+  model fails, times out, or returns a structurally valid but incomplete
+  artifact.
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_PERSISTENCE_MODE`
 - Supabase variables from `.env.example` when running with Supabase persistence.
+
+Structured artifact calls use OpenRouter JSON-schema responses directly and
+disable reasoning with `reasoning: {"effort": "none"}`. The reason is practical:
+for artifact extraction Argus needs complete JSON content, not billable hidden
+reasoning tokens. If a provider rejects that reasoning setting, the client may
+retry the same request without it before moving to the next configured model.

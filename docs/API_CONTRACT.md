@@ -285,14 +285,20 @@ Application-facing user object.
 Message `metadata` may include structured continuity artifacts. Assistant
 messages may store `pending_strategy`, `confirmation_card`,
 `confirmation_payload`, `result_card`, `result_run_id`, `latest_run_id`,
-`result_strategy_id`, and `result_conversation_id`. User messages created by
-action chips may store `chat_action` so the transcript can hydrate the selected
-chip as an action item after reload. Clients use these fields to hydrate cards
-and actions after reload. Runtime execution still validates against the
-LangGraph checkpoint first. A confirmation card may include
-`confirmation_id` and `confirmation_state`; only the latest active confirmation
-can execute, and older cards are transcript history. Result actions that mutate
-state must reference a canonical run id.
+`result_strategy_id`, and `result_conversation_id`. Additive artifact metadata
+may also include `artifact_id`, `artifact_type`, `artifact_status`,
+`active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
+`failed_action`, and `result_fact_bank`. User messages created by action chips
+may store `chat_action` so the transcript can hydrate the selected chip as an
+action item after reload. Clients use these fields to hydrate cards and actions
+after reload. Runtime execution still validates against the LangGraph checkpoint
+first. A confirmation card may include `confirmation_id` and
+`confirmation_state`; only the latest active confirmation can execute, and older
+cards are transcript history. Result actions that mutate state must reference a
+canonical run id. `result_fact_bank` is a backend-provided, run-derived context
+object for result follow-ups; it is not a second metrics source of truth.
+`saved_strategy_id` marks a result artifact as already saved and must be treated
+as idempotent display state after reload.
 
 ## Strategy
 

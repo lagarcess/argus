@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
 from argus.api.schemas import BacktestRun
-from argus.llm.openrouter import build_openrouter_model, log_openrouter_failure
+from argus.domain.engine_launch.result_facts import (
+    execution_note,
+    resolved_rule_summary,
+    runnable_next_tests,
+)
+from argus.llm.openrouter import (
+    invoke_openrouter_json_schema_sync,
+    log_openrouter_failure,
+)
 
 
 class ResultBreakdownPart(BaseModel):
@@ -24,8 +34,16 @@ class ResultBreakdownDraft(BaseModel):
     sections: list[ResultBreakdownSection] = Field(default_factory=list)
 
 
+RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS = 6.0
+
+
 def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
     card = run.conversation_result_card
+    result_facts = {
+        "metrics": run.metrics,
+        "config_snapshot": run.config_snapshot,
+        "trades": run.trades or [],
+    }
     return {
         "run_id": run.id,
         "title": card.get("title") if isinstance(card, dict) else None,
@@ -38,57 +56,35 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "benchmark_note": card.get("benchmark_note") if isinstance(card, dict) else None,
         "config_snapshot": run.config_snapshot,
         "raw_metrics": run.metrics,
+        "execution_note": execution_note(result_facts),
+        "rule_summary": resolved_rule_summary(result_facts),
     }
 
 
 def llm_result_breakdown_message(
     context: dict[str, Any],
     *,
-    build_openrouter_model_func=build_openrouter_model,
+    invoke_json_schema_func=invoke_openrouter_json_schema_sync,
     log_openrouter_failure_func=log_openrouter_failure,
+    timeout_seconds: float = RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS,
 ) -> str | None:
-    model = build_openrouter_model_func("result_breakdown")
-    if model is None:
-        return None
     fact_bank = result_breakdown_fact_bank(context)
     required_fact_ids = _required_result_breakdown_fact_ids(fact_bank)
     try:
-        structured_model = model.with_structured_output(ResultBreakdownDraft)
-        response = structured_model.invoke(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Argus, an investing backtest copilot. Explain the stored "
-                        "backtest result using only the supplied fact_bank. Return flexible, "
-                        "non-template professional markdown sections and vary the section "
-                        "headings. Build each section from text parts and fact reference "
-                        "parts. Use text parts for educational framing and fact reference "
-                        "parts for every run-specific symbol, date, percentage, benchmark, "
-                        "assumption, and caveat. Fact references render as polished canonical "
-                        "callouts, so do not try to manually copy or decorate the fact values "
-                        "inside text parts. Keep the writing polished, conversational, and "
-                        "cohesive rather than fragmented. Respect capability truth in next "
-                        "steps: runnable ideas must come from runnable_next_tests, while "
-                        "draft-only or future ideas must be clearly labeled that way. Do not "
-                        "invent causes, trades, prices, support, missing metrics, unsupported "
-                        "strategy mechanics, predictions, or investment advice. Cover what "
-                        "was tested, what happened, benchmark comparison, risk or drawdown, "
-                        "assumptions, caveats, and one useful next test."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {
-                            "fact_bank": fact_bank,
-                            "required_fact_ids": sorted(required_fact_ids),
-                        },
-                        default=str,
-                    ),
-                },
-            ]
+        response = _invoke_breakdown_llm_with_budget(
+            invoke_json_schema_func=invoke_json_schema_func,
+            fact_bank=fact_bank,
+            required_fact_ids=required_fact_ids,
+            timeout_seconds=timeout_seconds,
         )
+    except FutureTimeoutError:
+        log_openrouter_failure_func(
+            task="result_breakdown",
+            model_name=None,
+            exc=TimeoutError("Result breakdown LLM exceeded action budget"),
+            message="LLM result breakdown timed out; using deterministic fallback",
+        )
+        return None
     except Exception as exc:
         log_openrouter_failure_func(
             task="result_breakdown",
@@ -105,6 +101,82 @@ def llm_result_breakdown_message(
         fact_bank=fact_bank,
         required_fact_ids=required_fact_ids,
     )
+
+
+def _invoke_breakdown_llm_with_budget(
+    *,
+    invoke_json_schema_func: Any,
+    fact_bank: dict[str, str],
+    required_fact_ids: set[str],
+    timeout_seconds: float,
+) -> object:
+    def _invoke() -> object:
+        return invoke_json_schema_func(
+            task="result_breakdown",
+            messages=_result_breakdown_llm_messages(
+                fact_bank=fact_bank,
+                required_fact_ids=required_fact_ids,
+            ),
+            schema_model=ResultBreakdownDraft,
+            schema_name="ResultBreakdownDraft",
+        )
+
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="argus-breakdown")
+    future = executor.submit(_invoke)
+    try:
+        return future.result(timeout=max(0.1, timeout_seconds))
+    except FutureTimeoutError:
+        future.cancel()
+        raise
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+def _result_breakdown_llm_messages(
+    *,
+    fact_bank: dict[str, str],
+    required_fact_ids: set[str],
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus, an investing backtest copilot. Explain the stored "
+                "backtest result using only the supplied fact_bank. Return flexible, "
+                "non-template professional markdown sections and vary the section "
+                "headings, order, and phrasing. Do not fill a fixed outline. Build "
+                "each section from text parts and fact reference parts. Use text "
+                "parts for educational framing and fact reference parts for every "
+                "run-specific symbol, date, percentage, benchmark, assumption, rule, "
+                "execution note, and caveat. Fact references render as polished "
+                "canonical callouts, so do not manually copy or decorate fact values "
+                "inside text parts. Keep the writing polished, conversational, and "
+                "cohesive rather than fragmented. Respect capability truth in next "
+                "steps: runnable ideas must come from runnable_next_tests, while "
+                "draft-only or future ideas must be clearly labeled that way. Promote "
+                "discovery by naming one or two runnable next experiments, but do not "
+                "invent causes, trades, prices, support, missing metrics, unsupported "
+                "strategy mechanics, predictions, investment advice, advisory language, "
+                "profitable-trade claims, or custom benchmark support. Avoid phrases like "
+                "'investment decision-making', 'profitable trades', 'should buy', "
+                "'should sell', and 'alternative benchmarks'. For no-trade runs, say "
+                "the strategy stayed in cash because the entry condition did not trigger; "
+                "do not imply the market stood still or that trades were missed. Cover "
+                "what was tested, what happened, benchmark comparison, risk or drawdown, "
+                "assumptions, caveats, and one useful next test."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "fact_bank": fact_bank,
+                    "required_fact_ids": sorted(required_fact_ids),
+                },
+                default=str,
+            ),
+        },
+    ]
 
 
 def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
@@ -125,6 +197,14 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
     date_range = _format_result_breakdown_date_range(context.get("date_range"))
     if date_range:
         fact_bank["date_range"] = date_range
+
+    rule_summary = str(context.get("rule_summary") or "").strip()
+    if rule_summary:
+        fact_bank["rule_summary"] = rule_summary
+
+    run_note = str(context.get("execution_note") or "").strip()
+    if run_note:
+        fact_bank["execution_note"] = run_note
 
     benchmark = str(context.get("benchmark_symbol") or "").strip()
     if benchmark:
@@ -181,9 +261,11 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
         "This is historical simulation evidence, not a prediction or trading "
         "recommendation."
     )
-    fact_bank["runnable_next_tests"] = (
-        "Runnable now: change the date range, change the benchmark, or test the "
-        "same supported strategy on a different single asset."
+    fact_bank["runnable_next_tests"] = runnable_next_tests(
+        {
+            "config_snapshot": context.get("config_snapshot"),
+            "symbols": context.get("symbols"),
+        }
     )
     fact_bank["draft_only_or_future_tests"] = (
         "Draft-only or future support: DCA with separate starting principal, "
@@ -291,6 +373,10 @@ def _render_result_breakdown_fact_block(
         lines.append(f"**Test:** {test_text}.")
         _consume("title", "symbols", "date_range")
 
+    if _has("rule_summary"):
+        lines.append(f"**Rule:** {fact_bank['rule_summary']}")
+        _consume("rule_summary")
+
     if _has(
         "total_return",
         "benchmark_symbol",
@@ -323,6 +409,10 @@ def _render_result_breakdown_fact_block(
     if _has("max_drawdown"):
         lines.append(f"**Risk marker:** max drawdown {fact_bank['max_drawdown']}.")
         _consume("max_drawdown")
+
+    if _has("execution_note"):
+        lines.append(f"**Execution:** {fact_bank['execution_note']}")
+        _consume("execution_note")
 
     if _has("starting_capital"):
         lines.append(f"**Starting capital:** {fact_bank['starting_capital']}.")
@@ -395,6 +485,8 @@ def _required_result_breakdown_fact_ids(fact_bank: dict[str, str]) -> set[str]:
         "title",
         "symbols",
         "date_range",
+        "rule_summary",
+        "execution_note",
         "total_return",
         "benchmark_symbol",
         "max_drawdown",
@@ -434,6 +526,7 @@ def _result_breakdown_starting_capital(context: dict[str, Any]) -> str:
 
 
 def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
+    fact_bank = result_breakdown_fact_bank(context)
     total_return = _result_breakdown_metric(
         context,
         "total_return_pct",
@@ -489,29 +582,38 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
         if max_drawdown is not None
         else "the available risk data"
     )
+    rule_summary = str(context.get("rule_summary") or "").strip()
+    execution_summary = str(context.get("execution_note") or "").strip()
     assumption_bullets = "\n".join(f"- {line}" for line in assumption_lines)
     period_sentence = f" over {date_range}" if date_range else ""
+    setup_lines = [
+        f"{title} tested {symbols_text}{period_sentence} using the stored backtest configuration."
+    ]
+    if rule_summary:
+        setup_lines.append(rule_summary)
+
+    performance_lines = [
+        (
+            f"**Total return:** {total_return_text}. The comparison benchmark was "
+            f"{benchmark or 'the stored benchmark'} at {benchmark_text}, leaving the "
+            f"run at {delta_text} versus the benchmark."
+        )
+    ]
+    if execution_summary:
+        performance_lines.append(execution_summary)
+
     return (
-        f"### What Was Tested\n"
-        f"{title} tested {symbols_text}{period_sentence} using the stored "
-        f"backtest configuration.\n\n"
-        f"### What Happened\n"
-        f"**Total return:** {total_return_text}. This is the headline portfolio "
-        f"change for the selected period, before treating it as a future expectation.\n\n"
-        f"### Benchmark Context\n"
-        f"The benchmark was {benchmark or 'the stored benchmark'} at {benchmark_text}. "
-        f"The strategy finished {delta_text} versus that benchmark, so the card is "
-        f"showing relative performance as well as absolute return.\n\n"
-        f"### Risk Read\n"
-        f"**Max drawdown:** {drawdown_text}. This marks the largest peak-to-trough "
-        f"decline during the simulation and is the first risk number to compare "
-        f"against the return profile.\n\n"
-        f"### Assumptions\n"
+        "### Run Lens\n"
+        f"{' '.join(setup_lines)}\n\n"
+        "### Performance Read\n"
+        f"{' '.join(performance_lines)}\n\n"
+        "### Risk And Assumptions\n"
+        f"**Max drawdown:** {drawdown_text}. This is the largest peak-to-trough "
+        f"decline captured by the simulation.\n\n"
         f"{assumption_bullets}\n\n"
-        f"### What To Try Next\n"
-        f"Use this as historical simulation evidence, not a prediction or trading "
-        f"recommendation. A runnable next check is changing the date range or "
-        f"benchmark to see whether the conclusion depends on this exact window."
+        "### Discovery Path\n"
+        "Use this as historical simulation evidence, not a prediction or trading "
+        f"recommendation. {_ensure_sentence(fact_bank['runnable_next_tests'])}"
     )
 
 

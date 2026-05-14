@@ -7,6 +7,50 @@ from argus.domain.engine_launch.models import (
     LaunchExecutionEnvelope,
 )
 
+USER_SAFE_FAILURE_MESSAGES = {
+    "missing_rule_group": (
+        "The visible strategy is missing a complete executable entry and exit rule. "
+        "Keep the draft and choose the rule details before running it."
+    ),
+    "indicator_data_insufficient": (
+        "That indicator needs more historical bars than this date window provides. "
+        "Use a longer date range or a shorter indicator period before running it."
+    ),
+    "unsupported_indicator": (
+        "That indicator is not executable in the current backtest engine yet. "
+        "I can keep it as a draft or help convert the idea to a supported RSI or "
+        "SMA/EMA rule."
+    ),
+    "unsupported_indicator_threshold": (
+        "That threshold rule is not executable with the current indicator registry. "
+        "Use a supported indicator threshold or keep the idea as a draft."
+    ),
+    "unsupported_rule_operator": (
+        "That rule operator is not executable yet. Choose one of the supported "
+        "comparison or crossover rules and I can keep the rest of the draft intact."
+    ),
+    "invalid_indicator_parameter": (
+        "One indicator parameter is outside the supported schema. Adjust the "
+        "period or threshold values and I can run the same idea."
+    ),
+    "indicator_period_out_of_bounds": (
+        "That indicator period is outside the supported range. Choose a valid "
+        "period and I can run the same idea."
+    ),
+    "indicator_threshold_out_of_bounds": (
+        "That indicator threshold is outside the supported range. Choose a value "
+        "inside the indicator scale and I can run the same idea."
+    ),
+    "market_data_unavailable": (
+        "Market data was unavailable for that run. I still have the draft; try "
+        "again, change the dates, or choose a different supported asset."
+    ),
+    "invalid_date_range": (
+        "That date range is not valid for a backtest. Choose a start and end date "
+        "in chronological order and I will keep the strategy intact."
+    ),
+}
+
 
 def build_success_envelope(
     *,
@@ -29,6 +73,40 @@ def build_success_envelope(
         caveats=caveats,
         artifact_references=artifact_references or [],
         provider_metadata=provider_metadata,
+    )
+
+
+def user_safe_failure_message(
+    *,
+    failure_reason: str | None,
+    failure_category: str | None = None,
+) -> str:
+    code = str(failure_reason or "").strip()
+    if code in USER_SAFE_FAILURE_MESSAGES:
+        return USER_SAFE_FAILURE_MESSAGES[code]
+    if failure_category == "missing_required_input":
+        return (
+            "I need one more executable detail before I can run this. Tell me the "
+            "missing rule, asset, or date range and I will keep the draft intact."
+        )
+    if failure_category == "unsupported_capability":
+        return (
+            "That request is outside the current executable backtest capability. "
+            "I can preserve the idea and offer supported alternatives."
+        )
+    if failure_category == "parameter_validation_error":
+        return (
+            "One detail in the launch payload is not valid for the current engine. "
+            "Adjust the strategy, dates, or sizing and I can run the same draft."
+        )
+    if failure_category == "upstream_dependency_error":
+        return (
+            "The run hit a temporary data or service issue. I still have the draft; "
+            "ask me to try again or adjust the setup."
+        )
+    return (
+        "The backtest could not complete. I still have the draft; ask me to try "
+        "again or adjust the setup."
     )
 
 

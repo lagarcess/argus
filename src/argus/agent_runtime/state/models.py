@@ -93,6 +93,9 @@ class StrategySummary(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
     comparison_baseline: str | None = None
     refinement_of: str | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
     resolution_provenance: list["ResolutionProvenance"] = Field(default_factory=list)
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
@@ -165,6 +168,7 @@ class ResponseIntent(BaseModel):
 class ArtifactReference(BaseModel):
     artifact_kind: str
     artifact_id: str
+    artifact_status: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -195,14 +199,21 @@ class TaskSnapshot(BaseModel):
     pending_needs: list[PendingNeedName] = Field(default_factory=list)
     field_provenance: dict[str, str] = Field(default_factory=dict)
     resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
+    active_draft_reference: ArtifactReference | None = None
+    active_confirmation_reference: ArtifactReference | None = None
     latest_backtest_result_reference: ArtifactReference | None = None
     latest_collection_action_reference: ArtifactReference | None = None
+    latest_failed_action_reference: ArtifactReference | None = None
+    saved_strategy_reference: ArtifactReference | None = None
+    artifact_references: list[ArtifactReference] = Field(default_factory=list)
     last_unresolved_follow_up: str | None = None
 
 
 class ConfirmationPayload(BaseModel):
     strategy: StrategySummary
     optional_parameters: dict[str, Any] = Field(default_factory=dict)
+    launch_payload: dict[str, Any] | None = None
+    validation: dict[str, Any] = Field(default_factory=dict)
 
 
 class ToolCallRecord(BaseModel):

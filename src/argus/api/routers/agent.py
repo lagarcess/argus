@@ -8,10 +8,16 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_artifact_reference,
+    confirmation_id_from_payload,
+)
 from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
+from argus.api.chat.artifacts import result_fact_bank, saved_strategy_metadata
+from argus.api.chat.recovery import failed_action_metadata_fallback_context
 from argus.api.chat_service import (
     RuntimeFallbackContext,
     chat_display_message,
@@ -97,12 +103,6 @@ async def chat_stream(
                 period="day",
                 limit_count=200,
             )
-            api_state.supabase_gateway.check_and_increment_usage(
-                user_id=user.id,
-                resource="chat_messages",
-                period="minute",
-                limit_count=10,
-            )
         except QuotaExceededError as exc:
             raise problem(
                 request,
@@ -168,44 +168,60 @@ async def chat_stream(
             recovery_message=stale_confirmation_message
         )
     elif is_confirmation_action(payload):
-        if not checkpoint_has_pending_confirmation(checkpoint_values):
-            metadata_fallback = confirmation_metadata_fallback_context(
-                user_id=user.id,
-                conversation_id=conversation.id,
-            )
-            if metadata_fallback is None:
-                raise problem(
-                    request,
-                    status_code=409,
-                    code="confirmation_required",
-                    title="Confirmation Required",
-                    detail=(
-                        "There is no pending strategy confirmation to approve. "
-                        "Describe the idea again and I will prepare a fresh confirmation."
-                    ),
-                )
-            runtime_fallback = metadata_fallback
-    elif not checkpoint_has_pending_strategy(checkpoint_values):
-        pending_fallback = pending_strategy_metadata_fallback_context(
+        metadata_fallback = confirmation_metadata_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
         )
-        if pending_fallback is not None:
-            runtime_fallback = pending_fallback
-        elif not checkpoint_has_latest_result(checkpoint_values):
+        if metadata_fallback is None and not checkpoint_has_pending_confirmation(
+            checkpoint_values
+        ):
+            raise problem(
+                request,
+                status_code=409,
+                code="confirmation_required",
+                title="Confirmation Required",
+                detail=(
+                    "There is no pending strategy confirmation to approve. "
+                    "Describe the idea again and I will prepare a fresh confirmation."
+                ),
+            )
+        if metadata_fallback is not None:
+            runtime_fallback = metadata_fallback
+    elif not checkpoint_has_pending_strategy(checkpoint_values):
+        failed_fallback = failed_action_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if failed_fallback is not None:
+            runtime_fallback = failed_fallback
+        else:
+            pending_fallback = pending_strategy_metadata_fallback_context(
+                user_id=user.id,
+                conversation_id=conversation.id,
+            )
+            if pending_fallback is not None:
+                runtime_fallback = pending_fallback
+            elif not checkpoint_has_latest_result(checkpoint_values):
+                result_fallback = latest_result_fallback_context(
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                )
+                if result_fallback is not None:
+                    runtime_fallback = result_fallback
+    elif not checkpoint_has_latest_result(checkpoint_values):
+        failed_fallback = failed_action_metadata_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if failed_fallback is not None:
+            runtime_fallback = failed_fallback
+        else:
             result_fallback = latest_result_fallback_context(
                 user_id=user.id,
                 conversation_id=conversation.id,
             )
             if result_fallback is not None:
                 runtime_fallback = result_fallback
-    elif not checkpoint_has_latest_result(checkpoint_values):
-        result_fallback = latest_result_fallback_context(
-            user_id=user.id,
-            conversation_id=conversation.id,
-        )
-        if result_fallback is not None:
-            runtime_fallback = result_fallback
 
     mention_provenance = [
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
@@ -397,9 +413,8 @@ async def chat_stream(
                 )
             else:
                 strategy = save_strategy_from_run(user=user, run=run)
-                metadata["latest_run_id"] = run.id
-                metadata["result_run_id"] = run.id
-                metadata["result_strategy_id"] = strategy.id
+                metadata.update(saved_strategy_metadata(run, strategy.id))
+                metadata["result_fact_bank"] = result_fact_bank(run)
                 assistant_text = f"Saved {strategy.name} to Strategies."
             assistant_message = create_message(
                 user_id=user.id,
@@ -417,6 +432,10 @@ async def chat_stream(
                         "stage_outcome": "ready_to_respond",
                         "assistant_response": assistant_text,
                         "message_id": assistant_message.id,
+                        "latest_run_id": metadata.get("latest_run_id"),
+                        "result_run_id": metadata.get("result_run_id"),
+                        "result_strategy_id": metadata.get("result_strategy_id"),
+                        "saved_strategy_id": metadata.get("saved_strategy_id"),
                     },
                 }
             )
@@ -439,6 +458,7 @@ async def chat_stream(
                 metadata["latest_run_id"] = run.id
                 metadata["result_run_id"] = run.id
                 metadata["result_strategy_id"] = run.strategy_id
+                metadata["result_fact_bank"] = result_fact_bank(run)
             assistant_message = create_message(
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -513,7 +533,16 @@ async def chat_stream(
                 assistant_text = runtime_result_message(runtime_result)
                 confirmation_card = runtime_confirmation_card(
                     runtime_result,
-                    confirmation_id=api_state.store.new_id(),
+                    confirmation_id=(
+                        confirmation_id_from_payload(
+                            runtime_result.get("confirmation_payload", {}),
+                            fallback=api_state.store.new_id(),
+                        )
+                        if isinstance(
+                            runtime_result.get("confirmation_payload"), dict
+                        )
+                        else api_state.store.new_id()
+                    ),
                 )
                 if confirmation_card is not None:
                     assistant_text = str(confirmation_card["summary"])
@@ -567,9 +596,41 @@ async def chat_stream(
                         metadata["confirmation_payload"] = runtime_result[
                             "confirmation_payload"
                         ]
+                        confirmation_reference = confirmation_artifact_reference(
+                            confirmation_id=str(
+                                confirmation_card.get("confirmation_id")
+                                or confirmation_card.get("confirmationId")
+                                or api_state.store.new_id()
+                            ),
+                            confirmation_payload=runtime_result[
+                                "confirmation_payload"
+                            ],
+                            confirmation_card=confirmation_card,
+                        )
+                        metadata["active_confirmation_reference"] = (
+                            confirmation_reference.model_dump(mode="python")
+                        )
+                        metadata["artifact_references"] = [
+                            confirmation_reference.model_dump(mode="python")
+                        ]
+                        runtime_result["active_confirmation_reference"] = (
+                            confirmation_reference.model_dump(mode="python")
+                        )
                     runtime_result["confirmation"] = confirmation_card
                 if result_card is not None:
                     metadata["result_card"] = result_card
+                latest_failed_action_reference = runtime_result.get(
+                    "latest_failed_action_reference"
+                )
+                if isinstance(latest_failed_action_reference, dict):
+                    metadata["latest_failed_action_reference"] = (
+                        latest_failed_action_reference
+                    )
+                    failed_action_metadata = latest_failed_action_reference.get(
+                        "metadata"
+                    )
+                    if isinstance(failed_action_metadata, dict):
+                        metadata["failed_action"] = dict(failed_action_metadata)
                 if run is not None:
                     result_card = run.conversation_result_card
                     metadata["result_card"] = result_card
@@ -577,9 +638,15 @@ async def chat_stream(
                     metadata["result_run_id"] = run.id
                     metadata["result_strategy_id"] = run.strategy_id
                     metadata["result_conversation_id"] = run.conversation_id
+                    metadata["result_fact_bank"] = result_fact_bank(run)
                     runtime_result["run"] = run.model_dump(mode="json")
 
-                persisted_text = assistant_text or "".join(streamed_text_parts).strip()
+                streamed_text = "".join(streamed_text_parts).strip()
+                if streamed_text and confirmation_card is None and run is None:
+                    assistant_text = streamed_text
+                    runtime_result["assistant_response"] = streamed_text
+
+                persisted_text = assistant_text or streamed_text
                 assistant_message = None
                 if persisted_text:
                     assistant_message = create_message(

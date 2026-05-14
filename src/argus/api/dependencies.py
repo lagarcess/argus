@@ -71,10 +71,7 @@ def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
 
 
 def dev_memory_fallback_enabled() -> bool:
-    return (
-        os.getenv("NEXT_PUBLIC_MOCK_AUTH", "").strip().lower() == "true"
-        and os.getenv("ARGUS_SUPABASE_STRICT", "").strip().lower() != "true"
-    )
+    return os.getenv("ARGUS_DEV_MEMORY_FALLBACK", "").strip().lower() == "true"
 
 
 def current_user(request: Request) -> User:
@@ -86,7 +83,8 @@ def current_user(request: Request) -> User:
             try:
                 return api_state.supabase_gateway.get_or_create_mock_user()
             except Exception:
-                pass
+                if not dev_memory_fallback_enabled():
+                    raise
         return api_state.store.get_or_create_dev_user()
 
     if api_state.supabase_gateway is None:

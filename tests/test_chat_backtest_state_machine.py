@@ -106,6 +106,16 @@ def _confirmation_runtime_result() -> dict[str, Any]:
                 "fees": {"value": 0.0, "source": "default", "label": "Fees"},
                 "slippage": {"value": 0.0, "source": "default", "label": "Slippage"},
             },
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": ["AAPL"],
+                "timeframe": "1D",
+                "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
+                "sizing_mode": "capital_amount",
+                "benchmark_symbol": "SPY",
+            },
+            "validation": {"executable": True},
         },
     }
 
@@ -606,14 +616,16 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert runtime_calls == 1
     assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
-    assert "### What Happened" in breakdown
+    assert "### Performance Read" in breakdown
     assert "**Total return:**" in breakdown
-    assert "### Benchmark Context" in breakdown
+    assert "### Discovery Path" in breakdown
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert run_id in messages.text
     assistant = messages.json()["items"][-1]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
+    assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
+    assert assistant["metadata"]["result_fact_bank"]["symbols"] == ["AAPL"]
     assert "result_card" not in assistant["metadata"]
 
 
@@ -842,6 +854,28 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
     assert "Saved" in text
     strategies = client.get("/api/v1/strategies").json()["items"]
     assert [strategy["symbols"] for strategy in strategies] == [["AAPL"]]
+    saved_strategy_id = strategies[0]["id"]
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["saved_strategy_id"] == saved_strategy_id
+    assert final["result_strategy_id"] == saved_strategy_id
+    assert final["result_run_id"] == run_id
+    stored_run = api_state.store.backtest_runs[run_id]
+    assert stored_run.strategy_id == saved_strategy_id
+    assert stored_run.conversation_result_card["saved_strategy_id"] == saved_strategy_id
+    assert stored_run.conversation_result_card["saved_state"] == {
+        "status": "saved",
+        "strategy_id": saved_strategy_id,
+    }
+    assert all(
+        action["type"] != "save_strategy"
+        for action in stored_run.conversation_result_card.get("actions", [])
+    )
+    assistant = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ][-1]
+    assert assistant["metadata"]["saved_strategy_id"] == saved_strategy_id
+    assert assistant["metadata"]["result_strategy_id"] == saved_strategy_id
+    assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
 
     duplicate = client.post(
         "/api/v1/chat/stream",
@@ -863,7 +897,7 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
     assert duplicate.status_code == 200
     strategies_after_duplicate = client.get("/api/v1/strategies").json()["items"]
     assert [strategy["id"] for strategy in strategies_after_duplicate] == [
-        strategies[0]["id"]
+        saved_strategy_id
     ]
 
 
@@ -919,7 +953,7 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
     second_text = _stream_payloads(second.text, "token")[0]["text"]
     assert "help you choose a sensible next step" in first_text
     assert "What should trigger the buy?" not in second_text
-    assert "could not process that turn" in second_text
+    assert "interpreter was unavailable" in second_text
 
 
 def test_discovery_endpoints_return_assets_and_indicators(

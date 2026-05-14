@@ -18,6 +18,9 @@ from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     LaunchExecutionEnvelope,
 )
+from argus.domain.engine_launch.result_facts import (
+    append_execution_note_to_result_card,
+)
 from argus.domain.engine_launch.results import (
     build_benchmark_metrics,
     build_explanation_context,
@@ -28,6 +31,7 @@ from argus.domain.engine_launch.sizing import resolve_starting_capital
 from argus.domain.engine_launch.strategies import (
     indicator_threshold_parameters,
     normalize_template_name,
+    rule_spec_from_request,
     validate_launch_supported,
 )
 from argus.domain.market_data import fetch_price_series
@@ -48,14 +52,19 @@ def run_launch_backtest(
     try:
         validate_launch_supported(request)
     except ValueError as exc:
+        category, status = _normalize_value_error(str(exc))
         return _blocked_result(
             request,
+            execution_status=status,
+            failure_category=category,
             failure_reason=str(exc),
         )
 
     try:
         if request.strategy_type == "dca_accumulation":
             result = _run_dca_accumulation(request, language=language)
+        elif request.strategy_type == "signal_strategy":
+            result = _run_signal_strategy(request, language=language)
         elif request.strategy_type == "indicator_threshold":
             result = _run_indicator_threshold(request, language=language)
         else:
@@ -130,6 +139,7 @@ def _run_indicator_threshold(
             "indicator_period": indicator_parameters["indicator_period"],
             "entry_threshold": indicator_parameters["entry_threshold"],
             "exit_threshold": indicator_parameters["exit_threshold"],
+            "rule_spec": indicator_parameters["rule_spec"],
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
@@ -137,14 +147,101 @@ def _run_indicator_threshold(
         caveats=[
             f"{config['timeframe']} bars only.",
             (
-                "Indicator thresholds use the executable indicator registry; "
-                "draft-only indicators are not run until they have execution specs."
+                f"Only the confirmed {indicator_parameters['indicator'].upper()} "
+                "threshold rule was simulated; no extra filters were added."
             ),
         ],
         provider_metadata={
             "provider": "alpaca",
             "asset_class": asset_class,
             "timeframe": config["timeframe"],
+        },
+    )
+    result_card = append_execution_note_to_result_card(
+        result_card,
+        {
+            "resolved_strategy": envelope.resolved_strategy,
+            "resolved_parameters": envelope.resolved_parameters,
+            "metrics": envelope.metrics,
+        },
+    )
+    return LaunchExecutionAdapterResult(
+        envelope=envelope,
+        result_card=result_card,
+        explanation_context=build_explanation_context(
+            request=request,
+            envelope=envelope,
+            result_card=result_card,
+        ),
+    )
+
+
+def _run_signal_strategy(
+    request: LaunchBacktestRequest,
+    *,
+    language: str,
+) -> LaunchExecutionAdapterResult:
+    symbols, asset_class = _resolve_request_symbols(request)
+    initial_price = _initial_price(request, asset_class=asset_class)
+    starting_capital = resolve_starting_capital(
+        request,
+        initial_price=initial_price,
+    )
+    rule_spec = rule_spec_from_request(request)
+    config = _build_signal_strategy_config(
+        request=request,
+        asset_class=asset_class,
+        symbols=symbols,
+        starting_capital=starting_capital,
+        rule_spec=rule_spec,
+    )
+    validate_backtest_config(config)
+
+    metrics = compute_alpha_metrics(config)
+    result_card = _build_launch_result_card(config, metrics, language=language)
+    benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
+    envelope = build_success_envelope(
+        resolved_strategy={
+            "strategy_type": request.strategy_type,
+            "symbol": config["symbols"][0],
+            "asset_universe": config["symbols"],
+            "entry_rule": request.entry_rule,
+            "exit_rule": request.exit_rule,
+            "rule_spec": rule_spec,
+        },
+        resolved_parameters={
+            "timeframe": config["timeframe"],
+            "date_range": {
+                "start": config["start_date"],
+                "end": config["end_date"],
+            },
+            "benchmark_symbol": config["benchmark_symbol"],
+            "sizing_mode": request.sizing_mode,
+            "capital_amount": starting_capital,
+            "position_size": request.position_size,
+            "cadence": request.cadence,
+            "template": config["template"],
+            "rule_spec": rule_spec,
+        },
+        metrics=metrics,
+        benchmark_metrics=benchmark_metrics,
+        assumptions=list(result_card.get("assumptions", [])),
+        caveats=[
+            f"{config['timeframe']} bars only.",
+            "Only the confirmed signal rules were simulated; no extra filters were added.",
+        ],
+        provider_metadata={
+            "provider": "alpaca",
+            "asset_class": asset_class,
+            "timeframe": config["timeframe"],
+        },
+    )
+    result_card = append_execution_note_to_result_card(
+        result_card,
+        {
+            "resolved_strategy": envelope.resolved_strategy,
+            "resolved_parameters": envelope.resolved_parameters,
+            "metrics": envelope.metrics,
         },
     )
     return LaunchExecutionAdapterResult(
@@ -410,6 +507,33 @@ def _build_indicator_threshold_config(
     }
 
 
+def _build_signal_strategy_config(
+    *,
+    request: LaunchBacktestRequest,
+    asset_class: str,
+    symbols: list[str],
+    starting_capital: float,
+    rule_spec: dict[str, Any],
+) -> dict[str, Any]:
+    benchmark_asset = classify_symbol(request.benchmark_symbol)
+    if benchmark_asset.asset_class != asset_class:
+        raise ValueError("invalid_benchmark_symbol")
+
+    return {
+        "template": normalize_template_name(request),
+        "asset_class": asset_class,
+        "symbols": symbols,
+        "timeframe": request.timeframe,
+        "start_date": request.date_range.start,
+        "end_date": request.date_range.end,
+        "side": "long",
+        "starting_capital": starting_capital,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": benchmark_asset.symbol,
+        "parameters": {"rule_spec": rule_spec},
+    }
+
+
 def _initial_price(
     request: LaunchBacktestRequest,
     *,
@@ -445,13 +569,15 @@ def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str],
 def _blocked_result(
     request: LaunchBacktestRequest,
     *,
+    execution_status: str = "blocked_unsupported",
+    failure_category: str = "unsupported_capability",
     failure_reason: str,
 ) -> LaunchExecutionAdapterResult:
     return LaunchExecutionAdapterResult(
         envelope=build_failure_envelope(
             request=request,
-            execution_status="blocked_unsupported",
-            failure_category="unsupported_capability",
+            execution_status=execution_status,
+            failure_category=failure_category,
             failure_reason=failure_reason,
         )
     )
@@ -468,6 +594,11 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "invalid_symbol_count",
         "position_price_required",
         "asset_class_conflict",
+        "indicator_data_insufficient",
+        "invalid_indicator_parameter",
+        "indicator_period_out_of_bounds",
+        "indicator_threshold_out_of_bounds",
+        "missing_rule_group",
     }
     unsupported = {
         "cadence_required",
@@ -479,6 +610,10 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "unsupported_parameters",
         "unsupported_allocation_method",
         "unsupported_side",
+        "unsupported_indicator",
+        "unsupported_indicator_threshold",
+        "unsupported_risk_rules",
+        "unsupported_rule_operator",
     }
     if error_code == "market_data_unavailable":
         return "upstream_dependency_error", "failed_upstream"

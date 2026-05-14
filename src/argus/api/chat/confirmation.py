@@ -4,6 +4,11 @@ from datetime import date
 from typing import Any
 from uuid import uuid4
 
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_id_from_payload,
+    stable_payload_hash,
+    validate_confirmation_execution_payload,
+)
 from argus.agent_runtime.strategy_contract import (
     display_strategy_slug,
     display_strategy_type,
@@ -88,52 +93,69 @@ def runtime_confirmation_card(
         f"I read this as {assets} using {_article_for(strategy_type)} "
         f"{strategy_type} approach over {summary_period}."
     )
-    active_confirmation_id = confirmation_id or f"confirmation-{uuid4()}"
-    return {
+    active_confirmation_id = confirmation_id_from_payload(
+        payload,
+        fallback=confirmation_id or f"confirmation-{uuid4()}",
+    )
+    execution_validation = validate_confirmation_execution_payload(payload)
+    is_ready_to_run = execution_validation.executable
+    action_payload = {
         "confirmation_id": active_confirmation_id,
-        "confirmation_state": "active",
-        "title": title,
-        "statusLabel": "Ready to run",
-        "summary": summary,
-        "rows": rows,
-        "assumptions": assumptions,
-        "actions": [
+        "artifact_id": active_confirmation_id,
+        "launch_payload_hash": stable_payload_hash(
+            execution_validation.launch_payload
+        ),
+    }
+    actions = [
+        {
+            "id": "change-dates",
+            "type": "change_dates",
+            "label": "Change dates",
+            "presentation": "confirmation",
+            "payload": action_payload,
+        },
+        {
+            "id": "change-asset",
+            "type": "change_asset",
+            "label": "Change asset",
+            "presentation": "confirmation",
+            "payload": action_payload,
+        },
+        {
+            "id": "adjust-assumptions",
+            "type": "adjust_assumptions",
+            "label": "Adjust assumptions",
+            "presentation": "confirmation",
+            "payload": action_payload,
+        },
+        {
+            "id": "cancel-confirmation",
+            "type": "cancel_confirmation",
+            "label": "Cancel",
+            "presentation": "confirmation",
+            "payload": action_payload,
+        },
+    ]
+    if is_ready_to_run:
+        actions.insert(
+            0,
             {
                 "id": "run-backtest",
                 "type": "run_backtest",
                 "label": "Run backtest",
                 "presentation": "confirmation",
-                "payload": {"confirmation_id": active_confirmation_id},
+                "payload": action_payload,
             },
-            {
-                "id": "change-dates",
-                "type": "change_dates",
-                "label": "Change dates",
-                "presentation": "confirmation",
-                "payload": {"confirmation_id": active_confirmation_id},
-            },
-            {
-                "id": "change-asset",
-                "type": "change_asset",
-                "label": "Change asset",
-                "presentation": "confirmation",
-                "payload": {"confirmation_id": active_confirmation_id},
-            },
-            {
-                "id": "adjust-assumptions",
-                "type": "adjust_assumptions",
-                "label": "Adjust assumptions",
-                "presentation": "confirmation",
-                "payload": {"confirmation_id": active_confirmation_id},
-            },
-            {
-                "id": "cancel-confirmation",
-                "type": "cancel_confirmation",
-                "label": "Cancel",
-                "presentation": "confirmation",
-                "payload": {"confirmation_id": active_confirmation_id},
-            },
-        ],
+        )
+    return {
+        "confirmation_id": active_confirmation_id,
+        "confirmation_state": "active",
+        "title": title,
+        "statusLabel": "Ready to run" if is_ready_to_run else "Needs change",
+        "summary": summary,
+        "rows": rows,
+        "assumptions": assumptions,
+        "actions": actions,
     }
 
 

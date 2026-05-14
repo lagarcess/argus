@@ -271,7 +271,7 @@ def test_run_backtest_quota_exceeded(mock_gateway):
 
 def test_chat_stream_quota_exceeded(mock_gateway):
     mock_gateway.check_and_increment_usage.side_effect = QuotaExceededError(
-        "Quota exceeded for chat_messages (minute)"
+        "Quota exceeded for chat_messages (day)"
     )
 
     response = client.post(
@@ -322,11 +322,10 @@ def test_patch_me_supabase_merges_onboarding_and_persists(mock_gateway):
 
 def test_create_conversation_uses_dev_memory_fallback_when_supabase_fails(
     mock_gateway,
+    monkeypatch,
 ):
     mock_gateway.create_conversation.side_effect = RuntimeError("supabase unavailable")
-    import os
-
-    os.environ["NEXT_PUBLIC_MOCK_AUTH"] = "true"
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "true")
 
     response = client.post(
         "/api/v1/conversations",

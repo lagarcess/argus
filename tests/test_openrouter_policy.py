@@ -1,21 +1,43 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
+import time
 from typing import Any
 
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
+    FocusedStrategyExtraction,
     LLMInterpretationResponse,
+    LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
 )
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.interpret import InterpretationRequest
-from argus.agent_runtime.state.models import UserState
+from argus.agent_runtime.state.models import (
+    ConversationMessage,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
+from argus.domain.market_data import clear_asset_cache
 from argus.llm import openrouter
-from argus.llm.openrouter import log_openrouter_failure
+from argus.llm.openrouter import (
+    log_openrouter_failure,
+    openrouter_structured_model_candidates,
+    resolve_openrouter_structured_model,
+)
 from langgraph.checkpoint.memory import MemorySaver
+
+
+@pytest.fixture(autouse=True)
+def _provider_fixture_mode(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+    clear_asset_cache()
+    yield
+    clear_asset_cache()
 
 
 class FakeChatOpenRouter:
@@ -96,6 +118,72 @@ class FakeStructuredModel:
         return self.invoke([])
 
 
+class SlowBreakdownModel:
+    def with_structured_output(self, _schema: object) -> "SlowBreakdownModel":
+        return self
+
+    def invoke(self, _messages: list[dict[str, str]]) -> object:
+        time.sleep(0.2)
+        return None
+
+
+class SlowBreakdownSchemaClient:
+    def __call__(self, **_kwargs: Any) -> object:
+        time.sleep(0.2)
+        return None
+
+
+class FakeBreakdownSchemaClient:
+    def __init__(self, response: object | None = None) -> None:
+        self.response = response
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(self, **kwargs: Any) -> object:
+        self.calls.append(kwargs)
+        if self.response is not None:
+            return self.response
+        schema = kwargs["schema_model"]
+        return schema(
+            sections=[
+                {
+                    "heading": "Reading the run",
+                    "parts": [
+                        {"kind": "text", "text": "The tested result is "},
+                        {"kind": "fact", "fact_id": "title"},
+                        {
+                            "kind": "text",
+                            "text": ". The context to keep in view is ",
+                        },
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                },
+                {
+                    "heading": "Benchmark and risk context",
+                    "parts": [
+                        {
+                            "kind": "text",
+                            "text": "Use the card metrics as the source of truth.",
+                        },
+                    ],
+                },
+            ]
+        )
+
+
+class SlowStructuredInterpreterModel:
+    def with_structured_output(self, _schema: object) -> "SlowStructuredInterpreterModel":
+        return self
+
+    async def ainvoke(self, _messages: list[object]) -> object:
+        await asyncio.sleep(0.2)
+        return LLMInterpretationResponse(
+            intent="conversation_followup",
+            task_relation="new_task",
+            user_goal_summary="Slow response",
+            assistant_response="This should time out.",
+        )
+
+
 def test_openrouter_factory_applies_task_token_budget(
     monkeypatch,
 ) -> None:
@@ -112,7 +200,9 @@ def test_openrouter_factory_applies_task_token_budget(
         {
             "model_name": "test/model",
             "temperature": 0,
-            "max_tokens": 1200,
+            "max_tokens": 3200,
+            "timeout": 12,
+            "max_retries": 1,
             "openrouter_api_key": "test-key",
         }
     ]
@@ -122,6 +212,34 @@ def test_openrouter_factory_returns_none_without_key(monkeypatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     assert openrouter.build_openrouter_model("result_breakdown") is None
+
+
+def test_structured_model_uses_configured_models_unless_explicitly_overridden(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AGENT_STRUCTURED_MODEL", raising=False)
+    monkeypatch.setenv("AGENT_FALLBACK_MODEL", "deepseek/deepseek-v4-flash")
+    monkeypatch.setenv("AGENT_MODEL", "qwen/qwen3.5-9b")
+
+    assert resolve_openrouter_structured_model() == "qwen/qwen3.5-9b"
+    assert openrouter_structured_model_candidates() == [
+        "qwen/qwen3.5-9b",
+        "deepseek/deepseek-v4-flash",
+    ]
+
+    monkeypatch.setenv("AGENT_STRUCTURED_MODEL", "custom/structured")
+
+    assert resolve_openrouter_structured_model() == "custom/structured"
+    assert openrouter_structured_model_candidates() == [
+        "custom/structured",
+        "qwen/qwen3.5-9b",
+        "deepseek/deepseek-v4-flash",
+    ]
+
+    monkeypatch.delenv("AGENT_STRUCTURED_MODEL", raising=False)
+    monkeypatch.delenv("AGENT_MODEL", raising=False)
+
+    assert resolve_openrouter_structured_model() == "deepseek/deepseek-v4-flash"
 
 
 def test_structured_interpreter_uses_bounded_interpretation_profile(
@@ -150,27 +268,916 @@ def test_structured_interpreter_uses_bounded_interpretation_profile(
     assert FakeChatOpenRouter.calls[0] == {
         "model_name": "custom/model",
         "temperature": 0,
-        "max_tokens": 1200,
+        "max_tokens": 3200,
+        "timeout": 12,
+        "max_retries": 1,
         "openrouter_api_key": "test-key",
     }
 
 
-def test_result_breakdown_uses_bounded_profile(monkeypatch) -> None:
+def test_result_breakdown_uses_direct_json_schema_client(monkeypatch) -> None:
     from argus.api import chat_service
 
-    FakeChatOpenRouter.calls.clear()
-    FakeChatOpenRouter.invoked_messages.clear()
-    FakeChatOpenRouter.structured_invoked_messages.clear()
-    FakeChatOpenRouter.structured_response = None
-    FakeChatOpenRouter.invoke_content = None
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient()
 
-    text = chat_service.llm_result_breakdown_message({"title": "AAPL test"})
+    text = chat_service.llm_result_breakdown_message(
+        {"title": "AAPL test"},
+        invoke_json_schema_func=fake_schema,
+    )
 
     assert text is not None
-    assert FakeChatOpenRouter.calls[0]["temperature"] == 0.2
-    assert FakeChatOpenRouter.calls[0]["max_tokens"] == 2400
+    assert fake_schema.calls[0]["task"] == "result_breakdown"
+    assert fake_schema.calls[0]["schema_model"].__name__ == "ResultBreakdownDraft"
+    assert fake_schema.calls[0]["schema_name"] == "ResultBreakdownDraft"
+
+
+def test_result_breakdown_llm_has_hard_action_budget() -> None:
+    from argus.api.chat.breakdown import llm_result_breakdown_message
+
+    failures: list[dict[str, Any]] = []
+
+    text = llm_result_breakdown_message(
+        {"title": "AAPL test"},
+        invoke_json_schema_func=SlowBreakdownSchemaClient(),
+        log_openrouter_failure_func=lambda **kwargs: failures.append(kwargs),
+        timeout_seconds=0.01,
+    )
+
+    assert text is None
+    assert failures
+    assert failures[0]["task"] == "result_breakdown"
+    assert "timed out" in failures[0]["message"]
+
+
+def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen: dict[str, Any] = {}
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        seen.update(kwargs)
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            user_goal_summary="Backtest TSLA with RSI thresholds.",
+            semantic_turn_act="new_idea",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "Backtest TSLA using RSI entry at 20 or lower and exit at 60 "
+                    "or higher over the last 3 months."
+                ),
+                strategy_type="rsi_mean_reversion",
+                strategy_thesis="Use RSI thresholds on TSLA.",
+                asset_universe=["TSLA"],
+                date_range="last 3 months",
+                indicator="rsi",
+                entry_threshold=20,
+                exit_threshold=60,
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=(
+                "Backtest TSLA using RSI entry at 20 or lower and exit at 60 "
+                "or higher over the last 3 months."
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen["task"] == "interpretation"
+    assert seen["schema_model"] is LLMInterpretationResponse
+    assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
+    assert result.candidate_strategy_draft.extra_parameters["indicator"] == "rsi"
+    assert (
+        result.candidate_strategy_draft.extra_parameters["indicator_parameters"][
+            "entry_threshold"
+        ]
+        == 20
+    )
+    assert seen["model_name"] == "primary/model"
+
+
+def test_default_interpreter_retries_configured_structured_model_when_first_is_incomplete(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    calls: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        model_name = str(kwargs["model_name"])
+        calls.append(model_name)
+        if model_name == "primary/model":
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="new_task",
+                user_goal_summary="Backtest TSLA with RSI thresholds.",
+                semantic_turn_act="new_idea",
+            )
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            user_goal_summary="Backtest TSLA with RSI thresholds.",
+            semantic_turn_act="new_idea",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "Backtest TSLA using RSI entry at 20 or lower and exit at 60 "
+                    "or higher over the last 3 months."
+                ),
+                strategy_type="rsi_mean_reversion",
+                strategy_thesis="Use RSI thresholds on TSLA.",
+                asset_universe=["TSLA"],
+                date_range="last 3 months",
+                indicator="rsi",
+                entry_threshold=20,
+                exit_threshold=60,
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model", "fallback/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=(
+                "Backtest TSLA using RSI entry at 20 or lower and exit at 60 "
+                "or higher over the last 3 months."
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert calls == [
+        "primary/model",
+        "primary/model",
+        "fallback/model",
+        "fallback/model",
+    ]
+    assert interpreter.last_status == "fallback_used"
+    assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
+    assert result.candidate_strategy_draft.extra_parameters["indicator"] == "rsi"
+
+
+def test_default_interpreter_repairs_underfilled_new_signal_idea(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        seen_schema_names.append(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
+        if schema_model is LLMInterpretationResponse:
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="new_task",
+                user_goal_summary=(
+                    "Backtest Nvidia using a 50/200-day moving average crossover."
+                ),
+                semantic_turn_act="new_idea",
+            )
+        assert schema_model is FocusedStrategyExtraction
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            user_goal_summary=(
+                "Backtest NVDA using a 50-day SMA crossing above a 200-day SMA."
+            ),
+            strategy_type="moving_average_crossover",
+            asset_universe=["NVDA"],
+            date_range="past 2 years",
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+            exit_logic="Use the opposite crossover as the exit.",
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=(
+                "Test Nvidia when the 50-day moving average crosses above the "
+                "200-day moving average over the past two years."
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen_schema_names == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+    ]
+    assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
+    assert result.candidate_strategy_draft.date_range == "past 2 years"
+    assert result.candidate_strategy_draft.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+
+
+def test_default_interpreter_repairs_partial_signal_idea_without_rule_payload(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        seen_schema_names.append(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
+        if schema_model is LLMInterpretationResponse:
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="new_task",
+                user_goal_summary="Backtest NVDA with a moving average crossover.",
+                semantic_turn_act="new_idea",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    strategy_type="moving_average_crossover",
+                    asset_universe=["NVDA"],
+                    date_range="past two years",
+                ),
+            )
+        assert schema_model is FocusedStrategyExtraction
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            user_goal_summary="Backtest NVDA with a 50/200 SMA bullish crossover.",
+            strategy_type="signal_strategy",
+            asset_universe=["NVDA"],
+            date_range="past 2 years",
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=(
+                "Test Nvidia when the 50-day moving average crosses above the "
+                "200-day moving average over the past two years."
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen_schema_names == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+    ]
+    assert result.candidate_strategy_draft.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+
+
+def test_default_interpreter_retries_empty_unsupported_clarification(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        model_name = str(kwargs["model_name"])
+        schema_name = str(kwargs["schema_name"])
+        calls.append((model_name, schema_name))
+        if model_name == "primary/model" and schema_name == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="unsupported_or_out_of_scope",
+                task_relation="new_task",
+                requires_clarification=True,
+                user_goal_summary="Buy Tesla after big drops.",
+                assistant_response=(
+                    "Could you clarify what you mean by big drops?"
+                ),
+            )
+        if schema_name == "FocusedStrategyExtraction":
+            return FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                user_goal_summary="Buy Tesla after big drops.",
+            )
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            requires_clarification=True,
+            user_goal_summary="Buy Tesla after big drops.",
+            semantic_turn_act="new_idea",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="indicator_threshold",
+                strategy_thesis="Buy Tesla after large price declines.",
+                asset_universe=["TSLA"],
+            ),
+            missing_required_fields=["date_range", "entry_threshold", "exit_threshold"],
+            assistant_response=(
+                "I understand you want to buy Tesla after big drops. "
+                "What period and threshold should I use?"
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model", "fallback/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="What if I bought Tesla after big drops?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert calls == [
+        ("primary/model", "LLMInterpretationResponse"),
+        ("primary/model", "FocusedStrategyExtraction"),
+        ("fallback/model", "FocusedStrategyExtraction"),
+        ("fallback/model", "LLMInterpretationResponse"),
+    ]
+    assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
+
+
+def test_default_interpreter_keeps_artifact_context_for_vague_signal_clarification(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        seen_schema_names.append(str(kwargs["schema_name"]))
+        schema_model = kwargs["schema_model"]
+        if schema_model is LLMInterpretationResponse:
+            return LLMInterpretationResponse(
+                intent="unsupported_or_out_of_scope",
+                task_relation="new_task",
+                requires_clarification=True,
+                user_goal_summary="Test buying SPY when it starts rising.",
+                assistant_response=(
+                    "I understand the direction, but starts rising needs a concrete "
+                    "trigger such as a moving-average crossover or RSI threshold."
+                ),
+            )
+        assert schema_model is FocusedStrategyExtraction
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            requires_clarification=True,
+            user_goal_summary="Test buying SPY when it starts rising.",
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy SPY when it starts rising.",
+            asset_universe=["SPY"],
+            entry_logic="Buy SPY when it starts rising.",
+            missing_required_fields=["date_range", "entry_rule"],
+            assistant_response=(
+                "What concrete trigger and date range should I use?"
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="Test buying SPY when it starts rising.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen_schema_names == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+    ]
+    assert result.candidate_strategy_draft.asset_universe == ["SPY"]
+    assert result.candidate_strategy_draft.entry_logic == (
+        "Buy SPY when it starts rising."
+    )
+    assert result.requires_clarification is True
+
+
+def test_default_interpreter_retries_empty_refinement_candidate(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    calls: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        model_name = str(kwargs["model_name"])
+        calls.append(model_name)
+        if model_name == "primary/model":
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="refine",
+                user_goal_summary="Change the date range.",
+                semantic_turn_act="refine_current_idea",
+                candidate_strategy_draft=LLMStrategyDraft(),
+            )
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="refine",
+            user_goal_summary="Change the date range.",
+            semantic_turn_act="refine_current_idea",
+            candidate_strategy_draft=LLMStrategyDraft(date_range="last 6 months"),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model", "fallback/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="Use the last 6 months instead.",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    date_range="past year",
+                )
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert calls == ["primary/model", "primary/model", "fallback/model"]
+    assert result.candidate_strategy_draft.date_range == "last 6 months"
+
+
+def test_default_interpreter_retries_stale_prior_strategy_replay(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    calls: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        model_name = str(kwargs["model_name"])
+        calls.append(model_name)
+        if model_name == "primary/model":
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="refine",
+                user_goal_summary="Change the asset to Nvidia.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="Test buying and holding Apple over the past year.",
+                    strategy_type="buy_and_hold",
+                    strategy_thesis=(
+                        "Test buying and holding Apple over the past year."
+                    ),
+                    asset_universe=["AAPL"],
+                    date_range="past year",
+                ),
+            )
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="refine",
+            user_goal_summary="Change the asset to Nvidia.",
+            semantic_turn_act="refine_current_idea",
+            candidate_strategy_draft=LLMStrategyDraft(asset_universe=["NVDA"]),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model", "fallback/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="Actually make it Nvidia.",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    raw_user_phrasing="Test buying and holding Apple over the past year.",
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Test buying and holding Apple over the past year.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range="last 1 year",
+                )
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert calls == ["primary/model", "primary/model", "fallback/model"]
+    assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
+
+
+def test_default_interpreter_repairs_stale_artifact_patch_before_fallback(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    calls: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        model_name = str(kwargs["model_name"])
+        calls.append(model_name)
+        wire_text = "\n".join(message["content"] for message in kwargs["messages"])
+        if "Focused artifact patch repair" not in wire_text:
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="refine",
+                user_goal_summary="Change the asset to Nvidia.",
+                semantic_turn_act="refine_current_idea",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="Test buying and holding Apple over the past year.",
+                    strategy_type="buy_and_hold",
+                    strategy_thesis=(
+                        "Test buying and holding Apple over the past year."
+                    ),
+                    asset_universe=["AAPL"],
+                    date_range="past year",
+                ),
+            )
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="refine",
+            user_goal_summary="Change the asset to Nvidia.",
+            semantic_turn_act="refine_current_idea",
+            candidate_strategy_draft=LLMStrategyDraft(asset_universe=["NVDA"]),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model", "fallback/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="Actually make it Nvidia.",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    raw_user_phrasing="Test buying and holding Apple over the past year.",
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Test buying and holding Apple over the past year.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range="last 1 year",
+                )
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert calls == ["primary/model", "primary/model"]
+    assert interpreter.last_status == "used"
+    assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
+
+
+def test_interpreter_uses_artifact_snapshot_instead_of_raw_history_for_refinements(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_messages: list[dict[str, str]] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        seen_messages.extend(kwargs["messages"])
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="refine",
+            user_goal_summary="Change the asset to Nvidia.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="Actually make it Nvidia.",
+                strategy_type="buy_and_hold",
+                asset_universe=["NVDA"],
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="Actually make it Nvidia.",
+            recent_thread_history=[
+                ConversationMessage(
+                    role="user",
+                    content="Test buying and holding Apple over the past year.",
+                ),
+                ConversationMessage(
+                    role="assistant",
+                    content=(
+                        "I read this as AAPL using a buy and hold approach over "
+                        "past year."
+                    ),
+                ),
+            ],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range="last 1 year",
+                )
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    wire_text = "\n".join(message["content"] for message in seen_messages)
+    assert "Prior strategy JSON" in wire_text
+    assert "I read this as AAPL" not in wire_text
+    assert "Test buying and holding Apple over the past year." not in wire_text
+
+
+def test_default_interpreter_rejects_result_explanation_without_latest_result(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    calls: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        model_name = str(kwargs["model_name"])
+        calls.append(model_name)
+        if model_name == "primary/model":
+            return LLMInterpretationResponse(
+                intent="results_explanation",
+                task_relation="new_task",
+                user_goal_summary="Claims a run result without a run.",
+                semantic_turn_act="answer_pending_need",
+                assistant_response="Microsoft beat SPY by 10.2%.",
+            )
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            user_goal_summary="Backtest Microsoft buy and hold.",
+            semantic_turn_act="new_idea",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="Did Microsoft beat SPY last year if I held it?",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold Microsoft for the last year.",
+                asset_universe=["MSFT"],
+                date_range="last year",
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model", "fallback/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="Did Microsoft beat SPY last year if I held it?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["primary/model", "fallback/model"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
+
+
+def test_default_interpreter_coerces_strategy_draft_mislabeled_as_result_context(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    async def fake_direct_schema(**_kwargs: Any) -> LLMInterpretationResponse:
+        return LLMInterpretationResponse(
+            intent="results_explanation",
+            task_relation="new_task",
+            user_goal_summary="Backtest Microsoft buy and hold.",
+            semantic_turn_act="result_followup",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="Did Microsoft beat SPY last year if I held it?",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Hold Microsoft for the last year.",
+                asset_universe=["MSFT"],
+                date_range="last year",
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="Did Microsoft beat SPY last year if I held it?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert result.intent == "strategy_drafting"
+    assert result.semantic_turn_act == "new_idea"
+    assert "coerced_result_explanation_to_strategy_draft" in result.reason_codes
+    assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
+
+
+def test_interpretation_llm_has_hard_turn_budget(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    monkeypatch.setenv("AGENT_MODEL", "primary/model")
+    monkeypatch.delenv("AGENT_FALLBACK_MODEL", raising=False)
+    monkeypatch.setattr(
+        llm_interpreter,
+        "build_openrouter_model",
+        lambda *_args, **_kwargs: SlowStructuredInterpreterModel(),
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_task_timeout_seconds",
+        lambda _task: 0.01,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract(),
+        model_name="primary/model",
+    )
+
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="what strategies can I test?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is None
+    assert interpreter.last_status == "failed"
 
 
 def test_result_breakdown_prompt_asks_for_fact_bank_references(
@@ -178,13 +1185,8 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
 ) -> None:
     from argus.api import chat_service
 
-    FakeChatOpenRouter.calls.clear()
-    FakeChatOpenRouter.invoked_messages.clear()
-    FakeChatOpenRouter.structured_invoked_messages.clear()
-    FakeChatOpenRouter.structured_response = None
-    FakeChatOpenRouter.invoke_content = None
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient()
 
     chat_service.llm_result_breakdown_message(
         {
@@ -201,16 +1203,21 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
                     }
                 }
             },
-        }
+        },
+        invoke_json_schema_func=fake_schema,
     )
 
-    system_prompt = FakeChatOpenRouter.structured_invoked_messages[0][0]["content"]
-    user_payload = FakeChatOpenRouter.structured_invoked_messages[0][1]["content"]
+    messages = fake_schema.calls[0]["messages"]
+    system_prompt = messages[0]["content"]
+    user_payload = messages[1]["content"]
     assert "non-template" in system_prompt.lower()
     assert "vary the section headings" in system_prompt.lower()
     assert "fact reference" in system_prompt.lower()
     assert "professional markdown" in system_prompt.lower()
     assert "capability truth" in system_prompt.lower()
+    assert "profitable trades" in system_prompt.lower()
+    assert "alternative benchmarks" in system_prompt.lower()
+    assert "stayed in cash" in system_prompt.lower()
     assert "fact_bank" in user_payload
     assert "runnable_next_tests" in user_payload
     assert "draft_only_or_future_tests" in user_payload
@@ -221,10 +1228,9 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
 ) -> None:
     from argus.api import chat_service
 
-    FakeChatOpenRouter.calls.clear()
-    FakeChatOpenRouter.invoked_messages.clear()
-    FakeChatOpenRouter.structured_invoked_messages.clear()
-    FakeChatOpenRouter.structured_response = {
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
         "sections": [
             {
                 "heading": "Reading this run",
@@ -263,10 +1269,8 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
                 ],
             },
         ]
-    }
-    FakeChatOpenRouter.invoke_content = None
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+        }
+    )
 
     text = chat_service.llm_result_breakdown_message(
         {
@@ -298,7 +1302,8 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
                     }
                 }
             },
-        }
+        },
+        invoke_json_schema_func=fake_schema,
     )
 
     assert text is not None
@@ -320,10 +1325,9 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
 ) -> None:
     from argus.api import chat_service
 
-    FakeChatOpenRouter.calls.clear()
-    FakeChatOpenRouter.invoked_messages.clear()
-    FakeChatOpenRouter.structured_invoked_messages.clear()
-    FakeChatOpenRouter.structured_response = {
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
         "sections": [
             {
                 "heading": "Reading this run",
@@ -364,10 +1368,8 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
                 ],
             },
         ]
-    }
-    FakeChatOpenRouter.invoke_content = None
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+        }
+    )
 
     text = chat_service.llm_result_breakdown_message(
         {
@@ -386,7 +1388,8 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
                 }
             },
             "assumptions": ["Universe: BABA.", "Benchmark: SPY."],
-        }
+        },
+        invoke_json_schema_func=fake_schema,
     )
 
     assert text is not None
@@ -407,10 +1410,9 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
 def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> None:
     from argus.api import chat_service
 
-    FakeChatOpenRouter.calls.clear()
-    FakeChatOpenRouter.invoked_messages.clear()
-    FakeChatOpenRouter.structured_invoked_messages.clear()
-    FakeChatOpenRouter.structured_response = {
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
         "sections": [
             {
                 "heading": "Invented future",
@@ -420,10 +1422,8 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
                 ],
             }
         ]
-    }
-    FakeChatOpenRouter.invoke_content = None
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+        }
+    )
 
     text = chat_service.llm_result_breakdown_message(
         {
@@ -441,7 +1441,8 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
                 }
             },
             "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
-        }
+        },
+        invoke_json_schema_func=fake_schema,
     )
 
     assert text is None
@@ -450,10 +1451,9 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
 def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
     from argus.api import chat_service
 
-    FakeChatOpenRouter.calls.clear()
-    FakeChatOpenRouter.invoked_messages.clear()
-    FakeChatOpenRouter.structured_invoked_messages.clear()
-    FakeChatOpenRouter.structured_response = {
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
         "sections": [
             {
                 "heading": "Too thin",
@@ -463,10 +1463,8 @@ def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
                 ],
             }
         ]
-    }
-    FakeChatOpenRouter.invoke_content = None
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+        }
+    )
 
     text = chat_service.llm_result_breakdown_message(
         {
@@ -484,7 +1482,8 @@ def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
                 }
             },
             "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
-        }
+        },
+        invoke_json_schema_func=fake_schema,
     )
 
     assert text is None
@@ -554,17 +1553,18 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
 
     text = result_breakdown_message(run)
 
-    assert "### What Was Tested" in text
-    assert "### What Happened" in text
-    assert "### Benchmark Context" in text
-    assert "### Risk Read" in text
-    assert "### Assumptions" in text
-    assert "### What To Try Next" in text
+    assert "### Run Lens" in text
+    assert "### Performance Read" in text
+    assert "### Risk And Assumptions" in text
+    assert "### Discovery Path" in text
     assert "**Total return:** +39.5%." in text
+    assert "Entry rule: buy at the start of the period" in text
     assert "AAPL Buy and Hold" in text
     assert "+39.5%" in text
     assert "SPY" in text
     assert "-13.8%" in text
+    assert "supported RSI threshold" in text
+    assert "compare against buy-and-hold" not in text
     assert "not a prediction" in text.lower()
     assert "trading recommendation" in text.lower()
 
@@ -606,7 +1606,9 @@ async def test_agent_runtime_turn_uses_interpretation_profile_without_legacy_com
         {
             "model_name": "custom/model",
             "temperature": 0,
-            "max_tokens": 1200,
+            "max_tokens": 3200,
+            "timeout": 12,
+            "max_retries": 1,
             "openrouter_api_key": "test-key",
         }
     ]
@@ -630,7 +1632,56 @@ def test_openrouter_failure_log_includes_visible_diagnostics(monkeypatch) -> Non
     message, kwargs = observed[0]
     assert "task=interpretation" in message
     assert "model=test/model" in message
-    assert "max_tokens=1200" in message
+    assert "max_tokens=3200" in message
     assert "error_type=RuntimeError" in message
     assert "provider rejected request" not in message
     assert kwargs["error_type"] == "RuntimeError"
+
+
+def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
+    monkeypatch,
+) -> None:
+    observed_payloads: list[dict[str, Any]] = []
+
+    class FakeAsyncClient:
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def post(self, _url: str, **kwargs: Any) -> object:
+            observed_payloads.append(kwargs["json"])
+
+            class FakeResponse:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict[str, Any]:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": '{"intent":"conversation_followup","task_relation":"new_task","requires_clarification":false,"user_goal_summary":"hi","candidate_strategy_draft":{},"missing_required_fields":[],"assistant_response":"Hi.","uses_latest_result_context":false,"confidence":0.8,"reason_codes":[],"ambiguous_fields":[],"unsupported_constraints":[],"response_profile_overrides":{},"semantic_turn_act":"educational_question","result_followup_focus":null}'
+                                }
+                            }
+                        ]
+                    }
+
+            return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("AGENT_MODEL", "qwen/qwen3.5-9b")
+    monkeypatch.setattr(openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient())
+
+    result = asyncio.run(
+        openrouter.invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=[{"role": "user", "content": "hello"}],
+            schema_model=LLMInterpretationResponse,
+            schema_name="LLMInterpretationResponse",
+        )
+    )
+
+    assert result is not None
+    assert observed_payloads[0]["reasoning"] == {"effort": "none"}

@@ -28,6 +28,7 @@ import {
   deleteConversation,
   deleteStrategy,
   formatRelativeDate,
+  getBacktestRun,
   getMe,
   getConversationMessages,
   getStarterPrompts,
@@ -77,6 +78,12 @@ type HydratedMessages = {
   inputActions: ChatActionOption[];
 };
 
+type ConsumedResultAction = {
+  type: "show_breakdown" | "save_strategy";
+  runId?: string;
+  savedStrategyId?: string | null;
+};
+
 function readActiveConversationId() {
   if (typeof window === "undefined") return null;
   try {
@@ -106,7 +113,54 @@ function clearActiveConversationId() {
 
 function latestInputActions(messages: Message[]) {
   const latestAi = [...messages].reverse().find((message) => message.role === "ai");
+  if (
+    latestAi?.kind === "strategy_confirmation" ||
+    latestAi?.kind === "strategy_result"
+  ) {
+    return [];
+  }
   return (latestAi?.actions ?? []).filter((action) => action.type !== "save_strategy");
+}
+
+const CARD_SCOPED_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>([
+  "run_backtest",
+  "change_dates",
+  "change_asset",
+  "adjust_assumptions",
+  "cancel_confirmation",
+  "show_breakdown",
+  "refine_strategy",
+  "save_strategy",
+]);
+
+function isCardScopedAction(action: ChatActionOption) {
+  return Boolean(action.type && CARD_SCOPED_ACTION_TYPES.has(action.type));
+}
+
+function visibleInputActions(actions: ChatActionOption[]) {
+  return actions.filter((action) => action.type !== "save_strategy");
+}
+
+function visibleComposerActions(actions: ChatActionOption[]) {
+  return visibleInputActions(actions).filter((action) => !isCardScopedAction(action));
+}
+
+function hasActiveArtifactActionSet(messages: Message[]) {
+  const latestAi = [...messages].reverse().find((message) => message.role === "ai");
+  if (!latestAi) {
+    return false;
+  }
+  if (latestAi.kind === "strategy_confirmation" && latestAi.confirmation) {
+    const activeActions = latestAi.confirmation.confirmation_state !== "superseded"
+      ? latestAi.confirmation.actions ?? latestAi.actions ?? []
+      : [];
+    return activeActions.length > 0;
+  }
+  if (latestAi.kind === "strategy_result" && latestAi.result) {
+    const activeActions = latestAi.result.actions ?? latestAi.actions ?? [];
+    return activeActions.length > 0;
+  }
+  return false;
 }
 
 function isBreakdownActionMetadata(metadata: Record<string, unknown>) {
@@ -119,6 +173,16 @@ function isBreakdownActionMetadata(metadata: Record<string, unknown>) {
   );
 }
 
+function isSaveActionMetadata(metadata: Record<string, unknown>) {
+  const chatAction = metadata.chat_action;
+  return (
+    typeof chatAction === "object" &&
+    chatAction !== null &&
+    "type" in chatAction &&
+    chatAction.type === "save_strategy"
+  );
+}
+
 function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[]) {
   if (action.type === "show_breakdown") {
     return actions.filter((candidate) => candidate.type !== "show_breakdown");
@@ -128,6 +192,130 @@ function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[
 
 function resultActionRequiresRunContext(action: ChatActionOption) {
   return action.type === "show_breakdown" || action.type === "save_strategy";
+}
+
+function resultActionRunId(action: ChatActionOption | undefined) {
+  const rawRunId = action?.payload?.run_id ?? action?.payload?.runId;
+  return typeof rawRunId === "string" && rawRunId.trim() ? rawRunId.trim() : undefined;
+}
+
+function consumedResultActionsFromApi(items: ApiMessage[]): ConsumedResultAction[] {
+  return items.flatMap((message) => {
+    const metadata = message.metadata ?? {};
+    const action = metadata.chat_action as ChatActionOption | undefined;
+    if (isBreakdownActionMetadata(metadata)) {
+      return [{ type: "show_breakdown", runId: resultActionRunId(action) }];
+    }
+    if (message.role === "assistant" && isSaveActionMetadata(metadata)) {
+      const savedStrategyId = savedStrategyIdFromMetadata(metadata);
+      if (!savedStrategyId) {
+        return [];
+      }
+      return [
+        {
+          type: "save_strategy",
+          runId: stringOrNull(metadata.result_run_id) ?? resultActionRunId(action),
+          savedStrategyId,
+        },
+      ];
+    }
+    return [];
+  });
+}
+
+function hiddenSaveActionMessageIdsFromApi(items: ApiMessage[]) {
+  const hiddenIds = new Set<string>();
+  items.forEach((message, index) => {
+    const metadata = message.metadata ?? {};
+    if (message.role !== "assistant" || !isSaveActionMetadata(metadata)) {
+      return;
+    }
+    if (!savedStrategyIdFromMetadata(metadata)) {
+      return;
+    }
+    const action = metadata.chat_action as ChatActionOption | undefined;
+    const runId = stringOrNull(metadata.result_run_id) ?? resultActionRunId(action);
+    hiddenIds.add(message.id);
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const candidate = items[cursor];
+      const candidateMetadata = candidate.metadata ?? {};
+      if (candidate.role !== "user" || !isSaveActionMetadata(candidateMetadata)) {
+        continue;
+      }
+      const candidateAction = candidateMetadata.chat_action as ChatActionOption | undefined;
+      if (!runId || resultActionRunId(candidateAction) === runId) {
+        hiddenIds.add(candidate.id);
+        return;
+      }
+    }
+  });
+  return hiddenIds;
+}
+
+function resultActionWasConsumed(
+  action: ChatActionOption,
+  resultRunId: string | undefined,
+  consumedActions: ConsumedResultAction[],
+) {
+  return consumedActions.some((consumed) => {
+    if (consumed.type !== action.type) {
+      return false;
+    }
+    if (!consumed.runId) {
+      return true;
+    }
+    return consumed.runId === resultRunId;
+  });
+}
+
+function applyConsumedResultActions(
+  messages: Message[],
+  consumedActions: ConsumedResultAction[],
+): Message[] {
+  if (consumedActions.length === 0) {
+    return messages;
+  }
+  return messages.map((message) => {
+    if (message.kind !== "strategy_result" || !message.result) {
+      return message;
+    }
+    const resultRunId = message.result.runId;
+    const savedEffect = consumedActions.find(
+      (consumed) =>
+        consumed.type === "save_strategy" &&
+        (!consumed.runId || consumed.runId === resultRunId),
+    );
+    const savedStrategyId = savedEffect?.savedStrategyId ?? message.savedStrategyId ?? null;
+    const resultActions = (message.result.actions ?? []).filter(
+      (action) => !resultActionWasConsumed(action, resultRunId, consumedActions),
+    );
+    const messageActions = (message.actions ?? []).filter(
+      (action) => !resultActionWasConsumed(action, resultRunId, consumedActions),
+    );
+    return {
+      ...message,
+      savedStrategyId,
+      actions: messageActions,
+      result: {
+        ...message.result,
+        savedStrategyId,
+        strategyId: message.result.strategyId ?? savedStrategyId,
+        actions: resultActions,
+      },
+    };
+  });
+}
+
+function consumeResultActionOnMessages(
+  messages: Message[],
+  action: ChatActionOption | undefined,
+): Message[] {
+  if (action?.type !== "show_breakdown") {
+    return messages;
+  }
+  return applyConsumedResultActions(messages, [
+    { type: "show_breakdown", runId: resultActionRunId(action) },
+  ]);
 }
 
 function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
@@ -164,15 +352,158 @@ function hydrateResultActions(
         conversation_id: context.conversationId,
         strategy_name: context.strategyName,
         symbols: context.symbols ?? [],
-        template: context.template ?? "",
-        asset_class: context.assetClass ?? "equity",
+        ...(context.template !== undefined ? { template: context.template } : {}),
+        ...(context.assetClass ? { asset_class: context.assetClass } : {}),
       },
       value: action.value,
     }));
 }
 
+function stringOrNull(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function recordOrNull(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringArrayOrNull(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const values = value.map(String).filter(Boolean);
+  return values.length > 0 ? values : null;
+}
+
+function assetClassOrUndefined(value: unknown): AssetClass | undefined {
+  return value === "crypto" || value === "equity" ? value : undefined;
+}
+
+function resultActionContextFromMetadata(
+  metadata: Record<string, unknown>,
+  card: ReturnType<typeof resultCardFromConversationCard>,
+) {
+  const factBank = recordOrNull(metadata.result_fact_bank);
+  const configSnapshot = recordOrNull(factBank?.config_snapshot);
+  const symbols = card.symbols ?? stringArrayOrNull(factBank?.symbols) ?? [];
+  return {
+    symbols,
+    template: stringOrNull(configSnapshot?.template),
+    assetClass: assetClassOrUndefined(factBank?.asset_class),
+  };
+}
+
+function savedStrategyIdFromMetadata(metadata: Record<string, unknown>) {
+  return stringOrNull(metadata.saved_strategy_id);
+}
+
+function savedStrategyIdFromFinalPayload(payload: Record<string, unknown>) {
+  return stringOrNull(payload.saved_strategy_id);
+}
+
+function resultRunIdFromFinalPayload(
+  payload: Record<string, unknown>,
+  action?: ChatActionOption,
+) {
+  const run = payload.run;
+  const runId =
+    typeof run === "object" && run !== null && "id" in run
+      ? stringOrNull(run.id)
+      : null;
+  return (
+    stringOrNull(payload.result_run_id) ??
+    stringOrNull(payload.latest_run_id) ??
+    runId ??
+    stringOrNull(action?.payload?.run_id)
+  );
+}
+
+function markComposerActionsInactive(messages: Message[]): Message[] {
+  return messages.map((message) => {
+    if (message.kind === "strategy_result" && message.result) {
+      const resultActions = message.result.actions ?? message.actions;
+      return {
+        ...message,
+        actions: undefined,
+        result: {
+          ...message.result,
+          actions: resultActions,
+        },
+      };
+    }
+    if (message.kind === "strategy_confirmation" && message.confirmation) {
+      const confirmationActions = message.confirmation.actions ?? message.actions;
+      return {
+        ...message,
+        actions: undefined,
+        confirmation: {
+          ...message.confirmation,
+          actions: confirmationActions,
+        },
+      };
+    }
+    return message.actions ? { ...message, actions: undefined } : message;
+  });
+}
+
+function markResultCardSaved(
+  messages: Message[],
+  runId: string | null,
+  savedStrategyId: string,
+): Message[] {
+  if (!runId) return messages;
+  return messages.map((message) => {
+    if (message.kind !== "strategy_result" || !message.result || message.result.runId !== runId) {
+      return message;
+    }
+    const resultActions = message.result.actions?.map((action) =>
+      action.type === "save_strategy" ? { ...action, savedStrategyId } : action,
+    );
+    const messageActions = message.actions?.map((action) =>
+      action.type === "save_strategy" ? { ...action, savedStrategyId } : action,
+    );
+    return {
+      ...message,
+      savedStrategyId,
+      savingStrategy: false,
+      actions: messageActions ?? resultActions ?? message.actions,
+      result: {
+        ...message.result,
+        savedStrategyId,
+        savingStrategy: false,
+        strategyId: message.result.strategyId ?? savedStrategyId,
+        actions: resultActions ?? message.result.actions,
+      },
+    };
+  });
+}
+
+function markResultCardSaving(
+  messages: Message[],
+  runId: string | null,
+  savingStrategy: boolean,
+): Message[] {
+  if (!runId) return messages;
+  return messages.map((message) => {
+    if (message.kind !== "strategy_result" || !message.result || message.result.runId !== runId) {
+      return message;
+    }
+    return {
+      ...message,
+      result: {
+        ...message.result,
+        savingStrategy,
+      },
+    };
+  });
+}
+
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
-  const messages: Message[] = items.map((m) => {
+  const consumedResultActions = consumedResultActionsFromApi(items);
+  const hiddenMessageIds = hiddenSaveActionMessageIdsFromApi(items);
+  const messages: Message[] = items.filter((m) => !hiddenMessageIds.has(m.id)).map((m) => {
     const metadata = m.metadata ?? {};
     const chatAction = metadata.chat_action as ChatActionOption | undefined;
     const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
@@ -197,26 +528,37 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         typeof metadata.result_conversation_id === "string"
           ? metadata.result_conversation_id
           : m.conversation_id;
+      const resultStrategyId = stringOrNull(metadata.result_strategy_id);
+      const savedStrategyId = savedStrategyIdFromMetadata(metadata);
       const card = resultCardFromConversationCard(resultCard, {
         id: runId,
-        strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
+        strategy_id: resultStrategyId,
       });
+      const resultActionContext = resultActionContextFromMetadata(metadata, card);
       const restoredActions = hydrateResultActions(card.actions ?? [], {
         runId: card.runId,
         strategyId: card.strategyId,
         conversationId,
         strategyName: card.strategyName,
-        symbols: card.symbols ?? [],
-        template: "",
-        assetClass: "equity",
+        symbols: resultActionContext.symbols,
+        template: resultActionContext.template ?? undefined,
+        assetClass: resultActionContext.assetClass,
       });
       return {
         id: m.id,
         role: "ai",
         kind: "strategy_result",
         content: m.content,
-        result: { ...card, actions: restoredActions },
+        result: {
+          ...card,
+          symbols: resultActionContext.symbols,
+          template: resultActionContext.template ?? undefined,
+          assetClass: resultActionContext.assetClass,
+          savedStrategyId,
+          actions: restoredActions,
+        },
         actions: restoredActions,
+        savedStrategyId,
       };
     }
     if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
@@ -234,10 +576,17 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
       role: m.role === "user" ? "user" : "ai",
       kind: "text",
       content: m.content,
+      contentPresentation:
+        m.role !== "user" && isBreakdownActionMetadata(metadata)
+          ? "result_breakdown"
+          : undefined,
     };
   });
 
-  const normalized = normalizeConfirmationHistory(messages);
+  const normalized = applyConsumedResultActions(
+    normalizeConfirmationHistory(messages),
+    consumedResultActions,
+  );
   return { messages: normalized, inputActions: latestInputActions(normalized) };
 }
 
@@ -429,9 +778,6 @@ export default function ChatInterface() {
       template: String(run.config_snapshot?.template ?? ""),
       assetClass: run.asset_class,
     });
-
-  const visibleInputActions = (actions: ChatActionOption[]) =>
-    actions.filter((action) => action.type !== "save_strategy");
 
   const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({
@@ -665,6 +1011,47 @@ export default function ChatInterface() {
     }
   };
 
+  const loadConversationForRun = async (item: Pick<HistoryItem | SearchItem, "id" | "conversation_id">) => {
+    if (item.conversation_id) {
+      void loadConversation(item.conversation_id);
+      return;
+    }
+    try {
+      const { run } = await getBacktestRun(item.id);
+      if (run.conversation_id) {
+        void loadConversation(run.conversation_id);
+        return;
+      }
+    } catch {
+      // Fall through to the chat surface if the run is unavailable.
+    }
+    setCurrentView("chat");
+    setIsSidebarOpen(false);
+  };
+
+  const openHistoryItem = (item: HistoryItem | SearchItem) => {
+    if (item.type === "chat") {
+      void loadConversation(item.id);
+      return;
+    }
+    if (item.type === "strategy") {
+      setCurrentView("strategies");
+      setIsSidebarOpen(false);
+      return;
+    }
+    if (item.type === "collection") {
+      setCurrentView("collections");
+      setIsSidebarOpen(false);
+      return;
+    }
+    if (item.type === "run") {
+      void loadConversationForRun(item);
+      return;
+    }
+    setCurrentView("chat");
+    setIsSidebarOpen(false);
+  };
+
   // ── Start new chat ─────────────────────────────────────────────────────────
 
   const startNewChat = async () => {
@@ -748,9 +1135,16 @@ export default function ChatInterface() {
     const assistantId = crypto.randomUUID();
 
     setMessages((prev) => [
-      ...prev.map((m) => ({ ...m, actions: undefined })),
+      ...consumeResultActionOnMessages(markComposerActionsInactive(prev), action),
       userMsg,
-      { id: assistantId, role: "ai", kind: "text", content: "" },
+      {
+        id: assistantId,
+        role: "ai",
+        kind: "text",
+        content: "",
+        contentPresentation:
+          action?.type === "show_breakdown" ? "result_breakdown" : undefined,
+      },
     ]);
     setInputActions([]);
     setStreamStatus(null);
@@ -769,6 +1163,7 @@ export default function ChatInterface() {
         setStreamStatus(t(`chat.status.${event.data.stage}`) || t('chat.status.preparing'));
       }
       if (event.event === "token") {
+        setStreamStatus(null);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
@@ -795,11 +1190,23 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "final") {
+        setStreamStatus(null);
+        const finalPayload = event.data as typeof event.data & Record<string, unknown>;
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
+        const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
+        if (action?.type === "save_strategy" && savedStrategyId) {
+          setMessages((prev) =>
+            markResultCardSaved(
+              prev,
+              resultRunIdFromFinalPayload(finalPayload, action),
+              savedStrategyId,
+            ),
+          );
+        }
         if (event.data.confirmation) {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
-          setInputActions(confirmation.actions ?? []);
+          setInputActions([]);
           setMessages((prev) =>
             normalizeConfirmationHistory(
               prev.map((m) =>
@@ -809,6 +1216,7 @@ export default function ChatInterface() {
                       kind: "strategy_confirmation",
                       content: undefined,
                       confirmation,
+                      actions: confirmation.actions ?? [],
                     }
                   : m,
               ),
@@ -818,8 +1226,12 @@ export default function ChatInterface() {
           const run = event.data.run as BacktestRun;
           const baseCard = resultCardFromRun(run);
           const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
-          const card = { ...baseCard, actions: resultActions };
-          setInputActions(visibleInputActions(resultActions));
+          const card = {
+            ...baseCard,
+            savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
+            actions: resultActions,
+          };
+          setInputActions([]);
           setMessages((prev) =>
             normalizeConfirmationHistory(
               prev.map((m) =>
@@ -830,6 +1242,7 @@ export default function ChatInterface() {
                     content: m.content || finalText || undefined,
                     result: card,
                     actions: resultActions,
+                    savedStrategyId: card.savedStrategyId,
                     }
                   : m,
               ),
@@ -839,7 +1252,14 @@ export default function ChatInterface() {
           setMessages((prev) => {
             const nextMessages = prev.map((m) =>
               m.id === assistantId && !m.content
-                ? { ...m, content: finalText }
+                ? {
+                    ...m,
+                    content: finalText,
+                    contentPresentation:
+                      action?.type === "show_breakdown"
+                        ? "result_breakdown"
+                        : m.contentPresentation,
+                  }
                 : m,
             );
             if (
@@ -931,7 +1351,7 @@ export default function ChatInterface() {
 
     setMessages((prev) => {
       shouldAutoScrollRef.current = true;
-      const base = prev.map((m) => ({ ...m, actions: undefined }));
+      const base = markComposerActionsInactive(prev);
       if (isSkip) {
         return [...base, { id: assistantId, role: "ai", kind: "text", content: "" }];
       }
@@ -1015,8 +1435,60 @@ export default function ChatInterface() {
     }
   };
 
+  const handleSaveStrategyAction = async (action: ChatActionOption) => {
+    if (!conversationId) return;
+    const runId = resultActionRunId(action) ?? null;
+    const streamInput: ChatActionRequest = {
+      type: "save_strategy",
+      label: action.label,
+      payload: action.payload,
+      presentation: action.presentation,
+    };
+
+    try {
+      setMessages((prev) => markResultCardSaving(prev, runId, true));
+      await streamChatMessage(conversationId, streamInput, i18n.language, (event) => {
+        if (event.event === "final") {
+          const finalPayload = event.data as typeof event.data & Record<string, unknown>;
+          const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
+          if (savedStrategyId) {
+            setMessages((prev) =>
+              markResultCardSaved(
+                prev,
+                resultRunIdFromFinalPayload(finalPayload, action),
+                savedStrategyId,
+              ),
+            );
+            showToast(t("chat.saved"));
+          } else if (event.data.assistant_response) {
+            showToast(event.data.assistant_response);
+          }
+        }
+        if (event.event === "error") {
+          showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
+        }
+        if (event.event === "done") {
+          refreshHistory();
+        }
+      }, []);
+    } catch (err: unknown) {
+      const message =
+        err instanceof ChatStreamError && err.message
+          ? err.message
+          : t('chat.error_generic');
+          showToast(message);
+    }
+    finally {
+      setMessages((prev) => markResultCardSaving(prev, runId, false));
+    }
+  };
+
   const handleAction = (action: ChatActionOption) => {
     const value = action.value ?? "";
+    if (action.type === "save_strategy") {
+      void handleSaveStrategyAction(action);
+      return;
+    }
     if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
       if (action.payload) {
         setCollectionPickerTarget({
@@ -1102,9 +1574,9 @@ export default function ChatInterface() {
         runId: res.runId ?? "",
         strategyId: res.strategyId ?? null,
         strategyName: res.strategyName,
-        symbols: [],
-        template: "",
-        assetClass: "equity",
+        symbols: res.symbols ?? [],
+        template: res.template ?? "",
+        assetClass: res.assetClass ?? "equity",
       });
       closeChatOptions();
     } else {
@@ -1145,6 +1617,9 @@ export default function ChatInterface() {
 
     return groups;
   }, [historyItems, t]);
+  const composerActions = hasActiveArtifactActionSet(messages)
+    ? []
+    : visibleComposerActions(inputActions);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1260,33 +1735,7 @@ export default function ChatInterface() {
                         {searchResults.map((item) => (
                           <button
                             key={`${item.type}:${item.id}`}
-                            onClick={() => {
-                              if (item.type === "chat") {
-                                void loadConversation(item.id);
-                                return;
-                              }
-                              if (item.type === "strategy") {
-                                setCurrentView("strategies");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "collection") {
-                                setCurrentView("collections");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "run") {
-                                if (item.conversation_id) {
-                                  void loadConversation(item.conversation_id);
-                                } else {
-                                  setCurrentView("chat");
-                                  setIsSidebarOpen(false);
-                                }
-                                return;
-                              }
-                              setCurrentView("chat");
-                              setIsSidebarOpen(false);
-                            }}
+                            onClick={() => openHistoryItem(item)}
                             className="group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
                           >
                             <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
@@ -1331,33 +1780,7 @@ export default function ChatInterface() {
                         {group.items.map((item) => (
                           <button
                             key={`${item.type}:${item.id}`}
-                            onClick={() => {
-                              if (item.type === "chat") {
-                                void loadConversation(item.id);
-                                return;
-                              }
-                              if (item.type === "strategy") {
-                                setCurrentView("strategies");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "collection") {
-                                setCurrentView("collections");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "run") {
-                                if (item.conversation_id) {
-                                  void loadConversation(item.conversation_id);
-                                } else {
-                                  setCurrentView("chat");
-                                  setIsSidebarOpen(false);
-                                }
-                                return;
-                              }
-                              setCurrentView("chat");
-                              setIsSidebarOpen(false);
-                            }}
+                            onClick={() => openHistoryItem(item)}
                             className={`group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 ${ item.type === "chat" && conversationId === item.id ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
                           >
                             <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
@@ -1714,9 +2137,9 @@ export default function ChatInterface() {
                         </button>
                       </div>
                     )}
-                    {visibleInputActions(inputActions).length > 0 && !streamStatus && (
+                    {composerActions.length > 0 && !streamStatus && (
                       <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {visibleInputActions(inputActions).map((action) => (
+                        {composerActions.map((action) => (
                           <button
                             key={action.id ?? action.type ?? action.label}
                             type="button"

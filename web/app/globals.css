@@ -313,3 +313,210 @@ body {
 .dark .prose code {
   background: rgba(255, 255, 255, 0.1);
 }
+
+.argus-result-readout {
+  position: relative;
+  max-width: 64ch;
+  border-left: 2px solid rgba(31, 35, 40, 0.16);
+  padding: 0.1rem 0 0.1rem 1.1rem;
+  color: rgba(0, 0, 0, 0.78);
+  font-size: 0.95rem;
+  line-height: 1.58;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+
+.argus-result-readout::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 0;
+  width: 2px;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.dark .argus-result-readout {
+  border-left-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.dark .argus-result-readout::before {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.argus-result-readout.prose p {
+  margin-bottom: 0.65rem;
+}
+
+.argus-result-readout.prose p:first-child {
+  margin-bottom: 0.5rem;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.dark .argus-result-readout.prose p:first-child {
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.argus-result-readout.prose p:nth-of-type(2) {
+  margin-bottom: 0.8rem;
+  max-width: 58ch;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 1rem;
+  line-height: 1.56;
+}
+
+.dark .argus-result-readout.prose p:nth-of-type(2) {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.argus-result-readout.prose ul {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding-left: 0;
+}
+
+.argus-result-readout.prose li {
+  position: relative;
+  margin-bottom: 0;
+  padding-left: 1.05rem;
+  color: rgba(0, 0, 0, 0.68);
+}
+
+.argus-result-readout.prose li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 9999px;
+  background: rgba(35, 42, 52, 0.38);
+}
+
+.dark .argus-result-readout.prose li {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.dark .argus-result-readout.prose li::before {
+  background: rgba(201, 201, 205, 0.42);
+}
+
+.argus-result-readout.prose li::marker {
+  content: "";
+}
+
+.argus-result-readout.prose strong {
+  font-weight: 650;
+  color: rgba(0, 0, 0, 0.86);
+}
+
+.dark .argus-result-readout.prose strong {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.argus-result-breakdown {
+  position: relative;
+  max-width: 68ch;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 1.05rem;
+  color: rgba(0, 0, 0, 0.76);
+  font-size: 0.96rem;
+  line-height: 1.62;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+
+.argus-result-breakdown::before {
+  content: "Breakdown";
+  display: inline-flex;
+  margin-bottom: 0.55rem;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.dark .argus-result-breakdown {
+  border-top-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dark .argus-result-breakdown::before {
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.argus-result-breakdown.prose h3 {
+  margin: 1.05rem 0 0.35rem;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.94rem;
+  font-weight: 680;
+  line-height: 1.2;
+  color: rgba(0, 0, 0, 0.9);
+}
+
+.argus-result-breakdown.prose h3:first-child {
+  margin-top: 0;
+}
+
+.dark .argus-result-breakdown.prose h3 {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.argus-result-breakdown.prose p {
+  margin-bottom: 0.75rem;
+}
+
+.argus-result-breakdown.prose ul {
+  display: grid;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0.75rem 0 0.95rem;
+  padding-left: 0;
+}
+
+.argus-result-breakdown.prose li {
+  position: relative;
+  margin-bottom: 0;
+  padding-left: 1.05rem;
+}
+
+.argus-result-breakdown.prose li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 0.26rem;
+  height: 0.26rem;
+  border-radius: 9999px;
+  background: rgba(38, 77, 88, 0.45);
+}
+
+.dark .argus-result-breakdown.prose li::before {
+  background: rgba(146, 184, 193, 0.52);
+}
+
+.argus-result-breakdown.prose li::marker {
+  content: "";
+}
+
+.argus-result-breakdown.prose strong {
+  font-weight: 680;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.dark .argus-result-breakdown.prose strong {
+  color: rgba(255, 255, 255, 0.88);
+}

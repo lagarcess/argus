@@ -70,8 +70,28 @@ def _confirmation_metadata() -> dict[str, Any]:
                 "date_range": "past year",
             },
             "optional_parameters": {},
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": ["AAPL"],
+                "timeframe": "1D",
+                "date_range": {"start": "2025-05-14", "end": "2026-05-14"},
+                "entry_rule": None,
+                "exit_rule": None,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000,
+                "position_size": None,
+                "cadence": None,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "en",
+            },
+            "validation": {"status": "ready_to_run", "executable": True},
         },
         "confirmation_card": {
+            "confirmation_id": "confirm-aapl",
+            "confirmation_state": "active",
             "title": "AAPL buy and hold",
             "statusLabel": "Ready to run",
             "summary": "I read this as AAPL using a buy and hold approach.",
@@ -87,7 +107,7 @@ def _confirmation_metadata() -> dict[str, Any]:
                     "type": "run_backtest",
                     "label": "Run backtest",
                     "presentation": "confirmation",
-                    "payload": {},
+                    "payload": {"confirmation_id": "confirm-aapl"},
                 }
             ],
         },
@@ -196,6 +216,73 @@ def test_confirmation_action_uses_structured_metadata_only_when_checkpoint_missi
     assert captured["thread_id"] == conversation["id"]
     run = _stream_payloads(response.text, "final")[0]["run"]
     assert run["symbols"] == ["AAPL"]
+
+
+def test_confirmation_action_prefers_visible_card_metadata_over_checkpoint(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _checkpoint(**_: Any):
+        return {
+            "stage_outcome": "await_approval",
+            "latest_task_snapshot": TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Stale checkpoint draft.",
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                    date_range="past year",
+                )
+            ),
+        }
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Used visible card context.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=_confirmation_metadata(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-aapl"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    fallback_payload = captured["fallback_confirmation_payload"]
+    assert fallback_payload["launch_payload"]["symbol"] == "AAPL"
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
 
 
 def test_pending_strategy_metadata_fallback_carries_text_turn_context(
@@ -583,6 +670,206 @@ def test_result_followup_after_reload_carries_latest_run_reference(
         == -4.2
     )
     assert reference.metadata["conversation_id"] == conversation["id"]
+
+
+def test_result_followup_after_reload_preserves_saved_strategy_id() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import latest_result_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    strategy_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=strategy_id,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 8.1}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["AAPL"]},
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+8.1%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Saved AAPL buy and hold to Strategies.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_strategy_id": strategy_id,
+            "saved_strategy_id": strategy_id,
+        },
+    )
+
+    fallback = latest_result_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.metadata["saved_strategy_id"] == strategy_id
+    assert reference.metadata["result_strategy_id"] == strategy_id
+    assert reference.metadata["latest_run_id"] == run_id
+
+
+def test_retry_after_reload_carries_latest_failed_action_reference(monkeypatch) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "approved_for_execution",
+                "assistant_response": "Retrying the same backtest.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "MSFT",
+        "symbols": ["MSFT"],
+        "timeframe": "1D",
+        "date_range": {"start": "2025-05-13", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I still have the MSFT buy-and-hold draft, but market data failed.",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "failed_action": {
+                "action_type": "run_backtest",
+                "launch_payload": launch_payload,
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+            },
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Can you try again?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    reference = snapshot.latest_failed_action_reference
+    assert reference is not None
+    assert reference.artifact_kind == "failed_action"
+    assert reference.metadata["launch_payload"] == launch_payload
+
+
+def test_failed_action_fallback_is_superseded_by_newer_completed_result() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import failed_action_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "NVDA",
+        "symbols": ["NVDA"],
+        "timeframe": "1D",
+        "date_range": {"start": "2026-01-01", "end": "2026-05-13"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The run failed.",
+        metadata={
+            "latest_failed_action_reference": {
+                "artifact_kind": "failed_action",
+                "artifact_id": "failed-action-1",
+                "artifact_status": "failed",
+                "metadata": {
+                    "action_type": "run_backtest",
+                    "launch_payload": launch_payload,
+                },
+            }
+        },
+    )
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["NVDA"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.0}}},
+        config_snapshot={"template": "buy_and_hold", "symbols": ["NVDA"]},
+        conversation_result_card={
+            "title": "NVDA buy and hold",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total Return", "value": "+12.0%"}
+            ],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Here is the completed result.",
+        metadata={"result_run_id": run_id, "latest_run_id": run_id},
+    )
+
+    fallback = failed_action_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is None
 
 
 def test_save_strategy_action_without_canonical_run_id_does_not_save_latest() -> None:

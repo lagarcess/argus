@@ -152,6 +152,133 @@ def test_resolve_asset_rejects_unknown_symbol(monkeypatch: pytest.MonkeyPatch) -
         assets.resolve_asset("NOTREAL")
 
 
+def test_live_provider_mode_fails_closed_when_provider_catalog_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(
+        assets,
+        "_load_assets_from_alpaca",
+        lambda: (_ for _ in ()).throw(ValueError("asset_universe_unavailable")),
+    )
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
+
+    with pytest.raises(ValueError, match="asset_universe_unavailable"):
+        assets.resolve_asset("Apple")
+
+
+def test_synthetic_unit_fixture_is_explicitly_opted_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+
+    apple = assets.resolve_asset("Apple")
+    nvidia = assets.search_assets("nvidia")[0]
+
+    assert apple.canonical_symbol == "AAPL"
+    assert apple.asset_class == "equity"
+    assert nvidia.canonical_symbol == "NVDA"
+
+
+def test_recorded_provider_fixture_uses_provider_shaped_payloads(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    fixture_path = tmp_path / "asset-catalog.json"
+    fixture_path.write_text(
+        """
+        {
+          "manifest": {
+            "provider_mode": "recorded_provider_fixture",
+            "snapshot_date": "2026-05-13",
+            "sources": ["alpaca:/v2/assets", "kraken:/public/AssetPairs"]
+          },
+          "alpaca_assets": [
+            {
+              "symbol": "AAPL",
+              "name": "Apple Inc.",
+              "asset_class": "us_equity",
+              "status": "active"
+            }
+          ],
+          "kraken_asset_pairs": {
+            "ZEURZUSD": {
+              "altname": "EURUSD",
+              "wsname": "EUR/USD",
+              "base": "ZEUR",
+              "quote": "ZUSD",
+              "status": "online"
+            }
+          }
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "recorded_provider_fixture")
+    monkeypatch.setenv("ARGUS_ASSET_FIXTURE_PATH", str(fixture_path))
+
+    apple = assets.resolve_asset("Apple Inc.")
+    eurusd = assets.resolve_asset("EUR/USD")
+
+    assert apple.canonical_symbol == "AAPL"
+    assert apple.asset_class == "equity"
+    assert eurusd.canonical_symbol == "EURUSD"
+    assert eurusd.asset_class == "currency_pair"
+
+
+def test_asset_search_prefers_provider_validated_close_symbol_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapping: dict[str, ResolvedAsset] = {}
+    aapl = ResolvedAsset(
+        canonical_symbol="AAPL",
+        asset_class="equity",
+        name="Apple Inc.",
+        raw_symbol="AAPL",
+    )
+    aaoi = ResolvedAsset(
+        canonical_symbol="AAOI",
+        asset_class="equity",
+        name="Applied Optoelectronics Inc.",
+        raw_symbol="AAOI",
+    )
+    assets._add_aliases(mapping, aaoi, canonical="AAOI")
+    assets._add_aliases(mapping, aapl, canonical="AAPL")
+    mapping["apple inc."] = aapl
+
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: mapping)
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
+
+    assert assets.search_assets("appl")[0].canonical_symbol == "AAPL"
+
+
+def test_resolve_asset_does_not_fuzzy_replace_exact_ticker_like_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapping: dict[str, ResolvedAsset] = {}
+    slay = ResolvedAsset(
+        canonical_symbol="SLAY",
+        asset_class="crypto",
+        name="Slex Token/USD",
+        raw_symbol="SLAY/USD",
+    )
+    assets._add_aliases(mapping, slay, canonical="SLAY")
+
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: {})
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: mapping)
+
+    with pytest.raises(ValueError, match="invalid_symbol"):
+        assets.resolve_asset("TSLA")
+
+
 def test_kraken_currency_pairs_are_available_without_alpaca(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

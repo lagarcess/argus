@@ -8,6 +8,7 @@ LaunchStrategyType = Literal[
     "buy_and_hold",
     "dca_accumulation",
     "indicator_threshold",
+    "signal_strategy",
 ]
 SizingMode = Literal["capital_amount", "position_size"]
 Cadence = Literal["daily", "weekly", "monthly", "quarterly"]
@@ -33,6 +34,7 @@ class LaunchBacktestRequest(BaseModel):
     date_range: DateRange
     entry_rule: dict[str, Any] | None = None
     exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
     sizing_mode: SizingMode
     capital_amount: float | None = None
     position_size: float | None = None

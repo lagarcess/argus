@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import pytest
 from argus.agent_runtime.graph.workflow import build_workflow
-from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
+from argus.agent_runtime.runtime import (
+    _compose_runtime_response,
+    run_agent_turn,
+    stream_agent_turn_events,
+)
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot, UserState
+from argus.agent_runtime.state.models import (
+    ResponseIntent,
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+    UserState,
+)
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -85,6 +95,44 @@ class ConversationalInterpreter:
         )
 
 
+class ShortWindowCrossoverInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User wants a short-window moving-average crossover.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="signal_strategy",
+                strategy_thesis="Test SPY on a 20/50 SMA crossover.",
+                asset_universe=["SPY"],
+                asset_class="equity",
+                date_range="past month",
+                entry_logic="20-day SMA crosses above 50-day SMA",
+                exit_logic="20-day SMA crosses below 50-day SMA",
+                entry_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bullish",
+                },
+                exit_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bearish",
+                },
+            ),
+            confidence=0.94,
+            semantic_turn_act="new_idea",
+        )
+
+
 class ApprovalInterpreter:
     def __init__(self) -> None:
         self.seen_snapshots: list[object] = []
@@ -119,6 +167,65 @@ class ApprovalInterpreter:
         )
 
 
+def test_runtime_preserves_explicit_stage_prompt_over_composed_intent() -> None:
+    run_state = RunState.new(
+        current_user_message="use a 20-day SMA crossing above the 50-day SMA",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["period"],
+        requested_fields=["date_range"],
+        facts={"strategy": {"strategy_type": "signal_strategy"}},
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "That rule needs more historical bars than the selected window "
+                "can provide. Choose a longer date range, or use a shorter "
+                "indicator period so the backtest has enough data to evaluate "
+                "the signal."
+            ),
+        }
+    )
+
+    assert result["assistant_prompt"].startswith("That rule needs more historical bars")
+
+
+def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
+    run_state = RunState.new(
+        current_user_message="Test buying SPY when it starts rising.",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["period", "rule_definition"],
+        requested_fields=["date_range", "entry_logic"],
+        facts={
+            "strategy": {
+                "strategy_type": "signal_strategy",
+                "asset_universe": ["SPY"],
+            }
+        },
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "I could not generate the clarifying question right now. "
+                "Please try again."
+            ),
+        }
+    )
+
+    assert "try again" not in result["assistant_prompt"].lower()
+    assert "What time period" in result["assistant_prompt"]
+    assert "specific testable rule" in result["assistant_prompt"]
+
+
 @pytest.mark.asyncio
 async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
     from argus.agent_runtime import resolution as resolution_module
@@ -149,6 +256,33 @@ async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> Non
     assert result["pending_strategy"]["strategy"]["asset_universe"] == ["TSLA"]
     assert result["pending_strategy"]["missing_required_fields"] == []
     assert "I read this as" in result["assistant_prompt"]
+
+
+@pytest.mark.asyncio
+async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=ShortWindowCrossoverInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        thread_id="thread-short-window-crossover",
+        message="Use a 20-day SMA crossing above the 50-day SMA over the last month.",
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert "more historical bars" in result["assistant_prompt"]
+    assert result["pending_strategy"]["requested_field"] == "date_range"
+    assert "confirmation_payload" not in result
 
 
 @pytest.mark.asyncio

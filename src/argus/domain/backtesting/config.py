@@ -5,13 +5,14 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
+from argus.domain.backtesting.rules import validate_rule_spec
 from argus.domain.indicators import normalize_indicator_parameters
 from argus.domain.market_data import resolve_asset
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 
-ALLOWED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys())
+ALLOWED_TEMPLATES = set(STRATEGY_CAPABILITIES.keys()) | {"signal_strategy"}
 
 ALLOWED_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
 
@@ -196,19 +197,29 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
     params = dict(config.get("parameters") or {})
     template_name = config["template"]
     if template_name == "rsi_mean_reversion":
+        rule_spec = params.pop("rule_spec", None)
         params = normalize_indicator_parameters(
             str(params.get("indicator") or "rsi"),
             params,
         )
+        if rule_spec is not None:
+            validate_rule_spec(rule_spec)
+            params["rule_spec"] = rule_spec
         config["parameters"] = params
+    if template_name == "signal_strategy":
+        validate_rule_spec(params.get("rule_spec"))
+        config["parameters"] = params
+        return
     capability = STRATEGY_CAPABILITIES[template_name]
 
-    allowed_params = set(capability.parameters.keys())
+    allowed_params = set(capability.parameters.keys()) | {"rule_spec"}
     unknown = set(params.keys()) - allowed_params
     if unknown:
         raise ValueError("unsupported_parameters")
 
     for key, value in params.items():
+        if key == "rule_spec":
+            continue
         spec = capability.parameters[key]
         if spec.allowed_values and value not in spec.allowed_values:
             raise ValueError(f"unsupported_parameter_value_{key}")

@@ -75,17 +75,34 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
             "payload": {
                 "stage_outcome": "await_approval",
                 "assistant_response": "I read this as AAPL buy and hold.",
-                "confirmation_payload": {
-                    "strategy": {
-                        "strategy_type": "buy_and_hold",
-                        "asset_universe": ["AAPL"],
-                        "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
-                        "capital_amount": 10000,
+                    "confirmation_payload": {
+                        "strategy": {
+                            "strategy_type": "buy_and_hold",
+                            "asset_universe": ["AAPL"],
+                            "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
+                            "capital_amount": 10000,
+                        },
+                        "optional_parameters": {},
+                        "launch_payload": {
+                            "strategy_type": "buy_and_hold",
+                            "symbol": "AAPL",
+                            "symbols": ["AAPL"],
+                            "timeframe": "1D",
+                            "date_range": {
+                                "start": "2025-05-03",
+                                "end": "2026-05-03",
+                            },
+                            "sizing_mode": "capital_amount",
+                            "capital_amount": 10000,
+                            "benchmark_symbol": "SPY",
+                        },
+                        "validation": {
+                            "status": "ready_to_run",
+                            "executable": True,
+                        },
                     },
-                    "optional_parameters": {},
                 },
-            },
-        }
+            }
 
     monkeypatch.setattr(
         agent_router,
@@ -194,3 +211,56 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
     ]
     assert messages[-1]["id"] == payload["message_id"]
     assert messages[-1]["content"] == "Short grounded summary."
+
+
+def test_chat_stream_persists_visible_streamed_text_for_non_card_reply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {"type": "stage_outcome", "outcome": "needs_clarification"}
+        yield {"type": "token", "content": "Visible clarification."}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_response": "Different final clarification.",
+                "pending_strategy": {
+                    "strategy": {
+                        "strategy_type": None,
+                        "asset_universe": [],
+                        "date_range": None,
+                    },
+                    "missing_required_fields": ["asset_universe"],
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "hello from browser smoke",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = _final_payload(response.text)
+    assert payload["assistant_response"] == "Visible clarification."
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert messages[-1]["id"] == payload["message_id"]
+    assert messages[-1]["content"] == "Visible clarification."

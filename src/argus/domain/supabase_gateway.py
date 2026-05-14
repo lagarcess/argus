@@ -163,6 +163,19 @@ class SupabaseGateway:
         if user_id is None:
             raise RuntimeError("Unable to resolve mock auth user.")
 
+        existing = (
+            self.client.table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        existing_row = _row_one(existing)
+        if existing_row is not None:
+            user = User.model_validate(existing_row)
+            self._cached_mock_user = user
+            return user
+
         now = _now_iso()
         profile = {
             "id": user_id,
@@ -342,7 +355,7 @@ class SupabaseGateway:
             "conversation_id": conversation_id,
             "role": role,
             "content": content,
-            "metadata": metadata,
+            "metadata": metadata if metadata is not None else {},
             "created_at": _now_iso(),
         }
         created = self.client.table("messages").insert(payload).execute()

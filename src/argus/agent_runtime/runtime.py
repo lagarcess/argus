@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
 from argus.agent_runtime.graph.workflow import WorkflowNode, WorkflowState
+from argus.agent_runtime.stages.clarify import OFFLINE_CLARIFICATION_FALLBACK
 from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -217,6 +218,13 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
     run_state = result.get("run_state")
     if not isinstance(run_state, RunState):
         return result
+    explicit_prompt = result.get("assistant_prompt")
+    if (
+        isinstance(explicit_prompt, str)
+        and explicit_prompt.strip()
+        and explicit_prompt != OFFLINE_CLARIFICATION_FALLBACK
+    ):
+        return result
     composed = compose_response_intent(run_state)
     if composed is None:
         return result
@@ -238,6 +246,9 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "failure_classification",
         "final_response_payload",
         "resolution_provenance",
+        "artifact_references",
+        "latest_failed_action_reference",
+        "result_fact_bank",
     }
     serialized = {
         key: _serialize_public_value(key, value)
@@ -350,11 +361,13 @@ def _strategy_summary_has_content(strategy: Any) -> bool:
 
 
 def _serialize_public_value(key: str, value: Any) -> Any:
-    if key in {"confirmation_payload", "final_response_payload"} and hasattr(
-        value,
-        "model_dump",
-    ):
+    if hasattr(value, "model_dump"):
         return value.model_dump(mode="python")
+    if isinstance(value, list):
+        return [
+            item.model_dump(mode="python") if hasattr(item, "model_dump") else item
+            for item in value
+        ]
     return value
 
 

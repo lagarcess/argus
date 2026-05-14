@@ -1,15 +1,18 @@
 import { CheckCircle2 } from "lucide-react";
-import { StrategyConfirmationPayload } from "./types";
+import { type ChatActionOption, type StrategyConfirmationPayload } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 
 type StrategyConfirmationCardProps = {
   confirmation: StrategyConfirmationPayload;
+  onAction?: (action: ChatActionOption) => void;
 };
 
-export default function StrategyConfirmationCard({ confirmation }: StrategyConfirmationCardProps) {
+export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
   const primaryRows = confirmation.rows.slice(0, 3);
   const detailRows = confirmation.rows.slice(3);
   const isSuperseded = confirmation.confirmation_state === "superseded";
+  const activeActions =
+    confirmation.confirmation_state !== "superseded" ? confirmation.actions ?? [] : [];
   const statusLabel = isSuperseded
     ? confirmation.statusLabel || "Updated"
     : confirmation.statusLabel;
@@ -70,6 +73,21 @@ export default function StrategyConfirmationCard({ confirmation }: StrategyConfi
               <span className="h-1 w-1 rounded-full bg-black/20 dark:bg-white/20" />
               {text}
             </span>
+          ))}
+        </div>
+      )}
+
+      {activeActions.length > 0 && (
+        <div className="flex flex-wrap gap-2 border-t border-black/8 px-4 py-3 dark:border-white/8 sm:px-5">
+          {activeActions.map((action) => (
+            <button
+              key={action.id ?? action.type ?? action.label}
+              type="button"
+              onClick={() => onAction?.(action)}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:bg-white/[0.08]"
+            >
+              {action.label}
+            </button>
           ))}
         </div>
       )}

@@ -24,6 +24,14 @@ export type ResultChartPayload = {
   attribution?: string;
 };
 
+export type ArtifactType =
+  | "strategy_draft"
+  | "confirmation"
+  | "backtest_run"
+  | "result_review"
+  | "failed_action"
+  | "saved_strategy";
+
 export type ChatActionOption = {
   id?: string;
   label: string;
@@ -39,6 +47,11 @@ export type ChatActionOption = {
     | "save_strategy";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
+  artifactId?: string;
+  artifactType?: ArtifactType;
+  artifactStatus?: string;
+  savedStrategyId?: string | null;
+  copyText?: string;
 };
 
 export type ChatMention = {
@@ -55,6 +68,8 @@ export type StrategyResultPayload = {
   strategyName: string;
   strategyLabel?: string;
   symbols?: string[];
+  template?: string;
+  assetClass?: "equity" | "crypto";
   period: string;
   benchmarkNote?: string;
   statusLabel?: string;
@@ -62,6 +77,12 @@ export type StrategyResultPayload = {
   assumptions?: string[];
   runId?: string;
   strategyId?: string | null;
+  artifactId?: string;
+  artifactType?: ArtifactType;
+  artifactStatus?: string;
+  savedStrategyId?: string | null;
+  savingStrategy?: boolean;
+  copyText?: string;
   actions?: ChatActionOption[];
   chart?: ResultChartPayload | null;
 };
@@ -74,6 +95,11 @@ export type StrategyConfirmationRow = {
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded";
+  artifactId?: string;
+  artifactType?: ArtifactType;
+  artifactStatus?: string;
+  savedStrategyId?: string | null;
+  copyText?: string;
   title: string;
   statusLabel: string;
   summary: string;
@@ -86,6 +112,7 @@ export type Message = {
   id: string;
   role: "user" | "ai";
   kind?: "text" | "strategy_result" | "strategy_confirmation" | "action";
+  contentPresentation?: "result_breakdown";
   content?: string;
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;
@@ -93,4 +120,9 @@ export type Message = {
   confirmation?: StrategyConfirmationPayload;
   isLoadingResult?: boolean;
   actions?: ChatActionOption[];
+  artifactId?: string;
+  artifactType?: ArtifactType;
+  artifactStatus?: string;
+  savedStrategyId?: string | null;
+  copyText?: string;
 };
