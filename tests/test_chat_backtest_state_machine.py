@@ -113,6 +113,7 @@ def _confirmation_runtime_result() -> dict[str, Any]:
                 "timeframe": "1D",
                 "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
                 "sizing_mode": "capital_amount",
+                "capital_amount": 1000.0,
                 "benchmark_symbol": "SPY",
             },
             "validation": {"executable": True},
@@ -273,43 +274,11 @@ def test_chat_stream_emits_structured_confirmation_actions(
         "adjust_assumptions",
         "cancel_confirmation",
     ]
-    assert confirmation["actions"] == [
-        {
-            "id": "run-backtest",
-            "type": "run_backtest",
-            "label": "Run backtest",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "change-dates",
-            "type": "change_dates",
-            "label": "Change dates",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "change-asset",
-            "type": "change_asset",
-            "label": "Change asset",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "adjust-assumptions",
-            "type": "adjust_assumptions",
-            "label": "Adjust assumptions",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "cancel-confirmation",
-            "type": "cancel_confirmation",
-            "label": "Cancel",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-    ]
+    for action in confirmation["actions"]:
+        assert action["presentation"] == "confirmation"
+        assert action["payload"]["confirmation_id"] == confirmation_id
+        assert action["payload"]["artifact_id"] == confirmation_id
+        assert action["payload"]["launch_payload_hash"]
 
 
 def test_chat_stream_persists_confirmation_metadata_and_preview(
@@ -977,7 +946,7 @@ def test_discovery_endpoints_return_assets_and_indicators(
         discovery_router,
         "search_indicators",
         lambda q, limit=12: [
-            IndicatorInfo("rsi", "RSI", "Relative Strength Index", "supported")
+            IndicatorInfo("rsi", "RSI", "Relative Strength Index", "executable")
         ],
     )
     client = _client()
@@ -989,6 +958,7 @@ def test_discovery_endpoints_return_assets_and_indicators(
     assert assets.json()["items"][0]["insert_text"] == "AAPL"
     assert indicators.status_code == 200
     assert indicators.json()["items"][0]["provider"] == "pandas-ta-classic"
+    assert indicators.json()["items"][0]["support_status"] == "supported"
 
 
 def test_discovery_assets_display_currency_pair_label(

@@ -69,6 +69,54 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
 
 
 @pytest.mark.asyncio
+async def test_result_followup_replaces_llm_answer_that_contradicts_positive_delta() -> None:
+    async def fake_schema_client(**kwargs: Any) -> object:
+        schema = kwargs["schema_model"]
+        return schema(
+            parts=[
+                {
+                    "kind": "text",
+                    "text": "It underperformed the benchmark, so the important read is the gap.",
+                },
+                {"kind": "fact", "fact_id": "symbols"},
+                {"kind": "fact", "fact_id": "total_return"},
+                {"kind": "fact", "fact_id": "benchmark_symbol"},
+                {"kind": "fact", "fact_id": "benchmark_return"},
+                {"kind": "fact", "fact_id": "benchmark_delta"},
+                {"kind": "fact", "fact_id": "caveat"},
+            ]
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 40.8,
+                        "benchmark_return_pct": 26.4,
+                        "delta_vs_benchmark_pct": 14.5,
+                    }
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {"start": "2025-05-14", "end": "2026-05-14"},
+            },
+        },
+        focus="why_underperformed",
+        user_message="Why did it underperform?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert response.startswith("AAPL beat SPY in this run.")
+    assert "underperformed" not in response.lower()
+    assert "+14.5%" in response
+
+
+@pytest.mark.asyncio
 async def test_result_followup_rejects_fact_only_template_output() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
@@ -319,3 +367,70 @@ def test_what_tested_fallback_includes_performance_context_when_focus_drifts() -
     assert "The strategy returned +23.6%" in response
     assert "SPY returned +11.4%" in response
     assert "The gap versus the benchmark was +12.2%" in response
+
+
+def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncertain() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["NVDA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 21.9,
+                        "benchmark_return_pct": 11.4,
+                        "delta_vs_benchmark_pct": 10.4,
+                    },
+                    "risk": {"max_drawdown_pct": -15.7},
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {
+                    "start": "2025-11-15",
+                    "end": "2026-05-15",
+                },
+            },
+        },
+        focus="general",
+    )
+
+    assert response is not None
+    assert "NVDA" in response
+    assert "buy and hold" in response
+    assert "2025-11-15 to 2026-05-15" in response
+    assert "+21.9%" in response
+    assert "SPY returned +11.4%" in response
+    assert "gap versus the benchmark was +10.4%" in response
+    assert "max drawdown was -15.7%" in response.lower()
+    assert "try" in response.lower()
+
+
+def test_performance_fallback_keeps_core_risk_fact_when_focus_drifts() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["NVDA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 21.9,
+                        "benchmark_return_pct": 11.4,
+                        "delta_vs_benchmark_pct": 10.4,
+                    },
+                    "risk": {"max_drawdown_pct": -15.7},
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {
+                    "start": "2025-11-15",
+                    "end": "2026-05-15",
+                },
+            },
+        },
+        focus="why_underperformed",
+    )
+
+    assert response is not None
+    assert "max drawdown was -15.7%" in response.lower()

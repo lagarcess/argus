@@ -151,7 +151,7 @@ def test_ready_strategy_from_mock_interpreter_reaches_confirmation(monkeypatch) 
     assert result.decision.semantic_turn_act == "new_idea"
 
 
-def test_approval_uses_llm_semantic_turn_act_not_state_machine_confirmation(
+def test_text_approval_uses_llm_turn_act_but_defers_to_card_action(
     monkeypatch,
 ) -> None:
     _patch_resolve_asset(monkeypatch)
@@ -188,7 +188,5 @@ def test_approval_uses_llm_semantic_turn_act_not_state_machine_confirmation(
         ),
     )
 
-    assert result.outcome == "approved_for_execution"
-    assert result.patch["confirmation_payload"]["strategy"] == pending.model_dump(
-        mode="python"
-    )
+    assert result.outcome == "ready_to_respond"
+    assert "Run backtest button" in result.patch["assistant_response"]

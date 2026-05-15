@@ -7,6 +7,10 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.strategy_contract import (
+    normalize_date_range_candidate,
+    resolve_date_range,
+)
 
 _MATERIAL_STRATEGY_FIELDS = (
     "strategy_type",
@@ -131,6 +135,76 @@ def decision_requests_confirmation_card_action(
     )
 
 
+def decision_replays_visible_confirmation_without_material_change(
+    *,
+    decision: InterpretDecision,
+    visible_strategy: StrategySummary,
+    interpretation: StructuredInterpretation | None = None,
+    interpreted_candidate_strategy: StrategySummary | None = None,
+) -> bool:
+    """Return whether a strategy-routed text turn is just interacting with the card.
+
+    This is intentionally semantic and artifact-based rather than phrase-based. If
+    the LLM routes a turn toward backtest execution or drafting, but the structured
+    candidate adds no executable change to the active confirmation, the card remains
+    the owner of quota-bearing execution.
+    """
+    intent = interpretation.intent if interpretation is not None else decision.intent
+    semantic_turn_act = (
+        interpretation.semantic_turn_act
+        if interpretation is not None
+        else decision.semantic_turn_act
+    )
+    task_relation = (
+        interpretation.task_relation if interpretation is not None else decision.task_relation
+    )
+    requires_clarification = (
+        interpretation.requires_clarification
+        if interpretation is not None
+        else decision.requires_clarification
+    )
+    missing_required_fields = (
+        interpretation.missing_required_fields
+        if interpretation is not None
+        else decision.missing_required_fields
+    )
+    ambiguous_fields = (
+        interpretation.ambiguous_fields
+        if interpretation is not None
+        else decision.ambiguous_fields
+    )
+    unsupported_constraints = (
+        interpretation.unsupported_constraints
+        if interpretation is not None
+        else decision.unsupported_constraints
+    )
+    if intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if semantic_turn_act in {
+        "answer_pending_need",
+        "educational_question",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return False
+    if task_relation not in {"continue", "new_task"}:
+        return False
+    if (
+        requires_clarification
+        or missing_required_fields
+        or ambiguous_fields
+        or unsupported_constraints
+    ):
+        return False
+    candidate = interpreted_candidate_strategy or decision.candidate_strategy_draft
+    return not _candidate_contains_material_strategy_patch(
+        candidate=candidate,
+        visible=visible_strategy,
+        material_fields=_CARD_ACTION_REQUEST_FIELDS,
+    )
+
+
 def _candidate_contains_material_strategy_patch(
     *,
     candidate: StrategySummary,
@@ -154,6 +228,13 @@ def _candidate_contains_material_strategy_patch(
 def _normalize_strategy_value(field_name: str, value: Any) -> Any:
     if value in (None, "", [], {}):
         return None
+    if field_name == "date_range":
+        try:
+            resolved = resolve_date_range(normalize_date_range_candidate(value))
+        except Exception:
+            pass
+        else:
+            return (resolved.start.isoformat(), resolved.end.isoformat())
     if field_name == "asset_universe" and isinstance(value, list):
         return tuple(str(item).strip().upper() for item in value if str(item).strip())
     if isinstance(value, list):

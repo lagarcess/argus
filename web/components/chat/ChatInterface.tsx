@@ -1,14 +1,11 @@
 "use client";
 
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import {
-  Archive,
   ArrowDown,
   ChevronRight,
   History,
   PanelLeft,
-  MessageSquarePlus,
-  MoreHorizontal,
   Plus,
   Search,
   Settings,
@@ -24,20 +21,13 @@ import { ArgusLogo } from "@/components/ArgusLogo";
 
 import {
   createConversation,
-  deleteCollection,
   deleteConversation,
-  deleteStrategy,
-  formatRelativeDate,
   getBacktestRun,
   getMe,
   getConversationMessages,
-  getStarterPrompts,
   listHistory,
   searchGlobal,
-  patchCollection,
-  patchConversation,
   patchMe,
-  patchStrategy,
   resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
@@ -136,8 +126,20 @@ const CARD_SCOPED_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>(
   "save_strategy",
 ]);
 
+const CONFIRMATION_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>([
+  "run_backtest",
+  "change_dates",
+  "change_asset",
+  "adjust_assumptions",
+  "cancel_confirmation",
+]);
+
 function isCardScopedAction(action: ChatActionOption) {
   return Boolean(action.type && CARD_SCOPED_ACTION_TYPES.has(action.type));
+}
+
+function isConfirmationAction(action: ChatActionOption | undefined) {
+  return Boolean(action?.type && CONFIRMATION_ACTION_TYPES.has(action.type));
 }
 
 function actionHasCardScopedOwnership(action: ChatActionOption) {
@@ -197,7 +199,11 @@ function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[
 }
 
 function resultActionRequiresRunContext(action: ChatActionOption) {
-  return action.type === "show_breakdown" || action.type === "save_strategy";
+  return (
+    action.type === "show_breakdown" ||
+    action.type === "save_strategy" ||
+    action.type === "refine_strategy"
+  );
 }
 
 function resultActionRunId(action: ChatActionOption | undefined) {
@@ -322,6 +328,36 @@ function consumeResultActionOnMessages(
   return applyConsumedResultActions(messages, [
     { type: "show_breakdown", runId: resultActionRunId(action) },
   ]);
+}
+
+function confirmationActionStatusLabel(action: ChatActionOption | undefined) {
+  if (action?.type === "cancel_confirmation") {
+    return "Cancelled";
+  }
+  if (action?.type === "run_backtest") {
+    return "Running";
+  }
+  if (
+    action?.type === "change_dates" ||
+    action?.type === "change_asset" ||
+    action?.type === "adjust_assumptions"
+  ) {
+    return "Editing";
+  }
+  return "Updated";
+}
+
+function consumeConfirmationActionOnMessages(
+  messages: Message[],
+  action: ChatActionOption | undefined,
+): Message[] {
+  if (!isConfirmationAction(action)) {
+    return messages;
+  }
+  return supersedeOpenConfirmations(
+    messages,
+    confirmationActionStatusLabel(action),
+  );
 }
 
 function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
@@ -630,7 +666,10 @@ function normalizeConfirmationHistory(messages: Message[]): Message[] {
   });
 }
 
-function supersedePriorConfirmations(message: Message): Message {
+function supersedePriorConfirmations(
+  message: Message,
+  statusLabel = "Updated",
+): Message {
   if (message.kind !== "strategy_confirmation" || !message.confirmation) {
     return message;
   }
@@ -639,14 +678,17 @@ function supersedePriorConfirmations(message: Message): Message {
     confirmation: {
       ...message.confirmation,
       confirmation_state: "superseded",
-      statusLabel: "Updated",
+      statusLabel,
       actions: [],
     },
     actions: [],
   };
 }
 
-function supersedeOpenConfirmations(messages: Message[]): Message[] {
+function supersedeOpenConfirmations(
+  messages: Message[],
+  statusLabel = "Updated",
+): Message[] {
   const lastResultIndex = messages.reduce(
     (latest, message, index) =>
       message.kind === "strategy_result" ? index : latest,
@@ -654,7 +696,7 @@ function supersedeOpenConfirmations(messages: Message[]): Message[] {
   );
   return messages.map((message, index) =>
     message.kind === "strategy_confirmation" && index > lastResultIndex
-      ? supersedePriorConfirmations(message)
+      ? supersedePriorConfirmations(message, statusLabel)
       : message,
   );
 }
@@ -669,7 +711,6 @@ export default function ChatInterface() {
   const { t, i18n } = useTranslation();
   const collectionsEnabled = process.env.NEXT_PUBLIC_COLLECTIONS_ENABLED === "true";
 
-  const [starterActions, setStarterActions] = useState<ChatActionOption[]>([]);
   const onboardingChoices = useMemo<OnboardingChoice[]>(
     () => [
       {
@@ -739,9 +780,6 @@ export default function ChatInterface() {
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
   const [feedbackState, setFeedbackState] = useState<{
     isOpen: boolean;
     type: "bug" | "feature" | "general" | "rating";
@@ -786,7 +824,7 @@ export default function ChatInterface() {
       assetClass: run.asset_class,
     });
 
-  const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
+  const loadHistoryPage = useCallback(async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({
       limit: 30,
       cursor: nextCursor ?? undefined,
@@ -798,7 +836,7 @@ export default function ChatInterface() {
     );
     setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
     setHistoryNextCursor(next_cursor);
-  };
+  }, [collectionsEnabled]);
 
   // ── History ────────────────────────────────────────────────────────────────
 
@@ -817,7 +855,7 @@ export default function ChatInterface() {
 
   useEffect(() => {
     loadHistoryPage(null, false).catch(() => undefined);
-  }, []);
+  }, [loadHistoryPage]);
 
   useEffect(() => {
     if (!isSidebarOpen) {
@@ -919,13 +957,6 @@ export default function ChatInterface() {
               && (stage === "language_selection" || stage === "primary_goal_selection"),
             );
 
-            const prompts = await getStarterPrompts().catch(() => []);
-            if (cancelled) return;
-            setStarterActions(prompts.map((p, i) => ({
-              id: `starter-${i}`,
-              label: p,
-              value: p,
-            })));
             return;
           } catch {
             clearActiveConversationId();
@@ -941,12 +972,6 @@ export default function ChatInterface() {
           stage === "language_selection" || stage === "primary_goal_selection",
         );
 
-        const prompts = await getStarterPrompts().catch(() => []);
-        setStarterActions(prompts.map((p, i) => ({
-          id: `starter-${i}`,
-          label: p,
-          value: p,
-        })));
       } catch {
         if (cancelled) return;
         setMessages([
@@ -962,6 +987,8 @@ export default function ChatInterface() {
     return () => {
       cancelled = true;
     };
+    // Bootstraps the active conversation once; re-running on i18n updates would create noisy chat reloads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateScrollPositionState = () => {
@@ -1143,7 +1170,10 @@ export default function ChatInterface() {
     const assistantId = crypto.randomUUID();
 
     setMessages((prev) => [
-      ...consumeResultActionOnMessages(markComposerActionsInactive(prev), action),
+      ...consumeConfirmationActionOnMessages(
+        consumeResultActionOnMessages(markComposerActionsInactive(prev), action),
+        action,
+      ),
       userMsg,
       {
         id: assistantId,
@@ -1274,10 +1304,14 @@ export default function ChatInterface() {
                 : m,
             );
             if (
+              isConfirmationAction(action) ||
               finalStageOutcome === "await_user_reply" ||
               finalStageOutcome === "needs_clarification"
             ) {
-              return supersedeOpenConfirmations(nextMessages);
+              return supersedeOpenConfirmations(
+                nextMessages,
+                confirmationActionStatusLabel(action),
+              );
             }
             return nextMessages;
           });
@@ -1415,12 +1449,6 @@ export default function ChatInterface() {
         },
       });
 
-      const prompts = await getStarterPrompts().catch(() => []);
-      setStarterActions(prompts.map((p, i) => ({
-        id: `starter-${i}`,
-        label: p,
-        value: p,
-      })));
     } catch {
       setStreamStatus(null);
       setIsStreamingResponse(false);
@@ -1435,22 +1463,6 @@ export default function ChatInterface() {
   };
 
   // ── Action routing ─────────────────────────────────────────────────────────
-
-  const handleRename = async (id: string, newTitle: string, type: string) => {
-    try {
-      if (type === 'chat') await patchConversation(id, { title: newTitle });
-      else if (type === 'strategies') await patchStrategy(id, { name: newTitle });
-      else if (type === 'collections') await patchCollection(id, { name: newTitle });
-
-      setHistoryItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, title: newTitle } : item)),
-      );
-      setEditingId(null);
-    } catch (err) {
-      console.error("Failed to rename:", err);
-      showToast(t('chat.error_generic'));
-    }
-  };
 
   const handleSaveStrategyAction = async (action: ChatActionOption) => {
     if (!conversationId) return;
@@ -1569,18 +1581,6 @@ export default function ChatInterface() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showChatOptions]);
-
-  const handleArchiveChat = async () => {
-    if (!conversationId) return;
-    try {
-      await patchConversation(conversationId, { archived: true });
-      showToast(t("common.archived"));
-      closeChatOptions();
-      void startNewChat();
-    } catch {
-      showToast(t("common.error_occurred"));
-    }
-  };
 
   const handleAddToCollection = () => {
     // Find the latest strategy result in the message list

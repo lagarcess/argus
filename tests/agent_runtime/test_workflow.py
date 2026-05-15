@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from argus.agent_runtime.graph.workflow import build_workflow
+from argus.agent_runtime.graph.workflow import (
+    WorkflowStageOutcome,
+    _apply_stage_result,
+    build_workflow,
+)
 from argus.agent_runtime.runtime import (
     _compose_runtime_response,
     run_agent_turn,
@@ -11,7 +15,9 @@ from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
 )
+from argus.agent_runtime.stages.next_step import next_step_stage
 from argus.agent_runtime.state.models import (
+    FinalResponsePayload,
     ResponseIntent,
     RunState,
     StrategySummary,
@@ -192,6 +198,33 @@ def test_runtime_preserves_explicit_stage_prompt_over_composed_intent() -> None:
     )
 
     assert result["assistant_prompt"].startswith("That rule needs more historical bars")
+
+
+def test_next_step_preserves_completed_result_answer() -> None:
+    run_state = RunState.new(
+        current_user_message="",
+        recent_thread_history=[],
+    )
+    run_state.final_response_payload = FinalResponsePayload(
+        result={"total_return": 0.14},
+        summary="Completed run",
+    )
+    state = {
+        "run_state": run_state,
+        "user": UserState(user_id="u1"),
+        "stage_outcome": WorkflowStageOutcome.READY_TO_RESPOND,
+        "assistant_response": "Grounded result readout.",
+    }
+
+    updated = _apply_stage_result(state, next_step_stage(state=run_state))
+
+    assert updated["stage_outcome"] == WorkflowStageOutcome.END_RUN
+    assert updated["assistant_response"] == "Grounded result readout."
+    assert updated["next_actions"] == [
+        "refine_strategy",
+        "compare_benchmark",
+        "save_strategy",
+    ]
 
 
 def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:

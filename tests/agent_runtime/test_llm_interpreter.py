@@ -12,6 +12,7 @@ from argus.agent_runtime.llm_interpreter import (
     _recover_supported_signal_rule_from_draft_if_needed,
     _response_from_signal_grounding_audit,
     _response_from_signal_rule_plan,
+    _signal_rule_checked_response,
 )
 from argus.agent_runtime.signal_rule_repair import (
     SignalRuleGroundingAudit,
@@ -25,6 +26,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.strategy_contract import resolve_date_range
+from argus.domain.backtesting.rules import explicit_signal_rule_intent_from_text
 
 
 @dataclass(frozen=True)
@@ -369,6 +371,68 @@ async def test_supported_signal_rule_recovery_rescues_underfilled_ma_crossover(
     assert (
         "supported_signal_rule_contract_recovery" in repaired.reason_codes
     )
+
+
+@pytest.mark.asyncio
+async def test_underfilled_explicit_ma_crossover_is_normalized_without_model(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import signal_rule_repair as repair_module
+
+    async def fail_if_model_called(**kwargs):
+        raise AssertionError("explicit supported rules should normalize before LLM repair")
+
+    monkeypatch.setattr(
+        repair_module,
+        "invoke_openrouter_json_schema",
+        fail_if_model_called,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test Nvidia with a moving-average crossover.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Test Nvidia over the past year when the 50-day moving average "
+                "crosses above the 200-day moving average."
+            ),
+            strategy_type="signal_strategy",
+            strategy_thesis="Test Nvidia with a 50/200 moving-average crossover.",
+            asset_universe=["NVDA"],
+            date_range="past year",
+        ),
+    )
+
+    repaired = await _signal_rule_checked_response(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "Test Nvidia over the past year when the 50-day moving average "
+                "crosses above the 200-day moving average."
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired.intent == "backtest_execution"
+    assert repaired.requires_clarification is False
+    assert repaired.candidate_strategy_draft.rule_spec is not None
+    assert repaired.candidate_strategy_draft.entry_logic == (
+        "50-day SMA crosses above 200-day SMA"
+    )
+    assert repaired.candidate_strategy_draft.exit_logic == (
+        "50-day SMA crosses below 200-day SMA"
+    )
+
+
+def test_explicit_signal_rule_normalizer_rejects_vague_momentum() -> None:
+    assert explicit_signal_rule_intent_from_text(
+        "Test buying SPY when it starts rising."
+    ) is None
 
 
 def test_signal_grounding_audit_blocks_invented_vague_momentum_rule() -> None:

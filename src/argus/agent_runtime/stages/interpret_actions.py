@@ -9,9 +9,13 @@ from argus.agent_runtime.result_followups import (
 )
 from argus.agent_runtime.stages.approval_guard import (
     decision_is_pure_approval,
+    decision_replays_visible_confirmation_without_material_change,
     decision_requests_confirmation_card_action,
 )
 from argus.agent_runtime.stages.artifact_context import (
+    active_confirmation_effective_strategy,
+    confirmation_payload_dict,
+    confirmation_payload_is_validated_executable,
     decision_targets_result_artifact,
     draft_assumptions_response,
     failed_action_is_retryable,
@@ -22,6 +26,7 @@ from argus.agent_runtime.stages.artifact_context import (
     prior_stage_was_await_approval,
     semantic_need_for_action,
     stale_confirmation_action_response,
+    strategy_from_failed_launch_payload,
     strategy_from_result_action_snapshot,
     validated_approval_confirmation_payload_from_snapshot,
     validated_approval_confirmation_payload_from_state,
@@ -232,11 +237,68 @@ def approval_stage_result_if_applicable(
     selected_thread_metadata: dict[str, Any],
     interpretation: StructuredInterpretation | None = None,
 ) -> StageResult | None:
-    if decision.semantic_turn_act != "approval":
-        return None
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return None
     approved_strategy = snapshot.pending_strategy_summary.model_copy(deep=True)
+    visible_confirmation_strategy = active_confirmation_effective_strategy(
+        snapshot=snapshot,
+        fallback=approved_strategy,
+    )
+    if (
+        snapshot.active_confirmation_reference is not None
+        and _active_confirmation_is_valid(snapshot)
+        and decision_replays_visible_confirmation_without_material_change(
+            decision=decision,
+            visible_strategy=visible_confirmation_strategy,
+            interpretation=interpretation,
+            interpreted_candidate_strategy=(
+                interpretation.candidate_strategy_draft
+                if interpretation is not None
+                else None
+            ),
+        )
+    ):
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision.model_copy(
+                update={
+                    "intent": "conversation_followup",
+                    "task_relation": "continue",
+                    "requires_clarification": False,
+                    "candidate_strategy_draft": approved_strategy,
+                    "missing_required_fields": [],
+                    "semantic_turn_act": "approval",
+                    "reason_codes": [
+                        *decision.reason_codes,
+                        "text_action_deferred_to_confirmation_card",
+                    ],
+                }
+            ),
+            stage_patch={
+                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+            },
+        )
+    if decision.semantic_turn_act != "approval":
+        return None
+    if snapshot.active_confirmation_reference is not None and _active_confirmation_is_valid(
+        snapshot
+    ):
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision.model_copy(
+                update={
+                    "intent": "conversation_followup",
+                    "task_relation": "continue",
+                    "requires_clarification": False,
+                    "candidate_strategy_draft": approved_strategy,
+                    "missing_required_fields": [],
+                    "semantic_turn_act": "approval",
+                }
+            ),
+            stage_patch={
+                "assistant_response": TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE,
+            },
+        )
     if snapshot.active_confirmation_reference is not None and (
         decision_requests_confirmation_card_action(
             decision=decision,
@@ -269,7 +331,11 @@ def approval_stage_result_if_applicable(
         decision=decision,
         visible_strategy=approved_strategy,
         interpretation=interpretation,
-        interpreted_candidate_strategy=None,
+        interpreted_candidate_strategy=(
+            interpretation.candidate_strategy_draft
+            if interpretation is not None
+            else None
+        ),
     ):
         return None
     if snapshot.active_confirmation_reference is not None:
@@ -340,6 +406,14 @@ def approval_stage_result_if_applicable(
     )
 
 
+def _active_confirmation_is_valid(snapshot: TaskSnapshot) -> bool:
+    reference = snapshot.active_confirmation_reference
+    if reference is None:
+        return False
+    payload = confirmation_payload_dict(reference.metadata.get("confirmation_payload"))
+    return confirmation_payload_is_validated_executable(payload)
+
+
 def retry_failed_action_stage_result_if_applicable(
     *,
     decision: InterpretDecision,
@@ -385,18 +459,25 @@ def retry_failed_action_stage_result_if_applicable(
                 "assistant_response": non_retryable_failed_action_response(reference)
             },
         )
+    strategy = strategy_from_failed_launch_payload(launch_payload)
     return StageResult(
-        outcome="approved_for_execution",
+        outcome="ready_for_confirmation",
         decision=decision.model_copy(
             update={
                 "intent": "backtest_execution",
                 "task_relation": "continue",
                 "requires_clarification": False,
-                "candidate_strategy_draft": StrategySummary(),
+                "candidate_strategy_draft": strategy,
                 "missing_required_fields": [],
             }
         ),
-        stage_patch={"confirmation_payload": launch_payload},
+        stage_patch={
+            "candidate_strategy_draft": strategy,
+            "assistant_response": (
+                "I still have that failed setup. I rebuilt the draft so you can "
+                "use the Run backtest button on the card when you want to retry."
+            ),
+        },
     )
 
 

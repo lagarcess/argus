@@ -11,6 +11,7 @@ from argus.agent_runtime.capabilities.contract import (
 from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
     confirmation_id_from_payload,
+    validate_confirmation_execution_payload,
 )
 from argus.agent_runtime.stages.clarify import (
     StructuredClarificationGenerator,
@@ -85,6 +86,19 @@ class WorkflowState(TypedDict, total=False):
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
+_TURN_SCOPED_OUTPUT_KEYS = frozenset(
+    {
+        "assistant_prompt",
+        "assistant_response",
+        "requested_field",
+        "optional_parameter_choices",
+        "failure_classification",
+        "final_response_payload",
+        "latest_failed_action_reference",
+        "next_actions",
+        "result_fact_bank",
+    }
+)
 
 
 class DefaultBacktestTool:
@@ -283,8 +297,16 @@ def _apply_stage_result(
         run_state=_run_state(state),
         patch=result.patch,
     )
+    cleared_output_keys = set(_TURN_SCOPED_OUTPUT_KEYS)
+    if (
+        outcome is WorkflowStageOutcome.END_RUN
+        and "assistant_response" not in result.patch
+        and isinstance(state.get("assistant_response"), str)
+    ):
+        cleared_output_keys.discard("assistant_response")
     workflow_state: WorkflowState = {
         **state,
+        **{key: None for key in cleared_output_keys},
         "run_state": run_state,
         "stage_outcome": outcome,
     }
@@ -598,7 +620,9 @@ def _active_confirmation_reference(
     ):
         action = run_state.structured_action
         if action is None or action.type != "cancel_confirmation":
-            return prior_task_snapshot.active_confirmation_reference
+            return _valid_active_confirmation_reference(
+                prior_task_snapshot.active_confirmation_reference
+            )
     if stage_outcome_value in {
         "approved_for_execution",
         "execution_succeeded",
@@ -609,7 +633,7 @@ def _active_confirmation_reference(
     }:
         return None
     return (
-        prior_task_snapshot.active_confirmation_reference
+        _valid_active_confirmation_reference(prior_task_snapshot.active_confirmation_reference)
         if prior_task_snapshot is not None
         else None
     )
@@ -624,6 +648,19 @@ def _confirmation_payload_dict(value: Any) -> dict[str, Any]:
         dumped = value.model_dump(mode="python")
         return dict(dumped) if isinstance(dumped, dict) else {}
     return {}
+
+
+def _valid_active_confirmation_reference(
+    reference: ArtifactReference | None,
+) -> ArtifactReference | None:
+    if reference is None:
+        return None
+    payload = _confirmation_payload_dict(reference.metadata.get("confirmation_payload"))
+    if not payload:
+        return None
+    if not validate_confirmation_execution_payload(payload).executable:
+        return None
+    return reference
 
 
 def _dedupe_artifact_references(

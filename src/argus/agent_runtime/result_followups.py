@@ -392,6 +392,8 @@ def fallback_result_followup_response(
         return "The run used: " + fact_bank["assumptions"] + "."
     if focus == "why_underperformed":
         return fallback_performance_response(fact_bank)
+    if focus == "general":
+        return fallback_general_result_followup_response(fact_bank)
     return fallback_performance_response(fact_bank)
 
 
@@ -410,9 +412,29 @@ def apply_result_followup_fact_guardrails(
     if delta_number is None or delta_number <= 0:
         return cleaned
     lower = cleaned.lower()
-    if "did not underperform" in lower or "outperform" in lower:
+    if _contradicts_positive_benchmark_delta(lower):
+        return fallback_performance_response(fact_bank) or cleaned
+    if (
+        "did not underperform" in lower
+        or "outperform" in lower
+        or "beat " in lower
+        or "beat the benchmark" in lower
+    ):
         return cleaned
     return "It did not underperform in this run. " + cleaned
+
+
+def _contradicts_positive_benchmark_delta(response: str) -> bool:
+    normalized = comparable_text(response)
+    words = set(normalized.split())
+    if "underperformed" in words or "lagged" in words or "trailed" in words:
+        return True
+    contradiction_phrases = (
+        "lost to the benchmark",
+        "worse than the benchmark",
+        "behind the benchmark",
+    )
+    return any(phrase in normalized for phrase in contradiction_phrases)
 
 
 def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
@@ -453,6 +475,8 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
         pieces.append(f"The benchmark was {benchmark}.")
     if benchmark_delta:
         pieces.append(f"The gap versus the benchmark was {benchmark_delta}.")
+    if fact_bank.get("max_drawdown"):
+        pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
     if delta_number is not None and delta_number < 0:
         pieces.append(
             "For this kind of historical comparison, that mainly says the chosen "
@@ -469,6 +493,38 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
     if fact_bank.get("caveat"):
         pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
     return " ".join(piece.strip() for piece in pieces if piece.strip())
+
+
+def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str | None:
+    symbols = fact_bank.get("symbols") or "the latest run"
+    strategy = fact_bank.get("strategy") or "strategy"
+    pieces = [
+        f"I still have the latest run: {symbols} with {article_for(strategy)} {strategy} strategy.",
+    ]
+    if fact_bank.get("date_range"):
+        pieces.append(f"Period: {fact_bank['date_range']}.")
+    if fact_bank.get("total_return"):
+        pieces.append(f"The strategy returned {fact_bank['total_return']}.")
+    if fact_bank.get("benchmark_symbol") and fact_bank.get("benchmark_return"):
+        pieces.append(
+            f"{fact_bank['benchmark_symbol']} returned {fact_bank['benchmark_return']}."
+        )
+    elif fact_bank.get("benchmark_symbol"):
+        pieces.append(f"Benchmark: {fact_bank['benchmark_symbol']}.")
+    if fact_bank.get("benchmark_delta"):
+        pieces.append(
+            f"The gap versus the benchmark was {fact_bank['benchmark_delta']}."
+        )
+    if fact_bank.get("max_drawdown"):
+        pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
+    if fact_bank.get("execution_note"):
+        pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
+    if fact_bank.get("runnable_next_tests"):
+        pieces.append("Try next: " + clean_fragment(fact_bank["runnable_next_tests"]) + ".")
+    if fact_bank.get("caveat"):
+        pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
+    response = " ".join(piece.strip() for piece in pieces if piece.strip())
+    return normalize_text(response) or None
 
 
 def fallback_what_tested_response(fact_bank: dict[str, str]) -> str:

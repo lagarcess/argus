@@ -1118,6 +1118,49 @@ def test_natural_language_approval_executes_only_after_confirmation_card(
     assert "confirmation_payload" not in result.patch
 
 
+def test_confirmation_replay_without_material_change_defers_to_card_action(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Tesla.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2025-05-14", "end": "2026-05-14"},
+        capital_amount=10000,
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to run the visible confirmation.",
+        candidate_strategy_draft=pending.model_copy(
+            update={"raw_user_phrasing": "yes run it"}
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="yes run it",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        confirmation_payload=_validated_confirmation_payload(pending),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert "Run backtest" in result.patch["assistant_response"]
+    assert "confirmation_payload" not in result.patch
+    assert "text_action_deferred_to_confirmation_card" in result.decision.reason_codes
+
+
 def test_run_backtest_action_approves_pending_confirmation_without_llm(
     monkeypatch,
 ) -> None:
@@ -1282,7 +1325,7 @@ def test_model_unavailable_recovery_mentions_active_pending_draft() -> None:
     assert result.outcome == "ready_to_respond"
     assert "AAPL" in result.patch["assistant_response"]
     assert "draft" in result.patch["assistant_response"].lower()
-    assert "try again" in result.patch["assistant_response"].lower()
+    assert "retry" in result.patch["assistant_response"].lower()
     assert "interpretation model" not in result.patch["assistant_response"].lower()
 
 
@@ -1335,5 +1378,5 @@ def test_refine_strategy_result_action_prompts_for_change_without_llm() -> None:
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "refinement"
     assert "change" in result.patch["assistant_prompt"].lower()
-    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["MSFT"]
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
     assert result.patch["response_intent"]["facts"]["latest_run_id"] == "run-1"

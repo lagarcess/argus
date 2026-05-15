@@ -4,7 +4,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from argus.domain.backtesting.rules import validate_rule_spec
+from argus.domain.backtesting.rules import (
+    explicit_signal_rule_intent_from_text,
+    validate_rule_spec,
+)
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
@@ -37,6 +40,22 @@ async def repair_signal_rule_plan(
     prior_strategy: dict[str, Any] | None,
     preferred_model: str,
 ) -> SignalRulePlan | None:
+    explicit_intent = explicit_signal_rule_intent_from_text(current_user_message)
+    if explicit_intent is not None:
+        return SignalRulePlan(
+            outcome="ready_to_confirm",
+            user_goal_summary=(
+                explicit_intent.strategy_thesis
+                if candidate_strategy.get("asset_universe")
+                else "Test the explicit signal rule."
+            ),
+            strategy_thesis=explicit_intent.strategy_thesis,
+            entry_logic=explicit_intent.entry_logic,
+            exit_logic=explicit_intent.exit_logic,
+            rule_spec=explicit_intent.rule_spec,
+            confidence=explicit_intent.confidence,
+        )
+
     messages = _signal_rule_plan_messages(
         current_user_message=current_user_message,
         candidate_strategy=candidate_strategy,

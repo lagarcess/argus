@@ -5,12 +5,13 @@
 **Branch:** `codex/artifact-runtime-rebuild`
 **Origin branch:** `codex/backtesting-chat-service-modularization`
 **Reason for second pass:** Live browser QA contradicted the first-pass confidence. The app can still render cards and actions that are not backed by a canonical executable artifact, and several capability, retry, save, and follow-up behaviors remain below production readiness.
+**Directional update:** 2026-05-15
 
 ## Executive Truth
 
 The first pass moved in the right direction but did not finish the product problem.
 
-The production problem is not "fix one RSI case" or "hide a duplicate chip." The production problem is that Argus still allows four different things to drift apart:
+The production problem is not "fix one RSI case," "add one more strategy mapping," or "hide a duplicate chip." The production problem is that Argus still allows four different things to drift apart:
 
 1. The visible conversation artifact.
 2. The persisted message metadata.
@@ -18,6 +19,8 @@ The production problem is not "fix one RSI case" or "hide a duplicate chip." The
 4. The engine and provider capability truth.
 
 This second pass exists to make those four things one coherent runtime contract.
+
+The runtime contract must be based on a canonical investing-idea intent and rule representation, not on strategy-name branches. `buy_and_hold`, `dca_accumulation`, `indicator_threshold`, `signal_strategy`, and future labels such as sentiment strategies may remain useful for display, analytics, saved-strategy organization, and engine adapters. They are not the conversational contract. Normal user language should become structured intent, conditions, schedules, sizing, exits, provider requirements, and assumptions first; strategy family names are derived metadata at the edge.
 
 The release standard is live browser QA. Automated tests are supporting evidence only. A test suite that passes while the browser shows duplicate action chips, raw `missing_rule_group`, stale retries, or false capability claims is not sufficient.
 
@@ -40,6 +43,34 @@ The answer is sequential vertical slices:
 7. Expand live browser QA only when the prior slice remains passing.
 
 Each slice must leave the app usable in the browser. No slice is allowed to make the core happy path worse while waiting for a later slice to fix it.
+
+## Five Recommended Next Moves
+
+These are the next execution moves for the current branch. They are intentionally vertical and evidence-driven.
+
+1. **Freeze the evaluation spine before more behavior changes.**
+   - Convert the eight buckets and browser QA matrix into a small scenario manifest plus browser scripts.
+   - Capture prompt/action, visible artifact state, final answer, persisted metadata expectations, reload behavior, and pass/fail.
+   - Use this to prevent another "tests pass, browser fails" cycle.
+
+2. **Close the artifact/action runtime contract.**
+   - One active artifact owns one validated payload and one action set.
+   - Card actions must be functional, scoped, idempotent where appropriate, and reload-safe.
+   - Typed text that means "run it" should guide the user to the quota-bearing button; only card actions execute backtests.
+
+3. **Replace strategy-template thinking with canonical intent/rule IR.**
+   - The LLM extracts what the user wants in a flexible schema: universe, time window, entry/exit conditions, schedules, sizing, parameters, assumptions, and unsupported context.
+   - The capability planner validates whether that intent can become an executable artifact, needs clarification, needs repair, remains draft-only, or should become an answer-only turn.
+   - Strategy family names become derived display/compiler labels, not routing truth.
+
+4. **Unify provider and capability truth.**
+   - Composer search, chat interpretation, capability Q&A, artifact validation, and engine launch must use the same asset resolver, indicator registry, provider-mode contract, and rule compiler.
+   - Recorded fixtures are provider-shaped snapshots through the same interfaces, not a mock brain.
+
+5. **Run release-grade live browser QA and publish evidence.**
+   - The branch is not complete until the browser matrix passes against the implemented runtime.
+   - Evidence must include correct failures, not only happy paths.
+   - Any raw internal code, stale artifact action, false capability claim, lost draft context, or detached result follow-up blocks completion.
 
 ## Definition Of Full Functionality For This Pass
 
@@ -102,6 +133,7 @@ Inputs:
 
 - latest user message,
 - structured LLM interpretation,
+- canonical investing-idea intent and rule IR,
 - active artifact, if any,
 - provider-backed asset candidates,
 - schema-driven indicator definitions,
@@ -112,6 +144,7 @@ Inputs:
 Outputs:
 
 - understood intent,
+- normalized IR patch or replacement,
 - relationship to active artifact (`new_idea`, `patch_existing`, `answer_question`, `retry_failed_action`, `result_follow_up`),
 - resolved assets or ranked asset candidates,
 - indicator and rule candidates,
@@ -136,6 +169,7 @@ The planner should produce one of these outcomes:
 This is how the system remains flexible:
 
 - The LLM remains the natural-language brain.
+- The canonical IR captures user intent without collapsing it into a legacy strategy template.
 - The planner turns ambiguous language into structured next moves.
 - The capability registry tells the truth.
 - The rule compiler only compiles complete executable rules.
@@ -149,6 +183,7 @@ Planner rules:
 - Do not collapse creative language into one default template unless the user phrase clearly implies that template.
 - Preserve unsupported parts as draft notes instead of discarding them.
 - Offer executable completions, not generic "try again" language.
+- Treat strategy family names as derived labels or compiler macros, not as the primary routing contract.
 
 Examples:
 
@@ -399,6 +434,49 @@ Required:
 
 ## Production Architecture Direction
 
+### Canonical Investing-Idea Intent And Rule IR
+
+Argus must not scale by adding one conversational branch per strategy name. That path is brittle, English-centric, hard to evaluate, and incompatible with future breadth such as sentiment strategies, macro data, news events, or multilingual prompts.
+
+The scalable product shape is:
+
+1. Natural language.
+2. Structured LLM interpretation.
+3. Canonical investing-idea intent and rule IR.
+4. Capability planner outcome.
+5. Validated artifact.
+6. Engine launch payload.
+7. Result fact bank.
+
+The canonical IR should describe what the user wants, not which legacy template the user happened to trigger.
+
+Minimum IR responsibilities:
+
+- `universe`: resolved assets, unresolved candidates, asset class, provider candidates, and same-asset-class constraints.
+- `time_window`: user language, normalized dates, bars/timeframe, provider data-window feasibility, and warmup requirements.
+- `capital_and_sizing`: starting capital, contribution schedule, allocation method, recurring amount, and any future sizing constraints.
+- `entry_logic`: one or more entry condition groups.
+- `exit_logic`: one or more exit condition groups, hold-through-end semantics, or missing exit semantics.
+- `signals`: price, volume, indicator, provider-derived, or future external-signal references such as sentiment.
+- `parameters`: inferred defaults and user-provided overrides with provenance.
+- `assumptions`: benchmark, fees, slippage, long-only, allocation, bars, and provider mode.
+- `unsupported_context`: parts of the user's idea Argus understands but cannot execute yet.
+- `confidence_and_open_questions`: what is clear, what materially changes execution, and what must be clarified.
+
+Strategy families remain useful, but only as derived labels or compiler macros:
+
+- Buy-and-hold is entry at period start plus hold-through-end exit semantics.
+- Recurring buy/DCA is scheduled entry logic with contribution sizing.
+- RSI threshold is an indicator-threshold rule over an oscillator output.
+- Moving-average crossover is an indicator-vs-indicator crossover rule.
+- Sentiment strategies, when added, should become external-signal conditions with provider requirements, not a parallel chat runtime.
+
+This keeps the LLM flexible while keeping execution honest. The LLM proposes the IR. Deterministic capability, provider, rule, and engine-launch layers decide what can run.
+
+Non-negotiable rule:
+
+No new user-facing strategy breadth should require a new conversational hardcoded mapping unless it introduces a genuinely new engine primitive. New breadth should usually be added through registry schemas, rule compiler support, provider adapters, or artifact/action lifecycle support.
+
 ### Artifact Spine
 
 Add or consolidate a canonical artifact layer with small focused modules. Do not create one giant runtime script.
@@ -567,6 +645,29 @@ The production loop should be:
 
 This is the required shape for production readiness. Any implementation that bypasses one of these layers with a one-off phrase rule or local hardcoded shortcut is drift.
 
+### Strategy Labels Are Edge Metadata
+
+The runtime may still expose familiar labels because users, cards, saved strategies, analytics, and engine adapters benefit from understandable names. Those labels must not become the route map for natural language.
+
+Allowed uses of strategy labels:
+
+- Card title and saved strategy organization.
+- Analytics and usage reporting.
+- Engine-launch macro selection after a valid IR has been produced.
+- Backward-compatible API fields where existing clients expect a strategy type.
+
+Disallowed uses:
+
+- Deciding user intent before LLM interpretation.
+- Adding one hardcoded chat branch per new strategy phrase.
+- Treating `signal_strategy` as a catch-all for incomplete rules.
+- Losing richer IR fields because a template label was selected.
+- Claiming a label is executable when the underlying IR cannot compile.
+
+Backward-compatible migration rule:
+
+Existing `strategy_type` fields may remain during this pass, but they must be derived from or attached to the canonical IR. If the IR and `strategy_type` disagree, the IR/capability/compiler truth wins and the artifact must not be marked ready until the disagreement is repaired.
+
 ### Model Routing And Cost Discipline
 
 Model selection is part of the runtime contract, not an implementation accident.
@@ -620,7 +721,7 @@ QA should be promoted into environment defaults.
 
 The product must support creative user strategy ideas without hand-authoring one rigid strategy per phrase.
 
-The right backbone is a schema-driven pandas-ta indicator provider.
+The right backbone is canonical intent/rule IR plus a schema-driven pandas-ta indicator provider.
 
 pandas-ta support means Argus can compute or discover an indicator. Executable strategy support means Argus can also map user language into a validated rule using that indicator, with clear parameters, outputs, defaults, and entry/exit semantics.
 
@@ -630,6 +731,13 @@ This distinction should unlock flexibility rather than restrict it:
 - If Argus can infer or declare its parameter schema and outputs, Argus can draft with it safely.
 - If Argus can bind those outputs into rule grammar and validate the data window, Argus can execute it.
 - If user phrasing is incomplete, Argus asks a precise clarification instead of guessing.
+
+This same direction applies beyond indicators:
+
+- Sentiment strategies should be modeled as external-signal conditions with provider/data-source requirements.
+- Event or macro strategies should be modeled as provider-backed signal conditions with clear timestamps and lookback rules.
+- Multi-language prompts should produce the same IR as equivalent English prompts.
+- New strategy breadth should change schemas, providers, compiler support, or guardrails, not add another conversational shortcut.
 
 ### Capability Tiers
 
@@ -1061,6 +1169,16 @@ Stop and consult the user before changing:
 
 Implementation must proceed as vertical slices, not broad layers. A vertical slice means browser-visible functionality works end to end before the next expansion begins.
 
+The eight workstreams below are governed by the five recommended next moves:
+
+- Move 1, freeze the evaluation spine, guards every workstream.
+- Move 2, close artifact/action runtime, owns Workstreams 1, 2, 3, 6, 7, and 8.
+- Move 3, replace strategy-template thinking with canonical IR, owns Workstreams 4, 5, and 6.
+- Move 4, unify provider and capability truth, owns Workstreams 4 and 5.
+- Move 5, run release-grade live browser QA, is the exit gate for every workstream.
+
+No workstream is complete until its browser gate is represented in the evaluation spine and has fresh evidence.
+
 ### Slice 0: First-Pass Drift Audit
 
 Goal: decide what to keep, rework, or remove from the current branch before adding more behavior.
@@ -1174,6 +1292,7 @@ Exit criteria:
 
 - A short audit note lists keep/remove/rework decisions.
 - No implementation proceeds from stale "passing" assumptions.
+- Any deterministic phrase/strategy mapping that predates LLM-first interpretation is classified as keep only if it is an engine macro or compatibility adapter, not a conversational router.
 
 ### Workstream 2: Canonical Artifact Contract
 
@@ -1211,10 +1330,11 @@ Exit criteria:
 
 ### Workstream 4: Capability Planner And Provider Truth
 
-Goal: one capability planner and capability plane power LLM context, UI answers, provider modes, fixture-backed QA, and validation.
+Goal: one capability planner and capability plane power LLM context, canonical IR, UI answers, provider modes, fixture-backed QA, and validation.
 
 Actions:
 
+- Define canonical investing-idea intent and rule IR models or explicit adapter boundaries for the current pass.
 - Define planner input and output models.
 - Implement outcome taxonomy: `ready_to_confirm`, `needs_clarification`, `needs_repair`, `draft_only`, `answer_only`, `unsupported_with_alternatives`.
 - Route planner outputs into artifact creation, artifact patching, retry recovery, result follow-ups, and capability answers.
@@ -1236,10 +1356,11 @@ Exit criteria:
 - Capability Q&A answers are deterministic and match actual executable registry.
 - Recorded fixture mode does not hide production resolver gaps.
 - Composer search and chat resolution return consistent assets/indicators.
+- Strategy family/type values are derived from the IR and compiler/capability result, not selected by conversational shortcuts.
 
 ### Workstream 5: Indicator And Rule Engine Completion
 
-Goal: make the advertised indicator/rule patterns actually executable end to end.
+Goal: make the advertised indicator/rule patterns actually executable end to end through canonical IR and generic compiler support.
 
 Actions:
 
@@ -1258,6 +1379,7 @@ Exit criteria:
 - Every indicator claimed as executable has engine tests and live browser QA.
 - Every unsupported indicator is preserved and explained without fake execution promises.
 - Every executable indicator can use defaults or user-provided parameter overrides.
+- A new executable rule pattern is added by extending schemas/compiler support, not by adding a chat phrase branch.
 
 ### Workstream 6: Conversation Continuity And Recovery
 
@@ -1539,6 +1661,84 @@ Required test classes:
 
 But final acceptance requires live browser QA matrix passing.
 
+## Lightweight Evaluation Spine
+
+Argus needs an evaluation spine that embraces non-determinism without letting the runtime become untestable.
+
+The goal is not a large evaluation platform. The goal is a small, durable harness that makes the eight buckets repeatedly testable and prevents regressions from hiding behind green unit tests.
+
+### Evaluation Artifacts
+
+Create a small scenario manifest for the current release slice.
+
+Each scenario should include:
+
+- `id`
+- `bucket`
+- `purpose`
+- `natural_prompt_variants`
+- `conversation_steps`
+- expected artifact type and status
+- expected visible card state
+- expected action availability
+- expected persisted metadata fields
+- reload expectations
+- expected result fact usage when relevant
+- forbidden outcomes
+- optional LLM-judge rubric for answer quality
+
+The manifest should be intentionally small at first. It should cover the browser QA matrix and the known red/yellow regressions before adding breadth.
+
+### Evaluation Layers
+
+Use three complementary layers:
+
+1. **Code-scored contract checks**
+   - Artifact exists.
+   - Artifact id is stable.
+   - Launch payload exists before `Ready to run`.
+   - Actions include artifact/run ids.
+   - Result fact bank exists after completion.
+   - Reload preserves active artifact/result context.
+
+2. **Browser trajectory checks**
+   - The app reaches the expected visual state.
+   - Card actions are clickable and scoped.
+   - Composer actions do not duplicate card actions.
+   - Raw internal codes are absent.
+   - Reload behavior matches the pre-reload artifact state.
+
+3. **LLM-as-judge checks**
+   - Used only for answer quality after hard runtime checks pass.
+   - Scores whether the answer is grounded in visible/run facts, truthful about capability, helpful, concise, and non-overclaiming.
+   - Must not override deterministic failures. A beautiful answer attached to a stale artifact is still a failure.
+
+### Probabilistic Mindset
+
+Non-deterministic prompts should be grouped by intended semantic target, not exact text.
+
+Example group:
+
+- "what if I bought Tesla after a big drop?"
+- "suppose I wait for TSLA to get hammered then buy"
+- "can we test buying Tesla on dips?"
+
+Correct behavior is not identical wording. Correct behavior is a high probability of converging to the same truthful next move: clarify dip semantics or draft a supported rule if the user supplies one.
+
+### Release Scoring
+
+For this pass, use a simple release score:
+
+- `must_pass`: hard runtime invariants and browser QA scripts.
+- `should_pass`: natural variants that should usually converge to the same planner outcome.
+- `watch`: educational or exploratory answers judged for quality but not release-blocking unless they overclaim executable support.
+
+A `must_pass` failure blocks completion. A `should_pass` failure requires a documented decision: fix now, downgrade to watch with reason, or add it to the next pass. A `watch` failure is recorded as product learning unless it violates capability truth.
+
+### Eval Scope Guardrail
+
+The eval spine must not become a second product runtime. It observes the runtime, seeds scenarios, inspects artifacts/actions/results, and optionally judges answer quality. It does not add interpretation rules, hidden mock behavior, or special browser-only shortcuts.
+
 ## Expected End State
 
 If this pass is implemented correctly, the system status should be:
@@ -1583,12 +1783,209 @@ If this pass is implemented correctly, the system status should be:
 - `ChatInterface.tsx`, runtime stage files, and provider modules do not become catch-all files.
 - Cross-layer communication uses typed payloads.
 - Tests protect boundaries without normalizing broken live behavior.
+- Strategy labels are edge metadata derived from canonical IR, not the primary product brain.
+- New strategy breadth plugs into IR, provider schemas, capability planner, compiler support, or artifact lifecycle rather than chat phrase branches.
 
 ### Release Evidence
 
 - A QA evidence document lists every live browser script, prompt/action, visible card state, final answer, reload behavior, and pass/fail.
 - Any failed browser script blocks completion.
 - The final status is a matrix, not a narrative claim.
+
+## Release-Grade Runtime Contract Checklist
+
+The branch is close to production readiness only when this checklist is complete with fresh evidence.
+
+## Fresh Evidence Ledger
+
+This ledger is intentionally narrow. It records current proof without upgrading
+the whole branch to "complete" until every release-gate scenario has browser
+evidence.
+
+### Automated Contract Evidence
+
+- `poetry run pytest tests/agent_runtime/test_llm_interpreter.py tests/agent_runtime/test_interpret_stage.py tests/agent_runtime/test_conversation_stages.py tests/agent_runtime/test_runtime_semantic_boundaries.py -q --tb=short`
+  - Result: 117 passed.
+  - Covers: LLM-first interpretation boundaries, structured interpretation
+    recovery, semantic integrity, staged conversation behavior, explicit
+    supported rule repair, and prevention of vague momentum invention.
+- `poetry run pytest tests/evals/test_chat_runtime_eval_manifest.py tests/test_chat_backtest_state_machine.py tests/test_chat_runtime_reload_guardrails.py tests/agent_runtime/test_conversational_contract_hardening.py tests/agent_runtime/test_confirmation_artifacts.py tests/agent_runtime/test_execute_launch_payload.py tests/agent_runtime/test_execute_recovery.py tests/agent_runtime/test_result_followups.py tests/agent_runtime/test_workflow.py -q --tb=short`
+  - Result: 121 passed.
+  - Covers: eight-bucket eval manifest, card-owned actions, launch payload
+    identity, stale action rejection, reload guardrails, failed-action recovery,
+    result follow-ups, save/breakdown/refine contracts, and workflow integration.
+- `poetry run pytest tests/test_chat_runtime_reload_guardrails.py::test_newer_confirmation_metadata_overrides_stale_result_checkpoint_for_text_turn tests/test_chat_runtime_reload_guardrails.py::test_visible_confirmation_metadata_fallback_carries_text_turn_context tests/test_chat_runtime_reload_guardrails.py::test_stale_confirmation_action_id_does_not_execute tests/agent_runtime/test_conversational_contract_hardening.py::test_natural_language_approval_executes_only_after_confirmation_card -q --tb=short`
+  - Result: 4 passed.
+  - Covers: the live-discovered stale checkpoint bug where an older result
+    could override a newer visible confirmation card during text turns.
+- `poetry run ruff check src/argus/api/routers/agent.py src/argus/domain/backtesting/rules/intent_normalizer.py src/argus/agent_runtime/stages/execute.py src/argus/agent_runtime/strategy_contract.py src/argus/agent_runtime/stages/interpret_actions.py src/argus/agent_runtime/signal_rule_repair.py tests/test_chat_runtime_reload_guardrails.py tests/agent_runtime/test_llm_interpreter.py tests/agent_runtime/test_execute_launch_payload.py tests/agent_runtime/test_execute_recovery.py`
+  - Result: all checks passed.
+- `cd web && bun run lint components/chat/ChatInput.tsx components/chat/ChatInterface.tsx components/chat/StrategyConfirmationCard.tsx components/chat/StrategyResultCard.tsx`
+  - Result: passed.
+- `cd web && bun test __tests__/chat-composer-model.test.ts __tests__/alpha-frontend.test.ts`
+  - Result: 48 passed.
+  - Covers: composer model, structured cards, card-scoped actions, result
+    presentation, and frontend guardrail string checks.
+
+### Direct Runtime Evidence
+
+- Stream prompt:
+  `Test Nvidia over the past year when the 50-day moving average crosses above the 200-day moving average.`
+  - Result: `await_approval`.
+  - Confirmation card: `NVDA signal strategy`, `Ready to run`, asset `NVDA`,
+    period `past year`, entry `50-day SMA crosses above 200-day SMA`, exit
+    `50-day SMA crosses below 200-day SMA`.
+  - Payload: executable `rule_spec` present for entry and exit; launch validation
+    marked the card ready to run.
+- Stream prompt after a visible confirmation card:
+  `yes run it`
+  - Result: no quota-bearing execution.
+  - Assistant answer: directs the user to use the visible `Run backtest` card
+    action.
+  - Card identity stayed stable rather than rotating a new draft.
+
+### Live Browser Evidence
+
+2026-05-15 update: the in-app Browser path is now usable after rebooting the
+local servers and reconnecting the browser session. Free-text entry was verified
+through the browser, card-scoped actions were clicked in the browser, and reload
+behavior was verified on the real frontend. The Browser Playwright `fill/click`
+wrapper can still report a contenteditable textbox as disabled; DOM click/type
+was the reliable browser-control path for this QA pass.
+
+- Correct failure discovered and fixed:
+  - In a long mixed QA thread, a visible TSLA `Run backtest` card action was
+    rejected as stale even though it was the newest visible card.
+  - Root cause: stale latest-result checkpoint state could outrank newer visible
+    confirmation metadata for text turns.
+  - Fix: persisted confirmation metadata now outranks stale result checkpoint
+    fallback for plain text turns; stale action ids still reject.
+- Fresh golden card/action/result flow:
+  - Prompt: `could you check if holding Tesla for about a year would have beaten SPY?`
+  - Visible card after reload: `TSLA buy and hold`, `Ready to run`, one visible
+    card-scoped `Run backtest`, no duplicate composer-level action chips.
+  - Natural text after the card: `yes run it`.
+  - Result: no backtest executed; assistant directed the user to the visible
+    card action.
+  - Action: clicked the visible browser `Run backtest` button.
+  - Result card: `TSLA Buy and Hold`, `Simulation Complete`, result actions
+    visible, no raw `missing_rule_group`, and no duplicate result card.
+  - Result answer: TSLA returned `+29.3%` versus SPY `+26.7%`, with a `+2.6 pts`
+    gap and explicit assumptions.
+- Reload continuity:
+  - Reload after the ready card preserved the same card and one card-scoped run
+    action.
+  - Reload after the completed result showed zero active `Run backtest` buttons
+    and preserved the result card/actions.
+  - Follow-up after result, `what exactly did you test?`, answered from latest
+    run facts: TSLA, buy-and-hold, exact dates, SPY benchmark, return, benchmark
+    return, gap, and assumptions.
+- Composer discovery:
+  - `@` discovery showed both assets and indicators, including `SMA`, `RSI`,
+    runnable `MACD`, and draft-only `ATR`.
+  - This proves the regression where inline search returned assets only is fixed
+    for the current capability surface.
+- Fresh browser-typed continuity/result flow:
+  - Prompt: `Test buying and holding Apple over the past year.`
+  - Visible card: `AAPL buy and hold`, `Ready to run`, period `past year`.
+  - Prompt: `Actually make it Nvidia.`
+  - Visible card: `NVDA buy and hold`, same period preserved.
+  - Prompt: `Use the last 6 months instead.`
+  - Visible card: `NVDA buy and hold`, period updated to `past 6 months`.
+  - Prompt: `What assumptions are you using?`
+  - Assistant answered from the visible draft assumptions: `$1,000`, `1D bars`,
+    no fees/slippage, `Benchmark: SPY`.
+  - Prompt: `yes run it`
+  - Assistant did not execute; it directed the user to the visible
+    `Run backtest` button.
+  - Browser action: clicked card-scoped `Run backtest`.
+  - Result card: `NVDA Buy and Hold`, `Simulation Complete`, return `+21.9%`,
+    SPY `+11.4%`, gap `+10.4 pts`, max drawdown `-15.7%`.
+  - Follow-up: `What exactly did you test?` answered from latest run facts.
+  - Follow-up regression found: `What was the max drawdown?` initially answered
+    with the generic performance fallback because interpreter focus drift plus a
+    structured-composer validation failure suppressed the risk fact.
+  - Fix: result follow-up fallback now produces fact-complete general answers and
+    performance fallbacks include the core risk fact. Rechecked in browser:
+    `What was the max drawdown?` answered with `The max drawdown was -15.7%`.
+  - Result actions: `Show a breakdown` added one breakdown message without
+    duplicating the result card; `Save strategy` changed the card state to
+    disabled `Saved`; `Refine strategy` produced a follow-up prompt asking what
+    to change.
+  - Reload: preserved result card, saved state, result actions, breakdown, and
+    post-reload follow-up context. `Why did this result happen after reload?`
+    answered from the latest run facts and included return, benchmark, gap, max
+    drawdown, and caveat.
+
+### Still Unproven Or Incomplete
+
+- Full QA 1-14 browser matrix is not complete yet, but browser typing is no
+  longer the blocker.
+- Trust polish needs desktop and mobile browser evidence for scroll behavior,
+  final-only controls, and copy feedback.
+- Natural retry recovery has automated coverage, but still needs a clean live
+  failed-action scenario and reload proof.
+- Capability breadth and schema-driven pandas-ta expansion are not fully proven
+  across the advertised indicator/rule families.
+- Result actions have fresh browser click proof for breakdown, save, and refine;
+  cancel/change-date/change-asset confirmation actions still need the full
+  scripted browser matrix.
+- Spanish smoke and mixed provider asset resolution still need browser evidence.
+
+### Runtime Contract
+
+- [ ] Normal user text reaches LLM-first interpretation before deterministic routing.
+- [x] Structured interpretation produces or patches canonical investing-idea IR.
+- [ ] Strategy type/family is derived edge metadata, not the chat routing source.
+- [x] Capability planner outcome is persisted or traceable for the active artifact.
+- [x] `Ready to run` requires validated executable payload.
+- [x] Typed "run it" intent does not execute quota-bearing backtests; the card action does.
+
+### Artifact Contract
+
+- [x] One active artifact owns one visible card state.
+- [x] One active artifact owns one action set.
+- [x] Actions carry artifact/run ids.
+- [x] Superseded artifacts remain visible history but cannot execute.
+- [x] Reload hydrates the same artifact status and actions.
+- [ ] Failed actions preserve retry context and user-safe recovery.
+
+### Capability Contract
+
+- [ ] Capability Q&A answers from registry/provider/compiler truth.
+- [x] Composer search and chat resolution use the same asset/indicator capability interfaces.
+- [ ] Provider modes use the same resolver/registry/planner/compiler/artifact shapes.
+- [ ] Unsupported or draft-only ideas are preserved and explained without fake execution claims.
+- [ ] Indicators marked executable support defaults and user overrides.
+- [ ] Rule patterns marked executable compile and run through the engine.
+
+### Result Contract
+
+- [x] Completed runs create immutable result facts.
+- [x] Follow-ups after result use latest run facts.
+- [ ] False premises are corrected.
+- [ ] Breakdown is fact-grounded and non-duplicative.
+- [ ] Save strategy is idempotent and persists visible saved state.
+- [ ] Refine strategy starts from prior result config and creates a new draft artifact.
+
+### UI Contract
+
+- [x] Card actions render inside cards only.
+- [x] Composer does not duplicate active artifact actions.
+- [x] Raw internal codes never appear to users.
+- [ ] Status and streamed answer do not compete visually.
+- [ ] Feedback/copy controls appear only when the answer is final.
+- [ ] Copy shows visible success/failure feedback.
+- [ ] Scroll does not yank while the user is reading older content.
+
+### Evaluation Contract
+
+- [x] Scenario manifest covers the eight buckets and the live browser QA matrix.
+- [x] Hard contract checks run before LLM-judge answer scoring.
+- [ ] Browser trajectory checks cover prompt/action/card/final/reload behavior.
+- [ ] Correct failures are documented as pass cases when they preserve capability truth.
+- [ ] Any `must_pass` scenario failure blocks completion.
+- [ ] Final evidence is a matrix with links or notes for every QA script.
 
 ## Stop Conditions
 
@@ -1655,11 +2052,13 @@ The spec requires focused modules, typed cross-layer payloads, and clean ownersh
 
 ## Self Review 4: Indicator Scope Honesty
 
-Result: pass after adding capability tiers.
+Result: pass after adding capability tiers and the canonical IR rule.
 
 The spec now frames pandas-ta as a schema-driven provider, not a hand-curated dead end. It allows broad search/education, schema-driven drafting, and broad execution where parameter schemas, output roles, rule semantics, validation, engine integration, and browser QA are complete.
 
 This matches production readiness better than claiming breadth without execution truth.
+
+It also prevents the current supported labels from becoming permanent product walls. `buy_and_hold`, recurring buy, RSI threshold, moving-average crossover, and future sentiment strategies are all represented through IR semantics first, with labels derived later.
 
 ## Self Review 5: Provider Backbone Coverage
 
@@ -1679,7 +2078,7 @@ This closes the gap where the prior version could still be read as a narrow manu
 
 ## Self Review 6: Anti-Pattern And Sequencing Review
 
-Result: pass after adding the missing-question section, anti-pattern list, vertical slices, and expected end state.
+Result: pass after adding the missing-question section, anti-pattern list, vertical slices, five next moves, release-grade checklist, and expected end state.
 
 The most important missing question was the production slice question: what is the smallest end-to-end slice that proves the architecture before expanding indicator and provider breadth?
 
@@ -1688,7 +2087,24 @@ The spec now prevents:
 - a big-bang rewrite,
 - an implementation that claims production readiness without a working happy path at each slice,
 - expanding pandas-ta/provider scope before the artifact spine is truthful,
+- treating strategy labels as the primary conversational contract,
+- building a deterministic evaluation suite that ignores non-deterministic trajectories,
 - ending without explicit expectations for runtime, strategy execution, capability truth, UI actions, codebase health, and release evidence.
+
+## Self Review 7: Evaluation Spine Coverage
+
+Result: pass after adding the lightweight evaluation spine and release-grade runtime contract checklist.
+
+The spec now defines how deterministic checks, browser trajectory checks, and LLM-as-judge quality checks work together:
+
+- deterministic checks own runtime truth,
+- browser checks own product truth,
+- LLM judges own answer quality only after runtime truth passes.
+
+This avoids two failure modes:
+
+- green unit tests that miss broken browser behavior,
+- subjective browser impressions with no repeatable artifact/action assertions.
 
 ## Final Acceptance Statement
 

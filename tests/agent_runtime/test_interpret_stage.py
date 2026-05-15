@@ -20,6 +20,7 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     StructuredActionContext,
     TaskSnapshot,
+    UnsupportedConstraint,
     UserState,
 )
 
@@ -839,6 +840,67 @@ def test_result_followup_uses_latest_result_fact_bank() -> None:
     assert result.outcome == "ready_to_respond"
     assert "-34.2%" in result.patch["assistant_response"]
     assert "MSFT" in result.patch["assistant_response"]
+
+
+def test_result_followup_uses_latest_result_when_interpreter_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return "Grounded answer from the latest result facts."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        fake_compose_result_followup_response,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-interpreter-down",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 41.1,
+                            "benchmark_return_pct": 26.7,
+                            "delta_vs_benchmark_pct": 14.4,
+                        }
+                    }
+                },
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "date_range": {"start": "2025-05-15", "end": "2026-05-15"},
+                },
+            },
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Why did this happen?",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=snapshot,
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["assistant_response"] == (
+        "Grounded answer from the latest result facts."
+    )
+    assert result.decision is not None
+    assert result.decision.semantic_turn_act == "result_followup"
+    assert result.decision.result_followup_focus == "general"
+    assert "latest_result_fact_bank_recovery" in result.decision.reason_codes
+    assert captured["metadata"]["symbols"] == ["AAPL"]
+    assert captured["user_message"] == "Why did this happen?"
 
 
 def test_result_followup_uses_llm_composer_before_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1817,6 +1879,94 @@ def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
     assert result.decision.missing_required_fields == []
 
 
+def test_pending_date_answer_removes_mislabeled_timeframe_constraint(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy Nvidia on a 50/200 moving-average crossover.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            entry_logic="50-day SMA crosses above 200-day SMA",
+            exit_logic="50-day SMA crosses below 200-day SMA",
+            entry_rule=entry_rule,
+            exit_rule=exit_rule,
+            extra_parameters={"entry_rule": entry_rule, "exit_rule": exit_rule},
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the pending date question.",
+            candidate_strategy_draft=StrategySummary(
+                date_range="past year",
+                timeframe="past year",
+            ),
+            unsupported_constraints=[
+                UnsupportedConstraint(
+                    category="unsupported_time_granularity",
+                    raw_value="past year",
+                    explanation="The timeframe is not supported.",
+                )
+            ],
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use the past year.",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == "past year"
+    assert strategy.timeframe is None
+    assert strategy.entry_rule == entry_rule
+    assert strategy.exit_rule == exit_rule
+    assert result.decision.unsupported_constraints == []
+    assert (
+        "semantic_unsubstantiated_timeframe_constraint_removed"
+        in result.decision.reason_codes
+    )
+
+
 def test_contextual_asset_edit_preserves_existing_signal_rule_without_restatement(
     monkeypatch,
 ) -> None:
@@ -2181,6 +2331,111 @@ def test_refinement_without_date_words_preserves_active_draft_period(
     assert "spurious_date_range_removed" not in result.decision.reason_codes
 
 
+def test_contextual_merge_clears_prior_signal_rules_when_family_changes_to_buy_hold(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    prior_entry_rule = {
+        "type": "moving_average_crossover",
+        "direction": "bullish",
+        "fast_period": 50,
+        "slow_period": 200,
+        "fast_indicator": "sma",
+        "slow_indicator": "sma",
+    }
+    prior_exit_rule = {
+        "type": "moving_average_crossover",
+        "direction": "bearish",
+        "fast_period": 50,
+        "slow_period": 200,
+        "fast_indicator": "sma",
+        "slow_indicator": "sma",
+    }
+    prior_rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_above",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_below",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy Nvidia on a moving-average crossover.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range="past year",
+            entry_logic="50-day SMA crosses above 200-day SMA",
+            exit_logic="50-day SMA crosses below 200-day SMA",
+            entry_rule=prior_entry_rule,
+            exit_rule=prior_exit_rule,
+            rule_spec=prior_rule_spec,
+            extra_parameters={
+                "entry_rule": prior_entry_rule,
+                "exit_rule": prior_exit_rule,
+                "rule_spec": prior_rule_spec,
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User wants a fresh Tesla buy-and-hold test.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="Backtest buying and holding Tesla over the past year.",
+            strategy_type=None,
+            strategy_thesis="Buy and hold Tesla.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="past year",
+            extra_parameters={"raw_strategy_type": "buy_and_hold"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Backtest buying and holding Tesla over the past year.",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={"requested_field": "refinement"},
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert result.outcome == "ready_for_confirmation"
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == "past year"
+    assert strategy.strategy_thesis == "Buy and hold Tesla."
+    assert strategy.entry_logic is None
+    assert strategy.exit_logic is None
+    assert strategy.entry_rule is None
+    assert strategy.exit_rule is None
+    assert strategy.rule_spec is None
+    assert "entry_rule" not in strategy.extra_parameters
+    assert "exit_rule" not in strategy.extra_parameters
+    assert "rule_spec" not in strategy.extra_parameters
+
+
 def test_indicator_simplification_does_not_patch_when_llm_misroutes(
     monkeypatch,
 ) -> None:
@@ -2455,7 +2710,7 @@ def test_interpreter_unavailable_reads_visible_confirmation_assumptions() -> Non
     assert "card controls" in answer
 
 
-def test_retry_failed_action_uses_failed_launch_payload() -> None:
+def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> None:
     launch_payload = {
         "strategy_type": "buy_and_hold",
         "symbol": "MSFT",
@@ -2493,8 +2748,14 @@ def test_retry_failed_action_uses_failed_launch_payload() -> None:
         snapshot=snapshot,
     )
 
-    assert result.outcome == "approved_for_execution"
-    assert result.patch["confirmation_payload"] == launch_payload
+    assert result.outcome == "ready_for_confirmation"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["candidate_strategy_draft"].asset_universe == ["MSFT"]
+    assert result.patch["candidate_strategy_draft"].date_range == {
+        "start": "2025-05-13",
+        "end": "2026-05-13",
+    }
+    assert "Run backtest button" in result.patch["assistant_response"]
 
 
 def test_interpret_canonicalizes_symbols_through_market_data(monkeypatch) -> None:

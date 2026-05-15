@@ -10,6 +10,16 @@ from argus.domain.market_data import search_assets
 
 router = APIRouter(prefix="/api/v1", tags=["discovery"])
 
+_INDICATOR_SUPPORT_STATUS = {
+    "executable": "supported",
+    "supported": "supported",
+    "draftable": "draft_only",
+    "draft_only": "draft_only",
+    "searchable": "draft_only",
+    "searchable_only": "draft_only",
+    "unavailable": "unavailable",
+}
+
 
 def display_asset_class(asset_class: str) -> str:
     labels = {
@@ -18,6 +28,10 @@ def display_asset_class(asset_class: str) -> str:
         "currency_pair": "Currency Pair",
     }
     return labels.get(asset_class, asset_class.replace("_", " ").title())
+
+
+def discovery_support_status(status: str | None) -> str:
+    return _INDICATOR_SUPPORT_STATUS.get((status or "").strip().lower(), "draft_only")
 
 
 @router.get("/discovery/assets", response_model=DiscoveryResponse)
@@ -77,7 +91,7 @@ def discovery_indicators(
                 description=indicator.description,
                 insert_text=indicator.key.upper(),
                 provider="pandas-ta-classic",
-                support_status=indicator.support_status,  # type: ignore[arg-type]
+                support_status=discovery_support_status(indicator.support_status),
             )
             for indicator in indicators
         ]
@@ -85,3 +99,4 @@ def discovery_indicators(
 
 
 _display_asset_class = display_asset_class
+_discovery_support_status = discovery_support_status

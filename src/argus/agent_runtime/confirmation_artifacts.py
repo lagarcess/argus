@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
+from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.state.models import ArtifactReference
+from argus.agent_runtime.strategy_contract import (
+    executable_strategy_type,
+    resolve_date_range,
+)
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
 
@@ -43,6 +48,12 @@ def validate_confirmation_execution_payload(
         return ConfirmationExecutionValidation(
             executable=False,
             failure_code="invalid_launch_payload",
+        )
+    contract_failure = _strategy_contract_failure(confirmation_payload, request)
+    if contract_failure is not None:
+        return ConfirmationExecutionValidation(
+            executable=False,
+            failure_code=contract_failure,
         )
     return ConfirmationExecutionValidation(
         executable=True,
@@ -96,3 +107,69 @@ def stable_payload_hash(value: Any) -> str | None:
         return None
     encoded = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+
+def _strategy_contract_failure(
+    confirmation_payload: dict[str, Any],
+    request: LaunchBacktestRequest,
+) -> str | None:
+    strategy = confirmation_payload.get("strategy")
+    if not isinstance(strategy, dict):
+        return None
+
+    expected_strategy_type = executable_strategy_type(strategy)
+    if expected_strategy_type and request.strategy_type != expected_strategy_type:
+        return "launch_payload_strategy_mismatch"
+
+    expected_symbols = _strategy_symbols(strategy)
+    if expected_symbols and request.symbols != expected_symbols:
+        return "launch_payload_symbols_mismatch"
+
+    expected_date_range = _strategy_date_range(strategy)
+    if (
+        expected_date_range is not None
+        and request.date_range.model_dump(mode="python") != expected_date_range
+    ):
+        return "launch_payload_date_range_mismatch"
+
+    if expected_strategy_type == "signal_strategy":
+        expected_rule_spec = executable_rule_spec_from_strategy(strategy)
+        if expected_rule_spec is None or request.rule_spec != expected_rule_spec:
+            return "launch_payload_rule_mismatch"
+        return None
+
+    if expected_strategy_type in {"buy_and_hold", "dca_accumulation"} and any(
+        [
+            request.entry_rule,
+            request.exit_rule,
+            request.rule_spec,
+        ]
+    ):
+        return "launch_payload_rule_mismatch"
+
+    if expected_strategy_type == "indicator_threshold" and request.rule_spec is not None:
+        return "launch_payload_rule_mismatch"
+
+    return None
+
+
+def _strategy_symbols(strategy: dict[str, Any]) -> list[str]:
+    asset_universe = strategy.get("asset_universe")
+    if not isinstance(asset_universe, list):
+        return []
+    symbols: list[str] = []
+    for value in asset_universe:
+        symbol = str(value).strip().upper()
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+    return symbols
+
+
+def _strategy_date_range(strategy: dict[str, Any]) -> dict[str, str] | None:
+    value = strategy.get("date_range")
+    if not isinstance(value, dict) or value in ({}, []):
+        return None
+    try:
+        return resolve_date_range(value).payload
+    except Exception:
+        return None

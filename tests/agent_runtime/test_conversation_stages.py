@@ -5,8 +5,9 @@ from pathlib import Path
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
 from argus.agent_runtime.stages.clarify import clarify_stage
+from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.stages.confirm import confirm_stage
-from argus.agent_runtime.state.models import RunState, StrategySummary
+from argus.agent_runtime.state.models import ResponseIntent, RunState, StrategySummary
 
 
 class RecordingClarifier:
@@ -107,6 +108,36 @@ def test_clarify_uses_interpreter_authored_clarification_before_generator() -> N
     assert result.patch["assistant_prompt"] == assistant_prompt
     assert result.patch["requested_field"] == "entry_logic"
     assert clarifier.requests == []
+
+
+def test_rule_clarification_preserves_known_asset_context() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "Can you test Nvidia using MACD and RSI together and only buy if volume "
+            "is above average?"
+        ),
+        recent_thread_history=[],
+    )
+    strategy = StrategySummary(
+        strategy_type="signal_strategy",
+        strategy_thesis="Test Nvidia using MACD and RSI with volume confirmation.",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        entry_logic="MACD, RSI, and volume confirmation",
+    )
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["rule_definition"],
+        requested_fields=["entry_logic"],
+        facts={"strategy": strategy.model_dump(mode="python")},
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "NVDA" in prompt
+    assert "simplified into one supported rule" in prompt
+    assert "keep the full rule as a draft" in prompt
 
 
 def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> None:

@@ -100,6 +100,73 @@ def active_confirmation_assumptions(snapshot: TaskSnapshot) -> list[str]:
     return []
 
 
+def active_confirmation_effective_strategy(
+    *,
+    snapshot: TaskSnapshot,
+    fallback: StrategySummary,
+) -> StrategySummary:
+    reference = snapshot.active_confirmation_reference
+    if reference is None:
+        return fallback.model_copy(deep=True)
+    payload = confirmation_payload_dict(
+        reference.metadata.get("confirmation_payload")
+    )
+    strategy_payload = payload.get("strategy")
+    if isinstance(strategy_payload, dict):
+        allowed_fields = set(StrategySummary.model_fields)
+        strategy_values = {
+            key: value
+            for key, value in strategy_payload.items()
+            if key in allowed_fields
+        }
+        try:
+            strategy = StrategySummary.model_validate(strategy_values)
+        except Exception:
+            strategy = fallback.model_copy(deep=True)
+    else:
+        strategy = fallback.model_copy(deep=True)
+    launch_payload = payload.get("launch_payload")
+    if isinstance(launch_payload, dict):
+        strategy = _strategy_with_launch_defaults(
+            strategy=strategy,
+            launch_payload=launch_payload,
+        )
+    return strategy
+
+
+def _strategy_with_launch_defaults(
+    *,
+    strategy: StrategySummary,
+    launch_payload: dict[str, Any],
+) -> StrategySummary:
+    updated = strategy.model_copy(deep=True)
+    if launch_payload.get("strategy_type"):
+        updated.strategy_type = str(launch_payload["strategy_type"])
+    symbols = launch_payload.get("symbols")
+    if isinstance(symbols, list) and symbols:
+        updated.asset_universe = [str(symbol).strip().upper() for symbol in symbols]
+    elif launch_payload.get("symbol"):
+        updated.asset_universe = [str(launch_payload["symbol"]).strip().upper()]
+    for field_name in (
+        "timeframe",
+        "date_range",
+        "sizing_mode",
+        "capital_amount",
+        "position_size",
+        "cadence",
+        "entry_rule",
+        "exit_rule",
+        "rule_spec",
+    ):
+        value = launch_payload.get(field_name)
+        if value not in (None, "", [], {}):
+            setattr(updated, field_name, value)
+    benchmark_symbol = launch_payload.get("benchmark_symbol")
+    if benchmark_symbol:
+        updated.comparison_baseline = str(benchmark_symbol).strip().upper()
+    return updated
+
+
 def inferred_strategy_assumptions(strategy: StrategySummary) -> list[str]:
     assumptions = ["Long-only", "Equal weight"]
     if strategy.comparison_baseline:
@@ -213,10 +280,10 @@ def strategy_from_result_action_snapshot(
     *,
     snapshot: TaskSnapshot | None,
 ) -> StrategySummary:
-    if snapshot is not None and snapshot.confirmed_strategy_summary is not None:
-        return snapshot.confirmed_strategy_summary.model_copy(deep=True)
     if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
         return strategy_from_result_reference(snapshot.latest_backtest_result_reference)
+    if snapshot is not None and snapshot.confirmed_strategy_summary is not None:
+        return snapshot.confirmed_strategy_summary.model_copy(deep=True)
     return StrategySummary()
 
 
@@ -294,6 +361,48 @@ def launch_payload_from_failed_action(
     if not isinstance(launch_payload, dict) or not launch_payload:
         return None
     return dict(launch_payload)
+
+
+def strategy_from_failed_launch_payload(payload: dict[str, Any]) -> StrategySummary:
+    symbols = _symbols_from_launch_payload(payload)
+    benchmark_symbol = str(payload.get("benchmark_symbol") or "").upper()
+    asset_class = payload.get("asset_class")
+    if not isinstance(asset_class, str) or not asset_class.strip():
+        asset_class = "crypto" if benchmark_symbol == "BTC" else "equity"
+
+    strategy_payload: dict[str, Any] = {
+        "strategy_type": payload.get("strategy_type"),
+        "strategy_thesis": _retry_strategy_thesis(payload, symbols),
+        "asset_universe": symbols,
+        "asset_class": asset_class,
+        "date_range": payload.get("date_range"),
+        "capital_amount": payload.get("capital_amount"),
+    }
+    if payload.get("entry_rule") not in (None, "", [], {}):
+        strategy_payload["entry_logic"] = payload.get("entry_rule")
+    if payload.get("exit_rule") not in (None, "", [], {}):
+        strategy_payload["exit_logic"] = payload.get("exit_rule")
+    if payload.get("rule_spec") not in (None, "", [], {}):
+        strategy_payload["rule_spec"] = payload.get("rule_spec")
+    if payload.get("cadence") not in (None, "", [], {}):
+        strategy_payload["cadence"] = payload.get("cadence")
+    return StrategySummary.model_validate(strategy_payload)
+
+
+def _symbols_from_launch_payload(payload: dict[str, Any]) -> list[str]:
+    raw_symbols = payload.get("symbols")
+    if isinstance(raw_symbols, list):
+        symbols = [str(symbol).strip().upper() for symbol in raw_symbols if symbol]
+    else:
+        symbol = str(payload.get("symbol") or "").strip().upper()
+        symbols = [symbol] if symbol else []
+    return list(dict.fromkeys(symbols))
+
+
+def _retry_strategy_thesis(payload: dict[str, Any], symbols: list[str]) -> str:
+    strategy_type = str(payload.get("strategy_type") or "strategy").replace("_", " ")
+    asset_text = ", ".join(symbols) if symbols else "the selected asset"
+    return f"Retry the previous {asset_text} {strategy_type} setup."
 
 
 def failed_action_is_retryable(reference: ArtifactReference | None) -> bool:

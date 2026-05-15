@@ -113,12 +113,30 @@ async def chat_stream(
                 detail=str(exc),
                 headers={"Retry-After": "60"},
             ) from exc
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase usage counter failed; using dev memory fallback",
+                error=str(exc),
+                user_id=user.id,
+                resource="chat_messages",
+            )
 
-    current_user_profile = (
-        api_state.supabase_gateway.get_user(user_id=user.id)
-        if api_state.supabase_gateway is not None
-        else api_state.store.users.get(user.id, user)
-    )
+    current_user_profile = None
+    if api_state.supabase_gateway is not None:
+        try:
+            current_user_profile = api_state.supabase_gateway.get_user(user_id=user.id)
+        except Exception as exc:
+            if not dev_memory_fallback_enabled():
+                raise
+            logger.warning(
+                "Supabase user read failed; using dev memory fallback",
+                error=str(exc),
+                user_id=user.id,
+            )
+    else:
+        current_user_profile = api_state.store.users.get(user.id, user)
     if current_user_profile is None:
         current_user_profile = user
 
@@ -188,7 +206,7 @@ async def chat_stream(
             )
         if metadata_fallback is not None:
             runtime_fallback = metadata_fallback
-    elif not checkpoint_has_pending_strategy(checkpoint_values):
+    elif payload.action is None:
         failed_fallback = failed_action_metadata_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
@@ -202,7 +220,7 @@ async def chat_stream(
             )
             if confirmation_fallback is not None:
                 runtime_fallback = confirmation_fallback
-            else:
+            elif not checkpoint_has_pending_strategy(checkpoint_values):
                 pending_fallback = pending_strategy_metadata_fallback_context(
                     user_id=user.id,
                     conversation_id=conversation.id,
@@ -216,21 +234,7 @@ async def chat_stream(
                     )
                     if result_fallback is not None:
                         runtime_fallback = result_fallback
-    elif not checkpoint_has_latest_result(checkpoint_values):
-        failed_fallback = failed_action_metadata_fallback_context(
-            user_id=user.id,
-            conversation_id=conversation.id,
-        )
-        if failed_fallback is not None:
-            runtime_fallback = failed_fallback
-        else:
-            confirmation_fallback = confirmation_metadata_fallback_context(
-                user_id=user.id,
-                conversation_id=conversation.id,
-            )
-            if confirmation_fallback is not None:
-                runtime_fallback = confirmation_fallback
-            else:
+            elif not checkpoint_has_latest_result(checkpoint_values):
                 result_fallback = latest_result_fallback_context(
                     user_id=user.id,
                     conversation_id=conversation.id,

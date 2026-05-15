@@ -277,7 +277,11 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         "date_range": _resolve_date_range(strategy.get("date_range")),
         "entry_rule": _resolve_entry_rule(strategy, strategy_type),
         "exit_rule": _resolve_exit_rule(strategy, strategy_type),
-        "rule_spec": executable_rule_spec_from_strategy(strategy),
+        "rule_spec": (
+            executable_rule_spec_from_strategy(strategy)
+            if strategy_type == "signal_strategy"
+            else None
+        ),
         "sizing_mode": sizing_mode,
         "capital_amount": capital_amount,
         "position_size": position_size if sizing_mode == "position_size" else None,
@@ -706,21 +710,20 @@ def _resolve_strategy_type(
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
 ) -> str:
+    explicit_strategy_type = _explicit_strategy_type(strategy)
+    if explicit_strategy_type in {"buy_and_hold", "dca_accumulation"}:
+        return explicit_strategy_type
     entry_rule = strategy_rule(strategy, "entry")
     if isinstance(entry_rule, dict) and entry_rule.get("type") == "moving_average_crossover":
         return "signal_strategy"
     if executable_rule_spec_from_strategy(strategy) is not None:
         return "signal_strategy"
+    if explicit_strategy_type == "indicator_threshold":
+        return explicit_strategy_type
     if indicator_threshold_rule(strategy, "entry") is not None:
         return "indicator_threshold"
-    explicit_strategy_type = strategy.get("strategy_type")
-    if isinstance(explicit_strategy_type, str) and explicit_strategy_type:
-        return canonical_strategy_type(
-            explicit_strategy_type,
-            entry_logic=strategy.get("entry_logic"),
-            exit_logic=strategy.get("exit_logic"),
-            cadence=strategy.get("cadence"),
-        )
+    if explicit_strategy_type == "signal_strategy":
+        return "signal_strategy"
 
     extra_parameters = strategy.get("extra_parameters")
     if isinstance(extra_parameters, dict):
@@ -739,6 +742,36 @@ def _resolve_strategy_type(
     if cadence is not None:
         return "dca_accumulation"
     return "buy_and_hold"
+
+
+def _explicit_strategy_type(strategy: dict[str, Any]) -> str | None:
+    candidates: list[Any] = [strategy.get("strategy_type")]
+    extra_parameters = strategy.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        candidates.extend(
+            [
+                extra_parameters.get("raw_strategy_type"),
+                extra_parameters.get("strategy_type"),
+                extra_parameters.get("template"),
+            ]
+        )
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate:
+            continue
+        normalized = canonical_strategy_type(
+            candidate,
+            entry_logic=strategy.get("entry_logic"),
+            exit_logic=strategy.get("exit_logic"),
+            cadence=strategy.get("cadence"),
+        )
+        if normalized in {
+            "buy_and_hold",
+            "dca_accumulation",
+            "indicator_threshold",
+            "signal_strategy",
+        }:
+            return normalized
+    return None
 
 
 def _normalize_strategy_type(value: str) -> str:

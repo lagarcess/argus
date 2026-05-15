@@ -12,6 +12,7 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     normalize_date_range_candidate,
+    resolve_date_range,
 )
 
 
@@ -43,6 +44,7 @@ def conserve_semantic_constraints(
     selected_thread_metadata: dict[str, Any],
     prior_strategy: StrategySummary | None = None,
     optional_parameter_values: dict[str, Any] | None = None,
+    supported_timeframes: tuple[str, ...] = (),
 ) -> SemanticIntegrityReport:
     """Preserve typed LLM constraints before a draft can reach confirmation."""
 
@@ -52,13 +54,23 @@ def conserve_semantic_constraints(
     unsupported_constraints: list[UnsupportedConstraint] = []
     reason_codes: list[str] = []
 
+    requested_field = str(selected_thread_metadata.get("requested_field") or "")
     normalized_date_range = normalize_date_range_candidate(updated.date_range)
+    timeframe_as_date_range = explicit_date_range_value(
+        updated.timeframe,
+        supported_timeframes=supported_timeframes,
+    )
+    if _field_base(requested_field) == "date_range" and timeframe_as_date_range:
+        if normalized_date_range in (None, "", [], {}):
+            normalized_date_range = updated.timeframe
+            updated.date_range = updated.timeframe
+        updated.timeframe = None
+        reason_codes.append("semantic_timeframe_reassigned_to_date_range")
     if normalized_date_range not in (None, "", [], {}):
         if normalized_date_range != updated.date_range:
             updated.date_range = normalized_date_range
         reason_codes.append("semantic_date_constraint_preserved")
 
-    requested_field = str(selected_thread_metadata.get("requested_field") or "")
     structured_signal_rule_reference = _strategy_has_signal_rule_payload(updated)
 
     money_evidence = _structured_money_role_evidence(
@@ -102,6 +114,42 @@ def conserve_semantic_constraints(
         unsupported_constraints=_dedupe_unsupported_constraints(unsupported_constraints),
         reason_codes=list(dict.fromkeys(reason_codes)),
         evidence=evidence,
+    )
+
+
+def filter_unsubstantiated_timeframe_constraints(
+    *,
+    constraints: list[UnsupportedConstraint],
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    supported_timeframes: tuple[str, ...] = (),
+) -> tuple[list[UnsupportedConstraint], list[str]]:
+    """Drop LLM constraints that mislabeled an explicit date answer as timeframe."""
+
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return constraints, []
+
+    filtered: list[UnsupportedConstraint] = []
+    removed = False
+    for constraint in constraints:
+        if not _is_timeframe_constraint(constraint):
+            filtered.append(constraint)
+            continue
+        raw_value = constraint.raw_value or strategy.timeframe or strategy.date_range
+        if explicit_date_range_value(
+            raw_value,
+            supported_timeframes=supported_timeframes,
+        ):
+            removed = True
+            continue
+        filtered.append(constraint)
+
+    return (
+        filtered,
+        ["semantic_unsubstantiated_timeframe_constraint_removed"] if removed else [],
     )
 
 
@@ -184,6 +232,40 @@ def _structured_money_role_evidence(
         recurring_contribution=recurring,
         total_capital=total,
     )
+
+
+def explicit_date_range_value(
+    value: Any,
+    *,
+    supported_timeframes: tuple[str, ...] = (),
+) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    if _is_supported_timeframe_value(value, supported_timeframes=supported_timeframes):
+        return False
+    try:
+        resolution = resolve_date_range(value)
+    except Exception:
+        return False
+    return not resolution.used_default
+
+
+def _is_supported_timeframe_value(
+    value: str,
+    *,
+    supported_timeframes: tuple[str, ...],
+) -> bool:
+    normalized = value.strip().lower()
+    return normalized in {str(item).strip().lower() for item in supported_timeframes}
+
+
+def _is_timeframe_constraint(constraint: UnsupportedConstraint) -> bool:
+    category = constraint.category.strip().lower()
+    return category in {"unsupported_time_granularity", "unsupported_timeframe"}
+
+
+def _field_base(field_name: str) -> str:
+    return field_name.split("[", 1)[0]
 
 
 def _structured_recurring_cadence(strategy: StrategySummary) -> str | None:

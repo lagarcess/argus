@@ -117,7 +117,14 @@ def canonical_strategy_type(
 
 def executable_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
     payload = _strategy_payload(strategy)
+    explicit = _explicit_strategy_type(payload)
+    if explicit in {"buy_and_hold", "dca_accumulation"}:
+        return explicit
     if _has_structured_moving_average_rule(payload):
+        return "signal_strategy"
+    if explicit == "indicator_threshold":
+        return explicit
+    if explicit == "signal_strategy":
         return "signal_strategy"
     return canonical_strategy_type(
         payload.get("strategy_type"),
@@ -355,6 +362,31 @@ def _has_value(value: Any) -> bool:
     if isinstance(value, list):
         return bool(value)
     return True
+
+
+def _explicit_strategy_type(payload: dict[str, Any]) -> str | None:
+    candidates: list[Any] = [payload.get("strategy_type")]
+    extra_parameters = payload.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        candidates.extend(
+            [
+                extra_parameters.get("raw_strategy_type"),
+                extra_parameters.get("strategy_type"),
+                extra_parameters.get("template"),
+            ]
+        )
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate:
+            continue
+        normalized = canonical_strategy_type(
+            candidate,
+            entry_logic=payload.get("entry_logic"),
+            exit_logic=payload.get("exit_logic"),
+            cadence=payload.get("cadence"),
+        )
+        if normalized in SUPPORTED_STRATEGY_TYPES:
+            return normalized
+    return None
 
 
 def _has_structured_moving_average_rule(payload: dict[str, Any]) -> bool:

@@ -1011,7 +1011,7 @@ class RetryApprovalInterpreter:
 
 
 @pytest.mark.asyncio
-async def test_workflow_preserves_latest_failed_action_reference_for_retry() -> None:
+async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     tool = StubBacktestTool(
         responses=[
             {
@@ -1062,11 +1062,19 @@ async def test_workflow_preserves_latest_failed_action_reference_for_retry() -> 
         },
     )
 
-    assert result["stage_outcome"] == "execution_failed_recoverably"
+    assert result["stage_outcome"] == "await_approval"
+    assert tool.calls == []
+    confirmation_payload = result["confirmation_payload"]
+    launch = confirmation_payload["launch_payload"]
+    assert launch["symbol"] == "MSFT"
+    assert launch["date_range"] == {"start": "2025-05-13", "end": "2026-05-13"}
     state_snapshot = await workflow.aget_state(
         {"configurable": {"thread_id": "thread-retry-failed-action"}}
     )
     snapshot = state_snapshot.values["latest_task_snapshot"]
+    active_confirmation = snapshot.active_confirmation_reference
+    assert active_confirmation is not None
+    assert active_confirmation.artifact_kind == "confirmation"
     reference = snapshot.latest_failed_action_reference
     assert reference is not None
     assert reference.metadata["launch_payload"]["symbol"] == "MSFT"

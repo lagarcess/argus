@@ -119,11 +119,7 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
         searchDiscovery("indicators", query, 5).catch(() => ({ items: [] })),
       ]).then(([assets, indicators]) => {
         if (cancelled) return;
-        setDiscoveryItems(
-          [...assets.items, ...indicators.items]
-            .sort((a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query))
-            .slice(0, 8),
-        );
+        setDiscoveryItems(mergeDiscoveryItems(assets.items, indicators.items, query, 8));
       });
     }, 180);
 
@@ -259,7 +255,7 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
                     </span>
                   </span>
                   <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
-                    {item.type}
+                    {discoveryBadgeLabel(item)}
                   </span>
                 </button>
               ))}
@@ -366,6 +362,54 @@ function rankDiscoveryItem(item: DiscoveryItem, query: string) {
   if (prefix && item.type === "asset") return 2;
   if (prefix) return 3;
   return item.type === "asset" ? 4 : 5;
+}
+
+function mergeDiscoveryItems(
+  assets: DiscoveryItem[],
+  indicators: DiscoveryItem[],
+  query: string,
+  limit: number,
+) {
+  const sortedAssets = [...assets].sort(
+    (a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query),
+  );
+  const sortedIndicators = [...indicators].sort(
+    (a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query),
+  );
+  const merged: DiscoveryItem[] = [];
+  const seen = new Set<string>();
+
+  const push = (item: DiscoveryItem | undefined) => {
+    if (!item || seen.has(item.id) || merged.length >= limit) return;
+    seen.add(item.id);
+    merged.push(item);
+  };
+
+  for (
+    let index = 0;
+    merged.length < limit &&
+    (index < sortedAssets.length || index < sortedIndicators.length);
+    index++
+  ) {
+    const indicator = sortedIndicators[index];
+    const asset = sortedAssets[index];
+    if (indicator && rankDiscoveryItem(indicator, query) <= 1) {
+      push(indicator);
+      push(asset);
+    } else {
+      push(asset);
+      push(indicator);
+    }
+  }
+
+  return merged;
+}
+
+function discoveryBadgeLabel(item: DiscoveryItem) {
+  if (item.type === "asset") return "asset";
+  if (item.support_status === "supported") return "runnable";
+  if (item.support_status === "unavailable") return "unavailable";
+  return "draft";
 }
 
 function writeSegmentsToEditor(root: HTMLDivElement | null, segments: ComposerSegment[]) {
@@ -623,6 +667,16 @@ const DEFAULT_DISCOVERY_ITEMS: DiscoveryItem[] = [
     support_status: "supported",
   },
   {
+    id: "indicator:sma",
+    type: "indicator",
+    label: "SMA",
+    symbol: "sma",
+    description: "Simple moving average",
+    insert_text: "SMA",
+    provider: "pandas-ta-classic",
+    support_status: "supported",
+  },
+  {
     id: "indicator:rsi",
     type: "indicator",
     label: "RSI",
@@ -631,5 +685,25 @@ const DEFAULT_DISCOVERY_ITEMS: DiscoveryItem[] = [
     insert_text: "RSI",
     provider: "pandas-ta-classic",
     support_status: "supported",
+  },
+  {
+    id: "indicator:macd",
+    type: "indicator",
+    label: "MACD",
+    symbol: "macd",
+    description: "Moving Average Convergence Divergence",
+    insert_text: "MACD",
+    provider: "pandas-ta-classic",
+    support_status: "supported",
+  },
+  {
+    id: "indicator:atr",
+    type: "indicator",
+    label: "ATR",
+    symbol: "atr",
+    description: "Average true range",
+    insert_text: "ATR",
+    provider: "pandas-ta-classic",
+    support_status: "draft_only",
   },
 ];

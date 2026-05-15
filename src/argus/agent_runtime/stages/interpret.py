@@ -13,6 +13,10 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.result_followups import (
+    compose_result_followup_response,
+    fallback_result_followup_response,
+)
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
@@ -24,6 +28,7 @@ from argus.agent_runtime.rule_specs import (
 from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,
     conserve_semantic_constraints,
+    filter_unsubstantiated_timeframe_constraints,
 )
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
@@ -64,6 +69,8 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.strategy_contract import (
+    SUPPORTED_STRATEGY_TYPES,
+    canonical_strategy_type,
     executable_strategy_type,
 )
 from argus.agent_runtime.strategy_requirements import (
@@ -134,7 +141,7 @@ async def interpret_stage_async(
         return structured_action_result
     selected_metadata = dict(selected_thread_metadata or {})
     if structured_interpreter is None:
-        return _offline_interpreter_unavailable_result(
+        return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
             current_user_message=state.current_user_message,
@@ -151,7 +158,7 @@ async def interpret_stage_async(
         ),
     )
     if interpretation is None:
-        return _offline_interpreter_unavailable_result(
+        return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
             current_user_message=state.current_user_message,
@@ -279,6 +286,7 @@ async def _stage_result_from_interpretation(
             selected_thread_metadata=selected_thread_metadata,
             prior_strategy=_active_strategy_from_snapshot(snapshot),
             optional_parameter_values=optional_parameter_values,
+            supported_timeframes=_supported_timeframes(capability_contract),
         )
         if expects_strategy_route
         else SemanticIntegrityReport(
@@ -292,6 +300,16 @@ async def _stage_result_from_interpretation(
         *interpretation.unsupported_constraints,
         *integrity_report.unsupported_constraints,
     ]
+    constraint_filter_reason_codes: list[str] = []
+    if expects_strategy_route:
+        unsupported_constraints, constraint_filter_reason_codes = (
+            filter_unsubstantiated_timeframe_constraints(
+                constraints=unsupported_constraints,
+                strategy=strategy,
+                selected_thread_metadata=selected_thread_metadata,
+                supported_timeframes=_supported_timeframes(capability_contract),
+            )
+        )
     ambiguous_fields = list(interpretation.ambiguous_fields)
     if pending_resolution_applied:
         ambiguous_fields = [
@@ -384,6 +402,7 @@ async def _stage_result_from_interpretation(
                 else []
             ),
             *integrity_report.reason_codes,
+            *constraint_filter_reason_codes,
             *interpretation.reason_codes,
         ],
         effective_response_profile=effective_profile,
@@ -695,6 +714,13 @@ def _field_base(field_name: str) -> str:
     return field_name.split("[", 1)[0]
 
 
+def _supported_timeframes(contract: Any) -> tuple[str, ...]:
+    parameter = contract.get_optional_parameter("timeframe")
+    if parameter is None or parameter.allowed_range is None:
+        return ()
+    return tuple(str(value) for value in parameter.allowed_range.allowed_values)
+
+
 def _optional_parameter_stage_patch(
     *,
     decision: InterpretDecision,
@@ -737,6 +763,82 @@ def _offline_interpreter_unavailable_result(
         stage_patch={
             "assistant_response": _offline_recovery_message(snapshot),
         },
+    )
+
+
+async def _interpreter_unavailable_result(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None = None,
+    current_user_message: str = "",
+) -> StageResult:
+    result_followup = await _latest_result_followup_when_interpreter_unavailable(
+        user=user,
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+    )
+    if result_followup is not None:
+        return result_followup
+    return _offline_interpreter_unavailable_result(
+        user=user,
+        snapshot=snapshot,
+        current_user_message=current_user_message,
+    )
+
+
+async def _latest_result_followup_when_interpreter_unavailable(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+) -> StageResult | None:
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return None
+    if not current_user_message.strip():
+        return None
+    reference = snapshot.latest_backtest_result_reference
+    metadata = dict(reference.metadata)
+    response = await compose_result_followup_response(
+        metadata=metadata,
+        focus="general",
+        user_message=current_user_message,
+    )
+    if response is None:
+        response = fallback_result_followup_response(
+            metadata=metadata,
+            focus="general",
+        )
+    if response is None:
+        return None
+    effective_profile = resolve_effective_response_profile(
+        user=user,
+        explicit_overrides=None,
+    )
+    decision = InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary=(
+            "The LLM interpreter was unavailable; answered from the latest "
+            "result artifact facts."
+        ),
+        candidate_strategy_draft=StrategySummary(),
+        missing_required_fields=[],
+        optional_parameter_opportunity=[],
+        confidence=0.0,
+        arbitration_mode="deterministic",
+        reason_codes=[
+            "llm_interpreter_unavailable",
+            "latest_result_fact_bank_recovery",
+        ],
+        effective_response_profile=effective_profile,
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={"assistant_response": response},
     )
 
 
@@ -800,17 +902,116 @@ def _strategy_with_contextual_merge(
     )
     if not should_merge:
         return strategy
-    merged = prior.model_copy(deep=True)
+    incoming_strategy_family = _declared_strategy_family(strategy)
+    prior_strategy_family = executable_strategy_type(prior)
+    strategy_family_changed = (
+        incoming_strategy_family in SUPPORTED_STRATEGY_TYPES
+        and prior_strategy_family in SUPPORTED_STRATEGY_TYPES
+        and incoming_strategy_family != prior_strategy_family
+    )
+    merged = (
+        _reset_contextual_strategy_definition(
+            prior,
+            incoming_strategy_family,
+        )
+        if strategy_family_changed and incoming_strategy_family is not None
+        else prior.model_copy(deep=True)
+    )
     incoming = strategy.model_dump(mode="python")
     for key, value in incoming.items():
-        if key in {"raw_user_phrasing", "strategy_thesis"}:
+        if key == "raw_user_phrasing":
+            continue
+        if key == "strategy_thesis" and not strategy_family_changed:
             continue
         if value in (None, "", [], {}):
             continue
         setattr(merged, key, value)
+    if strategy_family_changed and incoming_strategy_family is not None:
+        merged.strategy_type = incoming_strategy_family
     if strategy.raw_user_phrasing:
         merged.raw_user_phrasing = strategy.raw_user_phrasing
+    declared_family = _declared_strategy_family(merged)
+    if declared_family in SUPPORTED_STRATEGY_TYPES:
+        _clear_incompatible_strategy_rule_state(merged, declared_family)
     return merged
+
+
+def _declared_strategy_family(strategy: StrategySummary) -> str | None:
+    """Return the family the LLM explicitly declared, ignoring derived rule state."""
+
+    raw_candidates: list[Any] = [strategy.strategy_type]
+    extra_parameters = dict(strategy.extra_parameters or {})
+    raw_candidates.extend(
+        [
+            extra_parameters.get("raw_strategy_type"),
+            extra_parameters.get("template"),
+        ]
+    )
+    for raw_candidate in raw_candidates:
+        candidate = canonical_strategy_type(raw_candidate)
+        if candidate in SUPPORTED_STRATEGY_TYPES:
+            return candidate
+    if _indicator_key_from_strategy(strategy) is not None:
+        return "indicator_threshold"
+    return None
+
+
+def _reset_contextual_strategy_definition(
+    prior: StrategySummary,
+    incoming_strategy_family: str,
+) -> StrategySummary:
+    """Preserve context fields while clearing incompatible strategy-rule state."""
+
+    updated = prior.model_copy(deep=True)
+    updated.strategy_type = incoming_strategy_family
+    updated.strategy_thesis = None
+    _clear_incompatible_strategy_rule_state(updated, incoming_strategy_family)
+    return updated
+
+
+def _clear_incompatible_strategy_rule_state(
+    strategy: StrategySummary,
+    strategy_family: str,
+) -> None:
+    """Keep one declared strategy family from carrying another family's rules."""
+
+    if strategy_family in {"buy_and_hold", "dca_accumulation"}:
+        strategy.entry_logic = None
+        strategy.exit_logic = None
+    if strategy_family != "signal_strategy":
+        strategy.entry_rule = None
+        strategy.exit_rule = None
+        strategy.rule_spec = None
+    if strategy_family != "dca_accumulation":
+        strategy.cadence = None
+    strategy.extra_parameters = _extra_parameters_for_strategy_family(
+        strategy.extra_parameters,
+        strategy_family,
+    )
+
+
+def _extra_parameters_for_strategy_family(
+    extra_parameters: dict[str, Any],
+    strategy_family: str,
+) -> dict[str, Any]:
+    incompatible_keys = {"entry_rule", "exit_rule", "rule_spec"}
+    if strategy_family != "indicator_threshold":
+        incompatible_keys.update({"indicator", "indicator_parameters"})
+    if strategy_family != "dca_accumulation":
+        incompatible_keys.update(
+            {
+                "cadence",
+                "recurring_contribution",
+                "contribution_amount",
+                "periodic_contribution",
+                "dca_contribution",
+            }
+        )
+    return {
+        key: value
+        for key, value in extra_parameters.items()
+        if key not in incompatible_keys
+    }
 
 
 def _strategy_looks_like_pending_artifact_patch(

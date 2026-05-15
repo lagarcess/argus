@@ -221,6 +221,12 @@ def list_messages(
                 conversation_id=conversation_id,
                 limit=None,
             )
+            if (
+                dev_memory_fallback_enabled()
+                and conversation_id in api_state.store.conversations
+                and api_state.store.messages.get(conversation_id)
+            ):
+                items = api_state.store.messages.get(conversation_id, [])
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise

@@ -390,7 +390,10 @@ def _build_confirmation_prompt(
 
     assumptions = [*user_selected_lines, *assumption_lines]
     assumption_text = f" I will use {', '.join(assumptions)}." if assumptions else ""
-    return f"{summary}{assumption_text} Reply yes to run it, or tell me what to change."
+    return (
+        f"{summary}{assumption_text} Use the Run backtest button on the card "
+        "when you are ready, or tell me what to change."
+    )
 
 
 def _plain_language_strategy_summary(

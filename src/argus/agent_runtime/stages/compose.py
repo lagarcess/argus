@@ -61,6 +61,14 @@ def _compose_clarification(intent: ResponseIntent) -> str:
     if needs == ["sizing_amount"]:
         return f"{context}How much should each recurring purchase be?"
     if needs == ["rule_definition"]:
+        if _strategy_has_rule_detail(strategy):
+            return (
+                f"{context}I have the rule direction, but the executable version "
+                "needs to be simplified into one supported rule. I can use a "
+                "percentage move, a supported moving-average crossover, an RSI "
+                "threshold, or keep the full rule as a draft. Which direction "
+                "should I take?"
+            )
         return (
             f"{context}I need to turn the idea into a specific testable rule. "
             "Do you want to define it as a percentage move, a supported "
@@ -134,7 +142,26 @@ def _strategy_context(strategy: StrategySummary) -> str:
         if assets:
             return f"I read this as an indicator-rule test for {assets}. "
         return "I read this as an indicator-rule test. "
+    if strategy_type == "signal_strategy":
+        if assets:
+            return f"I read this as a signal-rule test for {assets}. "
+        return "I read this as a signal-rule test. "
+    if assets:
+        return f"I understand the idea for {assets}. "
     return "I understand the direction. "
+
+
+def _strategy_has_rule_detail(strategy: StrategySummary) -> bool:
+    return any(
+        value not in (None, "", [], {})
+        for value in (
+            strategy.entry_logic,
+            strategy.exit_logic,
+            strategy.entry_rule,
+            strategy.exit_rule,
+            strategy.rule_spec,
+        )
+    )
 
 
 def _question_for_need(need: str) -> str:
