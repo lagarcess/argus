@@ -3,6 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from argus.agent_runtime.state.models import StrategySummary
+from argus.domain.backtesting.rules import (
+    canonicalize_rule_spec,
+    rule_spec_from_moving_average_crossover_rules,
+    rule_spec_from_signal_rule,
+    validate_rule_spec,
+)
 from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
@@ -51,6 +57,37 @@ def rule_spec_from_strategy(
     return None
 
 
+def executable_rule_spec_from_strategy(
+    strategy: StrategySummary | dict[str, Any],
+) -> dict[str, Any] | None:
+    rule_spec = rule_spec_from_strategy(strategy)
+    if rule_spec is not None:
+        try:
+            validate_rule_spec(rule_spec)
+        except ValueError:
+            try:
+                converted = rule_spec_from_signal_rule(rule_spec)
+                return canonicalize_rule_spec(converted) if converted else None
+            except (TypeError, ValueError):
+                return None
+        return canonicalize_rule_spec(rule_spec)
+
+    try:
+        generated = rule_spec_from_moving_average_crossover_rules(
+            entry_rule=strategy_rule(strategy, "entry"),
+            exit_rule=strategy_rule(strategy, "exit"),
+        )
+        return canonicalize_rule_spec(generated) if generated else None
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        generated = rule_spec_from_signal_rule(strategy_rule(strategy, "entry"))
+        return canonicalize_rule_spec(generated) if generated else None
+    except (TypeError, ValueError):
+        return None
+
+
 def indicator_threshold_rule(
     strategy: StrategySummary | dict[str, Any],
     side: str,
@@ -88,7 +125,11 @@ def indicator_parameters_from_strategy(
 
     raw_parameters = extra_parameters.get("indicator_parameters")
     parameters = dict(raw_parameters) if isinstance(raw_parameters, dict) else {}
-    indicator = _indicator_key_from_parameters(extra_parameters, parameters)
+    indicator = _indicator_key_from_parameters(
+        strategy_type=payload.get("strategy_type"),
+        extra_parameters=extra_parameters,
+        nested_parameters=parameters,
+    )
     if indicator is not None:
         parameters["indicator"] = indicator
 
@@ -127,31 +168,6 @@ def moving_average_crossover_text(rule: dict[str, Any] | None) -> str | None:
     )
 
 
-def moving_average_crossover_rules_from_text(
-    text: str,
-) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    tokens = _rule_tokens(text)
-    if not tokens:
-        return None
-    mentions = _moving_average_mentions(tokens)
-    if len(mentions) < 2 or not _has_crossover_direction(tokens):
-        return None
-    fast = mentions[0]
-    slow = mentions[1]
-    if fast["period"] == slow["period"]:
-        return None
-    direction = "bearish" if _has_bearish_direction(tokens) else "bullish"
-    entry = {
-        "type": "moving_average_crossover",
-        "fast_indicator": fast["indicator"],
-        "fast_period": fast["period"],
-        "slow_indicator": slow["indicator"],
-        "slow_period": slow["period"],
-        "direction": direction,
-    }
-    return entry, opposite_moving_average_crossover_rule(entry) or {}
-
-
 def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, Any]:
     if isinstance(strategy, StrategySummary):
         return strategy.model_dump(mode="python")
@@ -159,12 +175,26 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
 
 
 def _indicator_key_from_parameters(
+    *,
+    strategy_type: Any,
     extra_parameters: dict[str, Any],
     nested_parameters: dict[str, Any],
 ) -> str | None:
-    raw_indicator = extra_parameters.get("indicator") or nested_parameters.get("indicator")
+    raw_indicator = extra_parameters.get("indicator") or nested_parameters.get(
+        "indicator"
+    )
     if isinstance(raw_indicator, str) and raw_indicator.strip():
-        return raw_indicator.strip()
+        spec = executable_indicator_spec(raw_indicator.strip())
+        return spec.key if spec is not None else raw_indicator.strip()
+    raw_strategy_type = extra_parameters.get("raw_strategy_type")
+    if isinstance(raw_strategy_type, str) and raw_strategy_type.strip():
+        spec = executable_indicator_spec(raw_strategy_type.strip())
+        if spec is not None:
+            return spec.key
+    if isinstance(strategy_type, str) and strategy_type.strip():
+        spec = executable_indicator_spec(strategy_type.strip())
+        if spec is not None:
+            return spec.key
     return None
 
 
@@ -181,59 +211,3 @@ def _int_or_none(value: Any) -> int | None:
         return int(str(value))
     except (TypeError, ValueError):
         return None
-
-
-def _rule_tokens(text: str) -> list[str]:
-    normalized_chars: list[str] = []
-    for char in text.lower():
-        normalized_chars.append(char if char.isalnum() else " ")
-    return [token for token in "".join(normalized_chars).split() if token]
-
-
-def _moving_average_mentions(tokens: list[str]) -> list[dict[str, Any]]:
-    mentions: list[dict[str, Any]] = []
-    for index, token in enumerate(tokens):
-        indicator: str | None = None
-        if token in {"sma", "ema"}:
-            indicator = token
-        elif token == "average" and index > 0 and tokens[index - 1] == "moving":
-            indicator = "sma"
-        if indicator is None:
-            continue
-        period = _period_near(tokens, index)
-        if period is None:
-            continue
-        mentions.append({"indicator": indicator, "period": period})
-    return mentions
-
-
-def _period_near(tokens: list[str], index: int) -> int | None:
-    offsets = (-2, -1, 1, 2)
-    for offset in offsets:
-        candidate_index = index + offset
-        if candidate_index < 0 or candidate_index >= len(tokens):
-            continue
-        period = _int_or_none(tokens[candidate_index])
-        if period is not None:
-            return period
-    return None
-
-
-def _has_crossover_direction(tokens: list[str]) -> bool:
-    return bool(
-        set(tokens)
-        & {
-            "cross",
-            "crosses",
-            "crossing",
-            "crossover",
-            "above",
-            "below",
-            "over",
-            "under",
-        }
-    )
-
-
-def _has_bearish_direction(tokens: list[str]) -> bool:
-    return bool(set(tokens) & {"below", "under", "bearish"})

@@ -52,6 +52,48 @@ USER_SAFE_FAILURE_MESSAGES = {
 }
 
 
+USER_SAFE_FAILURE_DETAILS = {
+    "missing_rule_group": "incomplete_rule",
+    "indicator_data_insufficient": "insufficient_indicator_data",
+    "unsupported_indicator": "unsupported_signal_family",
+    "unsupported_indicator_threshold": "unsupported_rule",
+    "unsupported_rule_operator": "unsupported_rule",
+    "invalid_indicator_parameter": "invalid_parameter",
+    "indicator_period_out_of_bounds": "invalid_parameter",
+    "indicator_threshold_out_of_bounds": "invalid_parameter",
+    "market_data_unavailable": "market_data_issue",
+    "invalid_date_range": "invalid_date_window",
+    "capital_amount_required": "invalid_parameter",
+    "position_size_required": "invalid_parameter",
+    "capital_amount_not_applicable": "invalid_parameter",
+    "position_size_not_applicable": "invalid_parameter",
+}
+
+
+def user_safe_failure_detail(
+    *,
+    failure_reason: str | None,
+    failure_category: str | None = None,
+) -> str:
+    code = str(failure_reason or "").strip()
+    if code in USER_SAFE_FAILURE_DETAILS:
+        return USER_SAFE_FAILURE_DETAILS[code]
+    if failure_category == "missing_required_input":
+        return "missing_required_input"
+    if failure_category == "unsupported_capability":
+        return "unsupported_capability"
+    if failure_category == "parameter_validation_error":
+        return "invalid_parameter"
+    if failure_category == "upstream_dependency_error":
+        return "temporary_dependency_issue"
+    return "execution_failed"
+
+
+def is_user_safe_failure_code(value: str | None) -> bool:
+    code = str(value or "").strip()
+    return code in USER_SAFE_FAILURE_MESSAGES or code in USER_SAFE_FAILURE_DETAILS
+
+
 def build_success_envelope(
     *,
     resolved_strategy: dict[str, Any],

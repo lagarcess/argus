@@ -3,7 +3,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from argus.domain.backtesting.rules import required_warmup_bars, validate_rule_spec
+from argus.domain.backtesting.rules import (
+    required_warmup_bars,
+    rule_spec_from_moving_average_crossover_rules,
+    validate_rule_spec,
+)
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.indicators import normalize_indicator_parameters
 
@@ -46,14 +50,12 @@ def rule_spec_from_request(request: LaunchBacktestRequest) -> dict[str, Any]:
         if isinstance(rule_spec, dict):
             return rule_spec
     if request.entry_rule and request.exit_rule:
-        return {
-            "entry": {
-                "conditions": [_crossover_condition(request.entry_rule)],
-            },
-            "exit": {
-                "conditions": [_crossover_condition(request.exit_rule)],
-            },
-        }
+        rule_spec = rule_spec_from_moving_average_crossover_rules(
+            entry_rule=request.entry_rule,
+            exit_rule=request.exit_rule,
+        )
+        if rule_spec is not None:
+            return rule_spec
     raise ValueError("missing_rule_group")
 
 
@@ -169,29 +171,3 @@ def _indicator_threshold_parameters(
     }
     return parameters
 
-
-def _crossover_condition(rule: dict[str, Any]) -> dict[str, Any]:
-    if str(rule.get("type") or "").lower() != "moving_average_crossover":
-        raise ValueError("missing_rule_group")
-
-    direction = str(rule.get("direction") or "bullish").lower()
-    if direction in {"bullish", "above", "cross_above", "golden_cross"}:
-        operator = "cross_above"
-    elif direction in {"bearish", "below", "cross_below", "death_cross"}:
-        operator = "cross_below"
-    else:
-        raise ValueError("unsupported_rule_operator")
-
-    return {
-        "left": {
-            "kind": "indicator",
-            "key": str(rule.get("fast_indicator") or "sma"),
-            "period": int(rule.get("fast_period") or 20),
-        },
-        "operator": operator,
-        "right": {
-            "kind": "indicator",
-            "key": str(rule.get("slow_indicator") or "sma"),
-            "period": int(rule.get("slow_period") or 50),
-        },
-    }

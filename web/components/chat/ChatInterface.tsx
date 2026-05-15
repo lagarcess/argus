@@ -112,6 +112,9 @@ function clearActiveConversationId() {
 }
 
 function latestInputActions(messages: Message[]) {
+  if (hasActiveArtifactActionSet(messages)) {
+    return [];
+  }
   const latestAi = [...messages].reverse().find((message) => message.role === "ai");
   if (
     latestAi?.kind === "strategy_confirmation" ||
@@ -137,6 +140,10 @@ function isCardScopedAction(action: ChatActionOption) {
   return Boolean(action.type && CARD_SCOPED_ACTION_TYPES.has(action.type));
 }
 
+function actionHasCardScopedOwnership(action: ChatActionOption) {
+  return isCardScopedAction(action) || action.presentation === "confirmation" || action.presentation === "result";
+}
+
 function visibleInputActions(actions: ChatActionOption[]) {
   return actions.filter((action) => action.type !== "save_strategy");
 }
@@ -146,21 +153,20 @@ function visibleComposerActions(actions: ChatActionOption[]) {
 }
 
 function hasActiveArtifactActionSet(messages: Message[]) {
-  const latestAi = [...messages].reverse().find((message) => message.role === "ai");
-  if (!latestAi) {
+  return messages.some((message) => {
+    if (message.kind === "strategy_confirmation" && message.confirmation) {
+      if (message.confirmation.confirmation_state === "superseded") {
+        return false;
+      }
+      const activeActions = message.confirmation.actions ?? message.actions ?? [];
+      return activeActions.some(actionHasCardScopedOwnership);
+    }
+    if (message.kind === "strategy_result" && message.result) {
+      const activeActions = message.result.actions ?? message.actions ?? [];
+      return activeActions.some(actionHasCardScopedOwnership);
+    }
     return false;
-  }
-  if (latestAi.kind === "strategy_confirmation" && latestAi.confirmation) {
-    const activeActions = latestAi.confirmation.confirmation_state !== "superseded"
-      ? latestAi.confirmation.actions ?? latestAi.actions ?? []
-      : [];
-    return activeActions.length > 0;
-  }
-  if (latestAi.kind === "strategy_result" && latestAi.result) {
-    const activeActions = latestAi.result.actions ?? latestAi.actions ?? [];
-    return activeActions.length > 0;
-  }
-  return false;
+  });
 }
 
 function isBreakdownActionMetadata(metadata: Record<string, unknown>) {
@@ -720,6 +726,7 @@ export default function ChatInterface() {
   const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
+  const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
   const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
@@ -1118,6 +1125,7 @@ export default function ChatInterface() {
   ) => {
     const trimmed = text.trim();
     if (!trimmed || !conversationId) return;
+    if (isStreamingResponse) return;
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
 
@@ -1148,6 +1156,7 @@ export default function ChatInterface() {
     ]);
     setInputActions([]);
     setStreamStatus(null);
+    setIsStreamingResponse(true);
 
     const streamInput: string | ChatActionRequest = action?.type
       ? {
@@ -1175,6 +1184,7 @@ export default function ChatInterface() {
       if (event.event === "error") {
         setInputActions([]);
         setStreamStatus(null);
+        setIsStreamingResponse(false);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
@@ -1191,6 +1201,7 @@ export default function ChatInterface() {
       }
       if (event.event === "final") {
         setStreamStatus(null);
+        setIsStreamingResponse(false);
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
@@ -1283,6 +1294,7 @@ export default function ChatInterface() {
       }
       if (event.event === "done") {
         setStreamStatus(null);
+        setIsStreamingResponse(false);
         refreshHistory();
       }
     };
@@ -1313,6 +1325,7 @@ export default function ChatInterface() {
       }
       setInputActions([]);
       setStreamStatus(null);
+      setIsStreamingResponse(false);
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
       const fallbackMessage =
@@ -1358,6 +1371,7 @@ export default function ChatInterface() {
       return [...base, userMsg, { id: assistantId, role: "ai", kind: "text", content: "" }];
     });
     setStreamStatus(t("chat.status.understanding"));
+    setIsStreamingResponse(true);
     setIsSidebarOpen(false);
 
     try {
@@ -1373,6 +1387,7 @@ export default function ChatInterface() {
         }
         if (event.event === "error") {
           setStreamStatus(null);
+          setIsStreamingResponse(false);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -1386,6 +1401,7 @@ export default function ChatInterface() {
         }
         if (event.event === "done") {
           setStreamStatus(null);
+          setIsStreamingResponse(false);
           setShowOnboardingGoalCards(false);
           refreshHistory();
         }
@@ -1395,7 +1411,7 @@ export default function ChatInterface() {
           stage: "ready",
           language_confirmed: true,
           primary_goal: goal,
-          completed: false,
+          completed: true,
         },
       });
 
@@ -1407,6 +1423,7 @@ export default function ChatInterface() {
       })));
     } catch {
       setStreamStatus(null);
+      setIsStreamingResponse(false);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -1983,7 +2000,7 @@ export default function ChatInterface() {
                 </h1>
 
                 <div className="w-full max-w-2xl">
-                  <ChatInput onSend={handleSend} />
+                  <ChatInput onSend={handleSend} disabled={isStreamingResponse} />
                 </div>
 
                 {showOnboardingGoalCards && (
@@ -2095,7 +2112,7 @@ export default function ChatInterface() {
                       const isWorkingMessage =
                         isLatestAi &&
                         msg.kind === "text" &&
-                        (!!streamStatus || (msg.content ?? "") === "");
+                        (isStreamingResponse || !!streamStatus || (msg.content ?? "") === "");
                       return (
                         <ChatMessage
                           key={msg.id}
@@ -2137,7 +2154,7 @@ export default function ChatInterface() {
                         </button>
                       </div>
                     )}
-                    {composerActions.length > 0 && !streamStatus && (
+                    {composerActions.length > 0 && !streamStatus && !isStreamingResponse && (
                       <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {composerActions.map((action) => (
                           <button
@@ -2151,7 +2168,7 @@ export default function ChatInterface() {
                         ))}
                       </div>
                     )}
-                    <ChatInput onSend={handleSend} />
+                    <ChatInput onSend={handleSend} disabled={isStreamingResponse} />
                   </div>
                 </div>
               </>

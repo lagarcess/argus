@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.stages.interpret import StructuredInterpretation, interpret_stage
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -89,6 +90,19 @@ def _validated_confirmation_payload(
     }
 
 
+def _task_snapshot_with_confirmation(strategy: StrategySummary) -> TaskSnapshot:
+    payload = _validated_confirmation_payload(strategy)
+    reference = confirmation_artifact_reference(
+        confirmation_id="confirmation-test",
+        confirmation_payload=payload,
+    )
+    return TaskSnapshot(
+        pending_strategy_summary=strategy,
+        active_confirmation_reference=reference,
+        artifact_references=[reference],
+    )
+
+
 def test_answer_pending_need_preserves_prior_strategy_fields(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -120,7 +134,7 @@ def test_answer_pending_need_preserves_prior_strategy_fields(monkeypatch) -> Non
     result, _ = _interpret(
         message="ten thousand",
         response=response,
-        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        snapshot=_task_snapshot_with_confirmation(pending),
         selected_thread_metadata={"last_stage_outcome": "await_user_reply"},
     )
 
@@ -160,7 +174,7 @@ def test_non_dca_capital_answer_updates_initial_capital_assumption(monkeypatch) 
     result, _ = _interpret(
         message="ten thousand",
         response=response,
-        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        snapshot=_task_snapshot_with_confirmation(pending),
         selected_thread_metadata={
             "last_stage_outcome": "await_user_reply",
             "requested_field": "initial_capital",
@@ -622,6 +636,41 @@ def test_dca_starting_principal_recovery_copy_is_specific() -> None:
     assert "switch to buy and hold with the starting capital" in copy
 
 
+def test_unsupported_strategy_recovery_copy_uses_sentence_case_options() -> None:
+    from argus.agent_runtime.stages.compose import compose_response_intent
+    from argus.agent_runtime.state.models import ResponseIntent, RunState
+
+    state = RunState.new(
+        current_user_message="Test Apple when news sentiment turns positive.",
+        recent_thread_history=[],
+    )
+    state.response_intent = ResponseIntent(
+        kind="unsupported_recovery",
+        semantic_needs=["simplification_choice"],
+        facts={
+            "unsupported_constraints": [
+                {
+                    "category": "unsupported_strategy_logic",
+                    "explanation": (
+                        "This idea depends on strategy logic that is not executable yet."
+                    ),
+                }
+            ]
+        },
+        options=[
+            {"label": "Use a supported RSI threshold rule"},
+            {"label": "Compare with buy and hold"},
+            {"label": "Use a supported moving-average crossover"},
+        ],
+    )
+
+    copy = compose_response_intent(state)
+
+    assert copy is not None
+    assert "I can use a supported RSI threshold rule" in copy
+    assert "Compare with" not in copy
+
+
 def test_dca_confirmation_card_uses_recurring_contribution_not_total_capital() -> None:
     from argus.api.chat_service import runtime_confirmation_card
 
@@ -1059,13 +1108,14 @@ def test_natural_language_approval_executes_only_after_confirmation_card(
     result, _ = _interpret(
         message="yes, run it",
         response=response,
-        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        snapshot=_task_snapshot_with_confirmation(pending),
         selected_thread_metadata={"last_stage_outcome": "await_approval"},
         confirmation_payload=_validated_confirmation_payload(pending),
     )
 
-    assert result.outcome == "approved_for_execution"
-    assert result.patch["confirmation_payload"]["strategy"]["asset_universe"] == ["AAPL"]
+    assert result.outcome == "ready_to_respond"
+    assert "Run backtest" in result.patch["assistant_response"]
+    assert "confirmation_payload" not in result.patch
 
 
 def test_run_backtest_action_approves_pending_confirmation_without_llm(

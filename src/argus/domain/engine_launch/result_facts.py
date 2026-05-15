@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from argus.domain.backtesting.rules import describe_rule_spec
+
 NO_ENTRY_TRADES_NOTE = (
     "No entry trades were executed; the strategy stayed in cash because the "
     "entry condition did not trigger in that window."
@@ -132,6 +134,14 @@ def _indicator_threshold_summary(
 
 
 def _signal_strategy_summary(resolved_strategy: dict[str, Any]) -> str | None:
+    rule_spec = _rule_dict(resolved_strategy.get("rule_spec"))
+    entry_text = describe_rule_spec(rule_spec, "entry") if rule_spec else None
+    exit_text = describe_rule_spec(rule_spec, "exit") if rule_spec else None
+    if entry_text and exit_text:
+        return f"Entry rule: {entry_text}; exit rule: {exit_text}."
+    if entry_text:
+        return f"Entry rule: {entry_text}."
+
     entry_text = _moving_average_crossover_text(
         _rule_dict(resolved_strategy.get("entry_rule"))
     )

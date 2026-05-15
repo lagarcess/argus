@@ -37,7 +37,7 @@ async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<void> {
     const method = route.request().method();
     if (method === "PATCH") {
       const body = route.request().postDataJSON() as {
-        onboarding?: { primary_goal?: string | null };
+        onboarding?: { completed?: boolean; primary_goal?: string | null };
       };
       return route.fulfill({
         status: 200,
@@ -48,7 +48,7 @@ async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<void> {
             language: "en",
             locale: "en-US",
             onboarding: {
-              completed: false,
+              completed: body.onboarding?.completed ?? true,
               stage: "ready",
               language_confirmed: true,
               primary_goal: body.onboarding?.primary_goal ?? "surprise_me",
@@ -160,6 +160,14 @@ test("does not show onboarding cards for completed users", async ({ page }) => {
   await mockChatBoot(page, "completed");
   await page.goto("/chat", { waitUntil: "networkidle" });
 
+  await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
+});
+
+test("ready onboarding records enter chat even if legacy completed flag is false", async ({ page }) => {
+  await mockChatBoot(page, "ready");
+  await page.goto("/chat", { waitUntil: "networkidle" });
+
+  await expect(page.getByText("Choose your language")).toHaveCount(0);
   await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
 });
 

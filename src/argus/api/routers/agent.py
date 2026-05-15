@@ -63,9 +63,10 @@ class InternalAgentRuntimeTurnRequest(BaseModel):
 @router.post("/internal/agent-runtime/turn")
 async def internal_agent_runtime_turn(
     payload: InternalAgentRuntimeTurnRequest,
+    request: Request,
 ) -> dict[str, Any]:
     return await run_agent_turn(
-        workflow=api_state.get_agent_runtime_workflow(),
+        workflow=api_state.get_agent_runtime_workflow(request),
         user=UserState(user_id=payload.user_id),
         thread_id=payload.thread_id,
         message=payload.message,
@@ -195,19 +196,26 @@ async def chat_stream(
         if failed_fallback is not None:
             runtime_fallback = failed_fallback
         else:
-            pending_fallback = pending_strategy_metadata_fallback_context(
+            confirmation_fallback = confirmation_metadata_fallback_context(
                 user_id=user.id,
                 conversation_id=conversation.id,
             )
-            if pending_fallback is not None:
-                runtime_fallback = pending_fallback
-            elif not checkpoint_has_latest_result(checkpoint_values):
-                result_fallback = latest_result_fallback_context(
+            if confirmation_fallback is not None:
+                runtime_fallback = confirmation_fallback
+            else:
+                pending_fallback = pending_strategy_metadata_fallback_context(
                     user_id=user.id,
                     conversation_id=conversation.id,
                 )
-                if result_fallback is not None:
-                    runtime_fallback = result_fallback
+                if pending_fallback is not None:
+                    runtime_fallback = pending_fallback
+                elif not checkpoint_has_latest_result(checkpoint_values):
+                    result_fallback = latest_result_fallback_context(
+                        user_id=user.id,
+                        conversation_id=conversation.id,
+                    )
+                    if result_fallback is not None:
+                        runtime_fallback = result_fallback
     elif not checkpoint_has_latest_result(checkpoint_values):
         failed_fallback = failed_action_metadata_fallback_context(
             user_id=user.id,
@@ -216,12 +224,19 @@ async def chat_stream(
         if failed_fallback is not None:
             runtime_fallback = failed_fallback
         else:
-            result_fallback = latest_result_fallback_context(
+            confirmation_fallback = confirmation_metadata_fallback_context(
                 user_id=user.id,
                 conversation_id=conversation.id,
             )
-            if result_fallback is not None:
-                runtime_fallback = result_fallback
+            if confirmation_fallback is not None:
+                runtime_fallback = confirmation_fallback
+            else:
+                result_fallback = latest_result_fallback_context(
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                )
+                if result_fallback is not None:
+                    runtime_fallback = result_fallback
 
     mention_provenance = [
         mention_to_provenance(mention.model_dump(mode="python"), index=index)

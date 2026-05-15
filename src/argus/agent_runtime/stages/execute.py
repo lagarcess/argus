@@ -8,9 +8,9 @@ from typing import Any
 
 from argus.agent_runtime.recovery.policy import should_retry
 from argus.agent_runtime.rule_specs import (
+    executable_rule_spec_from_strategy,
     indicator_threshold_rule,
     opposite_moving_average_crossover_rule,
-    rule_spec_from_strategy,
     strategy_rule,
 )
 from argus.agent_runtime.stages.interpret import StageResult
@@ -22,6 +22,11 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     resolve_date_range,
+)
+from argus.domain.engine_launch.results import (
+    is_user_safe_failure_code,
+    user_safe_failure_detail,
+    user_safe_failure_message,
 )
 from argus.domain.market_data import resolve_asset
 
@@ -272,7 +277,7 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         "date_range": _resolve_date_range(strategy.get("date_range")),
         "entry_rule": _resolve_entry_rule(strategy, strategy_type),
         "exit_rule": _resolve_exit_rule(strategy, strategy_type),
-        "rule_spec": rule_spec_from_strategy(strategy),
+        "rule_spec": executable_rule_spec_from_strategy(strategy),
         "sizing_mode": sizing_mode,
         "capital_amount": capital_amount,
         "position_size": position_size if sizing_mode == "position_size" else None,
@@ -291,14 +296,22 @@ def _build_tool_call_record(
     envelope: dict[str, Any],
 ) -> dict[str, Any]:
     payload = envelope.get("payload")
+    error_type = _as_optional_str(envelope.get("error_type"))
+    capability_context = _safe_capability_context(
+        envelope.get("capability_context"),
+        failure_category=error_type,
+    )
     return {
         "tool_name": _tool_name(tool),
         "attempt": attempt,
         "success": bool(envelope.get("success")),
-        "error_type": _as_optional_str(envelope.get("error_type")),
-        "error_message": _as_optional_str(envelope.get("error_message")),
+        "error_type": error_type,
+        "error_message": _safe_error_message(
+            _as_optional_str(envelope.get("error_message")),
+            failure_category=error_type,
+        ),
         "retryable": bool(envelope.get("retryable")),
-        "capability_context": dict(envelope.get("capability_context") or {}),
+        "capability_context": capability_context,
         "payload": payload if isinstance(payload, dict) else {},
     }
 
@@ -357,6 +370,45 @@ def _as_optional_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _safe_capability_context(
+    value: Any,
+    *,
+    failure_category: str | None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    raw_failure_reason = _as_optional_str(
+        value.get("failure_reason") or value.get("failure_code")
+    )
+    safe_context = {
+        str(key): nested
+        for key, nested in value.items()
+        if key not in {"failure_reason", "failure_code"}
+    }
+    if raw_failure_reason is not None and "failure_detail" not in safe_context:
+        safe_context["failure_detail"] = user_safe_failure_detail(
+            failure_reason=raw_failure_reason,
+            failure_category=failure_category,
+        )
+    return safe_context
+
+
+def _safe_error_message(
+    error_message: str | None,
+    *,
+    failure_category: str | None,
+) -> str | None:
+    if error_message is None:
+        return None
+    if not is_user_safe_failure_code(error_message):
+        return error_message
+    safe_message = user_safe_failure_message(
+        failure_reason=error_message,
+        failure_category=failure_category,
+    )
+    return safe_message
 
 
 def _missing_required_fields(capability_context: dict[str, Any]) -> list[str]:
@@ -442,11 +494,11 @@ def _is_market_data_unavailable_error(
         if isinstance(record, dict)
     )
     values.extend(
-        str((record.get("capability_context") or {}).get("failure_reason") or "")
+        str((record.get("capability_context") or {}).get("failure_detail") or "")
         for record in records
         if isinstance(record, dict) and isinstance(record.get("capability_context"), dict)
     )
-    return any("market_data_unavailable" in value for value in values)
+    return any("market_data" in value for value in values)
 
 
 def _draft_label_from_payload(payload: dict[str, Any]) -> str:
@@ -657,7 +709,7 @@ def _resolve_strategy_type(
     entry_rule = strategy_rule(strategy, "entry")
     if isinstance(entry_rule, dict) and entry_rule.get("type") == "moving_average_crossover":
         return "signal_strategy"
-    if rule_spec_from_strategy(strategy) is not None:
+    if executable_rule_spec_from_strategy(strategy) is not None:
         return "signal_strategy"
     if indicator_threshold_rule(strategy, "entry") is not None:
         return "indicator_threshold"

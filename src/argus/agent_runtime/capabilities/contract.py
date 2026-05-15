@@ -407,8 +407,19 @@ def build_default_capability_contract() -> CapabilityContract:
                 category="unsupported_strategy_logic",
                 options=(
                     SimplificationOption(
-                        label="Simplify to RSI-only logic",
+                        label="Use a supported RSI threshold rule",
                         replacement_values={"simplify_logic": "rsi_only"},
+                    ),
+                    SimplificationOption(
+                        label="Compare with buy and hold",
+                        replacement_values={"strategy_type": "buy_and_hold"},
+                    ),
+                    SimplificationOption(
+                        label="Use a supported moving-average crossover",
+                        replacement_values={
+                            "strategy_type": "signal_strategy",
+                            "rule_family": "moving_average_crossover",
+                        },
                     ),
                 ),
             ),

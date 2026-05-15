@@ -233,6 +233,7 @@ async def _clarify_node_async(
             contract=contract,
             clarification_generator=clarification_generator,
             language=_user(state).language_preference,
+            prefilled_assistant_prompt=state.get("assistant_response"),
         ),
     )
 
@@ -589,6 +590,15 @@ def _active_confirmation_reference(
                 confirmation_id=confirmation_id,
                 confirmation_payload=payload,
             )
+    if (
+        stage_outcome_value == "ready_to_respond"
+        and prior_task_snapshot is not None
+        and prior_task_snapshot.pending_strategy_summary is not None
+        and prior_task_snapshot.active_confirmation_reference is not None
+    ):
+        action = run_state.structured_action
+        if action is None or action.type != "cancel_confirmation":
+            return prior_task_snapshot.active_confirmation_reference
     if stage_outcome_value in {
         "approved_for_execution",
         "execution_succeeded",

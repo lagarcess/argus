@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
 from argus.agent_runtime.state.models import StrategySummary
+from argus.domain.backtesting.rules import (
+    rule_spec_from_moving_average_crossover_rules,
+    rule_spec_from_signal_rule,
+    validate_rule_spec,
+)
+from argus.domain.indicators import executable_indicator_spec
 
 SUPPORTED_STRATEGY_TYPES = {
     "buy_and_hold",
@@ -118,6 +125,32 @@ def executable_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
         exit_logic=payload.get("exit_logic"),
         cadence=payload.get("cadence"),
     )
+
+
+def executable_strategy_type_from_extracted_fields(
+    fields: Mapping[str, Any],
+) -> str | None:
+    """Resolve only the executable strategy contract from extracted LLM fields."""
+    payload = dict(fields)
+    if _has_executable_signal_rule(payload):
+        return "signal_strategy"
+
+    strategy_type = canonical_strategy_type(fields.get("strategy_type"), cadence=None)
+    if strategy_type == "signal_strategy":
+        return None
+    if strategy_type in SUPPORTED_STRATEGY_TYPES:
+        return strategy_type
+
+    indicator = fields.get("indicator")
+    if not isinstance(indicator, str) or not indicator.strip():
+        return None
+    if executable_indicator_spec(indicator.strip().lower()) is None:
+        return None
+    if not _has_value(fields.get("entry_threshold")) or not _has_value(
+        fields.get("exit_threshold")
+    ):
+        return None
+    return "indicator_threshold"
 
 
 def strategy_can_be_approved(strategy: StrategySummary | dict[str, Any]) -> bool:
@@ -340,18 +373,55 @@ def _has_structured_moving_average_rule(payload: dict[str, Any]) -> bool:
 
 
 def _has_executable_signal_rule(payload: dict[str, Any]) -> bool:
-    if isinstance(payload.get("entry_rule"), dict) and payload["entry_rule"]:
+    rule_spec = payload.get("rule_spec")
+    if _valid_rule_spec_payload(rule_spec):
         return True
-    if isinstance(payload.get("rule_spec"), dict) and payload["rule_spec"]:
+    if _valid_typed_signal_rule(
+        entry_rule=payload.get("entry_rule"),
+        exit_rule=payload.get("exit_rule"),
+    ):
         return True
     extra_parameters = payload.get("extra_parameters")
     if not isinstance(extra_parameters, dict):
         return False
-    return any(
-        isinstance(extra_parameters.get(field_name), dict)
-        and bool(extra_parameters[field_name])
-        for field_name in ("entry_rule", "rule_spec")
+    return _valid_rule_spec_payload(
+        extra_parameters.get("rule_spec")
+    ) or _valid_typed_signal_rule(
+        entry_rule=extra_parameters.get("entry_rule"),
+        exit_rule=extra_parameters.get("exit_rule"),
     )
+
+
+def _valid_rule_spec_payload(value: Any) -> bool:
+    if not isinstance(value, dict) or not value:
+        return False
+    try:
+        validate_rule_spec(value)
+        return True
+    except (TypeError, ValueError):
+        try:
+            converted = rule_spec_from_signal_rule(value)
+        except (TypeError, ValueError):
+            return False
+        return converted is not None
+
+
+def _valid_typed_signal_rule(*, entry_rule: Any, exit_rule: Any) -> bool:
+    if not isinstance(entry_rule, dict) or not entry_rule:
+        return False
+    try:
+        return (
+            rule_spec_from_moving_average_crossover_rules(
+                entry_rule=entry_rule,
+                exit_rule=exit_rule if isinstance(exit_rule, dict) else None,
+            )
+            is not None
+        )
+    except (TypeError, ValueError):
+        try:
+            return rule_spec_from_signal_rule(entry_rule) is not None
+        except (TypeError, ValueError):
+            return False
 
 
 def _parse_iso_date(value: Any) -> date | None:

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import pandas as pd
-from argus.domain.backtesting.rules import compile_rule_signals
+from argus.domain.backtesting.rules import (
+    compile_rule_signals,
+    rule_spec_from_signal_rule,
+)
 
 
 def _sample_ohlcv(rows: int = 60) -> pd.DataFrame:
@@ -18,6 +21,31 @@ def _sample_ohlcv(rows: int = 60) -> pd.DataFrame:
         },
         index=index,
     )
+
+
+def test_macd_shorthand_rule_normalizes_to_compilable_rule_spec() -> None:
+    rule_spec = rule_spec_from_signal_rule(
+        {
+            "type": "macd_crossover",
+            "direction": "bullish",
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+        }
+    )
+
+    assert rule_spec is not None
+    entry = rule_spec["entry"]["conditions"][0]
+    exit_condition = rule_spec["exit"]["conditions"][0]
+    assert entry["operator"] == "cross_above"
+    assert entry["left"]["key"] == "macd"
+    assert entry["left"]["output"] == "macd"
+    assert entry["right"]["output"] == "signal"
+    assert exit_condition["operator"] == "cross_below"
+
+    entries, exits = compile_rule_signals(rule_spec, data=_sample_ohlcv(80))
+    assert len(entries) == 80
+    assert len(exits) == 80
 
 
 def test_threshold_rule_compiles_entries_and_exits() -> None:

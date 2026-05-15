@@ -124,9 +124,12 @@ def test_real_backtest_tool_maps_blocked_unsupported_failure(
 
     assert result["success"] is False
     assert result["error_type"] == "unsupported_capability"
-    assert result["error_message"] == "unsupported_indicator_threshold"
+    assert result["error_message"] != "unsupported_indicator_threshold"
+    assert "not executable" in result["error_message"]
     assert result["retryable"] is False
     assert result["capability_context"]["execution_status"] == "blocked_unsupported"
+    assert "failure_reason" not in result["capability_context"]
+    assert result["capability_context"]["failure_detail"] == "unsupported_rule"
 
 
 def test_real_backtest_tool_maps_validation_error() -> None:
@@ -152,4 +155,6 @@ def test_real_backtest_tool_maps_validation_error() -> None:
 
     assert result["success"] is False
     assert result["error_type"] == "parameter_validation_error"
-    assert result["error_message"] == "capital_amount_required"
+    assert result["error_message"] != "capital_amount_required"
+    assert "not valid" in result["error_message"]
+    assert result["capability_context"]["failure_detail"] == "invalid_parameter"

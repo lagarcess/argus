@@ -36,7 +36,10 @@ async def compose_result_followup_response(
     fact_bank = result_followup_fact_bank(metadata)
     if not fact_bank:
         return None
-    required_fact_ids = required_result_followup_llm_fact_ids(fact_bank)
+    required_fact_ids = required_result_followup_fact_ids(
+        fact_bank=fact_bank,
+        focus=focus,
+    )
     try:
         raw_response = invoke_json_schema_func(
             task="result_summary",
@@ -364,13 +367,6 @@ def required_result_followup_fact_ids(
     return required
 
 
-def required_result_followup_llm_fact_ids(fact_bank: dict[str, str]) -> set[str]:
-    required: set[str] = {"caveat"}
-    if "symbols" in fact_bank:
-        required.add("symbols")
-    return required
-
-
 def fallback_result_followup_response(
     *,
     metadata: dict[str, Any],
@@ -490,6 +486,16 @@ def fallback_what_tested_response(fact_bank: dict[str, str]) -> str:
         fact_bank.get("rule_summary"),
         fact_bank.get("execution_note"),
     ]
+    if fact_bank.get("total_return"):
+        extras.append(f"The strategy returned {fact_bank['total_return']}")
+    if fact_bank.get("benchmark_symbol") and fact_bank.get("benchmark_return"):
+        extras.append(
+            f"{fact_bank['benchmark_symbol']} returned {fact_bank['benchmark_return']}"
+        )
+    elif fact_bank.get("benchmark_symbol"):
+        extras.append(f"The benchmark was {fact_bank['benchmark_symbol']}")
+    if fact_bank.get("benchmark_delta"):
+        extras.append(f"The gap versus the benchmark was {fact_bank['benchmark_delta']}")
     if fact_bank.get("assumptions"):
         extras.append(f"Assumptions: {fact_bank['assumptions']}")
     extra_text = " ".join(clean_fragment(item) + "." for item in extras if item)

@@ -182,7 +182,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
 
   return (
     <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300 group relative">
-      {!isUser && !isStreaming && (
+      {!isUser && !isStreaming && !copyFeedback && (
         <button
           onClick={() => {
             void handleCopy();
@@ -193,7 +193,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
           <Copy className="w-4 h-4" />
         </button>
       )}
-      {!isUser && !isStreaming && copyFeedback && (
+      {copyFeedback && (
         <span
           role="status"
           aria-live="polite"

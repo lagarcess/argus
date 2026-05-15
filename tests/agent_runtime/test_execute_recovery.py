@@ -23,6 +23,20 @@ from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 from langgraph.checkpoint.memory import MemorySaver
 
 
+def _assert_value_absent(value: object, forbidden: str) -> None:
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            assert forbidden not in str(key)
+            _assert_value_absent(nested, forbidden)
+        return
+    if isinstance(value, list):
+        for nested in value:
+            _assert_value_absent(nested, forbidden)
+        return
+    if isinstance(value, str):
+        assert forbidden not in value
+
+
 def test_parameter_validation_retries_only_for_mechanical_intent_preserving_fix() -> None:
     assert (
         should_retry(
@@ -362,7 +376,39 @@ def test_real_backtest_tool_maps_failure_codes_to_user_safe_messages(
     assert result["success"] is False
     assert result["error_message"] != "missing_rule_group"
     assert "complete executable entry and exit rule" in result["error_message"]
-    assert result["capability_context"]["failure_reason"] == "missing_rule_group"
+    assert "failure_reason" not in result["capability_context"]
+    assert result["capability_context"]["failure_detail"] == "incomplete_rule"
+
+
+def test_execute_stage_keeps_raw_failure_code_out_of_ui_error_metadata() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": False,
+                "error_type": "parameter_validation_error",
+                "error_message": "missing_rule_group",
+                "retryable": False,
+                "payload": None,
+                "capability_context": {
+                    "failure_reason": "missing_rule_group",
+                    "failure_detail": "incomplete_rule",
+                    "missing_required_fields": ["entry_logic"],
+                },
+            },
+        ]
+    )
+    state = RunState.new(current_user_message="run it", recent_thread_history=[])
+    state.confirmation_payload = {"strategy": {"asset_universe": ["TSLA"]}}
+
+    result = execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert result.outcome == "execution_failed_terminally"
+    _assert_value_absent(result.patch["final_response_payload"], "missing_rule_group")
+    _assert_value_absent(result.patch["latest_failed_action_reference"], "missing_rule_group")
+    _assert_value_absent(result.patch["tool_call_records"], "missing_rule_group")
+    assert "not valid for the current backtest" in (
+        result.patch["final_response_payload"]["error"]
+    )
 
 
 def test_execute_ambiguous_user_intent_returns_to_conversation() -> None:

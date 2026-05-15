@@ -350,6 +350,60 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     assert captured["thread_id"] == conversation["id"]
 
 
+def test_visible_confirmation_metadata_fallback_carries_text_turn_context(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        snapshot = kwargs["fallback_latest_task_snapshot"]
+        assert snapshot.pending_strategy_summary is not None
+        assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+        assert snapshot.active_confirmation_reference is not None
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "For the visible draft, I am using Benchmark: SPY.",
+            },
+        }
+
+    async def _checkpoint(**_: Any):
+        return {}
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=_confirmation_metadata(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "What assumptions are you using?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["fallback_confirmation_payload"]["strategy"]["asset_universe"] == [
+        "AAPL"
+    ]
+    assert captured["fallback_artifact_references"][0].artifact_kind == "confirmation"
+
+
 def test_newer_unrelated_assistant_message_blocks_pending_strategy_fallback(
     monkeypatch,
 ) -> None:

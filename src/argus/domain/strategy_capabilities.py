@@ -50,7 +50,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
     ),
     "rsi_mean_reversion": StrategyCapability(
         template="rsi_mean_reversion",
-        display_name="RSI Mean Reversion",
+        display_name="RSI Threshold",
         aliases=[
             "rsi",
             "oversold",

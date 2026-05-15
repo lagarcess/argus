@@ -8,6 +8,7 @@ from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
     new_confirmation_id,
 )
+from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
@@ -189,6 +190,19 @@ def _missing_required_fields(
     contract: CapabilityContract,
 ) -> list[str]:
     missing_fields: list[str] = []
+    if _resolve_strategy_type(strategy, {}) == "signal_strategy" and not _has_signal_rule(
+        strategy
+    ):
+        for field_name in ("strategy_thesis", "asset_universe"):
+            value = strategy.get(field_name)
+            if isinstance(value, list):
+                if not value:
+                    missing_fields.append(field_name)
+                continue
+            if value is None or value == "":
+                missing_fields.append(field_name)
+        missing_fields.append("entry_logic")
+        return list(dict.fromkeys(missing_fields))
     for field_name in _required_fields_for_strategy(strategy, contract):
         value = strategy.get(field_name)
         if isinstance(value, list):
@@ -225,18 +239,7 @@ def _required_fields_for_strategy(
 
 
 def _has_signal_rule(strategy: dict[str, Any]) -> bool:
-    for field_name in ("entry_rule", "rule_spec"):
-        value = strategy.get(field_name)
-        if isinstance(value, dict) and value:
-            return True
-    extra_parameters = strategy.get("extra_parameters")
-    if not isinstance(extra_parameters, dict):
-        return False
-    return any(
-        isinstance(extra_parameters.get(field_name), dict)
-        and bool(extra_parameters[field_name])
-        for field_name in ("entry_rule", "rule_spec")
-    )
+    return executable_rule_spec_from_strategy(strategy) is not None
 
 
 def _date_limit_prompt(strategy: dict[str, Any]) -> str | None:
@@ -410,9 +413,10 @@ def _plain_language_strategy_summary(
 
     entry_logic = _format_value(strategy.get("entry_logic"))
     exit_logic = _format_value(strategy.get("exit_logic"))
+    article = _article_for(strategy_type_label)
     return (
-        f"I read this as an {strategy_type_label} backtest for {assets}: buy when {entry_logic}, "
-        f"exit when {exit_logic}, over {date_range}."
+        f"I read this as {article} {strategy_type_label} backtest for {assets}: "
+        f"entry rule: {entry_logic}; exit rule: {exit_logic}; over {date_range}."
     )
 
 
@@ -568,6 +572,10 @@ def _strategy_type_label(strategy_type: str) -> str:
         "signal_strategy": "signal strategy",
     }
     return labels.get(strategy_type, strategy_type.replace("_", " "))
+
+
+def _article_for(value: str) -> str:
+    return "an" if value[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
 
 
 def _asset_label(value: Any) -> str:

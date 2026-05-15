@@ -226,6 +226,39 @@ def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
     assert "specific testable rule" in result["assistant_prompt"]
 
 
+def test_runtime_uses_canonical_rule_definition_choices_over_generic_clarifier() -> None:
+    run_state = RunState.new(
+        current_user_message="Test buying SPY when it starts rising.",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["rule_definition"],
+        requested_fields=["entry_logic"],
+        facts={
+            "strategy": {
+                "strategy_type": "signal_strategy",
+                "asset_universe": ["SPY"],
+            }
+        },
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "Could you please define what starts rising means in terms of "
+                "price movement, indicators, or other measurable criteria?"
+            ),
+        }
+    )
+
+    assert "moving-average crossover" in result["assistant_prompt"]
+    assert "RSI threshold" in result["assistant_prompt"]
+    assert "percentage move" in result["assistant_prompt"]
+    assert result["assistant_response"] == result["assistant_prompt"]
+
+
 @pytest.mark.asyncio
 async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
     from argus.agent_runtime import resolution as resolution_module
@@ -503,4 +536,6 @@ async def test_workflow_uses_checkpointer_for_thread_state(monkeypatch) -> None:
     assert snapshot is not None
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.pending_strategy_summary.asset_universe == ["BTC"]
-    assert second["stage_outcome"] == "end_run"
+    assert second["stage_outcome"] == "ready_to_respond"
+    assert "Run backtest" in second["assistant_response"]
+    assert "run" not in second

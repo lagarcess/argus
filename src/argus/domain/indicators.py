@@ -84,6 +84,10 @@ EXECUTABLE_INDICATORS: dict[str, IndicatorExecutionSpec] = {
         default_exit_threshold=55,
         aliases=(
             "relative strength index",
+            "rsi threshold",
+            "rsi_threshold",
+            "rsi mean reversion",
+            "rsi_mean_reversion",
             "oversold",
             "overbought",
             "momentum gauge",
@@ -466,8 +470,11 @@ def _consume_number(
 
 def _validate_period(spec: IndicatorExecutionSpec, period: int | float) -> None:
     period_spec = next(
-        item for item in spec.parameter_schema if item.key == "indicator_period"
+        (item for item in spec.parameter_schema if item.key == "indicator_period"),
+        None,
     )
+    if period_spec is None:
+        return
     if period_spec.min_value is not None and period < period_spec.min_value:
         raise ValueError("indicator_period_out_of_bounds")
     if period_spec.max_value is not None and period > period_spec.max_value:

@@ -40,6 +40,15 @@ def compose_response_intent(state: RunState) -> str | None:
     return None
 
 
+def should_prefer_composed_intent(state: RunState) -> bool:
+    intent = state.response_intent
+    if intent is None:
+        return False
+    if intent.kind != "clarification":
+        return False
+    return "rule_definition" in intent.semantic_needs
+
+
 def _compose_clarification(intent: ResponseIntent) -> str:
     strategy = _strategy_from_intent(intent)
     needs = list(dict.fromkeys(intent.semantic_needs))
@@ -54,8 +63,9 @@ def _compose_clarification(intent: ResponseIntent) -> str:
     if needs == ["rule_definition"]:
         return (
             f"{context}I need to turn the idea into a specific testable rule. "
-            "Do you want to define it as a percentage move, use a supported "
-            "indicator rule, or keep drafting the full rule?"
+            "Do you want to define it as a percentage move, a supported "
+            "moving-average crossover, an RSI threshold, or keep drafting the "
+            "full rule?"
         )
     if set(needs) == {"asset_target", "period"}:
         return f"{context}What asset and time period should I use?"
@@ -160,6 +170,11 @@ def _human_option_label(label: str) -> str:
         "adjust recurring contribution": "adjust the recurring contribution",
         "use buy and hold with starting capital": (
             "switch to buy and hold with the starting capital"
+        ),
+        "use a supported rsi threshold rule": "use a supported RSI threshold rule",
+        "compare with buy and hold": "compare with buy and hold",
+        "use a supported moving-average crossover": (
+            "use a supported moving-average crossover"
         ),
     }
     return labels.get(normalized, label.strip().replace("_", " "))

@@ -40,9 +40,7 @@ def build_result_card(
     template_names = {
         "buy_and_hold": "Comprar y Mantener" if is_es else "Buy and Hold",
         "buy_the_dip": "Comprar la Caída" if is_es else "Buy the Dip",
-        "rsi_mean_reversion": "Reversión a la Media RSI"
-        if is_es
-        else "RSI Mean Reversion",
+        "rsi_mean_reversion": "Umbral RSI" if is_es else "RSI Threshold",
         "moving_average_crossover": "Cruce de Medias Móviles"
         if is_es
         else "Moving Average Crossover",

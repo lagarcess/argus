@@ -62,6 +62,42 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(api_state, "supabase_gateway", None)
 
 
+def test_internal_agent_runtime_turn_uses_app_scoped_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    seen_requests: list[Any] = []
+
+    def _workflow(request: Any = None) -> object:
+        seen_requests.append(request)
+        return object()
+
+    async def _run_agent_turn(**_: Any) -> dict[str, Any]:
+        return {"stage_outcome": "ready_to_respond"}
+
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "get_agent_runtime_workflow",
+        _workflow,
+    )
+    monkeypatch.setattr(agent_router, "run_agent_turn", _run_agent_turn)
+
+    response = _client().post(
+        "/internal/agent-runtime/turn",
+        json={
+            "user_id": "u1",
+            "thread_id": "thread-internal",
+            "message": "Backtest Apple.",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"stage_outcome": "ready_to_respond"}
+    assert len(seen_requests) == 1
+    assert seen_requests[0] is not None
+
+
 def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

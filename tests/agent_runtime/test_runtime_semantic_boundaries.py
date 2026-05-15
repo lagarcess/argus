@@ -9,6 +9,7 @@ RUNTIME_INTENT_FILES = [
     "src/argus/agent_runtime/semantic_integrity.py",
     "src/argus/agent_runtime/strategy_contract.py",
     "src/argus/agent_runtime/stages/execute.py",
+    "src/argus/agent_runtime/rule_specs.py",
 ]
 
 
@@ -44,11 +45,28 @@ def test_runtime_does_not_restore_raw_message_semantic_routers() -> None:
         "src/argus/agent_runtime/stages/interpret.py": [
             "_latest_result_followup_semantically_indicated",
             "_is_affirmative_pending_resolution_reply",
+            "_typed_pending_need_fallback_stage_result_if_applicable",
+            "typed_pending_need_validator_used",
             "summary = str(decision.user_goal_summary or \"\").lower()",
+        ],
+        "src/argus/agent_runtime/semantic_integrity.py": [
+            "_current_turn_has_signal_rule_reference",
+            "_semantic_tokens",
         ],
         "src/argus/agent_runtime/strategy_contract.py": [
             "_date_range_from_raw_phrase",
             "_extract_period_label_from_raw_phrase",
+        ],
+        "src/argus/agent_runtime/rule_specs.py": [
+            "moving_average_crossover_rules_from_text",
+            "_rule_tokens",
+            "_moving_average_mentions",
+        ],
+        "src/argus/agent_runtime/llm_interpreter.py": [
+            "Nvidia to NVDA",
+            "Apple to AAPL",
+            "Tesla to TSLA",
+            "Microsoft to MSFT",
         ],
     }
     violations: list[str] = []

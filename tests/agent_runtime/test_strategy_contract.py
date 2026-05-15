@@ -2,6 +2,7 @@ from datetime import date
 
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
+    executable_strategy_type_from_extracted_fields,
     normalize_date_range_candidate,
     resolve_date_range,
     strategy_can_be_approved,
@@ -92,3 +93,41 @@ def test_dca_strategy_requires_explicit_recurring_amount_for_approval() -> None:
     strategy.capital_amount = 500
 
     assert strategy_can_be_approved(strategy) is True
+
+
+def test_extracted_fields_resolve_indicator_threshold_from_registry() -> None:
+    resolved = executable_strategy_type_from_extracted_fields(
+        {
+            "indicator": "sma",
+            "entry_threshold": 450,
+            "exit_threshold": 500,
+        }
+    )
+
+    assert resolved == "indicator_threshold"
+
+
+def test_extracted_fields_do_not_force_unknown_strategy_contract() -> None:
+    resolved = executable_strategy_type_from_extracted_fields(
+        {
+            "strategy_type": "sentiment_strategy",
+            "entry_logic": "news sentiment turns positive",
+            "asset_universe": ["AAPL"],
+            "date_range": "past year",
+        }
+    )
+
+    assert resolved is None
+
+
+def test_extracted_fields_do_not_accept_unknown_rule_spec_as_signal_strategy() -> None:
+    resolved = executable_strategy_type_from_extracted_fields(
+        {
+            "strategy_type": "signal_strategy",
+            "rule_spec": {"type": "news_sentiment", "sentiment_direction": "positive"},
+            "asset_universe": ["AAPL"],
+            "date_range": "past year",
+        }
+    )
+
+    assert resolved is None

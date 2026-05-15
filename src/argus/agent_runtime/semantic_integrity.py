@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from argus.agent_runtime.rule_specs import rule_spec_from_strategy, strategy_rule
+from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.state.models import (
     SimplificationOption,
     StrategySummary,
@@ -40,7 +40,6 @@ class SemanticIntegrityReport:
 def conserve_semantic_constraints(
     *,
     strategy: StrategySummary,
-    current_user_message: str,
     selected_thread_metadata: dict[str, Any],
     prior_strategy: StrategySummary | None = None,
     optional_parameter_values: dict[str, Any] | None = None,
@@ -60,21 +59,7 @@ def conserve_semantic_constraints(
         reason_codes.append("semantic_date_constraint_preserved")
 
     requested_field = str(selected_thread_metadata.get("requested_field") or "")
-    explicit_signal_rule_reference = _current_turn_has_signal_rule_reference(
-        current_user_message,
-    )
-    if (
-        executable_strategy_type(updated) == "signal_strategy"
-        and _strategy_has_signal_rule_payload(updated)
-        and not explicit_signal_rule_reference
-        and not _signal_rule_payload_matches_prior(
-            strategy=updated,
-            prior_strategy=prior_strategy,
-        )
-    ):
-        _clear_unsubstantiated_signal_rule(updated)
-        blocking_missing_fields.append("entry_logic")
-        reason_codes.append("semantic_unsubstantiated_signal_rule_removed")
+    structured_signal_rule_reference = _strategy_has_signal_rule_payload(updated)
 
     money_evidence = _structured_money_role_evidence(
         strategy=updated,
@@ -83,7 +68,7 @@ def conserve_semantic_constraints(
     cadence = _structured_recurring_cadence(updated)
     evidence = SemanticConstraintEvidence(
         explicit_date_reference=normalized_date_range not in (None, "", [], {}),
-        explicit_signal_rule_reference=explicit_signal_rule_reference,
+        explicit_signal_rule_reference=structured_signal_rule_reference,
         normalized_date_range=normalized_date_range,
         recurring_contribution=money_evidence.recurring_contribution,
         total_capital=money_evidence.total_capital,
@@ -212,105 +197,7 @@ def _structured_recurring_cadence(strategy: StrategySummary) -> str | None:
 
 
 def _strategy_has_signal_rule_payload(strategy: StrategySummary) -> bool:
-    return bool(
-        strategy_rule(strategy, "entry")
-        or strategy_rule(strategy, "exit")
-        or rule_spec_from_strategy(strategy)
-    )
-
-
-def _signal_rule_payload_matches_prior(
-    *,
-    strategy: StrategySummary,
-    prior_strategy: StrategySummary | None,
-) -> bool:
-    if prior_strategy is None:
-        return False
-    return (
-        _normalized_rule_payload(strategy_rule(strategy, "entry"))
-        == _normalized_rule_payload(strategy_rule(prior_strategy, "entry"))
-        and _normalized_rule_payload(strategy_rule(strategy, "exit"))
-        == _normalized_rule_payload(strategy_rule(prior_strategy, "exit"))
-        and _normalized_rule_payload(rule_spec_from_strategy(strategy))
-        == _normalized_rule_payload(rule_spec_from_strategy(prior_strategy))
-        and _strategy_has_signal_rule_payload(prior_strategy)
-    )
-
-
-def _normalized_rule_payload(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            key: _normalized_rule_payload(value[key])
-            for key in sorted(value)
-            if value[key] not in (None, "", [], {})
-        }
-    if isinstance(value, list):
-        return [_normalized_rule_payload(item) for item in value]
-    return value
-
-
-def _clear_unsubstantiated_signal_rule(strategy: StrategySummary) -> None:
-    strategy.entry_rule = None
-    strategy.exit_rule = None
-    strategy.rule_spec = None
-    extra_parameters = dict(strategy.extra_parameters or {})
-    for key in ("entry_rule", "exit_rule", "rule_spec"):
-        extra_parameters.pop(key, None)
-    strategy.extra_parameters = extra_parameters
-
-
-def _current_turn_has_signal_rule_reference(message: str) -> bool:
-    tokens = _semantic_tokens(message)
-    if not tokens:
-        return False
-    indicator_terms = {
-        "sma",
-        "ema",
-        "ma",
-        "macd",
-        "rsi",
-        "vwap",
-        "bbands",
-        "bollinger",
-        "stoch",
-        "stochastic",
-        "mfi",
-        "adx",
-        "atr",
-        "obv",
-        "roc",
-        "momentum",
-    }
-    operator_terms = {
-        "cross",
-        "crosses",
-        "crossing",
-        "crossover",
-        "above",
-        "below",
-        "over",
-        "under",
-        "greater",
-        "less",
-        "threshold",
-        "reaches",
-        "drops",
-        "rises",
-    }
-    if "moving" in tokens and "average" in tokens:
-        return True
-    return bool(tokens & indicator_terms and tokens & operator_terms)
-
-
-def _semantic_tokens(message: str) -> set[str]:
-    normalized_chars: list[str] = []
-    for char in message.lower():
-        normalized_chars.append(char if char.isalnum() else " ")
-    return {
-        token
-        for token in "".join(normalized_chars).split()
-        if token and not token.isnumeric()
-    }
+    return executable_rule_spec_from_strategy(strategy) is not None
 
 
 def _first_number(payload: dict[str, Any], keys: tuple[str, ...]) -> float | None:

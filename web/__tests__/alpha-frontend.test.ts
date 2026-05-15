@@ -154,6 +154,22 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />");
   });
 
+  test("composer hides artifact actions whenever any active card owns them", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    const activeArtifactHelper = chat.slice(
+      chat.indexOf("function hasActiveArtifactActionSet"),
+      chat.indexOf("function isBreakdownActionMetadata"),
+    );
+
+    expect(activeArtifactHelper).toContain("messages.some");
+    expect(activeArtifactHelper).toContain("confirmation.confirmation_state === \"superseded\"");
+    expect(activeArtifactHelper).toContain("actionHasCardScopedOwnership");
+    expect(activeArtifactHelper).not.toContain("latestAi");
+    expect(chat).toContain("const composerActions = hasActiveArtifactActionSet(messages)");
+    expect(chat).toContain("visibleComposerActions(inputActions)");
+  });
+
   test("chat supersedes older confirmation cards when a newer draft appears", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const card = readFileSync(join(root, "components/chat/StrategyConfirmationCard.tsx"), "utf-8");
@@ -229,12 +245,27 @@ describe("Argus Alpha frontend contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
 
+    expect(chat).toContain("isStreamingResponse");
     expect(chat).toContain("latestAiIndex");
     expect(chat).toContain("isWorkingMessage");
     expect(chat).toContain('(msg.content ?? "") === ""');
     expect(chat).toContain("isStreaming={isWorkingMessage}");
-    expect(message).toContain("{!isUser && !isStreaming && (");
-    expect(message).toContain("{!isStreaming && (");
+    expect(message).toContain("{!isUser && !isStreaming && !copyFeedback && (");
+    expect(message).toContain("{copyFeedback && (");
+  });
+
+  test("chat composer prevents overlapping turns while stream is active", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+
+    expect(chat).toContain("if (isStreamingResponse) return;");
+    expect(chat).toContain("<ChatInput onSend={handleSend} disabled={isStreamingResponse} />");
+    expect(chat).toContain('if (event.event === "final")');
+    expect(chat).toContain("setIsStreamingResponse(false);");
+    expect(input).toContain("disabled?: boolean");
+    expect(input).toContain("if (disabled) return;");
+    expect(input).toContain("contentEditable={!disabled}");
+    expect(input).toContain("disabled={composerIsEmpty || disabled}");
   });
 
   test("chat restores jump-to-latest affordance without forced reading jumps", () => {

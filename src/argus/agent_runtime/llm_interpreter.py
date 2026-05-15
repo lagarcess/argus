@@ -1,34 +1,46 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Literal
+from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
+from argus.agent_runtime.llm_interpreter_types import (
+    FocusedStrategyExtraction,
+    LLMAmbiguousField,
+    LLMInterpretationResponse,
+    LLMRiskRule,
+    LLMStrategyDraft,
+    LLMUnsupportedConstraint,
+)
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.rule_specs import (
-    indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
-)
-from argus.agent_runtime.rule_specs import (
+    executable_rule_spec_from_strategy,
     moving_average_crossover_text,
     opposite_moving_average_crossover_rule,
     strategy_rule,
 )
+from argus.agent_runtime.rule_specs import (
+    indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
+)
+from argus.agent_runtime.signal_rule_repair import (
+    SignalRuleGroundingAudit,
+    SignalRulePlan,
+    audit_signal_rule_grounding,
+    repair_signal_rule_plan,
+)
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
-    ResultFollowupFocus,
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     ResolutionProvenance,
     ResolutionSource,
-    ResponseProfileOverrides,
     SimplificationOption,
     StrategySummary,
     UnsupportedConstraint,
@@ -36,9 +48,11 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     executable_strategy_type,
+    executable_strategy_type_from_extracted_fields,
     normalize_date_range_candidate,
     resolve_date_range,
 )
+from argus.domain.backtesting.rules import canonicalize_rule_spec, describe_rule_spec
 from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
@@ -53,120 +67,6 @@ from argus.llm.openrouter import (
 )
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
-
-
-class LLMRiskRule(BaseModel):
-    type: str
-    value_pct: float | None = None
-    mode: str | None = None
-
-
-class LLMStrategyDraft(BaseModel):
-    raw_user_phrasing: str | None = None
-    strategy_type: str | None = None
-    strategy_thesis: str | None = None
-    asset_universe: list[str] = Field(default_factory=list)
-    asset_class: str | None = None
-    timeframe: str | None = None
-    cadence: str | None = None
-    entry_logic: str | None = None
-    exit_logic: str | None = None
-    entry_rule: dict[str, Any] | None = None
-    exit_rule: dict[str, Any] | None = None
-    rule_spec: dict[str, Any] | None = None
-    indicator: str | None = None
-    indicator_period: int | None = None
-    entry_threshold: float | None = None
-    exit_threshold: float | None = None
-    date_range: str | dict[str, str] | None = None
-    sizing_mode: str | None = None
-    capital_amount: float | None = None
-    recurring_contribution: float | None = None
-    initial_capital: float | None = None
-    total_capital: float | None = None
-    position_size: float | None = None
-    risk_rules: list[LLMRiskRule] = Field(default_factory=list)
-    assumptions: list[str] = Field(default_factory=list)
-    comparison_baseline: str | None = None
-    refinement_of: str | None = None
-    field_provenance: dict[str, str] = Field(default_factory=dict)
-    extra_parameters: dict[str, Any] = Field(default_factory=dict)
-
-
-class LLMUnsupportedConstraint(BaseModel):
-    category: str
-    raw_value: str
-    explanation: str
-    simplification_labels: list[str] = Field(default_factory=list)
-
-
-class LLMAmbiguousField(BaseModel):
-    field_name: str
-    raw_value: str
-    candidate_normalized_value: Any | None = None
-    reason_code: str
-
-
-class LLMInterpretationResponse(BaseModel):
-    intent: Literal[
-        "beginner_guidance",
-        "strategy_drafting",
-        "backtest_execution",
-        "results_explanation",
-        "collection_management",
-        "conversation_followup",
-        "unsupported_or_out_of_scope",
-    ]
-    task_relation: Literal["new_task", "continue", "refine", "ambiguous"]
-    requires_clarification: bool = False
-    user_goal_summary: str
-    candidate_strategy_draft: LLMStrategyDraft = Field(default_factory=LLMStrategyDraft)
-    missing_required_fields: list[str] = Field(default_factory=list)
-    assistant_response: str | None = None
-    uses_latest_result_context: bool | None = None
-    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
-    reason_codes: list[str] = Field(default_factory=list)
-    ambiguous_fields: list[LLMAmbiguousField] = Field(default_factory=list)
-    unsupported_constraints: list[LLMUnsupportedConstraint] = Field(default_factory=list)
-    response_profile_overrides: ResponseProfileOverrides = Field(
-        default_factory=ResponseProfileOverrides
-    )
-    semantic_turn_act: (
-        Literal[
-            "new_idea",
-            "answer_pending_need",
-            "refine_current_idea",
-            "educational_question",
-            "result_followup",
-            "retry_failed_action",
-            "approval",
-            "unsupported_request",
-        ]
-        | None
-    ) = None
-    result_followup_focus: ResultFollowupFocus | None = None
-
-
-class FocusedStrategyExtraction(BaseModel):
-    is_testable_strategy: bool
-    requires_clarification: bool = False
-    user_goal_summary: str
-    strategy_type: str | None = None
-    strategy_thesis: str | None = None
-    asset_universe: list[str] = Field(default_factory=list)
-    date_range: str | dict[str, str] | None = None
-    entry_logic: str | None = None
-    exit_logic: str | None = None
-    entry_rule: dict[str, Any] | None = None
-    exit_rule: dict[str, Any] | None = None
-    rule_spec: dict[str, Any] | None = None
-    indicator: str | None = None
-    indicator_period: int | None = None
-    entry_threshold: float | None = None
-    exit_threshold: float | None = None
-    missing_required_fields: list[str] = Field(default_factory=list)
-    assistant_response: str | None = None
-    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
 class OpenRouterStructuredInterpreter:
@@ -204,6 +104,11 @@ class OpenRouterStructuredInterpreter:
                         continue
                     response = _normalize_response_for_runtime_context(
                         response,
+                        request=request,
+                    )
+                    response = await _signal_rule_checked_response(
+                        response=response,
+                        preferred_model=candidate_model,
                         request=request,
                     )
                     needs_artifact_context_repair = (
@@ -282,6 +187,15 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    response = _normalize_response_for_runtime_context(
+                        response,
+                        request=request,
+                    )
+                    response = await _signal_rule_checked_response(
+                        response=response,
+                        preferred_model=self.model_name,
+                        request=request,
+                    )
                     self.last_status = "used"
                     return self._to_runtime_interpretation(response, request=request)
             except Exception as exc:
@@ -316,6 +230,15 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    response = _normalize_response_for_runtime_context(
+                        response,
+                        request=request,
+                    )
+                    response = await _signal_rule_checked_response(
+                        response=response,
+                        preferred_model=fallback_model_name,
+                        request=request,
+                    )
                     self.last_status = "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
             except Exception as exc:
@@ -422,6 +345,11 @@ class OpenRouterStructuredInterpreter:
             "the crossover as entry_logic, and default the exit to the same fast "
             "average crossing back below the slow average when the user leaves the "
             "exit unspecified. Do not ask what the buy trigger is.\n\n"
+            "Do not turn vague momentum language such as 'starts rising', 'big drops', "
+            "'breaks out', or 'looks strong' into a moving-average crossover or any "
+            "other executable signal by yourself. If the user does not name the "
+            "indicator, threshold, crossover, or price rule, mark the entry rule as "
+            "missing or ask for the executable definition.\n\n"
             "NLU ownership: you are the only intent and extraction layer. "
             "Extract symbols, company names, crypto assets, and currency pairs, date ranges, "
             "DCA cadence, recurring contribution amount, entry logic, exit logic, and "
@@ -497,9 +425,18 @@ class OpenRouterStructuredInterpreter:
             "the closest value: why_underperformed, max_drawdown, what_tested, "
             "next_experiment, assumptions, or general. Result follow-ups must be "
             "answered from the latest result facts supplied to the runtime; do not "
-            "invent metrics. Assumption questions about a visible confirmation or "
-            "draft should use the active draft/card context instead of regenerating "
-            "a new card. Retry turns should preserve the failed action payload; do "
+            "invent metrics. Use why_underperformed for any why/how the result happened "
+            "or other performance "
+            "question, including phrases like 'why did this result happen', even "
+            "when the run actually outperformed; the answer layer will correct false "
+            "underperformance premises from the facts. Use next_experiment when "
+            "the user asks what to try next, what else to test, next steps, what "
+            "to change, or how to refine the latest result. Assumption questions "
+            "about a visible confirmation or draft should set semantic_turn_act="
+            "result_followup and result_followup_focus=assumptions even when no "
+            "completed run exists; use the active draft/card context instead of "
+            "regenerating a new card. "
+            "Retry turns should preserve the failed action payload; do "
             "not reinterpret the original investing idea from scratch. "
             "Social turns are conversation_followup with assistant_response and no "
             "strategy draft unless they also contain a real investing idea. "
@@ -580,6 +517,11 @@ async def _repair_incomplete_artifact_patch(
     if not isinstance(response, LLMInterpretationResponse):
         return None
     response = _normalize_response_for_runtime_context(response, request=request)
+    response = await _signal_rule_checked_response(
+        response=response,
+        preferred_model=model_name,
+        request=request,
+    )
     if not _structured_interpretation_has_required_shape(response, request=request):
         return None
     return response
@@ -614,9 +556,394 @@ async def _repair_incomplete_strategy_extraction(
             request=request,
         )
         response = _normalize_response_for_runtime_context(response, request=request)
+        response = await _signal_rule_checked_response(
+            response=response,
+            preferred_model=model_name,
+            request=request,
+        )
         if _structured_interpretation_has_required_shape(response, request=request):
             return response
     return None
+
+
+async def _signal_rule_checked_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    pending_rule_answer = await _repair_pending_signal_rule_answer_if_needed(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    response = pending_rule_answer or response
+    recovered_signal_rule = await _recover_supported_signal_rule_from_draft_if_needed(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    response = recovered_signal_rule or response
+    planned = (
+        await _plan_underfilled_signal_rule_if_needed(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        or response
+    )
+    audited = await _audit_signal_rule_grounding_if_needed(
+        response=planned,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    return audited or planned
+
+
+async def _recover_supported_signal_rule_from_draft_if_needed(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_supported_signal_rule_recovery(response):
+        return None
+    planning_response = _supported_signal_rule_planning_response(response)
+    plan = await repair_signal_rule_plan(
+        current_user_message=request.current_user_message,
+        candidate_strategy=planning_response.candidate_strategy_draft.model_dump(
+            mode="json"
+        ),
+        prior_strategy=_prior_strategy_payload(request),
+        preferred_model=preferred_model,
+    )
+    if plan is None or plan.outcome != "ready_to_confirm":
+        return None
+    return _response_from_signal_rule_plan(
+        response=planning_response,
+        plan=plan,
+    )
+
+
+def _response_needs_supported_signal_rule_recovery(
+    response: LLMInterpretationResponse,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) == "signal_strategy":
+        return False
+    if draft.rule_spec or draft.entry_rule:
+        return False
+    if not (draft.raw_user_phrasing or draft.strategy_thesis):
+        return False
+    if not (draft.asset_universe and draft.date_range):
+        return False
+    if response.intent == "unsupported_or_out_of_scope":
+        return True
+    return any(
+        item.category == "unsupported_strategy_logic"
+        for item in response.unsupported_constraints
+    )
+
+
+def _supported_signal_rule_planning_response(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    planning = response.model_copy(deep=True)
+    planning.intent = "strategy_drafting"
+    planning.requires_clarification = True
+    planning.assistant_response = None
+    planning.missing_required_fields = ["entry_logic", "exit_logic"]
+    planning.unsupported_constraints = []
+    planning.candidate_strategy_draft.strategy_type = "signal_strategy"
+    planning.reason_codes = list(
+        dict.fromkeys(
+            [
+                *planning.reason_codes,
+                "supported_signal_rule_contract_recovery",
+            ]
+        )
+    )
+    return planning
+
+
+async def _repair_pending_signal_rule_answer_if_needed(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _request_targets_pending_signal_rule(request):
+        return None
+    if _response_needs_signal_rule_grounding_audit(response):
+        return None
+    prior_strategy = _prior_strategy_payload(request)
+    if not prior_strategy:
+        return None
+    if canonical_strategy_type(prior_strategy.get("strategy_type")) != "signal_strategy":
+        return None
+
+    planning_response = _pending_signal_rule_planning_response(
+        response=response,
+        prior_strategy=prior_strategy,
+        current_user_message=request.current_user_message,
+    )
+    plan = await repair_signal_rule_plan(
+        current_user_message=request.current_user_message,
+        candidate_strategy=planning_response.candidate_strategy_draft.model_dump(
+            mode="json"
+        ),
+        prior_strategy=prior_strategy,
+        preferred_model=preferred_model,
+    )
+    if plan is None:
+        return None
+    return _response_from_signal_rule_plan(
+        response=planning_response,
+        plan=plan,
+    )
+
+
+def _request_targets_pending_signal_rule(request: InterpretationRequest) -> bool:
+    requested_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).split("[", 1)[0]
+    return requested_field in {"entry_logic", "exit_logic"}
+
+
+def _pending_signal_rule_planning_response(
+    *,
+    response: LLMInterpretationResponse,
+    prior_strategy: dict[str, Any],
+    current_user_message: str,
+) -> LLMInterpretationResponse:
+    repaired = response.model_copy(deep=True)
+    payload = _signal_rule_planning_context_from_prior(prior_strategy)
+    incoming = response.candidate_strategy_draft.model_dump(mode="json")
+    for key, value in incoming.items():
+        if value in (None, "", [], {}):
+            continue
+        payload[key] = value
+    payload["raw_user_phrasing"] = current_user_message
+    repaired.candidate_strategy_draft = LLMStrategyDraft.model_validate(payload)
+    return repaired
+
+
+def _signal_rule_planning_context_from_prior(
+    prior_strategy: dict[str, Any],
+) -> dict[str, Any]:
+    context_fields = {
+        "strategy_type",
+        "asset_universe",
+        "asset_class",
+        "timeframe",
+        "date_range",
+        "sizing_mode",
+        "capital_amount",
+        "position_size",
+        "assumptions",
+        "comparison_baseline",
+        "refinement_of",
+        "resolution_provenance",
+    }
+    return {
+        key: value
+        for key, value in prior_strategy.items()
+        if key in context_fields and value not in (None, "", [], {})
+    }
+
+
+async def _plan_underfilled_signal_rule_if_needed(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_signal_rule_plan(response):
+        return None
+    plan = await repair_signal_rule_plan(
+        current_user_message=request.current_user_message,
+        candidate_strategy=response.candidate_strategy_draft.model_dump(mode="json"),
+        prior_strategy=_prior_strategy_payload(request),
+        preferred_model=preferred_model,
+    )
+    if plan is None:
+        return None
+    return _response_from_signal_rule_plan(
+        response=response,
+        plan=plan,
+    )
+
+
+async def _audit_signal_rule_grounding_if_needed(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_signal_rule_grounding_audit(response):
+        return None
+    audit = await audit_signal_rule_grounding(
+        current_user_message=request.current_user_message,
+        candidate_strategy=response.candidate_strategy_draft.model_dump(mode="json"),
+        prior_strategy=_prior_strategy_payload(request),
+        preferred_model=preferred_model,
+    )
+    if audit is None or audit.outcome == "grounded":
+        return None
+    return _response_from_signal_grounding_audit(
+        response=response,
+        audit=audit,
+    )
+
+
+def _response_needs_signal_rule_grounding_audit(
+    response: LLMInterpretationResponse,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) != "signal_strategy":
+        return False
+    return bool(draft.rule_spec or draft.entry_rule)
+
+
+def _response_from_signal_grounding_audit(
+    *,
+    response: LLMInterpretationResponse,
+    audit: SignalRuleGroundingAudit,
+) -> LLMInterpretationResponse:
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    draft.entry_logic = None
+    draft.exit_logic = None
+    draft.entry_rule = None
+    draft.exit_rule = None
+    draft.rule_spec = None
+    for key in ("entry_rule", "exit_rule", "rule_spec"):
+        draft.extra_parameters.pop(key, None)
+
+    repaired.intent = "strategy_drafting"
+    repaired.requires_clarification = True
+    repaired.assistant_response = audit.assistant_response
+    repaired.missing_required_fields = list(
+        dict.fromkeys(audit.missing_required_fields or ["entry_logic"])
+    )
+    repaired.confidence = min(repaired.confidence, audit.confidence)
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [*repaired.reason_codes, "signal_rule_grounding_needs_clarification"]
+        )
+    )
+    return repaired
+
+
+def _response_needs_signal_rule_plan(response: LLMInterpretationResponse) -> bool:
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) != "signal_strategy":
+        return False
+    if draft.rule_spec or draft.entry_rule:
+        return False
+    return _llm_strategy_draft_has_extractable_fields(draft)
+
+
+def _response_from_signal_rule_plan(
+    *,
+    response: LLMInterpretationResponse,
+    plan: SignalRulePlan,
+) -> LLMInterpretationResponse:
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    if plan.user_goal_summary:
+        repaired.user_goal_summary = plan.user_goal_summary
+    if plan.strategy_thesis:
+        draft.strategy_thesis = plan.strategy_thesis
+    if plan.entry_logic:
+        draft.entry_logic = plan.entry_logic
+    if plan.exit_logic:
+        draft.exit_logic = plan.exit_logic
+    if plan.rule_spec is not None:
+        draft.rule_spec = canonicalize_rule_spec(plan.rule_spec)
+
+    repaired.confidence = min(repaired.confidence, plan.confidence)
+    repaired.reason_codes = list(
+        dict.fromkeys([*repaired.reason_codes, "signal_rule_plan_repair"])
+    )
+    if plan.outcome == "draft_only":
+        draft.strategy_type = None
+        draft.entry_rule = None
+        draft.exit_rule = None
+        draft.rule_spec = None
+        draft.risk_rules = []
+        repaired.intent = "unsupported_or_out_of_scope"
+        repaired.semantic_turn_act = "unsupported_request"
+        repaired.requires_clarification = True
+        repaired.assistant_response = plan.assistant_response
+        repaired.missing_required_fields = []
+        repaired.unsupported_constraints = [
+            *repaired.unsupported_constraints,
+            LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value=_signal_rule_plan_raw_value(draft),
+                explanation=(
+                    plan.assistant_response
+                    or "This idea depends on strategy logic that is not executable yet."
+                ),
+                simplification_labels=[
+                    "Use a supported RSI threshold rule",
+                    "Compare with buy and hold",
+                    "Use a supported moving-average crossover",
+                ],
+            ),
+        ]
+        repaired.reason_codes = list(
+            dict.fromkeys(
+                [*repaired.reason_codes, "signal_rule_plan_draft_only"]
+            )
+        )
+        return repaired
+
+    draft.strategy_type = "signal_strategy"
+    if plan.outcome == "ready_to_confirm":
+        # A ready signal-rule plan is the executable contract. Drop unrelated
+        # non-executable draft fields that the planner did not ground in the rule.
+        draft.risk_rules = []
+        repaired.intent = "backtest_execution"
+        repaired.requires_clarification = False
+        repaired.missing_required_fields = []
+        repaired.assistant_response = None
+        return repaired
+
+    repaired.intent = "strategy_drafting"
+    repaired.requires_clarification = True
+    repaired.assistant_response = plan.assistant_response
+    repaired.missing_required_fields = list(
+        dict.fromkeys(plan.missing_required_fields or ["entry_logic"])
+    )
+    repaired.reason_codes = list(
+        dict.fromkeys([*repaired.reason_codes, "signal_rule_plan_needs_clarification"])
+    )
+    return repaired
+
+
+def _signal_rule_plan_raw_value(draft: LLMStrategyDraft) -> str:
+    value = (
+        draft.entry_logic
+        or draft.strategy_thesis
+        or draft.raw_user_phrasing
+        or draft.strategy_type
+        or "unsupported signal strategy"
+    )
+    return str(value)
+
+
+def _prior_strategy_payload(
+    request: InterpretationRequest,
+) -> dict[str, Any] | None:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return None
+    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    if prior is None:
+        return None
+    return prior.model_dump(mode="json")
 
 
 def _unique_repair_models(preferred_model: str) -> list[str]:
@@ -634,13 +961,19 @@ def _unique_repair_models(preferred_model: str) -> list[str]:
 def _response_needs_artifact_context_repair(
     response: LLMInterpretationResponse,
 ) -> bool:
-    if response.intent != "unsupported_or_out_of_scope":
+    if response.unsupported_constraints:
         return False
-    if not response.requires_clarification:
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_structural_execution_fields(draft):
         return False
-    if _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
-        return False
-    return bool(response.assistant_response)
+    if response.intent == "unsupported_or_out_of_scope":
+        return bool(response.assistant_response)
+    return (
+        response.intent == "conversation_followup"
+        and response.semantic_turn_act == "educational_question"
+        and bool(response.assistant_response)
+        and _llm_strategy_draft_has_unstructured_strategy_text(draft)
+    )
 
 
 def _focused_strategy_extraction_has_material_fields(
@@ -691,13 +1024,23 @@ def _focused_strategy_extraction_messages(
                 "Interpret only the current user message and return all fields needed "
                 "to draft an executable backtest. Do not omit a field that appears in "
                 "the message. Do not invent fees, slippage, position size, or provider "
-                "details.\n\n"
-                "Supported strategy_type values are buy_and_hold, dca_accumulation, "
-                "rsi_mean_reversion, and signal_strategy. Normalize obvious company "
-                "names or crypto names to common symbols when you are confident, such "
-                "as Nvidia to NVDA, Apple to AAPL, Tesla to TSLA, Microsoft to MSFT, "
-                "Bitcoin to BTC, and Ethereum to ETH. Natural date periods should be "
-                "compact strings such as 'past 2 years' or 'last 3 months'.\n\n"
+                "details. is_testable_strategy means the user is asking for a strategy "
+                "or backtest idea; it does not mean Argus can execute every part. For "
+                "clear sentiment, news, fundamental, external-data, or other draft-only "
+                "strategy requests, set is_testable_strategy=true, preserve the asset, "
+                "period, unsupported rule, and raw strategy_type, and let the runtime "
+                "route it to unsupported recovery.\n\n"
+                "Executable strategy_type values are buy_and_hold, dca_accumulation, "
+                "indicator_threshold, and signal_strategy. Treat this as an execution "
+                "contract, not a taxonomy for every creative idea. If the user asks for "
+                "sentiment, news, fundamentals, custom external data, or any rule you "
+                "cannot express with these structured executable fields, do not force "
+                "it into signal_strategy or indicator_threshold. Preserve the idea in "
+                "user_goal_summary/assistant_response and mark it as needing a supported "
+                "executable simplification. Preserve user-stated asset names or symbols "
+                "in asset_universe; the provider-backed resolver will validate and "
+                "canonicalize assets after interpretation. Natural date periods should "
+                "be compact strings such as 'past 2 years' or 'last 3 months'.\n\n"
                 "For moving-average crossovers, set strategy_type to signal_strategy "
                 "and set entry_rule to {'type':'moving_average_crossover', "
                 "'fast_indicator':'sma' or 'ema', 'fast_period':number, "
@@ -705,7 +1048,7 @@ def _focused_strategy_extraction_messages(
                 "'direction':'bullish' for crosses above or 'bearish' for crosses "
                 "below}. If the user does not state an exit, leave exit_rule null "
                 "and set exit_logic to the opposite crossover default.\n\n"
-                "For RSI threshold ideas, set strategy_type to rsi_mean_reversion, "
+                "For RSI threshold ideas, set strategy_type to indicator_threshold, "
                 "indicator to rsi, indicator_period only when supplied, and threshold "
                 "overrides as numbers. For explicit buy-and-hold ideas, set "
                 "strategy_type to buy_and_hold."
@@ -720,16 +1063,56 @@ def _response_from_focused_strategy_extraction(
     extraction: FocusedStrategyExtraction,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    strategy_type = _strategy_type_from_focused_extraction(extraction)
-    if not extraction.is_testable_strategy and extraction.assistant_response:
+    strategy_type = executable_strategy_type_from_extracted_fields(
+        extraction.model_dump(mode="python")
+    )
+    if strategy_type is None:
         return LLMInterpretationResponse(
-            intent="conversation_followup",
+            intent="unsupported_or_out_of_scope",
             task_relation="new_task",
-            requires_clarification=extraction.requires_clarification,
+            requires_clarification=True,
             user_goal_summary=extraction.user_goal_summary,
-            assistant_response=extraction.assistant_response,
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=request.current_user_message,
+                strategy_thesis=extraction.strategy_thesis
+                or extraction.user_goal_summary,
+                asset_universe=list(extraction.asset_universe),
+                date_range=extraction.date_range,
+                entry_logic=extraction.entry_logic,
+                exit_logic=extraction.exit_logic,
+                indicator=extraction.indicator,
+                indicator_period=extraction.indicator_period,
+                entry_threshold=extraction.entry_threshold,
+                exit_threshold=extraction.exit_threshold,
+                extra_parameters={
+                    "raw_strategy_type": extraction.strategy_type,
+                }
+                if extraction.strategy_type
+                else {},
+            ),
+            unsupported_constraints=[
+                LLMUnsupportedConstraint(
+                    category="unsupported_strategy_logic",
+                    raw_value=(
+                        extraction.strategy_type
+                        or extraction.entry_logic
+                        or extraction.strategy_thesis
+                        or extraction.user_goal_summary
+                    ),
+                    explanation=(
+                        extraction.assistant_response
+                        or "This idea depends on strategy logic that is not executable yet."
+                    ),
+                    simplification_labels=[
+                        "Use a supported RSI threshold rule",
+                        "Compare with buy and hold",
+                        "Use a supported moving-average crossover",
+                    ],
+                )
+            ],
             confidence=extraction.confidence,
-            semantic_turn_act="educational_question",
+            reason_codes=["focused_strategy_extraction_unrecognized_contract"],
+            semantic_turn_act="unsupported_request",
         )
     return LLMInterpretationResponse(
         intent="strategy_drafting"
@@ -760,40 +1143,6 @@ def _response_from_focused_strategy_extraction(
         reason_codes=["focused_strategy_extraction_repair"],
         semantic_turn_act="new_idea",
     )
-
-
-def _strategy_type_from_focused_extraction(
-    extraction: FocusedStrategyExtraction,
-) -> str | None:
-    if extraction.entry_rule or extraction.rule_spec:
-        return "signal_strategy"
-    raw_strategy_type = str(extraction.strategy_type or "").strip().lower()
-    strategy_type_aliases = {
-        "buy_and_hold": "buy_and_hold",
-        "buy-and-hold": "buy_and_hold",
-        "dca_accumulation": "dca_accumulation",
-        "dca": "dca_accumulation",
-        "recurring_buy": "dca_accumulation",
-        "recurring-buys": "dca_accumulation",
-        "rsi_mean_reversion": "rsi_mean_reversion",
-        "rsi_threshold": "rsi_mean_reversion",
-        "indicator_threshold": "rsi_mean_reversion",
-        "signal_strategy": "signal_strategy",
-        "moving_average_crossover": "signal_strategy",
-        "ma_crossover": "signal_strategy",
-        "macd_crossover": "signal_strategy",
-    }
-    if raw_strategy_type in strategy_type_aliases:
-        return strategy_type_aliases[raw_strategy_type]
-    indicator = str(extraction.indicator or "").strip().lower()
-    if indicator == "rsi" or (
-        indicator
-        and extraction.entry_threshold is not None
-        and extraction.exit_threshold is not None
-    ):
-        return "rsi_mean_reversion"
-    return None
-
 
 def _focused_artifact_patch_messages(
     request: InterpretationRequest,
@@ -871,7 +1220,10 @@ def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str
             "date_range='last 3 months', indicator='rsi', entry_threshold=20, "
             "and exit_threshold=60. For a moving-average crossover request, include "
             "candidate_strategy_draft.entry_rule as the typed moving_average_crossover "
-            "object described above."
+            "object described above. For a MACD crossover request, include "
+            "candidate_strategy_draft.rule_spec with the MACD line crossing its "
+            "signal line using the default 12/26/9 parameters unless the user "
+            "overrides them."
         )
     return wire_messages
 
@@ -958,6 +1310,20 @@ def _llm_strategy_draft_has_extractable_fields(draft: LLMStrategyDraft) -> bool:
             bool(draft.extra_parameters),
         ]
     )
+
+
+def _llm_strategy_draft_has_structural_execution_fields(
+    draft: LLMStrategyDraft,
+) -> bool:
+    return bool(_material_strategy_updates_from_draft(draft))
+
+
+def _llm_strategy_draft_has_unstructured_strategy_text(
+    draft: LLMStrategyDraft,
+) -> bool:
+    if _llm_strategy_draft_has_structural_execution_fields(draft):
+        return False
+    return bool(draft.raw_user_phrasing or draft.strategy_thesis)
 
 
 def _response_replays_prior_strategy_without_current_turn_update(
@@ -1059,6 +1425,22 @@ def _normalize_response_for_runtime_context(
         return response
     if response.intent != "results_explanation":
         return response
+    if (
+        response.semantic_turn_act == "result_followup"
+        and response.result_followup_focus == "assumptions"
+        and _request_has_active_strategy_context(request)
+    ):
+        return response.model_copy(
+            update={
+                "intent": "conversation_followup",
+                "assistant_response": None,
+                "uses_latest_result_context": False,
+                "reason_codes": [
+                    *response.reason_codes,
+                    "routed_pending_artifact_assumptions_followup",
+                ],
+            }
+        )
     if response.semantic_turn_act == "educational_question":
         return response.model_copy(
             update={
@@ -1115,6 +1497,18 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
     initial_capital = payload.pop("initial_capital", None)
     total_capital = payload.pop("total_capital", None)
     recurring_contribution = payload.pop("recurring_contribution", None)
+    initial_capital = _grounded_initial_capital(
+        initial_capital,
+        field_provenance=field_provenance,
+    )
+    total_capital = _grounded_total_capital(
+        total_capital,
+        field_provenance=field_provenance,
+    )
+    recurring_contribution = _grounded_recurring_contribution(
+        recurring_contribution,
+        field_provenance=field_provenance,
+    )
     indicator_parameters = {
         key: value
         for key, value in {
@@ -1162,6 +1556,81 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         for rule in draft.risk_rules
     ]
     return StrategySummary.model_validate(payload)
+
+
+def _grounded_initial_capital(
+    value: Any,
+    *,
+    field_provenance: dict[str, str],
+) -> Any:
+    if value is None:
+        return None
+    if _capital_source(field_provenance, "initial_capital") in _TOTAL_CAPITAL_SOURCES:
+        return value
+    if _capital_source(field_provenance, "capital_amount") in _TOTAL_CAPITAL_SOURCES:
+        return value
+    return None
+
+
+def _grounded_total_capital(
+    value: Any,
+    *,
+    field_provenance: dict[str, str],
+) -> Any:
+    if value is None:
+        return None
+    if _capital_source(field_provenance, "total_capital") in _TOTAL_CAPITAL_SOURCES:
+        return value
+    if _capital_source(field_provenance, "capital_amount") in _TOTAL_CAPITAL_SOURCES:
+        return value
+    return None
+
+
+def _grounded_recurring_contribution(
+    value: Any,
+    *,
+    field_provenance: dict[str, str],
+) -> Any:
+    if value is None:
+        return None
+    if (
+        _capital_source(field_provenance, "recurring_contribution")
+        in _RECURRING_CAPITAL_SOURCES
+    ):
+        return value
+    if _capital_source(field_provenance, "capital_amount") in _RECURRING_CAPITAL_SOURCES:
+        return value
+    return None
+
+
+def _capital_source(field_provenance: dict[str, str], key: str) -> str:
+    if not isinstance(field_provenance, dict):
+        return ""
+    return str(field_provenance.get(key) or "").strip()
+
+
+_TOTAL_CAPITAL_SOURCES = {
+    "user",
+    "explicit_user",
+    "prior",
+    "initial_capital",
+    "starting_capital",
+    "starting_principal",
+    "total_capital",
+    "total_budget",
+    "max_budget",
+    "investment_budget",
+}
+
+_RECURRING_CAPITAL_SOURCES = {
+    "user",
+    "explicit_user",
+    "prior",
+    "recurring_contribution",
+    "contribution_amount",
+    "periodic_contribution",
+    "dca_contribution",
+}
 
 
 def _ground_strategy_in_current_turn(
@@ -1384,7 +1853,8 @@ def _apply_executable_indicator_defaults(strategy: StrategySummary) -> None:
 
 def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
     entry_rule = strategy_rule(strategy, "entry")
-    if entry_rule is None:
+    rule_spec = executable_rule_spec_from_strategy(strategy)
+    if entry_rule is None and rule_spec is None:
         return
     if strategy.entry_rule is None:
         strategy.entry_rule = entry_rule
@@ -1397,10 +1867,16 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
         "entry_rule": strategy.entry_rule,
         "exit_rule": strategy.exit_rule,
     }
-    if not strategy.entry_logic:
-        strategy.entry_logic = moving_average_crossover_text(strategy.entry_rule)
-    if not strategy.exit_logic:
-        strategy.exit_logic = moving_average_crossover_text(strategy.exit_rule)
+    entry_text = describe_rule_spec(rule_spec, "entry") if rule_spec else None
+    exit_text = describe_rule_spec(rule_spec, "exit") if rule_spec else None
+    strategy.entry_logic = (
+        entry_text or moving_average_crossover_text(strategy.entry_rule)
+        or strategy.entry_logic
+    )
+    strategy.exit_logic = (
+        exit_text or moving_average_crossover_text(strategy.exit_rule)
+        or strategy.exit_logic
+    )
 
 
 def _dca_amount_has_user_provenance(

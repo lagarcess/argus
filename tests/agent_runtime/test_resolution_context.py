@@ -87,7 +87,7 @@ def test_currency_pair_resolution_preserves_direction(monkeypatch) -> None:
     assert result.provenance.raw_text == "EUR/USD"
 
 
-def test_macd_is_searchable_but_not_executable() -> None:
+def test_macd_is_searchable_and_executable() -> None:
     from argus.agent_runtime import resolution
 
     result = resolution.resolve_indicator_candidate(
@@ -97,7 +97,7 @@ def test_macd_is_searchable_but_not_executable() -> None:
     )
 
     assert search_indicators("MACD")[0].key == "macd"
-    assert executable_indicator_spec("MACD") is None
-    assert result.status == "unsupported"
+    assert executable_indicator_spec("MACD") is not None
+    assert result.status == "resolved"
     assert result.provenance.canonical_symbol == "macd"
     assert result.provenance.validated_by == "indicator_registry"

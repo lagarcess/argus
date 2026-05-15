@@ -225,6 +225,42 @@ def test_result_followup_next_tests_respect_strategy_family() -> None:
     assert "compare NVDA with buy-and-hold" in signal_facts["runnable_next_tests"]
 
 
+@pytest.mark.asyncio
+async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> None:
+    async def fake_schema_client(**kwargs: Any) -> object:
+        schema = kwargs["schema_model"]
+        return schema(
+            parts=[
+                {"kind": "text", "text": "Here is generic performance context."},
+                {"kind": "fact", "fact_id": "symbols"},
+                {"kind": "fact", "fact_id": "total_return"},
+                {"kind": "fact", "fact_id": "caveat"},
+            ]
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 0.0,
+                        "benchmark_return_pct": 9.6,
+                        "delta_vs_benchmark_pct": -9.6,
+                    }
+                }
+            },
+            "config_snapshot": {"template": "rsi_mean_reversion"},
+        },
+        focus="next_experiment",
+        user_message="What should I try next?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is None
+
+
 def test_result_followup_fallback_uses_neutral_result_language() -> None:
     response = fallback_result_followup_response(
         metadata={
@@ -250,3 +286,36 @@ def test_result_followup_fallback_uses_neutral_result_language() -> None:
     assert response is not None
     assert response.startswith("AAPL beat SPY in this run.")
     assert "It did not underperform" not in response
+
+
+def test_what_tested_fallback_includes_performance_context_when_focus_drifts() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["NVDA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 23.6,
+                        "benchmark_return_pct": 11.4,
+                        "delta_vs_benchmark_pct": 12.2,
+                    }
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "symbols": ["NVDA"],
+                "date_range": {
+                    "start": "2025-11-14",
+                    "end": "2026-05-14",
+                },
+            },
+        },
+        focus="what_tested",
+    )
+
+    assert response is not None
+    assert "I tested NVDA" in response
+    assert "The strategy returned +23.6%" in response
+    assert "SPY returned +11.4%" in response
+    assert "The gap versus the benchmark was +12.2%" in response

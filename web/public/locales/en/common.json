@@ -168,8 +168,8 @@
     "best_performer": "Best performer",
     "suggestions": [
       {
-        "title": "RSI Mean Reversion",
-        "desc": "Buy oversold dips and sell overbought peaks.",
+        "title": "RSI Threshold",
+        "desc": "Buy or sell when RSI reaches chosen levels.",
         "prompt": "Design a strategy that buys the dip whenever the RSI falls below 30 and sells when it hits 70 for BTC."
       },
       {

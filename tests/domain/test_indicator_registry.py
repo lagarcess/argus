@@ -100,3 +100,15 @@ def test_normalize_indicator_parameters_accepts_aliases_and_defaults() -> None:
 def test_normalize_indicator_parameters_rejects_out_of_bounds_thresholds() -> None:
     with pytest.raises(ValueError, match="indicator_threshold_out_of_bounds"):
         normalize_indicator_parameters("rsi", {"entry_threshold": 120})
+
+
+def test_normalize_indicator_parameters_does_not_require_single_period_schema() -> None:
+    params = normalize_indicator_parameters(
+        "macd",
+        {"fast": 12, "slow": 26, "signal": 9},
+    )
+
+    assert params["indicator"] == "macd"
+    assert params["fast"] == 12
+    assert params["slow"] == 26
+    assert params["signal"] == 9

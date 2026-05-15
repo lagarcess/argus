@@ -27,6 +27,7 @@ def clarify_stage(
     contract: CapabilityContract,
     clarification_generator: StructuredClarificationGenerator | None = None,
     language: str = "en",
+    prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
     return asyncio.run(
         clarify_stage_async(
@@ -34,6 +35,7 @@ def clarify_stage(
             contract=contract,
             clarification_generator=clarification_generator,
             language=language,
+            prefilled_assistant_prompt=prefilled_assistant_prompt,
         )
     )
 
@@ -44,6 +46,7 @@ async def clarify_stage_async(
     contract: CapabilityContract,
     clarification_generator: StructuredClarificationGenerator | None = None,
     language: str = "en",
+    prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
@@ -57,6 +60,49 @@ async def clarify_stage_async(
         unsupported_constraints=unsupported_constraints,
         optional_parameter_choices=optional_parameter_choices,
     )
+    if prefilled_assistant_prompt and (
+        not unsupported_constraints and (ambiguous_fields or requested_fields)
+    ):
+        options = _simplification_options(unsupported_constraints)
+        response_intent = _response_intent(
+            kind="unsupported_recovery" if unsupported_constraints else "clarification",
+            state=state,
+            semantic_needs=(
+                ["simplification_choice"]
+                if unsupported_constraints
+                else _semantic_needs_from_required_fields(requested_fields)
+            ),
+            requested_fields=requested_fields,
+            facts={
+                **(
+                    {"unsupported_constraints": unsupported_constraints}
+                    if unsupported_constraints
+                    else {}
+                ),
+                **({"ambiguous_fields": ambiguous_fields} if ambiguous_fields else {}),
+            },
+            options=options,
+        )
+        return StageResult(
+            outcome="await_user_reply",
+            stage_patch={
+                "assistant_prompt": prefilled_assistant_prompt,
+                "response_intent": response_intent,
+                "requested_field": requested_fields[0]
+                if len(requested_fields) == 1
+                else None,
+                "requested_fields": requested_fields,
+                **(
+                    {
+                        "unsupported_constraints": unsupported_constraints,
+                        "simplification_options": options,
+                    }
+                    if unsupported_constraints
+                    else {}
+                ),
+                **({"ambiguous_fields": ambiguous_fields} if ambiguous_fields else {}),
+            },
+        )
 
     if unsupported_constraints:
         options = _simplification_options(unsupported_constraints)

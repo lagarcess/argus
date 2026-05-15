@@ -43,7 +43,7 @@ export function OnboardingGate({
       try {
         const me = await getMe();
         setUser(me.user);
-        if (me.user.onboarding.completed) {
+        if (me.user.onboarding.completed || me.user.onboarding.stage === "ready") {
           setStep("done");
         } else {
           setStep(me.user.onboarding.stage === "primary_goal_selection" ? "goal" : "language");

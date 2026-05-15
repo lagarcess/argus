@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
@@ -98,6 +99,19 @@ def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
         },
         "validation": {"status": "ready_to_run", "executable": True},
     }
+
+
+def task_snapshot_with_confirmation(strategy: StrategySummary) -> TaskSnapshot:
+    payload = validated_confirmation_payload(strategy)
+    reference = confirmation_artifact_reference(
+        confirmation_id="confirmation-test",
+        confirmation_payload=payload,
+    )
+    return TaskSnapshot(
+        pending_strategy_summary=strategy,
+        active_confirmation_reference=reference,
+        artifact_references=[reference],
+    )
 
 
 def test_interpret_passes_raw_message_to_llm_without_regex_normalization() -> None:
@@ -228,7 +242,7 @@ def test_pending_rule_answer_preserves_active_artifact_context(monkeypatch) -> N
         exit_logic="sell SPY when it starts falling",
         date_range="past month",
     )
-    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    snapshot = task_snapshot_with_confirmation(pending)
     response = StructuredInterpretation(
         intent="strategy_drafting",
         task_relation="new_task",
@@ -318,7 +332,64 @@ def test_malformed_signal_rule_spec_is_not_executable() -> None:
     )
 
 
-def test_vague_momentum_does_not_accept_unsubstantiated_signal_defaults(
+def test_pending_signal_subset_with_macd_shorthand_reaches_confirmation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+    pending = StrategySummary(
+        strategy_type="signal_strategy",
+        strategy_thesis="Test Bitcoin when MACD turns bullish and volume jumps.",
+        asset_universe=["BTC"],
+        asset_class="crypto",
+        date_range="last 6 months",
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User chose the runnable MACD subset.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            entry_logic="MACD line crosses above the signal line",
+            exit_logic="MACD line crosses below the signal line",
+            rule_spec={
+                "type": "macd_crossover",
+                "direction": "bullish",
+                "fast_period": 12,
+                "slow_period": 26,
+                "signal_period": 9,
+            },
+        ),
+        missing_required_fields=["entry_logic"],
+        assistant_response="The old volume clarification should not block this subset.",
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="ok run the macd crossover only",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "entry_logic",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["BTC"]
+    assert strategy.date_range == "last 6 months"
+    assert strategy.entry_logic == "MACD line crosses above the signal line"
+    assert result.decision.missing_required_fields == []
+
+
+def test_structured_signal_rule_from_llm_reaches_confirmation_without_text_scanner(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -332,11 +403,11 @@ def test_vague_momentum_does_not_accept_unsubstantiated_signal_defaults(
         intent="strategy_drafting",
         task_relation="new_task",
         requires_clarification=False,
-        user_goal_summary="User wants to buy SPY when it starts rising.",
+        user_goal_summary="User wants to buy SPY on a concrete moving-average crossover.",
         candidate_strategy_draft=StrategySummary(
-            raw_user_phrasing="Test buying SPY when it starts rising.",
+            raw_user_phrasing="Test buying SPY when the 5-day SMA crosses above the 20-day SMA.",
             strategy_type="signal_strategy",
-            strategy_thesis="Test buying SPY when it starts rising.",
+            strategy_thesis="Test buying SPY when the 5-day SMA crosses above the 20-day SMA.",
             asset_universe=["SPY"],
             asset_class="equity",
             entry_logic="5-day SMA crosses above 20-day SMA",
@@ -363,17 +434,17 @@ def test_vague_momentum_does_not_accept_unsubstantiated_signal_defaults(
     )
 
     result, _ = run_interpret_with_llm(
-        message="Test buying SPY when it starts rising.",
+        message="Test buying SPY when the 5-day SMA crosses above the 20-day SMA.",
         response=response,
     )
 
-    assert result.outcome == "needs_clarification"
+    assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["SPY"]
-    assert strategy.entry_rule is None
-    assert strategy.exit_rule is None
-    assert "entry_logic" in result.decision.missing_required_fields
-    assert "semantic_unsubstantiated_signal_rule_removed" in result.decision.reason_codes
+    assert strategy.entry_rule["fast_period"] == 5
+    assert strategy.exit_rule["direction"] == "bearish"
+    assert result.decision.missing_required_fields == []
+    assert "semantic_unsubstantiated_signal_rule_removed" not in result.decision.reason_codes
 
 
 def test_interpret_approval_uses_semantic_turn_act() -> None:
@@ -383,7 +454,7 @@ def test_interpret_approval_uses_semantic_turn_act() -> None:
         asset_universe=["TSLA"],
         date_range="past year",
     )
-    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    snapshot = task_snapshot_with_confirmation(pending)
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="continue",
@@ -406,8 +477,9 @@ def test_interpret_approval_uses_semantic_turn_act() -> None:
         ],
     )
 
-    assert result.outcome == "approved_for_execution"
-    assert result.patch["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
+    assert result.outcome == "ready_to_respond"
+    assert "Run backtest" in result.patch["assistant_response"]
+    assert "confirmation_payload" not in result.patch
     assert result.decision.semantic_turn_act == "approval"
 
 
@@ -428,7 +500,7 @@ def test_interpret_approval_preserves_visible_artifact_without_re_resolving(
         asset_class="equity",
         date_range="past year",
     )
-    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    snapshot = task_snapshot_with_confirmation(pending)
     response = StructuredInterpretation(
         intent="backtest_execution",
         task_relation="continue",
@@ -447,11 +519,10 @@ def test_interpret_approval_preserves_visible_artifact_without_re_resolving(
         confirmation_payload=validated_confirmation_payload(pending),
     )
 
-    assert result.outcome == "approved_for_execution"
-    strategy = result.patch["confirmation_payload"]["strategy"]
-    assert strategy["asset_universe"] == ["TSLA"]
-    assert strategy["asset_class"] == "equity"
-    assert result.patch["confirmation_payload"]["launch_payload"]["symbol"] == "TSLA"
+    assert result.outcome == "ready_to_respond"
+    assert "Run backtest" in result.patch["assistant_response"]
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["TSLA"]
 
 
 def test_interpret_approval_without_validated_payload_refreshes_confirmation() -> None:
@@ -486,6 +557,92 @@ def test_interpret_approval_without_validated_payload_refreshes_confirmation() -
 
     assert result.outcome == "ready_for_confirmation"
     assert "confirmation_payload" not in result.patch
+
+
+def test_interpret_approval_does_not_run_when_turn_contains_date_refinement(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Nvidia.",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User wants to shorten the existing Nvidia draft.",
+        candidate_strategy_draft=StrategySummary(date_range="last 6 months"),
+        semantic_turn_act="approval",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Use the last 6 months instead.",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        confirmation_payload=validated_confirmation_payload(pending),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert "confirmation_payload" not in result.patch
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.date_range == "last 6 months"
+    assert result.decision.task_relation == "refine"
+
+
+def test_interpret_approval_does_not_run_when_turn_contains_asset_refinement(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User wants to change the asset in the visible draft.",
+        candidate_strategy_draft=StrategySummary(asset_universe=["NVDA"]),
+        semantic_turn_act="approval",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Actually make it Nvidia.",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        confirmation_payload=validated_confirmation_payload(pending),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert "confirmation_payload" not in result.patch
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.date_range == "past year"
+    assert result.decision.task_relation == "refine"
 
 
 def test_structured_confirmation_action_preserves_visible_artifact_without_re_resolving(
@@ -692,7 +849,7 @@ def test_result_followup_uses_llm_composer_before_fallback(monkeypatch: pytest.M
         return "LLM-composed answer grounded in the result fact bank."
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         fake_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
@@ -750,7 +907,7 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         fake_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
@@ -813,7 +970,7 @@ def test_underperformance_followup_corrects_false_premise_when_run_outperformed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         _force_result_followup_fallback,
     )
     snapshot = TaskSnapshot(
@@ -853,7 +1010,7 @@ def test_underperformance_followup_corrects_false_premise_when_run_outperformed(
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
-    assert "did not underperform" in answer
+    assert "beat SPY" in answer
     assert "+33.4%" in answer
     assert "+26.5%" in answer
     assert "The strategy returned +33.4%." in answer
@@ -865,7 +1022,7 @@ def test_zero_return_followup_uses_result_reason_without_repeating_readout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         _force_result_followup_fallback,
     )
     snapshot = TaskSnapshot(
@@ -926,7 +1083,7 @@ def test_result_followup_summarizes_what_was_tested_from_fact_bank(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         _force_result_followup_fallback,
     )
     snapshot = TaskSnapshot(
@@ -999,7 +1156,7 @@ def test_result_followup_uses_composer_question_when_llm_focus_is_wrong(
         )
 
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         fake_compose_result_followup_response,
     )
     snapshot = TaskSnapshot(
@@ -1064,7 +1221,7 @@ def test_result_followup_names_indicator_rules_and_no_trade_outcome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
         _force_result_followup_fallback,
     )
     snapshot = TaskSnapshot(
@@ -1481,6 +1638,39 @@ def test_vague_signal_strategy_requires_executable_rule(monkeypatch) -> None:
     assert result.decision.missing_required_fields == ["entry_logic"]
 
 
+def test_non_executable_signal_rule_requires_rule_before_date(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to buy SPY when it starts rising.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy SPY when it starts rising.",
+            asset_universe=["SPY"],
+            asset_class="equity",
+            entry_logic="buy SPY when it starts rising",
+            entry_rule={"type": "price_momentum", "direction": "up"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Test buying SPY when it starts rising.",
+        response=response,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.missing_required_fields == ["entry_logic"]
+
+
 def test_llm_vague_rule_clarifying_response_is_not_discarded() -> None:
     response = StructuredInterpretation(
         intent="unsupported_or_out_of_scope",
@@ -1504,7 +1694,7 @@ def test_llm_vague_rule_clarifying_response_is_not_discarded() -> None:
     assert "starts rising" in result.patch["assistant_response"]
 
 
-def test_pending_date_answer_uses_typed_validator_when_interpreter_unavailable(
+def test_pending_date_answer_uses_structured_interpreter_before_updating_draft(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -1522,7 +1712,16 @@ def test_pending_date_answer_uses_typed_validator_when_interpreter_unavailable(
             asset_class="equity",
         )
     )
-    interpreter = RecordingInterpreter(None)
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User answered the pending date question.",
+            candidate_strategy_draft=StrategySummary(date_range="past month"),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
 
     result = interpret_stage(
         state=RunState.new(
@@ -1538,10 +1737,10 @@ def test_pending_date_answer_uses_typed_validator_when_interpreter_unavailable(
         structured_interpreter=interpreter,
     )
 
-    assert len(interpreter.requests) == 0
+    assert len(interpreter.requests) == 1
     assert result.outcome == "ready_for_confirmation"
     assert result.decision.candidate_strategy_draft.date_range == "past month"
-    assert "typed_pending_date_answer_applied" in result.decision.reason_codes
+    assert "typed_pending_date_answer_applied" not in result.decision.reason_codes
 
 
 def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
@@ -1584,7 +1783,16 @@ def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
             extra_parameters={"entry_rule": entry_rule, "exit_rule": exit_rule},
         )
     )
-    interpreter = RecordingInterpreter(None)
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User changed only the date on the pending draft.",
+            candidate_strategy_draft=StrategySummary(date_range="past year"),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
 
     result = interpret_stage(
         state=RunState.new(
@@ -1600,7 +1808,7 @@ def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
         structured_interpreter=interpreter,
     )
 
-    assert len(interpreter.requests) == 0
+    assert len(interpreter.requests) == 1
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.date_range == "past year"
@@ -1684,7 +1892,7 @@ def test_contextual_asset_edit_preserves_existing_signal_rule_without_restatemen
     assert "semantic_unsubstantiated_signal_rule_removed" not in result.decision.reason_codes
 
 
-def test_pending_date_answer_keeps_vague_signal_unrunnable_without_rule(
+def test_interpreter_unavailable_does_not_parse_pending_date_from_text(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -1718,14 +1926,13 @@ def test_pending_date_answer_keeps_vague_signal_unrunnable_without_rule(
         structured_interpreter=RecordingInterpreter(None),
     )
 
-    assert result.outcome == "needs_clarification"
-    strategy = result.decision.candidate_strategy_draft
-    assert strategy.asset_universe == ["SPY"]
-    assert strategy.date_range == "past month"
-    assert result.decision.missing_required_fields == ["entry_logic"]
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
+    assert result.decision.candidate_strategy_draft.asset_universe == []
+    assert "interpreter was unavailable" in result.patch["assistant_response"].lower()
 
 
-def test_pending_date_answer_updates_artifact_before_generic_llm_response(
+def test_pending_date_answer_does_not_bypass_structured_interpreter_response(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -1766,15 +1973,12 @@ def test_pending_date_answer_updates_artifact_before_generic_llm_response(
         structured_interpreter=interpreter,
     )
 
-    assert len(interpreter.requests) == 0
-    assert result.outcome == "needs_clarification"
-    strategy = result.decision.candidate_strategy_draft
-    assert strategy.asset_universe == ["SPY"]
-    assert strategy.date_range == "past month"
-    assert result.decision.missing_required_fields == ["entry_logic"]
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["assistant_response"] == "Please provide a complete strategy."
 
 
-def test_pending_signal_rule_answer_uses_typed_rule_validator_when_interpreter_unavailable(
+def test_pending_signal_rule_answer_uses_structured_interpreter(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -1795,6 +1999,38 @@ def test_pending_signal_rule_answer_uses_typed_rule_validator_when_interpreter_u
         )
     )
 
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User defined the pending rising rule as an SMA crossover.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="signal_strategy",
+                entry_logic="20-day SMA crosses above 50-day SMA",
+                exit_logic="20-day SMA crosses below 50-day SMA",
+                date_range="past month",
+                entry_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bullish",
+                },
+                exit_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bearish",
+                },
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
     result = interpret_stage(
         state=RunState.new(
             current_user_message=(
@@ -1808,9 +2044,10 @@ def test_pending_signal_rule_answer_uses_typed_rule_validator_when_interpreter_u
             "requested_field": "entry_logic",
             "last_stage_outcome": "await_user_reply",
         },
-        structured_interpreter=RecordingInterpreter(None),
+        structured_interpreter=interpreter,
     )
 
+    assert len(interpreter.requests) == 1
     assert result.outcome == "ready_for_confirmation"
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["SPY"]
@@ -1818,10 +2055,10 @@ def test_pending_signal_rule_answer_uses_typed_rule_validator_when_interpreter_u
     assert strategy.entry_rule["fast_period"] == 20
     assert strategy.entry_rule["slow_period"] == 50
     assert strategy.exit_rule["direction"] == "bearish"
-    assert "typed_pending_signal_rule_answer_applied" in result.decision.reason_codes
+    assert "typed_pending_signal_rule_answer_applied" not in result.decision.reason_codes
 
 
-def test_pending_signal_rule_answer_infers_missing_rule_from_artifact_state(
+def test_interpreter_unavailable_does_not_infer_missing_signal_rule_from_text(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -1855,13 +2092,10 @@ def test_pending_signal_rule_answer_infers_missing_rule_from_artifact_state(
         structured_interpreter=RecordingInterpreter(None),
     )
 
-    assert result.outcome == "ready_for_confirmation"
-    strategy = result.decision.candidate_strategy_draft
-    assert strategy.asset_universe == ["SPY"]
-    assert strategy.date_range == "past month"
-    assert strategy.entry_rule["fast_period"] == 20
-    assert strategy.entry_rule["slow_period"] == 50
-    assert "typed_pending_signal_rule_answer_applied" in result.decision.reason_codes
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
+    assert result.decision.candidate_strategy_draft.entry_rule is None
+    assert "interpreter was unavailable" in result.patch["assistant_response"].lower()
 
 
 def test_explicit_relative_date_reference_clears_llm_date_ambiguity(
@@ -2036,6 +2270,53 @@ def test_supported_indicator_patch_uses_structured_indicator_not_phrase_regex(
     assert "supported_indicator_simplification_applied" in result.decision.reason_codes
 
 
+def test_supported_indicator_patch_accepts_structured_template_alias(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_thesis="Test Apple when news sentiment turns positive.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User chose a supported RSI simplification.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="Simplify the active draft to a supported indicator.",
+            strategy_type="indicator_threshold",
+            extra_parameters={"raw_strategy_type": "rsi_mean_reversion"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Let's do the runnable version.",
+        response=response,
+        snapshot=snapshot,
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert result.outcome == "ready_for_confirmation"
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range == "past year"
+    assert strategy.strategy_type == "indicator_threshold"
+    assert strategy.extra_parameters["indicator"] == "rsi"
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 30 or below"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+    assert "supported_indicator_simplification_applied" in result.decision.reason_codes
+
+
 def test_supported_indicator_simplification_preserves_user_threshold_overrides(
     monkeypatch,
 ) -> None:
@@ -2170,7 +2451,8 @@ def test_interpreter_unavailable_reads_visible_confirmation_assumptions() -> Non
     answer = result.patch["assistant_response"]
     assert "$1,000 starting capital" in answer
     assert "Benchmark: SPY" in answer
-    assert "left the visible draft unchanged" in answer
+    assert "Run backtest button" in answer
+    assert "card controls" in answer
 
 
 def test_retry_failed_action_uses_failed_launch_payload() -> None:

@@ -132,11 +132,18 @@ class OpenRouterClarificationGenerator:
         return [
             SystemMessage(
                 content=(
-                    "Generate exactly one concise, context-aware clarifying question. "
+                    "Generate exactly one concise, context-aware assistant response. "
                     "Do not expose field names such as asset_universe, capital_amount, "
                     "date_range, requested_field, or missing_required_fields. Do not "
                     "output JSON. Respond in the user's preferred language (e.g., "
-                    "Spanish if language is 'es-419')."
+                    "Spanish if language is 'es-419').\n\n"
+                    "If response_intent.kind is unsupported_recovery, do not write a "
+                    "bare generic question. Acknowledge the exact idea using the "
+                    "candidate strategy's asset, period, and unsupported rule when "
+                    "available; name the limitation in product language; then offer "
+                    "the provided simplification_options as concrete runnable next "
+                    "moves. Ask which direction to use. Do not claim the unsupported "
+                    "part is executable."
                 )
             ),
             SystemMessage(content=json.dumps(context, default=str, sort_keys=True)),

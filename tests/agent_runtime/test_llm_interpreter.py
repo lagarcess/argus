@@ -1,11 +1,21 @@
 from dataclasses import dataclass
 from datetime import date
 
+import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_interpreter import (
     LLMInterpretationResponse,
+    LLMRiskRule,
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
+    _pending_signal_rule_planning_response,
+    _recover_supported_signal_rule_from_draft_if_needed,
+    _response_from_signal_grounding_audit,
+    _response_from_signal_rule_plan,
+)
+from argus.agent_runtime.signal_rule_repair import (
+    SignalRuleGroundingAudit,
+    SignalRulePlan,
 )
 from argus.agent_runtime.stages.interpret import InterpretationRequest, interpret_stage
 from argus.agent_runtime.state.models import (
@@ -84,6 +94,367 @@ def test_llm_interpreter_prompt_names_currency_pair_runtime_truth() -> None:
     assert "Kraken" in prompt
 
 
+def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "why did this result happen" in prompt
+    assert "why/how the result happened" in prompt
+    assert "why_underperformed" in prompt
+
+
+def test_signal_rule_plan_promotes_macd_crossover_to_ready_rule_spec() -> None:
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="Test Bitcoin with a MACD crossover.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="ok run the macd crossover only",
+            strategy_type="signal_strategy",
+            strategy_thesis="Test Bitcoin when MACD turns bullish.",
+            asset_universe=["BTC"],
+            date_range="last 6 months",
+            entry_logic="MACD crosses above its signal line",
+        ),
+        assistant_response="I need a more specific rule.",
+    )
+    rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {
+                        "kind": "indicator",
+                        "key": "macd",
+                        "output": "macd",
+                        "parameters": {"fast": 12, "slow": 26, "signal": 9},
+                    },
+                    "operator": "cross_above",
+                    "right": {
+                        "kind": "indicator",
+                        "key": "macd",
+                        "output": "signal",
+                        "parameters": {"fast": 12, "slow": 26, "signal": 9},
+                    },
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {
+                        "kind": "indicator",
+                        "key": "macd",
+                        "output": "macd",
+                        "parameters": {"fast": 12, "slow": 26, "signal": 9},
+                    },
+                    "operator": "cross_below",
+                    "right": {
+                        "kind": "indicator",
+                        "key": "macd",
+                        "output": "signal",
+                        "parameters": {"fast": 12, "slow": 26, "signal": 9},
+                    },
+                }
+            ]
+        },
+    }
+
+    repaired = _response_from_signal_rule_plan(
+        response=response,
+        plan=SignalRulePlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="Test Bitcoin with a MACD crossover.",
+            entry_logic="MACD(12,26,9) crosses above signal",
+            exit_logic="MACD(12,26,9) crosses below signal",
+            rule_spec=rule_spec,
+        ),
+    )
+
+    assert repaired.intent == "backtest_execution"
+    assert repaired.requires_clarification is False
+    assert repaired.assistant_response is None
+    assert repaired.candidate_strategy_draft.rule_spec == rule_spec
+    assert repaired.candidate_strategy_draft.entry_logic == (
+        "MACD(12,26,9) crosses above signal"
+    )
+    assert "signal_rule_plan_repair" in repaired.reason_codes
+
+
+def test_signal_rule_plan_ready_drops_unplanned_risk_rules() -> None:
+    rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_above",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {"kind": "indicator", "key": "sma", "period": 50},
+                    "operator": "cross_below",
+                    "right": {"kind": "indicator", "key": "sma", "period": 200},
+                }
+            ]
+        },
+    }
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test Nvidia with a 50/200 SMA crossover.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="signal_strategy",
+            strategy_thesis="Test Nvidia with a 50/200 SMA crossover.",
+            asset_universe=["NVDA"],
+            date_range="last 1 year",
+            risk_rules=[LLMRiskRule(type="max_drawdown", value_pct=0.2)],
+        ),
+    )
+
+    repaired = _response_from_signal_rule_plan(
+        response=response,
+        plan=SignalRulePlan(
+            outcome="ready_to_confirm",
+            entry_logic="50-day SMA crosses above 200-day SMA",
+            exit_logic="50-day SMA crosses below 200-day SMA",
+            rule_spec=rule_spec,
+        ),
+    )
+
+    assert repaired.intent == "backtest_execution"
+    assert repaired.candidate_strategy_draft.rule_spec == rule_spec
+    assert repaired.candidate_strategy_draft.risk_rules == []
+
+
+def test_signal_rule_plan_draft_only_routes_to_unsupported_recovery() -> None:
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test Apple when news sentiment turns positive.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Test Apple when news sentiment turns positive.",
+            strategy_type="signal_strategy",
+            strategy_thesis="Use news sentiment as the Apple entry trigger.",
+            asset_universe=["AAPL"],
+            date_range="last 1 year",
+            entry_logic="news sentiment turns positive",
+        ),
+    )
+
+    repaired = _response_from_signal_rule_plan(
+        response=response,
+        plan=SignalRulePlan(
+            outcome="draft_only",
+            assistant_response="Sentiment/news signals are not executable yet.",
+        ),
+    )
+
+    assert repaired.intent == "unsupported_or_out_of_scope"
+    assert repaired.semantic_turn_act == "unsupported_request"
+    assert repaired.missing_required_fields == []
+    assert repaired.candidate_strategy_draft.strategy_type is None
+    assert repaired.unsupported_constraints[0].category == "unsupported_strategy_logic"
+    assert "Sentiment/news" in repaired.unsupported_constraints[0].explanation
+    assert "signal_rule_plan_draft_only" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_supported_signal_rule_recovery_rescues_underfilled_ma_crossover(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    rule_spec = {
+        "entry": {
+            "conditions": [
+                {
+                    "left": {
+                        "kind": "indicator",
+                        "key": "sma",
+                        "period": 50,
+                    },
+                    "operator": "cross_above",
+                    "right": {
+                        "kind": "indicator",
+                        "key": "sma",
+                        "period": 200,
+                    },
+                }
+            ]
+        },
+        "exit": {
+            "conditions": [
+                {
+                    "left": {
+                        "kind": "indicator",
+                        "key": "sma",
+                        "period": 50,
+                    },
+                    "operator": "cross_below",
+                    "right": {
+                        "kind": "indicator",
+                        "key": "sma",
+                        "period": 200,
+                    },
+                }
+            ]
+        },
+    }
+
+    async def plan_stub(**kwargs):
+        candidate = kwargs["candidate_strategy"]
+        assert candidate["strategy_type"] == "signal_strategy"
+        return SignalRulePlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="Test NVDA with a 50/200 SMA crossover.",
+            entry_logic="50-day SMA crosses above 200-day SMA",
+            exit_logic="50-day SMA crosses below 200-day SMA",
+            rule_spec=rule_spec,
+        )
+
+    monkeypatch.setattr(interpreter_module, "repair_signal_rule_plan", plan_stub)
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Test Nvidia with a Golden Cross strategy.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Test Nvidia when the 50-day moving average crosses above "
+                "the 200-day moving average over the last year."
+            ),
+            strategy_thesis="Use a Golden Cross strategy on NVDA.",
+            asset_universe=["NVDA"],
+            date_range="last 1 year",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="Golden Cross strategy",
+                explanation="This rule is not executable yet.",
+            )
+        ],
+    )
+
+    repaired = await _recover_supported_signal_rule_from_draft_if_needed(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "Test Nvidia when the 50-day moving average crosses above "
+                "the 200-day moving average over the last year."
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired is not None
+    assert repaired.intent == "backtest_execution"
+    assert repaired.requires_clarification is False
+    assert repaired.unsupported_constraints == []
+    assert repaired.candidate_strategy_draft.strategy_type == "signal_strategy"
+    assert repaired.candidate_strategy_draft.rule_spec == rule_spec
+    assert (
+        "supported_signal_rule_contract_recovery" in repaired.reason_codes
+    )
+
+
+def test_signal_grounding_audit_blocks_invented_vague_momentum_rule() -> None:
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="User wants to buy SPY when it starts rising.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Test buying SPY when it starts rising.",
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy SPY when it starts rising.",
+            asset_universe=["SPY"],
+            asset_class="equity",
+            entry_logic="5-day SMA crosses above 20-day SMA",
+            exit_logic="5-day SMA crosses below 20-day SMA",
+            entry_rule={
+                "type": "moving_average_crossover",
+                "direction": "bullish",
+                "fast_indicator": "sma",
+                "fast_period": 5,
+                "slow_indicator": "sma",
+                "slow_period": 20,
+            },
+            exit_rule={
+                "type": "moving_average_crossover",
+                "direction": "bearish",
+                "fast_indicator": "sma",
+                "fast_period": 5,
+                "slow_indicator": "sma",
+                "slow_period": 20,
+            },
+        ),
+    )
+    audit = SignalRuleGroundingAudit(
+        outcome="needs_clarification",
+        assistant_response="I can test this, but I need the exact rising trigger first.",
+        missing_required_fields=["entry_logic"],
+    )
+
+    repaired = _response_from_signal_grounding_audit(response=response, audit=audit)
+
+    draft = repaired.candidate_strategy_draft
+    assert repaired.requires_clarification is True
+    assert repaired.missing_required_fields == ["entry_logic"]
+    assert repaired.assistant_response == audit.assistant_response
+    assert "signal_rule_grounding_needs_clarification" in repaired.reason_codes
+    assert draft.entry_logic is None
+    assert draft.exit_logic is None
+    assert draft.entry_rule is None
+    assert draft.exit_rule is None
+    assert draft.rule_spec is None
+
+
+def test_pending_signal_rule_planning_response_preserves_prior_artifact() -> None:
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User confirmed a subset of the pending signal idea.",
+        candidate_strategy_draft=LLMStrategyDraft(),
+        assistant_response="Do you want to use only MACD?",
+    )
+    prior_strategy = {
+        "strategy_type": "signal_strategy",
+        "strategy_thesis": "Test Bitcoin when MACD turns bullish and volume jumps.",
+        "asset_universe": ["BTC"],
+        "asset_class": "crypto",
+        "date_range": "last 6 months",
+    }
+
+    repaired = _pending_signal_rule_planning_response(
+        response=response,
+        prior_strategy=prior_strategy,
+        current_user_message="ok run the macd crossover only",
+    )
+
+    draft = repaired.candidate_strategy_draft
+    assert draft.strategy_type == "signal_strategy"
+    assert draft.asset_universe == ["BTC"]
+    assert draft.date_range == "last 6 months"
+    assert draft.raw_user_phrasing == "ok run the macd crossover only"
+    assert draft.strategy_thesis is None
+    assert draft.entry_logic is None
+    assert draft.rule_spec is None
+
+
 def test_llm_interpreter_maps_indicator_threshold_fields_to_strategy_parameters(
     monkeypatch,
 ) -> None:
@@ -130,6 +501,190 @@ def test_llm_interpreter_maps_indicator_threshold_fields_to_strategy_parameters(
     assert parameters["indicator"] == "rsi"
     assert parameters["entry_threshold"] == 20
     assert parameters["exit_threshold"] == 60
+
+
+def test_llm_interpreter_keeps_pending_artifact_assumptions_as_followup() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="results_explanation",
+        task_relation="continue",
+        user_goal_summary="User asks what assumptions the visible draft uses.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["NVDA"],
+            date_range="past 6 months",
+        ),
+        assistant_response="The assumptions include a starting capital of $10,000.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="assumptions",
+    )
+
+    normalized = interpreter_module._normalize_response_for_runtime_context(
+        response,
+        request=InterpretationRequest(
+            current_user_message="What assumptions are you using?",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    date_range="past 6 months",
+                )
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert normalized.intent == "conversation_followup"
+    assert normalized.semantic_turn_act == "result_followup"
+    assert normalized.result_followup_focus == "assumptions"
+    assert normalized.assistant_response is None
+    assert "routed_pending_artifact_assumptions_followup" in normalized.reason_codes
+
+
+def test_focused_strategy_extraction_uses_indicator_threshold_registry() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    extraction = interpreter_module.FocusedStrategyExtraction(
+        is_testable_strategy=True,
+        user_goal_summary="Buy when SMA is below a chosen level.",
+        indicator="sma",
+        entry_threshold=450,
+        exit_threshold=500,
+    )
+
+    response = interpreter_module._response_from_focused_strategy_extraction(
+        extraction=extraction,
+        request=InterpretationRequest(
+            current_user_message="Buy SPY when SMA is under 450.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert response.candidate_strategy_draft.strategy_type == "indicator_threshold"
+    assert response.candidate_strategy_draft.indicator == "sma"
+
+
+def test_focused_strategy_extraction_does_not_force_unknown_strategy_contracts() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    extraction = interpreter_module.FocusedStrategyExtraction(
+        is_testable_strategy=True,
+        user_goal_summary="Buy Apple when news sentiment turns positive.",
+        strategy_type="sentiment_strategy",
+        strategy_thesis="Use sentiment as the entry signal for Apple.",
+        asset_universe=["AAPL"],
+        date_range="past year",
+        entry_logic="news sentiment turns positive",
+    )
+
+    response = interpreter_module._response_from_focused_strategy_extraction(
+        extraction=extraction,
+        request=InterpretationRequest(
+            current_user_message="Test Apple when news sentiment turns positive.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert response.intent == "unsupported_or_out_of_scope"
+    assert response.semantic_turn_act == "unsupported_request"
+    assert response.requires_clarification is True
+    assert response.candidate_strategy_draft.strategy_type is None
+    assert response.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert response.unsupported_constraints[0].category == "unsupported_strategy_logic"
+    assert (
+        "focused_strategy_extraction_unrecognized_contract" in response.reason_codes
+    )
+
+
+def test_focused_strategy_extraction_prompt_preserves_draft_only_strategy_fields() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    messages = interpreter_module._focused_strategy_extraction_messages(
+        InterpretationRequest(
+            current_user_message="Test Apple when news sentiment turns positive.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+    prompt = messages[0].content
+
+    assert "it does not mean Argus can execute every part" in prompt
+    assert "preserve the asset, period, unsupported rule" in prompt
+
+
+def test_focused_strategy_extraction_preserves_non_executable_idea_as_recovery() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    extraction = interpreter_module.FocusedStrategyExtraction(
+        is_testable_strategy=False,
+        user_goal_summary="Test Apple when news sentiment turns positive.",
+        strategy_thesis="Use sentiment as the entry signal for Apple.",
+        asset_universe=["AAPL"],
+        date_range="past year",
+        entry_logic="news sentiment turns positive",
+        assistant_response="Sentiment/news signals are not executable yet.",
+    )
+
+    response = interpreter_module._response_from_focused_strategy_extraction(
+        extraction=extraction,
+        request=InterpretationRequest(
+            current_user_message="Test Apple when news sentiment turns positive.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert response.intent == "unsupported_or_out_of_scope"
+    assert response.semantic_turn_act == "unsupported_request"
+    assert response.requires_clarification is True
+    assert response.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert response.candidate_strategy_draft.date_range == "past year"
+    assert "Sentiment/news signals" in response.unsupported_constraints[0].explanation
+
+
+def test_unsupported_free_text_strategy_response_needs_context_repair() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test Apple when news sentiment turns positive.",
+        assistant_response=(
+            "This strategy requires sentiment analysis, which is not supported."
+        ),
+    )
+
+    assert interpreter_module._response_needs_artifact_context_repair(response) is True
+
+
+def test_conversation_followup_with_unstructured_strategy_text_needs_repair() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="new_task",
+        user_goal_summary="Test Apple when news sentiment turns positive.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Test Apple when news sentiment turns positive.",
+            strategy_thesis="Test Apple when news sentiment turns positive.",
+        ),
+        assistant_response=(
+            "This strategy requires sentiment analysis, which is not supported."
+        ),
+        semantic_turn_act="educational_question",
+    )
+
+    assert interpreter_module._response_needs_artifact_context_repair(response) is True
 
 
 def test_llm_interpreter_promotes_typed_indicator_values_from_extra_parameters(
@@ -189,6 +744,68 @@ def test_llm_interpreter_promotes_typed_indicator_values_from_extra_parameters(
     assert parameters["exit_threshold"] == 60.0
     assert strategy.entry_logic == "Buy when RSI(14) drops to 20 or below"
     assert strategy.exit_logic == "Sell when RSI(14) rises to 60 or above"
+
+
+def test_llm_signal_rule_defaults_describe_indicator_parameters(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        user_goal_summary="User supplied RSI signal thresholds.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Use RSI: enter at 20 and exit at 60.",
+            strategy_type="signal_strategy",
+            strategy_thesis="Use RSI thresholds for TSLA.",
+            asset_universe=["TSLA"],
+            date_range="past 3 months",
+            entry_logic="RSI is 20 or lower",
+            exit_logic="RSI is 60 or higher",
+            rule_spec={
+                "entry": {
+                    "conditions": [
+                        {
+                            "left": {"kind": "indicator", "key": "rsi"},
+                            "operator": "lte",
+                            "right": 20,
+                        }
+                    ]
+                },
+                "exit": {
+                    "conditions": [
+                        {
+                            "left": {"kind": "indicator", "key": "rsi"},
+                            "operator": "gte",
+                            "right": 60,
+                        }
+                    ]
+                },
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Use RSI: enter at 20 and exit at 60.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.entry_logic == "RSI(14) is 20 or lower"
+    assert strategy.exit_logic == "RSI(14) is 60 or higher"
 
 
 def test_llm_interpreter_merges_refinement_with_pending_strategy(monkeypatch) -> None:
@@ -315,6 +932,8 @@ def test_llm_system_prompt_owns_phase_one_routing_and_quality_rules() -> None:
     assert "capital_amount" in prompt
     assert "missing_required_fields" in prompt
     assert "not specified" in prompt
+    assert "what to try next" in prompt
+    assert "next_experiment" in prompt
 
 
 def test_llm_system_prompt_owns_phase_three_extraction_rules() -> None:
@@ -382,7 +1001,7 @@ def test_llm_interpreter_treats_moving_average_crossover_as_executable_signal(
     )
 
     assert result.candidate_strategy_draft.entry_logic == (
-        "50-day moving average crosses above the 200-day moving average"
+        "50-day SMA crosses above 200-day SMA"
     )
     assert result.candidate_strategy_draft.strategy_type == "signal_strategy"
     assert result.candidate_strategy_draft.exit_logic == (
@@ -750,6 +1369,89 @@ def test_llm_interpreter_rejects_invented_dca_contribution_amount(monkeypatch) -
     strategy = result.candidate_strategy_draft
     assert strategy.strategy_type == "dca_accumulation"
     assert strategy.capital_amount is None
+
+
+def test_llm_interpreter_rejects_invented_initial_capital(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Test Apple with RSI.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Simplify it to RSI.",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Test Apple with RSI.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range="last year",
+            indicator="rsi",
+            initial_capital=100000,
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Simplify it to RSI.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert "initial_capital" not in result.candidate_strategy_draft.extra_parameters
+
+
+def test_llm_interpreter_preserves_grounded_initial_capital(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Test Apple with RSI using $10,000.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Test Apple with RSI using $10,000.",
+            strategy_type="indicator_threshold",
+            strategy_thesis="Test Apple with RSI.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range="last year",
+            indicator="rsi",
+            initial_capital=10000,
+            field_provenance={"initial_capital": "explicit_user"},
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="Test Apple with RSI using $10,000.",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.candidate_strategy_draft.extra_parameters["initial_capital"] == 10000
 
 
 def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(

@@ -5,7 +5,10 @@ from typing import Any
 
 from argus.agent_runtime.graph.workflow import WorkflowNode, WorkflowState
 from argus.agent_runtime.stages.clarify import OFFLINE_CLARIFICATION_FALLBACK
-from argus.agent_runtime.stages.compose import compose_response_intent
+from argus.agent_runtime.stages.compose import (
+    compose_response_intent,
+    should_prefer_composed_intent,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     ConfirmationPayload,
@@ -223,6 +226,7 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
         isinstance(explicit_prompt, str)
         and explicit_prompt.strip()
         and explicit_prompt != OFFLINE_CLARIFICATION_FALLBACK
+        and not should_prefer_composed_intent(run_state)
     ):
         return result
     composed = compose_response_intent(run_state)
@@ -230,6 +234,7 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
         return result
     patched = dict(result)
     patched["assistant_prompt"] = composed
+    patched["assistant_response"] = composed
     return patched
 
 

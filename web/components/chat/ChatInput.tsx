@@ -19,9 +19,10 @@ import type { ChatMention } from "./types";
 
 type ChatInputProps = {
   onSend: (text: string, mentions?: ChatMention[]) => void;
+  disabled?: boolean;
 };
 
-export default function ChatInput({ onSend }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled = false }: ChatInputProps) {
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
   const [composerHasContent, setComposerHasContent] = useState(false);
@@ -164,6 +165,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (disabled) return;
     const current = readCurrentSegments();
     const message = serializeComposerSegments(current);
     if (message) {
@@ -284,8 +286,9 @@ export default function ChatInput({ onSend }: ChatInputProps) {
           ref={editorRef}
           data-testid="chat-input"
           role="textbox"
+          aria-disabled={disabled}
           aria-label={t("chat.input_placeholder")}
-          contentEditable
+          contentEditable={!disabled}
           suppressContentEditableWarning
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -342,7 +345,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
         <button
           type="submit"
           data-testid="chat-send"
-          disabled={composerIsEmpty}
+          disabled={composerIsEmpty || disabled}
           className="rounded-full bg-black p-2.5 text-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
         >
           <ArrowUp className="h-5 w-5 stroke-[2.5]" />
