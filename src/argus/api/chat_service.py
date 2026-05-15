@@ -10,10 +10,12 @@ from argus.api.chat import confirmation as _confirmation
 from argus.api.chat import onboarding as _onboarding
 from argus.api.chat import persistence as _persistence
 from argus.api.chat import recovery as _recovery
+from argus.api.chat import result_actions as _result_actions
 from argus.api.chat import strategies as _strategies
 from argus.api.chat import streaming as _streaming
 from argus.api.chat.actions import (
     CONFIRMATION_ACTION_TYPES,
+    RESULT_ACTION_TYPES,
     STALE_CONFIRMATION_ACTION_MESSAGE,
 )
 from argus.api.chat.breakdown import (
@@ -26,7 +28,15 @@ from argus.api.chat.recovery import (
     LOST_CONFIRMATION_STATE_MESSAGE,
     RuntimeFallbackContext,
 )
-from argus.api.schemas import BacktestRun, ChatStreamRequest, Conversation, Strategy, User
+from argus.api.chat.result_actions import ResultActionTurn
+from argus.api.schemas import (
+    BacktestRun,
+    ChatActionPayload,
+    ChatStreamRequest,
+    Conversation,
+    Strategy,
+    User,
+)
 from argus.domain.engine import classify_symbol, default_benchmark
 from argus.llm.openrouter import (
     build_openrouter_model,
@@ -37,7 +47,9 @@ from argus.llm.openrouter import (
 __all__ = [
     "Any",
     "BacktestRun",
+    "ChatActionPayload",
     "CONFIRMATION_ACTION_TYPES",
+    "RESULT_ACTION_TYPES",
     "ChatStreamRequest",
     "Conversation",
     "LOST_CONFIRMATION_STATE_MESSAGE",
@@ -47,6 +59,7 @@ __all__ = [
     "RuntimeFallbackContext",
     "STALE_CONFIRMATION_ACTION_MESSAGE",
     "SUPPORTED_ONBOARDING_GOALS",
+    "ResultActionTurn",
     "Strategy",
     "User",
     "assistant_copy_for_result",
@@ -68,16 +81,20 @@ __all__ = [
     "fallback_result_breakdown_message",
     "fetch_run_metrics",
     "is_confirmation_action",
+    "is_cancel_confirmation_action",
+    "is_result_action",
     "latest_active_confirmation_id",
     "latest_completed_run_for_conversation",
     "latest_result_fallback_context",
     "llm_result_breakdown_message",
     "log_openrouter_failure",
+    "missing_refine_strategy_action_turn",
     "parse_onboarding_control_message",
     "pending_confirmation_exists",
     "pending_strategy_metadata_fallback_context",
     "persist_onboarding_update",
     "persist_runtime_backtest_run",
+    "refine_strategy_action_turn",
     "resolve_date_range",
     "resolved_run_symbols",
     "result_breakdown_context",
@@ -266,6 +283,14 @@ def is_confirmation_action(payload: ChatStreamRequest) -> bool:
     return _actions.is_confirmation_action(payload)
 
 
+def is_cancel_confirmation_action(payload: ChatStreamRequest) -> bool:
+    return _actions.is_cancel_confirmation_action(payload)
+
+
+def is_result_action(payload: ChatStreamRequest) -> bool:
+    return _actions.is_result_action(payload)
+
+
 def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
     return _actions.pending_confirmation_exists(
         user_id=user_id,
@@ -414,6 +439,21 @@ def run_for_result_action(
         conversation_id=conversation_id,
         require_run_id=require_run_id,
     )
+
+
+def refine_strategy_action_turn(
+    *,
+    run: BacktestRun,
+    action: ChatActionPayload,
+) -> ResultActionTurn:
+    return _result_actions.refine_strategy_action_turn(run=run, action=action)
+
+
+def missing_refine_strategy_action_turn(
+    *,
+    action: ChatActionPayload,
+) -> ResultActionTurn:
+    return _result_actions.missing_refine_strategy_action_turn(action=action)
 
 
 def strategy_template_from_run(run: BacktestRun) -> str:

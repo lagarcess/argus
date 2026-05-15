@@ -291,6 +291,29 @@ def test_confirm_stage_still_builds_confirmation_card() -> None:
     assert "1D bars" in result.patch["candidate_strategy_draft"]["assumptions"]
 
 
+def test_confirm_stage_does_not_require_thesis_for_buy_and_hold() -> None:
+    state = RunState.new(
+        current_user_message="Backtest buy and hold Apple over the past year.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        raw_user_phrasing="Backtest buy and hold Apple over the past year.",
+        strategy_type="buy_and_hold",
+        strategy_thesis=None,
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    assert result.patch["missing_required_fields"] == []
+    strategy = result.patch["confirmation_payload"]["strategy"]
+    assert strategy["strategy_type"] == "buy_and_hold"
+    assert strategy["asset_universe"] == ["AAPL"]
+
+
 def test_confirm_stage_resolves_indicator_from_strategy_type_alias() -> None:
     state = RunState.new(
         current_user_message="Backtest Tesla RSI",

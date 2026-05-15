@@ -8,12 +8,14 @@ from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
     new_confirmation_id,
 )
-from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     resolve_date_range,
+)
+from argus.agent_runtime.strategy_requirements import (
+    missing_required_fields_for_strategy,
 )
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
@@ -189,57 +191,10 @@ def _missing_required_fields(
     strategy: dict[str, Any],
     contract: CapabilityContract,
 ) -> list[str]:
-    missing_fields: list[str] = []
-    if _resolve_strategy_type(strategy, {}) == "signal_strategy" and not _has_signal_rule(
-        strategy
-    ):
-        for field_name in ("strategy_thesis", "asset_universe"):
-            value = strategy.get(field_name)
-            if isinstance(value, list):
-                if not value:
-                    missing_fields.append(field_name)
-                continue
-            if value is None or value == "":
-                missing_fields.append(field_name)
-        missing_fields.append("entry_logic")
-        return list(dict.fromkeys(missing_fields))
-    for field_name in _required_fields_for_strategy(strategy, contract):
-        value = strategy.get(field_name)
-        if isinstance(value, list):
-            if not value:
-                missing_fields.append(field_name)
-            continue
-        if value is None or value == "":
-            missing_fields.append(field_name)
-    if _resolve_strategy_type(strategy, {}) == "signal_strategy" and not _has_signal_rule(
-        strategy
-    ):
-        missing_fields.append("entry_logic")
-    return missing_fields
-
-
-def _required_fields_for_strategy(
-    strategy: dict[str, Any],
-    contract: CapabilityContract,
-) -> list[str]:
-    strategy_type = _resolve_strategy_type(strategy, {})
-    if strategy_type in {"buy_and_hold", "dca_accumulation"}:
-        return [
-            field_name
-            for field_name in contract.required_fields
-            if field_name not in {"entry_logic", "exit_logic"}
-        ]
-    if strategy_type == "signal_strategy":
-        return [
-            field_name
-            for field_name in contract.required_fields
-            if field_name != "exit_logic"
-        ]
-    return list(contract.required_fields)
-
-
-def _has_signal_rule(strategy: dict[str, Any]) -> bool:
-    return executable_rule_spec_from_strategy(strategy) is not None
+    return missing_required_fields_for_strategy(
+        StrategySummary.model_validate(strategy),
+        contract=contract,
+    )
 
 
 def _date_limit_prompt(strategy: dict[str, Any]) -> str | None:

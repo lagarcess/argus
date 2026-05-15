@@ -26,12 +26,16 @@ from argus.api.chat_service import (
     checkpoint_has_pending_confirmation,
     checkpoint_has_pending_strategy,
     confirmation_metadata_fallback_context,
+    is_cancel_confirmation_action,
     is_confirmation_action,
+    is_result_action,
     latest_result_fallback_context,
+    missing_refine_strategy_action_turn,
     parse_onboarding_control_message,
     pending_strategy_metadata_fallback_context,
     persist_onboarding_update,
     persist_runtime_backtest_run,
+    refine_strategy_action_turn,
     result_breakdown_message,
     run_for_result_action,
     runtime_checkpoint_values,
@@ -58,6 +62,31 @@ class InternalAgentRuntimeTurnRequest(BaseModel):
     user_id: str
     thread_id: str
     message: str
+
+
+def _confirmation_artifact_id_from_runtime_result(
+    runtime_result: dict[str, Any],
+) -> str | None:
+    references = runtime_result.get("artifact_references")
+    if not isinstance(references, list):
+        return None
+    for reference in references:
+        if not isinstance(reference, dict):
+            continue
+        if reference.get("artifact_kind") != "confirmation":
+            continue
+        artifact_id = reference.get("artifact_id")
+        if isinstance(artifact_id, str) and artifact_id.strip():
+            return artifact_id.strip()
+    return None
+
+
+def _confirmation_id_for_runtime_card(runtime_result: dict[str, Any]) -> str:
+    payload = runtime_result.get("confirmation_payload")
+    fallback = _confirmation_artifact_id_from_runtime_result(runtime_result)
+    if isinstance(payload, dict):
+        return confirmation_id_from_payload(payload, fallback=fallback)
+    return fallback or api_state.store.new_id()
 
 
 @router.post("/internal/agent-runtime/turn")
@@ -206,6 +235,13 @@ async def chat_stream(
             )
         if metadata_fallback is not None:
             runtime_fallback = metadata_fallback
+    elif is_result_action(payload):
+        result_fallback = latest_result_fallback_context(
+            user_id=user.id,
+            conversation_id=conversation.id,
+        )
+        if result_fallback is not None:
+            runtime_fallback = result_fallback
     elif payload.action is None:
         failed_fallback = failed_action_metadata_fallback_context(
             user_id=user.id,
@@ -246,7 +282,8 @@ async def chat_stream(
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
     ]
-    if onboarding_goal is None:
+    cancel_confirmation_action = is_cancel_confirmation_action(payload)
+    if onboarding_goal is None and not cancel_confirmation_action:
         user_metadata: dict[str, Any] = {}
         if mention_provenance:
             user_metadata["mentions"] = [
@@ -414,6 +451,51 @@ async def chat_stream(
             yield sse_done()
             return
 
+        if cancel_confirmation_action and payload.action is not None:
+            action_payload = payload.action.payload
+            raw_confirmation_id = (
+                action_payload.get("confirmation_id")
+                or action_payload.get("confirmationId")
+            )
+            confirmation_id = (
+                str(raw_confirmation_id).strip()
+                if raw_confirmation_id is not None
+                else ""
+            )
+            confirmation_cancelled = {
+                "confirmation_id": confirmation_id,
+            }
+            artifact_event = {
+                "type": "confirmation_cancelled",
+                "confirmation_id": confirmation_id,
+            }
+            metadata = {
+                "conversation_mode": "confirm",
+                "agent_runtime_stage_outcome": "ready_to_respond",
+                "chat_action": payload.action.model_dump(mode="python"),
+                "artifact_event": artifact_event,
+            }
+            assistant_message = create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content="",
+                metadata=metadata,
+            )
+            yield sse_data(
+                {
+                    "type": "final",
+                    "payload": {
+                        "stage_outcome": "ready_to_respond",
+                        "assistant_response": "",
+                        "message_id": assistant_message.id,
+                        "confirmation_cancelled": confirmation_cancelled,
+                    },
+                }
+            )
+            yield sse_done()
+            return
+
         if payload.action is not None and payload.action.type == "save_strategy":
             run = run_for_result_action(
                 payload=payload,
@@ -499,6 +581,33 @@ async def chat_stream(
             yield sse_done()
             return
 
+        if payload.action is not None and payload.action.type == "refine_strategy":
+            run = run_for_result_action(
+                payload=payload,
+                user=user,
+                conversation_id=conversation.id,
+                require_run_id=True,
+            )
+            turn = (
+                missing_refine_strategy_action_turn(action=payload.action)
+                if run is None
+                else refine_strategy_action_turn(run=run, action=payload.action)
+            )
+            assistant_message = create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=turn.assistant_text,
+                metadata=turn.metadata,
+            )
+            final_payload = dict(turn.final_payload)
+            final_payload["message_id"] = assistant_message.id
+            yield sse_data({"type": "stage_start", "stage": turn.stage})
+            yield sse_data({"type": "token", "content": turn.assistant_text})
+            yield sse_data({"type": "final", "payload": final_payload})
+            yield sse_done()
+            return
+
         runtime_user = UserState(
             user_id=user.id,
             display_name=current_user_profile.display_name,
@@ -552,16 +661,7 @@ async def chat_stream(
                 assistant_text = runtime_result_message(runtime_result)
                 confirmation_card = runtime_confirmation_card(
                     runtime_result,
-                    confirmation_id=(
-                        confirmation_id_from_payload(
-                            runtime_result.get("confirmation_payload", {}),
-                            fallback=api_state.store.new_id(),
-                        )
-                        if isinstance(
-                            runtime_result.get("confirmation_payload"), dict
-                        )
-                        else api_state.store.new_id()
-                    ),
+                    confirmation_id=_confirmation_id_for_runtime_card(runtime_result),
                 )
                 if confirmation_card is not None:
                     assistant_text = str(confirmation_card["summary"])
@@ -635,6 +735,9 @@ async def chat_stream(
                         runtime_result["active_confirmation_reference"] = (
                             confirmation_reference.model_dump(mode="python")
                         )
+                        runtime_result["artifact_references"] = [
+                            confirmation_reference.model_dump(mode="python")
+                        ]
                     runtime_result["confirmation"] = confirmation_card
                 if result_card is not None:
                     metadata["result_card"] = result_card

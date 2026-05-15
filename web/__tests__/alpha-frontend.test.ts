@@ -163,7 +163,7 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(activeArtifactHelper).toContain("messages.some");
-    expect(activeArtifactHelper).toContain("confirmation.confirmation_state === \"superseded\"");
+    expect(activeArtifactHelper).toContain("confirmation.confirmation_state !== \"active\"");
     expect(activeArtifactHelper).toContain("actionHasCardScopedOwnership");
     expect(activeArtifactHelper).not.toContain("latestAi");
     expect(chat).toContain("const composerActions = hasActiveArtifactActionSet(messages)");
@@ -175,12 +175,13 @@ describe("Argus Alpha frontend contract", () => {
     const card = readFileSync(join(root, "components/chat/StrategyConfirmationCard.tsx"), "utf-8");
     const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
 
-    expect(types).toContain('confirmation_state?: "active" | "superseded"');
+    expect(types).toContain('confirmation_state?: "active" | "superseded" | "cancelled"');
     expect(types).toContain("confirmation_id?: string");
     expect(chat).toContain("supersedePriorConfirmations");
     expect(chat).toContain("normalizeConfirmationHistory");
     expect(card).toContain('confirmation.confirmation_state === "superseded"');
-    expect(card).toContain('confirmation.statusLabel || "Updated"');
+    expect(card).toContain('confirmation.confirmation_state === "cancelled"');
+    expect(card).toContain('isCancelled ? "Draft cancelled" : "Updated"');
   });
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {
@@ -322,7 +323,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(card).toContain("onAction?: (action: ChatActionOption) => void");
     expect(card).toContain("confirmation.actions");
-    expect(card).toContain('confirmation.confirmation_state !== "superseded"');
+    expect(card).toContain('confirmation.confirmation_state === "active"');
+    expect(card).toContain("!confirmation.confirmation_state");
     expect(card).not.toContain("ArrowRight");
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />");
   });

@@ -50,6 +50,12 @@ import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import { type ChatActionOption, type ChatMention, type Message, type StrategyConfirmationPayload } from "./types";
+import {
+  applyConfirmationActionEffects,
+  confirmationActionEffectFromAction,
+  confirmationActionEffectsFromApi,
+  confirmationActionStatusLabel,
+} from "./artifact-history";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -157,7 +163,10 @@ function visibleComposerActions(actions: ChatActionOption[]) {
 function hasActiveArtifactActionSet(messages: Message[]) {
   return messages.some((message) => {
     if (message.kind === "strategy_confirmation" && message.confirmation) {
-      if (message.confirmation.confirmation_state === "superseded") {
+      if (
+        message.confirmation.confirmation_state &&
+        message.confirmation.confirmation_state !== "active"
+      ) {
         return false;
       }
       const activeActions = message.confirmation.actions ?? message.actions ?? [];
@@ -330,34 +339,15 @@ function consumeResultActionOnMessages(
   ]);
 }
 
-function confirmationActionStatusLabel(action: ChatActionOption | undefined) {
-  if (action?.type === "cancel_confirmation") {
-    return "Cancelled";
-  }
-  if (action?.type === "run_backtest") {
-    return "Running";
-  }
-  if (
-    action?.type === "change_dates" ||
-    action?.type === "change_asset" ||
-    action?.type === "adjust_assumptions"
-  ) {
-    return "Editing";
-  }
-  return "Updated";
-}
-
 function consumeConfirmationActionOnMessages(
   messages: Message[],
   action: ChatActionOption | undefined,
 ): Message[] {
-  if (!isConfirmationAction(action)) {
+  const effect = confirmationActionEffectFromAction(action);
+  if (!effect) {
     return messages;
   }
-  return supersedeOpenConfirmations(
-    messages,
-    confirmationActionStatusLabel(action),
-  );
+  return applyConfirmationActionEffects(messages, [effect]);
 }
 
 function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
@@ -544,7 +534,11 @@ function markResultCardSaving(
 
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   const consumedResultActions = consumedResultActionsFromApi(items);
-  const hiddenMessageIds = hiddenSaveActionMessageIdsFromApi(items);
+  const confirmationActionEffects = confirmationActionEffectsFromApi(items);
+  const hiddenMessageIds = new Set([
+    ...hiddenSaveActionMessageIdsFromApi(items),
+    ...confirmationActionEffects.hiddenMessageIds,
+  ]);
   const messages: Message[] = items.filter((m) => !hiddenMessageIds.has(m.id)).map((m) => {
     const metadata = m.metadata ?? {};
     const chatAction = metadata.chat_action as ChatActionOption | undefined;
@@ -626,7 +620,10 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   });
 
   const normalized = applyConsumedResultActions(
-    normalizeConfirmationHistory(messages),
+    applyConfirmationActionEffects(
+      normalizeConfirmationHistory(messages),
+      confirmationActionEffects.effects,
+    ),
     consumedResultActions,
   );
   return { messages: normalized, inputActions: latestInputActions(normalized) };
@@ -1512,10 +1509,54 @@ export default function ChatInterface() {
     }
   };
 
+  const handleCancelConfirmationAction = async (action: ChatActionOption) => {
+    if (!conversationId || isStreamingResponse) return;
+    const effect = confirmationActionEffectFromAction(action);
+    if (!effect) return;
+    const streamInput: ChatActionRequest = {
+      type: "cancel_confirmation",
+      label: action.label,
+      payload: action.payload,
+      presentation: action.presentation,
+    };
+
+    setInputActions([]);
+    setStreamStatus(null);
+    setIsStreamingResponse(true);
+    try {
+      await streamChatMessage(conversationId, streamInput, i18n.language, (event) => {
+        if (event.event === "final") {
+          setMessages((prev) =>
+            applyConfirmationActionEffects(markComposerActionsInactive(prev), [effect]),
+          );
+        }
+        if (event.event === "error") {
+          showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
+        }
+        if (event.event === "done") {
+          refreshHistory();
+        }
+      }, []);
+    } catch (err: unknown) {
+      const message =
+        err instanceof ChatStreamError && err.message
+          ? err.message
+          : t('chat.error_generic');
+      showToast(message);
+    } finally {
+      setIsStreamingResponse(false);
+      setStreamStatus(null);
+    }
+  };
+
   const handleAction = (action: ChatActionOption) => {
     const value = action.value ?? "";
     if (action.type === "save_strategy") {
       void handleSaveStrategyAction(action);
+      return;
+    }
+    if (action.type === "cancel_confirmation") {
+      void handleCancelConfirmationAction(action);
       return;
     }
     if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {

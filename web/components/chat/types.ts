@@ -94,7 +94,7 @@ export type StrategyConfirmationRow = {
 
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
-  confirmation_state?: "active" | "superseded";
+  confirmation_state?: "active" | "superseded" | "cancelled";
   artifactId?: string;
   artifactType?: ArtifactType;
   artifactStatus?: string;

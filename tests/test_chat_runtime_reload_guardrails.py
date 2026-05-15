@@ -285,6 +285,59 @@ def test_confirmation_action_prefers_visible_card_metadata_over_checkpoint(
     assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
 
 
+def test_confirmation_final_payload_keeps_artifact_identity_consistent(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    confirmation_payload = _confirmation_metadata()["confirmation_payload"]
+
+    async def _runtime(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "Ready to confirm.",
+                "confirmation_payload": confirmation_payload,
+                "artifact_references": [
+                    {
+                        "artifact_kind": "confirmation",
+                        "artifact_id": "confirm-from-stage",
+                        "artifact_status": "active",
+                        "metadata": {
+                            "confirmation_id": "confirm-from-stage",
+                            "confirmation_payload": confirmation_payload,
+                        },
+                    }
+                ],
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest buy and hold Apple over the past year.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    confirmation_id = final["confirmation"]["confirmation_id"]
+    assert confirmation_id == "confirm-from-stage"
+    assert final["artifact_references"][0]["artifact_id"] == confirmation_id
+    assert (
+        final["active_confirmation_reference"]["artifact_id"]
+        == final["artifact_references"][0]["artifact_id"]
+    )
+
+
 def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     monkeypatch,
 ) -> None:
@@ -715,7 +768,7 @@ def test_canceled_confirmation_does_not_recover_older_card(monkeypatch) -> None:
     assert runtime_calls == 0
 
 
-def test_cancel_confirmation_action_closes_visible_card_context() -> None:
+def test_cancel_confirmation_action_persists_invisible_artifact_tombstone() -> None:
     client = _client()
     conversation = _conversation(client)
     user_id = _user_id(client)
@@ -744,12 +797,27 @@ def test_cancel_confirmation_action_closes_visible_card_context() -> None:
     assert response.status_code == 200
     final = _stream_payloads(response.text, "final")[0]
     assert final["stage_outcome"] == "ready_to_respond"
-    assert "unrun" in final["assistant_response"].lower()
+    assert final["assistant_response"] == ""
+    assert final["confirmation_cancelled"] == {"confirmation_id": "confirm-aapl"}
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
         "items"
     ]
-    assert messages[-2]["metadata"]["chat_action"]["type"] == "cancel_confirmation"
+    assert all(
+        not (
+            message["role"] == "user"
+            and message["metadata"]
+            and message["metadata"].get("chat_action", {}).get("type")
+            == "cancel_confirmation"
+        )
+        for message in messages
+    )
+    assert messages[-1]["role"] == "assistant"
+    assert messages[-1]["content"] == ""
     assert messages[-1]["metadata"]["chat_action"]["type"] == "cancel_confirmation"
+    assert messages[-1]["metadata"]["artifact_event"] == {
+        "type": "confirmation_cancelled",
+        "confirmation_id": "confirm-aapl",
+    }
 
 
 def test_result_followup_after_reload_carries_latest_run_reference(
@@ -941,6 +1009,7 @@ def test_refine_strategy_action_uses_latest_result_context_after_reload() -> Non
         },
     )
     assert followup_response.status_code == 200
+    api_state.reset_agent_runtime_workflow(app)
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -965,6 +1034,124 @@ def test_refine_strategy_action_uses_latest_result_context_after_reload() -> Non
     assert "change" in final["assistant_response"].lower()
     assert final["pending_strategy"]["requested_field"] == "refinement"
     assert final["pending_strategy"]["strategy"]["asset_universe"] == ["AAPL"]
+
+
+def test_refine_strategy_action_uses_card_run_before_runtime_memory(
+    monkeypatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    runtime_invoked = False
+
+    async def _stale_runtime(**_: Any):
+        nonlocal runtime_invoked
+        runtime_invoked = True
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": (
+                    "I do not have a completed result to refine. Run a strategy "
+                    "first, then use Refine strategy from the result card."
+                ),
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _stale_runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="crypto",
+        symbols=["DOGE"],
+        allocation_method="equal_weight",
+        benchmark_symbol="BTC",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 1.4,
+                    "benchmark_return_pct": 13.5,
+                    "delta_vs_benchmark_pct": -12.1,
+                }
+            },
+            "by_symbol": {},
+        },
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["DOGE"],
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold Dogecoin.",
+                "asset_universe": ["DOGE"],
+                "asset_class": "crypto",
+                "date_range": "last 90 days",
+            },
+        },
+        conversation_result_card={
+            "title": "DOGE buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return",
+                    "value": "+1.4%",
+                }
+            ],
+            "assumptions": ["Benchmark: BTC"],
+            "actions": [{"type": "refine_strategy", "label": "Refine strategy"}],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="DOGE result ready.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_card": run.conversation_result_card,
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Refine strategy",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run.id,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    assert runtime_invoked is False
+    assert final["stage_outcome"] == "await_user_reply"
+    assert "change" in final["assistant_response"].lower()
+    assert final["latest_run_id"] == run.id
+    assert final["pending_strategy"]["requested_field"] == "refinement"
+    assert final["pending_strategy"]["strategy"]["asset_universe"] == ["DOGE"]
 
 
 def test_result_followup_after_reload_preserves_saved_strategy_id() -> None:

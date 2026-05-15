@@ -18,9 +18,14 @@ CONFIRMATION_ACTION_TYPES = {
     "cancel_confirmation",
 }
 
+RESULT_ACTION_TYPES = {
+    "show_breakdown",
+    "refine_strategy",
+    "save_strategy",
+}
+
 STALE_CONFIRMATION_ACTION_MESSAGE = (
-    "That confirmation was updated. Use the latest Ready to run card before "
-    "running the backtest."
+    "That confirmation was updated. Use the latest card action before continuing."
 )
 
 
@@ -75,6 +80,14 @@ def is_confirmation_action(payload: ChatStreamRequest) -> bool:
     return payload.action is not None and payload.action.type in CONFIRMATION_ACTION_TYPES
 
 
+def is_cancel_confirmation_action(payload: ChatStreamRequest) -> bool:
+    return payload.action is not None and payload.action.type == "cancel_confirmation"
+
+
+def is_result_action(payload: ChatStreamRequest) -> bool:
+    return payload.action is not None and payload.action.type in RESULT_ACTION_TYPES
+
+
 def pending_confirmation_exists(*, user_id: str, conversation_id: str) -> bool:
     messages = _recent_messages_for_conversation(
         user_id=user_id,
@@ -99,11 +112,9 @@ def stale_confirmation_action_message(
     user_id: str,
     conversation_id: str,
 ) -> str | None:
-    if (
-        payload.action is None
-        or payload.action.type != "run_backtest"
-        or payload.action.presentation != "confirmation"
-    ):
+    if payload.action is None or payload.action.presentation != "confirmation":
+        return None
+    if payload.action.type not in CONFIRMATION_ACTION_TYPES:
         return None
     action_confirmation_id = _confirmation_id_from_action_payload(payload.action.payload)
     if action_confirmation_id is None:
