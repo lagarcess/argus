@@ -111,7 +111,7 @@ Examples:
 - Bad: special-case `"starts rising"` into a 50/200 crossover.
 - Good: classify `"starts rising"` as incomplete momentum semantics and route it through rule-definition clarification.
 - Bad: add a regex that turns `"simplify to RSI"` into NVDA RSI only for that prompt.
-- Good: patch the active artifact with a new indicator family while preserving asset/date context through the artifact patcher.
+- Good: plan an artifact edit that applies a new indicator family while preserving asset/date context through the artifact-edit pipeline.
 - Bad: hardcode `Apple -> AAPL` in chat.
 - Good: resolve Apple through the provider-backed asset catalog used by chat and composer search.
 - Bad: add another composer chip condition to hide one duplicate button.
@@ -144,8 +144,8 @@ Inputs:
 Outputs:
 
 - understood intent,
-- normalized IR patch or replacement,
-- relationship to active artifact (`new_idea`, `patch_existing`, `answer_question`, `retry_failed_action`, `result_follow_up`),
+- normalized IR edit or replacement,
+- relationship to active artifact (`new_idea`, `edit_existing`, `answer_question`, `retry_failed_action`, `result_follow_up`),
 - resolved assets or ranked asset candidates,
 - indicator and rule candidates,
 - default parameters applied,
@@ -155,7 +155,7 @@ Outputs:
 - draft/search-only status when applicable,
 - repair options,
 - user-facing explanation,
-- artifact patch or executable launch payload.
+- artifact edit or executable launch payload.
 
 The planner should produce one of these outcomes:
 
@@ -1033,8 +1033,16 @@ Answer requirements:
 ### Refine Strategy
 
 - Starts from the result artifact and prior config snapshot.
-- Creates a new draft/confirmation artifact that supersedes the old one.
+- Creates a new draft/confirmation artifact from the completed run snapshot.
+- Applies the user's refinement to that new draft while preserving unchanged
+  run context such as asset class, asset, benchmark, date range, and
+  assumptions.
 - Does not mutate the completed run.
+- Does not save over an existing saved strategy until the user explicitly saves
+  the refined result.
+- If the refinement is executable, shows a new confirmation card. If it is
+  unsupported or underspecified, preserves the idea as draft context and asks
+  only for the missing execution semantics.
 
 ## UX Decision: Card-Scoped Actions Only
 
@@ -1110,9 +1118,9 @@ Backend:
 - `domain/engine_launch/`
   - converts canonical artifact launch payloads into engine configs.
 - `agent_runtime/planning/`
-  - capability planner outcomes, artifact patch proposals, clarification/repair options, and retry/result-follow-up routing.
+  - capability planner outcomes, artifact edit proposals, clarification/repair options, and retry/result-follow-up routing.
 - `agent_runtime/`
-  - LLM interpretation, artifact selection, artifact patching, result/retry binding.
+  - LLM interpretation, artifact selection, artifact editing, result/retry binding.
 - `api/chat/`
   - persistence, recovery, action endpoints, saved/breakdown behavior.
 
@@ -1233,7 +1241,7 @@ Goal: interpreted user ideas flow through a planner that can produce truthful ne
 Required output:
 
 - Capability planner input/output models and outcome taxonomy.
-- Planner support for new ideas, artifact patches, capability questions, retries, result follow-ups, clarification, repair, draft-only ideas, and unsupported-with-alternatives.
+- Planner support for new ideas, artifact edits, capability questions, retries, result follow-ups, clarification, repair, draft-only ideas, and unsupported-with-alternatives.
 - Provider-aware asset catalog and fixture-backed mock provider path.
 - Schema-driven indicator catalog and support tiers.
 - Capability answer helpers that the LLM can consume but does not own.
@@ -1337,7 +1345,7 @@ Actions:
 - Define canonical investing-idea intent and rule IR models or explicit adapter boundaries for the current pass.
 - Define planner input and output models.
 - Implement outcome taxonomy: `ready_to_confirm`, `needs_clarification`, `needs_repair`, `draft_only`, `answer_only`, `unsupported_with_alternatives`.
-- Route planner outputs into artifact creation, artifact patching, retry recovery, result follow-ups, and capability answers.
+- Route planner outputs into artifact creation, artifact editing, retry recovery, result follow-ups, and capability answers.
 - Ensure planner decisions are based on capability/provider/compiler truth, not prompt copy.
 - Inventory current provider asset resolution.
 - Define provider-backed asset catalog records and resolver priority rules.
@@ -1826,6 +1834,94 @@ evidence.
   - Result: 48 passed.
   - Covers: composer model, structured cards, card-scoped actions, result
     presentation, and frontend guardrail string checks.
+- `poetry run pytest tests/agent_runtime/test_interpret_stage.py::test_supported_indicator_simplification_preserves_user_threshold_overrides tests/agent_runtime/test_interpret_stage.py::test_active_artifact_rule_answer_repairs_and_preserves_prior_asset tests/agent_runtime/test_llm_interpreter.py::test_llm_interpreter_maps_indicator_threshold_fields_to_strategy_parameters tests/agent_runtime/test_llm_interpreter.py::test_llm_interpreter_promotes_typed_indicator_values_from_extra_parameters tests/agent_runtime/test_llm_interpreter.py::test_llm_interpreter_merges_refinement_with_pending_strategy -q --tb=short`
+  - Result: 5 passed.
+  - Covers: active-artifact rule repair, preservation of prior asset/date
+    context when the LLM underfills an artifact edit, indicator threshold
+    promotion, and refinement merging.
+- `poetry run pytest tests/agent_runtime/test_interpret_stage.py::test_result_refinement_reply_forks_latest_result_into_new_draft tests/test_chat_runtime_reload_guardrails.py::test_refine_strategy_action_uses_latest_result_context_after_reload tests/test_chat_runtime_reload_guardrails.py::test_refine_strategy_text_reply_uses_persisted_refinement_context_after_reload tests/test_chat_runtime_reload_guardrails.py::test_refine_strategy_action_uses_card_run_before_runtime_memory -q --tb=short`
+  - Result: 4 passed.
+  - Covers: result-refinement forks a new artifact from immutable run facts,
+    persisted refinement context survives runtime reset/reload, free-text
+    refinement replies keep prior asset/date context, and result-card action ids
+    outrank stale runtime memory.
+- `poetry run pytest tests/agent_runtime/test_conversational_contract_hardening.py::test_refine_strategy_result_action_prompts_for_change_without_llm tests/test_chat_runtime_reload_guardrails.py::test_cancel_confirmation_action_persists_invisible_artifact_tombstone tests/test_chat_runtime_reload_guardrails.py::test_canceled_confirmation_does_not_recover_older_card -q --tb=short`
+  - Result: 3 passed.
+  - Covers: result-card refine action prompts without a model round-trip,
+    cancel persists a terminal artifact tombstone, and cancelled confirmations do
+    not resurrect older cards after reload.
+- `poetry run pytest tests/domain/test_engine_launch.py::test_launch_request_limits_cadence_to_dca tests/domain/test_engine_launch.py::test_dca_adapter_supports_quarterly_cadence tests/domain/test_engine_launch.py::test_build_signals_supports_quarterly_dca_cadence tests/test_openrouter_policy.py::test_explicit_model_interpreter_plans_result_refinement_before_accepting_prose tests/agent_runtime/test_interpret_stage.py::test_result_refinement_reply_forks_latest_result_into_new_draft tests/test_engine_signals.py::test_dca_accumulation_signals_biweekly tests/test_slot_normalizer.py::test_normalizes_locale_cadence_values -q --tb=short`
+  - Result: 7 passed.
+  - Covers: explicit-model interpreter symmetry, result-refinement fork
+    planning, biweekly recurring-buy execution, calendar-quarter recurring-buy
+    execution, and cadence capability normalization without a validation shim.
+- `poetry run ruff check tests/domain/test_engine_launch.py src/argus/domain/cadences.py src/argus/domain/engine_launch/cadence.py src/argus/domain/engine_launch/models.py src/argus/domain/engine_launch/adapter.py src/argus/domain/strategy_capabilities.py src/argus/domain/backtesting/signals.py src/argus/agent_runtime/llm_interpreter.py tests/test_openrouter_policy.py tests/agent_runtime/test_interpret_stage.py tests/test_engine_signals.py tests/test_slot_normalizer.py`
+  - Result: all checks passed.
+  - Covers: the shared cadence registry, launch model, engine signal builder,
+    strategy capability surface, and interpreter acceptance-gate refactor.
+- `cd web && bun test __tests__/chat-artifact-history.test.ts`
+  - Result: 12 passed.
+  - Covers: confirmation action tombstones, reload-safe cancelled card state,
+    terminal artifact status preservation, stale-action recovery immunity, and
+    transient edit/cancel priority.
+- `cd web && bun run lint -- components/chat/ChatInterface.tsx components/chat/artifact-history.ts __tests__/chat-artifact-history.test.ts`
+  - Result: passed.
+  - Covers: frontend artifact-history extraction and card state normalization.
+- `poetry run pytest tests/test_openrouter_policy.py::test_explicit_model_interpreter_plans_result_refinement_before_accepting_prose tests/agent_runtime/test_interpret_stage.py::test_result_refinement_reply_forks_latest_result_into_new_draft tests/agent_runtime/test_conversational_contract_hardening.py::test_refine_strategy_result_action_prompts_for_change_without_llm tests/agent_runtime/test_interpret_stage.py::test_capability_question_answer_uses_indicator_registry_not_llm_copy -q --tb=short`
+  - Result: 4 passed.
+  - Covers: explicit-model interpreter symmetry, result-refinement fork
+    planning, result-card refine action handoff, and capability Q&A grounded in
+    the executable indicator registry instead of stale LLM copy.
+- `poetry run ruff check src/argus/agent_runtime/capabilities/answers.py src/argus/agent_runtime/stages/interpret.py src/argus/agent_runtime/stages/interpret_types.py src/argus/agent_runtime/llm_interpreter.py src/argus/agent_runtime/llm_interpreter_types.py tests/agent_runtime/test_interpret_stage.py`
+  - Result: all checks passed.
+  - Covers: capability answer module integration, structured schema fields, and
+    the LLM-to-runtime capability focus handoff.
+- `poetry run pytest tests/agent_runtime/test_interpret_stage.py::test_underperformance_followup_corrects_false_premise_when_run_outperformed tests/agent_runtime/test_result_followups.py::test_result_followup_replaces_llm_answer_that_contradicts_positive_delta -q --tb=short`
+  - Result: 2 passed.
+  - Covers: result follow-ups correct false underperformance premises from run
+    facts instead of accepting contradictory LLM prose.
+
+- `poetry run pytest tests/domain/test_indicator_registry.py tests/domain/test_engine_launch.py::test_indicator_threshold_adapter_returns_envelope_card_and_context tests/domain/test_engine_launch.py::test_adapter_accepts_registry_bounded_indicator_threshold_shape tests/domain/test_engine_launch.py::test_adapter_uses_indicator_period_from_threshold_rules tests/domain/test_engine_launch.py::test_adapter_maps_common_crossover_payload_to_rule_spec tests/domain/test_engine_launch.py::test_build_signals_preserves_rule_template_branches_after_rsi -q --tb=short`
+  - Result: 12 passed.
+  - Covers: executable indicator defaults/overrides, draft-only catalog status
+    for indicators without execution specs, registry-bounded threshold launch,
+    rule-spec launch validation, and generic rule-template execution branches.
+- `poetry run pytest tests/agent_runtime/test_interpret_stage.py::test_interpret_passes_raw_message_to_llm_without_regex_normalization tests/agent_runtime/test_interpret_stage.py::test_pending_date_answer_uses_structured_interpreter_before_updating_draft -q --tb=short`
+  - Result: 2 passed.
+  - Covers: normal user text reaches the structured interpreter before draft
+    updates and is not pre-normalized through regex or phrase gates.
+- `poetry run pytest tests/agent_runtime/test_strategy_contract.py::test_extracted_fields_do_not_force_unknown_strategy_contract tests/agent_runtime/test_strategy_contract.py::test_extracted_fields_do_not_accept_unknown_rule_spec_as_signal_strategy tests/agent_runtime/test_strategy_contract.py::test_extracted_fields_resolve_indicator_threshold_from_registry -q --tb=short`
+  - Result: 3 passed.
+  - Covers: strategy family names are not accepted as the conversational contract
+    for unknown future families such as sentiment, unknown rule specs do not
+    become executable signal strategies, and executable labels are derived only
+    from registry-backed fields.
+- `poetry run pytest tests/agent_runtime/test_llm_interpreter.py::test_signal_rule_plan_draft_only_routes_to_unsupported_recovery tests/agent_runtime/test_llm_interpreter.py::test_focused_strategy_extraction_prompt_preserves_draft_only_strategy_fields tests/agent_runtime/test_llm_interpreter.py::test_unsupported_free_text_strategy_response_needs_context_repair tests/agent_runtime/test_conversation_stages.py::test_clarifier_system_prompt_guides_unsupported_recovery_context tests/agent_runtime/test_conversation_stages.py::test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy -q --tb=short`
+  - Result: 5 passed.
+  - Covers: unsupported and draft-only ideas preserve asset, period, and rule
+    context, avoid fake execution claims, and route through recovery copy grounded
+    in capability constraints instead of stale prefilled prose.
+- `poetry run pytest tests/agent_runtime/test_execute_recovery.py::test_execute_recovers_visible_dca_confirmation_when_market_data_is_unavailable tests/agent_runtime/test_execute_recovery.py::test_workflow_rebuilds_failed_action_retry_as_confirmation tests/agent_runtime/test_interpret_stage.py::test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running tests/test_chat_runtime_reload_guardrails.py::test_retry_after_reload_carries_latest_failed_action_reference tests/test_chat_runtime_reload_guardrails.py::test_failed_action_fallback_is_superseded_by_newer_completed_result -q --tb=short`
+  - Result: 5 passed.
+  - Covers: failed actions persist retryable launch payloads, natural retry
+    rebuilds a confirmation instead of auto-running quota-bearing work, reload
+    recovers the failed-action reference, and newer completed results supersede
+    stale failures.
+- `poetry run pytest tests/section3/test_market_data_provider.py::test_live_provider_mode_fails_closed_when_provider_catalog_unavailable tests/section3/test_market_data_provider.py::test_synthetic_unit_fixture_is_explicitly_opted_in tests/section3/test_market_data_provider.py::test_recorded_provider_fixture_uses_provider_shaped_payloads tests/agent_runtime/test_llm_interpreter.py::test_llm_interpreter_validates_asset_class_with_alpaca_resolver -q --tb=short`
+  - Result: 4 passed.
+  - Covers: provider modes share resolver shapes, live mode fails closed when the
+    provider catalog is unavailable, recorded fixtures use provider-shaped
+    payloads, synthetic fixtures are opt-in only, and LLM asset candidates still
+    pass through deterministic provider validation.
+- `cd web && bun test __tests__/alpha-frontend.test.ts __tests__/chat-artifact-history.test.ts`
+  - Result: 53 passed.
+  - Covers: card-scoped action rendering, duplicated composer-action prevention,
+    artifact hydration, saved-state feedback, copy feedback, jump-to-latest
+    behavior, final-only feedback controls, status hiding after assistant tokens
+    begin, and cancelled/superseded confirmation history.
+- `cd web && bun run lint -- components/chat/ChatInterface.tsx components/chat/ChatMessage.tsx __tests__/alpha-frontend.test.ts`
+  - Result: passed.
+  - Covers: the trust-polish frontend changes and artifact-history integration.
 
 ### Direct Runtime Evidence
 
@@ -1843,15 +1939,25 @@ evidence.
   - Assistant answer: directs the user to use the visible `Run backtest` card
     action.
   - Card identity stayed stable rather than rotating a new draft.
+- Direct streaming runtime probe:
+  - Prompt: `Backtest buy and hold Apple over the past year.`
+  - Action: sent the exact persisted `Run backtest` confirmation action.
+  - Result: completed `AAPL Buy and Hold` run with result actions.
+  - Action: sent the exact persisted `Refine strategy` result action.
+  - Reply: `i want to do recurrent biweekly buys of 500 bucks instead`.
+  - Result: new `AAPL recurring buys` confirmation card, `Ready to run`, with
+    `Cadence: Biweekly` and `Contribution: $500`; no prose-only fake update.
 
 ### Live Browser Evidence
 
-2026-05-15 update: the in-app Browser path is now usable after rebooting the
-local servers and reconnecting the browser session. Free-text entry was verified
-through the browser, card-scoped actions were clicked in the browser, and reload
-behavior was verified on the real frontend. The Browser Playwright `fill/click`
-wrapper can still report a contenteditable textbox as disabled; DOM click/type
-was the reliable browser-control path for this QA pass.
+2026-05-15 update: the in-app Browser path is usable for visual inspection,
+card-scoped clicks, sidebar/history hydration, screenshots, and reload proof
+after rebooting the local servers and reconnecting the browser session. In the
+current Codex browser session, free-text entry into the contenteditable composer
+is still blocked by the browser clipboard bridge, so free-text setup evidence is
+split between API-seeded runtime turns and browser-hydrated/card-clicked visual
+verification. Do not treat API-seeded setup as a replacement for the final live
+browser free-text matrix.
 
 - Correct failure discovered and fixed:
   - In a long mixed QA thread, a visible TSLA `Run backtest` card action was
@@ -1912,31 +2018,121 @@ was the reliable browser-control path for this QA pass.
     duplicating the result card; `Save strategy` changed the card state to
     disabled `Saved`; `Refine strategy` produced a follow-up prompt asking what
     to change.
-  - Reload: preserved result card, saved state, result actions, breakdown, and
-    post-reload follow-up context. `Why did this result happen after reload?`
-    answered from the latest run facts and included return, benchmark, gap, max
-    drawdown, and caveat.
+- Reload: preserved result card, saved state, result actions, breakdown, and
+  post-reload follow-up context. `Why did this result happen after reload?`
+  answered from the latest run facts and included return, benchmark, gap, max
+  drawdown, and caveat.
+- Fresh active-artifact repair QA:
+  - Prompt: `What if I bought Tesla after big drops?`
+  - Follow-up: `technical thing like RSI, buy when it gets to 20 or lower, sell when 60 or higher, past 3 months`
+  - Result: the active TSLA draft was preserved, the vague dip idea was refined
+    into an executable RSI rule, user thresholds were preserved as RSI(14)
+    `<= 20` entry and `>= 60` exit, and the card became `Ready to run`.
+  - Card action: `Run backtest` executed from the confirmation payload and
+    produced a result card instead of `missing_rule_group`.
+  - Result truth: return `0.0%` because no entry trade fired; the result facts
+    explicitly stated the strategy stayed in cash, which is the correct
+    historical outcome rather than a market-flat inference.
+- Fresh result-action API/browser-backed QA:
+  - `Show a breakdown` added one breakdown response without duplicating the
+    result card.
+  - `Save strategy` returned and persisted a saved strategy id.
+  - `Refine strategy` created a pending strategy from the completed run config
+    and asked what to change, instead of losing the result.
+- Fresh cancel/reload browser QA:
+  - Prompt: `Backtest buy and hold Apple over the past year.`
+  - Action: clicked the card-scoped `Cancel` action through the persisted action
+    payload.
+  - Reload behavior: the confirmation card hydrated as `Draft canceled`, had no
+    runnable actions, and did not show a noisy cancel transcript.
+  - Root cause fixed: frontend history normalization now lives in
+    `artifact-history` and preserves terminal confirmation states instead of
+    reactivating the latest card after reload.
+- Fresh API-seeded + browser-clicked confirmation lifecycle QA:
+  - API-seeded prompt: `Backtest buy and hold Apple over the past year.`
+  - API-seeded card action: `Change dates`.
+  - API-seeded reply: `July 3rd to August 13th in 2024`.
+  - Browser-loaded visible card: `AAPL buy and hold`, `Ready to run`, period
+    `July 3, 2024 - August 13, 2024`, with exactly one visible `Run backtest`
+    button and one card-owned action set.
+  - Browser action: clicked `Cancel`.
+  - Browser result: card changed to `Draft canceled`, runnable action buttons
+    disappeared, reload preserved the terminal state, and no user-visible cancel
+    transcript was added.
+- Fresh browser-clicked result-action lifecycle QA after extracting result
+  action history into `artifact-history`:
+  - API-seeded prompt: `Backtest buy and hold Apple over the last 90 days.`
+  - Browser-loaded visible card: `Ready to run` with one `Run backtest`.
+  - Browser action: clicked card-owned `Run backtest`.
+  - Browser result: `Simulation Complete`, result actions visible, no raw
+    `missing_rule_group`, and no duplicate result card.
+  - Browser action: clicked `Show a breakdown`.
+  - Browser result: one breakdown response appeared, result card count remained
+    one, and `Show a breakdown` was consumed.
+  - Browser action: clicked `Save strategy`.
+  - Browser result: visible state changed to `Saved`; `Save strategy` was
+    consumed.
+  - Browser action: clicked `Refine strategy`.
+  - Browser result: Argus asked what to change and did not say it lacked a
+    completed result.
+  - Reload result: completed result, saved state, breakdown, and refine prompt
+    persisted without the prior missing-result error.
+- Fresh result-refinement contract evidence:
+  - Browser-observed failure: after `Refine strategy`, the reply `i want to do
+    recurrent biweekly buys of 500 bucks instead` produced prose claiming the
+    strategy was updated but did not create a new card.
+  - Root cause: explicit-model structured interpretation accepted a prose-only
+    response before running the same artifact-edit planning gate used by the
+    default candidate path.
+  - Fix: all structured interpretation paths now pass through the same runtime
+    acceptance gate before returning to the graph.
+  - Expected runtime behavior: completed result remains immutable; refinement
+    forks a pending draft from the latest result snapshot; unchanged asset/date
+    context is preserved; executable refinements create a new confirmation card.
+  - Related capability truth: biweekly recurring buys are now a supported DCA
+    cadence in the shared cadence registry and engine signal builder, not a
+    one-off chat phrase.
+  - Direct runtime proof: the same AAPL result-refinement sequence now returns
+    a new `AAPL recurring buys` confirmation artifact, `Ready to run`, with
+    rows for `Cadence: Biweekly` and `Contribution: $500`.
+  - Browser-hydration proof: opening the persisted run thread from the sidebar
+    shows the result refine prompt, the user refinement, and the new
+    `AAPL recurring buys` confirmation card with card-owned actions. The old
+    completed result remains above it as immutable evidence.
+  - Live DOM proof after user stress testing: the visible conversation contains
+    the original `AAPL Buy and Hold` completed result, the user action transcript
+    `Refine strategy`, the refinement prompt, the free-text change
+    `i want to do recurrent biweekly buys of 500 bucks instead`, the new
+    `AAPL recurring buys` artifact with `Cadence: Biweekly` and
+    `Contribution: $500`, and a separate completed `DCA Accumulation` result.
+    This confirms refinement forks forward from the prior snapshot rather than
+    editing the old completed result or saving over an existing strategy.
 
 ### Still Unproven Or Incomplete
 
-- Full QA 1-14 browser matrix is not complete yet, but browser typing is no
-  longer the blocker.
+- Full QA 1-14 browser matrix is not complete yet. Browser free-text `fill`
+  and `type` still hit a Codex clipboard bridge issue in the current session, so
+  this pass used API seeding for setup and real browser hydration, clicks, and
+  reloads for card/action verification where needed.
 - Trust polish needs desktop and mobile browser evidence for scroll behavior,
   final-only controls, and copy feedback.
 - Natural retry recovery has automated coverage, but still needs a clean live
   failed-action scenario and reload proof.
-- Capability breadth and schema-driven pandas-ta expansion are not fully proven
-  across the advertised indicator/rule families.
-- Result actions have fresh browser click proof for breakdown, save, and refine;
-  cancel/change-date/change-asset confirmation actions still need the full
-  scripted browser matrix.
+- Capability Q&A now has focused runtime proof that indicator support answers
+  come from the executable registry rather than stale LLM prose. Full
+  schema-driven pandas-ta expansion remains intentionally gated by execution
+  specs across advertised indicator/rule families.
+- Result actions have fresh proof for breakdown, save, and refine; cancellation
+  now has browser reload proof. Change-date has API-seeded/browser-hydrated proof.
+  Change-asset and adjust-assumptions still need the full scripted browser
+  matrix.
 - Spanish smoke and mixed provider asset resolution still need browser evidence.
 
 ### Runtime Contract
 
-- [ ] Normal user text reaches LLM-first interpretation before deterministic routing.
+- [x] Normal user text reaches LLM-first interpretation before deterministic routing.
 - [x] Structured interpretation produces or patches canonical investing-idea IR.
-- [ ] Strategy type/family is derived edge metadata, not the chat routing source.
+- [x] Strategy type/family is derived edge metadata, not the chat routing source.
 - [x] Capability planner outcome is persisted or traceable for the active artifact.
 - [x] `Ready to run` requires validated executable payload.
 - [x] Typed "run it" intent does not execute quota-bearing backtests; the card action does.
@@ -1948,35 +2144,35 @@ was the reliable browser-control path for this QA pass.
 - [x] Actions carry artifact/run ids.
 - [x] Superseded artifacts remain visible history but cannot execute.
 - [x] Reload hydrates the same artifact status and actions.
-- [ ] Failed actions preserve retry context and user-safe recovery.
+- [x] Failed actions preserve retry context and user-safe recovery.
 
 ### Capability Contract
 
-- [ ] Capability Q&A answers from registry/provider/compiler truth.
+- [x] Capability Q&A answers from registry/provider/compiler truth.
 - [x] Composer search and chat resolution use the same asset/indicator capability interfaces.
-- [ ] Provider modes use the same resolver/registry/planner/compiler/artifact shapes.
-- [ ] Unsupported or draft-only ideas are preserved and explained without fake execution claims.
-- [ ] Indicators marked executable support defaults and user overrides.
-- [ ] Rule patterns marked executable compile and run through the engine.
+- [x] Provider modes use the same resolver/registry/planner/compiler/artifact shapes.
+- [x] Unsupported or draft-only ideas are preserved and explained without fake execution claims.
+- [x] Indicators marked executable support defaults and user overrides.
+- [x] Rule patterns marked executable compile and run through the engine.
 
 ### Result Contract
 
 - [x] Completed runs create immutable result facts.
 - [x] Follow-ups after result use latest run facts.
-- [ ] False premises are corrected.
-- [ ] Breakdown is fact-grounded and non-duplicative.
-- [ ] Save strategy is idempotent and persists visible saved state.
-- [ ] Refine strategy starts from prior result config and creates a new draft artifact.
+- [x] False premises are corrected.
+- [x] Breakdown is fact-grounded and non-duplicative.
+- [x] Save strategy is idempotent and persists visible saved state.
+- [x] Refine strategy starts from prior result config and creates a new draft artifact.
 
 ### UI Contract
 
 - [x] Card actions render inside cards only.
 - [x] Composer does not duplicate active artifact actions.
 - [x] Raw internal codes never appear to users.
-- [ ] Status and streamed answer do not compete visually.
-- [ ] Feedback/copy controls appear only when the answer is final.
-- [ ] Copy shows visible success/failure feedback.
-- [ ] Scroll does not yank while the user is reading older content.
+- [x] Status and streamed answer do not compete visually.
+- [x] Feedback/copy controls appear only when the answer is final.
+- [x] Copy shows visible success/failure feedback.
+- [x] Scroll does not yank while the user is reading older content.
 
 ### Evaluation Contract
 

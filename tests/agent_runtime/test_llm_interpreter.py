@@ -108,6 +108,174 @@ def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus
     assert "why_underperformed" in prompt
 
 
+@pytest.mark.asyncio
+async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model_failure(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            raise ValueError("general interpreter returned unusable JSON")
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible draft starting capital.",
+            initial_capital=5000,
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="Use $5,000 starting capital",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold Nvidia.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    date_range={"start": "2024-07-03", "end": "2024-08-13"},
+                )
+            ),
+            selected_thread_metadata={
+                "requested_field": "assumption",
+                "last_stage_outcome": "await_user_reply",
+            },
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.semantic_turn_act == "answer_pending_need"
+    assert result.candidate_strategy_draft.capital_amount == 5000
+    assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
+        "capital_amount": "starting_capital"
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if schema_model.__name__ == "LLMInterpretationResponse":
+            return LLMInterpretationResponse(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User continued the visible draft.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="Use $5,000 starting capital",
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold Nvidia.",
+                    asset_universe=["NVDA"],
+                    date_range={"start": "2024-07-03", "end": "2024-08-13"},
+                ),
+                semantic_turn_act="answer_pending_need",
+            )
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible draft starting capital.",
+            initial_capital=5000,
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="Use $5,000 starting capital",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold Nvidia.",
+                    asset_universe=["NVDA"],
+                    asset_class="equity",
+                    date_range={"start": "2024-07-03", "end": "2024-08-13"},
+                )
+            ),
+            selected_thread_metadata={
+                "requested_field": "assumption",
+                "last_stage_outcome": "await_user_reply",
+            },
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse", "ArtifactAssumptionEditPlan"]
+    assert result is not None
+    assert result.intent == "backtest_execution"
+    assert result.candidate_strategy_draft.capital_amount == 5000
+    assert result.candidate_strategy_draft.extra_parameters["field_provenance"] == {
+        "capital_amount": "starting_capital"
+    }
+    assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
 def test_signal_rule_plan_promotes_macd_crossover_to_ready_rule_spec() -> None:
     response = LLMInterpretationResponse(
         intent="strategy_drafting",

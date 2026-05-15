@@ -20,6 +20,22 @@ def test_dca_accumulation_signals_weekly():
     assert exits.sum() == 0
 
 
+def test_dca_accumulation_signals_biweekly():
+    index = pd.date_range("2024-01-01", periods=28, freq="D")
+    data = pd.DataFrame({"close": [100] * 28}, index=index)
+    config = {
+        "template": "dca_accumulation",
+        "parameters": {"dca_cadence": "biweekly"},
+    }
+
+    entries, exits = _build_signals(config, data)
+
+    assert entries.sum() == 2
+    assert bool(entries.iloc[0])
+    assert bool(entries.iloc[14])
+    assert exits.sum() == 0
+
+
 def test_dca_metrics_account_for_each_recurring_contribution(monkeypatch):
     index = pd.date_range("2024-01-01", periods=60, freq="D")
     prices = [100.0] * 31 + [200.0] * 29

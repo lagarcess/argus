@@ -1,10 +1,7 @@
 from __future__ import annotations
 
+from argus.domain.cadences import SUPPORTED_DCA_CADENCES
 from argus.domain.engine_launch.models import Cadence
-
-SUPPORTED_DCA_CADENCES: frozenset[str] = frozenset(
-    {"daily", "weekly", "monthly", "quarterly"}
-)
 
 
 def resolve_dca_cadence(value: Cadence | None) -> str:

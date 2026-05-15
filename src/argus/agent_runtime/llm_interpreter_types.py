@@ -4,7 +4,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
+from argus.agent_runtime.stages.interpret_types import (
+    CapabilityQuestionFocus,
+    ResultFollowupFocus,
+)
 from argus.agent_runtime.state.models import ResponseProfileOverrides
 
 
@@ -98,6 +101,7 @@ class LLMInterpretationResponse(BaseModel):
         | None
     ) = None
     result_followup_focus: ResultFollowupFocus | None = None
+    capability_question_focus: CapabilityQuestionFocus | None = None
 
 
 class FocusedStrategyExtraction(BaseModel):

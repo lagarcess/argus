@@ -159,7 +159,7 @@ describe("Argus Alpha frontend contract", () => {
 
     const activeArtifactHelper = chat.slice(
       chat.indexOf("function hasActiveArtifactActionSet"),
-      chat.indexOf("function isBreakdownActionMetadata"),
+      chat.indexOf("function consumeInputAction"),
     );
 
     expect(activeArtifactHelper).toContain("messages.some");
@@ -172,16 +172,22 @@ describe("Argus Alpha frontend contract", () => {
 
   test("chat supersedes older confirmation cards when a newer draft appears", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const artifactHistory = readFileSync(
+      join(root, "components/chat/artifact-history.ts"),
+      "utf-8",
+    );
     const card = readFileSync(join(root, "components/chat/StrategyConfirmationCard.tsx"), "utf-8");
     const types = readFileSync(join(root, "components/chat/types.ts"), "utf-8");
 
     expect(types).toContain('confirmation_state?: "active" | "superseded" | "cancelled"');
     expect(types).toContain("confirmation_id?: string");
-    expect(chat).toContain("supersedePriorConfirmations");
     expect(chat).toContain("normalizeConfirmationHistory");
+    expect(chat).toContain("from \"./artifact-history\"");
+    expect(artifactHistory).toContain("supersedePriorConfirmations");
+    expect(artifactHistory).toContain("function isTerminalConfirmation");
     expect(card).toContain('confirmation.confirmation_state === "superseded"');
     expect(card).toContain('confirmation.confirmation_state === "cancelled"');
-    expect(card).toContain('isCancelled ? "Draft cancelled" : "Updated"');
+    expect(card).toContain('isCancelled ? "Draft canceled" : "Updated"');
   });
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {
@@ -255,6 +261,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("{copyFeedback && (");
   });
 
+  test("stream status hides once assistant tokens are visible", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("latestAssistantContent");
+    expect(chat).toContain("const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0)");
+    expect(chat).toContain("{showStreamStatus && (");
+  });
+
   test("chat composer prevents overlapping turns while stream is active", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
@@ -283,12 +297,16 @@ describe("Argus Alpha frontend contract", () => {
   test("chat hydrates persisted structured cards from message metadata", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const artifactHistory = readFileSync(
+      join(root, "components/chat/artifact-history.ts"),
+      "utf-8",
+    );
 
     expect(api).toContain("metadata?: Record<string, unknown> | null");
     expect(chat).toContain("metadata.confirmation_card");
     expect(chat).toContain("metadata.result_card");
     expect(chat).toContain("isBreakdownActionMetadata(metadata)");
-    expect(chat).toContain('chatAction.type === "show_breakdown"');
+    expect(artifactHistory).toContain('chatAction.type === "show_breakdown"');
     expect(chat).toContain("resultCardFromConversationCard");
   });
 

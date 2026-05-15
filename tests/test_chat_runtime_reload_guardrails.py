@@ -1036,6 +1036,129 @@ def test_refine_strategy_action_uses_latest_result_context_after_reload() -> Non
     assert final["pending_strategy"]["strategy"]["asset_universe"] == ["AAPL"]
 
 
+def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_reload(
+    monkeypatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 8.1}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold Apple.",
+                "asset_universe": ["AAPL"],
+                "asset_class": "equity",
+                "date_range": "past year",
+            },
+        },
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": ["Benchmark: SPY"],
+            "actions": [{"type": "refine_strategy", "label": "Refine strategy"}],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I tested that idea.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_card": run.conversation_result_card,
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+
+    refine_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Refine strategy",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run.id,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "language": "en",
+        },
+    )
+    assert refine_response.status_code == 200
+    api_state.reset_agent_runtime_workflow(app)
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        snapshot = kwargs["fallback_latest_task_snapshot"]
+        assert snapshot.pending_strategy_summary is not None
+        assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+        assert kwargs["fallback_selected_thread_metadata"]["requested_field"] == (
+            "refinement"
+        )
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_for_confirmation",
+                "assistant_response": "I read this as AAPL recurring buys.",
+                "confirmation_payload": {
+                    "strategy": {
+                        "strategy_type": "dca_accumulation",
+                        "asset_universe": ["AAPL"],
+                        "asset_class": "equity",
+                        "date_range": "past year",
+                        "cadence": "biweekly",
+                        "capital_amount": 500,
+                    },
+                    "optional_parameters": {},
+                    "validation": {"status": "ready_to_run", "executable": True},
+                },
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "i want to do recurrent biweekly buys of 500 bucks instead",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["message"].startswith("i want to do recurrent biweekly")
+
+
 def test_refine_strategy_action_uses_card_run_before_runtime_memory(
     monkeypatch,
 ) -> None:

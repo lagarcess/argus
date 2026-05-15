@@ -893,7 +893,7 @@ def test_default_interpreter_retries_stale_prior_strategy_replay(
     assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
 
 
-def test_default_interpreter_repairs_stale_artifact_patch_before_fallback(
+def test_default_interpreter_plans_stale_artifact_edit_before_fallback(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter
@@ -904,7 +904,7 @@ def test_default_interpreter_repairs_stale_artifact_patch_before_fallback(
         model_name = str(kwargs["model_name"])
         calls.append(model_name)
         wire_text = "\n".join(message["content"] for message in kwargs["messages"])
-        if "Focused artifact patch repair" not in wire_text:
+        if "Focused artifact edit planning" not in wire_text:
             return LLMInterpretationResponse(
                 intent="backtest_execution",
                 task_relation="refine",
@@ -964,6 +964,91 @@ def test_default_interpreter_repairs_stale_artifact_patch_before_fallback(
     assert calls == ["primary/model", "primary/model"]
     assert interpreter.last_status == "used"
     assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
+
+
+def test_explicit_model_interpreter_plans_result_refinement_before_accepting_prose(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    FakeChatOpenRouter.calls.clear()
+    FakeChatOpenRouter.structured_response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User wants to refine the latest result.",
+        assistant_response=(
+            "I've updated the strategy to use biweekly recurring buys of $500."
+        ),
+        semantic_turn_act="educational_question",
+    )
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+
+    calls: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        calls.append(str(kwargs["model_name"]))
+        wire_text = "\n".join(message["content"] for message in kwargs["messages"])
+        assert "Focused artifact edit planning" in wire_text
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="refine",
+            requires_clarification=False,
+            user_goal_summary="Refine AAPL into recurring biweekly buys.",
+            semantic_turn_act="refine_current_idea",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "i want to do recurrent biweekly buys of 500 bucks instead"
+                ),
+                strategy_type="dca_accumulation",
+                cadence="biweekly",
+                capital_amount=500,
+                field_provenance={"capital_amount": "recurring_contribution"},
+            ),
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract(),
+        model_name="custom/model",
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=(
+                "i want to do recurrent biweekly buys of 500 bucks instead"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    raw_user_phrasing="Backtest buy and hold Apple over the past year.",
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold Apple.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range="past year",
+                )
+            ),
+            selected_thread_metadata={
+                "requested_field": "refinement",
+                "source_result_run_id": "run_123",
+            },
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert interpreter.last_status == "used"
+    assert calls == ["custom/model"]
+    assert result.assistant_response is None
+    assert result.candidate_strategy_draft.strategy_type == "dca_accumulation"
+    assert result.candidate_strategy_draft.cadence == "biweekly"
+    assert result.candidate_strategy_draft.capital_amount == 500
 
 
 def test_interpreter_uses_artifact_snapshot_instead_of_raw_history_for_refinements(

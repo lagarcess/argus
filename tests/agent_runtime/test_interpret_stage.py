@@ -23,6 +23,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.domain.indicators import EXECUTABLE_INDICATORS
 
 
 @dataclass(frozen=True)
@@ -136,6 +137,35 @@ def test_interpret_passes_raw_message_to_llm_without_regex_normalization() -> No
         == "  Actually make that weekly instead.  "
     )
     assert result.outcome == "ready_to_respond"
+
+
+def test_capability_question_answer_uses_indicator_registry_not_llm_copy() -> None:
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked which indicators Argus can execute.",
+        assistant_response="I only support RSI right now.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_indicators",
+    )
+
+    result, interpreter = run_interpret_with_llm(
+        message="do you only support two indicators?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_to_respond"
+    assert "I only support RSI" not in answer
+    for spec in EXECUTABLE_INDICATORS.values():
+        assert spec.label in answer
+    assert "draft" in answer.lower()
+    assert (
+        result.patch["normalized_signals"]["capability_question_focus"]
+        == "supported_indicators"
+    )
 
 
 def test_interpret_social_opener_uses_llm_response() -> None:
@@ -2629,6 +2659,226 @@ def test_supported_indicator_simplification_preserves_user_threshold_overrides(
     assert "supported_indicator_simplification_applied" in result.decision.reason_codes
 
 
+def test_active_artifact_rule_answer_repairs_and_preserves_prior_asset(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+        OpenRouterStructuredInterpreter,
+    )
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        calls.append(schema_model.__name__)
+        if len(calls) == 1:
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="new_task",
+                requires_clarification=True,
+                user_goal_summary="User supplied RSI thresholds.",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing=(
+                        "technical thing like RSI, buy when it gets to 20 or "
+                        "lower, sell when 60 or higher, past 3 months"
+                    ),
+                    strategy_thesis=(
+                        "RSI mean reversion: buy when RSI <= 20, sell when "
+                        "RSI >= 60, over the last 3 months."
+                    ),
+                    date_range="last 3 months",
+                ),
+                assistant_response=(
+                    "Strategy drafted as RSI mean reversion. Asset symbol is missing."
+                ),
+                semantic_turn_act="new_idea",
+            )
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User supplied RSI thresholds.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "technical thing like RSI, buy when it gets to 20 or "
+                    "lower, sell when 60 or higher, past 3 months"
+                ),
+                strategy_type="indicator_threshold",
+                strategy_thesis="Use RSI thresholds for the active draft.",
+                date_range="last 3 months",
+                indicator="rsi",
+                entry_threshold=20,
+                exit_threshold=60,
+            ),
+            semantic_turn_act="new_idea",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    pending = StrategySummary(
+        strategy_type=None,
+        strategy_thesis="User wants to buy Tesla after big drops.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        raw_user_phrasing="What if I bought Tesla after big drops?",
+    )
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "technical thing like RSI, buy when it gets to 20 or lower, "
+                "sell when 60 or higher, past 3 months"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={},
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract()
+        ),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert calls == ["LLMInterpretationResponse", "LLMInterpretationResponse"]
+    assert result.outcome == "ready_for_confirmation"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == "last 3 months"
+    assert strategy.strategy_type == "indicator_threshold"
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 20 or below"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 60 or above"
+
+
+def test_result_refinement_reply_forks_latest_result_into_new_draft(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime.llm_interpreter import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+        OpenRouterStructuredInterpreter,
+    )
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        calls.append(schema_model.__name__)
+        if len(calls) == 1:
+            return LLMInterpretationResponse(
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary=(
+                    "User wants to refine the latest result into recurring buys."
+                ),
+                assistant_response=(
+                    "I've updated the strategy to use biweekly recurring buys."
+                ),
+                semantic_turn_act="educational_question",
+            )
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="refine",
+            requires_clarification=False,
+            user_goal_summary=(
+                "Refine the latest AAPL result into recurring $500 buys."
+            ),
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing=(
+                    "i want to do recurrent biweekly buys of 500 bucks instead"
+                ),
+                strategy_type="dca_accumulation",
+                strategy_thesis="Buy AAPL with recurring $500 contributions.",
+                cadence="biweekly",
+                capital_amount=500,
+                field_provenance={"capital_amount": "recurring_contribution"},
+            ),
+            semantic_turn_act="refine_current_idea",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        raw_user_phrasing="Backtest buy and hold Apple over the past year.",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "i want to do recurrent biweekly buys of 500 bucks instead"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "requested_field": "refinement",
+            "source_result_run_id": "run_123",
+        },
+        structured_interpreter=OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract()
+        ),
+    )
+
+    strategy = result.decision.candidate_strategy_draft
+    assert calls == ["LLMInterpretationResponse", "LLMInterpretationResponse"]
+    assert result.outcome == "ready_for_confirmation"
+    assert result.stage_patch.get("assistant_response") is None
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range == "past year"
+    assert strategy.cadence == "biweekly"
+    assert strategy.capital_amount == 500
+
+
 def test_indicator_simplification_does_not_regex_parse_when_interpreter_unavailable(
     monkeypatch,
 ) -> None:
@@ -2708,6 +2958,54 @@ def test_interpreter_unavailable_reads_visible_confirmation_assumptions() -> Non
     assert "Benchmark: SPY" in answer
     assert "Run backtest button" in answer
     assert "card controls" in answer
+
+
+def test_interpreter_unavailable_during_assumption_edit_does_not_answer_stale_assumptions() -> None:
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Nvidia.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range="past 6 months",
+        ),
+        active_confirmation_reference=ArtifactReference(
+            artifact_kind="confirmation",
+            artifact_id="confirmation-1",
+            artifact_status="active",
+            metadata={
+                "confirmation_card": {
+                    "assumptions": [
+                        "$1,000 starting capital",
+                        "1D bars",
+                        "No fees",
+                        "No slippage",
+                        "Benchmark: SPY",
+                    ]
+                }
+            },
+        ),
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="Use $5,000 starting capital",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "assumption",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    assert "could not safely apply that assumption change" in answer
+    assert "$1,000 starting capital" not in answer
+    assert "left the visible draft unchanged" in answer
 
 
 def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> None:

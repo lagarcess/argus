@@ -148,6 +148,24 @@ def test_launch_request_requires_matching_sizing_field() -> None:
 
 
 def test_launch_request_limits_cadence_to_dca() -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="dca_accumulation",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=500.0,
+        position_size=None,
+        cadence="biweekly",
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    assert request.cadence == "biweekly"
+
     with pytest.raises(ValueError, match="cadence_required"):
         LaunchBacktestRequest(
             strategy_type="dca_accumulation",
@@ -1013,7 +1031,18 @@ def test_dca_adapter_supports_quarterly_cadence(
 
 
 def test_build_signals_supports_quarterly_dca_cadence() -> None:
-    index = pd.date_range("2024-01-02", periods=8, freq="MS")
+    index = pd.to_datetime(
+        [
+            "2024-02-01",
+            "2024-03-01",
+            "2024-04-01",
+            "2024-05-01",
+            "2024-06-01",
+            "2024-07-01",
+            "2024-08-01",
+            "2024-09-01",
+        ]
+    )
     data = pd.DataFrame({"close": [100, 101, 102, 103, 104, 105, 106, 107]}, index=index)
     config = {
         "template": "dca_accumulation",
@@ -1022,7 +1051,7 @@ def test_build_signals_supports_quarterly_dca_cadence() -> None:
 
     entries, exits = _build_signals(config, data)
 
-    assert entries.tolist() == [True, False, False, True, False, False, True, False]
+    assert entries.tolist() == [True, False, True, False, False, True, False, False]
     assert exits.tolist() == [False] * len(index)
 
 

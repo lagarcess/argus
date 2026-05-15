@@ -444,11 +444,6 @@ def _validate_launch_config(config: dict[str, Any]) -> None:
             1000.0,
             float(config["starting_capital"]),
         )
-        validation_parameters = dict(config.get("parameters") or {})
-        cadence = validation_parameters.get("dca_cadence")
-        if cadence == "quarterly":
-            validation_parameters["dca_cadence"] = "monthly"
-        validation_config["parameters"] = validation_parameters
         validate_backtest_config(validation_config)
         return
     validate_backtest_config(config)

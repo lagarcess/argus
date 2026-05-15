@@ -3,9 +3,21 @@ import { describe, expect, test } from "bun:test";
 import {
   applyConfirmationActionEffects,
   confirmationActionEffectsFromApi,
+  normalizeConfirmationHistory,
 } from "../components/chat/artifact-history";
-import type { Message } from "../components/chat/types";
+import type { ChatActionOption, Message } from "../components/chat/types";
 import type { ApiMessage } from "../lib/argus-api";
+
+type ConfirmationActionType = Extract<
+  ChatActionOption["type"],
+  | "run_backtest"
+  | "change_dates"
+  | "change_asset"
+  | "adjust_assumptions"
+  | "cancel_confirmation"
+>;
+
+type ConfirmationTerminalState = "cancelled" | "superseded";
 
 function confirmationMessage(): Message {
   return {
@@ -51,10 +63,18 @@ describe("chat artifact history", () => {
     ["change_dates", "Editing", "superseded"],
     ["change_asset", "Editing", "superseded"],
     ["adjust_assumptions", "Editing", "superseded"],
-    ["cancel_confirmation", "Draft cancelled", "cancelled"],
-  ] as const)(
+    ["cancel_confirmation", "Draft canceled", "cancelled"],
+  ] satisfies readonly [
+    ConfirmationActionType,
+    string,
+    ConfirmationTerminalState,
+  ][])(
     "%s closes active confirmation cards with the expected state",
-    (type, statusLabel, confirmationState) => {
+    (
+      type: ConfirmationActionType,
+      statusLabel: string,
+      confirmationState: ConfirmationTerminalState,
+    ) => {
       const [message] = applyConfirmationActionEffects([confirmationMessage()], [
         {
           type,
@@ -75,12 +95,12 @@ describe("chat artifact history", () => {
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-aapl",
-        statusLabel: "Draft cancelled",
+        statusLabel: "Draft canceled",
       },
     ]);
 
     expect(message.confirmation?.confirmation_state).toBe("cancelled");
-    expect(message.confirmation?.statusLabel).toBe("Draft cancelled");
+    expect(message.confirmation?.statusLabel).toBe("Draft canceled");
     expect(message.confirmation?.actions).toEqual([]);
     expect(message.actions).toEqual([]);
   });
@@ -129,12 +149,12 @@ describe("chat artifact history", () => {
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-aapl",
-        statusLabel: "Draft cancelled",
+        statusLabel: "Draft canceled",
       },
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-aapl",
-        statusLabel: "Draft cancelled",
+        statusLabel: "Draft canceled",
       },
     ]);
     expect([...effects.hiddenMessageIds]).toEqual([
@@ -199,14 +219,14 @@ describe("chat artifact history", () => {
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-updated-aapl",
-        statusLabel: "Draft cancelled",
+        statusLabel: "Draft canceled",
       },
     ]);
 
     expect(messages[0].confirmation?.confirmation_state).toBe("superseded");
     expect(messages[0].confirmation?.statusLabel).toBe("Updated");
     expect(messages[1].confirmation?.confirmation_state).toBe("cancelled");
-    expect(messages[1].confirmation?.statusLabel).toBe("Draft cancelled");
+    expect(messages[1].confirmation?.statusLabel).toBe("Draft canceled");
   });
 
   test("cancel wins over earlier transient effects for the same active card", () => {
@@ -219,13 +239,30 @@ describe("chat artifact history", () => {
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-aapl",
-        statusLabel: "Draft cancelled",
+        statusLabel: "Draft canceled",
       },
     ]);
 
     expect(message.confirmation?.confirmation_state).toBe("cancelled");
-    expect(message.confirmation?.statusLabel).toBe("Draft cancelled");
+    expect(message.confirmation?.statusLabel).toBe("Draft canceled");
     expect(message.confirmation?.actions).toEqual([]);
+  });
+
+  test("normalization preserves cancelled confirmation state after reload", () => {
+    const [cancelled] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "cancel_confirmation",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Draft canceled",
+      },
+    ]);
+
+    const [normalized] = normalizeConfirmationHistory([cancelled]);
+
+    expect(normalized.confirmation?.confirmation_state).toBe("cancelled");
+    expect(normalized.confirmation?.statusLabel).toBe("Draft canceled");
+    expect(normalized.confirmation?.actions).toEqual([]);
+    expect(normalized.actions).toEqual([]);
   });
 
   test("specific action effects beat broad fallback effects during hydration", () => {
@@ -237,11 +274,11 @@ describe("chat artifact history", () => {
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-aapl",
-        statusLabel: "Draft cancelled",
+        statusLabel: "Draft canceled",
       },
     ]);
 
     expect(message.confirmation?.confirmation_state).toBe("cancelled");
-    expect(message.confirmation?.statusLabel).toBe("Draft cancelled");
+    expect(message.confirmation?.statusLabel).toBe("Draft canceled");
   });
 });

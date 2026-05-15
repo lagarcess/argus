@@ -2,6 +2,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
+
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 SlotPolicy = Literal["required", "defaultable", "clarify_if_missing"]
 
@@ -117,12 +119,20 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
                 key="dca_cadence",
                 policy="clarify_if_missing",
                 default="monthly",
-                allowed_values=["daily", "weekly", "monthly"],
+                allowed_values=list(SUPPORTED_DCA_CADENCE_VALUES),
                 description="How often Argus makes a fixed-dollar purchase.",
                 value_aliases={
                     "daily": ["diario", "cada dia", "diariamente"],
                     "weekly": ["semanal", "cada semana", "semanalmente"],
+                    "biweekly": [
+                        "biweekly",
+                        "every two weeks",
+                        "every other week",
+                        "quincenal",
+                        "cada dos semanas",
+                    ],
                     "monthly": ["mensual", "cada mes", "mensualmente"],
+                    "quarterly": ["quarterly", "trimestral", "cada trimestre"],
                 },
             )
         },

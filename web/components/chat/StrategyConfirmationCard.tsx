@@ -18,7 +18,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
       ? confirmation.actions ?? []
       : [];
   const statusLabel = isInactive
-    ? confirmation.statusLabel || (isCancelled ? "Draft cancelled" : "Updated")
+    ? confirmation.statusLabel || (isCancelled ? "Draft canceled" : "Updated")
     : confirmation.statusLabel;
   const StatusIcon = isCancelled ? CircleSlash2 : CheckCircle2;
 

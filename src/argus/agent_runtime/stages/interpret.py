@@ -4,6 +4,7 @@ import asyncio
 import inspect
 from typing import Any
 
+from argus.agent_runtime.capabilities.answers import compose_capability_answer
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.profile.response_profile import (
@@ -49,6 +50,7 @@ from argus.agent_runtime.stages.interpret_actions import (
     structured_action_stage_result_if_applicable as _structured_action_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_types import (
+    CapabilityQuestionFocus,
     InterpretationRequest,
     InterpretDecision,
     SemanticTurnAct,
@@ -96,7 +98,7 @@ STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "unsupported_request",
 }
 
-CONTEXTUAL_PATCH_TURN_ACTS = {
+CONTEXTUAL_EDIT_TURN_ACTS = {
     "answer_pending_need",
     "approval",
     "refine_current_idea",
@@ -145,6 +147,7 @@ async def interpret_stage_async(
             user=user,
             snapshot=snapshot,
             current_user_message=state.current_user_message,
+            selected_thread_metadata=selected_metadata,
         )
 
     interpretation = await _call_structured_interpreter(
@@ -162,6 +165,7 @@ async def interpret_stage_async(
             user=user,
             snapshot=snapshot,
             current_user_message=state.current_user_message,
+            selected_thread_metadata=selected_metadata,
         )
 
     return await _stage_result_from_interpretation(
@@ -415,7 +419,12 @@ async def _stage_result_from_interpretation(
         resolution_provenance=list(strategy.resolution_provenance),
         semantic_turn_act=interpretation.semantic_turn_act,
         result_followup_focus=interpretation.result_followup_focus,
+        capability_question_focus=interpretation.capability_question_focus,
     )
+    if interpretation.capability_question_focus is not None:
+        decision.normalized_signals["capability_question_focus"] = (
+            interpretation.capability_question_focus
+        )
     optional_parameter_stage_patch = _optional_parameter_stage_patch(
         decision=decision,
         values=optional_parameter_values,
@@ -450,6 +459,19 @@ async def _stage_result_from_interpretation(
     )
     if followup_result is not None:
         return followup_result
+    capability_answer = _capability_answer_if_applicable(
+        focus=interpretation.capability_question_focus,
+        semantic_turn_act=interpretation.semantic_turn_act,
+        expects_strategy_route=expects_strategy_route,
+        requires_clarification=requires_clarification,
+        capability_contract=capability_contract,
+    )
+    if capability_answer is not None:
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={"assistant_response": capability_answer},
+        )
     if (
         interpretation.assistant_response
         and not expects_strategy_route
@@ -489,13 +511,31 @@ async def _stage_result_from_interpretation(
     )
 
 
+def _capability_answer_if_applicable(
+    *,
+    focus: CapabilityQuestionFocus | None,
+    semantic_turn_act: SemanticTurnAct | None,
+    expects_strategy_route: bool,
+    requires_clarification: bool,
+    capability_contract: Any,
+) -> str | None:
+    if (
+        focus is None
+        or semantic_turn_act != "educational_question"
+        or expects_strategy_route
+        or requires_clarification
+    ):
+        return None
+    return compose_capability_answer(focus=focus, contract=capability_contract)
+
+
 def _route_contextual_money_answer(
     *,
     strategy: StrategySummary,
     selected_thread_metadata: dict[str, Any],
 ) -> tuple[StrategySummary, dict[str, Any]]:
     requested_field = str(selected_thread_metadata.get("requested_field") or "")
-    if requested_field not in {"initial_capital", "capital_amount"}:
+    if requested_field not in {"initial_capital", "capital_amount", "assumption"}:
         return strategy, {}
     if strategy.capital_amount is None:
         return strategy, {}
@@ -738,6 +778,7 @@ def _offline_interpreter_unavailable_result(
     user: UserState,
     snapshot: TaskSnapshot | None = None,
     current_user_message: str = "",
+    selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
     effective_profile = resolve_effective_response_profile(
         user=user,
@@ -761,7 +802,11 @@ def _offline_interpreter_unavailable_result(
         outcome="ready_to_respond",
         decision=decision,
         stage_patch={
-            "assistant_response": _offline_recovery_message(snapshot),
+            "assistant_response": _offline_recovery_message(
+                snapshot,
+                current_user_message=current_user_message,
+                selected_thread_metadata=selected_thread_metadata or {},
+            ),
         },
     )
 
@@ -771,6 +816,7 @@ async def _interpreter_unavailable_result(
     user: UserState,
     snapshot: TaskSnapshot | None = None,
     current_user_message: str = "",
+    selected_thread_metadata: dict[str, Any] | None = None,
 ) -> StageResult:
     result_followup = await _latest_result_followup_when_interpreter_unavailable(
         user=user,
@@ -783,6 +829,7 @@ async def _interpreter_unavailable_result(
         user=user,
         snapshot=snapshot,
         current_user_message=current_user_message,
+        selected_thread_metadata=selected_thread_metadata or {},
     )
 
 
@@ -842,11 +889,25 @@ async def _latest_result_followup_when_interpreter_unavailable(
     )
 
 
-def _offline_recovery_message(snapshot: TaskSnapshot | None) -> str:
+def _offline_recovery_message(
+    snapshot: TaskSnapshot | None,
+    *,
+    current_user_message: str = "",
+    selected_thread_metadata: dict[str, Any] | None = None,
+) -> str:
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         strategy = snapshot.pending_strategy_summary
         assets = ", ".join(strategy.asset_universe) or "the current asset"
         strategy_label = (strategy.strategy_type or "strategy").replace("_", " ")
+        if _pending_assumption_edit_was_not_applied(
+            current_user_message=current_user_message,
+            selected_thread_metadata=selected_thread_metadata or {},
+        ):
+            return (
+                f"I still have the {assets} {strategy_label} draft in this chat, "
+                "but I could not safely apply that assumption change, so I left "
+                "the visible draft unchanged. Please retry the change in a moment."
+            )
         if snapshot.active_confirmation_reference is None:
             return (
                 f"I still have the {assets} {strategy_label} draft in this chat, "
@@ -878,6 +939,15 @@ def _offline_recovery_message(snapshot: TaskSnapshot | None) -> str:
     )
 
 
+def _pending_assumption_edit_was_not_applied(
+    *,
+    current_user_message: str,
+    selected_thread_metadata: dict[str, Any],
+) -> bool:
+    requested_field = _field_base(str(selected_thread_metadata.get("requested_field") or ""))
+    return requested_field == "assumption" and bool(current_user_message.strip())
+
+
 def _strategy_with_contextual_merge(
     *,
     strategy: StrategySummary,
@@ -892,9 +962,10 @@ def _strategy_with_contextual_merge(
     if prior is None:
         return strategy
     should_merge = (
-        semantic_turn_act in CONTEXTUAL_PATCH_TURN_ACTS
+        semantic_turn_act in CONTEXTUAL_EDIT_TURN_ACTS
         or task_relation == "refine"
-        or _strategy_looks_like_pending_artifact_patch(
+        or _strategy_supplies_contextual_rule_edit(prior=prior, strategy=strategy)
+        or _strategy_looks_like_pending_artifact_edit(
             prior=prior,
             strategy=strategy,
             selected_thread_metadata=selected_thread_metadata,
@@ -1014,7 +1085,7 @@ def _extra_parameters_for_strategy_family(
     }
 
 
-def _strategy_looks_like_pending_artifact_patch(
+def _strategy_looks_like_pending_artifact_edit(
     *,
     prior: StrategySummary,
     strategy: StrategySummary,
@@ -1030,7 +1101,7 @@ def _strategy_looks_like_pending_artifact_patch(
     if requested_field == "asset_universe":
         return bool(strategy.asset_universe)
     if requested_field in {"entry_logic", "exit_logic"}:
-        return _strategy_supplies_executable_rule_patch(strategy)
+        return _strategy_supplies_executable_rule_edit(strategy)
     if requested_field == "refinement":
         return _strategy_has_execution_anchor(strategy) and bool(
             prior.asset_universe or prior.date_range
@@ -1038,7 +1109,23 @@ def _strategy_looks_like_pending_artifact_patch(
     return False
 
 
-def _strategy_supplies_executable_rule_patch(strategy: StrategySummary) -> bool:
+def _strategy_supplies_contextual_rule_edit(
+    *,
+    prior: StrategySummary,
+    strategy: StrategySummary,
+) -> bool:
+    if not _strategy_supplies_executable_rule_edit(strategy):
+        return False
+    return bool(
+        prior.asset_universe
+        or prior.date_range
+        or prior.asset_class
+        or prior.capital_amount is not None
+        or prior.position_size is not None
+    )
+
+
+def _strategy_supplies_executable_rule_edit(strategy: StrategySummary) -> bool:
     return bool(
         strategy_rule(strategy, "entry")
         or strategy_rule(strategy, "exit")

@@ -61,12 +61,20 @@ def _build_signals(
             # Entry on the first day of each week present in data
             weeks = _index_period_series(index, freq="W")
             entries = weeks != weeks.shift(1)
+        elif cadence == "biweekly":
+            elapsed_days = pd.Series(
+                (index - index[0]).days,
+                index=index,
+            )
+            windows = elapsed_days // 14
+            entries = windows != windows.shift(1)
         elif cadence == "monthly":
             # Entry on the first day of each month present in data
             months = _index_period_series(index, freq="M")
             entries = months != months.shift(1)
         elif cadence == "quarterly":
-            entries.iloc[::3] = True
+            quarters = _index_period_series(index, freq="Q")
+            entries = quarters != quarters.shift(1)
         else:
             # Fallback to single entry if unknown cadence
             entries.iloc[0] = True

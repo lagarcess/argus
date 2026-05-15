@@ -189,6 +189,48 @@ def test_non_dca_capital_answer_updates_initial_capital_assumption(monkeypatch) 
     assert result.patch["optional_parameter_status"]["initial_capital"] == 10000
 
 
+def test_adjust_assumptions_capital_answer_patches_visible_draft(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Nvidia.",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        date_range={"start": "2024-07-03", "end": "2024-08-13"},
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied an assumption change for starting capital.",
+        candidate_strategy_draft=StrategySummary(capital_amount=5000),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="Use $5,000 starting capital",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "assumption",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.date_range == {"start": "2024-07-03", "end": "2024-08-13"}
+    assert strategy.capital_amount is None
+    assert result.patch["optional_parameter_status"]["initial_capital"] == 5000
+
+
 def test_buy_and_hold_without_capital_is_ready_for_confirmation(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 

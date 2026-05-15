@@ -47,6 +47,13 @@ ResultFollowupFocus = Literal[
     "assumptions",
     "general",
 ]
+CapabilityQuestionFocus = Literal[
+    "supported_strategies",
+    "supported_indicators",
+    "limits",
+    "assets",
+    "general",
+]
 
 
 class InterpretDecision(BaseModel):
@@ -68,6 +75,7 @@ class InterpretDecision(BaseModel):
     resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
     semantic_turn_act: SemanticTurnAct | None = None
     result_followup_focus: ResultFollowupFocus | None = None
+    capability_question_focus: CapabilityQuestionFocus | None = None
 
     def to_patch(self) -> dict[str, Any]:
         ambiguous = [item.model_dump(mode="python") for item in self.ambiguous_fields]
@@ -106,6 +114,7 @@ class InterpretDecision(BaseModel):
             "resolution_provenance": resolution_provenance,
             "semantic_turn_act": self.semantic_turn_act,
             "result_followup_focus": self.result_followup_focus,
+            "capability_question_focus": self.capability_question_focus,
         }
 
 
@@ -139,6 +148,7 @@ class StructuredInterpretation(BaseModel):
     )
     semantic_turn_act: SemanticTurnAct | None = None
     result_followup_focus: ResultFollowupFocus | None = None
+    capability_question_focus: CapabilityQuestionFocus | None = None
 
 
 class InterpretationRequest(BaseModel):

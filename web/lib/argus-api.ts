@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "./supabase-client";
+import type { AssetClass } from "./argus-types";
 import type {
   ChatActionOption,
   ChatMention,
@@ -8,7 +9,7 @@ import { normalizeEnabledLanguage } from "./language-features";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
-export type AssetClass = "equity" | "crypto" | "currency_pair";
+export type { AssetClass } from "./argus-types";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";

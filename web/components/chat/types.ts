@@ -1,3 +1,5 @@
+import type { AssetClass } from "@/lib/argus-types";
+
 export type StrategyResultMetric = {
   label: string;
   value: string;
@@ -69,7 +71,7 @@ export type StrategyResultPayload = {
   strategyLabel?: string;
   symbols?: string[];
   template?: string;
-  assetClass?: "equity" | "crypto";
+  assetClass?: AssetClass;
   period: string;
   benchmarkNote?: string;
   statusLabel?: string;

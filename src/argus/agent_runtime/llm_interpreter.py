@@ -5,6 +5,10 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
+from argus.agent_runtime.artifact_edit_planner import (
+    ArtifactAssumptionEditPlan,
+    plan_artifact_assumption_edit,
+)
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
@@ -91,7 +95,8 @@ class OpenRouterStructuredInterpreter:
         """
         messages = self._messages(request)
         if self.model_name is None:
-            for index, candidate_model in enumerate(openrouter_structured_model_candidates()):
+            candidate_models = openrouter_structured_model_candidates()
+            for index, candidate_model in enumerate(candidate_models):
                 try:
                     response = await invoke_openrouter_json_schema(
                         task="interpretation",
@@ -102,66 +107,11 @@ class OpenRouterStructuredInterpreter:
                     )
                     if not isinstance(response, LLMInterpretationResponse):
                         continue
-                    response = _normalize_response_for_runtime_context(
-                        response,
-                        request=request,
-                    )
-                    response = await _signal_rule_checked_response(
+                    response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=candidate_model,
                         request=request,
                     )
-                    needs_artifact_context_repair = (
-                        _response_needs_artifact_context_repair(response)
-                    )
-                    if needs_artifact_context_repair:
-                        repaired_response = (
-                            await _repair_incomplete_strategy_extraction(
-                                failed_response=response,
-                                preferred_model=candidate_model,
-                                request=request,
-                            )
-                        )
-                        if repaired_response is not None:
-                            self.last_status = (
-                                "used" if index == 0 else "fallback_used"
-                            )
-                            return self._to_runtime_interpretation(
-                                repaired_response,
-                                request=request,
-                            )
-                        raise ValueError(
-                            "OpenRouter unsupported clarification omitted "
-                            "recoverable artifact context"
-                        )
-                    if not _structured_interpretation_has_required_shape(
-                        response,
-                        request=request,
-                    ):
-                        repaired_response = await _repair_incomplete_artifact_patch(
-                            model_name=candidate_model,
-                            request=request,
-                        )
-                        if repaired_response is None:
-                            repaired_response = (
-                                await _repair_incomplete_strategy_extraction(
-                                    failed_response=response,
-                                    preferred_model=candidate_model,
-                                    request=request,
-                                )
-                            )
-                        if repaired_response is not None:
-                            self.last_status = (
-                                "used" if index == 0 else "fallback_used"
-                            )
-                            return self._to_runtime_interpretation(
-                                repaired_response,
-                                request=request,
-                            )
-                        raise ValueError(
-                            "OpenRouter interpretation returned an incomplete "
-                            "strategy draft"
-                        )
                     self.last_status = "used" if index == 0 else "fallback_used"
                     return self._to_runtime_interpretation(response, request=request)
                 except Exception as exc:
@@ -174,6 +124,16 @@ class OpenRouterStructuredInterpreter:
                             "trying next configured model"
                         ),
                     )
+            repaired_response = await _plan_pending_artifact_assumption_edit(
+                request=request,
+                preferred_model=candidate_models[0] if candidate_models else "",
+            )
+            if repaired_response is not None:
+                self.last_status = "fallback_used"
+                return self._to_runtime_interpretation(
+                    repaired_response,
+                    request=request,
+                )
             self.last_status = "failed"
             return None
 
@@ -187,11 +147,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
-                    response = _normalize_response_for_runtime_context(
-                        response,
-                        request=request,
-                    )
-                    response = await _signal_rule_checked_response(
+                    response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=self.model_name,
                         request=request,
@@ -230,11 +186,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
-                    response = _normalize_response_for_runtime_context(
-                        response,
-                        request=request,
-                    )
-                    response = await _signal_rule_checked_response(
+                    response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=fallback_model_name,
                         request=request,
@@ -250,6 +202,13 @@ class OpenRouterStructuredInterpreter:
                     message="Fallback LLM interpretation failed",
                 )
 
+        repaired_response = await _plan_pending_artifact_assumption_edit(
+            request=request,
+            preferred_model=fallback_model_name or primary_model_name,
+        )
+        if repaired_response is not None:
+            self.last_status = "fallback_used"
+            return self._to_runtime_interpretation(repaired_response, request=request)
         return None
 
     def _messages(self, request: InterpretationRequest) -> list[BaseMessage]:
@@ -384,7 +343,8 @@ class OpenRouterStructuredInterpreter:
             "For natural periods, return date_range as a normalized string when exact dates "
             "are not available, or as {'start': 'YYYY-MM-DD', 'end': 'YYYY-MM-DD'} when the "
             "user provides exact dates. For recurring buys, extract cadence as daily, weekly, "
-            "monthly, or yearly and never invent capital_amount. For DCA, capital_amount means "
+            "biweekly, monthly, or quarterly and never invent capital_amount. For DCA, "
+            "capital_amount means "
             "the recurring contribution. If the user gives both a starting principal or total "
             "budget and a recurring contribution, put the recurring amount in capital_amount "
             "and put the starting principal in initial_capital or total_capital. If the user "
@@ -436,6 +396,12 @@ class OpenRouterStructuredInterpreter:
             "result_followup and result_followup_focus=assumptions even when no "
             "completed run exists; use the active draft/card context instead of "
             "regenerating a new card. "
+            "When semantic_turn_act is educational_question and the user asks what "
+            "Argus can do, what indicators it supports, what strategies it can run, "
+            "what assets are available, or what the limits are, set "
+            "capability_question_focus to supported_indicators, supported_strategies, "
+            "assets, limits, or general. The runtime will answer from the executable "
+            "capability registry; do not make unsupported execution claims in prose. "
             "Retry turns should preserve the failed action payload; do "
             "not reinterpret the original investing idea from scratch. "
             "Social turns are conversation_followup with assistant_response and no "
@@ -493,15 +459,62 @@ class OpenRouterStructuredInterpreter:
             response_profile_overrides=response.response_profile_overrides,
             semantic_turn_act=response.semantic_turn_act,
             result_followup_focus=response.result_followup_focus,
+            capability_question_focus=response.capability_question_focus,
         )
 
 
-async def _repair_incomplete_artifact_patch(
+async def _response_ready_for_runtime(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    response = _normalize_response_for_runtime_context(response, request=request)
+    response = await _signal_rule_checked_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if _response_needs_artifact_context_repair(response):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return repaired_response
+        raise ValueError(
+            "OpenRouter unsupported clarification omitted recoverable artifact context"
+        )
+    if _structured_interpretation_has_required_shape(response, request=request):
+        return response
+
+    planned_response = await _plan_pending_artifact_assumption_edit(
+        request=request,
+        preferred_model=preferred_model,
+    )
+    if planned_response is None:
+        planned_response = await _plan_focused_artifact_edit(
+            model_name=preferred_model,
+            request=request,
+        )
+    if planned_response is None:
+        planned_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+    if planned_response is not None:
+        return planned_response
+    raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+
+
+async def _plan_focused_artifact_edit(
     *,
     model_name: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
-    messages = _focused_artifact_patch_messages(request)
+    messages = _focused_artifact_edit_messages(request)
     if messages is None:
         return None
     try:
@@ -564,6 +577,112 @@ async def _repair_incomplete_strategy_extraction(
         if _structured_interpretation_has_required_shape(response, request=request):
             return response
     return None
+
+
+async def _plan_pending_artifact_assumption_edit(
+    *,
+    request: InterpretationRequest,
+    preferred_model: str,
+) -> LLMInterpretationResponse | None:
+    if not _request_targets_pending_artifact_assumption_edit(request):
+        return None
+    snapshot = request.latest_task_snapshot
+    prior_strategy = _prior_strategy_payload(request)
+    active_confirmation = (
+        snapshot.active_confirmation_reference.model_dump(mode="json")
+        if snapshot is not None
+        and snapshot.active_confirmation_reference is not None
+        else None
+    )
+    plan = await plan_artifact_assumption_edit(
+        current_user_message=request.current_user_message,
+        prior_strategy=prior_strategy,
+        active_confirmation=active_confirmation,
+        preferred_model=preferred_model,
+    )
+    if plan is None:
+        return None
+    return _response_from_artifact_assumption_edit_plan(plan=plan, request=request)
+
+
+def _request_targets_pending_artifact_assumption_edit(
+    request: InterpretationRequest,
+) -> bool:
+    requested_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).split("[", 1)[0]
+    if requested_field != "assumption":
+        return False
+    snapshot = request.latest_task_snapshot
+    return bool(
+        snapshot
+        and (
+            snapshot.pending_strategy_summary
+            or snapshot.confirmed_strategy_summary
+            or snapshot.active_confirmation_reference
+        )
+    )
+
+
+def _response_from_artifact_assumption_edit_plan(
+    *,
+    plan: ArtifactAssumptionEditPlan,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
+    field_provenance: dict[str, str] = {}
+    if plan.initial_capital is not None:
+        draft.capital_amount = plan.initial_capital
+        field_provenance["capital_amount"] = "starting_capital"
+    if plan.timeframe is not None:
+        draft.timeframe = plan.timeframe
+    extra_parameters: dict[str, Any] = {}
+    if plan.fee_rate is not None:
+        extra_parameters["fee_rate"] = plan.fee_rate
+    if plan.slippage is not None:
+        extra_parameters["slippage"] = plan.slippage
+    if extra_parameters:
+        draft.extra_parameters.update(extra_parameters)
+    if field_provenance:
+        draft.field_provenance = field_provenance
+
+    if plan.outcome == "ready_to_confirm":
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary=(
+                plan.user_goal_summary or "User changed a visible draft assumption."
+            ),
+            candidate_strategy_draft=draft,
+            confidence=plan.confidence,
+            reason_codes=["artifact_assumption_edit_planned"],
+            semantic_turn_act="answer_pending_need",
+        )
+
+    return LLMInterpretationResponse(
+        intent=(
+            "unsupported_or_out_of_scope"
+            if plan.outcome == "unsupported"
+            else "conversation_followup"
+        ),
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary=(
+            plan.user_goal_summary
+            or "The requested assumption change needs clarification."
+        ),
+        candidate_strategy_draft=draft,
+        missing_required_fields=list(plan.missing_required_fields),
+        assistant_response=plan.assistant_response,
+        confidence=plan.confidence,
+        reason_codes=["artifact_assumption_edit_planned"],
+        semantic_turn_act=(
+            "unsupported_request"
+            if plan.outcome == "unsupported"
+            else "answer_pending_need"
+        ),
+    )
 
 
 async def _signal_rule_checked_response(
@@ -1144,7 +1263,7 @@ def _response_from_focused_strategy_extraction(
         semantic_turn_act="new_idea",
     )
 
-def _focused_artifact_patch_messages(
+def _focused_artifact_edit_messages(
     request: InterpretationRequest,
 ) -> list[BaseMessage] | None:
     snapshot = request.latest_task_snapshot
@@ -1161,10 +1280,10 @@ def _focused_artifact_patch_messages(
     return [
         SystemMessage(
             content=(
-                "Focused artifact patch repair. The previous interpretation replayed "
+                "Focused artifact edit planning. The previous interpretation replayed "
                 "or under-filled the active artifact. Interpret only the current user "
                 "message against the canonical prior artifact. The current user message "
-                "is authoritative. Return a structured patch or answer; do not replay "
+                "is authoritative. Return a structured edit or answer; do not replay "
                 "the prior artifact unchanged. If the user changes the asset, date "
                 "range, indicator, thresholds, or assumptions, candidate_strategy_draft "
                 "must include the changed field. Preserve unchanged executable context "
@@ -1254,10 +1373,25 @@ def _structured_interpretation_has_required_shape(
         )
     ):
         return bool(response.assistant_response)
+    if _response_underfills_pending_result_refinement(
+        response=response,
+        request=request,
+    ):
+        return False
     if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return True
     if response.semantic_turn_act == "approval":
         return True
+    if _response_underfills_active_artifact_assumption_edit(
+        response=response,
+        request=request,
+    ):
+        return False
+    if _response_underfills_active_artifact_rule_edit(
+        response=response,
+        request=request,
+    ):
+        return False
     if response.requires_clarification and response.assistant_response:
         return True
     draft = response.candidate_strategy_draft
@@ -1279,6 +1413,106 @@ def _structured_interpretation_has_required_shape(
         snapshot = request.latest_task_snapshot
         return bool(snapshot and snapshot.latest_failed_action_reference is not None)
     return False
+
+
+def _response_underfills_pending_result_refinement(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    requested_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).split("[", 1)[0]
+    if requested_field != "refinement":
+        return False
+    snapshot = request.latest_task_snapshot
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return False
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return True
+    return not _llm_strategy_draft_has_extractable_fields(
+        response.candidate_strategy_draft
+    )
+
+
+def _response_underfills_active_artifact_rule_edit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not _request_has_active_strategy_context(request):
+        return False
+    if not response.requires_clarification or not response.assistant_response:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_rule_or_indicator_fields(draft):
+        return False
+    return bool(draft.raw_user_phrasing or draft.strategy_thesis)
+
+
+def _response_underfills_active_artifact_assumption_edit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not _request_targets_pending_artifact_assumption_edit(request):
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_supported_artifact_assumption_edit(draft):
+        return False
+    if response.requires_clarification and response.assistant_response:
+        return False
+    return bool(response.intent in {"strategy_drafting", "backtest_execution"})
+
+
+def _llm_strategy_draft_has_supported_artifact_assumption_edit(
+    draft: LLMStrategyDraft,
+) -> bool:
+    field_provenance = draft.field_provenance or {}
+    extra_parameters = draft.extra_parameters or {}
+    return any(
+        [
+            draft.capital_amount is not None
+            and field_provenance.get("capital_amount") in _TOTAL_CAPITAL_SOURCES,
+            draft.initial_capital is not None
+            and field_provenance.get("initial_capital") in _TOTAL_CAPITAL_SOURCES,
+            bool(draft.timeframe),
+            "fee_rate" in extra_parameters,
+            "slippage" in extra_parameters,
+        ]
+    )
+
+
+def _llm_strategy_draft_has_rule_or_indicator_fields(
+    draft: LLMStrategyDraft,
+) -> bool:
+    return any(
+        [
+            bool(draft.entry_logic),
+            bool(draft.exit_logic),
+            bool(draft.entry_rule),
+            bool(draft.exit_rule),
+            bool(draft.rule_spec),
+            bool(draft.indicator),
+            draft.indicator_period is not None,
+            draft.entry_threshold is not None,
+            draft.exit_threshold is not None,
+        ]
+    )
 
 
 def _llm_signal_strategy_is_underfilled(draft: LLMStrategyDraft) -> bool:

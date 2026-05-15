@@ -40,6 +40,10 @@ def test_normalizes_locale_cadence_values():
         == "weekly"
     )
     assert (
+        normalize_parameter_value("dca_accumulation", "dca_cadence", "quincenal")
+        == "biweekly"
+    )
+    assert (
         normalize_parameter_value("dca_accumulation", "dca_cadence", "diario") == "daily"
     )
     assert (

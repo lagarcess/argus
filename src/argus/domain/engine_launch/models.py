@@ -11,7 +11,7 @@ LaunchStrategyType = Literal[
     "signal_strategy",
 ]
 SizingMode = Literal["capital_amount", "position_size"]
-Cadence = Literal["daily", "weekly", "monthly", "quarterly"]
+Cadence = Literal["daily", "weekly", "biweekly", "monthly", "quarterly"]
 ExecutionStatus = Literal[
     "succeeded",
     "blocked_unsupported",

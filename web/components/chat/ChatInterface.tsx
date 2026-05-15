@@ -51,10 +51,18 @@ import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import { type ChatActionOption, type ChatMention, type Message, type StrategyConfirmationPayload } from "./types";
 import {
+  applyConsumedResultActions,
   applyConfirmationActionEffects,
   confirmationActionEffectFromAction,
   confirmationActionEffectsFromApi,
   confirmationActionStatusLabel,
+  consumeResultActionOnMessages,
+  consumedResultActionsFromApi,
+  hiddenSaveActionMessageIdsFromApi,
+  isBreakdownActionMetadata,
+  normalizeConfirmationHistory,
+  resultActionRunId,
+  supersedeOpenConfirmations,
 } from "./artifact-history";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -72,12 +80,6 @@ const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
 type HydratedMessages = {
   messages: Message[];
   inputActions: ChatActionOption[];
-};
-
-type ConsumedResultAction = {
-  type: "show_breakdown" | "save_strategy";
-  runId?: string;
-  savedStrategyId?: string | null;
 };
 
 function readActiveConversationId() {
@@ -180,26 +182,6 @@ function hasActiveArtifactActionSet(messages: Message[]) {
   });
 }
 
-function isBreakdownActionMetadata(metadata: Record<string, unknown>) {
-  const chatAction = metadata.chat_action;
-  return (
-    typeof chatAction === "object" &&
-    chatAction !== null &&
-    "type" in chatAction &&
-    chatAction.type === "show_breakdown"
-  );
-}
-
-function isSaveActionMetadata(metadata: Record<string, unknown>) {
-  const chatAction = metadata.chat_action;
-  return (
-    typeof chatAction === "object" &&
-    chatAction !== null &&
-    "type" in chatAction &&
-    chatAction.type === "save_strategy"
-  );
-}
-
 function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[]) {
   if (action.type === "show_breakdown") {
     return actions.filter((candidate) => candidate.type !== "show_breakdown");
@@ -213,130 +195,6 @@ function resultActionRequiresRunContext(action: ChatActionOption) {
     action.type === "save_strategy" ||
     action.type === "refine_strategy"
   );
-}
-
-function resultActionRunId(action: ChatActionOption | undefined) {
-  const rawRunId = action?.payload?.run_id ?? action?.payload?.runId;
-  return typeof rawRunId === "string" && rawRunId.trim() ? rawRunId.trim() : undefined;
-}
-
-function consumedResultActionsFromApi(items: ApiMessage[]): ConsumedResultAction[] {
-  return items.flatMap((message) => {
-    const metadata = message.metadata ?? {};
-    const action = metadata.chat_action as ChatActionOption | undefined;
-    if (isBreakdownActionMetadata(metadata)) {
-      return [{ type: "show_breakdown", runId: resultActionRunId(action) }];
-    }
-    if (message.role === "assistant" && isSaveActionMetadata(metadata)) {
-      const savedStrategyId = savedStrategyIdFromMetadata(metadata);
-      if (!savedStrategyId) {
-        return [];
-      }
-      return [
-        {
-          type: "save_strategy",
-          runId: stringOrNull(metadata.result_run_id) ?? resultActionRunId(action),
-          savedStrategyId,
-        },
-      ];
-    }
-    return [];
-  });
-}
-
-function hiddenSaveActionMessageIdsFromApi(items: ApiMessage[]) {
-  const hiddenIds = new Set<string>();
-  items.forEach((message, index) => {
-    const metadata = message.metadata ?? {};
-    if (message.role !== "assistant" || !isSaveActionMetadata(metadata)) {
-      return;
-    }
-    if (!savedStrategyIdFromMetadata(metadata)) {
-      return;
-    }
-    const action = metadata.chat_action as ChatActionOption | undefined;
-    const runId = stringOrNull(metadata.result_run_id) ?? resultActionRunId(action);
-    hiddenIds.add(message.id);
-    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-      const candidate = items[cursor];
-      const candidateMetadata = candidate.metadata ?? {};
-      if (candidate.role !== "user" || !isSaveActionMetadata(candidateMetadata)) {
-        continue;
-      }
-      const candidateAction = candidateMetadata.chat_action as ChatActionOption | undefined;
-      if (!runId || resultActionRunId(candidateAction) === runId) {
-        hiddenIds.add(candidate.id);
-        return;
-      }
-    }
-  });
-  return hiddenIds;
-}
-
-function resultActionWasConsumed(
-  action: ChatActionOption,
-  resultRunId: string | undefined,
-  consumedActions: ConsumedResultAction[],
-) {
-  return consumedActions.some((consumed) => {
-    if (consumed.type !== action.type) {
-      return false;
-    }
-    if (!consumed.runId) {
-      return true;
-    }
-    return consumed.runId === resultRunId;
-  });
-}
-
-function applyConsumedResultActions(
-  messages: Message[],
-  consumedActions: ConsumedResultAction[],
-): Message[] {
-  if (consumedActions.length === 0) {
-    return messages;
-  }
-  return messages.map((message) => {
-    if (message.kind !== "strategy_result" || !message.result) {
-      return message;
-    }
-    const resultRunId = message.result.runId;
-    const savedEffect = consumedActions.find(
-      (consumed) =>
-        consumed.type === "save_strategy" &&
-        (!consumed.runId || consumed.runId === resultRunId),
-    );
-    const savedStrategyId = savedEffect?.savedStrategyId ?? message.savedStrategyId ?? null;
-    const resultActions = (message.result.actions ?? []).filter(
-      (action) => !resultActionWasConsumed(action, resultRunId, consumedActions),
-    );
-    const messageActions = (message.actions ?? []).filter(
-      (action) => !resultActionWasConsumed(action, resultRunId, consumedActions),
-    );
-    return {
-      ...message,
-      savedStrategyId,
-      actions: messageActions,
-      result: {
-        ...message.result,
-        savedStrategyId,
-        strategyId: message.result.strategyId ?? savedStrategyId,
-        actions: resultActions,
-      },
-    };
-  });
-}
-
-function consumeResultActionOnMessages(
-  messages: Message[],
-  action: ChatActionOption | undefined,
-): Message[] {
-  if (action?.type !== "show_breakdown") {
-    return messages;
-  }
-  return applyConsumedResultActions(messages, [
-    { type: "show_breakdown", runId: resultActionRunId(action) },
-  ]);
 }
 
 function consumeConfirmationActionOnMessages(
@@ -410,7 +268,9 @@ function stringArrayOrNull(value: unknown): string[] | null {
 }
 
 function assetClassOrUndefined(value: unknown): AssetClass | undefined {
-  return value === "crypto" || value === "equity" ? value : undefined;
+  return value === "crypto" || value === "equity" || value === "currency_pair"
+    ? value
+    : undefined;
 }
 
 function resultActionContextFromMetadata(
@@ -627,75 +487,6 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     consumedResultActions,
   );
   return { messages: normalized, inputActions: latestInputActions(normalized) };
-}
-
-function normalizeConfirmationHistory(messages: Message[]): Message[] {
-  const lastResultIndex = messages.reduce(
-    (latest, message, index) =>
-      message.kind === "strategy_result" ? index : latest,
-    -1,
-  );
-  const latestConfirmationIndex = messages.reduce(
-    (latest, message, index) =>
-      message.kind === "strategy_confirmation" && index > lastResultIndex
-        ? index
-        : latest,
-    -1,
-  );
-  return messages.map((message, index) => {
-    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
-      return message;
-    }
-    const shouldSupersede =
-      index < lastResultIndex ||
-      (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex);
-    if (!shouldSupersede) {
-      return {
-        ...message,
-        confirmation: {
-          ...message.confirmation,
-          confirmation_state: "active",
-        },
-        actions: message.confirmation.actions ?? message.actions,
-      };
-    }
-    return supersedePriorConfirmations(message);
-  });
-}
-
-function supersedePriorConfirmations(
-  message: Message,
-  statusLabel = "Updated",
-): Message {
-  if (message.kind !== "strategy_confirmation" || !message.confirmation) {
-    return message;
-  }
-  return {
-    ...message,
-    confirmation: {
-      ...message.confirmation,
-      confirmation_state: "superseded",
-      statusLabel,
-      actions: [],
-    },
-    actions: [],
-  };
-}
-
-function supersedeOpenConfirmations(
-  messages: Message[],
-  statusLabel = "Updated",
-): Message[] {
-  const lastResultIndex = messages.reduce(
-    (latest, message, index) =>
-      message.kind === "strategy_result" ? index : latest,
-    -1,
-  );
-  return messages.map((message, index) =>
-    message.kind === "strategy_confirmation" && index > lastResultIndex
-      ? supersedePriorConfirmations(message, statusLabel)
-      : message,
-  );
 }
 
 function chatStreamErrorText(detail: string | undefined, fallback: string) {
@@ -1567,7 +1358,7 @@ export default function ChatInterface() {
           strategyName: String(action.payload.strategy_name ?? "My strategy"),
           symbols: Array.isArray(action.payload.symbols) ? action.payload.symbols.map(String) : [],
           template: String(action.payload.template ?? ""),
-          assetClass: (action.payload.asset_class === "crypto" ? "crypto" : "equity"),
+          assetClass: assetClassOrUndefined(action.payload.asset_class) ?? "equity",
         });
         return;
       }
@@ -1678,6 +1469,9 @@ export default function ChatInterface() {
   const composerActions = hasActiveArtifactActionSet(messages)
     ? []
     : visibleComposerActions(inputActions);
+  const latestAssistantContent =
+    [...messages].reverse().find((message) => message.role === "ai")?.content?.trim() ?? "";
+  const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -2168,7 +1962,7 @@ export default function ChatInterface() {
                         />
                       );
                     })}
-                    {streamStatus && (
+                    {showStreamStatus && (
                       <div className="ml-12">
                         <span className="animate-ethereal-shimmer text-[13px] text-black/45 dark:text-white/45">
                           {streamStatus}
