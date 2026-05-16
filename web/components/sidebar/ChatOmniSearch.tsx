@@ -358,7 +358,7 @@ export default function ChatOmniSearch({
       <div
         className={`relative flex flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white dark:border-white/10 dark:bg-[#1b1d20] transition-all duration-300 ${
           layoutMode === "expanded"
-            ? "h-[75vh] w-full max-w-4xl"
+            ? "h-[85vh] w-[96vw] max-w-6xl"
             : "h-[65vh] w-full max-w-lg"
         }`}
       >
@@ -501,7 +501,7 @@ export default function ChatOmniSearch({
 
           {/* Right panel: elevated chat preview (expanded mode only) */}
           {layoutMode === "expanded" && (
-            <div className="hidden w-[45%] flex-col overflow-y-auto md:flex">
+            <div className="argus-thin-scrollbar hidden w-[60%] flex-col overflow-y-auto bg-black/[0.02] dark:bg-white/[0.02] md:flex">
               {isLoadingPreview ? (
                 <div className="flex flex-1 items-center justify-center">
                   <Loader2 className="h-5 w-5 animate-spin text-black/15 dark:text-white/15" />
