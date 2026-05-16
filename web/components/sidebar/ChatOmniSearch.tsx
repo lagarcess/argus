@@ -12,6 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Tooltip } from "@/components/ui/Tooltip";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -140,10 +141,15 @@ export default function ChatOmniSearch({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [previewMessages, setPreviewMessages] = useState<ApiMessage[]>([]);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
-    if (typeof window === "undefined") return "expanded";
-    return (localStorage.getItem("argus:omni_search_layout") as LayoutMode) ?? "expanded";
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("argus:omni_search_layout") as LayoutMode;
+    if (saved) setLayoutMode(saved);
+  }, []);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -290,30 +296,40 @@ export default function ChatOmniSearch({
   }, []);
 
   // ── Actions ─────────────────────────────────────────────────────────────
-  const handleRename = useCallback(
+  const startRename = useCallback((item: DisplayItem) => {
+    setEditingId(item.id);
+    setEditingTitle(item.title);
+  }, []);
+
+  const handleRenameSave = useCallback(
     async (id: string) => {
-      const item = displayItems.find((r) => r.id === id);
-      if (!item) return;
-      const newTitle = prompt("Rename conversation:", item.title);
-      if (!newTitle?.trim()) return;
+      const trimmed = editingTitle.trim();
+      if (!trimmed || trimmed === displayItems.find(i => i.id === id)?.title) {
+        setEditingId(null);
+        return;
+      }
+      setIsSubmittingEdit(true);
       try {
-        await patchConversation(id, { title: newTitle.trim() });
+        await patchConversation(id, { title: trimmed });
         // Update local state
         if (isFiltering) {
           setSearchResults((prev) =>
-            prev.map((r) => (r.id === id ? { ...r, title: newTitle.trim() } : r)),
+            prev.map((r) => (r.id === id ? { ...r, title: trimmed } : r)),
           );
         } else {
           setColdStartItems((prev) =>
-            prev.map((r) => (r.id === id ? { ...r, title: newTitle.trim() } : r)),
+            prev.map((r) => (r.id === id ? { ...r, title: trimmed } : r)),
           );
         }
         onMutated?.();
+        setEditingId(null);
       } catch (err) {
         console.error("Failed to rename", err);
+      } finally {
+        setIsSubmittingEdit(false);
       }
     },
-    [displayItems, isFiltering, onMutated],
+    [displayItems, editingTitle, isFiltering, onMutated],
   );
 
   const handleArchive = useCallback(
@@ -453,17 +469,34 @@ export default function ChatOmniSearch({
                         {/* Content — with right padding to prevent overlap with actions */}
                         <div className="min-w-0 flex-1 pr-20">
                           <div className="flex items-center gap-2">
-                            <span className="font-display truncate text-[14px] font-medium text-black dark:text-white">
-                              {isFiltering ? highlightText(item.title, query) : item.title}
-                            </span>
-                            {activeConversationId === item.id && (
-                              <span className="shrink-0 rounded-full bg-[#5ba897]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5ba897]">
-                                Current
-                              </span>
+                            {editingId === item.id ? (
+                              <input
+                                autoFocus
+                                value={editingTitle}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") void handleRenameSave(item.id);
+                                  if (e.key === "Escape") setEditingId(null);
+                                }}
+                                onBlur={() => void handleRenameSave(item.id)}
+                                disabled={isSubmittingEdit}
+                                className="w-full rounded-md border border-[#5ba897]/30 bg-[#5ba897]/5 px-2 py-0.5 font-display text-[14px] font-medium text-black outline-none focus:border-[#5ba897]/50 dark:text-white"
+                              />
+                            ) : (
+                              <>
+                                <span className="font-display truncate text-[14px] font-medium text-black dark:text-white">
+                                  {isFiltering ? highlightText(item.title, query) : item.title}
+                                </span>
+                                {activeConversationId === item.id && (
+                                  <span className="shrink-0 rounded-full bg-[#5ba897]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5ba897]">
+                                    Current
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
                           {/* Subtitle: only in collapsed mode or when no preview panel */}
-                          {(layoutMode === "collapsed" || !item.subtitle) && item.subtitle && (
+                          {editingId !== item.id && (layoutMode === "collapsed" || !item.subtitle) && item.subtitle && (
                             <span className="mt-0.5 line-clamp-1 text-[12px] leading-relaxed text-black/40 dark:text-white/40">
                               {isFiltering ? highlightText(item.subtitle, query) : item.subtitle}
                             </span>
@@ -478,36 +511,42 @@ export default function ChatOmniSearch({
                           </span>
                           {/* Hover actions */}
                           <div className="hidden items-center gap-0.5 group-hover:flex">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleRename(item.id);
-                              }}
-                              className="rounded-md p-1.5 hover:bg-black/10 dark:hover:bg-white/10"
-                              title={t("common.rename", "Rename")}
-                            >
-                              <Edit2 className="h-3 w-3 text-black/50 dark:text-white/50" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleArchive(item.id);
-                              }}
-                              className="rounded-md p-1.5 hover:bg-black/10 dark:hover:bg-white/10"
-                              title={t("common.archive", "Archive")}
-                            >
-                              <Archive className="h-3 w-3 text-black/50 dark:text-white/50" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleDelete(item.id);
-                              }}
-                              className="rounded-md p-1.5 hover:bg-black/10 dark:hover:bg-white/10"
-                              title={t("common.delete", "Delete")}
-                            >
-                              <Trash2 className="h-3 w-3 text-[#d66d75]" />
-                            </button>
+                            <Tooltip content={t("common.rename", "Rename")} side="top">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startRename(item);
+                                }}
+                                className="rounded-md p-1.5 hover:bg-black/10 dark:hover:bg-white/10"
+                                aria-label="Rename"
+                              >
+                                <Edit2 className="h-3 w-3 text-black/50 dark:text-white/50" />
+                              </button>
+                            </Tooltip>
+                            <Tooltip content={t("common.archive", "Archive")} side="top">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleArchive(item.id);
+                                }}
+                                className="rounded-md p-1.5 hover:bg-black/10 dark:hover:bg-white/10"
+                                aria-label="Archive"
+                              >
+                                <Archive className="h-3 w-3 text-black/50 dark:text-white/50" />
+                              </button>
+                            </Tooltip>
+                            <Tooltip content={t("common.delete", "Delete")} side="top">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleDelete(item.id);
+                                }}
+                                className="rounded-md p-1.5 hover:bg-black/10 dark:hover:bg-white/10"
+                                aria-label="Delete"
+                              >
+                                <Trash2 className="h-3 w-3 text-[#d66d75]" />
+                              </button>
+                            </Tooltip>
                           </div>
                         </div>
                       </div>

@@ -24,6 +24,7 @@ export function Tooltip({
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [actualSide, setActualSide] = useState<"top" | "bottom" | "left" | "right">(side);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const triggerRef = useRef<HTMLElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -33,16 +34,24 @@ export function Tooltip({
     timeoutRef.current = setTimeout(() => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect();
+        let calculatedSide = side;
+
+        // Smart flip if too close to edges
+        if (side === "top" && rect.top < 40) calculatedSide = "bottom";
+        if (side === "bottom" && window.innerHeight - rect.bottom < 40) calculatedSide = "top";
+        if (side === "left" && rect.left < 60) calculatedSide = "right";
+        if (side === "right" && window.innerWidth - rect.right < 60) calculatedSide = "left";
+
         let top = 0;
         let left = 0;
 
-        if (side === "right") {
+        if (calculatedSide === "right") {
           top = rect.top + rect.height / 2;
           left = rect.right + 8;
-        } else if (side === "left") {
+        } else if (calculatedSide === "left") {
           top = rect.top + rect.height / 2;
           left = rect.left - 8;
-        } else if (side === "top") {
+        } else if (calculatedSide === "top") {
           top = rect.top - 8;
           left = rect.left + rect.width / 2;
         } else {
@@ -51,6 +60,7 @@ export function Tooltip({
         }
 
         setCoords({ top, left });
+        setActualSide(calculatedSide);
         setIsVisible(true);
       }
     }, delay);
@@ -70,6 +80,7 @@ export function Tooltip({
   // Use cloneElement to attach refs and events to children
   const trigger = React.cloneElement(children, {
     ref: triggerRef,
+    style: { ...children.props.style, cursor: "pointer" },
     onMouseEnter: (e: React.MouseEvent) => {
       children.props.onMouseEnter?.(e);
       showTooltip();
@@ -89,14 +100,15 @@ export function Tooltip({
   });
 
   const alignmentClass = 
-    side === "right" || side === "left" 
-      ? "-translate-y-1/2" 
-      : "-translate-x-1/2";
+    actualSide === "top" ? "-translate-x-1/2 -translate-y-full" :
+    actualSide === "bottom" ? "-translate-x-1/2" :
+    actualSide === "left" ? "-translate-x-full -translate-y-1/2" :
+    "-translate-y-1/2";
 
   const sideClass = 
-    side === "left" ? "origin-right" : 
-    side === "right" ? "origin-left" : 
-    side === "top" ? "origin-bottom" : "origin-top";
+    actualSide === "left" ? "origin-right" : 
+    actualSide === "right" ? "origin-left" : 
+    actualSide === "top" ? "origin-bottom" : "origin-top";
 
   return (
     <>
@@ -110,9 +122,9 @@ export function Tooltip({
             left: coords.left,
             zIndex: 9999,
           }}
-          className={`pointer-events-none ${alignmentClass} ${sideClass} animate-in fade-in zoom-in-95 duration-150`}
+          className={`pointer-events-none ${alignmentClass} ${sideClass} animate-in fade-in zoom-in-95 duration-200`}
         >
-          <div className="rounded-[10px] border border-black/10 bg-white/95 px-3 py-1.5 text-[13px] font-medium text-black shadow-[0_4px_12px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-[#1f2225]/95 dark:text-white">
+          <div className="rounded-[8px] border border-black/10 bg-black/90 px-2.5 py-1 text-[12px] font-medium text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] backdrop-blur-md dark:border-white/10 dark:bg-[#1f2225] dark:text-white/90">
             {content}
           </div>
         </div>,

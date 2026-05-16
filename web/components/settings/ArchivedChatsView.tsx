@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { listConversations, patchConversation, type Conversation } from "@/lib/argus-api";
 
 type ArchivedChatsViewProps = {
@@ -90,13 +91,15 @@ export default function ArchivedChatsView({ onClose }: ArchivedChatsViewProps) {
                       {chat.last_message_preview || t("chat.no_messages")}
                     </span>
                   </div>
-                  <button
-                    onClick={() => void handleUnarchive(chat.id)}
-                    className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-black/50 dark:text-white/50 transition-colors"
-                    title={t("common.restore") || "Restore"}
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </button>
+                  <Tooltip content={t("common.restore") || "Restore"} side="top">
+                    <button
+                      onClick={() => void handleUnarchive(chat.id)}
+                      className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-black/50 dark:text-white/50 transition-colors"
+                      aria-label="Restore"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                    </button>
+                  </Tooltip>
                 </div>
               ))}
             </div>

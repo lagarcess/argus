@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   listHistory,
   patchConversation,
@@ -127,13 +128,15 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => void handleRestore(item)}
-                    className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-black/50 dark:text-white/50 transition-colors"
-                    title={t("common.restore") || "Restore"}
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </button>
+                  <Tooltip content={t("common.restore") || "Restore"} side="top">
+                    <button
+                      onClick={() => void handleRestore(item)}
+                      className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-black/50 dark:text-white/50 transition-colors"
+                      aria-label="Restore"
+                    >
+                      <RotateCcw className="w-5 h-5" />
+                    </button>
+                  </Tooltip>
                 </div>
               ))}
             </div>
