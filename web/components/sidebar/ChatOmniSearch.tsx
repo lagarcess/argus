@@ -261,6 +261,25 @@ export default function ChatOmniSearch({
     };
   }, [hoveredId, layoutMode]);
 
+  // ── Scroll to first match ───────────────────────────────────────────────
+  const previewScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!query || previewMessages.length === 0 || isLoadingPreview) return;
+
+    // Give ReactMarkdown a frame to render the nodes, including <mark> tags
+    const timeoutId = setTimeout(() => {
+      if (previewScrollRef.current) {
+        const firstMark = previewScrollRef.current.querySelector("mark");
+        if (firstMark) {
+          firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [query, previewMessages, isLoadingPreview]);
+
   // ── Layout persistence ──────────────────────────────────────────────────
   const toggleLayout = useCallback(() => {
     setLayoutMode((prev) => {
@@ -501,7 +520,10 @@ export default function ChatOmniSearch({
 
           {/* Right panel: elevated chat preview (expanded mode only) */}
           {layoutMode === "expanded" && (
-            <div className="argus-thin-scrollbar hidden w-[60%] flex-col overflow-y-auto bg-black/[0.02] dark:bg-white/[0.02] md:flex">
+            <div 
+              ref={previewScrollRef}
+              className="argus-thin-scrollbar hidden w-[60%] flex-col overflow-y-auto bg-black/[0.02] dark:bg-white/[0.02] md:flex"
+            >
               {isLoadingPreview ? (
                 <div className="flex flex-1 items-center justify-center">
                   <Loader2 className="h-5 w-5 animate-spin text-black/15 dark:text-white/15" />
@@ -510,7 +532,7 @@ export default function ChatOmniSearch({
                 <div className="flex flex-1 flex-col gap-3 p-4">
                   {hydrateMessagesFromApi(previewMessages).messages.map((msg) => (
                     <div key={msg.id} className="pointer-events-none opacity-90">
-                      <ChatMessage message={msg} isLatest={false} />
+                      <ChatMessage message={msg} isLatest={false} searchQuery={query} />
                     </div>
                   ))}
                 </div>

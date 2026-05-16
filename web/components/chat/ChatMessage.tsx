@@ -9,6 +9,58 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
+import { Children, isValidElement, cloneElement, ReactNode, useMemo } from "react";
+
+function highlightText(text: string, query: string): ReactNode[] {
+  if (!query.trim()) return [text];
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <mark
+        key={i}
+        className="rounded-sm bg-[#c2a44d]/20 px-0.5 font-semibold text-[#c2a44d]"
+        style={{ textDecoration: "none" }}
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
+
+function highlightChildren(children: ReactNode, query: string): ReactNode {
+  if (typeof children === "string") {
+    return highlightText(children, query);
+  }
+  if (Array.isArray(children)) {
+    return Children.map(children, (child) => highlightChildren(child, query));
+  }
+  if (isValidElement(children)) {
+    return cloneElement(children as React.ReactElement<any>, {
+      children: highlightChildren((children.props as any).children, query)
+    });
+  }
+  return children;
+}
+
+function getMarkdownComponents(searchQuery?: string) {
+  if (!searchQuery) return undefined;
+  return {
+    p: ({ children, ...props }: any) => <p {...props}>{highlightChildren(children, searchQuery)}</p>,
+    span: ({ children, ...props }: any) => <span {...props}>{highlightChildren(children, searchQuery)}</span>,
+    li: ({ children, ...props }: any) => <li {...props}>{highlightChildren(children, searchQuery)}</li>,
+    h1: ({ children, ...props }: any) => <h1 {...props}>{highlightChildren(children, searchQuery)}</h1>,
+    h2: ({ children, ...props }: any) => <h2 {...props}>{highlightChildren(children, searchQuery)}</h2>,
+    h3: ({ children, ...props }: any) => <h3 {...props}>{highlightChildren(children, searchQuery)}</h3>,
+    strong: ({ children, ...props }: any) => <strong {...props}>{highlightChildren(children, searchQuery)}</strong>,
+    em: ({ children, ...props }: any) => <em {...props}>{highlightChildren(children, searchQuery)}</em>,
+    td: ({ children, ...props }: any) => <td {...props}>{highlightChildren(children, searchQuery)}</td>,
+    th: ({ children, ...props }: any) => <th {...props}>{highlightChildren(children, searchQuery)}</th>,
+  };
+}
 
 type ChatMessageProps = {
   message: Message;
@@ -16,9 +68,10 @@ type ChatMessageProps = {
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   isLatest?: boolean;
   isStreaming?: boolean;
+  searchQuery?: string;
 };
 
-export default function ChatMessage({ message, onAction, onFeedback, isLatest, isStreaming }: ChatMessageProps) {
+export default function ChatMessage({ message, onAction, onFeedback, isLatest, isStreaming, searchQuery }: ChatMessageProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
@@ -208,7 +261,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard result={message.result} onAction={onAction} />
               {message.content && (
-                <ResultReadout content={message.content} />
+                <ResultReadout content={message.content} searchQuery={searchQuery} />
               )}
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
@@ -216,10 +269,13 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
             </div>
           ) : message.contentPresentation === "result_breakdown" ? (
-            <ResultBreakdown content={message.content ?? ""} />
+            <ResultBreakdown content={message.content ?? ""} searchQuery={searchQuery} />
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={getMarkdownComponents(searchQuery)}
+              >
                 {message.content ?? ""}
               </ReactMarkdown>
             </div>
@@ -309,26 +365,32 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
   );
 }
 
-function ResultReadout({ content }: { content: string }) {
+function ResultReadout({ content, searchQuery }: { content: string; searchQuery?: string }) {
   return (
     <section
       className="argus-result-readout prose dark:prose-invert max-w-none"
       aria-label="Result readout"
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={getMarkdownComponents(searchQuery)}
+      >
         {content}
       </ReactMarkdown>
     </section>
   );
 }
 
-function ResultBreakdown({ content }: { content: string }) {
+function ResultBreakdown({ content, searchQuery }: { content: string; searchQuery?: string }) {
   return (
     <section
       className="argus-result-breakdown prose dark:prose-invert max-w-none"
       aria-label="Result breakdown"
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={getMarkdownComponents(searchQuery)}
+      >
         {content}
       </ReactMarkdown>
     </section>
