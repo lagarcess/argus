@@ -305,20 +305,32 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
                 <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
                 {(rating === null || rating === "positive") && (
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white" }`}
-                    title={t('chat.good_response')}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
+                      rating === "positive"
+                        ? "bg-[#5ba897]/15 text-[#5ba897] opacity-100 scale-110"
+                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+                    }`}
+                    title={t("chat.good_response")}
                     onClick={() => handleRating("positive")}
                   >
-                    <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? "fill-current" : ""}`} />
+                    <ThumbsUp
+                      className={`w-3.5 h-3.5 ${rating === "positive" ? "fill-current" : ""}`}
+                    />
                   </button>
                 )}
                 {(rating === null || rating === "negative") && (
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white" }`}
-                    title={t('chat.poor_response')}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
+                      rating === "negative"
+                        ? "bg-[#d66d75]/15 text-[#d66d75] opacity-100 scale-110"
+                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+                    }`}
+                    title={t("chat.poor_response")}
                     onClick={() => handleRating("negative")}
                   >
-                    <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? "fill-current" : ""}`} />
+                    <ThumbsDown
+                      className={`w-3.5 h-3.5 ${rating === "negative" ? "fill-current" : ""}`}
+                    />
                   </button>
                 )}
                 <button

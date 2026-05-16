@@ -13,8 +13,9 @@ import {
   LineChart,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import ChatSidebar from "@/components/sidebar/ChatSidebar";
+import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import ChatOmniSearch from "@/components/sidebar/ChatOmniSearch";
+import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 
 import {
   createConversation,
@@ -572,6 +573,8 @@ export default function ChatInterface() {
     rating?: "positive" | "negative";
     context?: Record<string, unknown>;
   }>({ isOpen: false, type: "general" });
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("expanded");
+  const [isSidebarPreferenceModalOpen, setIsSidebarPreferenceModalOpen] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -623,6 +626,30 @@ export default function ChatInterface() {
     setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
     setHistoryNextCursor(next_cursor);
   }, [collectionsEnabled]);
+
+  // Load sidebar mode preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("argus:sidebar_mode") as SidebarMode | null;
+    if (saved && ["expanded", "collapsed", "hover"].includes(saved)) {
+      setSidebarMode(saved);
+      if (saved === "collapsed") {
+        setIsSidebarOpen(false);
+      } else if (saved === "expanded") {
+        setIsSidebarOpen(true);
+      }
+    } else {
+      // Default to expanded for new users on desktop
+      setIsSidebarOpen(true);
+    }
+  }, []);
+
+  const handleSetSidebarMode = (mode: SidebarMode) => {
+    setSidebarMode(mode);
+    localStorage.setItem("argus:sidebar_mode", mode);
+    if (mode === "expanded") setIsSidebarOpen(true);
+    if (mode === "collapsed") setIsSidebarOpen(false);
+    if (mode === "hover") setIsSidebarOpen(false);
+  };
 
   // ── History ────────────────────────────────────────────────────────────────
 
@@ -1465,6 +1492,8 @@ export default function ChatInterface() {
         onFeedback={(type) => {
           setFeedbackState({ isOpen: true, type, context: { surface: "sidebar" } });
         }}
+        onOpenSidebarPreference={() => setIsSidebarPreferenceModalOpen(true)}
+        mode={sidebarMode}
       />
 
       {/* ── Chat Omni Search Overlay ── */}
@@ -1482,7 +1511,7 @@ export default function ChatInterface() {
 
       {/* ── Main panel ── */}
       <section
-        className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]"
+        className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] transition-all duration-300 ease-in-out dark:bg-[#141517]"
       >
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
         {currentView !== "settings" && (
@@ -1855,6 +1884,14 @@ export default function ChatInterface() {
         rating={feedbackState.rating}
         context={feedbackState.context}
       />
+
+      {isSidebarPreferenceModalOpen && (
+        <SidebarPreferenceModal
+          mode={sidebarMode}
+          onSelect={handleSetSidebarMode}
+          onClose={() => setIsSidebarPreferenceModalOpen(false)}
+        />
+      )}
 
       {/* ── Toast ── */}
       {toast && (

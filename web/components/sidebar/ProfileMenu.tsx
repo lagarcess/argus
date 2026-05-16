@@ -118,11 +118,25 @@ export default function ProfileMenu({
     return () => document.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
-  // Submenu hover with delay
+  // Submenu hover with delay and guard
+  const [canOpenSubmenu, setCanOpenSubmenu] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Guard: wait 100ms before allowing submenus to open to prevent 'exploded' effect on open
+      const t = setTimeout(() => setCanOpenSubmenu(true), 100);
+      return () => clearTimeout(t);
+    } else {
+      setCanOpenSubmenu(false);
+      setActiveSubmenu(null);
+    }
+  }, [isOpen]);
+
   const handleSubmenuEnter = useCallback((menu: SubMenu) => {
+    if (!canOpenSubmenu) return;
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
     setActiveSubmenu(menu);
-  }, []);
+  }, [canOpenSubmenu]);
 
   const handleSubmenuLeave = useCallback(() => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
@@ -323,7 +337,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "data" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[200px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+            className="absolute bottom-0 left-full ml-1.5 min-w-[220px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -332,14 +346,14 @@ export default function ProfileMenu({
               onClick={() => openModal("archived")}
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
-              <Archive className="h-3.5 w-3.5" />
+              <Archive className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.archived_chats", "Archived chats")}
             </button>
             <button
               onClick={() => openModal("deleted")}
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.data.recently_deleted", "Recently Deleted")}
             </button>
             <button
@@ -347,7 +361,7 @@ export default function ProfileMenu({
               className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-[#d66d75]/40"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Delete all conversations
+              <span className="whitespace-nowrap">Delete all conversations</span>
             </button>
           </div>
         )}
@@ -368,7 +382,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "settings" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[200px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+            className="absolute bottom-0 left-full ml-1.5 min-w-[220px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}
@@ -377,14 +391,14 @@ export default function ProfileMenu({
               onClick={() => openModal("appearance")}
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
-              <Palette className="h-3.5 w-3.5" />
+              <Palette className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.app.appearance", "Appearance")}
             </button>
             <button
               onClick={() => openModal("language")}
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
-              <Globe className="h-3.5 w-3.5" />
+              <Globe className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
               {t("settings.app.language", "Language")}
             </button>
             {onOpenSidebarPreference && (
@@ -395,7 +409,7 @@ export default function ProfileMenu({
                 }}
                 className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
               >
-                <PanelLeft className="h-3.5 w-3.5" />
+                <PanelLeft className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
                 Sidebar
               </button>
             )}
@@ -403,7 +417,7 @@ export default function ProfileMenu({
               disabled
               className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25"
             >
-              <Shield className="h-3.5 w-3.5" />
+              <Shield className="h-3.5 w-3.5 text-black/25 dark:text-white/25" />
               Security
             </button>
           </div>
@@ -425,7 +439,7 @@ export default function ProfileMenu({
         </button>
         {activeSubmenu === "help" && (
           <div
-            className="absolute bottom-0 left-full ml-1.5 min-w-[200px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+            className="absolute bottom-0 left-full ml-1.5 min-w-[220px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
             style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
             onMouseEnter={handleSubmenuKeepAlive}
             onMouseLeave={handleSubmenuLeave}

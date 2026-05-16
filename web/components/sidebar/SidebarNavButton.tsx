@@ -1,6 +1,6 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 type SidebarNavButtonProps = {
   /** Lucide icon component */
@@ -25,7 +25,7 @@ type SidebarNavButtonProps = {
  * Reusable sidebar navigation button.
  *
  * Typography: Space Grotesk (font-display) per DESIGN.md Nav/UI role.
- * When collapsed: shows only the icon with a native tooltip.
+ * When collapsed: shows only the icon with a premium custom tooltip.
  * When expanded: shows icon + label, with optional trailing element.
  */
 export default function SidebarNavButton({
@@ -38,10 +38,9 @@ export default function SidebarNavButton({
   trailing,
   iconSize = 22,
 }: SidebarNavButtonProps) {
-  return (
+  const button = (
     <button
       onClick={onClick}
-      title={collapsed ? label : undefined}
       className={`group mb-1 flex h-11 w-full items-center rounded-[14px] transition-colors duration-200 ${
         active
           ? "bg-black/5 dark:bg-white/5"
@@ -72,4 +71,14 @@ export default function SidebarNavButton({
       )}
     </button>
   );
+
+  if (collapsed) {
+    return (
+      <Tooltip content={label} side="right" delay={150}>
+        {button}
+      </Tooltip>
+    );
+  }
+
+  return button;
 }

@@ -19,6 +19,7 @@ import {
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
 import ProfileMenu from "./ProfileMenu";
 import { patchConversation, deleteConversation as apiDeleteConversation } from "@/lib/argus-api";
@@ -27,12 +28,17 @@ import type { HistoryItem, SearchItem } from "@/lib/argus-api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type SidebarMode = "expanded" | "collapsed" | "hover";
+
 type View = "chat" | "strategies" | "collections" | "settings";
 
 export type ChatSidebarProps = {
   /** Whether the sidebar is expanded or collapsed */
   isOpen: boolean;
   onToggle: () => void;
+
+  /** Sidebar behavior mode */
+  mode?: SidebarMode;
 
   /** Currently active view */
   currentView: View;
@@ -64,6 +70,8 @@ export type ChatSidebarProps = {
   onLogout: () => void;
   /** Feedback handler */
   onFeedback?: (type: "bug" | "feature" | "general") => void;
+  /** Sidebar preference handler */
+  onOpenSidebarPreference?: () => void;
 };
 
 // ─── Date grouping helpers ────────────────────────────────────────────────────
@@ -169,19 +177,21 @@ function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: Recen
 
   return (
     <div ref={menuRef} className="relative">
-      <button
-        ref={triggerRef}
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsMenuOpen(!isMenuOpen);
-        }}
-        className={`flex h-7 w-7 items-center justify-center rounded-md transition-opacity duration-150 hover:bg-black/10 dark:hover:bg-white/10 ${
-          isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-        }`}
-        title={t("common.more", "More")}
-      >
-        <MoreVertical className="h-3.5 w-3.5 text-black/50 dark:text-white/50" />
-      </button>
+      <Tooltip content={t("common.more", "More")} side="top" delay={150}>
+        <button
+          ref={triggerRef}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMenuOpen(!isMenuOpen);
+          }}
+          className={`flex h-7 w-7 items-center justify-center rounded-md transition-opacity duration-150 hover:bg-black/10 dark:hover:bg-white/10 ${
+            isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
+          aria-label={t("common.more", "More")}
+        >
+          <MoreVertical className="h-3.5 w-3.5 text-black/50 dark:text-white/50" />
+        </button>
+      </Tooltip>
 
       {isMenuOpen && menuPosition && typeof document !== "undefined" && createPortal(
         <div
@@ -249,6 +259,7 @@ function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: Recen
 export default function ChatSidebar({
   isOpen,
   onToggle,
+  mode = "expanded",
   currentView,
   conversationId,
   isRecentsExpanded,
@@ -265,6 +276,7 @@ export default function ChatSidebar({
   onHistoryMutated,
   onLogout,
   onFeedback,
+  onOpenSidebarPreference,
 }: ChatSidebarProps) {
   const { t } = useTranslation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -272,6 +284,37 @@ export default function ChatSidebar({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const recentsScrollRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ─── Hover Logic ────────────────────────────────────────────────────────────
+
+  const handleMouseEnter = () => {
+    if (mode !== "hover") return;
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (!isOpen) {
+        onToggle();
+      }
+    }, 300);
+  };
+
+  const handleMouseLeave = () => {
+    if (mode !== "hover") return;
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (isOpen) {
+        onToggle();
+      }
+    }, 300);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
 
   // ── Filter to chats only ────────────────────────────────────────────────
   const chatItems = useMemo(
@@ -359,25 +402,32 @@ export default function ChatSidebar({
 
   return (
     <aside
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`flex flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
         isOpen ? "w-72" : "w-14"
       }`}
     >
       {/* Sidebar Header: Brand + Panel Toggle */}
       <div className="flex h-20 items-center px-[6px] pb-4 pt-6">
-        <button
-          onClick={onToggle}
-          title={isOpen ? t("sidebar.close", "Close sidebar") : t("sidebar.open", "Open sidebar")}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-          aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
+        <Tooltip
+          content={isOpen ? t("sidebar.close", "Close sidebar") : t("sidebar.open", "Open sidebar")}
+          side="right"
+          delay={150}
         >
-          {/* Swap: PanelLeft when open → ArgusLogo when collapsed */}
-          {isOpen ? (
-            <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
-          ) : (
-            <ArgusLogo className="h-8 w-8 text-black dark:text-white" />
-          )}
-        </button>
+          <button
+            onClick={onToggle}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+            aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            {/* Swap: PanelLeft when open → ArgusLogo when collapsed */}
+            {isOpen ? (
+              <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
+            ) : (
+              <ArgusLogo className="h-8 w-8 text-black dark:text-white" />
+            )}
+          </button>
+        </Tooltip>
         {/* "argus" text — font-display (Space Grotesk) per DESIGN.md */}
         <span
           className={`ml-1 whitespace-nowrap font-display text-[22px] font-medium tracking-tight text-black transition-[opacity,max-width] duration-300 ease-in-out dark:text-white ${
@@ -556,6 +606,7 @@ export default function ChatSidebar({
           onClose={() => setIsProfileMenuOpen(false)}
           onLogout={onLogout}
           onFeedback={onFeedback}
+          onOpenSidebarPreference={onOpenSidebarPreference}
           anchorRef={profileButtonRef}
           sidebarCollapsed={!isOpen}
         />
