@@ -74,7 +74,7 @@ type OnboardingChoice = {
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
 
-type HydratedMessages = {
+export type HydratedMessages = {
   messages: Message[];
   inputActions: ChatActionOption[];
 };
@@ -389,7 +389,7 @@ function markResultCardSaving(
   });
 }
 
-function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
+export function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   const consumedResultActions = consumedResultActionsFromApi(items);
   const confirmationActionEffects = confirmationActionEffectsFromApi(items);
   const hiddenMessageIds = new Set([

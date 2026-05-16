@@ -9,12 +9,14 @@ import {
   History,
   MessageCirclePlus,
   MoreVertical,
+  PanelLeft,
   Pin,
   Search,
   Archive,
   Trash2,
   User,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
 import SidebarNavButton from "./SidebarNavButton";
@@ -124,14 +126,30 @@ type RecentChatActionsProps = {
 
 function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: RecentChatActionsProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const { t } = useTranslation();
+
+  // Calculate menu position when opening
+  useEffect(() => {
+    if (isMenuOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left: rect.right - 160, // align right edge with trigger
+      });
+    }
+  }, [isMenuOpen]);
 
   // Close on click-outside
   useEffect(() => {
     if (!isMenuOpen) return;
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        triggerRef.current && !triggerRef.current.contains(e.target as Node)
+      ) {
         setIsMenuOpen(false);
       }
     };
@@ -152,25 +170,36 @@ function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: Recen
   return (
     <div ref={menuRef} className="relative">
       <button
+        ref={triggerRef}
         onClick={(e) => {
           e.stopPropagation();
           setIsMenuOpen(!isMenuOpen);
         }}
-        className="flex h-7 w-7 items-center justify-center rounded-md opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
+        className={`flex h-7 w-7 items-center justify-center rounded-md transition-opacity duration-150 hover:bg-black/10 dark:hover:bg-white/10 ${
+          isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        }`}
         title={t("common.more", "More")}
       >
         <MoreVertical className="h-3.5 w-3.5 text-black/50 dark:text-white/50" />
       </button>
 
-      {isMenuOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]">
+      {isMenuOpen && menuPosition && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed z-[9999] min-w-[160px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
+          style={{
+            top: menuPosition.top,
+            left: menuPosition.left,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
               onPin(item.id, !item.pinned);
               setIsMenuOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] hover:bg-black/5 dark:hover:bg-white/5"
+            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5"
           >
             <Pin className="h-3.5 w-3.5" />
             {item.pinned ? t("common.unpin", "Unpin") : t("common.pin", "Pin")}
@@ -181,7 +210,7 @@ function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: Recen
               onRename(item.id);
               setIsMenuOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] hover:bg-black/5 dark:hover:bg-white/5"
+            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5"
           >
             <Edit2 className="h-3.5 w-3.5" />
             {t("common.rename", "Rename")}
@@ -192,7 +221,7 @@ function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: Recen
               onArchive(item.id);
               setIsMenuOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] hover:bg-black/5 dark:hover:bg-white/5"
+            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5"
           >
             <Archive className="h-3.5 w-3.5" />
             {t("common.archive", "Archive")}
@@ -203,12 +232,13 @@ function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: Recen
               onDelete(item.id);
               setIsMenuOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-[#d66d75] hover:bg-black/5 dark:hover:bg-white/5"
+            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-[#d66d75] hover:bg-black/5 dark:hover:bg-white/5"
           >
             <Trash2 className="h-3.5 w-3.5" />
             {t("common.delete", "Delete")}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -329,23 +359,29 @@ export default function ChatSidebar({
 
   return (
     <aside
-      className={`flex flex-col border-r border-black/5 bg-white transition-all duration-300 ease-in-out overflow-x-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
+      className={`flex flex-col border-r border-black/5 bg-white transition-[width] duration-300 ease-in-out overflow-hidden will-change-[width] dark:border-white/5 dark:bg-[#141517] ${
         isOpen ? "w-72" : "w-14"
       }`}
     >
-      {/* Sidebar Header: Brand & Toggle */}
-      <div className="flex h-20 items-center px-[6px] pb-4 pt-6 overflow-hidden">
+      {/* Sidebar Header: Brand + Panel Toggle */}
+      <div className="flex h-20 items-center px-[6px] pb-4 pt-6">
         <button
           onClick={onToggle}
           title={isOpen ? t("sidebar.close", "Close sidebar") : t("sidebar.open", "Open sidebar")}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-300 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
           aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
         >
-          <ArgusLogo className="h-8 w-8 text-black dark:text-white" />
+          {/* Swap: PanelLeft when open → ArgusLogo when collapsed */}
+          {isOpen ? (
+            <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
+          ) : (
+            <ArgusLogo className="h-8 w-8 text-black dark:text-white" />
+          )}
         </button>
+        {/* "argus" text — font-display (Space Grotesk) per DESIGN.md */}
         <span
-          className={`font-display pl-3 text-[22px] font-bold tracking-tight text-black transition-all duration-300 dark:text-white ${
-            isOpen ? "opacity-100" : "pointer-events-none absolute left-[72px] opacity-0"
+          className={`ml-1 whitespace-nowrap font-display text-[22px] font-medium tracking-tight text-black transition-[opacity,max-width] duration-300 ease-in-out dark:text-white ${
+            isOpen ? "max-w-[200px] opacity-100" : "max-w-0 overflow-hidden opacity-0"
           }`}
         >
           argus
@@ -360,7 +396,6 @@ export default function ChatSidebar({
           collapsed={!isOpen}
           onClick={() => {
             onNewChat();
-            // Auto-collapse sidebar when creating a new chat (if open)
           }}
           iconSize={20}
         />
@@ -387,7 +422,15 @@ export default function ChatSidebar({
             icon={History}
             label={t("common.recents")}
             collapsed={!isOpen}
-            onClick={onToggleRecents}
+            onClick={() => {
+              if (!isOpen) {
+                // When collapsed: expand sidebar + open recents
+                onToggle();
+                if (!isRecentsExpanded) onToggleRecents();
+              } else {
+                onToggleRecents();
+              }
+            }}
             trailing={
               <ChevronDown
                 className={`h-4 w-4 text-black/40 transition-transform duration-200 dark:text-white/40 ${
@@ -418,21 +461,32 @@ export default function ChatSidebar({
                         </span>
                       </div>
                       {group.items.map((item) => (
-                        <button
+                        <div
                           key={`chat:${item.id}`}
-                          onClick={() => {
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            // Only navigate if click was on this element or its text children,
+                            // not on nested interactive elements (three-dot menu)
+                            const target = e.target as HTMLElement;
+                            if (target.closest('[data-actions]')) return;
                             if (renamingId !== item.id) {
                               onOpenItem(item);
                             }
                           }}
-                          className={`group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 ${
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && renamingId !== item.id) {
+                              onOpenItem(item);
+                            }
+                          }}
+                          className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 ${
                             conversationId === item.id
                               ? "bg-black/5 dark:bg-white/5"
                               : "hover:bg-black/5 dark:hover:bg-white/5"
                           }`}
                         >
                           <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
-                          <div className="min-w-0 flex-1 pl-3 pr-2">
+                          <div className="min-w-0 flex-1 pl-3 pr-10">
                             {renamingId === item.id ? (
                               <input
                                 autoFocus
@@ -464,7 +518,7 @@ export default function ChatSidebar({
                             )}
                           </div>
                           {renamingId !== item.id && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <div data-actions className="absolute right-2 top-1/2 -translate-y-1/2">
                               <RecentChatActions
                                 item={item}
                                 onPin={handlePin}
@@ -474,7 +528,7 @@ export default function ChatSidebar({
                               />
                             </div>
                           )}
-                        </button>
+                        </div>
                       ))}
                     </div>
                   ))}
@@ -503,6 +557,7 @@ export default function ChatSidebar({
           onLogout={onLogout}
           onFeedback={onFeedback}
           anchorRef={profileButtonRef}
+          sidebarCollapsed={!isOpen}
         />
         <div ref={profileButtonRef as React.RefObject<HTMLDivElement>}>
           <SidebarNavButton

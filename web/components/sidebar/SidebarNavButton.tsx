@@ -24,6 +24,7 @@ type SidebarNavButtonProps = {
 /**
  * Reusable sidebar navigation button.
  *
+ * Typography: Space Grotesk (font-display) per DESIGN.md Nav/UI role.
  * When collapsed: shows only the icon with a native tooltip.
  * When expanded: shows icon + label, with optional trailing element.
  */
@@ -41,33 +42,31 @@ export default function SidebarNavButton({
     <button
       onClick={onClick}
       title={collapsed ? label : undefined}
-      className={`group mb-1 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${
+      className={`group mb-1 flex h-11 w-full items-center rounded-[14px] transition-colors duration-200 ${
         active
           ? "bg-black/5 dark:bg-white/5"
           : "hover:bg-black/5 dark:hover:bg-white/5"
       } ${className}`}
     >
+      {/* Icon container: fixed 44px square, always centered */}
       <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center">
         <Icon
           style={{ width: iconSize, height: iconSize }}
           className="text-black/60 transition-transform duration-150 ease-out group-hover:scale-[1.06] group-hover:text-black dark:text-white/60 dark:group-hover:text-white"
         />
       </div>
+      {/* Label: font-display (Space Grotesk) per DESIGN.md Nav/UI role */}
       <span
-        className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${
+        className={`ml-1 whitespace-nowrap font-display text-[15px] font-medium tracking-tight text-black transition-[opacity,max-width] duration-300 ease-in-out dark:text-white ${
           collapsed
-            ? "pointer-events-none absolute left-[72px] opacity-0"
-            : "opacity-100"
+            ? "pointer-events-none max-w-0 overflow-hidden opacity-0"
+            : "max-w-[180px] opacity-100"
         }`}
       >
         {label}
       </span>
-      {trailing && (
-        <div
-          className={`ml-auto pr-4 transition-opacity duration-300 ${
-            collapsed ? "pointer-events-none hidden opacity-0" : "opacity-100"
-          }`}
-        >
+      {trailing && !collapsed && (
+        <div className="ml-auto pr-4">
           {trailing}
         </div>
       )}
