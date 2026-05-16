@@ -6,6 +6,7 @@
 **Origin branch:** `codex/backtesting-chat-service-modularization`
 **Reason for second pass:** Live browser QA contradicted the first-pass confidence. The app can still render cards and actions that are not backed by a canonical executable artifact, and several capability, retry, save, and follow-up behaviors remain below production readiness.
 **Directional update:** 2026-05-15
+**Milestone checkpoint:** [2026-05-15 Artifact Runtime Milestone Checkpoint](./2026-05-15-artifact-runtime-milestone-checkpoint.md)
 
 ## Executive Truth
 
