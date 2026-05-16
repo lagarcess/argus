@@ -124,7 +124,7 @@ export function Tooltip({
           }}
           className={`pointer-events-none ${alignmentClass} ${sideClass} animate-in fade-in zoom-in-95 duration-200`}
         >
-          <div className="rounded-[8px] border border-black/10 bg-black/90 px-2.5 py-1 text-[12px] font-medium text-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] backdrop-blur-md dark:border-white/10 dark:bg-[#1f2225] dark:text-white/90">
+          <div className="rounded-[8px] border border-black/5 bg-white/95 px-2.5 py-1 text-[12px] font-medium text-black shadow-[0_4px_16px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-[#1f2225]/95 dark:text-white">
             {content}
           </div>
         </div>,
