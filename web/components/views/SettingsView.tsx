@@ -7,38 +7,19 @@ import {
   ChevronRight,
   User,
   LogOut,
-  Sun,
-  Moon,
-  Monitor,
-  Search,
-  Check,
   ChevronLeft,
-  Archive,
-  History,
-  RotateCcw,
-  Trash,
-  Loader2,
-  MessageSquare,
-  BarChart2,
-  Layers,
-  MessageSquareWarning,
   Sparkles,
-  MessageSquarePlus,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   patchMe,
   getMe,
-  listConversations,
-  listHistory,
-  patchConversation,
-  patchStrategy,
-  deleteConversation,
-  deleteStrategy,
-  type Conversation,
-  type HistoryItem,
   type ApiUser,
 } from "@/lib/argus-api";
+import AppearanceModal from "@/components/settings/AppearanceModal";
+import LanguageModal from "@/components/settings/LanguageModal";
+import ArchivedChatsView from "@/components/settings/ArchivedChatsView";
+import DeletedItemsView from "@/components/settings/DeletedItemsView";
 import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
 
 type SettingsViewProps = {
@@ -51,7 +32,7 @@ type SubView = "main" | "archived" | "deleted";
 
 export default function SettingsView({ onClose, onLogout, onFeedback }: SettingsViewProps) {
   const { t, i18n } = useTranslation();
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const showSubscriptionSection =
     process.env.NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION === "true";
   const showDevOnboardingReset =
@@ -59,63 +40,19 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
   const [activeSubView, setActiveSubView] = useState<SubView>("main");
   const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
   const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const lang = i18n.language || "en";
-
-  // Sub-view data
-  const [archivedChats, setArchivedChats] = useState<Conversation[]>([]);
-  const [deletedItems, setDeletedItems] = useState<HistoryItem[]>([]);
   const [profile, setProfile] = useState<ApiUser | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const currentLangLabel = useMemo(
-    () => ENABLED_LANGUAGES.find((entry) => entry.code === normalizeEnabledLanguage(lang))?.name ?? "English",
-    [lang],
-  );
-
-  const filteredLanguages = useMemo(
-    () =>
-      ENABLED_LANGUAGES.filter(
-        (entry) =>
-          entry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          entry.translation.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-    [searchQuery],
-  );
-
-  useEffect(() => {
-    if (activeSubView === "archived") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsLoading(true);
-      listConversations({ archived: true })
-        .then(({ items }) => setArchivedChats(items))
-        .finally(() => setIsLoading(false));
-    } else if (activeSubView === "deleted") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsLoading(true);
-      listHistory({ deleted: true })
-        .then(({ items }) => setDeletedItems(items))
-        .finally(() => setIsLoading(false));
-    }
-  }, [activeSubView]);
 
   useEffect(() => {
     getMe()
       .then(({ user }) => setProfile(user))
       .catch(() => null);
   }, []);
+  const lang = i18n.language || "en";
 
-  const setLanguage = async (nextLanguage: string) => {
-    await i18n.changeLanguage(nextLanguage);
-    setIsLanguageModalOpen(false);
-    setSearchQuery("");
-
-    try {
-      await patchMe({ language: normalizeEnabledLanguage(nextLanguage) });
-    } catch {
-      // Silently ignore if not logged in
-    }
-  };
+  const currentLangLabel = useMemo(
+    () => ENABLED_LANGUAGES.find((entry) => entry.code === normalizeEnabledLanguage(lang))?.name ?? "English",
+    [lang],
+  );
 
   const resetOnboardingForDev = async () => {
     await patchMe({
@@ -128,27 +65,6 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
     });
   };
 
-  const handleUnarchive = async (id: string) => {
-    try {
-      await patchConversation(id, { archived: false });
-      setArchivedChats((prev) => prev.filter((c) => c.id !== id));
-    } catch (err) {
-      console.error("Failed to unarchive", err);
-    }
-  };
-
-  const handleRestoreDeleted = async (item: HistoryItem) => {
-    try {
-      if (item.type === "chat") {
-        await patchConversation(item.id, { deleted_at: null });
-      } else if (item.type === "strategy") {
-        await patchStrategy(item.id, { deleted_at: null });
-      }
-      setDeletedItems((prev) => prev.filter((i) => i.id !== item.id));
-    } catch (err) {
-      console.error("Failed to restore", err);
-    }
-  };
 
   const appearanceLabel =
     theme === "light"
@@ -185,102 +101,11 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
   );
 
   if (activeSubView === "archived") {
-    return (
-      <div className="flex flex-col w-full h-[100dvh] max-w-5xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
-        {renderHeader(t("settings.data.archived_chats"), () => setActiveSubView("main"))}
-        <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 relative z-10 w-full max-w-md mx-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 animate-spin text-black/20 dark:text-white/20" />
-            </div>
-          ) : archivedChats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center">
-                <Archive className="w-8 h-8 text-black/20 dark:text-white/20" />
-              </div>
-              <p className="text-[15px] text-black/40 dark:text-white/40">{t("common.no_items") || "No archived chats"}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {archivedChats.map((chat) => (
-                <div
-                  key={chat.id}
-                  className="group flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px]"
-                >
-                  <div className="flex flex-col min-w-0 pr-4">
-                    <span className="text-[15px] font-medium text-black dark:text-white truncate">
-                      {chat.title || t("chat.new_chat")}
-                    </span>
-                    <span className="text-[13px] text-black/40 dark:text-white/40 truncate">
-                      {chat.last_message_preview || t("chat.no_messages")}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleUnarchive(chat.id)}
-                    className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-[#9a66d9] dark:text-[#d3a8fc] transition-colors"
-                    title={t("common.restore") || "Restore"}
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return <ArchivedChatsView onClose={() => setActiveSubView("main")} />;
   }
 
   if (activeSubView === "deleted") {
-    return (
-      <div className="flex flex-col w-full h-[100dvh] max-w-5xl mx-auto overflow-hidden bg-[#f9f9f9] dark:bg-[#141517] relative font-space">
-        {renderHeader(t("settings.data.recently_deleted"), () => setActiveSubView("main"))}
-        <div className="flex-1 overflow-y-auto px-6 pt-24 pb-32 relative z-10 w-full max-w-md mx-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 animate-spin text-black/20 dark:text-white/20" />
-            </div>
-          ) : deletedItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center">
-                <History className="w-8 h-8 text-black/20 dark:text-white/20" />
-              </div>
-              <p className="text-[15px] text-black/40 dark:text-white/40">{t("common.no_items") || "No recently deleted items"}</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {deletedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="group flex items-center justify-between p-4 bg-white dark:bg-[#1f2225] border border-black/10 dark:border-white/10 rounded-[16px]"
-                >
-                  <div className="flex items-center gap-3 min-w-0 pr-4">
-                    <div className="shrink-0 w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40">
-                      {item.type === "chat" ? <MessageSquare className="w-4 h-4" /> : item.type === "strategy" ? <BarChart2 className="w-4 h-4" /> : <Layers className="w-4 h-4" />}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[15px] font-medium text-black dark:text-white truncate">
-                        {item.title}
-                      </span>
-                      <span className="text-[12px] text-black/40 dark:text-white/40 truncate uppercase tracking-wider font-bold">
-                        {item.type}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleRestoreDeleted(item)}
-                    className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-[#9a66d9] dark:text-[#d3a8fc] transition-colors"
-                    title={t("common.restore") || "Restore"}
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return <DeletedItemsView onClose={() => setActiveSubView("main")} />;
   }
 
   return (
@@ -458,95 +283,11 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
       </div>
 
       {isLanguageModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
-          <button
-            className="absolute inset-0"
-            aria-label="Close language modal"
-            onClick={() => {
-              setIsLanguageModalOpen(false);
-              setSearchQuery("");
-            }}
-          />
-          <div className="relative w-full max-w-sm bg-white dark:bg-[#111111] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden">
-            <div className="flex items-center px-4 py-3 border-b border-black/5 dark:border-white/5">
-              <Search className="w-4 h-4 text-black/40 dark:text-white/40 mr-3" />
-              <input
-                type="text"
-                autoFocus
-                placeholder={t("settings.search_language")}
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-full bg-transparent border-none outline-none text-[15px] text-black dark:text-white placeholder:text-black/35 dark:placeholder:text-white/35"
-              />
-            </div>
-            <div className="max-h-[340px] overflow-y-auto py-1">
-              {filteredLanguages.length === 0 ? (
-                <div className="px-4 py-8 text-center text-[14px] text-black/45 dark:text-white/45">
-                  {t("settings.no_languages")}
-                </div>
-              ) : (
-                filteredLanguages.map((entry) => (
-                  <button
-                    key={entry.code}
-                    onClick={() => setLanguage(entry.code)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                  >
-                    <span className="text-[15px] font-medium text-black dark:text-white">{entry.name}</span>
-                    {entry.code === normalizeEnabledLanguage(lang) ? (
-                      <Check className="w-4 h-4 text-black dark:text-white" />
-                    ) : (
-                      <span className="text-[14px] text-black/45 dark:text-white/45">{entry.translation}</span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
+        <LanguageModal onClose={() => setIsLanguageModalOpen(false)} />
       )}
 
       {isAppearanceModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-end sm:items-center justify-center">
-          <button
-            className="absolute inset-0"
-            aria-label="Close appearance modal"
-            onClick={() => setIsAppearanceModalOpen(false)}
-          />
-          <div className="relative w-full max-w-sm bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden p-3">
-            <div className="flex items-center justify-between p-1 bg-black/5 dark:bg-black/35 rounded-2xl">
-              <button
-                onClick={() => {
-                  setTheme("light");
-                  setIsAppearanceModalOpen(false);
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "light" ? "bg-white text-black " : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
-              >
-                <Sun className="w-[16px] h-[16px]" />
-                <span className="text-[14px] font-medium">{t("settings.app.appearance_options.light")}</span>
-              </button>
-              <button
-                onClick={() => {
-                  setTheme("dark");
-                  setIsAppearanceModalOpen(false);
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "dark" ? "bg-white dark:bg-[#32363d] text-black dark:text-white " : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
-              >
-                <Moon className="w-[16px] h-[16px]" />
-                <span className="text-[14px] font-medium">{t("settings.app.appearance_options.dark")}</span>
-              </button>
-              <button
-                onClick={() => {
-                  setTheme("system");
-                  setIsAppearanceModalOpen(false);
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-colors ${theme === "system" ? "bg-white dark:bg-[#32363d] text-black dark:text-white " : "text-black/45 dark:text-white/45 hover:text-black dark:hover:text-white"}`}
-              >
-                <Monitor className="w-[16px] h-[16px]" />
-                <span className="text-[14px] font-medium">{t("settings.app.appearance_options.system")}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <AppearanceModal onClose={() => setIsAppearanceModalOpen(false)} />
       )}
     </div>
   );

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ChatSidebar from "@/components/sidebar/ChatSidebar";
+import ChatOmniSearch from "@/components/sidebar/ChatOmniSearch";
 
 import {
   createConversation,
@@ -537,7 +538,8 @@ export default function ChatInterface() {
   const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [activeChatOptionsPanel, setActiveChatOptionsPanel] = useState<
     "none" | "history" | "collection"
@@ -1447,25 +1449,36 @@ export default function ChatInterface() {
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         currentView={currentView}
         conversationId={conversationId}
-        collectionsEnabled={collectionsEnabled}
         isRecentsExpanded={isRecentsExpanded}
         onToggleRecents={() => setIsRecentsExpanded(!isRecentsExpanded)}
         historyItems={historyItems}
         historyNextCursor={historyNextCursor}
         isLoadingMoreHistory={isLoadingMoreHistory}
-        searchText={searchText}
-        onSearchChange={setSearchText}
-        searchResults={searchResults}
-        searchNextCursor={searchNextCursor}
-        isSearching={isSearching}
-        isLoadingMoreSearch={isLoadingMoreSearch}
         onNewChat={() => { void startNewChat(); setIsSidebarOpen(false); }}
         onNavigate={(view) => { setCurrentView(view); setIsSidebarOpen(false); }}
         onOpenItem={openHistoryItem}
         onLoadMoreHistory={loadMoreHistory}
-        onLoadMoreSearch={() => void loadMoreSearch()}
         onOpenSettings={() => setCurrentView("settings")}
+        onOpenSearch={() => setSearchOverlayOpen(true)}
+        onHistoryMutated={refreshHistory}
+        onLogout={() => { window.location.href = "/"; }}
+        onFeedback={(type) => {
+          setFeedbackState({ isOpen: true, type, context: { surface: "sidebar" } });
+        }}
       />
+
+      {/* ── Chat Omni Search Overlay ── */}
+      {searchOverlayOpen && (
+        <ChatOmniSearch
+          onClose={() => setSearchOverlayOpen(false)}
+          onOpenConversation={(convId) => {
+            setSearchOverlayOpen(false);
+            void loadConversation(convId);
+          }}
+          activeConversationId={conversationId}
+          onMutated={refreshHistory}
+        />
+      )}
 
       {/* ── Main panel ── */}
       <section
