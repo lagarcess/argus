@@ -1120,8 +1120,14 @@ def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_relo
         snapshot = kwargs["fallback_latest_task_snapshot"]
         assert snapshot.pending_strategy_summary is not None
         assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+        assert snapshot.latest_backtest_result_reference is not None
+        assert snapshot.latest_backtest_result_reference.artifact_id == run.id
         assert kwargs["fallback_selected_thread_metadata"]["requested_field"] == (
             "refinement"
+        )
+        assert (
+            kwargs["fallback_selected_thread_metadata"]["source_result_run_id"]
+            == run.id
         )
         yield {"type": "stage_start", "stage": "interpret"}
         yield {
@@ -1337,6 +1343,102 @@ def test_result_followup_after_reload_preserves_saved_strategy_id() -> None:
     assert reference.metadata["saved_strategy_id"] == strategy_id
     assert reference.metadata["result_strategy_id"] == strategy_id
     assert reference.metadata["latest_run_id"] == run_id
+
+
+def test_pending_refinement_fallback_carries_source_result_reference() -> None:
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import pending_strategy_metadata_fallback_context
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["MSFT"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 15.6,
+                    "benchmark_return_pct": 16.6,
+                    "delta_vs_benchmark_pct": -1.1,
+                }
+            }
+        },
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["MSFT"],
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold Microsoft.",
+                "asset_universe": ["MSFT"],
+                "asset_class": "equity",
+                "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            },
+        },
+        conversation_result_card={
+            "title": "MSFT buy and hold",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": ["Benchmark: SPY"],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What would you like to change about this strategy?",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Microsoft.",
+                    "asset_universe": ["MSFT"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+                },
+                "requested_field": "refinement",
+                "missing_required_fields": ["refinement"],
+                "source_result": {
+                    "run_id": run.id,
+                    "strategy_id": run.strategy_id,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "source_result_run_id": run.id,
+            "source_result_conversation_id": conversation["id"],
+        },
+    )
+
+    fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert fallback is not None
+    snapshot = fallback.latest_task_snapshot
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run.id
+    assert reference.metadata["symbols"] == ["MSFT"]
+    assert fallback.selected_thread_metadata is not None
+    assert fallback.selected_thread_metadata["requested_field"] == "refinement"
+    assert fallback.selected_thread_metadata["source_result_run_id"] == run.id
 
 
 def test_retry_after_reload_carries_latest_failed_action_reference(monkeypatch) -> None:

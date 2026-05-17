@@ -20,6 +20,7 @@ from argus.agent_runtime.signal_rule_repair import (
 )
 from argus.agent_runtime.stages.interpret import InterpretationRequest, interpret_stage
 from argus.agent_runtime.state.models import (
+    ArtifactReference,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -106,6 +107,20 @@ def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus
     assert "why did this result happen" in prompt
     assert "why/how the result happened" in prompt
     assert "why_underperformed" in prompt
+
+
+def test_llm_interpreter_prompt_separates_benchmarks_from_asset_universe() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "against spy" in prompt
+    assert "comparison_baseline" in prompt
+    assert "do not add benchmark symbols to asset_universe" in prompt
+    assert "exact start/end dates" in prompt
+    assert "never replace them with past year" in prompt
 
 
 @pytest.mark.asyncio
@@ -774,6 +789,111 @@ def test_llm_interpreter_keeps_pending_artifact_assumptions_as_followup() -> Non
     assert normalized.result_followup_focus == "assumptions"
     assert normalized.assistant_response is None
     assert "routed_pending_artifact_assumptions_followup" in normalized.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_preserves_result_followup_during_pending_refinement(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    calls: list[str] = []
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        calls.append(schema_model.__name__)
+        if len(calls) == 1:
+            return LLMInterpretationResponse(
+                intent="results_explanation",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User asks what the latest completed run tested.",
+                semantic_turn_act="result_followup",
+                result_followup_focus="what_tested",
+            )
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="refine",
+            requires_clarification=False,
+            user_goal_summary="Incorrectly replays the prior MSFT run as a new draft.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold MSFT.",
+                asset_universe=["MSFT"],
+                date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                capital_amount=100000,
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message="Before changing anything, what exactly did you test?",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Buy and hold MSFT.",
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                    date_range={"start": "2025-01-01", "end": "2025-12-31"},
+                ),
+                latest_backtest_result_reference=ArtifactReference(
+                    artifact_kind="backtest_result",
+                    artifact_id="run-msft-2025",
+                    artifact_status="completed",
+                    metadata={
+                        "symbols": ["MSFT"],
+                        "benchmark_symbol": "SPY",
+                        "metrics": {
+                            "aggregate": {
+                                "performance": {
+                                    "total_return_pct": 15.6,
+                                    "benchmark_return_pct": 16.6,
+                                    "delta_vs_benchmark_pct": -1.1,
+                                }
+                            }
+                        },
+                        "config_snapshot": {
+                            "template": "buy_and_hold",
+                            "symbols": ["MSFT"],
+                            "date_range": {
+                                "start": "2025-01-01",
+                                "end": "2025-12-31",
+                            },
+                            "starting_capital": 1000,
+                        },
+                    },
+                ),
+            ),
+            selected_thread_metadata={
+                "requested_field": "refinement",
+                "source_result_run_id": "run-msft-2025",
+            },
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert calls == ["LLMInterpretationResponse"]
+    assert result is not None
+    assert result.intent == "results_explanation"
+    assert result.semantic_turn_act == "result_followup"
+    assert result.result_followup_focus == "what_tested"
 
 
 def test_focused_strategy_extraction_uses_indicator_threshold_registry() -> None:
