@@ -5,9 +5,8 @@ from typing import Literal
 from pydantic import BaseModel
 
 from argus.llm.openrouter import (
-    build_openrouter_model,
+    invoke_openrouter_json_schema_sync,
     log_openrouter_failure,
-    resolve_openrouter_model,
 )
 
 SUPPORTED_GOALS = {
@@ -73,16 +72,13 @@ def suggest_entity_name(
     context: str,
     language: str | None,
 ) -> str | None:
-    primary_model = resolve_openrouter_model()
-    model = build_openrouter_model("name_suggestion", model_name=primary_model)
-    if model is None:
-        return None
-
     try:
-        structured = model.with_structured_output(NameSuggestion)
         resolved = resolve_language(language)
-        response = structured.invoke(
-            [
+        response = invoke_openrouter_json_schema_sync(
+            task="name_suggestion",
+            schema_model=NameSuggestion,
+            schema_name="name_suggestion",
+            messages=[
                 {
                     "role": "system",
                     "content": (
@@ -92,14 +88,16 @@ def suggest_entity_name(
                     ),
                 },
                 {"role": "user", "content": context},
-            ]
+            ],
         )
+        if response is None:
+            return None
         candidate = response.name.strip()
         return candidate if candidate else None
     except Exception as exc:
         log_openrouter_failure(
             task="name_suggestion",
-            model_name=primary_model,
+            model_name=None,
             exc=exc,
             message="Name suggestion failed",
         )

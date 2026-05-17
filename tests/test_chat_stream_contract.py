@@ -249,6 +249,58 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
     assert messages[-1]["content"] == "Short grounded summary."
 
 
+def test_chat_stream_artifact_naming_scheduler_failure_does_not_block_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    scheduled: list[dict[str, Any]] = []
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Short grounded summary.",
+            },
+        }
+
+    def _failing_scheduler(**kwargs: Any) -> None:
+        scheduled.append(kwargs)
+        raise RuntimeError("title service unavailable")
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "schedule_artifact_naming_after_stream",
+        _failing_scheduler,
+        raising=False,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Explain dollar cost averaging.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text.count("data: [DONE]") == 1
+    assert _final_payload(response.text)["assistant_response"] == (
+        "Short grounded summary."
+    )
+    assert len(scheduled) == 1
+
+
 def test_chat_stream_persists_visible_streamed_text_for_non_card_reply(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

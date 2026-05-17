@@ -530,6 +530,16 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).not.toContain("handleAction");
   });
 
+  test("chat schedules bounded history refreshes for async artifact naming", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain("function schedulePostTurnHistoryRefresh");
+    expect(chat).toContain("window.setTimeout");
+    expect(chat).toContain("1500");
+    expect(chat).toContain("5000");
+    expect(chat).toContain("schedulePostTurnHistoryRefresh();");
+  });
+
   test("feedback dialog provides rich feedback surfaces", () => {
     const dialog = readFileSync(join(root, "components/feedback/FeedbackDialog.tsx"), "utf-8");
 

@@ -629,6 +629,12 @@ export default function ChatInterface() {
     loadHistoryPage(null, false).catch(() => undefined);
   };
 
+  function schedulePostTurnHistoryRefresh() {
+    refreshHistory();
+    window.setTimeout(() => refreshHistory(), 1500);
+    window.setTimeout(() => refreshHistory(), 5000);
+  }
+
   const loadMoreHistory = () => {
     if (!historyNextCursor || isLoadingMoreHistory) return;
     setIsLoadingMoreHistory(true);
@@ -1085,7 +1091,7 @@ export default function ChatInterface() {
       if (event.event === "done") {
         setStreamStatus(null);
         setIsStreamingResponse(false);
-        refreshHistory();
+        schedulePostTurnHistoryRefresh();
       }
     };
 
@@ -1193,7 +1199,7 @@ export default function ChatInterface() {
           setStreamStatus(null);
           setIsStreamingResponse(false);
           setShowOnboardingGoalCards(false);
-          refreshHistory();
+          schedulePostTurnHistoryRefresh();
         }
       });
       await patchMe({
@@ -1253,7 +1259,7 @@ export default function ChatInterface() {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
         }
         if (event.event === "done") {
-          refreshHistory();
+          schedulePostTurnHistoryRefresh();
         }
       }, []);
     } catch (err: unknown) {
@@ -1293,7 +1299,7 @@ export default function ChatInterface() {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
         }
         if (event.event === "done") {
-          refreshHistory();
+          schedulePostTurnHistoryRefresh();
         }
       }, []);
     } catch (err: unknown) {

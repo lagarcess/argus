@@ -40,7 +40,7 @@ def save_strategy_from_run(*, user: User, run: BacktestRun) -> Strategy:
     parameters = dict(run.config_snapshot)
     payload = {
         "name": strategy_name,
-        "name_source": "ai_generated",
+        "name_source": "system_default",
         "template": template,
         "asset_class": run.asset_class,
         "symbols": run.symbols,
@@ -61,7 +61,7 @@ def save_strategy_from_run(*, user: User, run: BacktestRun) -> Strategy:
         strategy = Strategy(
             id=api_state.store.new_id(),
             name=strategy_name,
-            name_source="ai_generated",
+            name_source="system_default",
             template=template,  # type: ignore[arg-type]
             asset_class=run.asset_class,
             symbols=run.symbols,
