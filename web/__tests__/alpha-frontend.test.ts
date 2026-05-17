@@ -457,14 +457,144 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("__ONBOARDING_SKIP__");
   });
 
-  test("chat sidebar uses global search api and cursor pagination hooks", () => {
+  test("chat sidebar opens a safe command palette instead of hydrating chat previews", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const palette = readFileSync(join(root, "components/sidebar/ChatCommandPalette.tsx"), "utf-8");
+
+    expect(chat).toContain("ChatSidebar");
+    expect(chat).toContain("ChatCommandPalette");
+    expect(chat).toContain("searchOverlayOpen");
+    expect(chat).not.toContain("ChatOmniSearch");
+    expect(palette).toContain("searchGlobal");
+    expect(palette).toContain("listHistory");
+    expect(palette).toContain("onOpenConversation");
+    expect(palette).not.toContain("getConversationMessages");
+    expect(palette).not.toContain("hydrateMessagesFromApi");
+    expect(palette).not.toContain("ChatMessage");
+    expect(palette).not.toContain("streamChatMessage");
+    expect(palette).not.toContain("handleAction");
+  });
+
+  test("chat command palette uses global search api and cursor pagination hooks", () => {
+    const palette = readFileSync(join(root, "components/sidebar/ChatCommandPalette.tsx"), "utf-8");
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
 
-    expect(chat).toContain("searchGlobal({ q: query, limit: 20 })");
-    expect(chat).toContain("loadMoreSearch");
+    expect(palette).toContain("searchGlobal({ q: trimmed, limit: 30 })");
+    expect(palette).toContain("loadMoreSearch");
     expect(api).toContain("cursor?: string");
     expect(api).toContain("export async function searchGlobal");
+  });
+
+  test("chat command palette keeps safe hover management actions without chat hydration", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const palette = readFileSync(join(root, "components/sidebar/ChatCommandPalette.tsx"), "utf-8");
+
+    expect(chat).toContain("onMutated={refreshHistory}");
+    expect(palette).toContain("Edit2");
+    expect(palette).toContain("Archive");
+    expect(palette).toContain("Trash2");
+    expect(palette).toContain("editingId");
+    expect(palette).toContain("editingTitle");
+    expect(palette).toContain("handleRenameSave");
+    expect(palette).toContain("handleArchive");
+    expect(palette).toContain("handleDelete");
+    expect(palette).toContain("patchConversation");
+    expect(palette).toContain("apiDeleteConversation");
+    expect(palette).toContain('import { Tooltip } from "@/components/ui/Tooltip"');
+    expect(palette).toContain('<Tooltip content={t("common.rename", "Rename")} side="top" delay={120}>');
+    expect(palette).toContain('<Tooltip content={t("common.archive", "Archive")} side="top" delay={120}>');
+    expect(palette).toContain('<Tooltip content={t("common.delete", "Delete")} side="top" delay={120}>');
+    expect(palette).not.toContain("getConversationMessages");
+    expect(palette).not.toContain("hydrateMessagesFromApi");
+    expect(palette).not.toContain("ChatMessage");
+    expect(palette).not.toContain("streamChatMessage");
+    expect(palette).not.toContain("handleAction");
+  });
+
+  test("feedback dialog provides rich feedback surfaces", () => {
+    const dialog = readFileSync(join(root, "components/feedback/FeedbackDialog.tsx"), "utf-8");
+
+    expect(dialog).toContain("FeedbackType");
+    expect(dialog).toContain("bugTitle");
+    expect(dialog).toContain("steps");
+    expect(dialog).toContain("expected");
+    expect(dialog).toContain("actual");
+    expect(dialog).toContain("consent");
+    expect(dialog).toContain("files");
+    expect(dialog).toContain("Paperclip");
+    expect(dialog).toContain("ChevronDown");
+    expect(dialog).toContain("hasAttachments");
+    expect(dialog).toContain("Maximum 5 files");
+    expect(dialog).toContain("General Feedback");
+    expect(dialog).toContain("Report a Bug");
+    expect(dialog).toContain("Request a Feature");
+    expect(dialog).toContain("I consent to the Argus team");
+    expect(dialog).toContain('event.key === "Escape"');
+    expect(dialog).toContain("document.addEventListener(\"keydown\"");
+    expect(dialog).toContain('type === "bug"');
+    expect(dialog).toContain('const title = "Provide feedback";');
+    expect(dialog).toContain('"File a bug report."');
+    expect(dialog).toContain('"Share feedback about your Argus experience."');
+    expect(dialog).toContain('"What worked well in this response?"');
+    expect(dialog).toContain('"What should be improved in this response?"');
+    expect(dialog).toContain("Your conversation will be included with your feedback to help improve Argus.");
+    expect(dialog).toContain("Learn more");
+    expect(dialog).not.toContain("Provide positive feedback");
+    expect(dialog).not.toContain("Provide negative feedback");
+    expect(dialog).not.toContain("File a bug report, request a feature, or send general feedback.");
+    expect(dialog).not.toContain("Tell us what made this response land or miss.");
+    expect(dialog).not.toContain("ThumbsUp");
+    expect(dialog).not.toContain("ThumbsDown");
+  });
+
+  test("chat message feedback controls fill only the selected thumb glyph", () => {
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(message).toContain("text-[#191c1f] dark:text-white");
+    expect(message).toContain("selectedFeedbackClass");
+    expect(message).toContain("selectedFeedbackIconClass");
+    expect(message).toContain('rating === "positive" ? selectedFeedbackIconClass : ""');
+    expect(message).toContain('rating === "negative" ? selectedFeedbackIconClass : ""');
+    expect(message).not.toContain('rating === null || rating === "positive"');
+    expect(message).not.toContain('rating === null || rating === "negative"');
+    expect(message).not.toContain("bg-[#5a677d]/12 text-[#5a677d] dark:bg-[#c9c9cd]/12 dark:text-[#c9c9cd]");
+    expect(message).not.toContain("scale-110");
+    expect(message).not.toContain("bg-black text-white dark:bg-white dark:text-black");
+    expect(message).not.toContain("bg-[#5ba897]/15 text-[#5ba897]");
+    expect(message).not.toContain("bg-[#d66d75]/15 text-[#d66d75]");
+    expect(message).toContain("MessageSquareWarning");
+    expect(message).toContain("chat.report_issue");
+    expect(message).toContain('onFeedback?.("rating"');
+    expect(message).toContain("postFeedback");
+    expect(message).toContain("conversationId?: string | null");
+    expect(message).toContain("conversation_id: conversationId");
+    expect(chat).toContain("conversationId={conversationId}");
+  });
+
+  test("profile menu is isolated from sidebar hover expansion", () => {
+    const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
+    const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+
+    expect(profileMenu).toContain('import { createPortal } from "react-dom"');
+    expect(profileMenu).toContain("data-profile-menu-surface");
+    expect(profileMenu).toContain("handleSubmenuToggle");
+    expect(profileMenu).toContain("createPortal(menu, document.body)");
+    expect(sidebar).toContain("isPointerInsideSidebarRef");
+    expect(sidebar).toContain("if (isProfileMenuOpen) return");
+  });
+
+  test("interactive controls expose pointer cursor affordance globally", () => {
+    const globals = readFileSync(join(root, "app/globals.css"), "utf-8");
+
+    expect(globals).toContain("button:not(:disabled)");
+    expect(globals).toContain('[role="button"]:not([aria-disabled="true"])');
+    expect(globals).toContain("a[href]");
+    expect(globals).toContain("label[for]");
+    expect(globals).toContain("cursor: pointer;");
+    expect(globals).toContain("button:disabled");
+    expect(globals).toContain('[aria-disabled="true"]');
+    expect(globals).toContain("cursor: not-allowed;");
   });
 
   test("login surface text is localized through auth.login keys", () => {

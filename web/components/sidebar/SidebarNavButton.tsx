@@ -1,6 +1,8 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/Tooltip";
+import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 type SidebarNavButtonProps = {
   /** Lucide icon component */
@@ -16,7 +18,7 @@ type SidebarNavButtonProps = {
   /** Optional extra class names */
   className?: string;
   /** Optional right-side content (e.g. chevron for accordion) */
-  trailing?: React.ReactNode;
+  trailing?: ReactNode;
   /** Icon size override (default: 22) */
   iconSize?: number;
 };

@@ -26,6 +26,32 @@ body {
   color: var(--color-foreground);
 }
 
+:where(
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  label[for],
+  select:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="submit"]:not(:disabled)
+) {
+  cursor: pointer;
+}
+
+:where(
+  button:disabled,
+  [aria-disabled="true"],
+  select:disabled,
+  input:disabled,
+  textarea:disabled
+) {
+  cursor: not-allowed;
+}
+
 @utility bg-conic-glow {
   background-image: conic-gradient(
     from 180deg at 50% 50%,
@@ -160,34 +186,6 @@ body {
 
 .dark .argus-scroll-indicator {
   background-color: var(--argus-scroll-indicator-dark);
-}
-
-.argus-thin-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-.argus-thin-scrollbar:hover {
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
-}
-.dark .argus-thin-scrollbar:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-}
-
-.argus-thin-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-.argus-thin-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.argus-thin-scrollbar::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 4px;
-}
-.argus-thin-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.15);
-}
-.dark .argus-thin-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.15);
 }
 
 @keyframes argus_swoosh_up {

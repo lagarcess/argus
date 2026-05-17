@@ -9,58 +9,6 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
-import { Children, isValidElement, cloneElement, ReactNode, useMemo } from "react";
-
-function highlightText(text: string, query: string): ReactNode[] {
-  if (!query.trim()) return [text];
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`(${escaped})`, "gi");
-  const parts = text.split(regex);
-  return parts.map((part, i) =>
-    regex.test(part) ? (
-      <mark
-        key={i}
-        className="rounded-sm bg-[#c2a44d]/20 px-0.5 font-semibold text-[#c2a44d]"
-        style={{ textDecoration: "none" }}
-      >
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
-  );
-}
-
-function highlightChildren(children: ReactNode, query: string): ReactNode {
-  if (typeof children === "string") {
-    return highlightText(children, query);
-  }
-  if (Array.isArray(children)) {
-    return Children.map(children, (child) => highlightChildren(child, query));
-  }
-  if (isValidElement(children)) {
-    return cloneElement(children as React.ReactElement<any>, {
-      children: highlightChildren((children.props as any).children, query)
-    });
-  }
-  return children;
-}
-
-function getMarkdownComponents(searchQuery?: string) {
-  if (!searchQuery) return undefined;
-  return {
-    p: ({ children, ...props }: any) => <p {...props}>{highlightChildren(children, searchQuery)}</p>,
-    span: ({ children, ...props }: any) => <span {...props}>{highlightChildren(children, searchQuery)}</span>,
-    li: ({ children, ...props }: any) => <li {...props}>{highlightChildren(children, searchQuery)}</li>,
-    h1: ({ children, ...props }: any) => <h1 {...props}>{highlightChildren(children, searchQuery)}</h1>,
-    h2: ({ children, ...props }: any) => <h2 {...props}>{highlightChildren(children, searchQuery)}</h2>,
-    h3: ({ children, ...props }: any) => <h3 {...props}>{highlightChildren(children, searchQuery)}</h3>,
-    strong: ({ children, ...props }: any) => <strong {...props}>{highlightChildren(children, searchQuery)}</strong>,
-    em: ({ children, ...props }: any) => <em {...props}>{highlightChildren(children, searchQuery)}</em>,
-    td: ({ children, ...props }: any) => <td {...props}>{highlightChildren(children, searchQuery)}</td>,
-    th: ({ children, ...props }: any) => <th {...props}>{highlightChildren(children, searchQuery)}</th>,
-  };
-}
 
 type ChatMessageProps = {
   message: Message;
@@ -68,10 +16,17 @@ type ChatMessageProps = {
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   isLatest?: boolean;
   isStreaming?: boolean;
-  searchQuery?: string;
+  conversationId?: string | null;
 };
 
-export default function ChatMessage({ message, onAction, onFeedback, isLatest, isStreaming, searchQuery }: ChatMessageProps) {
+export default function ChatMessage({
+  message,
+  onAction,
+  onFeedback,
+  isLatest,
+  isStreaming,
+  conversationId,
+}: ChatMessageProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
@@ -80,6 +35,11 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
   const [copyFeedback, setCopyFeedback] = useState<"success" | "failed" | null>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
   const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedFeedbackClass =
+    "hover:bg-black/5 dark:hover:bg-white/10 text-[#191c1f] dark:text-white";
+  const idleFeedbackClass =
+    "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white";
+  const selectedFeedbackIconClass = "fill-current";
 
   const toggleOptions = (e: React.MouseEvent) => {
     if (!showOptions) {
@@ -135,10 +95,10 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
       postFeedback({
         type: "general",
         message: newRating === "positive" ? "Thumbs Up" : "Thumbs Down",
-        context: { message_id: message.id, rating: newRating }
+        context: { message_id: message.id, conversation_id: conversationId, rating: newRating }
       });
       // Then, open the detailed feedback dialog
-      onFeedback?.("rating", { message_id: message.id }, newRating);
+      onFeedback?.("rating", { message_id: message.id, conversation_id: conversationId }, newRating);
     }
   };
 
@@ -261,7 +221,7 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard result={message.result} onAction={onAction} />
               {message.content && (
-                <ResultReadout content={message.content} searchQuery={searchQuery} />
+                <ResultReadout content={message.content} />
               )}
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
@@ -269,13 +229,10 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
             </div>
           ) : message.contentPresentation === "result_breakdown" ? (
-            <ResultBreakdown content={message.content ?? ""} searchQuery={searchQuery} />
+            <ResultBreakdown content={message.content ?? ""} />
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={getMarkdownComponents(searchQuery)}
-              >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {message.content ?? ""}
               </ReactMarkdown>
             </div>
@@ -302,37 +259,21 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
 
               {/* Feedback Icon Row (Right-aligned) - Progressive Disclosure: Hide while streaming */}
               {!isStreaming && (
-                <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
-                {(rating === null || rating === "positive") && (
+                <div className={`relative flex items-center gap-1.5 transition-opacity shrink-0 ${rating ? "opacity-100" : "opacity-50 hover:opacity-100"}`} ref={optionsRef}>
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
-                      rating === "positive"
-                        ? "bg-[#5ba897]/15 text-[#5ba897] opacity-100 scale-110"
-                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                    }`}
-                    title={t("chat.good_response")}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? selectedFeedbackClass : idleFeedbackClass }`}
+                    title={t('chat.good_response')}
                     onClick={() => handleRating("positive")}
                   >
-                    <ThumbsUp
-                      className={`w-3.5 h-3.5 ${rating === "positive" ? "fill-current" : ""}`}
-                    />
+                    <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? selectedFeedbackIconClass : ""}`} />
                   </button>
-                )}
-                {(rating === null || rating === "negative") && (
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${
-                      rating === "negative"
-                        ? "bg-[#d66d75]/15 text-[#d66d75] opacity-100 scale-110"
-                        : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-                    }`}
-                    title={t("chat.poor_response")}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? selectedFeedbackClass : idleFeedbackClass }`}
+                    title={t('chat.poor_response')}
                     onClick={() => handleRating("negative")}
                   >
-                    <ThumbsDown
-                      className={`w-3.5 h-3.5 ${rating === "negative" ? "fill-current" : ""}`}
-                    />
+                    <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
                   </button>
-                )}
                 <button
                   onClick={toggleOptions}
                   className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
@@ -377,32 +318,26 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
   );
 }
 
-function ResultReadout({ content, searchQuery }: { content: string; searchQuery?: string }) {
+function ResultReadout({ content }: { content: string }) {
   return (
     <section
       className="argus-result-readout prose dark:prose-invert max-w-none"
       aria-label="Result readout"
     >
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
-        components={getMarkdownComponents(searchQuery)}
-      >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
         {content}
       </ReactMarkdown>
     </section>
   );
 }
 
-function ResultBreakdown({ content, searchQuery }: { content: string; searchQuery?: string }) {
+function ResultBreakdown({ content }: { content: string }) {
   return (
     <section
       className="argus-result-breakdown prose dark:prose-invert max-w-none"
       aria-label="Result breakdown"
     >
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
-        components={getMarkdownComponents(searchQuery)}
-      >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
         {content}
       </ReactMarkdown>
     </section>

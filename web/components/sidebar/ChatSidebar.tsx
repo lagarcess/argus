@@ -5,23 +5,19 @@ import type { TFunction } from "i18next";
 import {
   ChevronDown,
   Compass,
-  Edit2,
   History,
   MessageCirclePlus,
-  MoreVertical,
   PanelLeft,
   Pin,
   Search,
-  Archive,
-  Trash2,
   User,
 } from "lucide-react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
 import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
 import ProfileMenu from "./ProfileMenu";
+import RecentChatActions from "./RecentChatActions";
 import { patchConversation, deleteConversation as apiDeleteConversation } from "@/lib/argus-api";
 
 import type { HistoryItem, SearchItem } from "@/lib/argus-api";
@@ -122,138 +118,6 @@ function groupByDate(
   return groups;
 }
 
-// ─── RecentChatActions (three-dot hover menu) ─────────────────────────────────
-
-type RecentChatActionsProps = {
-  item: HistoryItem;
-  onPin: (id: string, pinned: boolean) => void;
-  onRename: (id: string) => void;
-  onArchive: (id: string) => void;
-  onDelete: (id: string) => void;
-};
-
-function RecentChatActions({ item, onPin, onRename, onArchive, onDelete }: RecentChatActionsProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const { t } = useTranslation();
-
-  // Calculate menu position when opening
-  useEffect(() => {
-    if (isMenuOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setMenuPosition({
-        top: rect.bottom + 4,
-        left: rect.right - 160, // align right edge with trigger
-      });
-    }
-  }, [isMenuOpen]);
-
-  // Close on click-outside
-  useEffect(() => {
-    if (!isMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        triggerRef.current && !triggerRef.current.contains(e.target as Node)
-      ) {
-        setIsMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isMenuOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isMenuOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsMenuOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [isMenuOpen]);
-
-  return (
-    <div ref={menuRef} className="relative">
-      <Tooltip content={t("common.more", "More")} side="top" delay={150}>
-        <button
-          ref={triggerRef}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsMenuOpen(!isMenuOpen);
-          }}
-          className={`flex h-7 w-7 items-center justify-center rounded-md transition-opacity duration-150 hover:bg-black/10 dark:hover:bg-white/10 ${
-            isMenuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-          }`}
-          aria-label={t("common.more", "More")}
-        >
-          <MoreVertical className="h-3.5 w-3.5 text-black/50 dark:text-white/50" />
-        </button>
-      </Tooltip>
-
-      {isMenuOpen && menuPosition && typeof document !== "undefined" && createPortal(
-        <div
-          className="fixed z-[9999] min-w-[160px] rounded-[12px] border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#1f2225]"
-          style={{
-            top: menuPosition.top,
-            left: menuPosition.left,
-            boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPin(item.id, !item.pinned);
-              setIsMenuOpen(false);
-            }}
-            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            <Pin className="h-3.5 w-3.5" />
-            {item.pinned ? t("common.unpin", "Unpin") : t("common.pin", "Pin")}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRename(item.id);
-              setIsMenuOpen(false);
-            }}
-            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            <Edit2 className="h-3.5 w-3.5" />
-            {t("common.rename", "Rename")}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onArchive(item.id);
-              setIsMenuOpen(false);
-            }}
-            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            <Archive className="h-3.5 w-3.5" />
-            {t("common.archive", "Archive")}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(item.id);
-              setIsMenuOpen(false);
-            }}
-            className="font-display flex w-full items-center gap-2.5 px-3 py-2 text-[13px] text-[#d66d75] hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {t("common.delete", "Delete")}
-          </button>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ChatSidebar({
@@ -285,10 +149,12 @@ export default function ChatSidebar({
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const recentsScrollRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPointerInsideSidebarRef = useRef(false);
 
   // ─── Hover Logic ────────────────────────────────────────────────────────────
 
   const handleMouseEnter = () => {
+    isPointerInsideSidebarRef.current = true;
     if (mode !== "hover") return;
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     
@@ -300,8 +166,10 @@ export default function ChatSidebar({
   };
 
   const handleMouseLeave = () => {
+    isPointerInsideSidebarRef.current = false;
     if (mode !== "hover") return;
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    if (isProfileMenuOpen) return;
     
     hoverTimeoutRef.current = setTimeout(() => {
       if (isOpen) {
@@ -315,6 +183,22 @@ export default function ChatSidebar({
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      mode === "hover" &&
+      isOpen &&
+      !isProfileMenuOpen &&
+      !isPointerInsideSidebarRef.current
+    ) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        onToggle();
+      }, 300);
+    }
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, [isProfileMenuOpen, isOpen, mode, onToggle]);
 
   // ── Filter to chats only ────────────────────────────────────────────────
   const chatItems = useMemo(

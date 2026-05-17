@@ -1,8 +1,25 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
-import { X, Send, AlertCircle, Sparkles, MessageSquare, ThumbsUp, ThumbsDown, Paperclip, ChevronDown, Check, Bug, Lightbulb, MessageCircle } from "lucide-react";
+import {
+  AlertCircle,
+  Bug,
+  Check,
+  ChevronDown,
+  Lightbulb,
+  MessageCircle,
+  Paperclip,
+  Send,
+  X,
+} from "lucide-react";
 import { postFeedback } from "@/lib/argus-api";
 
 type FeedbackType = "bug" | "feature" | "general" | "rating";
@@ -15,9 +32,20 @@ interface FeedbackDialogProps {
   context?: Record<string, unknown>;
 }
 
-export default function FeedbackDialog({ isOpen, onClose, type: initialType, rating, context }: FeedbackDialogProps) {
+type FeedbackTypeOption = {
+  value: Exclude<FeedbackType, "rating">;
+  label: string;
+  icon: ReactNode;
+};
+
+export default function FeedbackDialog({
+  isOpen,
+  onClose,
+  type: initialType,
+  rating,
+  context,
+}: FeedbackDialogProps) {
   const { t } = useTranslation();
-  
   const [type, setType] = useState<FeedbackType>(initialType);
   const [message, setMessage] = useState("");
   const [bugTitle, setBugTitle] = useState("");
@@ -26,52 +54,88 @@ export default function FeedbackDialog({ isOpen, onClose, type: initialType, rat
   const [actual, setActual] = useState("");
   const [consent, setConsent] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
-  
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setType(initialType);
-      setMessage("");
-      setBugTitle("");
-      setSteps("");
-      setExpected("");
-      setActual("");
-      setConsent(false);
-      setFiles([]);
-      setSelectedTags([]);
-      setIsSuccess(false);
-      setError(null);
-      setDropdownOpen(false);
-    }
-  }, [isOpen, initialType]);
+    if (!isOpen) return;
+
+    setType(initialType);
+    setMessage("");
+    setBugTitle("");
+    setSteps("");
+    setExpected("");
+    setActual("");
+    setConsent(false);
+    setFiles([]);
+    setSelectedTags([]);
+    setIsSubmitting(false);
+    setIsSuccess(false);
+    setError(null);
+    setDropdownOpen(false);
+  }, [initialType, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const isRating = type === "rating";
   const isBug = type === "bug";
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      if (files.length + newFiles.length > 5) {
-        setError("Maximum 5 files allowed.");
-        return;
-      }
-      setFiles(prev => [...prev, ...newFiles].slice(0, 5));
-      setError(null);
-    }
-  };
+  const typeOptions: FeedbackTypeOption[] = [
+    {
+      value: "general",
+      label: "General Feedback",
+      icon: <MessageCircle className="h-4 w-4" />,
+    },
+    {
+      value: "bug",
+      label: "Report a Bug",
+      icon: <Bug className="h-4 w-4" />,
+    },
+    {
+      value: "feature",
+      label: "Request a Feature",
+      icon: <Lightbulb className="h-4 w-4" />,
+    },
+  ];
 
-  const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
+  const currentType =
+    typeOptions.find((option) => option.value === type) ?? typeOptions[0];
+
+  const ratingTags =
+    rating === "positive"
+      ? [
+          { key: "accurate", label: t("feedback.tags.positive.accurate", "Accurate") },
+          { key: "exactly", label: t("feedback.tags.positive.exactly", "Exactly what I needed") },
+          { key: "fast", label: t("feedback.tags.positive.fast", "Fast") },
+          { key: "style", label: t("feedback.tags.positive.style", "Good format") },
+          { key: "helpful", label: t("feedback.tags.positive.helpful", "Helpful") },
+          { key: "other", label: t("feedback.tags.positive.other", "Other") },
+        ]
+      : [
+          { key: "incorrect", label: t("feedback.tags.negative.incorrect", "Incorrect") },
+          { key: "not_what_asked", label: t("feedback.tags.negative.not_what_asked", "Not what I asked") },
+          { key: "slow", label: t("feedback.tags.negative.slow", "Too slow") },
+          { key: "style", label: t("feedback.tags.negative.style", "Bad format") },
+          { key: "safety", label: t("feedback.tags.negative.safety", "Safety concern") },
+          { key: "other", label: t("feedback.tags.negative.other", "Other") },
+        ];
 
   const canSubmit = () => {
     if (isRating) return selectedTags.length > 0 || message.trim().length > 0;
@@ -80,17 +144,48 @@ export default function FeedbackDialog({ isOpen, onClose, type: initialType, rat
     return message.trim().length > 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = event.target.files;
+    if (!selectedFiles) return;
+
+    const nextFiles = Array.from(selectedFiles);
+    if (files.length + nextFiles.length > 5) {
+      setError("Maximum 5 files allowed.");
+      return;
+    }
+
+    setFiles((current) => [...current, ...nextFiles].slice(0, 5));
+    setError(null);
+    event.target.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const toggleTag = (tagKey: string) => {
+    setSelectedTags((current) =>
+      current.includes(tagKey)
+        ? current.filter((existing) => existing !== tagKey)
+        : [...current, tagKey],
+    );
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!canSubmit()) return;
 
     setIsSubmitting(true);
     setError(null);
 
-    let finalMessage = message.trim();
-    if (isBug) {
-      finalMessage = `Title: ${bugTitle}\n\nSteps to reproduce:\n${steps}\n\nExpected outcome:\n${expected}\n\nActual outcome:\n${actual}`;
-    }
+    const finalMessage = isBug
+      ? [
+          `Title: ${bugTitle.trim()}`,
+          `Steps to reproduce:\n${steps.trim()}`,
+          `Expected outcome:\n${expected.trim()}`,
+          `Actual outcome:\n${actual.trim()}`,
+        ].join("\n\n")
+      : message.trim();
 
     try {
       await postFeedback({
@@ -102,114 +197,120 @@ export default function FeedbackDialog({ isOpen, onClose, type: initialType, rat
           tags: selectedTags,
           url: typeof window !== "undefined" ? window.location.href : undefined,
           timestamp: new Date().toISOString(),
-          hasAttachments: files.length > 0, // Stub for now
+          hasAttachments: files.length > 0,
+          attachmentCount: files.length,
         },
       });
       setIsSuccess(true);
       setTimeout(() => onClose(), 2000);
-    } catch (err) {
-      setError(t("feedback.error"));
+    } catch {
+      setError(t("feedback.error", "We could not submit that yet. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const toggleTag = (tagKey: string) => {
-    setSelectedTags(prev => prev.includes(tagKey) ? prev.filter(t => t !== tagKey) : [...prev, tagKey]);
-  };
+  const title = "Provide feedback";
 
-  const typeOptions: { value: FeedbackType; label: string; icon: React.ReactNode }[] = [
-    { value: "general", label: "General Feedback", icon: <MessageCircle className="w-4 h-4" /> },
-    { value: "bug", label: "Report a Bug", icon: <Bug className="w-4 h-4" /> },
-    { value: "feature", label: "Request a Feature", icon: <Lightbulb className="w-4 h-4" /> },
-  ];
-
-  const currentType = typeOptions.find(t => t.value === type) || typeOptions[0];
-
-  const ratingTags = rating === "positive"
-    ? [
-        { key: "accurate", label: t("feedback.tags.positive.accurate", "Accurate") },
-        { key: "exactly", label: t("feedback.tags.positive.exactly", "Exactly what I needed") },
-        { key: "fast", label: t("feedback.tags.positive.fast", "Fast") },
-        { key: "style", label: t("feedback.tags.positive.style", "Good format") },
-        { key: "helpful", label: t("feedback.tags.positive.helpful", "Helpful") },
-        { key: "other", label: t("feedback.tags.positive.other", "Other") },
-      ]
-    : [
-        { key: "incorrect", label: t("feedback.tags.negative.incorrect", "Incorrect") },
-        { key: "not_what_asked", label: t("feedback.tags.negative.not_what_asked", "Not what I asked") },
-        { key: "slow", label: t("feedback.tags.negative.slow", "Too slow") },
-        { key: "style", label: t("feedback.tags.negative.style", "Bad format") },
-        { key: "safety", label: t("feedback.tags.negative.safety", "Safety concern") },
-        { key: "other", label: t("feedback.tags.negative.other", "Other") },
-      ];
+  const subheading = isRating
+    ? rating === "positive"
+      ? "What worked well in this response?"
+      : "What should be improved in this response?"
+    : type === "bug"
+      ? "File a bug report."
+      : type === "feature"
+        ? "Request a feature for Argus."
+        : "Share feedback about your Argus experience.";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/20 dark:bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
-      
-      <div className="relative w-full max-w-[600px] max-h-[90vh] flex flex-col bg-[#f5f5f5] dark:bg-[#1c1f24] border border-black/5 dark:border-white/10 rounded-[28px] overflow-hidden animate-in zoom-in-95 fade-in duration-300 shadow-2xl">
-        {/* Header */}
-        <div className="shrink-0 flex items-center justify-between px-6 sm:px-8 py-6 border-b border-black/5 dark:border-white/5">
-          <div className="flex flex-col">
-            <h2 className="text-[22px] font-display font-semibold tracking-tight text-black dark:text-white">
-              {isRating ? (rating === "positive" ? "Provide positive feedback" : "Provide negative feedback") : "Provide Feedback"}
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"
+        onClick={onClose}
+        aria-label="Close feedback"
+      />
+
+      <div className="relative flex max-h-[90vh] w-full max-w-[600px] flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#f5f5f5] dark:border-white/10 dark:bg-[#1c1f24]">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-black/5 px-6 py-6 dark:border-white/5 sm:px-8">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-black/45 dark:text-white/45">
+              <MessageCircle className="h-4 w-4" />
+              <span className="font-display text-[11px] font-semibold uppercase tracking-wider">
+                Feedback
+              </span>
+            </div>
+            <h2 className="font-display text-[22px] font-semibold tracking-tight text-black dark:text-white">
+              {title}
             </h2>
-            {!isRating && (
-              <p className="text-[13px] text-black/50 dark:text-white/50 mt-1">
-                Help us improve Argus.
-              </p>
-            )}
+            <p className="mt-1 text-[13px] leading-relaxed text-black/50 dark:text-white/50">
+              {subheading}
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-            <X className="w-5 h-5 text-black/40 dark:text-white/40" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-black/40 transition-colors hover:bg-black/5 hover:text-black dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white"
+            aria-label="Close feedback"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8 argus-thin-scrollbar">
+        <div className="argus-thin-scrollbar flex-1 overflow-y-auto p-6 sm:p-8">
           {isSuccess ? (
-            <div className="py-12 text-center animate-in zoom-in-95 duration-300">
-              <div className="w-16 h-16 bg-[#5ba897]/10 rounded-full flex items-center justify-center mx-auto mb-5">
-                <Send className="w-7 h-7 text-[#5ba897]" />
+            <div className="py-12 text-center">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#5ba897]/10">
+                <Send className="h-7 w-7 text-[#5ba897]" />
               </div>
-              <p className="text-[18px] font-display font-medium text-black dark:text-white">
-                Feedback submitted. Thank you!
+              <p className="font-display text-[18px] font-medium text-black dark:text-white">
+                Feedback submitted. Thank you.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-              
-              {/* Dropdown Type Selector (Hidden for rating) */}
               {!isRating && (
                 <div className="relative">
-                  <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2 uppercase tracking-wide">
+                  <label className="mb-2 block text-[13px] font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
                     Feedback Type
                   </label>
                   <button
                     type="button"
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex w-full items-center justify-between bg-white dark:bg-[#25282d] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-[14px] text-black dark:text-white hover:border-black/20 dark:hover:border-white/20 transition-colors"
+                    onClick={() => setDropdownOpen((open) => !open)}
+                    className="flex w-full items-center justify-between rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black transition-colors hover:border-black/20 dark:border-white/10 dark:bg-[#25282d] dark:text-white dark:hover:border-white/20"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-black/40 dark:text-white/40">{currentType.icon}</span>
+                    <span className="flex items-center gap-3">
+                      <span className="text-black/40 dark:text-white/40">
+                        {currentType.icon}
+                      </span>
                       <span className="font-medium">{currentType.label}</span>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 text-black/40 dark:text-white/40 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-black/40 transition-transform dark:text-white/40 ${
+                        dropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
-                  
+
                   {dropdownOpen && (
-                    <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-[#25282d] border border-black/10 dark:border-white/10 rounded-xl shadow-lg z-10 overflow-hidden py-1 animate-in fade-in slide-in-from-top-2">
-                      {typeOptions.map(opt => (
+                    <div className="absolute left-0 top-[calc(100%+8px)] z-10 w-full overflow-hidden rounded-xl border border-black/10 bg-white py-1 dark:border-white/10 dark:bg-[#25282d]">
+                      {typeOptions.map((option) => (
                         <button
-                          key={opt.value}
+                          key={option.value}
                           type="button"
-                          onClick={() => { setType(opt.value); setDropdownOpen(false); }}
-                          className="flex w-full items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 text-[14px] text-left text-black dark:text-white"
+                          onClick={() => {
+                            setType(option.value);
+                            setDropdownOpen(false);
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-[14px] text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
                         >
-                          <span className="text-black/40 dark:text-white/40">{opt.icon}</span>
-                          <span className="font-medium flex-1">{opt.label}</span>
-                          {type === opt.value && <Check className="w-4 h-4 text-[#4f55f1]" />}
+                          <span className="text-black/40 dark:text-white/40">
+                            {option.icon}
+                          </span>
+                          <span className="flex-1 font-medium">{option.label}</span>
+                          {type === option.value && (
+                            <Check className="h-4 w-4 text-[#4f55f1]" />
+                          )}
                         </button>
                       ))}
                     </div>
@@ -217,61 +318,79 @@ export default function FeedbackDialog({ isOpen, onClose, type: initialType, rat
                 </div>
               )}
 
-              {/* Bug Form */}
               {isBug && !isRating ? (
                 <>
                   <div>
-                    <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2">Title *</label>
+                    <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
+                      Title *
+                    </label>
                     <input
                       value={bugTitle}
-                      onChange={(e) => setBugTitle(e.target.value.slice(0, 100))}
+                      onChange={(event) => setBugTitle(event.target.value.slice(0, 100))}
                       placeholder="Brief description of the issue"
-                      className="w-full bg-white dark:bg-[#25282d] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-[14px] text-black dark:text-white outline-none focus:border-[#4f55f1] transition-colors placeholder:text-black/30 dark:placeholder:text-white/30"
+                      className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors placeholder:text-black/30 focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white dark:placeholder:text-white/30"
                     />
-                    <div className="text-right text-[11px] text-black/30 mt-1">{bugTitle.length}/100</div>
+                    <div className="mt-1 text-right text-[11px] text-black/30 dark:text-white/30">
+                      {bugTitle.length}/100
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2">Steps to reproduce *</label>
+                    <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
+                      Steps to reproduce *
+                    </label>
                     <textarea
                       value={steps}
-                      onChange={(e) => setSteps(e.target.value.slice(0, 1000))}
+                      onChange={(event) => setSteps(event.target.value.slice(0, 1000))}
                       placeholder={"1. Go to [Page/View]\n2. Click on [Button/Action]\n3. See [Error/Behavior]"}
-                      className="w-full min-h-[100px] bg-white dark:bg-[#25282d] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-[14px] text-black dark:text-white outline-none focus:border-[#4f55f1] transition-colors resize-y placeholder:text-black/30 dark:placeholder:text-white/30"
+                      className="min-h-[100px] w-full resize-y rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors placeholder:text-black/30 focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white dark:placeholder:text-white/30"
                     />
-                    <div className="text-right text-[11px] text-black/30 mt-1">{steps.length}/1000</div>
+                    <div className="mt-1 text-right text-[11px] text-black/30 dark:text-white/30">
+                      {steps.length}/1000
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2">Expected outcome</label>
+                      <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
+                        Expected outcome
+                      </label>
                       <textarea
                         value={expected}
-                        onChange={(e) => setExpected(e.target.value.slice(0, 500))}
-                        className="w-full min-h-[80px] bg-white dark:bg-[#25282d] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-[14px] text-black dark:text-white outline-none focus:border-[#4f55f1] transition-colors resize-none placeholder:text-black/30 dark:placeholder:text-white/30"
+                        onChange={(event) => setExpected(event.target.value.slice(0, 500))}
+                        className="min-h-[80px] w-full resize-none rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2">Actual outcome</label>
+                      <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
+                        Actual outcome
+                      </label>
                       <textarea
                         value={actual}
-                        onChange={(e) => setActual(e.target.value.slice(0, 500))}
-                        className="w-full min-h-[80px] bg-white dark:bg-[#25282d] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-[14px] text-black dark:text-white outline-none focus:border-[#4f55f1] transition-colors resize-none placeholder:text-black/30 dark:placeholder:text-white/30"
+                        onChange={(event) => setActual(event.target.value.slice(0, 500))}
+                        className="min-h-[80px] w-full resize-none rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white"
                       />
                     </div>
                   </div>
                 </>
               ) : (
-                /* General/Feature/Rating Form */
                 <div className={isRating ? "space-y-6" : ""}>
                   {isRating && (
                     <div>
-                      <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-3">What {rating === "positive" ? "went well" : "went wrong"}?</label>
+                      <label className="mb-3 block text-[13px] font-medium text-black/60 dark:text-white/60">
+                        What {rating === "positive" ? "went well" : "went wrong"}?
+                      </label>
                       <div className="flex flex-wrap gap-2">
                         {ratingTags.map((tag) => (
                           <button
                             key={tag.key}
                             type="button"
                             onClick={() => toggleTag(tag.key)}
-                            className={`px-4 py-2 rounded-full text-[13px] font-medium border transition-all ${ selectedTags.includes(tag.key) ? "bg-black dark:bg-white text-white dark:text-black border-transparent" : "bg-white dark:bg-[#25282d] border-black/10 dark:border-white/10 text-black/70 dark:text-white/70 hover:border-black/20 dark:hover:border-white/30" }`}
+                            className={`rounded-full border px-4 py-2 text-[13px] font-medium transition-all ${
+                              selectedTags.includes(tag.key)
+                                ? "border-transparent bg-black text-white dark:bg-white dark:text-black"
+                                : "border-black/10 bg-white text-black/70 hover:border-black/20 dark:border-white/10 dark:bg-[#25282d] dark:text-white/70 dark:hover:border-white/30"
+                            }`}
                           >
                             {tag.label}
                           </button>
@@ -279,41 +398,65 @@ export default function FeedbackDialog({ isOpen, onClose, type: initialType, rat
                       </div>
                     </div>
                   )}
+
                   <div>
-                    {!isRating && <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2">Details *</label>}
-                    {isRating && <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2">Additional details</label>}
+                    <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
+                      {isRating ? "Additional details" : "Details *"}
+                    </label>
                     <textarea
                       autoFocus={!isRating}
                       value={message}
-                      onChange={(e) => setMessage(e.target.value.slice(0, 1000))}
+                      onChange={(event) => setMessage(event.target.value.slice(0, 1000))}
                       placeholder={isRating ? "Tell us more about your experience..." : "What's on your mind?"}
-                      className="w-full min-h-[140px] bg-white dark:bg-[#25282d] border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 text-[14px] text-black dark:text-white outline-none focus:border-[#4f55f1] transition-colors resize-y placeholder:text-black/30 dark:placeholder:text-white/30"
+                      className="min-h-[140px] w-full resize-y rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors placeholder:text-black/30 focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white dark:placeholder:text-white/30"
                     />
-                    <div className="text-right text-[11px] text-black/30 dark:text-white/30 mt-1">{message.length}/1000</div>
+                    <div className="mt-1 text-right text-[11px] text-black/30 dark:text-white/30">
+                      {message.length}/1000
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Attachments */}
               {!isRating && (
                 <div>
-                  <label className="block text-[13px] font-medium text-black/60 dark:text-white/60 mb-2">Attachments</label>
-                  <div 
+                  <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
+                    Attachments
+                  </label>
+                  <button
+                    type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full border border-dashed border-black/20 dark:border-white/20 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-black/20 p-6 text-center transition-colors hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/5"
                   >
-                    <Paperclip className="w-5 h-5 text-black/40 dark:text-white/40 mb-2" />
-                    <p className="text-[13px] text-black/60 dark:text-white/60">Click to attach files (max 5)</p>
-                  </div>
-                  <input type="file" multiple ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                  
+                    <Paperclip className="mb-2 h-5 w-5 text-black/40 dark:text-white/40" />
+                    <span className="text-[13px] text-black/60 dark:text-white/60">
+                      Click to attach files (max 5)
+                    </span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
                   {files.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
-                      {files.map((file, i) => (
-                        <div key={i} className="flex items-center justify-between bg-white dark:bg-[#25282d] border border-black/5 dark:border-white/5 rounded-lg px-3 py-2">
-                          <span className="text-[13px] text-black/80 dark:text-white/80 truncate">{file.name}</span>
-                          <button type="button" onClick={() => removeFile(i)} className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded-full text-black/40 dark:text-white/40">
-                            <X className="w-3.5 h-3.5" />
+                      {files.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-black/5 bg-white px-3 py-2 dark:border-white/5 dark:bg-[#25282d]"
+                        >
+                          <span className="truncate text-[13px] text-black/80 dark:text-white/80">
+                            {file.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            className="rounded-full p-1 text-black/40 transition-colors hover:bg-black/10 hover:text-black dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
@@ -322,48 +465,62 @@ export default function FeedbackDialog({ isOpen, onClose, type: initialType, rat
                 </div>
               )}
 
-              {/* Consent */}
               {!isRating && (
-                <div className="flex items-start gap-3 mt-2">
-                  <input 
-                    type="checkbox" 
-                    id="consent" 
+                <div className="mt-1 flex items-start gap-3">
+                  <input
+                    id="consent"
+                    type="checkbox"
                     checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                    className="mt-0.5 accent-[#4f55f1] w-4 h-4 rounded-sm"
+                    onChange={(event) => setConsent(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-[#4f55f1]"
                   />
-                  <label htmlFor="consent" className="text-[13px] text-black/60 dark:text-white/60 leading-snug cursor-pointer select-none">
-                    I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.
+                  <label
+                    htmlFor="consent"
+                    className="cursor-pointer select-none text-[13px] leading-snug text-black/60 dark:text-white/60"
+                  >
+                    I consent to the Argus team processing this feedback and contacting me
+                    for follow-up details if necessary.
                   </label>
                 </div>
               )}
 
               {error && (
-                <p className="text-[13px] text-[#d66d75] font-medium bg-[#d66d75]/10 px-4 py-2 rounded-lg">
+                <p className="flex items-center gap-2 rounded-lg bg-[#d66d75]/10 px-4 py-2 text-[13px] font-medium text-[#d66d75]">
+                  <AlertCircle className="h-4 w-4" />
                   {error}
                 </p>
               )}
 
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-black/5 dark:border-white/5 mt-2">
+              <p className="text-[12px] leading-relaxed text-black/45 dark:text-white/45">
+                Your conversation will be included with your feedback to help improve Argus.{" "}
+                <button
+                  type="button"
+                  className="font-medium text-black underline underline-offset-2 hover:text-black/70 dark:text-white dark:hover:text-white/70"
+                >
+                  Learn more
+                </button>
+              </p>
+
+              <div className="mt-2 flex justify-end gap-3 border-t border-black/5 pt-4 dark:border-white/5">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-6 py-2.5 text-[14px] font-medium rounded-full border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-black dark:text-white"
+                  className="rounded-full border border-black/10 px-6 py-2.5 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!canSubmit() || isSubmitting}
-                  className="px-6 py-2.5 text-[14px] font-medium rounded-full bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity disabled:opacity-40 disabled:pointer-events-none flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-40 dark:bg-white dark:text-black"
                 >
                   {isSubmitting ? (
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  ) : "Submit Feedback"}
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    "Submit Feedback"
+                  )}
                 </button>
               </div>
-
             </form>
           )}
         </div>

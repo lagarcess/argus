@@ -32,10 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="antialiased h-full">
-      <body 
-        suppressHydrationWarning
-        className={`${spaceGrotesk.variable} ${inter.variable} min-h-full flex flex-col font-sans transition-colors duration-200`}
-      >
+      <body className={`${spaceGrotesk.variable} ${inter.variable} min-h-full flex flex-col font-sans transition-colors duration-200`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

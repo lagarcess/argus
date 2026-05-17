@@ -5,16 +5,16 @@ import {
   ArrowDown,
   ChevronRight,
   History,
-  Layers,
   Plus,
   Trash2,
   TrendingUp,
   Bitcoin,
   LineChart,
+  Layers,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
-import ChatOmniSearch from "@/components/sidebar/ChatOmniSearch";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
 
 import {
@@ -24,7 +24,6 @@ import {
   getMe,
   getConversationMessages,
   listHistory,
-  searchGlobal,
   patchMe,
   resultCardFromConversationCard,
   resultCardFromRun,
@@ -75,7 +74,7 @@ type OnboardingChoice = {
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
 
-export type HydratedMessages = {
+type HydratedMessages = {
   messages: Message[];
   inputActions: ChatActionOption[];
 };
@@ -390,7 +389,7 @@ function markResultCardSaving(
   });
 }
 
-export function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
+function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
   const consumedResultActions = consumedResultActionsFromApi(items);
   const confirmationActionEffects = confirmationActionEffectsFromApi(items);
   const hiddenMessageIds = new Set([
@@ -550,10 +549,6 @@ export default function ChatInterface() {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
-  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
@@ -573,7 +568,7 @@ export default function ChatInterface() {
     rating?: "positive" | "negative";
     context?: Record<string, unknown>;
   }>({ isOpen: false, type: "general" });
-  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("expanded");
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("collapsed");
   const [isSidebarPreferenceModalOpen, setIsSidebarPreferenceModalOpen] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -627,30 +622,6 @@ export default function ChatInterface() {
     setHistoryNextCursor(next_cursor);
   }, [collectionsEnabled]);
 
-  // Load sidebar mode preference from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("argus:sidebar_mode") as SidebarMode | null;
-    if (saved && ["expanded", "collapsed", "hover"].includes(saved)) {
-      setSidebarMode(saved);
-      if (saved === "collapsed") {
-        setIsSidebarOpen(false);
-      } else if (saved === "expanded") {
-        setIsSidebarOpen(true);
-      }
-    } else {
-      // Default to expanded for new users on desktop
-      setIsSidebarOpen(true);
-    }
-  }, []);
-
-  const handleSetSidebarMode = (mode: SidebarMode) => {
-    setSidebarMode(mode);
-    localStorage.setItem("argus:sidebar_mode", mode);
-    if (mode === "expanded") setIsSidebarOpen(true);
-    if (mode === "collapsed") setIsSidebarOpen(false);
-    if (mode === "hover") setIsSidebarOpen(false);
-  };
-
   // ── History ────────────────────────────────────────────────────────────────
 
   /** Imperative refresh — safe to call from event handlers */
@@ -677,71 +648,43 @@ export default function ChatInterface() {
   }, [isSidebarOpen]);
 
   useEffect(() => {
-    const query = searchText.trim();
-    if (currentView !== "chat" || query.length === 0) {
-      setSearchResults([]);
-      setSearchNextCursor(null);
-      setIsSearching(false);
-      return;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      setIsSearching(true);
-      searchGlobal({ q: query, limit: 20 })
-        .then(({ items, next_cursor }) => {
-          if (cancelled) return;
-          setSearchResults(
-            collectionsEnabled ? items : items.filter((item) => item.type !== "collection"),
-          );
-          setSearchNextCursor(next_cursor);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setSearchResults([]);
-          setSearchNextCursor(null);
-        })
-        .finally(() => {
-          if (cancelled) return;
-          setIsSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [searchText, currentView, collectionsEnabled]);
-
-  const loadMoreSearch = async () => {
-    const query = searchText.trim();
-    if (!searchNextCursor || !query || isLoadingMoreSearch) return;
-    setIsLoadingMoreSearch(true);
     try {
-      const { items, next_cursor } = await searchGlobal({
-        q: query,
-        limit: 20,
-        cursor: searchNextCursor,
-      });
-      setSearchResults((prev) => {
-        const seen = new Set(prev.map((item) => `${item.type}:${item.id}`));
-        const merged = [...prev];
-        const visibleItems = collectionsEnabled
-          ? items
-          : items.filter((item) => item.type !== "collection");
-        for (const item of visibleItems) {
-          const key = `${item.type}:${item.id}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            merged.push(item);
-          }
-        }
-        return merged;
-      });
-      setSearchNextCursor(next_cursor);
-    } finally {
-      setIsLoadingMoreSearch(false);
+      const saved = window.localStorage.getItem("argus:sidebar_mode") as SidebarMode | null;
+      if (saved === "expanded" || saved === "collapsed" || saved === "hover") {
+        setSidebarMode(saved);
+        setIsSidebarOpen(saved === "expanded");
+      }
+    } catch {
+      // Local preferences are optional.
     }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
+        return;
+      }
+      event.preventDefault();
+      setSearchOverlayOpen(true);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const handleSetSidebarMode = (mode: SidebarMode) => {
+    setSidebarMode(mode);
+    try {
+      window.localStorage.setItem("argus:sidebar_mode", mode);
+    } catch {
+      // Local preferences are optional.
+    }
+    if (mode === "expanded") setIsSidebarOpen(true);
+    if (mode === "collapsed" || mode === "hover") setIsSidebarOpen(false);
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen((open) => !open);
   };
 
   // ── Init conversation ──────────────────────────────────────────────────────
@@ -1473,32 +1416,43 @@ export default function ChatInterface() {
       {/* ── Desktop sidebar ── */}
       <ChatSidebar
         isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        onToggle={toggleSidebar}
         currentView={currentView}
         conversationId={conversationId}
         isRecentsExpanded={isRecentsExpanded}
-        onToggleRecents={() => setIsRecentsExpanded(!isRecentsExpanded)}
+        onToggleRecents={() => setIsRecentsExpanded((expanded) => !expanded)}
         historyItems={historyItems}
         historyNextCursor={historyNextCursor}
         isLoadingMoreHistory={isLoadingMoreHistory}
-        onNewChat={() => { void startNewChat(); setIsSidebarOpen(false); }}
-        onNavigate={(view) => { setCurrentView(view); setIsSidebarOpen(false); }}
+        onNewChat={() => {
+          void startNewChat();
+          setIsSidebarOpen(false);
+        }}
+        onNavigate={(view) => {
+          setCurrentView(view);
+          setIsSidebarOpen(false);
+        }}
         onOpenItem={openHistoryItem}
         onLoadMoreHistory={loadMoreHistory}
         onOpenSettings={() => setCurrentView("settings")}
         onOpenSearch={() => setSearchOverlayOpen(true)}
         onHistoryMutated={refreshHistory}
-        onLogout={() => { window.location.href = "/"; }}
+        onLogout={() => {
+          window.location.href = "/";
+        }}
         onFeedback={(type) => {
-          setFeedbackState({ isOpen: true, type, context: { surface: "sidebar" } });
+          setFeedbackState({
+            isOpen: true,
+            type,
+            context: { surface: "sidebar", conversation_id: conversationId },
+          });
         }}
         onOpenSidebarPreference={() => setIsSidebarPreferenceModalOpen(true)}
         mode={sidebarMode}
       />
 
-      {/* ── Chat Omni Search Overlay ── */}
       {searchOverlayOpen && (
-        <ChatOmniSearch
+        <ChatCommandPalette
           onClose={() => setSearchOverlayOpen(false)}
           onOpenConversation={(convId) => {
             setSearchOverlayOpen(false);
@@ -1511,7 +1465,7 @@ export default function ChatInterface() {
 
       {/* ── Main panel ── */}
       <section
-        className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] transition-all duration-300 ease-in-out dark:bg-[#141517]"
+        className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]"
       >
         {/* ── Unified View Header (SOTA: Absolute to content panel for perfect centering) ── */}
         {currentView !== "settings" && (
@@ -1767,11 +1721,17 @@ export default function ChatInterface() {
                           message={msg}
                           onAction={handleAction}
                           onFeedback={(type, context, rating) => {
-                            setFeedbackState({ isOpen: true, type, context, rating });
+                            setFeedbackState({
+                              isOpen: true,
+                              type,
+                              context: { ...context, conversation_id: conversationId },
+                              rating,
+                            });
                             setIsSidebarOpen(false);
                           }}
                           isLatest={isLatestAi}
                           isStreaming={isWorkingMessage}
+                          conversationId={conversationId}
                         />
                       );
                     })}
@@ -1851,7 +1811,11 @@ export default function ChatInterface() {
               window.location.href = "/";
             }}
             onFeedback={(type, context) => {
-              setFeedbackState({ isOpen: true, type, context });
+              setFeedbackState({
+                isOpen: true,
+                type,
+                context: { ...context, conversation_id: conversationId },
+              });
               setIsSidebarOpen(false);
             }}
           />

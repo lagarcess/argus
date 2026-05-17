@@ -77,24 +77,27 @@ export function Tooltip({
     };
   }, []);
 
-  // Use cloneElement to attach refs and events to children
-  const trigger = React.cloneElement(children, {
+  const child = children as React.ReactElement<any>;
+  const childProps = child.props;
+
+  // Use cloneElement to attach refs and events to children.
+  const trigger = React.cloneElement(child, {
     ref: triggerRef,
-    style: { ...children.props.style, cursor: "pointer" },
+    style: { ...childProps.style, cursor: "pointer" },
     onMouseEnter: (e: React.MouseEvent) => {
-      children.props.onMouseEnter?.(e);
+      childProps.onMouseEnter?.(e);
       showTooltip();
     },
     onMouseLeave: (e: React.MouseEvent) => {
-      children.props.onMouseLeave?.(e);
+      childProps.onMouseLeave?.(e);
       hideTooltip();
     },
     onFocus: (e: React.FocusEvent) => {
-      children.props.onFocus?.(e);
+      childProps.onFocus?.(e);
       showTooltip();
     },
     onBlur: (e: React.FocusEvent) => {
-      children.props.onBlur?.(e);
+      childProps.onBlur?.(e);
       hideTooltip();
     },
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Archive,
   ChevronRight,
@@ -137,6 +138,11 @@ export default function ProfileMenu({
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
     setActiveSubmenu(menu);
   }, [canOpenSubmenu]);
+
+  const handleSubmenuToggle = useCallback((menu: SubMenu) => {
+    if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
+    setActiveSubmenu((current) => (current === menu ? null : menu));
+  }, []);
 
   const handleSubmenuLeave = useCallback(() => {
     if (submenuTimeoutRef.current) clearTimeout(submenuTimeoutRef.current);
@@ -304,9 +310,10 @@ export default function ProfileMenu({
   // Position: detached from sidebar, consistently to the right
   const menuLeft = sidebarCollapsed ? "68px" : "16px";
 
-  return (
+  const menu = (
     <div
       ref={menuRef}
+      data-profile-menu-surface
       className="fixed bottom-16 z-[60] min-w-[220px] rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225]"
       style={{
         left: menuLeft,
@@ -328,7 +335,10 @@ export default function ProfileMenu({
         onMouseEnter={() => handleSubmenuEnter("data")}
         onMouseLeave={handleSubmenuLeave}
       >
-        <button className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+        <button
+          onClick={() => handleSubmenuToggle("data")}
+          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+        >
           <div className="flex items-center gap-2.5">
             <Database className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("settings.data.title", "Data")}
@@ -373,7 +383,10 @@ export default function ProfileMenu({
         onMouseEnter={() => handleSubmenuEnter("settings")}
         onMouseLeave={handleSubmenuLeave}
       >
-        <button className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+        <button
+          onClick={() => handleSubmenuToggle("settings")}
+          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+        >
           <div className="flex items-center gap-2.5">
             <Palette className="h-4 w-4 text-black/50 dark:text-white/50" />
             {t("common.settings", "Settings")}
@@ -430,7 +443,10 @@ export default function ProfileMenu({
         onMouseEnter={() => handleSubmenuEnter("help")}
         onMouseLeave={handleSubmenuLeave}
       >
-        <button className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+        <button
+          onClick={() => handleSubmenuToggle("help")}
+          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+        >
           <div className="flex items-center gap-2.5">
             <HelpCircle className="h-4 w-4 text-black/50 dark:text-white/50" />
             Help
@@ -466,7 +482,10 @@ export default function ProfileMenu({
         onMouseEnter={() => handleSubmenuEnter("feedback")}
         onMouseLeave={handleSubmenuLeave}
       >
-        <button className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5">
+        <button
+          onClick={() => handleSubmenuToggle("feedback")}
+          className="font-display flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-[13px] font-medium text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
+        >
           <div className="flex items-center gap-2.5">
             <MessageSquareText className="h-4 w-4 text-black/50 dark:text-white/50" />
             Feedback
@@ -536,4 +555,6 @@ export default function ProfileMenu({
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(menu, document.body) : null;
 }
