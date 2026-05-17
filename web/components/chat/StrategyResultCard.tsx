@@ -36,7 +36,7 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
   const isNegative = returnMetric?.value.trim().startsWith("-");
   const revealClass = isNegative ? "argus-result-reveal-caution" : "argus-result-reveal-positive";
   return (
-    <section className={`w-full rounded-[20px] border border-black/12 dark:border-white/12 bg-white dark:bg-[#1d2023] overflow-hidden ${revealClass}`}>
+    <section className={`argus-card-reveal w-full rounded-[20px] border border-black/12 dark:border-white/12 bg-white dark:bg-[#1d2023] overflow-hidden ${revealClass}`}>
       <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-black/8 dark:border-white/8">
         <div className="min-w-0">
           {symbols.length > 0 ? (

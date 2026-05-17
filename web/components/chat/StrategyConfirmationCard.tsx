@@ -23,7 +23,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
   const StatusIcon = isCancelled ? CircleSlash2 : CheckCircle2;
 
   return (
-    <section className={`argus-confirmation-reveal w-full rounded-[20px] border border-black/12 bg-white dark:border-white/12 dark:bg-[#1d2023] overflow-hidden ${isInactive ? "opacity-70" : ""}`}>
+    <section className={`argus-card-reveal argus-confirmation-reveal w-full rounded-[20px] border border-black/12 bg-white dark:border-white/12 dark:bg-[#1d2023] overflow-hidden ${isInactive ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-3.5 dark:border-white/8 sm:px-5">
         <div className="min-w-0">
           <p className="text-[14px] font-medium leading-snug tracking-tight text-black dark:text-white sm:text-[15px]">

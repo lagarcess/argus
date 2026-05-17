@@ -154,6 +154,25 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("<StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />");
   });
 
+  test("artifact cards use compositor-safe reveal motion with a reduced-motion opt out", () => {
+    const css = readFileSync(join(root, "app/globals.css"), "utf-8");
+    const resultCard = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
+    const confirmationCard = readFileSync(join(root, "components/chat/StrategyConfirmationCard.tsx"), "utf-8");
+
+    expect(resultCard).toContain("argus-card-reveal");
+    expect(resultCard).toContain("argus-result-reveal-positive");
+    expect(resultCard).toContain("argus-result-reveal-caution");
+    expect(confirmationCard).toContain("argus-card-reveal");
+    expect(confirmationCard).toContain("argus-confirmation-reveal");
+    expect(css).toContain(".argus-card-reveal");
+    expect(css).toContain("will-change: transform, opacity, border-color;");
+    expect(css).toContain("translate3d(0, 10px, 0)");
+    expect(css).toContain("translate3d(0, 12px, 0)");
+    expect(css).toContain("transform: translate3d(0, 0, 0) scale(1);");
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(css).toContain("animation: none;");
+  });
+
   test("composer hides artifact actions whenever any active card owns them", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
