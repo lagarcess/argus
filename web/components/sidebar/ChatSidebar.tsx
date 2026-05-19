@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ArgusLogo } from "@/components/ArgusLogo";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
 import ProfileMenu from "./ProfileMenu";
@@ -145,6 +146,9 @@ export default function ChatSidebar({
   const { t } = useTranslation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const recentsScrollRef = useRef<HTMLDivElement>(null);
@@ -228,24 +232,35 @@ export default function ChatSidebar({
     }
   }, [onHistoryMutated]);
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleRequestDelete = useCallback((id: string) => {
+    setPendingDeleteId(id);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDeleteId || isDeleting) return;
+    setIsDeleting(true);
     try {
-      await apiDeleteConversation(id);
+      await apiDeleteConversation(pendingDeleteId);
       onHistoryMutated?.();
     } catch (err) {
       console.error("Failed to delete conversation", err);
+    } finally {
+      setIsDeleting(false);
+      setPendingDeleteId(null);
     }
-  }, [onHistoryMutated]);
+  }, [isDeleting, onHistoryMutated, pendingDeleteId]);
 
   const handleStartRename = useCallback((id: string) => {
     const item = chatItems.find((i) => i.id === id);
     setRenamingId(id);
     setRenameValue(item?.title ?? "");
+    setRenameError(null);
   }, [chatItems]);
 
   const handleSaveRename = useCallback(async () => {
     if (!renamingId) return;
     const trimmed = renameValue.trim();
+    setRenameError(null);
     if (!trimmed) {
       setRenamingId(null);
       return;
@@ -255,13 +270,21 @@ export default function ChatSidebar({
       onHistoryMutated?.();
     } catch (err) {
       console.error("Failed to rename conversation", err);
+      setRenameError(t("chat.rename_failed", "Could not rename this chat. Try again."));
+      return;
     }
     setRenamingId(null);
-  }, [renamingId, renameValue, onHistoryMutated]);
+  }, [renamingId, renameValue, onHistoryMutated, t]);
 
   const handleCancelRename = useCallback(() => {
     setRenamingId(null);
+    setRenameError(null);
   }, []);
+
+  const pendingDeleteItem = useMemo(
+    () => chatItems.find((item) => item.id === pendingDeleteId) ?? null,
+    [chatItems, pendingDeleteId],
+  );
 
   // ── Infinite scroll for recents ─────────────────────────────────────────
   useEffect(() => {
@@ -422,24 +445,32 @@ export default function ChatSidebar({
                           <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
                           <div className="min-w-0 flex-1 pl-3 pr-10">
                             {renamingId === item.id ? (
-                              <input
-                                autoFocus
-                                type="text"
-                                value={renameValue}
-                                onChange={(e) => setRenameValue(e.target.value.slice(0, 80))}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    void handleSaveRename();
-                                  } else if (e.key === "Escape") {
-                                    handleCancelRename();
-                                  }
-                                }}
-                                onBlur={() => void handleSaveRename()}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full rounded-md border border-black/20 bg-transparent px-1.5 py-0.5 text-[14px] font-medium outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/40"
-                                maxLength={80}
-                              />
+                              <>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value.slice(0, 80))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void handleSaveRename();
+                                    } else if (e.key === "Escape") {
+                                      handleCancelRename();
+                                    }
+                                  }}
+                                  onBlur={() => void handleSaveRename()}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-invalid={Boolean(renameError)}
+                                  className="w-full rounded-md border border-black/20 bg-transparent px-1.5 py-0.5 text-[14px] font-medium outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/40"
+                                  maxLength={80}
+                                />
+                                {renameError && (
+                                  <p className="mt-1 text-[11px] font-medium text-[#d66d75]" role="alert">
+                                    {renameError}
+                                  </p>
+                                )}
+                              </>
                             ) : (
                               <>
                                 <span className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white">
@@ -458,7 +489,7 @@ export default function ChatSidebar({
                                 onPin={handlePin}
                                 onRename={handleStartRename}
                                 onArchive={handleArchive}
-                                onDelete={handleDelete}
+                                onDelete={handleRequestDelete}
                               />
                             </div>
                           )}
@@ -482,6 +513,22 @@ export default function ChatSidebar({
           )}
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={Boolean(pendingDeleteItem)}
+        title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
+        description={t(
+          "sidebar.delete_confirm.description",
+          "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+          { title: pendingDeleteItem?.title ?? t("common.conversation", "Conversation") },
+        )}
+        confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
+        cancelLabel={t("common.cancel", "Cancel")}
+        isBusy={isDeleting}
+        onCancel={() => {
+          if (!isDeleting) setPendingDeleteId(null);
+        }}
+        onConfirm={() => void handleConfirmDelete()}
+      />
 
       {/* Footer: Profile menu trigger */}
       <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">

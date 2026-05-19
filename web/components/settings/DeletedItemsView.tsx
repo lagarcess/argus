@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart2,
   History,
@@ -8,7 +8,6 @@ import {
   Loader2,
   MessageSquare,
   RotateCcw,
-  Trash2,
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -17,8 +16,6 @@ import {
   listHistory,
   patchConversation,
   patchStrategy,
-  deleteConversation as apiDeleteConversation,
-  deleteStrategy as apiDeleteStrategy,
   type HistoryItem,
 } from "@/lib/argus-api";
 
@@ -26,10 +23,6 @@ type DeletedItemsViewProps = {
   onClose: () => void;
 };
 
-/**
- * Centered blur modal showing soft-deleted items with restore and 7-day countdown.
- * Extracted from SettingsView for reuse in ProfileMenu > Data submenu.
- */
 export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
   const { t } = useTranslation();
   const [deletedItems, setDeletedItems] = useState<HistoryItem[]>([]);
@@ -60,18 +53,11 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
     return <Layers className="w-4 h-4" />;
   };
 
-  /** Days remaining before permanent deletion */
-  const daysRemaining = (item: HistoryItem) => {
-    // Items are based on created_at since deleted_at isn't on HistoryItem
-    // In production, the backend handles the 7-day purge policy
-    return 7;
-  };
-
   return (
     <div className="fixed inset-0 z-[70] bg-black/25 dark:bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center">
       <button
         className="absolute inset-0"
-        aria-label="Close recently deleted"
+        aria-label={t("settings.data.close_recently_deleted", "Close recently deleted")}
         onClick={onClose}
       />
       <div className="relative w-full max-w-md max-h-[70vh] bg-white dark:bg-[#1b1d20] rounded-[18px] border border-black/5 dark:border-white/10 overflow-hidden flex flex-col">
@@ -82,7 +68,10 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
               {t("settings.data.recently_deleted")}
             </h2>
             <p className="text-[12px] text-black/40 dark:text-white/40 mt-0.5">
-              Items are permanently deleted after 7 days
+              {t(
+                "settings.data.deleted_retention_note",
+                "Items stay here temporarily before permanent deletion.",
+              )}
             </p>
           </div>
           <button
@@ -105,7 +94,7 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
                 <History className="w-8 h-8 text-black/20 dark:text-white/20" />
               </div>
               <p className="text-[15px] text-black/40 dark:text-white/40">
-                {t("common.no_items") || "No recently deleted items"}
+                {t("settings.data.no_deleted_items", "No recently deleted items")}
               </p>
             </div>
           ) : (
@@ -124,7 +113,10 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
                         {item.title}
                       </span>
                       <span className="text-[12px] text-black/40 dark:text-white/40">
-                        Permanently deleted in {daysRemaining(item)} days
+                        {t(
+                          "settings.data.deleted_item_note",
+                          "Eligible for permanent deletion soon",
+                        )}
                       </span>
                     </div>
                   </div>
@@ -132,7 +124,7 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
                     <button
                       onClick={() => void handleRestore(item)}
                       className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-black/50 dark:text-white/50 transition-colors"
-                      aria-label="Restore"
+                      aria-label={t("common.restore", "Restore")}
                     >
                       <RotateCcw className="w-5 h-5" />
                     </button>

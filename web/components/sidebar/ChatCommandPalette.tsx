@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
 import {
   deleteConversation as apiDeleteConversation,
@@ -49,36 +50,40 @@ type DisplayItem = {
   source: "recent" | "search";
 };
 
-function formatRelativeDate(value: string) {
+function formatRelativeDate(
+  value: string,
+  t: ReturnType<typeof useTranslation>["t"],
+  locale: string,
+) {
   const date = new Date(value);
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const time = date.getTime();
 
-  if (time >= todayStart) return "Today";
-  if (time >= todayStart - 86400000) return "Yesterday";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (time >= todayStart) return t("chat.history.today", "Today");
+  if (time >= todayStart - 86400000) return t("chat.history.yesterday", "Yesterday");
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(date);
 }
 
-function dateGroup(value: string) {
+function dateGroup(value: string, t: ReturnType<typeof useTranslation>["t"]) {
   const date = new Date(value);
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const time = date.getTime();
 
-  if (time >= todayStart) return "Today";
-  if (time >= todayStart - 86400000) return "Yesterday";
-  if (time >= todayStart - 86400000 * 6) return "Last 7 Days";
-  if (time >= todayStart - 86400000 * 29) return "Last 30 Days";
-  return "Earlier";
+  if (time >= todayStart) return t("chat.history.today", "Today");
+  if (time >= todayStart - 86400000) return t("chat.history.yesterday", "Yesterday");
+  if (time >= todayStart - 86400000 * 6) return t("chat.history.last_7_days", "Last 7 days");
+  if (time >= todayStart - 86400000 * 29) return t("chat.history.last_30_days", "Last 30 days");
+  return t("chat.history.earlier", "Earlier");
 }
 
-function groupItems(items: DisplayItem[]) {
+function groupItems(items: DisplayItem[], t: ReturnType<typeof useTranslation>["t"]) {
   const groups: { label: string; items: DisplayItem[] }[] = [];
   const buckets = new Map<string, DisplayItem[]>();
 
   for (const item of items) {
-    const label = dateGroup(item.updatedAt);
+    const label = dateGroup(item.updatedAt, t);
     const existing = buckets.get(label);
     if (existing) {
       existing.push(item);
@@ -149,7 +154,7 @@ export default function ChatCommandPalette({
   activeConversationId,
   onMutated,
 }: ChatCommandPaletteProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
   const [recentItems, setRecentItems] = useState<HistoryItem[]>([]);
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
@@ -161,6 +166,8 @@ export default function ChatCommandPalette({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<DisplayItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("expanded");
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -218,7 +225,7 @@ export default function ChatCommandPalette({
       : recentItems.map(fromHistory);
     return items.filter((item): item is DisplayItem => Boolean(item));
   }, [isFiltering, recentItems, searchResults]);
-  const groupedItems = useMemo(() => groupItems(displayItems), [displayItems]);
+  const groupedItems = useMemo(() => groupItems(displayItems, t), [displayItems, t]);
   const selectedPreview = previewItem ?? displayItems[0] ?? null;
 
   const updateLocalTitle = useCallback((conversationId: string, title: string) => {
@@ -321,11 +328,26 @@ export default function ChatCommandPalette({
     onMutated?.();
   }, [onMutated, removeLocalConversation]);
 
-  const handleDelete = useCallback(async (item: DisplayItem) => {
-    await apiDeleteConversation(item.conversationId);
-    removeLocalConversation(item.conversationId);
-    onMutated?.();
-  }, [onMutated, removeLocalConversation]);
+  const handleDelete = useCallback((item: DisplayItem) => {
+    setPendingDeleteItem(item);
+  }, []);
+
+  const handleCancelDelete = useCallback(() => {
+    if (!isDeleting) setPendingDeleteItem(null);
+  }, [isDeleting]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDeleteItem || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await apiDeleteConversation(pendingDeleteItem.conversationId);
+      removeLocalConversation(pendingDeleteItem.conversationId);
+      onMutated?.();
+      setPendingDeleteItem(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [isDeleting, onMutated, pendingDeleteItem, removeLocalConversation]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -363,7 +385,7 @@ export default function ChatCommandPalette({
         type="button"
         className="absolute inset-0 bg-black/20 backdrop-blur-sm dark:bg-black/60"
         onClick={onClose}
-        aria-label="Close search"
+        aria-label={t("command_palette.close", "Close search")}
       />
 
       <div
@@ -409,7 +431,9 @@ export default function ChatCommandPalette({
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Search className="mb-3 h-8 w-8 text-black/10 dark:text-white/10" />
                 <p className="text-[14px] text-black/30 dark:text-white/30">
-                  {isFiltering ? "No results found" : "No conversations yet"}
+                  {isFiltering
+                    ? t("command_palette.no_results", "No results found")
+                    : t("command_palette.no_conversations", "No conversations yet")}
                 </p>
               </div>
             ) : (
@@ -472,7 +496,7 @@ export default function ChatCommandPalette({
                                     }
                                   }}
                                   className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-1 font-display text-[14px] font-medium text-black outline-none focus:border-black/30 dark:border-white/10 dark:bg-[#24272b] dark:text-white dark:focus:border-white/30"
-                                  aria-label="Rename conversation"
+                                  aria-label={t("command_palette.rename_conversation", "Rename conversation")}
                                 />
                               ) : (
                                 <span className="truncate font-display text-[14px] font-medium text-black dark:text-white">
@@ -481,7 +505,7 @@ export default function ChatCommandPalette({
                               )}
                               {isCurrent && (
                                 <span className="shrink-0 rounded-full bg-[#5ba897]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5ba897]">
-                                  Current
+                                  {t("common.current", "Current")}
                                 </span>
                               )}
                             </div>
@@ -492,7 +516,7 @@ export default function ChatCommandPalette({
                             )}
                           </div>
                           <span className="absolute right-3 top-3 text-[11px] text-black/30 dark:text-white/30">
-                            {formatRelativeDate(item.updatedAt)}
+                            {formatRelativeDate(item.updatedAt, t, i18n.language)}
                           </span>
                           {!isEditing && (
                             <div
@@ -507,7 +531,7 @@ export default function ChatCommandPalette({
                                     startRename(item);
                                   }}
                                   className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                  aria-label="Rename conversation"
+                                  aria-label={t("command_palette.rename_conversation", "Rename conversation")}
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </button>
@@ -520,7 +544,7 @@ export default function ChatCommandPalette({
                                     void handleArchive(item);
                                   }}
                                   className="rounded-full p-1.5 text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                                  aria-label="Archive conversation"
+                                  aria-label={t("command_palette.archive_conversation", "Archive conversation")}
                                 >
                                   <Archive className="h-3.5 w-3.5" />
                                 </button>
@@ -530,10 +554,10 @@ export default function ChatCommandPalette({
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    void handleDelete(item);
+                                    handleDelete(item);
                                   }}
                                   className="rounded-full p-1.5 text-[#d66d75]/75 transition-colors hover:bg-[#d66d75]/10 hover:text-[#d66d75]"
-                                  aria-label="Delete conversation"
+                                  aria-label={t("command_palette.delete_conversation", "Delete conversation")}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -565,32 +589,41 @@ export default function ChatCommandPalette({
                 <div className="flex h-full flex-col">
                   <div className="mb-6">
                     <span className="mb-3 inline-flex rounded-full bg-[#5ba897]/15 px-2.5 py-1 text-[11px] font-semibold text-[#5ba897]">
-                      {activeConversationId === selectedPreview.conversationId ? "Current" : "Conversation"}
+                      {activeConversationId === selectedPreview.conversationId
+                        ? t("common.current", "Current")
+                        : t("common.conversation", "Conversation")}
                     </span>
                     <h2 className="font-display text-[24px] font-medium leading-tight text-black dark:text-white">
                       {selectedPreview.title}
                     </h2>
                     <p className="mt-2 text-[13px] text-black/40 dark:text-white/40">
-                      {formatRelativeDate(selectedPreview.updatedAt)}
+                      {formatRelativeDate(selectedPreview.updatedAt, t, i18n.language)}
                     </p>
                   </div>
                   <div className="rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70">
                     <p className="text-[12px] font-semibold uppercase tracking-wider text-black/35 dark:text-white/35">
-                      Preview
+                      {t("command_palette.preview", "Preview")}
                     </p>
                     <p className="mt-2 text-[14px] leading-relaxed text-black/60 dark:text-white/60">
-                      {selectedPreview.snippet || "Open this conversation to view its messages."}
+                      {selectedPreview.snippet ||
+                        t(
+                          "command_palette.preview_empty",
+                          "Open this conversation to view its messages.",
+                        )}
                     </p>
                   </div>
                   <div className="mt-auto flex items-center justify-between border-t border-black/5 pt-4 text-[12px] text-black/35 dark:border-white/5 dark:text-white/35">
-                    <span>Open conversation</span>
+                    <span>{t("command_palette.open_conversation", "Open conversation")}</span>
                     <ChevronRight className="h-4 w-4" />
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-center">
                   <p className="text-[13px] text-black/30 dark:text-white/30">
-                    Select a conversation to preview its metadata.
+                    {t(
+                      "command_palette.select_preview",
+                      "Select a conversation to preview its metadata.",
+                    )}
                   </p>
                 </div>
               )}
@@ -600,7 +633,12 @@ export default function ChatCommandPalette({
 
         <div className="flex items-center justify-between border-t border-black/5 px-4 py-2 dark:border-white/5">
           <span className="text-[11px] text-black/30 dark:text-white/30">
-            {displayItems.length > 0 && `${displayItems.length} conversation${displayItems.length === 1 ? "" : "s"}`}
+            {displayItems.length > 0 &&
+              t("command_palette.conversation_count", {
+                count: displayItems.length,
+                defaultValue_one: "{{count}} conversation",
+                defaultValue_other: "{{count}} conversations",
+              })}
           </span>
           <button
             type="button"
@@ -610,16 +648,30 @@ export default function ChatCommandPalette({
             {layoutMode === "expanded" ? (
               <>
                 <Minimize2 className="h-3 w-3" />
-                Collapse
+                {t("common.collapse", "Collapse")}
               </>
             ) : (
               <>
                 <Maximize2 className="h-3 w-3" />
-                Expand
+                {t("common.expand", "Expand")}
               </>
             )}
           </button>
         </div>
+        <ConfirmDialog
+          isOpen={Boolean(pendingDeleteItem)}
+          title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
+          description={t(
+            "sidebar.delete_confirm.description",
+            "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+            { title: pendingDeleteItem?.title ?? t("common.conversation", "Conversation") },
+          )}
+          confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
+          cancelLabel={t("common.cancel", "Cancel")}
+          isBusy={isDeleting}
+          onCancel={handleCancelDelete}
+          onConfirm={() => void handleConfirmDelete()}
+        />
       </div>
     </div>
   );

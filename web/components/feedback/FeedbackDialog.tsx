@@ -100,17 +100,17 @@ export default function FeedbackDialog({
   const typeOptions: FeedbackTypeOption[] = [
     {
       value: "general",
-      label: "General Feedback",
+      label: t("feedback.type.general", "General Feedback"),
       icon: <MessageCircle className="h-4 w-4" />,
     },
     {
       value: "bug",
-      label: "Report a Bug",
+      label: t("feedback.type.bug", "Report a Bug"),
       icon: <Bug className="h-4 w-4" />,
     },
     {
       value: "feature",
-      label: "Request a Feature",
+      label: t("feedback.type.feature", "Request a Feature"),
       icon: <Lightbulb className="h-4 w-4" />,
     },
   ];
@@ -150,7 +150,7 @@ export default function FeedbackDialog({
 
     const nextFiles = Array.from(selectedFiles);
     if (files.length + nextFiles.length > 5) {
-      setError("Maximum 5 files allowed.");
+      setError(t("feedback.max_files", "Maximum 5 files allowed."));
       return;
     }
 
@@ -180,17 +180,19 @@ export default function FeedbackDialog({
 
     const finalMessage = isBug
       ? [
-          `Title: ${bugTitle.trim()}`,
-          `Steps to reproduce:\n${steps.trim()}`,
-          `Expected outcome:\n${expected.trim()}`,
-          `Actual outcome:\n${actual.trim()}`,
+          `${t("feedback.bug.message_title", "Title")}: ${bugTitle.trim()}`,
+          `${t("feedback.bug.message_steps", "Steps to reproduce")}:\n${steps.trim()}`,
+          `${t("feedback.bug.message_expected", "Expected outcome")}:\n${expected.trim()}`,
+          `${t("feedback.bug.message_actual", "Actual outcome")}:\n${actual.trim()}`,
         ].join("\n\n")
       : message.trim();
 
     try {
       await postFeedback({
         type: isRating ? "general" : type,
-        message: finalMessage || (isRating ? `${rating} rating with tags` : ""),
+        message:
+          finalMessage ||
+          (isRating ? t("feedback.rating_message_fallback", "{{rating}} rating with tags", { rating }) : ""),
         context: {
           ...context,
           rating,
@@ -211,16 +213,17 @@ export default function FeedbackDialog({
   };
 
   const title = "Provide feedback";
+  const displayTitle = t("feedback.title", title);
 
   const subheading = isRating
     ? rating === "positive"
-      ? "What worked well in this response?"
-      : "What should be improved in this response?"
+      ? t("feedback.subheading.positive", "What worked well in this response?")
+      : t("feedback.subheading.negative", "What should be improved in this response?")
     : type === "bug"
-      ? "File a bug report."
+      ? t("feedback.subheading.bug", "File a bug report.")
       : type === "feature"
-        ? "Request a feature for Argus."
-        : "Share feedback about your Argus experience.";
+        ? t("feedback.subheading.feature", "Request a feature for Argus.")
+        : t("feedback.subheading.general", "Share feedback about your Argus experience.");
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -237,11 +240,11 @@ export default function FeedbackDialog({
             <div className="mb-2 flex items-center gap-2 text-black/45 dark:text-white/45">
               <MessageCircle className="h-4 w-4" />
               <span className="font-display text-[11px] font-semibold uppercase tracking-wider">
-                Feedback
+                {t("feedback.eyebrow", "Feedback")}
               </span>
             </div>
             <h2 className="font-display text-[22px] font-semibold tracking-tight text-black dark:text-white">
-              {title}
+              {displayTitle}
             </h2>
             <p className="mt-1 text-[13px] leading-relaxed text-black/50 dark:text-white/50">
               {subheading}
@@ -264,7 +267,7 @@ export default function FeedbackDialog({
                 <Send className="h-7 w-7 text-[#5ba897]" />
               </div>
               <p className="font-display text-[18px] font-medium text-black dark:text-white">
-                Feedback submitted. Thank you.
+                {t("feedback.success_detail", "Feedback submitted.")}
               </p>
             </div>
           ) : (
@@ -272,7 +275,7 @@ export default function FeedbackDialog({
               {!isRating && (
                 <div className="relative">
                   <label className="mb-2 block text-[13px] font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
-                    Feedback Type
+                    {t("feedback.type_label", "Feedback type")}
                   </label>
                   <button
                     type="button"
@@ -322,12 +325,12 @@ export default function FeedbackDialog({
                 <>
                   <div>
                     <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                      Title *
+                      {t("feedback.bug.title_field", "Title")} *
                     </label>
                     <input
                       value={bugTitle}
                       onChange={(event) => setBugTitle(event.target.value.slice(0, 100))}
-                      placeholder="Brief description of the issue"
+                      placeholder={t("feedback.bug.title_placeholder", "Brief description of the issue")}
                       className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors placeholder:text-black/30 focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white dark:placeholder:text-white/30"
                     />
                     <div className="mt-1 text-right text-[11px] text-black/30 dark:text-white/30">
@@ -337,12 +340,15 @@ export default function FeedbackDialog({
 
                   <div>
                     <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                      Steps to reproduce *
+                      {t("feedback.bug.steps_field", "Steps to reproduce")} *
                     </label>
                     <textarea
                       value={steps}
                       onChange={(event) => setSteps(event.target.value.slice(0, 1000))}
-                      placeholder={"1. Go to [Page/View]\n2. Click on [Button/Action]\n3. See [Error/Behavior]"}
+                      placeholder={t(
+                        "feedback.bug.steps_placeholder",
+                        "1. Go to [Page/View]\n2. Click on [Button/Action]\n3. See [Error/Behavior]",
+                      )}
                       className="min-h-[100px] w-full resize-y rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors placeholder:text-black/30 focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white dark:placeholder:text-white/30"
                     />
                     <div className="mt-1 text-right text-[11px] text-black/30 dark:text-white/30">
@@ -353,7 +359,7 @@ export default function FeedbackDialog({
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                        Expected outcome
+                        {t("feedback.bug.expected_field", "Expected outcome")}
                       </label>
                       <textarea
                         value={expected}
@@ -363,7 +369,7 @@ export default function FeedbackDialog({
                     </div>
                     <div>
                       <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                        Actual outcome
+                        {t("feedback.bug.actual_field", "Actual outcome")}
                       </label>
                       <textarea
                         value={actual}
@@ -378,7 +384,9 @@ export default function FeedbackDialog({
                   {isRating && (
                     <div>
                       <label className="mb-3 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                        What {rating === "positive" ? "went well" : "went wrong"}?
+                        {rating === "positive"
+                          ? t("feedback.rating_positive_prompt", "What went well?")
+                          : t("feedback.rating_negative_prompt", "What went wrong?")}
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {ratingTags.map((tag) => (
@@ -401,13 +409,19 @@ export default function FeedbackDialog({
 
                   <div>
                     <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                      {isRating ? "Additional details" : "Details *"}
+                      {isRating
+                        ? t("feedback.additional_details", "Additional details")
+                        : `${t("feedback.details", "Details")} *`}
                     </label>
                     <textarea
                       autoFocus={!isRating}
                       value={message}
                       onChange={(event) => setMessage(event.target.value.slice(0, 1000))}
-                      placeholder={isRating ? "Tell us more about your experience..." : "What's on your mind?"}
+                      placeholder={
+                        isRating
+                          ? t("feedback.rating_placeholder", "Tell us more about your experience...")
+                          : t("feedback.details_placeholder", "What's on your mind?")
+                      }
                       className="min-h-[140px] w-full resize-y rounded-xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black outline-none transition-colors placeholder:text-black/30 focus:border-[#4f55f1] dark:border-white/10 dark:bg-[#25282d] dark:text-white dark:placeholder:text-white/30"
                     />
                     <div className="mt-1 text-right text-[11px] text-black/30 dark:text-white/30">
@@ -420,7 +434,7 @@ export default function FeedbackDialog({
               {!isRating && (
                 <div>
                   <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                    Attachments
+                    {t("feedback.attachments", "Attachments")}
                   </label>
                   <button
                     type="button"
@@ -429,7 +443,7 @@ export default function FeedbackDialog({
                   >
                     <Paperclip className="mb-2 h-5 w-5 text-black/40 dark:text-white/40" />
                     <span className="text-[13px] text-black/60 dark:text-white/60">
-                      Click to attach files (max 5)
+                      {t("feedback.attach_files", "Click to attach files (max 5)")}
                     </span>
                   </button>
                   <input
@@ -478,8 +492,10 @@ export default function FeedbackDialog({
                     htmlFor="consent"
                     className="cursor-pointer select-none text-[13px] leading-snug text-black/60 dark:text-white/60"
                   >
-                    I consent to the Argus team processing this feedback and contacting me
-                    for follow-up details if necessary.
+                    {t(
+                      "feedback.consent",
+                      "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
+                    )}
                   </label>
                 </div>
               )}
@@ -492,12 +508,15 @@ export default function FeedbackDialog({
               )}
 
               <p className="text-[12px] leading-relaxed text-black/45 dark:text-white/45">
-                Your conversation will be included with your feedback to help improve Argus.{" "}
+                {t(
+                  "feedback.footer_note",
+                  "Your conversation will be included with your feedback to help improve Argus.",
+                )}{" "}
                 <button
                   type="button"
                   className="font-medium text-black underline underline-offset-2 hover:text-black/70 dark:text-white dark:hover:text-white/70"
                 >
-                  Learn more
+                  {t("common.learn_more", "Learn more")}
                 </button>
               </p>
 
@@ -507,7 +526,7 @@ export default function FeedbackDialog({
                   onClick={onClose}
                   className="rounded-full border border-black/10 px-6 py-2.5 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
                 >
-                  Cancel
+                  {t("common.cancel", "Cancel")}
                 </button>
                 <button
                   type="submit"
@@ -517,7 +536,7 @@ export default function FeedbackDialog({
                   {isSubmitting ? (
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   ) : (
-                    "Submit Feedback"
+                    t("feedback.submit", "Submit feedback")
                   )}
                 </button>
               </div>

@@ -30,14 +30,59 @@
     "restore": "Restaurar",
     "permanently_delete": "Eliminar permanentemente",
     "submit": "Enviar",
+    "more": "Más",
+    "current": "Actual",
+    "collapse": "Contraer",
+    "expand": "Expandir",
+    "learn_more": "Más información",
     "and": "y",
     "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
   },
   "feedback": {
+    "title": "Enviar comentarios",
     "title_bug": "Reportar un error",
     "title_feature": "Sugerir función",
     "title_general": "Comentarios generales",
     "title_rating": "Compartir comentarios",
+    "eyebrow": "Comentarios",
+    "type_label": "Tipo de comentario",
+    "submit": "Enviar comentarios",
+    "success_detail": "Comentarios enviados.",
+    "max_files": "Máximo 5 archivos permitidos.",
+    "rating_message_fallback": "Calificación {{rating}} con etiquetas",
+    "additional_details": "Detalles adicionales",
+    "details": "Detalles",
+    "rating_placeholder": "Cuéntanos más sobre tu experiencia...",
+    "details_placeholder": "¿Qué tienes en mente?",
+    "attachments": "Adjuntos",
+    "attach_files": "Haz clic para adjuntar archivos (máx. 5)",
+    "consent": "Autorizo al equipo de Argus a procesar estos comentarios y contactarme si necesitan más detalles.",
+    "rating_positive_prompt": "¿Qué salió bien?",
+    "rating_negative_prompt": "¿Qué salió mal?",
+    "subheading": {
+      "positive": "¿Qué funcionó bien en esta respuesta?",
+      "negative": "¿Qué debería mejorar en esta respuesta?",
+      "bug": "Reporta un error.",
+      "feature": "Solicita una función para Argus.",
+      "general": "Comparte comentarios sobre tu experiencia con Argus."
+    },
+    "type": {
+      "general": "Comentarios generales",
+      "bug": "Reportar un error",
+      "feature": "Solicitar una función"
+    },
+    "bug": {
+      "title_field": "Título",
+      "title_placeholder": "Descripción breve del problema",
+      "steps_field": "Pasos para reproducirlo",
+      "steps_placeholder": "1. Ve a [Página/Vista]\n2. Haz clic en [Botón/Acción]\n3. Observa [Error/Comportamiento]",
+      "expected_field": "Resultado esperado",
+      "actual_field": "Resultado real",
+      "message_title": "Título",
+      "message_steps": "Pasos para reproducirlo",
+      "message_expected": "Resultado esperado",
+      "message_actual": "Resultado real"
+    },
     "placeholder": "Cuéntanos más...",
     "placeholder_details": "Compartir detalles (opcional)",
     "success": "¡Gracias por tus comentarios!",
@@ -114,6 +159,7 @@
       "today": "Hoy",
       "yesterday": "Ayer",
       "last_7_days": "Últimos 7 días",
+      "last_30_days": "Últimos 30 días",
       "earlier": "Anterior"
     },
     "no_recent_activity": "Sin actividad reciente aún. Tus estrategias y chats aparecerán aquí.",
@@ -131,6 +177,7 @@
     "copy_success": "Copiado",
     "copy_failed": "No se pudo copiar",
     "report_issue": "Reportar problema",
+    "rename_failed": "No se pudo renombrar este chat. Inténtalo de nuevo.",
     "saved": "Guardada",
     "saving": "Guardando",
     "simulation_complete": "Simulación completa",
@@ -224,7 +271,11 @@
   "settings": {
     "title": "Ajustes",
     "profile": {
-      "display_name": "Nombre de usuario"
+      "display_name": "Nombre para mostrar",
+      "default_user": "Usuario",
+      "edit_display_name": "Editar nombre para mostrar",
+      "delete_account": "Eliminar cuenta",
+      "title": "Perfil"
     },
     "subscription": {
       "title": "Suscripción",
@@ -233,6 +284,8 @@
     "app": {
       "title": "App",
       "language": "Idioma de la app",
+      "sidebar": "Barra lateral",
+      "security": "Seguridad",
       "appearance": "Apariencia",
       "appearance_options": {
         "light": "Claro",
@@ -244,7 +297,18 @@
       "title": "Datos e información",
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
+      "close_recently_deleted": "Cerrar borrados recientemente",
+      "deleted_retention_note": "Los elementos permanecen aquí temporalmente antes de eliminarse permanentemente.",
+      "deleted_item_note": "Puede eliminarse permanentemente pronto",
+      "no_deleted_items": "No hay elementos borrados recientemente",
+      "delete_all_conversations": "Eliminar todas las conversaciones",
       "security": "Seguridad"
+    },
+    "help": {
+      "title": "Ayuda",
+      "terms": "Términos de Servicio",
+      "privacy": "Política de Privacidad",
+      "release_notes": "Notas de la versión"
     },
     "about": {
       "title": "Acerca de",
@@ -261,6 +325,29 @@
       "en": "Inglés",
       "es-419": "Español"
     }
+  },
+  "sidebar": {
+    "open": "Abrir barra lateral",
+    "close": "Cerrar barra lateral",
+    "delete_confirm": {
+      "title": "¿Eliminar esta conversación?",
+      "description": "Esto mueve “{{title}}” a Borrados recientemente. Puedes restaurarla antes de que se elimine permanentemente.",
+      "confirm": "Eliminar conversación"
+    }
+  },
+  "command_palette": {
+    "close": "Cerrar búsqueda",
+    "no_results": "No se encontraron resultados",
+    "no_conversations": "No hay conversaciones aún",
+    "rename_conversation": "Renombrar conversación",
+    "archive_conversation": "Archivar conversación",
+    "delete_conversation": "Eliminar conversación",
+    "preview": "Vista previa",
+    "preview_empty": "Abre esta conversación para ver sus mensajes.",
+    "open_conversation": "Abrir conversación",
+    "select_preview": "Selecciona una conversación para ver sus metadatos.",
+    "conversation_count_one": "{{count}} conversación",
+    "conversation_count_other": "{{count}} conversaciones"
   },
   "onboarding": {
     "prompt": "¿Cuál es tu objetivo principal ahora? No te preocupes, puedes cambiarlo después.",

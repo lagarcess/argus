@@ -237,19 +237,19 @@ export default function ProfileMenu({
                       }}
                       className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-2 py-1 text-[14px] font-medium outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
                       maxLength={60}
-                      placeholder="Display name"
+                      placeholder={t("settings.profile.display_name", "Display name")}
                     />
                     <button
                       onClick={() => void handleSaveName()}
                       className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                      title="Save"
+                      title={t("common.save", "Save")}
                     >
                       <Check className="h-3.5 w-3.5 text-[#5ba897]" />
                     </button>
                     <button
                       onClick={() => setEditingName(false)}
                       className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                      title="Cancel"
+                      title={t("common.cancel", "Cancel")}
                     >
                       <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
                     </button>
@@ -257,12 +257,12 @@ export default function ProfileMenu({
                 ) : (
                   <div className="group flex items-center gap-1.5">
                     <span className="font-display truncate text-[15px] font-medium text-black dark:text-white">
-                      {profile?.display_name ?? "User"}
+                      {profile?.display_name ?? t("settings.profile.default_user", "User")}
                     </span>
                     <button
                       onClick={handleStartEditName}
                       className="rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
-                      title="Edit display name"
+                      title={t("settings.profile.edit_display_name", "Edit display name")}
                     >
                       <Edit2 className="h-3 w-3 text-black/40 dark:text-white/40" />
                     </button>
@@ -283,7 +283,9 @@ export default function ProfileMenu({
             {/* Info */}
             <div className="mt-2 flex flex-col gap-2 text-[13px]">
               <div className="flex justify-between">
-                <span className="text-black/50 dark:text-white/50">Language</span>
+                <span className="text-black/50 dark:text-white/50">
+                  {t("settings.app.language", "Language")}
+                </span>
                 <span className="text-black dark:text-white">{profile?.language ?? "en"}</span>
               </div>
             </div>
@@ -294,7 +296,7 @@ export default function ProfileMenu({
                 disabled
                 className="cursor-not-allowed text-[13px] text-[#d66d75]/40"
               >
-                Delete account
+                {t("settings.profile.delete_account", "Delete account")}
               </button>
             </div>
           </div>
@@ -371,7 +373,9 @@ export default function ProfileMenu({
               className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-[#d66d75]/40"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span className="whitespace-nowrap">Delete all conversations</span>
+              <span className="whitespace-nowrap">
+                {t("settings.data.delete_all_conversations", "Delete all conversations")}
+              </span>
             </button>
           </div>
         )}
@@ -423,7 +427,7 @@ export default function ProfileMenu({
                 className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
               >
                 <PanelLeft className="h-3.5 w-3.5 text-black/60 dark:text-white/60" />
-                Sidebar
+                {t("settings.app.sidebar", "Sidebar")}
               </button>
             )}
             <button
@@ -431,7 +435,7 @@ export default function ProfileMenu({
               className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25"
             >
               <Shield className="h-3.5 w-3.5 text-black/25 dark:text-white/25" />
-              Security
+              {t("settings.app.security", "Security")}
             </button>
           </div>
         )}
@@ -449,7 +453,7 @@ export default function ProfileMenu({
         >
           <div className="flex items-center gap-2.5">
             <HelpCircle className="h-4 w-4 text-black/50 dark:text-white/50" />
-            Help
+            {t("settings.help.title", "Help")}
           </div>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
@@ -462,15 +466,15 @@ export default function ProfileMenu({
           >
             <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
               <FileText className="h-3.5 w-3.5" />
-              Terms of Service
+              {t("settings.help.terms", "Terms of Service")}
             </button>
             <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
               <Shield className="h-3.5 w-3.5" />
-              Privacy Policy
+              {t("settings.help.privacy", "Privacy Policy")}
             </button>
             <button disabled className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-black/25 dark:text-white/25">
               <BookOpen className="h-3.5 w-3.5" />
-              Release Notes
+              {t("settings.help.release_notes", "Release Notes")}
             </button>
           </div>
         )}
@@ -488,7 +492,7 @@ export default function ProfileMenu({
         >
           <div className="flex items-center gap-2.5">
             <MessageSquareText className="h-4 w-4 text-black/50 dark:text-white/50" />
-            Feedback
+            {t("feedback.eyebrow", "Feedback")}
           </div>
           <ChevronRight className="h-3.5 w-3.5 text-black/30 dark:text-white/30" />
         </button>
@@ -507,7 +511,7 @@ export default function ProfileMenu({
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Bug className="h-3.5 w-3.5" />
-              Report a Bug
+              {t("feedback.type.bug", "Report a bug")}
             </button>
             <button
               onClick={() => {
@@ -517,7 +521,7 @@ export default function ProfileMenu({
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <Lightbulb className="h-3.5 w-3.5" />
-              Request a Feature
+              {t("feedback.type.feature", "Request a feature")}
             </button>
             <button
               onClick={() => {
@@ -527,7 +531,7 @@ export default function ProfileMenu({
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-black hover:bg-black/5 dark:text-white dark:hover:bg-white/5"
             >
               <MessageCircle className="h-3.5 w-3.5" />
-              General Feedback
+              {t("feedback.type.general", "General feedback")}
             </button>
           </div>
         )}
@@ -551,7 +555,7 @@ export default function ProfileMenu({
       {/* Footer links */}
       <div className="my-1 border-t border-black/5 dark:border-white/5" />
       <div className="px-3.5 py-1.5 text-[10px] text-black/25 dark:text-white/25">
-        Terms of Service · Privacy Policy
+        {t("settings.help.terms", "Terms of Service")} · {t("settings.help.privacy", "Privacy Policy")}
       </div>
     </div>
   );
