@@ -16,9 +16,17 @@ type ChatMessageProps = {
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   isLatest?: boolean;
   isStreaming?: boolean;
+  conversationId?: string | null;
 };
 
-export default function ChatMessage({ message, onAction, onFeedback, isLatest, isStreaming }: ChatMessageProps) {
+export default function ChatMessage({
+  message,
+  onAction,
+  onFeedback,
+  isLatest,
+  isStreaming,
+  conversationId,
+}: ChatMessageProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
@@ -27,6 +35,11 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
   const [copyFeedback, setCopyFeedback] = useState<"success" | "failed" | null>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
   const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedFeedbackClass =
+    "hover:bg-black/5 dark:hover:bg-white/10 text-[#191c1f] dark:text-white";
+  const idleFeedbackClass =
+    "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white";
+  const selectedFeedbackIconClass = "fill-current";
 
   const toggleOptions = (e: React.MouseEvent) => {
     if (!showOptions) {
@@ -82,10 +95,10 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
       postFeedback({
         type: "general",
         message: newRating === "positive" ? "Thumbs Up" : "Thumbs Down",
-        context: { message_id: message.id, rating: newRating }
+        context: { message_id: message.id, conversation_id: conversationId, rating: newRating }
       });
       // Then, open the detailed feedback dialog
-      onFeedback?.("rating", { message_id: message.id }, newRating);
+      onFeedback?.("rating", { message_id: message.id, conversation_id: conversationId }, newRating);
     }
   };
 
@@ -246,25 +259,21 @@ export default function ChatMessage({ message, onAction, onFeedback, isLatest, i
 
               {/* Feedback Icon Row (Right-aligned) - Progressive Disclosure: Hide while streaming */}
               {!isStreaming && (
-                <div className="relative flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity shrink-0" ref={optionsRef}>
-                {(rating === null || rating === "positive") && (
+                <div className={`relative flex items-center gap-1.5 transition-opacity shrink-0 ${rating ? "opacity-100" : "opacity-50 hover:opacity-100"}`} ref={optionsRef}>
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white" }`}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? selectedFeedbackClass : idleFeedbackClass }`}
                     title={t('chat.good_response')}
                     onClick={() => handleRating("positive")}
                   >
-                    <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? "fill-current" : ""}`} />
+                    <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? selectedFeedbackIconClass : ""}`} />
                   </button>
-                )}
-                {(rating === null || rating === "negative") && (
                   <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? "bg-black/5 dark:bg-white/10 text-black dark:text-white opacity-100 scale-110" : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white" }`}
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? selectedFeedbackClass : idleFeedbackClass }`}
                     title={t('chat.poor_response')}
                     onClick={() => handleRating("negative")}
                   >
-                    <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? "fill-current" : ""}`} />
+                    <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
                   </button>
-                )}
                 <button
                   onClick={toggleOptions}
                   className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"

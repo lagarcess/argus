@@ -16,6 +16,7 @@ from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
+from argus.api.artifact_naming import schedule_artifact_naming_after_stream
 from argus.api.chat.artifacts import result_fact_bank, saved_strategy_metadata
 from argus.api.chat.recovery import failed_action_metadata_fallback_context
 from argus.api.chat_service import (
@@ -52,7 +53,7 @@ from argus.api.chat_service import (
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import create_message, load_runtime_thread_history
 from argus.api.naming import get_starter_prompts, resolve_language
-from argus.api.schemas import ChatStreamRequest, StarterPromptsResponse, User
+from argus.api.schemas import BacktestRun, ChatStreamRequest, StarterPromptsResponse, User
 from argus.domain.supabase_gateway import QuotaExceededError
 
 router = APIRouter(tags=["agent"])
@@ -308,6 +309,37 @@ async def chat_stream(
     }
 
     async def events() -> AsyncIterator[str]:
+        naming_language = (
+            payload.language
+            or conversation.language
+            or current_user_profile.language
+            or "en"
+        )
+
+        def schedule_artifact_naming(
+            *,
+            assistant_message: str | None,
+            current_run: BacktestRun | None = None,
+            saved_strategy_id: str | None = None,
+        ) -> None:
+            try:
+                schedule_artifact_naming_after_stream(
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                    language=naming_language,
+                    current_run=current_run,
+                    saved_strategy_id=saved_strategy_id,
+                    user_message=display_message,
+                    assistant_message=assistant_message,
+                )
+            except Exception:
+                logger.opt(exception=True).warning(
+                    "Artifact naming scheduling failed",
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                    saved_strategy_id=saved_strategy_id,
+                )
+
         if onboarding_required and onboarding_goal is None:
             lang = (
                 payload.language
@@ -541,6 +573,15 @@ async def chat_stream(
                 }
             )
             yield sse_done()
+            schedule_artifact_naming(
+                assistant_message=assistant_text,
+                current_run=run,
+                saved_strategy_id=(
+                    str(metadata["saved_strategy_id"])
+                    if metadata.get("saved_strategy_id")
+                    else None
+                ),
+            )
             return
 
         if payload.action is not None and payload.action.type == "show_breakdown":
@@ -579,6 +620,10 @@ async def chat_stream(
                 }
             )
             yield sse_done()
+            schedule_artifact_naming(
+                assistant_message=assistant_text,
+                current_run=run,
+            )
             return
 
         if payload.action is not None and payload.action.type == "refine_strategy":
@@ -606,6 +651,10 @@ async def chat_stream(
             yield sse_data({"type": "token", "content": turn.assistant_text})
             yield sse_data({"type": "final", "payload": final_payload})
             yield sse_done()
+            schedule_artifact_naming(
+                assistant_message=turn.assistant_text,
+                current_run=run,
+            )
             return
 
         runtime_user = UserState(
@@ -793,6 +842,10 @@ async def chat_stream(
                     yield sse_data({"type": "token", "content": assistant_text})
                 yield sse_data({"type": "final", "payload": runtime_result})
                 yield sse_done()
+                schedule_artifact_naming(
+                    assistant_message=persisted_text,
+                    current_run=run,
+                )
                 return
         except Exception:
             logger.exception(

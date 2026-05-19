@@ -299,6 +299,13 @@ class OpenRouterStructuredInterpreter:
             "are supported through Kraken; currency pair benchmark is the tested "
             "pair itself. No brokerage trading, shorting, mixed asset-class runs, "
             "custom scripting, or real slippage/fee realism.\n\n"
+            "Benchmark language matters: phrases like 'against SPY', 'versus QQQ', "
+            "'compared with BTC', or 'beat the market' describe comparison_baseline "
+            "or the benchmark, not additional assets to buy. Do not add benchmark "
+            "symbols to asset_universe unless the user explicitly says to buy, hold, "
+            "or test both as assets. When the user gives exact start/end dates, "
+            "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
+            "never replace them with past year, last year, or another default period.\n\n"
             "When the user says something like 'buy Nvidia when the 50-day moving average "
             "crosses above the 200-day', classify it as signal_strategy, preserve "
             "the crossover as entry_logic, and default the exit to the same fast "
@@ -1427,6 +1434,11 @@ def _response_underfills_pending_result_refinement(
         return False
     snapshot = request.latest_task_snapshot
     if snapshot is None or snapshot.pending_strategy_summary is None:
+        return False
+    if (
+        _request_has_latest_result(request)
+        and response.semantic_turn_act == "result_followup"
+    ):
         return False
     if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return True

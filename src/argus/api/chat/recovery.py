@@ -233,20 +233,55 @@ def pending_strategy_metadata_fallback_context(
         pending_resolution = pending_payload.get("pending_resolution")
         if isinstance(pending_resolution, dict):
             selected_thread_metadata["pending_resolution"] = dict(pending_resolution)
+        source_reference: ArtifactReference | None = None
+        source_result = pending_payload.get("source_result")
+        raw_source_run_id = (
+            source_result.get("run_id")
+            if isinstance(source_result, dict)
+            else metadata.get("source_result_run_id")
+        )
+        if raw_source_run_id is not None:
+            run = _run_by_id_for_user(
+                user_id=user_id,
+                run_id=str(raw_source_run_id),
+            )
+            if (
+                run is not None
+                and run.conversation_id == conversation_id
+                and run.status == "completed"
+            ):
+                source_reference = result_reference_from_run(run)
+                source_reference.metadata.update(
+                    saved_strategy_metadata_from_sources(
+                        run=run,
+                        message_metadata=metadata,
+                    )
+                )
+                selected_thread_metadata["source_result_run_id"] = run.id
+                if run.strategy_id is not None:
+                    selected_thread_metadata["source_result_strategy_id"] = (
+                        run.strategy_id
+                    )
         return RuntimeFallbackContext(
             latest_task_snapshot=TaskSnapshot(
                 latest_task_type="backtest_execution",
                 completed=False,
                 pending_strategy_summary=pending_strategy,
+                latest_backtest_result_reference=source_reference,
                 last_unresolved_follow_up=(
                     pending_strategy.raw_user_phrasing
                     or pending_strategy.strategy_thesis
                     or pending_strategy.strategy_type
                 ),
                 resolution_provenance=list(pending_strategy.resolution_provenance),
+                artifact_references=(
+                    [source_reference] if source_reference is not None else []
+                ),
             ),
             selected_thread_metadata=selected_thread_metadata,
-            artifact_references=[],
+            artifact_references=(
+                [source_reference] if source_reference is not None else []
+            ),
             confirmation_payload=(
                 metadata.get("confirmation_payload")
                 if isinstance(metadata.get("confirmation_payload"), dict)

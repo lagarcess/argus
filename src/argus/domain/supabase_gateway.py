@@ -384,6 +384,22 @@ class SupabaseGateway:
         row = _row_one(rows)
         return BacktestRun.model_validate(row) if row else None
 
+    def get_latest_completed_run_for_conversation(
+        self, *, user_id: str, conversation_id: str
+    ) -> BacktestRun | None:
+        rows = (
+            self.client.table("backtest_runs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("conversation_id", conversation_id)
+            .eq("status", "completed")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        return BacktestRun.model_validate(row) if row else None
+
     def count_completed_runs(self, *, user_id: str) -> int:
         rows = (
             self.client.table("backtest_runs")
