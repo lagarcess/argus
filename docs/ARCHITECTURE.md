@@ -622,7 +622,7 @@ Never leave user confused.
 
 When choosing any technical path, ask:
 
-> *Does this help Argus deliver fast, trustworthy conversational idea testing with lower friction?*
+> *Does this preserve the separation between deterministic simulation truth, LLM-owned language, and contextual intelligence?*
 
 If not, it likely should wait.
 

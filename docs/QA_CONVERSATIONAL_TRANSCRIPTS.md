@@ -184,3 +184,11 @@ Run these before PR submission whenever conversational runtime code changes:
 5. Start a DCA flow, provide the amount, then provide the period.
    - Pass: Argus preserves the user-provided recurring amount through later turns.
    - Reject: re-asking the amount after it was supplied.
+
+## QA Transcript Decision Filter
+
+When adding or updating conversational QA transcripts, ask:
+
+> *Does this test semantic success, groundedness, and recovery rather than brittle exact wording?*
+
+If no, the transcript likely overfits language the LLM should own.

@@ -245,3 +245,11 @@ disable reasoning with `reasoning: {"effort": "none"}`. The reason is practical:
 for artifact extraction Argus needs complete JSON content, not billable hidden
 reasoning tokens. If a provider rejects that reasoning setting, the client may
 retry the same request without it before moving to the next configured model.
+
+## Conversational Runtime Decision Filter
+
+When changing conversational runtime behavior, ask:
+
+> *Does this keep the conversation resilient under messy human curiosity while preserving deterministic validation, artifacts, and recovery?*
+
+If no, it likely should wait or be redesigned.

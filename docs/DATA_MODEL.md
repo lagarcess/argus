@@ -517,6 +517,6 @@ Full Slowly Changing Dimension (SCD) systems (e.g., Type 2 historical tracking) 
 
 When adding or changing a table, ask:
 
-> *Does this support fast, trustworthy conversational investing idea testing?*
+> *Does this store durable truth, recovery state, or useful research memory without turning context into simulation truth?*
 
 If no, it likely should wait for post-Alpha.

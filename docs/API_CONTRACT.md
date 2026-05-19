@@ -1573,7 +1573,7 @@ Not in current contract:
 
 When adding endpoints ask:
 
-> *Does this reduce friction for conversational investing idea testing?*
+> *Does this keep run facts reproducible, provider/source metadata explicit, and user-facing language separate from machine contracts?*
 
 If no, it likely should wait.
 
