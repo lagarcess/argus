@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -13,6 +14,7 @@ from argus.llm.openrouter import (
     build_openrouter_model,
     log_openrouter_failure,
     openrouter_task_timeout_seconds,
+    record_openrouter_route_receipt,
 )
 
 
@@ -55,17 +57,35 @@ class OpenRouterClarificationGenerator:
 
         model = build_openrouter_model("clarification", model_name=self.model_name)
         if model:
+            started_at = time.perf_counter()
             try:
                 chunks = await asyncio.wait_for(
                     _collect_stream_chunks(model, messages),
                     timeout=openrouter_task_timeout_seconds("clarification"),
                 )
                 if chunks:
+                    record_openrouter_route_receipt(
+                        task="clarification",
+                        model_name=self.model_name,
+                        mode="chat_model",
+                        schema_name=None,
+                        latency_ms=_elapsed_ms(started_at),
+                        outcome="succeeded",
+                    )
                     for content in chunks:
                         yield content
                     self.last_status = "used"
                     return
             except Exception as exc:
+                record_openrouter_route_receipt(
+                    task="clarification",
+                    model_name=self.model_name,
+                    mode="chat_model",
+                    schema_name=None,
+                    latency_ms=_elapsed_ms(started_at),
+                    outcome="failed",
+                    failure_mode=type(exc).__name__,
+                )
                 log_openrouter_failure(
                     task="clarification",
                     model_name=self.model_name,
@@ -92,18 +112,36 @@ class OpenRouterClarificationGenerator:
             "clarification", model_name=fallback_model_name
         )
         if fallback_model:
+            started_at = time.perf_counter()
             try:
                 chunks = await asyncio.wait_for(
                     _collect_stream_chunks(fallback_model, messages),
                     timeout=openrouter_task_timeout_seconds("clarification"),
                 )
                 if chunks:
+                    record_openrouter_route_receipt(
+                        task="clarification",
+                        model_name=fallback_model_name,
+                        mode="chat_model",
+                        schema_name=None,
+                        latency_ms=_elapsed_ms(started_at),
+                        outcome="succeeded",
+                    )
                     for content in chunks:
                         yield content
                     self.last_status = "fallback_used"
                     return
             except Exception as exc:
                 self.last_status = "failed"
+                record_openrouter_route_receipt(
+                    task="clarification",
+                    model_name=fallback_model_name,
+                    mode="chat_model",
+                    schema_name=None,
+                    latency_ms=_elapsed_ms(started_at),
+                    outcome="failed",
+                    failure_mode=type(exc).__name__,
+                )
                 log_openrouter_failure(
                     task="clarification",
                     model_name=fallback_model_name,
@@ -180,3 +218,7 @@ def _chunk_content(chunk: Any) -> str:
                 parts.append(item["text"])
         return "".join(parts)
     return ""
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)

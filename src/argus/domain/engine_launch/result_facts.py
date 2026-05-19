@@ -40,41 +40,108 @@ def resolved_rule_summary(facts: dict[str, Any]) -> str | None:
 
 def runnable_next_tests(facts: dict[str, Any]) -> str:
     """Return truthful next experiments for the strategy family that actually ran."""
+    options = structured_next_experiments(facts)
+    if options:
+        labels = ", ".join(str(option["label"]) for option in options[:-1])
+        if len(options) > 1:
+            labels = f"{labels}, or {options[-1]['label']}"
+        else:
+            labels = str(options[0]["label"])
+        return f"Runnable next tests: {labels}"
 
-    strategy_type = _strategy_type(facts)
-    symbols = _symbols_label(facts)
-    asset_phrase = f" on {symbols}" if symbols else ""
-    peer_phrase = "a different same-class asset"
-
-    if strategy_type == "buy_and_hold":
-        return (
-            "Runnable next tests: change the date range, test the same buy-and-hold "
-            f"setup on {peer_phrase}, try a supported RSI threshold{asset_phrase}, "
-            f"or try a supported SMA/EMA crossover{asset_phrase}"
-        )
-    if strategy_type == "indicator_threshold":
-        return (
-            "Runnable next tests: adjust the indicator period or thresholds, compare "
-            f"{symbols or 'this asset'} with buy-and-hold, change the date range, "
-            f"or test the rule on {peer_phrase}"
-        )
-    if strategy_type == "signal_strategy":
-        return (
-            "Runnable next tests: adjust the signal periods or crossover direction, "
-            f"compare {symbols or 'this asset'} with buy-and-hold, change the date "
-            f"range, or test the rule on {peer_phrase}"
-        )
-    if strategy_type == "dca_accumulation":
-        return (
-            "Runnable next tests: change the date range, adjust the contribution "
-            f"cadence, test the same recurring-buy setup on {peer_phrase}, or compare "
-            f"{symbols or 'this asset'} with buy-and-hold"
-        )
     return (
         "Runnable next tests: change the date range, test the same supported setup on "
         "a different same-class asset, or simplify the idea into a supported RSI or "
         "SMA/EMA rule"
     )
+
+
+def structured_next_experiments(facts: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return structured, executable next-step options grounded in the completed run."""
+
+    strategy_type = _strategy_type(facts)
+    symbols = _symbols_label(facts)
+    asset_phrase = f" on {symbols}" if symbols else ""
+    asset_label = symbols or "this asset"
+    peer_phrase = "a different same-class asset"
+
+    if strategy_type == "buy_and_hold":
+        return [
+            _next_experiment("change_date_range", "change the date range"),
+            _next_experiment(
+                "same_setup_peer_asset",
+                f"test the same buy-and-hold setup on {peer_phrase}",
+            ),
+            _next_experiment(
+                "supported_rsi_threshold",
+                f"try a supported RSI threshold{asset_phrase}",
+            ),
+            _next_experiment(
+                "supported_ma_crossover",
+                f"try a supported SMA/EMA crossover{asset_phrase}",
+            ),
+        ]
+    if strategy_type == "indicator_threshold":
+        return [
+            _next_experiment(
+                "adjust_indicator_thresholds",
+                "adjust the indicator period or thresholds",
+            ),
+            _next_experiment(
+                "compare_buy_and_hold",
+                f"compare {asset_label} with buy-and-hold",
+            ),
+            _next_experiment("change_date_range", "change the date range"),
+            _next_experiment("same_rule_peer_asset", f"test the rule on {peer_phrase}"),
+        ]
+    if strategy_type == "signal_strategy":
+        return [
+            _next_experiment(
+                "adjust_signal_periods",
+                "adjust the signal periods or crossover direction",
+            ),
+            _next_experiment(
+                "compare_buy_and_hold",
+                f"compare {asset_label} with buy-and-hold",
+            ),
+            _next_experiment("change_date_range", "change the date range"),
+            _next_experiment("same_rule_peer_asset", f"test the rule on {peer_phrase}"),
+        ]
+    if strategy_type == "dca_accumulation":
+        return [
+            _next_experiment("change_date_range", "change the date range"),
+            _next_experiment(
+                "adjust_contribution_cadence",
+                "adjust the contribution cadence",
+            ),
+            _next_experiment(
+                "same_setup_peer_asset",
+                f"test the same recurring-buy setup on {peer_phrase}",
+            ),
+            _next_experiment(
+                "compare_buy_and_hold",
+                f"compare {asset_label} with buy-and-hold",
+            ),
+        ]
+    return [
+        _next_experiment("change_date_range", "change the date range"),
+        _next_experiment(
+            "same_setup_peer_asset",
+            "test the same supported setup on a different same-class asset",
+        ),
+        _next_experiment(
+            "supported_rsi_or_ma_rule",
+            "simplify the idea into a supported RSI or SMA/EMA rule",
+        ),
+    ]
+
+
+def _next_experiment(kind: str, label: str) -> dict[str, Any]:
+    return {
+        "kind": kind,
+        "label": label,
+        "contract": "supported_backtest_experiment",
+    }
 
 
 def append_execution_note_to_result_card(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any
 
 from argus.agent_runtime.stages.interpret import StageResult
@@ -21,6 +22,7 @@ from argus.llm.openrouter import (
     build_openrouter_model,
     log_openrouter_failure,
     openrouter_task_timeout_seconds,
+    record_openrouter_route_receipt,
 )
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -157,12 +159,22 @@ async def _stream_llm_explanation(
         ),
         HumanMessage(content=json.dumps(context, default=str, sort_keys=True)),
     ]
+    started_at = time.perf_counter()
     try:
         chunks = await asyncio.wait_for(
             _collect_stream_chunks(model, messages),
             timeout=openrouter_task_timeout_seconds("result_summary"),
         )
     except Exception as exc:
+        record_openrouter_route_receipt(
+            task="result_summary",
+            model_name=None,
+            mode="chat_model",
+            schema_name=None,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="failed",
+            failure_mode=type(exc).__name__,
+        )
         log_openrouter_failure(
             task="result_summary",
             model_name=None,
@@ -171,6 +183,15 @@ async def _stream_llm_explanation(
         )
         return None
     text = "".join(chunks).strip()
+    record_openrouter_route_receipt(
+        task="result_summary",
+        model_name=None,
+        mode="chat_model",
+        schema_name=None,
+        latency_ms=_elapsed_ms(started_at),
+        outcome="succeeded" if text else "failed",
+        failure_mode=None if text else "empty_response",
+    )
     return text or None
 
 
@@ -196,6 +217,10 @@ def _chunk_content(chunk: Any) -> str:
                 parts.append(item["text"])
         return "".join(parts)
     return ""
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)
 
 
 def _result_payload(state: RunState) -> dict[str, Any]:

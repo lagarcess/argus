@@ -382,13 +382,13 @@ def test_multi_symbol_aggregate_uses_equal_weight_capital() -> None:
 def test_indicator_signals_use_user_selected_thresholds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    index = pd.date_range("2025-01-01", periods=5, freq="D", tz="UTC")
-    bars = pd.DataFrame({"close": [100, 101, 102, 103, 104]}, index=index)
+    index = pd.date_range("2025-01-01", periods=16, freq="D", tz="UTC")
+    bars = pd.DataFrame({"close": list(range(100, 116))}, index=index)
     monkeypatch.setattr(
         engine,
         "_resolve_indicator_series",
         lambda data, *, indicator, period, fallback_col="close": pd.Series(
-            [35, 24, 29, 61, 50],
+            [35, 24, 29, 61, 50, *([50] * 11)],
             index=data.index,
         ),
     )
@@ -398,7 +398,7 @@ def test_indicator_signals_use_user_selected_thresholds(
             "template": "rsi_mean_reversion",
             "parameters": {
                 "indicator": "rsi",
-                "indicator_period": 10,
+                "indicator_period": 2,
                 "entry_threshold": 25,
                 "exit_threshold": 60,
             },
@@ -406,8 +406,10 @@ def test_indicator_signals_use_user_selected_thresholds(
         bars,
     )
 
-    assert entries.tolist() == [False, True, False, False, False]
-    assert exits.tolist() == [False, False, False, True, False]
+    assert entries.iloc[:5].tolist() == [False, True, False, False, False]
+    assert not entries.iloc[5:].any()
+    assert exits.iloc[:5].tolist() == [False, False, False, True, False]
+    assert not exits.iloc[5:].any()
 
 
 def test_compute_alpha_metrics_preserves_contract_shape_multi_symbol() -> None:

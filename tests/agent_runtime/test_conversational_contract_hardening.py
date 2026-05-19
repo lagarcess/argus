@@ -714,7 +714,7 @@ def test_unsupported_strategy_recovery_copy_uses_sentence_case_options() -> None
 
 
 def test_dca_confirmation_card_uses_recurring_contribution_not_total_capital() -> None:
-    from argus.api.chat_service import runtime_confirmation_card
+    from argus.api.chat.confirmation import runtime_confirmation_card
 
     card = runtime_confirmation_card(
         {

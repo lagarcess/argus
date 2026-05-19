@@ -8,6 +8,19 @@ MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
 EXPECTED_QA_IDS = {f"QA {index}" for index in range(1, 15)}
 EXPECTED_WORKSTREAMS = {f"workstream_{index}" for index in range(1, 9)}
 VALID_PRIORITIES = {"must_pass", "should_pass", "watch"}
+EXPECTED_EVAL_CATEGORIES = {
+    "messy_beginner_investing_prompts",
+    "partial_strategy_ideas",
+    "unsupported_requests",
+    "contradictory_requests",
+    "recovery_scenarios",
+    "reload_refinement_continuity",
+    "result_followup_groundedness",
+    "why_did_this_happen_contextual_synthesis",
+    "next_experiment_usefulness",
+    "hallucination_prevention",
+    "no_unsupported_investment_advice",
+}
 
 
 def _load_manifest() -> dict[str, Any]:
@@ -71,3 +84,25 @@ def test_chat_runtime_eval_manifest_separates_hard_checks_from_llm_judgment() ->
         )
         assert "judge" not in hard_check_text.lower()
         assert "rubric" not in hard_check_text.lower()
+
+
+def test_chat_runtime_eval_layer_tracks_semantic_groundedness_and_receipts() -> None:
+    manifest = _load_manifest()
+    layer = manifest["production_readiness_eval_layer"]
+
+    assert layer["assertion_style"] == "semantic_contracts_not_exact_wording"
+    assert set(layer["exact_strings_reserved_for"]) == {
+        "protocol",
+        "static_ui",
+        "safety_fallback",
+    }
+    assert set(layer["categories"]) == EXPECTED_EVAL_CATEGORIES
+    assert set(layer["receipt_fields"]) >= {
+        "task",
+        "tier",
+        "model",
+        "fallback_model",
+        "latency_ms",
+        "outcome",
+        "failure_mode",
+    }

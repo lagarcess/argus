@@ -372,6 +372,66 @@ class SupabaseGateway:
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
 
+    def create_context_packet(
+        self,
+        *,
+        user_id: str,
+        packet: dict[str, Any],
+    ) -> dict[str, Any]:
+        payload = dict(packet)
+        payload["user_id"] = user_id
+        payload["packet"] = dict(packet)
+        created = self.client.table("context_packets").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
+    def attach_context_packet_to_run(
+        self,
+        *,
+        user_id: str,
+        attachment: dict[str, Any],
+    ) -> dict[str, Any]:
+        payload = {
+            "user_id": user_id,
+            "run_id": attachment["run_id"],
+            "context_packet_id": attachment["packet_id"],
+            "explanation_id": attachment.get("explanation_id"),
+            "attached_at": attachment.get("attached_at") or _now_iso(),
+            "immutable_snapshot": bool(attachment.get("immutable_snapshot", True)),
+        }
+        created = self.client.table("run_context_packets").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
+    def create_route_receipt(
+        self,
+        *,
+        user_id: str | None,
+        receipt: dict[str, Any],
+        conversation_id: str | None = None,
+        run_id: str | None = None,
+        message_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "run_id": run_id,
+            "message_id": message_id,
+            "task": receipt["task"],
+            "tier": receipt["tier"],
+            "model": receipt.get("model"),
+            "fallback_model": receipt.get("fallback_model"),
+            "mode": receipt["mode"],
+            "schema_name": receipt.get("schema_name"),
+            "latency_ms": receipt.get("latency_ms", 0),
+            "outcome": receipt["outcome"],
+            "failure_mode": receipt.get("failure_mode"),
+            "fallback_used": bool(receipt.get("fallback_used")),
+            "metadata": metadata or {},
+            "created_at": receipt.get("created_at") or _now_iso(),
+        }
+        created = self.client.table("route_receipts").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
     def get_backtest_run(self, *, user_id: str, run_id: str) -> BacktestRun | None:
         rows = (
             self.client.table("backtest_runs")

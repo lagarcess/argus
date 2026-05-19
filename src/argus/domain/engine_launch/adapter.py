@@ -151,11 +151,10 @@ def _run_indicator_threshold(
                 "threshold rule was simulated; no extra filters were added."
             ),
         ],
-        provider_metadata={
-            "provider": "alpaca",
-            "asset_class": asset_class,
-            "timeframe": config["timeframe"],
-        },
+        provider_metadata=_provider_metadata(
+            asset_class=asset_class,
+            timeframe=config["timeframe"],
+        ),
     )
     result_card = append_execution_note_to_result_card(
         result_card,
@@ -230,11 +229,10 @@ def _run_signal_strategy(
             f"{config['timeframe']} bars only.",
             "Only the confirmed signal rules were simulated; no extra filters were added.",
         ],
-        provider_metadata={
-            "provider": "alpaca",
-            "asset_class": asset_class,
-            "timeframe": config["timeframe"],
-        },
+        provider_metadata=_provider_metadata(
+            asset_class=asset_class,
+            timeframe=config["timeframe"],
+        ),
     )
     result_card = append_execution_note_to_result_card(
         result_card,
@@ -309,11 +307,10 @@ def _run_dca_accumulation(
             f"{config['timeframe']} bars only.",
             "Recurring entries use the first available bar in each cadence window.",
         ],
-        provider_metadata={
-            "provider": "alpaca",
-            "asset_class": asset_class,
-            "timeframe": config["timeframe"],
-        },
+        provider_metadata=_provider_metadata(
+            asset_class=asset_class,
+            timeframe=config["timeframe"],
+        ),
     )
     return LaunchExecutionAdapterResult(
         envelope=envelope,
@@ -372,11 +369,10 @@ def _run_buy_and_hold(
         benchmark_metrics=benchmark_metrics,
         assumptions=list(result_card.get("assumptions", [])),
         caveats=[f"{config['timeframe']} bars only."],
-        provider_metadata={
-            "provider": "alpaca",
-            "asset_class": asset_class,
-            "timeframe": config["timeframe"],
-        },
+        provider_metadata=_provider_metadata(
+            asset_class=asset_class,
+            timeframe=config["timeframe"],
+        ),
     )
     return LaunchExecutionAdapterResult(
         envelope=envelope,
@@ -387,6 +383,29 @@ def _run_buy_and_hold(
             result_card=result_card,
         ),
     )
+
+
+def _provider_metadata(*, asset_class: str, timeframe: str) -> dict[str, Any]:
+    if asset_class == "currency_pair":
+        return {
+            "provider": "kraken",
+            "asset_class": asset_class,
+            "timeframe": timeframe,
+        }
+    if asset_class == "crypto":
+        return {
+            "provider": "alpaca",
+            "fallback_provider": "kraken",
+            "asset_class": asset_class,
+            "timeframe": timeframe,
+            "source_policy": "alpaca_crypto_with_kraken_fallback",
+        }
+    return {
+        "provider": "alpaca",
+        "asset_class": asset_class,
+        "timeframe": timeframe,
+        "feed": "iex",
+    }
 
 
 def _build_periodic_config(

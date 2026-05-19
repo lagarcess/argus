@@ -7,6 +7,24 @@
     "should_pass": "Quality or polish signal. A failure can ship only with an explicit follow-up owner.",
     "watch": "Exploratory behavior. Use for trends, not release gates."
   },
+  "production_readiness_eval_layer": {
+    "assertion_style": "semantic_contracts_not_exact_wording",
+    "exact_strings_reserved_for": ["protocol", "static_ui", "safety_fallback"],
+    "receipt_fields": ["task", "tier", "model", "fallback_model", "latency_ms", "outcome", "failure_mode"],
+    "categories": [
+      "messy_beginner_investing_prompts",
+      "partial_strategy_ideas",
+      "unsupported_requests",
+      "contradictory_requests",
+      "recovery_scenarios",
+      "reload_refinement_continuity",
+      "result_followup_groundedness",
+      "why_did_this_happen_contextual_synthesis",
+      "next_experiment_usefulness",
+      "hallucination_prevention",
+      "no_unsupported_investment_advice"
+    ]
+  },
   "scenarios": [
     {
       "id": "qa_01_simple_buy_hold_human_language",

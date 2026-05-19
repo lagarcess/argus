@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -68,6 +69,7 @@ from argus.llm.openrouter import (
     log_openrouter_failure,
     openrouter_structured_model_candidates,
     openrouter_task_timeout_seconds,
+    record_openrouter_route_receipt,
 )
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
@@ -140,6 +142,7 @@ class OpenRouterStructuredInterpreter:
         # 1. Try Primary Model
         model = build_openrouter_model("interpretation", model_name=self.model_name)
         if model:
+            started_at = time.perf_counter()
             try:
                 structured = model.with_structured_output(LLMInterpretationResponse)
                 response = await asyncio.wait_for(
@@ -147,6 +150,14 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    record_openrouter_route_receipt(
+                        task="interpretation",
+                        model_name=self.model_name,
+                        mode="chat_model",
+                        schema_name="LLMInterpretationResponse",
+                        latency_ms=_elapsed_ms(started_at),
+                        outcome="succeeded",
+                    )
                     response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=self.model_name,
@@ -155,6 +166,15 @@ class OpenRouterStructuredInterpreter:
                     self.last_status = "used"
                     return self._to_runtime_interpretation(response, request=request)
             except Exception as exc:
+                record_openrouter_route_receipt(
+                    task="interpretation",
+                    model_name=self.model_name,
+                    mode="chat_model",
+                    schema_name="LLMInterpretationResponse",
+                    latency_ms=_elapsed_ms(started_at),
+                    outcome="failed",
+                    failure_mode=type(exc).__name__,
+                )
                 log_openrouter_failure(
                     task="interpretation",
                     model_name=self.model_name,
@@ -183,6 +203,7 @@ class OpenRouterStructuredInterpreter:
             "interpretation", model_name=fallback_model_name
         )
         if fallback_model:
+            started_at = time.perf_counter()
             try:
                 structured = fallback_model.with_structured_output(
                     LLMInterpretationResponse
@@ -192,6 +213,14 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
+                    record_openrouter_route_receipt(
+                        task="interpretation",
+                        model_name=fallback_model_name,
+                        mode="chat_model",
+                        schema_name="LLMInterpretationResponse",
+                        latency_ms=_elapsed_ms(started_at),
+                        outcome="succeeded",
+                    )
                     response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=fallback_model_name,
@@ -201,6 +230,15 @@ class OpenRouterStructuredInterpreter:
                     return self._to_runtime_interpretation(response, request=request)
             except Exception as exc:
                 self.last_status = "failed"
+                record_openrouter_route_receipt(
+                    task="interpretation",
+                    model_name=fallback_model_name,
+                    mode="chat_model",
+                    schema_name="LLMInterpretationResponse",
+                    latency_ms=_elapsed_ms(started_at),
+                    outcome="failed",
+                    failure_mode=type(exc).__name__,
+                )
                 log_openrouter_failure(
                     task="interpretation",
                     model_name=fallback_model_name,
@@ -332,7 +370,11 @@ class OpenRouterStructuredInterpreter:
             "strategy_type, strategy_thesis, asset_universe, date_range, entry_logic, "
             "exit_logic, and structured indicator or rule fields when present. "
             "Do not return an empty candidate_strategy_draft for a testable investing "
-            "idea. "
+            "idea. Normal curiosity such as 'what if I bought/held/owned a company, "
+            "ticker, crypto asset, or currency pair' is a testable investing idea, "
+            "not a capability or education question; classify it as new_idea and "
+            "extract the asset and strategy draft before asking only for truly missing "
+            "run facts. "
             "For indicator threshold rules, put the indicator key in indicator, "
             "the lookback in indicator_period when supplied, and numeric threshold "
             "overrides in entry_threshold and exit_threshold. Also preserve readable "
@@ -481,6 +523,14 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(response, request=request)
+    if _response_needs_signal_rule_plan(response):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return repaired_response
     response = await _signal_rule_checked_response(
         response=response,
         preferred_model=preferred_model,
@@ -497,6 +547,14 @@ async def _response_ready_for_runtime(
         raise ValueError(
             "OpenRouter unsupported clarification omitted recoverable artifact context"
         )
+    if _response_needs_testable_idea_repair(response=response, request=request):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return repaired_response
     if _structured_interpretation_has_required_shape(response, request=request):
         return response
 
@@ -1103,6 +1161,87 @@ def _response_needs_artifact_context_repair(
     )
 
 
+def _response_needs_testable_idea_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    requested_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).split("[", 1)[0]
+    if requested_field:
+        return False
+    if _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
+        return False
+    if response.intent != "conversation_followup":
+        return False
+    if response.semantic_turn_act not in {None, "educational_question"}:
+        return False
+    if _message_asks_for_capability_inventory(request.current_user_message):
+        return False
+    return _message_looks_like_investing_experiment(request.current_user_message)
+
+
+def _message_asks_for_capability_inventory(message: str) -> bool:
+    text = message.strip().lower()
+    inventory_terms = (
+        "indicators",
+        "strategies",
+        "assets",
+        "coins",
+        "symbols",
+        "markets",
+        "limits",
+    )
+    asks_inventory = (
+        text.startswith(("what ", "which "))
+        and any(term in text for term in inventory_terms)
+    )
+    capability_phrases = (
+        "what can you do",
+        "can you support",
+        "could you support",
+        "can you run",
+        "could you run",
+        "can you test",
+        "could you test",
+    )
+    return asks_inventory or any(phrase in text for phrase in capability_phrases)
+
+
+def _message_looks_like_investing_experiment(message: str) -> bool:
+    text = message.strip().lower()
+    if not text:
+        return False
+    normalized = f" {text}"
+    investing_actions = (
+        " buy",
+        " bought",
+        " hold",
+        " held",
+        " own",
+        " owned",
+        " invest",
+        " invested",
+        " dca",
+    )
+    curiosity_buy = "what if" in text and any(
+        action in normalized for action in investing_actions
+    )
+    explicit_backtest = "backtest" in text or "simulate" in text
+    action_test = any(word in text.split() for word in ("test", "try")) and (
+        any(action in normalized for action in investing_actions)
+        or " when " in normalized
+    )
+    recurring_buy = any(
+        action in normalized for action in (" buy", " invest", " dca")
+    ) and any(
+        cadence in text
+        for cadence in ("every", "daily", "weekly", "biweekly", "monthly", "quarterly")
+    )
+    return bool(curiosity_buy or explicit_backtest or action_test or recurring_buy)
+
+
 def _focused_strategy_extraction_has_material_fields(
     extraction: FocusedStrategyExtraction,
 ) -> bool:
@@ -1354,6 +1493,10 @@ def _openrouter_wire_messages(messages: list[BaseMessage]) -> list[dict[str, str
             "overrides them."
         )
     return wire_messages
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)
 
 
 def _structured_interpretation_has_required_shape(
@@ -1990,6 +2133,7 @@ def _validate_capability_boundaries(
         strategy.strategy_type = canonical_type
         strategy.entry_logic = None
         strategy.exit_logic = None
+        _remove_unstated_model_defaults(strategy)
     if canonical_type == "indicator_threshold":
         strategy.strategy_type = canonical_type
         _apply_executable_indicator_defaults(strategy)
@@ -2010,6 +2154,57 @@ def _validate_capability_boundaries(
         strategy=strategy,
         current_message=request.current_user_message,
     )
+
+
+def _remove_unstated_model_defaults(strategy: StrategySummary) -> None:
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
+    capital_source = str(field_provenance.get("capital_amount") or "").strip()
+    if capital_source in {
+        "default",
+        "default_assumption",
+        "assumed_default",
+        "model_default",
+    }:
+        strategy.capital_amount = None
+        if strategy.sizing_mode in {"fixed", "capital_amount"}:
+            strategy.sizing_mode = None
+        field_provenance.pop("capital_amount", None)
+    position_source = str(field_provenance.get("position_size") or "").strip()
+    if strategy.position_size == 1.0 and position_source in {
+        "",
+        "default",
+        "default_assumption",
+        "assumed_default",
+        "model_default",
+    }:
+        strategy.position_size = None
+        if strategy.sizing_mode in {"fixed", "position_size"}:
+            strategy.sizing_mode = None
+    strategy.risk_rules = [
+        rule
+        for rule in strategy.risk_rules
+        if not _risk_rule_is_unstated_full_position_default(rule)
+    ]
+    if field_provenance:
+        strategy.extra_parameters["field_provenance"] = dict(field_provenance)
+    else:
+        strategy.extra_parameters.pop("field_provenance", None)
+
+
+def _risk_rule_is_unstated_full_position_default(rule: Any) -> bool:
+    payload = rule.model_dump(mode="python") if hasattr(rule, "model_dump") else rule
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("type") != "max_position_size":
+        return False
+    raw_value = payload.get("value_pct")
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        return False
+    return value >= 100.0
 
 
 def _resolve_asset_candidate(

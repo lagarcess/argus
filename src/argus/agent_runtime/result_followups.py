@@ -7,10 +7,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, ValidationError
 
 from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
+from argus.context.rendering import context_packet_fact_summary
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
     runnable_next_tests,
+    structured_next_experiments,
 )
 from argus.llm.openrouter import invoke_openrouter_json_schema, log_openrouter_failure
 
@@ -97,9 +99,11 @@ def result_followup_llm_messages(
                 "start with a block of consecutive fact parts; weave facts into a short "
                 "answer. Correct "
                 "false premises directly. Explain what happened from metrics separately "
-                "from plausible non-causal market interpretation. Offer only next tests "
-                "listed in runnable_next_tests. Do not invent trades, prices, support, "
-                "indicators, predictions, investment advice, or unsupported mechanics."
+                "from plausible non-causal market interpretation. Use context_packet_facts "
+                "only as possible backdrop, never as proof of causality unless the fact "
+                "directly says so. Offer only next tests listed in runnable_next_tests or "
+                "next_experiment_options. Do not invent trades, prices, support, indicators, "
+                "predictions, investment advice, or unsupported mechanics."
             ),
         },
         {
@@ -322,8 +326,14 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
     assumptions = assumptions_from_result_metadata(metadata)
     if assumptions:
         fact_bank["assumptions"] = "; ".join(clean_fragment(item) for item in assumptions)
+    context_facts = context_packet_fact_summary(_context_packets_from_metadata(metadata))
+    fact_bank.update(context_facts)
     fact_bank["caveat"] = "Historical simulation evidence, not a prediction or trading recommendation"
     fact_bank["runnable_next_tests"] = runnable_next_tests(metadata)
+    fact_bank["next_experiment_options"] = json.dumps(
+        structured_next_experiments(metadata),
+        default=str,
+    )
     return fact_bank
 
 
@@ -333,6 +343,8 @@ def required_result_followup_fact_ids(
     focus: ResultFollowupFocus,
 ) -> set[str]:
     required: set[str] = {"caveat"}
+    if "context_packet_limitations" in fact_bank:
+        required.add("context_packet_limitations")
     if "symbols" in fact_bank:
         required.add("symbols")
     if focus == "max_drawdown":
@@ -360,11 +372,19 @@ def required_result_followup_fact_ids(
                 required.add(fact_id)
     elif focus == "next_experiment":
         required.add("runnable_next_tests")
+        required.add("next_experiment_options")
     elif focus == "assumptions":
         for fact_id in ("assumptions", "starting_capital", "benchmark_symbol"):
             if fact_id in fact_bank:
                 required.add(fact_id)
     return required
+
+
+def _context_packets_from_metadata(metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    packets = metadata.get("context_packets") or metadata.get("attached_context_packets")
+    if not isinstance(packets, list):
+        return []
+    return [packet for packet in packets if isinstance(packet, dict)]
 
 
 def fallback_result_followup_response(

@@ -1301,6 +1301,8 @@ def test_llm_system_prompt_owns_phase_three_extraction_rules() -> None:
     assert "response_profile_overrides" in prompt
     assert "social" in prompt.lower()
     assert "educational" in prompt.lower()
+    assert "what if I bought/held/owned" in prompt
+    assert "not a capability or education question" in prompt
 
 
 def test_llm_interpreter_treats_moving_average_crossover_as_executable_signal(
@@ -1762,6 +1764,55 @@ def test_llm_interpreter_rejects_invented_initial_capital(monkeypatch) -> None:
     )
 
     assert "initial_capital" not in result.candidate_strategy_draft.extra_parameters
+
+
+def test_llm_interpreter_drops_unstated_buy_hold_execution_defaults(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="Test TSLA over the past year.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="test the past year",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Tesla.",
+            asset_universe=["TSLA"],
+            date_range="past 1 year",
+            sizing_mode="fixed",
+            capital_amount=10000,
+            position_size=1.0,
+            risk_rules=[LLMRiskRule(type="max_position_size", value_pct=100.0)],
+            field_provenance={"capital_amount": "default_assumption"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message="test the past year",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.capital_amount is None
+    assert strategy.position_size is None
+    assert strategy.sizing_mode is None
+    assert strategy.risk_rules == []
+    assert "field_provenance" not in strategy.extra_parameters
 
 
 def test_llm_interpreter_preserves_grounded_initial_capital(monkeypatch) -> None:

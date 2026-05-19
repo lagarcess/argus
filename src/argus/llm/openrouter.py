@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import time
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from threading import Lock
 from typing import Literal, TypeVar
 
 import httpx
@@ -30,6 +34,44 @@ class OpenRouterProfile:
     max_tokens: int
     timeout_seconds: int = 12
     max_retries: int = 1
+
+
+@dataclass(frozen=True)
+class OpenRouterRouteReceipt:
+    task: OpenRouterTask
+    tier: OpenRouterModelTier
+    model: str
+    fallback_model: str
+    mode: Literal["json_schema", "chat_model"]
+    schema_name: str | None
+    latency_ms: int
+    outcome: Literal["succeeded", "failed", "skipped"]
+    failure_mode: str | None = None
+    fallback_used: bool = False
+    created_at: str = ""
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "task": self.task,
+            "tier": self.tier,
+            "model": self.model,
+            "fallback_model": self.fallback_model,
+            "mode": self.mode,
+            "schema_name": self.schema_name,
+            "latency_ms": self.latency_ms,
+            "outcome": self.outcome,
+            "failure_mode": self.failure_mode,
+            "fallback_used": self.fallback_used,
+            "created_at": self.created_at,
+        }
+
+
+_ROUTE_RECEIPTS: list[OpenRouterRouteReceipt] = []
+_ROUTE_RECEIPTS_LOCK = Lock()
+_ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = ContextVar(
+    "openrouter_route_receipt_capture",
+    default=None,
+)
 
 
 OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
@@ -204,6 +246,75 @@ def openrouter_task_timeout_seconds(task: OpenRouterTask) -> float:
     return float(OPENROUTER_PROFILES[task].timeout_seconds)
 
 
+def record_openrouter_route_receipt(
+    *,
+    task: OpenRouterTask,
+    model_name: str | None,
+    mode: Literal["json_schema", "chat_model"],
+    schema_name: str | None,
+    latency_ms: int,
+    outcome: Literal["succeeded", "failed", "skipped"],
+    failure_mode: str | None = None,
+) -> OpenRouterRouteReceipt:
+    tier = openrouter_model_tier_for_task(task)
+    fallback_model = resolve_openrouter_model(fallback=True, task=task)
+    resolved_model = resolve_openrouter_model(model_name, task=task)
+    receipt = OpenRouterRouteReceipt(
+        task=task,
+        tier=tier,
+        model=resolved_model,
+        fallback_model=fallback_model,
+        mode=mode,
+        schema_name=schema_name,
+        latency_ms=max(0, int(latency_ms)),
+        outcome=outcome,
+        failure_mode=failure_mode,
+        fallback_used=bool(
+            fallback_model and resolved_model == fallback_model and resolved_model != ""
+        ),
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    with _ROUTE_RECEIPTS_LOCK:
+        _ROUTE_RECEIPTS.append(receipt)
+    capture = _ROUTE_RECEIPT_CAPTURE.get()
+    if capture is not None:
+        capture.append(receipt)
+    logger.bind(
+        llm_task=task,
+        llm_tier=tier,
+        model=resolved_model,
+        fallback_model=fallback_model,
+        schema_name=schema_name,
+        outcome=outcome,
+        failure_mode=failure_mode,
+        latency_ms=receipt.latency_ms,
+        fallback_used=receipt.fallback_used,
+    ).info("OpenRouter route receipt")
+    return receipt
+
+
+def get_openrouter_route_receipts() -> list[OpenRouterRouteReceipt]:
+    with _ROUTE_RECEIPTS_LOCK:
+        return list(_ROUTE_RECEIPTS)
+
+
+def clear_openrouter_route_receipts() -> None:
+    with _ROUTE_RECEIPTS_LOCK:
+        _ROUTE_RECEIPTS.clear()
+
+
+def begin_openrouter_route_receipt_capture() -> Token[list[OpenRouterRouteReceipt] | None]:
+    return _ROUTE_RECEIPT_CAPTURE.set([])
+
+
+def end_openrouter_route_receipt_capture(
+    token: Token[list[OpenRouterRouteReceipt] | None],
+) -> list[OpenRouterRouteReceipt]:
+    receipts = list(_ROUTE_RECEIPT_CAPTURE.get() or [])
+    _ROUTE_RECEIPT_CAPTURE.reset(token)
+    return receipts
+
+
 async def invoke_openrouter_json_schema(
     *,
     task: OpenRouterTask,
@@ -212,14 +323,33 @@ async def invoke_openrouter_json_schema(
     schema_name: str,
     model_name: str | None = None,
 ) -> SchemaModelT | None:
+    started_at = time.perf_counter()
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=model_name,
+            mode="json_schema",
+            schema_name=schema_name,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="skipped",
+            failure_mode="missing_api_key",
+        )
         return None
 
     resolved_model = resolve_openrouter_structured_model(model_name, task=task)
     if not resolved_model:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=model_name,
+            mode="json_schema",
+            schema_name=schema_name,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="skipped",
+            failure_mode="missing_model",
+        )
         return None
 
     profile = OPENROUTER_PROFILES[task]
@@ -238,18 +368,39 @@ async def invoke_openrouter_json_schema(
         "max_tokens": profile.max_tokens,
     }
     _disable_reasoning_for_structured_artifact(payload)
-    async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
-        response = await _post_openrouter_json_schema(
-            client=client,
-            api_key=api_key,
-            payload=payload,
+    try:
+        async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
+            response = await _post_openrouter_json_schema(
+                client=client,
+                api_key=api_key,
+                payload=payload,
+            )
+        data = response.json()
+        _raise_openrouter_payload_error(data)
+        content = _openrouter_message_content(data)
+        if not content:
+            raise ValueError("OpenRouter JSON schema response did not include content")
+        result = schema_model.model_validate_json(content)
+    except Exception as exc:
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=resolved_model,
+            mode="json_schema",
+            schema_name=schema_name,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="failed",
+            failure_mode=type(exc).__name__,
         )
-    data = response.json()
-    _raise_openrouter_payload_error(data)
-    content = _openrouter_message_content(data)
-    if not content:
-        raise ValueError("OpenRouter JSON schema response did not include content")
-    return schema_model.model_validate_json(content)
+        raise
+    record_openrouter_route_receipt(
+        task=task,
+        model_name=resolved_model,
+        mode="json_schema",
+        schema_name=schema_name,
+        latency_ms=_elapsed_ms(started_at),
+        outcome="succeeded",
+    )
+    return result
 
 
 def invoke_openrouter_json_schema_sync(
@@ -260,14 +411,33 @@ def invoke_openrouter_json_schema_sync(
     schema_name: str,
     model_name: str | None = None,
 ) -> SchemaModelT | None:
+    started_at = time.perf_counter()
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=model_name,
+            mode="json_schema",
+            schema_name=schema_name,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="skipped",
+            failure_mode="missing_api_key",
+        )
         return None
 
     resolved_model = resolve_openrouter_structured_model(model_name, task=task)
     if not resolved_model:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=model_name,
+            mode="json_schema",
+            schema_name=schema_name,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="skipped",
+            failure_mode="missing_model",
+        )
         return None
 
     profile = OPENROUTER_PROFILES[task]
@@ -286,18 +456,43 @@ def invoke_openrouter_json_schema_sync(
         "max_tokens": profile.max_tokens,
     }
     _disable_reasoning_for_structured_artifact(payload)
-    with httpx.Client(timeout=profile.timeout_seconds) as client:
-        response = _post_openrouter_json_schema_sync(
-            client=client,
-            api_key=api_key,
-            payload=payload,
+    try:
+        with httpx.Client(timeout=profile.timeout_seconds) as client:
+            response = _post_openrouter_json_schema_sync(
+                client=client,
+                api_key=api_key,
+                payload=payload,
+            )
+        data = response.json()
+        _raise_openrouter_payload_error(data)
+        content = _openrouter_message_content(data)
+        if not content:
+            raise ValueError("OpenRouter JSON schema response did not include content")
+        result = schema_model.model_validate_json(content)
+    except Exception as exc:
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=resolved_model,
+            mode="json_schema",
+            schema_name=schema_name,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="failed",
+            failure_mode=type(exc).__name__,
         )
-    data = response.json()
-    _raise_openrouter_payload_error(data)
-    content = _openrouter_message_content(data)
-    if not content:
-        raise ValueError("OpenRouter JSON schema response did not include content")
-    return schema_model.model_validate_json(content)
+        raise
+    record_openrouter_route_receipt(
+        task=task,
+        model_name=resolved_model,
+        mode="json_schema",
+        schema_name=schema_name,
+        latency_ms=_elapsed_ms(started_at),
+        outcome="succeeded",
+    )
+    return result
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)
 
 
 def _disable_reasoning_for_structured_artifact(payload: dict[str, object]) -> None:

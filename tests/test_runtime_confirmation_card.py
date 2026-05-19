@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from argus.api.chat_service import runtime_confirmation_card
+from argus.api.chat.confirmation import runtime_confirmation_card
 
 
 def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None:

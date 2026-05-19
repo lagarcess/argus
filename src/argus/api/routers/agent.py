@@ -17,46 +17,84 @@ from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
 from argus.api.artifact_naming import schedule_artifact_naming_after_stream
-from argus.api.chat.artifacts import result_fact_bank, saved_strategy_metadata
-from argus.api.chat.recovery import failed_action_metadata_fallback_context
-from argus.api.chat_service import (
-    RuntimeFallbackContext,
+from argus.api.chat.actions import (
     chat_display_message,
     chat_request_message,
+    is_cancel_confirmation_action,
+    is_confirmation_action,
+    is_result_action,
+    run_for_result_action,
+    stale_confirmation_action_message,
+)
+from argus.api.chat.artifacts import result_fact_bank, saved_strategy_metadata
+from argus.api.chat.breakdown import result_breakdown_message
+from argus.api.chat.confirmation import runtime_confirmation_card
+from argus.api.chat.onboarding import (
+    parse_onboarding_control_message,
+    persist_onboarding_update,
+)
+from argus.api.chat.persistence import persist_runtime_backtest_run
+from argus.api.chat.recovery import (
+    RuntimeFallbackContext,
     checkpoint_has_latest_result,
     checkpoint_has_pending_confirmation,
     checkpoint_has_pending_strategy,
     confirmation_metadata_fallback_context,
-    is_cancel_confirmation_action,
-    is_confirmation_action,
-    is_result_action,
+    failed_action_metadata_fallback_context,
     latest_result_fallback_context,
-    missing_refine_strategy_action_turn,
-    parse_onboarding_control_message,
     pending_strategy_metadata_fallback_context,
-    persist_onboarding_update,
-    persist_runtime_backtest_run,
-    refine_strategy_action_turn,
-    result_breakdown_message,
-    run_for_result_action,
     runtime_checkpoint_values,
-    runtime_confirmation_card,
+)
+from argus.api.chat.result_actions import (
+    missing_refine_strategy_action_turn,
+    refine_strategy_action_turn,
+)
+from argus.api.chat.strategies import save_strategy_from_run
+from argus.api.chat.streaming import (
     runtime_result_card,
     runtime_result_envelope,
     runtime_result_message,
     runtime_stage_status,
-    save_strategy_from_run,
     sse_data,
     sse_done,
-    stale_confirmation_action_message,
 )
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import create_message, load_runtime_thread_history
 from argus.api.naming import get_starter_prompts, resolve_language
 from argus.api.schemas import BacktestRun, ChatStreamRequest, StarterPromptsResponse, User
 from argus.domain.supabase_gateway import QuotaExceededError
+from argus.llm.openrouter import (
+    OpenRouterRouteReceipt,
+    begin_openrouter_route_receipt_capture,
+    end_openrouter_route_receipt_capture,
+)
 
 router = APIRouter(tags=["agent"])
+
+
+def _persist_route_receipts(
+    *,
+    receipts: list[OpenRouterRouteReceipt],
+    user_id: str,
+    conversation_id: str,
+) -> None:
+    if not receipts or api_state.supabase_gateway is None:
+        return
+    for receipt in receipts:
+        try:
+            api_state.supabase_gateway.create_route_receipt(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                receipt=receipt.as_dict(),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Route receipt persistence failed; using in-memory receipt only",
+                error=str(exc),
+                user_id=user_id,
+                conversation_id=conversation_id,
+                llm_task=receipt.task,
+            )
 
 
 class InternalAgentRuntimeTurnRequest(BaseModel):
@@ -591,7 +629,15 @@ async def chat_stream(
                 conversation_id=conversation.id,
             )
             yield sse_data({"type": "stage_start", "stage": "explain"})
-            assistant_text = result_breakdown_message(run)
+            receipt_token = begin_openrouter_route_receipt_capture()
+            try:
+                assistant_text = result_breakdown_message(run)
+            finally:
+                _persist_route_receipts(
+                    receipts=end_openrouter_route_receipt_capture(receipt_token),
+                    user_id=user.id,
+                    conversation_id=conversation.id,
+                )
             metadata = {
                 "conversation_mode": "result_review",
                 "chat_action": payload.action.model_dump(mode="python"),
@@ -674,6 +720,7 @@ async def chat_stream(
         )
         streamed_text_parts: list[str] = []
 
+        receipt_token = begin_openrouter_route_receipt_capture()
         try:
             async for runtime_event in stream_agent_turn_events(
                 workflow=workflow,
@@ -864,6 +911,12 @@ async def chat_stream(
             )
             yield sse_done()
             return
+        finally:
+            _persist_route_receipts(
+                receipts=end_openrouter_route_receipt_capture(receipt_token),
+                user_id=user.id,
+                conversation_id=conversation.id,
+            )
 
     return StreamingResponse(
         events(),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -271,6 +272,44 @@ def test_result_followup_next_tests_respect_strategy_family() -> None:
     assert "compare with buy-and-hold" not in buy_hold_facts["runnable_next_tests"]
     assert "RSI threshold on AAPL" in buy_hold_facts["runnable_next_tests"]
     assert "compare NVDA with buy-and-hold" in signal_facts["runnable_next_tests"]
+    options = json.loads(signal_facts["next_experiment_options"])
+    assert options[0]["contract"] == "supported_backtest_experiment"
+    assert {option["kind"] for option in options} >= {
+        "adjust_signal_periods",
+        "compare_buy_and_hold",
+    }
+
+
+def test_result_followup_fact_bank_includes_context_packet_limitations() -> None:
+    fact_bank = result_followup_fact_bank(
+        {
+            "symbols": ["NVDA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 7.0}}},
+            "config_snapshot": {"template": "buy_and_hold"},
+            "context_packets": [
+                {
+                    "id": "packet-1",
+                    "provider": "fred",
+                    "packet_type": "macro",
+                    "facts": [
+                        {
+                            "kind": "macro_observation",
+                            "label": "FEDFUNDS latest observation",
+                            "value": 5.25,
+                        }
+                    ],
+                    "limitations": [
+                        "FRED macro observations are contextual backdrop only."
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert fact_bank["context_packet_ids"] == "packet-1"
+    assert "FEDFUNDS latest observation" in fact_bank["context_packet_facts"]
+    assert "contextual backdrop only" in fact_bank["context_packet_limitations"]
 
 
 @pytest.mark.asyncio

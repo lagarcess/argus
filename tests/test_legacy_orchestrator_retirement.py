@@ -48,3 +48,9 @@ def test_legacy_state_module_is_retired() -> None:
     )
 
     assert not retired_path.exists()
+
+
+def test_agent_router_does_not_route_new_code_through_chat_service_facade() -> None:
+    source = _source("src/argus/api/routers/agent.py")
+
+    assert "argus.api.chat_service" not in source

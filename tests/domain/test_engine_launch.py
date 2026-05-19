@@ -5,7 +5,7 @@ import warnings
 import pandas as pd
 import pytest
 from argus.domain.engine import _build_signals
-from argus.domain.engine_launch.adapter import run_launch_backtest
+from argus.domain.engine_launch.adapter import _provider_metadata, run_launch_backtest
 from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     LaunchExecutionEnvelope,
@@ -217,6 +217,24 @@ def test_launch_envelope_carries_card_and_explanation_fields() -> None:
     assert envelope.execution_status == "succeeded"
     assert envelope.metrics["total_return_pct"] == 12.5
     assert envelope.provider_metadata["provider"] == "alpaca"
+
+
+def test_provider_metadata_distinguishes_market_data_sources() -> None:
+    assert _provider_metadata(asset_class="equity", timeframe="1D") == {
+        "provider": "alpaca",
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "feed": "iex",
+    }
+    assert _provider_metadata(asset_class="currency_pair", timeframe="1h") == {
+        "provider": "kraken",
+        "asset_class": "currency_pair",
+        "timeframe": "1h",
+    }
+    crypto_metadata = _provider_metadata(asset_class="crypto", timeframe="1D")
+    assert crypto_metadata["provider"] == "alpaca"
+    assert crypto_metadata["fallback_provider"] == "kraken"
+    assert crypto_metadata["source_policy"] == "alpaca_crypto_with_kraken_fallback"
 
 
 def test_buy_and_hold_adapter_returns_envelope_card_and_context(

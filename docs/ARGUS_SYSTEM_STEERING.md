@@ -20,13 +20,13 @@ Argus is currently a chat-first, simulation-grounded investing experimentation s
 Known state on `codex/context-intelligence-routing`:
 
 - Tiered OpenRouter routing exists through `ARGUS_*` model-tier environment variables.
-- Backward-compatible `AGENT_*` aliases still exist and are still referenced by tests/docs.
-- FRED environment configuration exists, but no macro `ContextPacket` implementation exists yet.
+- Backward-compatible `AGENT_*` aliases still exist for older tools/scripts, but
+  `ARGUS_*` is the primary model-tier config path.
+- FRED environment configuration exists, and the minimal `ContextPacket` contract/provider wrappers now exist.
 - Alpaca and Kraken provide the current deterministic market-data truth layer for OHLCV and availability.
 - Alpaca should be considered near-term context for scoped news, corporate actions, most actives, and movers, but not as a generic dashboard feed.
-- Tier 4 currently synthesizes from run facts only. It does not yet consume FRED or Alpaca context packets.
-- A current OpenRouter signal-repair regression remains: `tests/test_openrouter_policy.py::test_default_interpreter_repairs_partial_signal_idea_without_rule_payload`.
-- The failure indicates that a partial moving-average crossover interpretation can be treated as sufficiently shaped before focused extraction repairs the missing executable rule payload.
+- Tier 4 can synthesize from run facts plus attached context-packet fields; completed runs without attached packets still fall back to run-fact-only explanations.
+- The OpenRouter signal-repair regression for partial moving-average crossover ideas is green after routing underfilled structured interpretations through focused repair.
 - Deterministic run facts, result fact banks, result cards, reload metadata, confirmation artifacts, and action payloads exist.
 - `chat_service.py` is now mostly a compatibility facade over split `api/chat/*` modules and should not be the import path for new code.
 - Several files mix too many responsibilities and should be modularized to reduce brittleness before or during private-launch hardening.
@@ -97,12 +97,12 @@ Current state:
 - LangGraph is the active chat runtime.
 - Result facts and result cards are persisted.
 - Metadata fallback paths exist for confirmation, pending strategy, latest result, and failed action recovery.
-- Provider metadata has correctness risk, especially where launch adapter paths may stamp provider values too generically.
-- LLM model routing exists but lacks full route receipts.
+- Provider metadata is explicitly stamped for Alpaca equity, Alpaca crypto, and Kraken currency-pair paths; this must stay covered by tests as provider routing evolves.
+- LLM model routing now records route receipts for launch-critical OpenRouter paths.
 
 Production risks:
 
-- Current failing signal-repair test can block normal human strategy phrasing.
+- Future signal-repair regressions can block normal human strategy phrasing.
 - Incorrect provider metadata weakens result trust.
 - Reload recovery depends on metadata and checkpoint agreement that must be browser-proven.
 - Fallback observability is not visible enough to evaluate model cost, latency, and failures.
@@ -125,10 +125,10 @@ LLM-owned responsibilities:
 
 Immediate priorities:
 
-1. Fix the current signal-repair regression.
-2. Correct provider metadata for Alpaca/Kraken/currency-pair paths.
-3. Add route receipts for every LLM task and fallback.
-4. Verify reload and saved-result actions in a real browser.
+1. Keep signal-repair coverage green as messy-human prompts expand.
+2. Keep provider metadata covered for Alpaca/Kraken/currency-pair paths.
+3. Persist route receipts for every launch-critical LLM task and fallback.
+4. Continue browser verification for reload and saved-result actions.
 5. Gate or remove internal-only runtime endpoints before private launch.
 
 Deferred work:
@@ -254,10 +254,9 @@ Current state:
 
 - FRED API key is configured.
 - Alpaca/Kraken execution truth exists.
-- Tier 4 currently uses run facts only.
-- No `ContextPacket` schema exists yet.
-- No FRED macro packet implementation exists.
-- No Alpaca news/corporate-action context packet implementation exists.
+- The minimal `ContextPacket` schema, Supabase migration, gateway methods, and provider wrappers exist.
+- Tier 4 can use packet facts and limitations when packets are attached to the result fact bank.
+- Live provider attachment and browser QA for context-enriched explanations remain required before relying on packets in the private-launch loop.
 
 Production risks:
 
@@ -280,8 +279,8 @@ LLM-owned responsibilities:
 
 Immediate priorities:
 
-1. Define `ContextPacket` before API integration.
-2. Add packet references to result fact banks and message metadata.
+1. Browser-prove packet attachment and replay for completed runs.
+2. Keep packet references in result fact banks and message metadata.
 3. Use FRED for macro regime context.
 4. Use Alpaca corporate actions and scoped news for symbol-specific context.
 5. Keep context generation out of the simulation truth layer.
@@ -309,9 +308,11 @@ Implementation dependency order:
 Current state:
 
 - `chat_service.py` remains as a compatibility facade.
-- Router code still imports heavily from `chat_service.py`.
-- Tests still import `chat_service.py` for helpers that now live in focused modules.
-- `AGENT_*` config is still documented and tested as a first-class path, though `ARGUS_*` is the intended primary model-tier config.
+- Launch router code should import focused runtime/chat modules directly.
+- Tests should import focused modules for helpers that now live outside the
+  facade.
+- `AGENT_*` config is compatibility-only; `ARGUS_*` is the primary model-tier
+  config.
 - Some helpers appear obsolete or compatibility-only.
 
 Production risks:
@@ -475,7 +476,7 @@ Classification: split now before private launch.
 Why:
 
 - It mixes OpenRouter candidate loops, prompts, focused extraction, artifact edits, signal repair, shape validation, response normalization, strategy mapping, asset grounding, capability validation, and fallback repair.
-- The current failing signal-repair test sits inside this responsibility knot.
+- The previous signal-repair regression sat inside this responsibility knot.
 
 Target responsibilities:
 
@@ -897,13 +898,13 @@ Read these planning documents before implementation:
 
 ## 14. Implementation Order
 
-The next stage of work should proceed top down:
+The next hardening and validation work should proceed top down:
 
-1. Restore runtime integrity.
-   - Fix the OpenRouter signal-repair regression.
-   - Correct provider metadata.
-   - Add route receipts.
-   - Verify action/reload trust.
+1. Preserve runtime integrity.
+   - Keep OpenRouter signal-repair coverage green as messy prompts expand.
+   - Keep provider metadata explicit and tested.
+   - Keep route receipts persisted for launch-critical LLM paths.
+   - Verify action/reload trust in browser QA.
 
 2. Reduce conversation brittleness.
    - Relax exact-string tests where LLM language is expected.
@@ -916,16 +917,16 @@ The next stage of work should proceed top down:
    - Split `interpret_actions.py` by action family.
    - Stop new imports from `chat_service.py`.
 
-4. Structure next experiments.
-   - Move next-test generation out of prose-only `result_facts.py`.
-   - Represent next experiments as structured options.
+4. Keep next experiments structured.
+   - Keep next-test generation as structured options, not prose-only copy.
+   - Ensure reload/follow-up paths can reuse those options.
    - Let LLM tiers phrase them.
 
-5. Prepare context intelligence without overreaching.
-   - Define `ContextPacket`.
+5. Validate context intelligence without overreaching.
+   - Browser-prove `ContextPacket` attachment and replay.
    - Attach context packet references to fact banks/message metadata.
-   - Implement FRED macro context first.
-   - Implement Alpaca corporate actions and scoped news next.
+   - Use FRED macro context first.
+   - Use Alpaca corporate actions and scoped news next.
 
 6. Prove the browser loop.
    - Run the full private-launch flow in a real browser.

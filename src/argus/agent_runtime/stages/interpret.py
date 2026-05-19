@@ -203,6 +203,11 @@ async def _stage_result_from_interpretation(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
+    interpretation = _repair_retry_route_when_pending_need_is_active(
+        interpretation=interpretation,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
     route_suppression_reason_codes: list[str] = []
     expects_strategy_route = _strategy_route_expected(
         intent=interpretation.intent,
@@ -508,6 +513,37 @@ async def _stage_result_from_interpretation(
             if interpretation.assistant_response
             else optional_parameter_stage_patch
         ),
+    )
+
+
+def _repair_retry_route_when_pending_need_is_active(
+    *,
+    interpretation: StructuredInterpretation,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation:
+    if interpretation.semantic_turn_act != "retry_failed_action":
+        return interpretation
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return interpretation
+    if snapshot.latest_failed_action_reference is not None:
+        return interpretation
+    requested_field = _field_base(str(selected_thread_metadata.get("requested_field") or ""))
+    prior_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    if not requested_field and prior_outcome != "await_user_reply":
+        return interpretation
+    return interpretation.model_copy(
+        update={
+            "intent": "backtest_execution",
+            "task_relation": "continue",
+            "requires_clarification": False,
+            "assistant_response": None,
+            "semantic_turn_act": "answer_pending_need",
+            "reason_codes": [
+                *interpretation.reason_codes,
+                "retry_route_repaired_to_pending_need",
+            ],
+        }
     )
 
 

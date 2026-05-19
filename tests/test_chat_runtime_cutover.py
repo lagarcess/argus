@@ -193,7 +193,7 @@ def test_chat_stream_falls_back_conversationally_for_unsupported_runtime_result(
 def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import confirmation as chat_service
 
     monkeypatch.setattr(
         chat_service,
@@ -224,8 +224,21 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
                     "symbol": "GOOGL",
                     "symbols": ["GOOGL"],
                     "timeframe": "1D",
-                    "date_range": "past year",
-                    "sizing_mode": "initial_capital",
+                    "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
+                    "entry_rule": {
+                        "indicator": "rsi",
+                        "operator": "below",
+                        "period": 14,
+                        "threshold": 30,
+                    },
+                    "exit_rule": {
+                        "indicator": "rsi",
+                        "operator": "above",
+                        "period": 14,
+                        "threshold": 55,
+                    },
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 10000,
                     "benchmark_symbol": "SPY",
                 },
                 "validation": {"executable": True},
@@ -237,19 +250,19 @@ def test_runtime_confirmation_card_resolves_relative_period_and_natural_actions(
     period = next(row["value"] for row in card["rows"] if row["label"] == "Period")
     assert period == "past year (May 3, 2025 - May 3, 2026)"
     assert card["summary"].endswith("over past year, May 3, 2025 - May 3, 2026.")
-    assert card["actions"][0] == {
-        "id": "run-backtest",
-        "label": "Run backtest",
-        "type": "run_backtest",
-        "presentation": "confirmation",
-        "payload": {"confirmation_id": card["confirmation_id"]},
-    }
+    run_action = next(
+        action for action in card["actions"] if action["type"] == "run_backtest"
+    )
+    assert run_action["id"] == "run-backtest"
+    assert run_action["presentation"] == "confirmation"
+    assert run_action["payload"]["confirmation_id"] == card["confirmation_id"]
+    assert run_action["payload"]["launch_payload_hash"]
 
 
 def test_runtime_confirmation_card_expands_compact_period_and_hides_indicator_cadence(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import confirmation as chat_service
 
     monkeypatch.setattr(
         chat_service,
@@ -286,7 +299,7 @@ def test_runtime_confirmation_card_expands_compact_period_and_hides_indicator_ca
 def test_runtime_confirmation_card_simplifies_counted_one_year_period(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import confirmation as chat_service
 
     monkeypatch.setattr(
         chat_service,
@@ -320,7 +333,7 @@ def test_runtime_confirmation_card_simplifies_counted_one_year_period(
 def test_runtime_confirmation_card_formats_machine_date_tokens(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import confirmation as chat_service
 
     monkeypatch.setattr(
         chat_service,
@@ -362,7 +375,7 @@ def test_runtime_confirmation_card_formats_machine_date_tokens(
 def test_runtime_confirmation_card_formats_structured_date_range(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import confirmation as chat_service
 
     monkeypatch.setattr(
         chat_service,

@@ -12,6 +12,7 @@ def test_batched_fetch_helper_exists_for_unbounded_queries():
 class _RecordingSupabaseClient:
     def __init__(self) -> None:
         self.inserted_message: dict[str, object] | None = None
+        self.inserted_by_table: dict[str, dict[str, object]] = {}
 
     def table(self, table_name: str):
         return _RecordingTable(self, table_name)
@@ -26,6 +27,7 @@ class _RecordingTable:
     def insert(self, payload: dict[str, object]):
         if self.table_name == "messages":
             self.client.inserted_message = payload
+        self.client.inserted_by_table[self.table_name] = payload
         self.payload = payload
         return self
 
@@ -57,6 +59,60 @@ def test_create_message_writes_empty_metadata_object_when_omitted():
     assert client.inserted_message is not None
     assert client.inserted_message["metadata"] == {}
     assert message.metadata == {}
+
+
+def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
+    client = _RecordingSupabaseClient()
+    gateway = SupabaseGateway(client=client)
+
+    packet_row = gateway.create_context_packet(
+        user_id="user-1",
+        packet={
+            "id": "packet-1",
+            "provider": "fred",
+            "packet_type": "macro",
+            "scope": {"series_id": "FEDFUNDS"},
+            "source_ids": ["FEDFUNDS:2024-01-01"],
+            "retrieved_at": "2026-05-19T00:00:00+00:00",
+            "coverage_start": "2024-01-01",
+            "coverage_end": "2024-01-31",
+            "freshness": "fresh",
+            "facts": [],
+            "limitations": ["Context only."],
+            "not_for": "simulation_truth",
+        },
+    )
+    attachment_row = gateway.attach_context_packet_to_run(
+        user_id="user-1",
+        attachment={
+            "packet_id": "packet-1",
+            "run_id": "run-1",
+            "immutable_snapshot": True,
+        },
+    )
+    receipt_row = gateway.create_route_receipt(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        receipt={
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "structured/primary",
+            "fallback_model": "structured/fallback",
+            "mode": "json_schema",
+            "schema_name": "LLMInterpretationResponse",
+            "latency_ms": 123,
+            "outcome": "succeeded",
+            "fallback_used": False,
+            "created_at": "2026-05-19T00:00:00+00:00",
+        },
+    )
+
+    assert packet_row["packet"]["not_for"] == "simulation_truth"
+    assert client.inserted_by_table["context_packets"]["user_id"] == "user-1"
+    assert attachment_row["context_packet_id"] == "packet-1"
+    assert attachment_row["immutable_snapshot"] is True
+    assert receipt_row["conversation_id"] == "conversation-1"
+    assert receipt_row["latency_ms"] == 123
 
 
 class _MockAuthAdmin:

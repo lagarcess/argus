@@ -8,10 +8,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, ValidationError
 
 from argus.api.schemas import BacktestRun
+from argus.context.rendering import context_packet_fact_summary
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
     runnable_next_tests,
+    structured_next_experiments,
 )
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema_sync,
@@ -58,6 +60,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "raw_metrics": run.metrics,
         "execution_note": execution_note(result_facts),
         "rule_summary": resolved_rule_summary(result_facts),
+        "context_packets": card.get("context_packets") if isinstance(card, dict) else None,
     }
 
 
@@ -161,7 +164,10 @@ def _result_breakdown_llm_messages(
                 "'investment decision-making', 'profitable trades', 'should buy', "
                 "'should sell', and 'alternative benchmarks'. For no-trade runs, say "
                 "the strategy stayed in cash because the entry condition did not trigger; "
-                "do not imply the market stood still or that trades were missed. Cover "
+                "do not imply the market stood still or that trades were missed. If "
+                "context_packet_facts are present, treat them as possible backdrop only "
+                "and include context_packet_limitations; do not claim causality unless "
+                "the supplied fact directly supports it. Cover "
                 "what was tested, what happened, benchmark comparison, risk or drawdown, "
                 "assumptions, caveats, and one useful next test."
             ),
@@ -257,6 +263,9 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
     if assumption_text:
         fact_bank["assumptions"] = assumption_text
 
+    fact_bank.update(
+        context_packet_fact_summary(_context_packets_from_context(context))
+    )
     fact_bank["caveat"] = (
         "This is historical simulation evidence, not a prediction or trading "
         "recommendation."
@@ -267,11 +276,27 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
             "symbols": context.get("symbols"),
         }
     )
+    fact_bank["next_experiment_options"] = json.dumps(
+        structured_next_experiments(
+            {
+                "config_snapshot": context.get("config_snapshot"),
+                "symbols": context.get("symbols"),
+            }
+        ),
+        default=str,
+    )
     fact_bank["draft_only_or_future_tests"] = (
         "Draft-only or future support: DCA with separate starting principal, "
         "investment ceilings, and unsupported custom rules."
     )
     return fact_bank
+
+
+def _context_packets_from_context(context: dict[str, Any]) -> list[dict[str, Any]]:
+    packets = context.get("context_packets")
+    if not isinstance(packets, list):
+        return []
+    return [packet for packet in packets if isinstance(packet, dict)]
 
 
 def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:

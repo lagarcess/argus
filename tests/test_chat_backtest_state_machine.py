@@ -522,7 +522,10 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
 def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat.breakdown import (
+        fallback_result_breakdown_message,
+        result_breakdown_context,
+    )
     from argus.api.routers import agent as agent_router
 
     runtime_calls = 0
@@ -539,7 +542,11 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         "stream_agent_turn_events",
         _stream_events_from_runtime(_runtime),
     )
-    monkeypatch.setattr(chat_service, "build_openrouter_model", lambda _task: None)
+    monkeypatch.setattr(
+        agent_router,
+        "result_breakdown_message",
+        lambda run: fallback_result_breakdown_message(result_breakdown_context(run)),
+    )
     client = _client()
     conversation = _conversation(client)
     confirmation = client.post(
@@ -695,10 +702,8 @@ def test_result_action_with_run_from_another_conversation_does_not_fallback() ->
 def test_show_breakdown_action_rejects_mismatched_conversation_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import chat_service
     from argus.api import state as api_state
 
-    monkeypatch.setattr(chat_service, "build_openrouter_model", lambda _task: None)
     client = _client()
     active_conversation = _conversation(client)
     other_conversation = _conversation(client)

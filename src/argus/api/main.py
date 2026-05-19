@@ -7,7 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from argus.api import chat_service, pagination, search_utils
+from argus.api import pagination, search_utils
+from argus.api.chat.breakdown import llm_result_breakdown_message
+from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api import state as api_state
 from argus.api.dependencies import request_id_middleware
 from argus.api.routers import (
@@ -121,5 +123,5 @@ _encode_cursor = pagination.encode_cursor
 _decode_cursor = pagination.decode_cursor
 _search_type_rank = search_utils.search_type_rank
 _score_search_item = search_utils.score_search_item
-_runtime_confirmation_card = chat_service.runtime_confirmation_card
-_llm_result_breakdown_message = chat_service.llm_result_breakdown_message
+_runtime_confirmation_card = runtime_confirmation_card
+_llm_result_breakdown_message = llm_result_breakdown_message

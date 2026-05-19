@@ -3056,6 +3056,51 @@ def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> 
     assert "Run backtest button" in result.patch["assistant_response"]
 
 
+def test_pending_date_answer_is_not_treated_as_failed_action_retry(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub("TSLA", "equity", raw_symbol=symbol),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Tesla.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+    )
+    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the missing date range.",
+        semantic_turn_act="retry_failed_action",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"start": "2025-05-19", "end": "2026-05-19"},
+        ),
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="test the past year",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.patch["semantic_turn_act"] == "answer_pending_need"
+    assert "retry_route_repaired_to_pending_need" in result.patch["reason_codes"]
+    draft = result.patch["candidate_strategy_draft"]
+    assert draft["asset_universe"] == ["TSLA"]
+    assert draft["date_range"] == {"start": "2025-05-19", "end": "2026-05-19"}
+    assert "assistant_response" not in result.stage_patch
+
+
 def test_interpret_canonicalizes_symbols_through_market_data(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 

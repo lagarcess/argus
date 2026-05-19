@@ -227,14 +227,17 @@ Frontend package management uses Bun.
 Required model and data variables:
 
 - `OPENROUTER_API_KEY`
-- `AGENT_MODEL`: primary low-cost conversational model for normal chat,
+- `ARGUS_UTILITY_MODEL` / `ARGUS_UTILITY_FALLBACK_MODEL`: cheap background
+  utility tasks such as titles and labels.
+- `ARGUS_CHAT_MODEL` / `ARGUS_CHAT_FALLBACK_MODEL`: normal chat,
   clarification, education, and flexible prose.
-- `AGENT_STRUCTURED_MODEL`: optional model for durable JSON-schema artifact
-  interpretation. Leave unset in low-cost development mode unless live QA proves
-  the primary/fallback pair cannot produce complete artifacts.
-- `AGENT_FALLBACK_MODEL`: secondary model tried when the primary configured
-  model fails, times out, or returns a structurally valid but incomplete
-  artifact.
+- `ARGUS_STRUCTURED_MODEL` / `ARGUS_STRUCTURED_FALLBACK_MODEL`: durable
+  JSON-schema artifact interpretation, repair, and draft edits.
+- `ARGUS_CONTEXT_MODEL` / `ARGUS_CONTEXT_FALLBACK_MODEL`: grounded context
+  synthesis from run facts plus structured context packets.
+- `AGENT_MODEL`, `AGENT_STRUCTURED_MODEL`, and `AGENT_FALLBACK_MODEL` are
+  backward-compatible aliases only. New docs, scripts, and code should use
+  `ARGUS_*` names.
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_PERSISTENCE_MODE`

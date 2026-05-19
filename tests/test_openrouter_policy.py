@@ -190,7 +190,7 @@ def test_openrouter_factory_applies_task_token_budget(
     FakeChatOpenRouter.calls.clear()
     FakeChatOpenRouter.structured_response = None
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("AGENT_MODEL", "test/model")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "test/model")
     monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
 
     model = openrouter.build_openrouter_model("interpretation")
@@ -303,6 +303,8 @@ def test_openrouter_factory_returns_none_without_key(monkeypatch) -> None:
 def test_structured_model_uses_configured_models_unless_explicitly_overridden(
     monkeypatch,
 ) -> None:
+    monkeypatch.delenv("ARGUS_STRUCTURED_MODEL", raising=False)
+    monkeypatch.delenv("ARGUS_STRUCTURED_FALLBACK_MODEL", raising=False)
     monkeypatch.delenv("AGENT_STRUCTURED_MODEL", raising=False)
     monkeypatch.setenv("AGENT_FALLBACK_MODEL", "deepseek/deepseek-v4-flash")
     monkeypatch.setenv("AGENT_MODEL", "qwen/qwen3.5-9b")
@@ -326,6 +328,10 @@ def test_structured_model_uses_configured_models_unless_explicitly_overridden(
     monkeypatch.delenv("AGENT_MODEL", raising=False)
 
     assert resolve_openrouter_structured_model() == "deepseek/deepseek-v4-flash"
+
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "argus/structured")
+
+    assert resolve_openrouter_structured_model() == "argus/structured"
 
 
 def test_structured_interpreter_uses_bounded_interpretation_profile(
@@ -362,7 +368,7 @@ def test_structured_interpreter_uses_bounded_interpretation_profile(
 
 
 def test_result_breakdown_uses_direct_json_schema_client(monkeypatch) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient()
@@ -698,6 +704,68 @@ def test_default_interpreter_repairs_partial_signal_idea_without_rule_payload(
         "slow_period": 200,
         "direction": "bullish",
     }
+
+
+def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        seen_schema_names.append(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
+        if schema_model is LLMInterpretationResponse:
+            return LLMInterpretationResponse(
+                intent="conversation_followup",
+                task_relation="new_task",
+                user_goal_summary="User asks about executable indicators.",
+                assistant_response="Executable indicators right now are RSI and SMA.",
+                semantic_turn_act="educational_question",
+                capability_question_focus="supported_indicators",
+            )
+        assert schema_model is FocusedStrategyExtraction
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            user_goal_summary="Test a buy-and-hold Tesla idea.",
+            strategy_type="buy_and_hold",
+            asset_universe=["TSLA"],
+            date_range="past year",
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="what if I bought Tesla when it looked cheap?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen_schema_names == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+    ]
+    assert result.semantic_turn_act == "new_idea"
+    assert result.candidate_strategy_draft.strategy_type == "buy_and_hold"
+    assert result.candidate_strategy_draft.asset_universe == ["TSLA"]
+    assert result.candidate_strategy_draft.date_range == "past year"
 
 
 def test_default_interpreter_retries_empty_unsupported_clarification(
@@ -1346,7 +1414,7 @@ def test_interpretation_llm_has_hard_turn_budget(monkeypatch) -> None:
 def test_result_breakdown_prompt_asks_for_fact_bank_references(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient()
@@ -1389,7 +1457,7 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
 def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
@@ -1486,7 +1554,7 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
 def test_result_breakdown_fact_parts_join_with_professional_spacing(
     monkeypatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
@@ -1571,7 +1639,7 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
 
 
 def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
@@ -1612,7 +1680,7 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
 
 
 def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
-    from argus.api import chat_service
+    from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
@@ -1653,9 +1721,9 @@ def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
 
 
 def test_result_breakdown_path_does_not_use_regex_prose_scanner() -> None:
-    from argus.api import chat_service
+    from argus.api.chat import breakdown
 
-    source = inspect.getsource(chat_service)
+    source = inspect.getsource(breakdown)
 
     assert "_unknown_result_breakdown_symbols" not in source
     assert "_unknown_result_breakdown_percentages" not in source
@@ -1665,7 +1733,7 @@ def test_result_breakdown_path_does_not_use_regex_prose_scanner() -> None:
 def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     monkeypatch,
 ) -> None:
-    from argus.api.chat_service import result_breakdown_message
+    from argus.api.chat.breakdown import result_breakdown_message
     from argus.api.schemas import BacktestRun
     from argus.domain.store import utcnow
 
@@ -1805,6 +1873,7 @@ def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
     monkeypatch,
 ) -> None:
     observed_payloads: list[dict[str, Any]] = []
+    openrouter.clear_openrouter_route_receipts()
 
     class FakeAsyncClient:
         async def __aenter__(self) -> "FakeAsyncClient":
@@ -1834,7 +1903,7 @@ def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
             return FakeResponse()
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("AGENT_MODEL", "qwen/qwen3.5-9b")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "qwen/qwen3.5-9b")
     monkeypatch.setattr(
         openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient()
     )
@@ -1850,3 +1919,57 @@ def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
 
     assert result is not None
     assert observed_payloads[0]["reasoning"] == {"effort": "none"}
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert receipt.task == "interpretation"
+    assert receipt.tier == "structured"
+    assert receipt.model == "qwen/qwen3.5-9b"
+    assert receipt.schema_name == "LLMInterpretationResponse"
+    assert receipt.outcome == "succeeded"
+    assert receipt.failure_mode is None
+
+
+def test_direct_json_schema_records_missing_key_route_receipt(monkeypatch) -> None:
+    openrouter.clear_openrouter_route_receipts()
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "structured/fallback")
+
+    result = asyncio.run(
+        openrouter.invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=[{"role": "user", "content": "hello"}],
+            schema_model=LLMInterpretationResponse,
+            schema_name="LLMInterpretationResponse",
+        )
+    )
+
+    assert result is None
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert receipt.task == "interpretation"
+    assert receipt.tier == "structured"
+    assert receipt.model == "structured/primary"
+    assert receipt.fallback_model == "structured/fallback"
+    assert receipt.outcome == "skipped"
+    assert receipt.failure_mode == "missing_api_key"
+
+
+def test_route_receipt_capture_collects_current_runtime_calls() -> None:
+    token = openrouter.begin_openrouter_route_receipt_capture()
+    openrouter.record_openrouter_route_receipt(
+        task="result_summary",
+        model_name="chat/model",
+        mode="chat_model",
+        schema_name=None,
+        latency_ms=42,
+        outcome="failed",
+        failure_mode="TimeoutError",
+    )
+    captured = openrouter.end_openrouter_route_receipt_capture(token)
+
+    assert len(captured) == 1
+    assert captured[0].task == "result_summary"
+    assert captured[0].failure_mode == "TimeoutError"
