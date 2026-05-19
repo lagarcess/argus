@@ -112,6 +112,7 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
                       <span className="text-[15px] font-medium text-black dark:text-white truncate">
                         {item.title}
                       </span>
+                      {/* TODO(future): expose deleted_at or retention_expires_at on HistoryItem so this can show an exact restore window. */}
                       <span className="text-[12px] text-black/40 dark:text-white/40">
                         {t(
                           "settings.data.deleted_item_note",

@@ -75,9 +75,15 @@ class OpenRouterClarificationGenerator:
 
         from argus.llm.openrouter import resolve_openrouter_model
 
-        fallback_model_name = resolve_openrouter_model(fallback=True)
+        fallback_model_name = resolve_openrouter_model(
+            fallback=True,
+            task="clarification",
+        )
 
-        primary_model_name = resolve_openrouter_model(model_name=self.model_name)
+        primary_model_name = resolve_openrouter_model(
+            model_name=self.model_name,
+            task="clarification",
+        )
         if not fallback_model_name or fallback_model_name == primary_model_name:
             self.last_status = "failed"
             return

@@ -12,7 +12,6 @@ from argus.api.naming import suggest_entity_name
 from argus.api.schemas import BacktestRun, Conversation, Strategy
 from argus.domain.store import utcnow
 
-
 MAX_ARTIFACT_NAME_CHARS = 80
 
 

@@ -208,6 +208,92 @@ def test_openrouter_factory_applies_task_token_budget(
     ]
 
 
+def test_openrouter_model_routing_uses_task_specific_tiers(monkeypatch) -> None:
+    monkeypatch.setenv("ARGUS_UTILITY_MODEL", "utility/primary")
+    monkeypatch.setenv("ARGUS_UTILITY_FALLBACK_MODEL", "utility/fallback")
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "structured/fallback")
+    monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "context/primary")
+    monkeypatch.setenv("ARGUS_CONTEXT_FALLBACK_MODEL", "context/fallback")
+
+    assert openrouter.resolve_openrouter_model(task="name_suggestion") == (
+        "utility/primary"
+    )
+    assert (
+        openrouter.resolve_openrouter_model(
+            task="name_suggestion",
+            fallback=True,
+        )
+        == "utility/fallback"
+    )
+    assert openrouter.resolve_openrouter_model(task="clarification") == "chat/primary"
+    assert (
+        openrouter.resolve_openrouter_model(
+            task="clarification",
+            fallback=True,
+        )
+        == "chat/fallback"
+    )
+    assert openrouter.resolve_openrouter_model(task="interpretation") == (
+        "structured/primary"
+    )
+    assert (
+        openrouter.resolve_openrouter_model(
+            task="interpretation",
+            fallback=True,
+        )
+        == "structured/fallback"
+    )
+    assert openrouter.resolve_openrouter_model(task="result_breakdown") == (
+        "context/primary"
+    )
+    assert (
+        openrouter.resolve_openrouter_model(
+            task="result_breakdown",
+            fallback=True,
+        )
+        == "context/fallback"
+    )
+
+
+def test_openrouter_structured_candidates_follow_task_tier(monkeypatch) -> None:
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "structured/fallback")
+    monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "context/primary")
+    monkeypatch.setenv("ARGUS_CONTEXT_FALLBACK_MODEL", "context/fallback")
+    monkeypatch.setenv("AGENT_STRUCTURED_MODEL", "legacy/structured")
+    monkeypatch.setenv("AGENT_MODEL", "legacy/chat")
+    monkeypatch.setenv("AGENT_FALLBACK_MODEL", "legacy/fallback")
+
+    assert openrouter_structured_model_candidates(task="interpretation") == [
+        "structured/primary",
+        "structured/fallback",
+        "legacy/structured",
+        "legacy/chat",
+        "legacy/fallback",
+    ]
+    assert openrouter_structured_model_candidates(task="result_breakdown") == [
+        "context/primary",
+        "context/fallback",
+        "legacy/chat",
+        "legacy/fallback",
+    ]
+
+
+def test_openrouter_factory_uses_context_model_for_result_breakdown(monkeypatch) -> None:
+    FakeChatOpenRouter.calls.clear()
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "context/primary")
+    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+
+    model = openrouter.build_openrouter_model("result_breakdown")
+
+    assert model is not None
+    assert FakeChatOpenRouter.calls[0]["model_name"] == "context/primary"
+
+
 def test_openrouter_factory_returns_none_without_key(monkeypatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
@@ -631,9 +717,7 @@ def test_default_interpreter_retries_empty_unsupported_clarification(
                 task_relation="new_task",
                 requires_clarification=True,
                 user_goal_summary="Buy Tesla after big drops.",
-                assistant_response=(
-                    "Could you clarify what you mean by big drops?"
-                ),
+                assistant_response=("Could you clarify what you mean by big drops?"),
             )
         if schema_name == "FocusedStrategyExtraction":
             return FocusedStrategyExtraction(
@@ -722,9 +806,7 @@ def test_default_interpreter_keeps_artifact_context_for_vague_signal_clarificati
             asset_universe=["SPY"],
             entry_logic="Buy SPY when it starts rising.",
             missing_required_fields=["date_range", "entry_rule"],
-            assistant_response=(
-                "What concrete trigger and date range should I use?"
-            ),
+            assistant_response=("What concrete trigger and date range should I use?"),
         )
 
     monkeypatch.setattr(
@@ -841,9 +923,7 @@ def test_default_interpreter_retries_stale_prior_strategy_replay(
                 candidate_strategy_draft=LLMStrategyDraft(
                     raw_user_phrasing="Test buying and holding Apple over the past year.",
                     strategy_type="buy_and_hold",
-                    strategy_thesis=(
-                        "Test buying and holding Apple over the past year."
-                    ),
+                    strategy_thesis=("Test buying and holding Apple over the past year."),
                     asset_universe=["AAPL"],
                     date_range="past year",
                 ),
@@ -913,9 +993,7 @@ def test_default_interpreter_plans_stale_artifact_edit_before_fallback(
                 candidate_strategy_draft=LLMStrategyDraft(
                     raw_user_phrasing="Test buying and holding Apple over the past year.",
                     strategy_type="buy_and_hold",
-                    strategy_thesis=(
-                        "Test buying and holding Apple over the past year."
-                    ),
+                    strategy_thesis=("Test buying and holding Apple over the past year."),
                     asset_universe=["AAPL"],
                     date_range="past year",
                 ),
@@ -1316,44 +1394,44 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-        "sections": [
-            {
-                "heading": "Reading this run",
-                "parts": [
-                    {"kind": "text", "text": "The tested idea was "},
-                    {"kind": "fact", "fact_id": "title"},
-                    {"kind": "text", "text": " across "},
-                    {"kind": "fact", "fact_id": "date_range"},
-                    {"kind": "text", "text": "."},
-                ],
-            },
-            {
-                "heading": "Return and benchmark",
-                "parts": [
-                    {"kind": "fact", "fact_id": "symbols"},
-                    {"kind": "text", "text": " finished at "},
-                    {"kind": "fact", "fact_id": "total_return"},
-                    {"kind": "text", "text": " while "},
-                    {"kind": "fact", "fact_id": "benchmark_symbol"},
-                    {"kind": "text", "text": " returned "},
-                    {"kind": "fact", "fact_id": "benchmark_return"},
-                    {"kind": "text", "text": ", leaving "},
-                    {"kind": "fact", "fact_id": "benchmark_delta"},
-                    {"kind": "text", "text": " of relative performance."},
-                ],
-            },
-            {
-                "heading": "Risk and caveat",
-                "parts": [
-                    {"kind": "text", "text": "The largest drawdown was "},
-                    {"kind": "fact", "fact_id": "max_drawdown"},
-                    {"kind": "text", "text": ". Assumptions: "},
-                    {"kind": "fact", "fact_id": "assumptions"},
-                    {"kind": "text", "text": " "},
-                    {"kind": "fact", "fact_id": "caveat"},
-                ],
-            },
-        ]
+            "sections": [
+                {
+                    "heading": "Reading this run",
+                    "parts": [
+                        {"kind": "text", "text": "The tested idea was "},
+                        {"kind": "fact", "fact_id": "title"},
+                        {"kind": "text", "text": " across "},
+                        {"kind": "fact", "fact_id": "date_range"},
+                        {"kind": "text", "text": "."},
+                    ],
+                },
+                {
+                    "heading": "Return and benchmark",
+                    "parts": [
+                        {"kind": "fact", "fact_id": "symbols"},
+                        {"kind": "text", "text": " finished at "},
+                        {"kind": "fact", "fact_id": "total_return"},
+                        {"kind": "text", "text": " while "},
+                        {"kind": "fact", "fact_id": "benchmark_symbol"},
+                        {"kind": "text", "text": " returned "},
+                        {"kind": "fact", "fact_id": "benchmark_return"},
+                        {"kind": "text", "text": ", leaving "},
+                        {"kind": "fact", "fact_id": "benchmark_delta"},
+                        {"kind": "text", "text": " of relative performance."},
+                    ],
+                },
+                {
+                    "heading": "Risk and caveat",
+                    "parts": [
+                        {"kind": "text", "text": "The largest drawdown was "},
+                        {"kind": "fact", "fact_id": "max_drawdown"},
+                        {"kind": "text", "text": ". Assumptions: "},
+                        {"kind": "fact", "fact_id": "assumptions"},
+                        {"kind": "text", "text": " "},
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                },
+            ]
         }
     )
 
@@ -1413,46 +1491,46 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-        "sections": [
-            {
-                "heading": "Reading this run",
-                "parts": [
-                    {"kind": "text", "text": "The tested idea was"},
-                    {"kind": "fact", "fact_id": "title"},
-                    {"kind": "text", "text": "over"},
-                    {"kind": "fact", "fact_id": "date_range"},
-                    {"kind": "text", "text": "and returned"},
-                    {"kind": "fact", "fact_id": "total_return"},
-                    {"kind": "text", "text": "."},
-                ],
-            },
-            {
-                "heading": "Benchmark context",
-                "parts": [
-                    {"kind": "fact", "fact_id": "symbols"},
-                    {"kind": "text", "text": "was compared with"},
-                    {"kind": "fact", "fact_id": "benchmark_symbol"},
-                    {"kind": "text", "text": "at"},
-                    {"kind": "fact", "fact_id": "benchmark_return"},
-                    {"kind": "text", "text": "for a relative spread of"},
-                    {"kind": "fact", "fact_id": "benchmark_delta"},
-                    {"kind": "text", "text": "."},
-                ],
-            },
-            {
-                "heading": "Risk, assumptions, and next step",
-                "parts": [
-                    {"kind": "text", "text": "The max drawdown was"},
-                    {"kind": "fact", "fact_id": "max_drawdown"},
-                    {"kind": "text", "text": ". Assumptions:"},
-                    {"kind": "fact", "fact_id": "assumptions"},
-                    {"kind": "text", "text": "Next runnable checks:"},
-                    {"kind": "fact", "fact_id": "runnable_next_tests"},
-                    {"kind": "text", "text": "."},
-                    {"kind": "fact", "fact_id": "caveat"},
-                ],
-            },
-        ]
+            "sections": [
+                {
+                    "heading": "Reading this run",
+                    "parts": [
+                        {"kind": "text", "text": "The tested idea was"},
+                        {"kind": "fact", "fact_id": "title"},
+                        {"kind": "text", "text": "over"},
+                        {"kind": "fact", "fact_id": "date_range"},
+                        {"kind": "text", "text": "and returned"},
+                        {"kind": "fact", "fact_id": "total_return"},
+                        {"kind": "text", "text": "."},
+                    ],
+                },
+                {
+                    "heading": "Benchmark context",
+                    "parts": [
+                        {"kind": "fact", "fact_id": "symbols"},
+                        {"kind": "text", "text": "was compared with"},
+                        {"kind": "fact", "fact_id": "benchmark_symbol"},
+                        {"kind": "text", "text": "at"},
+                        {"kind": "fact", "fact_id": "benchmark_return"},
+                        {"kind": "text", "text": "for a relative spread of"},
+                        {"kind": "fact", "fact_id": "benchmark_delta"},
+                        {"kind": "text", "text": "."},
+                    ],
+                },
+                {
+                    "heading": "Risk, assumptions, and next step",
+                    "parts": [
+                        {"kind": "text", "text": "The max drawdown was"},
+                        {"kind": "fact", "fact_id": "max_drawdown"},
+                        {"kind": "text", "text": ". Assumptions:"},
+                        {"kind": "fact", "fact_id": "assumptions"},
+                        {"kind": "text", "text": "Next runnable checks:"},
+                        {"kind": "fact", "fact_id": "runnable_next_tests"},
+                        {"kind": "text", "text": "."},
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                },
+            ]
         }
     )
 
@@ -1498,15 +1576,15 @@ def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> N
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-        "sections": [
-            {
-                "heading": "Invented future",
-                "parts": [
-                    {"kind": "text", "text": "The future expectation is "},
-                    {"kind": "fact", "fact_id": "future_return"},
-                ],
-            }
-        ]
+            "sections": [
+                {
+                    "heading": "Invented future",
+                    "parts": [
+                        {"kind": "text", "text": "The future expectation is "},
+                        {"kind": "fact", "fact_id": "future_return"},
+                    ],
+                }
+            ]
         }
     )
 
@@ -1539,15 +1617,15 @@ def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
     del monkeypatch
     fake_schema = FakeBreakdownSchemaClient(
         {
-        "sections": [
-            {
-                "heading": "Too thin",
-                "parts": [
-                    {"kind": "text", "text": "The run needs more context. "},
-                    {"kind": "fact", "fact_id": "caveat"},
-                ],
-            }
-        ]
+            "sections": [
+                {
+                    "heading": "Too thin",
+                    "parts": [
+                        {"kind": "text", "text": "The run needs more context. "},
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                }
+            ]
         }
     )
 
@@ -1757,7 +1835,9 @@ def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setenv("AGENT_MODEL", "qwen/qwen3.5-9b")
-    monkeypatch.setattr(openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient())
+    monkeypatch.setattr(
+        openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient()
+    )
 
     result = asyncio.run(
         openrouter.invoke_openrouter_json_schema(

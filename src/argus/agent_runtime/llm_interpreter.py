@@ -165,10 +165,16 @@ class OpenRouterStructuredInterpreter:
         # 2. Try Fallback Model (if primary failed or was unavailable)
         from argus.llm.openrouter import resolve_openrouter_model
 
-        fallback_model_name = resolve_openrouter_model(fallback=True)
+        fallback_model_name = resolve_openrouter_model(
+            fallback=True,
+            task="interpretation",
+        )
 
         # Don't retry with the same model name if resolve returned the same thing
-        primary_model_name = resolve_openrouter_model(self.model_name)
+        primary_model_name = resolve_openrouter_model(
+            self.model_name,
+            task="interpretation",
+        )
         if not fallback_model_name or fallback_model_name == primary_model_name:
             self.last_status = "failed"
             return None
@@ -232,10 +238,8 @@ class OpenRouterStructuredInterpreter:
                     request.latest_task_snapshot.latest_backtest_result_reference.metadata
                 )
             if request.latest_task_snapshot.latest_failed_action_reference is not None:
-                latest_failed_action = (
-                    request.latest_task_snapshot.latest_failed_action_reference.model_dump(
-                        mode="json"
-                    )
+                latest_failed_action = request.latest_task_snapshot.latest_failed_action_reference.model_dump(
+                    mode="json"
                 )
         has_artifact_context = any(
             item is not None
@@ -597,8 +601,7 @@ async def _plan_pending_artifact_assumption_edit(
     prior_strategy = _prior_strategy_payload(request)
     active_confirmation = (
         snapshot.active_confirmation_reference.model_dump(mode="json")
-        if snapshot is not None
-        and snapshot.active_confirmation_reference is not None
+        if snapshot is not None and snapshot.active_confirmation_reference is not None
         else None
     )
     plan = await plan_artifact_assumption_edit(
@@ -1020,9 +1023,7 @@ def _response_from_signal_rule_plan(
             ),
         ]
         repaired.reason_codes = list(
-            dict.fromkeys(
-                [*repaired.reason_codes, "signal_rule_plan_draft_only"]
-            )
+            dict.fromkeys([*repaired.reason_codes, "signal_rule_plan_draft_only"])
         )
         return repaired
 
@@ -1269,6 +1270,7 @@ def _response_from_focused_strategy_extraction(
         reason_codes=["focused_strategy_extraction_repair"],
         semantic_turn_act="new_idea",
     )
+
 
 def _focused_artifact_edit_messages(
     request: InterpretationRequest,
@@ -1601,10 +1603,14 @@ def _response_replays_prior_strategy_without_current_turn_update(
     for key, value in material_updates.items():
         if _normalized_material_strategy_value(key, prior_payload.get(key)) != value:
             return False
-    return response.task_relation == "refine" or request.current_user_message.strip() not in {
-        str(prior.raw_user_phrasing or "").strip(),
-        str(prior.strategy_thesis or "").strip(),
-    }
+    return (
+        response.task_relation == "refine"
+        or request.current_user_message.strip()
+        not in {
+            str(prior.raw_user_phrasing or "").strip(),
+            str(prior.strategy_thesis or "").strip(),
+        }
+    )
 
 
 def _material_strategy_updates_from_draft(
@@ -2116,11 +2122,13 @@ def _apply_signal_strategy_defaults(strategy: StrategySummary) -> None:
     entry_text = describe_rule_spec(rule_spec, "entry") if rule_spec else None
     exit_text = describe_rule_spec(rule_spec, "exit") if rule_spec else None
     strategy.entry_logic = (
-        entry_text or moving_average_crossover_text(strategy.entry_rule)
+        entry_text
+        or moving_average_crossover_text(strategy.entry_rule)
         or strategy.entry_logic
     )
     strategy.exit_logic = (
-        exit_text or moving_average_crossover_text(strategy.exit_rule)
+        exit_text
+        or moving_average_crossover_text(strategy.exit_rule)
         or strategy.exit_logic
     )
 

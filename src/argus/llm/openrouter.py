@@ -18,6 +18,7 @@ OpenRouterTask = Literal[
     "result_breakdown",
     "name_suggestion",
 ]
+OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
 
 SchemaModelT = TypeVar("SchemaModelT", bound=BaseModel)
 
@@ -50,37 +51,113 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     ),
 }
 
+OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
+    "interpretation": "structured",
+    "clarification": "chat",
+    "chat_composer": "chat",
+    "result_summary": "chat",
+    "result_breakdown": "context",
+    "name_suggestion": "utility",
+}
+
+_TIER_PRIMARY_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
+    "utility": ("ARGUS_UTILITY_MODEL", "AGENT_MODEL"),
+    "chat": ("ARGUS_CHAT_MODEL", "AGENT_MODEL"),
+    "structured": ("ARGUS_STRUCTURED_MODEL", "AGENT_STRUCTURED_MODEL", "AGENT_MODEL"),
+    "context": ("ARGUS_CONTEXT_MODEL", "AGENT_MODEL"),
+}
+
+_TIER_FALLBACK_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
+    "utility": ("ARGUS_UTILITY_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
+    "chat": ("ARGUS_CHAT_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
+    "structured": ("ARGUS_STRUCTURED_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
+    "context": ("ARGUS_CONTEXT_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
+}
+
+_TIER_CANDIDATE_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
+    "utility": (
+        "ARGUS_UTILITY_MODEL",
+        "ARGUS_UTILITY_FALLBACK_MODEL",
+        "AGENT_MODEL",
+        "AGENT_FALLBACK_MODEL",
+    ),
+    "chat": (
+        "ARGUS_CHAT_MODEL",
+        "ARGUS_CHAT_FALLBACK_MODEL",
+        "AGENT_MODEL",
+        "AGENT_FALLBACK_MODEL",
+    ),
+    "structured": (
+        "ARGUS_STRUCTURED_MODEL",
+        "ARGUS_STRUCTURED_FALLBACK_MODEL",
+        "AGENT_STRUCTURED_MODEL",
+        "AGENT_MODEL",
+        "AGENT_FALLBACK_MODEL",
+    ),
+    "context": (
+        "ARGUS_CONTEXT_MODEL",
+        "ARGUS_CONTEXT_FALLBACK_MODEL",
+        "AGENT_MODEL",
+        "AGENT_FALLBACK_MODEL",
+    ),
+}
+
+
+def openrouter_model_tier_for_task(task: OpenRouterTask | None) -> OpenRouterModelTier:
+    if task is None:
+        return "chat"
+    return OPENROUTER_TASK_MODEL_TIERS[task]
+
 
 def resolve_openrouter_model(
-    model_name: str | None = None, fallback: bool = False
+    model_name: str | None = None,
+    fallback: bool = False,
+    *,
+    task: OpenRouterTask | None = None,
 ) -> str:
     """
-    Resolves the model name to use, preferring AGENT_MODEL or AGENT_FALLBACK_MODEL.
+    Resolves the model name to use for the task-specific model tier.
     """
     if model_name:
         return model_name
 
-    if fallback:
-        return os.getenv("AGENT_FALLBACK_MODEL", "").strip()
+    tier = openrouter_model_tier_for_task(task)
+    env_names = _TIER_FALLBACK_ENV[tier] if fallback else _TIER_PRIMARY_ENV[tier]
+    return _first_configured_model(env_names)
 
-    return os.getenv("AGENT_MODEL", "").strip()
 
-
-def resolve_openrouter_structured_model(model_name: str | None = None) -> str:
-    candidates = openrouter_structured_model_candidates(model_name)
+def resolve_openrouter_structured_model(
+    model_name: str | None = None,
+    *,
+    task: OpenRouterTask = "interpretation",
+) -> str:
+    candidates = openrouter_structured_model_candidates(model_name, task=task)
     return candidates[0] if candidates else ""
 
 
-def openrouter_structured_model_candidates(model_name: str | None = None) -> list[str]:
+def openrouter_structured_model_candidates(
+    model_name: str | None = None,
+    *,
+    task: OpenRouterTask = "interpretation",
+) -> list[str]:
     if model_name:
         return [model_name]
+    tier = openrouter_model_tier_for_task(task)
     return _unique_nonempty(
-        [
-            os.getenv("AGENT_STRUCTURED_MODEL", "").strip(),
-            os.getenv("AGENT_MODEL", "").strip(),
-            os.getenv("AGENT_FALLBACK_MODEL", "").strip(),
-        ]
+        [_env_model_value(name) for name in _TIER_CANDIDATE_ENV[tier]]
     )
+
+
+def _env_model_value(name: str) -> str:
+    return os.getenv(name, "").strip()
+
+
+def _first_configured_model(env_names: tuple[str, ...]) -> str:
+    for name in env_names:
+        value = _env_model_value(name)
+        if value:
+            return value
+    return ""
 
 
 def _unique_nonempty(values: list[str]) -> list[str]:
@@ -108,7 +185,7 @@ def build_openrouter_model(
         return None
 
     profile = OPENROUTER_PROFILES[task]
-    resolved_model = resolve_openrouter_model(model_name)
+    resolved_model = resolve_openrouter_model(model_name, task=task)
     if not resolved_model:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
         return None
@@ -140,7 +217,7 @@ async def invoke_openrouter_json_schema(
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         return None
 
-    resolved_model = resolve_openrouter_structured_model(model_name)
+    resolved_model = resolve_openrouter_structured_model(model_name, task=task)
     if not resolved_model:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
         return None
@@ -188,7 +265,7 @@ def invoke_openrouter_json_schema_sync(
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         return None
 
-    resolved_model = resolve_openrouter_structured_model(model_name)
+    resolved_model = resolve_openrouter_structured_model(model_name, task=task)
     if not resolved_model:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
         return None
@@ -335,7 +412,7 @@ def log_openrouter_failure(
     message: str,
 ) -> None:
     profile = OPENROUTER_PROFILES[task]
-    resolved_model = resolve_openrouter_model(model_name)
+    resolved_model = resolve_openrouter_model(model_name, task=task)
     error_type = type(exc).__name__
     logger.warning(
         (
