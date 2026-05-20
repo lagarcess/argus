@@ -10,6 +10,7 @@ from argus.agent_runtime.result_followups import (
     fallback_result_followup_response,
     result_followup_fact_bank,
 )
+from argus.llm import openrouter
 
 
 @pytest.mark.asyncio
@@ -70,7 +71,9 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
 
 
 @pytest.mark.asyncio
-async def test_result_followup_replaces_llm_answer_that_contradicts_positive_delta() -> None:
+async def test_result_followup_replaces_llm_answer_that_contradicts_positive_delta() -> (
+    None
+):
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
@@ -119,6 +122,8 @@ async def test_result_followup_replaces_llm_answer_that_contradicts_positive_del
 
 @pytest.mark.asyncio
 async def test_result_followup_rejects_fact_only_template_output() -> None:
+    openrouter.clear_openrouter_route_receipts()
+
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
@@ -153,6 +158,8 @@ async def test_result_followup_rejects_fact_only_template_output() -> None:
     )
 
     assert response is None
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert receipts[-1].failure_mode == "result_followup_draft_rejected"
 
 
 @pytest.mark.asyncio
@@ -313,6 +320,79 @@ def test_result_followup_fact_bank_includes_context_packet_limitations() -> None
 
 
 @pytest.mark.asyncio
+async def test_general_followup_uses_context_packet_facts_when_attached() -> None:
+    async def fake_schema_client(**kwargs: Any) -> object:
+        assert kwargs["task"] == "result_breakdown"
+        schema = kwargs["schema_model"]
+        payload = json.loads(kwargs["messages"][1]["content"])
+        assert payload["focus"] == "general"
+        assert "context_packet_facts" in payload["required_fact_ids"]
+        return schema(
+            parts=[
+                {
+                    "kind": "text",
+                    "text": "The run result is performance evidence first; the attached macro packet is only backdrop.",
+                },
+                {"kind": "fact", "fact_id": "symbols"},
+                {"kind": "fact", "fact_id": "total_return"},
+                {"kind": "fact", "fact_id": "benchmark_symbol"},
+                {"kind": "fact", "fact_id": "benchmark_return"},
+                {"kind": "fact", "fact_id": "benchmark_delta"},
+                {"kind": "fact", "fact_id": "context_packet_facts"},
+                {"kind": "fact", "fact_id": "context_packet_limitations"},
+                {"kind": "fact", "fact_id": "caveat"},
+            ]
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 130.0,
+                        "benchmark_return_pct": 24.8,
+                        "delta_vs_benchmark_pct": 105.2,
+                    }
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {"start": "2023-01-01", "end": "2023-12-31"},
+            },
+            "context_packets": [
+                {
+                    "id": "packet-1",
+                    "provider": "fred",
+                    "packet_type": "macro",
+                    "facts": [
+                        {
+                            "kind": "macro_observation",
+                            "label": "FEDFUNDS latest observation",
+                            "value": 5.33,
+                        }
+                    ],
+                    "limitations": [
+                        "FRED macro observations are contextual backdrop only."
+                    ],
+                }
+            ],
+        },
+        focus="general",
+        user_message="why did that happen?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert "TSLA" in response
+    assert "+130.0%" in response
+    assert "SPY" in response
+    assert "FEDFUNDS latest observation" in response
+    assert "contextual backdrop only" in response
+
+
+@pytest.mark.asyncio
 async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
@@ -408,7 +488,9 @@ def test_what_tested_fallback_includes_performance_context_when_focus_drifts() -
     assert "The gap versus the benchmark was +12.2%" in response
 
 
-def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncertain() -> None:
+def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncertain() -> (
+    None
+):
     response = fallback_result_followup_response(
         metadata={
             "symbols": ["NVDA"],

@@ -14,7 +14,12 @@ from argus.domain.engine_launch.result_facts import (
     runnable_next_tests,
     structured_next_experiments,
 )
-from argus.llm.openrouter import invoke_openrouter_json_schema, log_openrouter_failure
+from argus.llm.openrouter import (
+    OpenRouterTask,
+    invoke_openrouter_json_schema,
+    log_openrouter_failure,
+    record_openrouter_route_receipt,
+)
 
 
 class ResultFollowupPart(BaseModel):
@@ -38,13 +43,22 @@ async def compose_result_followup_response(
     fact_bank = result_followup_fact_bank(metadata)
     if not fact_bank:
         return None
+    use_context_route = result_followup_uses_context_route(
+        fact_bank=fact_bank,
+        focus=focus,
+    )
     required_fact_ids = required_result_followup_fact_ids(
+        fact_bank=fact_bank,
+        focus=focus,
+        include_context=use_context_route,
+    )
+    llm_task = result_followup_llm_task(
         fact_bank=fact_bank,
         focus=focus,
     )
     try:
         raw_response = invoke_json_schema_func(
-            task="result_summary",
+            task=llm_task,
             messages=result_followup_llm_messages(
                 fact_bank=fact_bank,
                 focus=focus,
@@ -58,7 +72,7 @@ async def compose_result_followup_response(
             raw_response = await raw_response
     except Exception as exc:
         log_openrouter_failure_func(
-            task="result_summary",
+            task=llm_task,
             model_name=None,
             exc=exc,
             message="LLM result follow-up failed; using grounded fallback",
@@ -67,12 +81,59 @@ async def compose_result_followup_response(
 
     draft = coerce_result_followup_draft(raw_response)
     if draft is None:
+        record_result_followup_fallback_receipt(
+            task=llm_task,
+            failure_mode="invalid_result_followup_draft",
+        )
         return None
-    return render_result_followup_draft(
+    rendered = render_result_followup_draft(
         draft=draft,
         fact_bank=fact_bank,
         required_fact_ids=required_fact_ids,
         focus=focus,
+    )
+    if rendered is None:
+        record_result_followup_fallback_receipt(
+            task=llm_task,
+            failure_mode="result_followup_draft_rejected",
+        )
+    return rendered
+
+
+def result_followup_llm_task(
+    *,
+    fact_bank: dict[str, str],
+    focus: ResultFollowupFocus,
+) -> OpenRouterTask:
+    if result_followup_uses_context_route(fact_bank=fact_bank, focus=focus):
+        return "result_breakdown"
+    return "result_summary"
+
+
+def result_followup_uses_context_route(
+    *,
+    fact_bank: dict[str, str],
+    focus: ResultFollowupFocus,
+) -> bool:
+    return bool(
+        fact_bank.get("context_packet_facts")
+        and focus in {"general", "why_underperformed"}
+    )
+
+
+def record_result_followup_fallback_receipt(
+    *,
+    task: OpenRouterTask,
+    failure_mode: str,
+) -> None:
+    record_openrouter_route_receipt(
+        task=task,
+        model_name=None,
+        mode="json_schema",
+        schema_name="ResultFollowupDraft",
+        latency_ms=0,
+        outcome="failed",
+        failure_mode=failure_mode,
     )
 
 
@@ -92,6 +153,8 @@ def result_followup_llm_messages(
                 "specific, and useful; do not sound like a fixed template. Put every "
                 "run-specific symbol, date, percentage, drawdown, benchmark, rule, "
                 "trade count, assumption, caveat, and next-test option in a fact part. "
+                "The final parts list must include every fact_id in required_fact_ids; "
+                "do not omit required fact ids even when they feel repetitive. "
                 "Use fact parts inline where the exact value belongs, and use text parts "
                 "for interpretation, education, and transitions. Text parts must not "
                 "repeat raw fact values; they should say what the fact means, while "
@@ -328,7 +391,9 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
         fact_bank["assumptions"] = "; ".join(clean_fragment(item) for item in assumptions)
     context_facts = context_packet_fact_summary(_context_packets_from_metadata(metadata))
     fact_bank.update(context_facts)
-    fact_bank["caveat"] = "Historical simulation evidence, not a prediction or trading recommendation"
+    fact_bank["caveat"] = (
+        "Historical simulation evidence, not a prediction or trading recommendation"
+    )
     fact_bank["runnable_next_tests"] = runnable_next_tests(metadata)
     fact_bank["next_experiment_options"] = json.dumps(
         structured_next_experiments(metadata),
@@ -341,9 +406,12 @@ def required_result_followup_fact_ids(
     *,
     fact_bank: dict[str, str],
     focus: ResultFollowupFocus,
+    include_context: bool = False,
 ) -> set[str]:
     required: set[str] = {"caveat"}
-    if "context_packet_limitations" in fact_bank:
+    has_context_facts = "context_packet_facts" in fact_bank
+    has_context_limitations = "context_packet_limitations" in fact_bank
+    if has_context_limitations:
         required.add("context_packet_limitations")
     if "symbols" in fact_bank:
         required.add("symbols")
@@ -370,6 +438,23 @@ def required_result_followup_fact_ids(
         ):
             if fact_id in fact_bank:
                 required.add(fact_id)
+        if has_context_facts:
+            required.add("context_packet_facts")
+        if has_context_limitations:
+            required.add("context_packet_limitations")
+    elif focus == "general" and include_context:
+        for fact_id in (
+            "total_return",
+            "benchmark_symbol",
+            "benchmark_return",
+            "benchmark_delta",
+            "execution_note",
+            "context_packet_facts",
+        ):
+            if fact_id in fact_bank:
+                required.add(fact_id)
+        if has_context_limitations:
+            required.add("context_packet_limitations")
     elif focus == "next_experiment":
         required.add("runnable_next_tests")
         required.add("next_experiment_options")
@@ -532,15 +617,15 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
     elif fact_bank.get("benchmark_symbol"):
         pieces.append(f"Benchmark: {fact_bank['benchmark_symbol']}.")
     if fact_bank.get("benchmark_delta"):
-        pieces.append(
-            f"The gap versus the benchmark was {fact_bank['benchmark_delta']}."
-        )
+        pieces.append(f"The gap versus the benchmark was {fact_bank['benchmark_delta']}.")
     if fact_bank.get("max_drawdown"):
         pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
     if fact_bank.get("execution_note"):
         pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
     if fact_bank.get("runnable_next_tests"):
-        pieces.append("Try next: " + clean_fragment(fact_bank["runnable_next_tests"]) + ".")
+        pieces.append(
+            "Try next: " + clean_fragment(fact_bank["runnable_next_tests"]) + "."
+        )
     if fact_bank.get("caveat"):
         pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
     response = " ".join(piece.strip() for piece in pieces if piece.strip())

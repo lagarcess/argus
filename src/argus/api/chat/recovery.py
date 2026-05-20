@@ -102,6 +102,27 @@ def checkpoint_has_latest_result(values: dict[str, Any]) -> bool:
     return snapshot is not None and snapshot.latest_backtest_result_reference is not None
 
 
+def checkpoint_latest_result_has_context_packets(values: dict[str, Any]) -> bool:
+    snapshot = _task_snapshot_from_value(values.get("latest_task_snapshot"))
+    if snapshot is None:
+        return False
+    return result_reference_has_context_packets(snapshot.latest_backtest_result_reference)
+
+
+def result_reference_has_context_packets(reference: ArtifactReference | None) -> bool:
+    if reference is None:
+        return False
+    metadata = reference.metadata
+    packets = metadata.get("context_packets")
+    if isinstance(packets, list) and packets:
+        return True
+    result_card = metadata.get("result_card")
+    if isinstance(result_card, dict):
+        card_packets = result_card.get("context_packets")
+        return isinstance(card_packets, list) and bool(card_packets)
+    return False
+
+
 def checkpoint_has_pending_strategy(values: dict[str, Any]) -> bool:
     snapshot = _task_snapshot_from_value(values.get("latest_task_snapshot"))
     return snapshot is not None and snapshot.pending_strategy_summary is not None
