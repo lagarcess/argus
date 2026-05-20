@@ -550,6 +550,29 @@ def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
     )
 
 
+def test_confirm_stage_prioritizes_data_window_before_missing_rule_details() -> None:
+    state = RunState.new(
+        current_user_message="test EUR/USD 1h from Jan 2025 to Feb 2025",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_thesis="Test EUR/USD with a long hourly window.",
+        asset_universe=["EURUSD"],
+        asset_class="currency_pair",
+        timeframe="1h",
+        date_range={"start": "2025-01-01", "end": "2025-02-15"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert result.patch["assistant_prompt"] is None
+    assert result.patch["requested_field"] == "date_range"
+    assert result.patch["missing_required_fields"] == ["date_range"]
+    constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
+    assert constraints[0]["category"] == "data_window_unavailable"
+
+
 def test_confirm_stage_resolves_indicator_from_strategy_type_alias() -> None:
     state = RunState.new(
         current_user_message="Backtest Tesla RSI",

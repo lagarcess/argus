@@ -4,6 +4,10 @@ import asyncio
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.response_style import (
+    result_followup_heading,
+    with_response_heading,
+)
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     context_packet_ids_from_fact_bank,
@@ -569,7 +573,12 @@ async def artifact_followup_stage_result_if_applicable(
                 "result_followup_focus": focus,
             }
         ),
-        stage_patch={"assistant_response": response},
+        stage_patch={
+            "assistant_response": with_response_heading(
+                heading=result_followup_heading(focus),
+                body=response,
+            )
+        },
     )
 
 

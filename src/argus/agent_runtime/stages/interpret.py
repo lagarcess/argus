@@ -14,6 +14,10 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.response_style import (
+    result_followup_heading,
+    with_response_heading,
+)
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     fallback_result_followup_response,
@@ -366,6 +370,15 @@ async def _stage_result_from_interpretation(
                 ),
             ]
         )
+        strategy_logic_constraint = _unsupported_strategy_logic_constraint(
+            strategy=strategy,
+            existing_constraints=unsupported_constraints,
+            contract=capability_contract,
+        )
+        if strategy_logic_constraint is not None:
+            unsupported_constraints = _dedupe_unsupported_constraints(
+                [*unsupported_constraints, strategy_logic_constraint]
+            )
     missing_required_fields = _missing_fields_for_interpretation(
         interpretation=interpretation,
         strategy=strategy,
@@ -938,7 +951,12 @@ async def _latest_result_followup_when_interpreter_unavailable(
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
-        stage_patch={"assistant_response": response},
+        stage_patch={
+            "assistant_response": with_response_heading(
+                heading=result_followup_heading("general"),
+                body=response,
+            )
+        },
     )
 
 
@@ -963,15 +981,16 @@ async def _latest_result_followup_recovery_if_applicable(
         return None
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
+    focus = decision.result_followup_focus or "general"
     response = await compose_result_followup_response(
         metadata=metadata,
-        focus="general",
+        focus=focus,
         user_message=current_user_message,
     )
     if response is None:
         response = fallback_result_followup_response(
             metadata=metadata,
-            focus="general",
+            focus=focus,
         )
     if response is None:
         return None
@@ -988,7 +1007,7 @@ async def _latest_result_followup_recovery_if_applicable(
                 "missing_required_fields": [],
                 "effective_response_profile": effective_profile,
                 "semantic_turn_act": "result_followup",
-                "result_followup_focus": decision.result_followup_focus or "general",
+                "result_followup_focus": focus,
                 "reason_codes": [
                     *decision.reason_codes,
                     (
@@ -999,7 +1018,12 @@ async def _latest_result_followup_recovery_if_applicable(
                 ],
             }
         ),
-        stage_patch={"assistant_response": response},
+        stage_patch={
+            "assistant_response": with_response_heading(
+                heading=result_followup_heading(focus),
+                body=response,
+            )
+        },
     )
 
 
@@ -1498,6 +1522,54 @@ def _unsupported_symbol_constraints(
             ),
         )
     ]
+
+
+def _unsupported_strategy_logic_constraint(
+    *,
+    strategy: StrategySummary,
+    existing_constraints: list[UnsupportedConstraint],
+    contract: Any,
+) -> UnsupportedConstraint | None:
+    if existing_constraints:
+        return None
+    if executable_strategy_type(strategy) in SUPPORTED_STRATEGY_TYPES:
+        return None
+    if _strategy_supplies_executable_rule_edit(strategy):
+        return None
+    if not _strategy_has_unstructured_strategy_thesis(strategy):
+        return None
+    raw_value = _unstructured_strategy_raw_value(strategy)
+    return UnsupportedConstraint(
+        category="unsupported_strategy_logic",
+        raw_value=raw_value,
+        explanation=(
+            "That idea needs a rule or data source the current backtest engine "
+            "cannot execute directly yet."
+        ),
+        simplification_options=contract.get_simplification_options(
+            "unsupported_strategy_logic"
+        ),
+    )
+
+
+def _strategy_has_unstructured_strategy_thesis(strategy: StrategySummary) -> bool:
+    return bool(
+        str(strategy.strategy_thesis or "").strip()
+        or str(strategy.raw_user_phrasing or "").strip()
+    )
+
+
+def _unstructured_strategy_raw_value(strategy: StrategySummary) -> str:
+    for value in (
+        strategy.entry_logic,
+        strategy.strategy_thesis,
+        strategy.raw_user_phrasing,
+        strategy.strategy_type,
+    ):
+        text = str(value or "").strip()
+        if text:
+            return text
+    return "unsupported strategy logic"
 
 
 def _ambiguous_fields_from_resolution(

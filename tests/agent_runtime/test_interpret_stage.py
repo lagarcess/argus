@@ -966,9 +966,10 @@ def test_result_followup_uses_latest_result_when_interpreter_unavailable(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"] == (
-        "Grounded answer from the latest result facts."
-    )
+    assert result.patch["assistant_response"].startswith("**Readout**")
+    assert "Grounded answer from the latest result facts." in result.patch[
+        "assistant_response"
+    ]
     assert result.decision is not None
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "general"
@@ -1024,8 +1025,10 @@ def test_result_followup_uses_llm_composer_before_fallback(monkeypatch: pytest.M
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"] == (
+    assert result.patch["assistant_response"].startswith("**Readout**")
+    assert (
         "LLM-composed answer grounded in the result fact bank."
+        in result.patch["assistant_response"]
     )
     assert captured["metadata"]["symbols"] == ["AAPL"]
     assert captured["focus"] == "why_underperformed"
@@ -1084,10 +1087,81 @@ def test_empty_non_strategy_turn_after_result_falls_back_to_next_tests(
 
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
-    assert "Try next" in answer
-    assert "change the date range" in answer
+    answer_lower = answer.lower()
+    assert "latest run" in answer_lower
+    assert "next" in answer_lower
+    assert any(
+        option in answer_lower
+        for option in ("date range", "indicator period", "threshold")
+    )
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "general"
+    assert "latest_result_empty_turn_recovery" in result.decision.reason_codes
+
+
+def test_latest_result_recovery_preserves_next_experiment_focus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def empty_compose_result_followup_response(**kwargs: Any) -> None:
+        captured.update(kwargs)
+        return None
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        empty_compose_result_followup_response,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-next-focus",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["BTC"],
+                "benchmark_symbol": "BTC",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 75.1,
+                            "benchmark_return_pct": 75.1,
+                            "delta_vs_benchmark_pct": 0.0,
+                        }
+                    }
+                },
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "symbols": ["BTC"],
+                    "date_range": {"start": "2024-01-01", "end": "2026-05-20"},
+                },
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what to try next from the latest result.",
+        semantic_turn_act="educational_question",
+        result_followup_focus="next_experiment",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="what should I try next from this result?",
+        response=response,
+        snapshot=snapshot,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    answer_lower = answer.lower()
+    assert answer.startswith("**Try next**")
+    assert "A good next move is to isolate one assumption." in answer
+    assert "change the date range" in answer_lower
+    assert "try a supported rsi threshold on btc" in answer_lower
+    assert captured["focus"] == "next_experiment"
+    assert result.decision.semantic_turn_act == "result_followup"
+    assert result.decision.result_followup_focus == "next_experiment"
     assert "latest_result_empty_turn_recovery" in result.decision.reason_codes
 
 
@@ -1148,7 +1222,9 @@ def test_unanchored_clarification_after_result_falls_back_to_next_tests(
 
     assert result.outcome == "ready_to_respond"
     answer = result.patch["assistant_response"]
-    assert "Try next" in answer
+    answer_lower = answer.lower()
+    assert "latest run" in answer_lower
+    assert "next" in answer_lower
     assert "one more detail" not in answer
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.requires_clarification is False
@@ -1224,7 +1300,7 @@ def test_result_followup_timeout_falls_back_to_grounded_facts(
     answer = result.patch["assistant_response"]
     assert "TSLA" in answer
     assert "27.5%" in answer
-    assert "Historical simulation evidence" in answer
+    assert "historical simulation evidence" in answer.lower()
     receipts = openrouter.get_openrouter_route_receipts()
     assert receipts[-1].task == "result_summary"
     assert receipts[-1].failure_mode == "result_followup_timeout"
@@ -1291,8 +1367,8 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("I tested AAPL")
-    assert "Readout" not in result.patch["assistant_response"]
+    assert result.patch["assistant_response"].startswith("**Readout**")
+    assert "I tested AAPL" in result.patch["assistant_response"]
     assert result.decision.semantic_turn_act == "result_followup"
 
 
@@ -1407,10 +1483,10 @@ def test_zero_return_followup_uses_result_reason_without_repeating_readout(
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
+    assert answer.startswith("**Readout**")
     assert "strategy returned 0.0%" in answer
     assert "SPY returned +8.9%" in answer
     assert "No entry trades were executed" in answer
-    assert "Readout" not in answer
 
 
 def test_result_followup_summarizes_what_was_tested_from_fact_bank(
@@ -2005,6 +2081,49 @@ def test_unclassified_rule_like_strategy_requires_executable_rule_before_assets(
     assert result.decision.missing_required_fields[0] == "entry_logic"
     assert "asset_universe" in result.decision.missing_required_fields
     assert "date_range" in result.decision.missing_required_fields
+
+
+def test_unanchored_investing_thesis_routes_to_supported_simplification(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants to test a non-executable signal source.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="trade based on Reddit sentiment",
+            strategy_thesis=(
+                "Use social discussion sentiment as the signal for trades."
+            ),
+        ),
+        missing_required_fields=["asset_universe", "entry_logic", "date_range"],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="trade based on Reddit sentiment",
+        response=response,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.unsupported_constraints
+    constraint = result.decision.unsupported_constraints[0]
+    assert constraint.category == "unsupported_strategy_logic"
+    assert constraint.simplification_options
+    labels = [option.label for option in constraint.simplification_options]
+    assert labels == [
+        "Use a supported RSI threshold rule",
+        "Compare with buy and hold",
+        "Use a supported moving-average crossover",
+    ]
 
 
 def test_non_executable_signal_rule_requires_rule_before_date(monkeypatch) -> None:
@@ -3192,7 +3311,11 @@ def test_active_artifact_rule_answer_repairs_and_preserves_prior_asset(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert calls == ["LLMInterpretationResponse", "LLMInterpretationResponse"]
+    assert calls == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+        "LLMInterpretationResponse",
+    ]
     assert result.outcome == "ready_for_confirmation"
     assert strategy.asset_universe == ["TSLA"]
     assert strategy.date_range == "last 3 months"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from datetime import date
 from typing import Any
@@ -25,6 +26,7 @@ from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
+from argus.agent_runtime.result_followups import result_followup_fact_bank
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     moving_average_crossover_text,
@@ -42,6 +44,7 @@ from argus.agent_runtime.signal_rule_repair import (
 )
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
+    ResultFollowupFocus,
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
@@ -59,7 +62,11 @@ from argus.agent_runtime.strategy_contract import (
     normalize_date_range_candidate,
     resolve_date_range,
 )
-from argus.domain.backtesting.rules import canonicalize_rule_spec, describe_rule_spec
+from argus.domain.backtesting.rules import (
+    canonicalize_rule_spec,
+    describe_rule_spec,
+    explicit_signal_rule_intent_from_text,
+)
 from argus.domain.indicators import (
     executable_indicator_spec,
     normalize_indicator_parameters,
@@ -115,6 +122,22 @@ class ExecutableStrategyGroundingAudit(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
+class LatestResultRoutingAudit(BaseModel):
+    targets_latest_result: bool = Field(
+        description=(
+            "True when the current user message should be answered from the "
+            "latest completed result artifact instead of general capability copy."
+        )
+    )
+    focus: ResultFollowupFocus | None = Field(
+        default=None,
+        description=(
+            "Closest result follow-up focus when targets_latest_result is true."
+        ),
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
 class OpenRouterStructuredInterpreter:
     def __init__(
         self,
@@ -167,6 +190,16 @@ class OpenRouterStructuredInterpreter:
                         ),
                     )
             repaired_response = await _plan_pending_artifact_assumption_edit(
+                request=request,
+                preferred_model=candidate_models[0] if candidate_models else "",
+            )
+            if repaired_response is not None:
+                self.last_status = "fallback_used"
+                return self._to_runtime_interpretation(
+                    repaired_response,
+                    request=request,
+                )
+            repaired_response = await _focused_strategy_repair_after_candidate_failures(
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
             )
@@ -599,6 +632,17 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(response, request=request)
+    response = await _latest_result_routing_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if _response_targets_latest_result_followup(response=response, request=request):
+        return response
+    response = _augment_strategy_assets_from_resolvable_context(
+        response=response,
+        request=request,
+    )
     response = _clear_auto_simplified_strategy_when_rule_is_ambiguous(response)
     if _response_needs_signal_rule_plan(response):
         repaired_response = await _repair_incomplete_strategy_extraction(
@@ -668,6 +712,18 @@ async def _response_ready_for_runtime(
         raise ValueError(
             "OpenRouter unsupported clarification omitted recoverable artifact context"
         )
+    if _response_needs_structured_strategy_repair(response=response):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
     if _response_needs_testable_idea_repair(response=response, request=request):
         repaired_response = await _repair_incomplete_strategy_extraction(
             failed_response=response,
@@ -1000,9 +1056,16 @@ async def _recover_supported_signal_rule_from_draft_if_needed(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
-    if not _response_needs_supported_signal_rule_recovery(response):
+    if not _response_needs_supported_signal_rule_recovery(
+        response,
+        current_user_message=request.current_user_message,
+    ):
         return None
     planning_response = _supported_signal_rule_planning_response(response)
+    planning_response = _augment_signal_planning_context_from_message(
+        response=planning_response,
+        request=request,
+    )
     plan = await repair_signal_rule_plan(
         current_user_message=request.current_user_message,
         candidate_strategy=planning_response.candidate_strategy_draft.model_dump(
@@ -1021,6 +1084,8 @@ async def _recover_supported_signal_rule_from_draft_if_needed(
 
 def _response_needs_supported_signal_rule_recovery(
     response: LLMInterpretationResponse,
+    *,
+    current_user_message: str,
 ) -> bool:
     draft = response.candidate_strategy_draft
     if canonical_strategy_type(draft.strategy_type) == "signal_strategy":
@@ -1029,14 +1094,32 @@ def _response_needs_supported_signal_rule_recovery(
         return False
     if not (draft.raw_user_phrasing or draft.strategy_thesis):
         return False
-    if not (draft.asset_universe and draft.date_range):
+    if not _has_explicit_signal_rule_intent(
+        current_user_message,
+        draft.raw_user_phrasing,
+        draft.strategy_thesis,
+    ):
         return False
     if response.intent == "unsupported_or_out_of_scope":
+        return True
+    if response.requires_clarification and response.assistant_response:
         return True
     return any(
         item.category == "unsupported_strategy_logic"
         for item in response.unsupported_constraints
     )
+
+
+def _has_explicit_signal_rule_intent(*values: str | None) -> bool:
+    for value in values:
+        if not value:
+            continue
+        try:
+            if explicit_signal_rule_intent_from_text(value) is not None:
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def _supported_signal_rule_planning_response(
@@ -1058,6 +1141,317 @@ def _supported_signal_rule_planning_response(
         )
     )
     return planning
+
+
+def _augment_signal_planning_context_from_message(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    draft = response.candidate_strategy_draft
+    if draft.asset_universe:
+        return response
+    assets = _resolved_asset_mentions_from_message(request.current_user_message)
+    if not assets:
+        return response
+    repaired = response.model_copy(deep=True)
+    repaired_draft = repaired.candidate_strategy_draft
+    repaired_draft.asset_universe = [asset.canonical_symbol for asset in assets]
+    asset_classes = {asset.asset_class for asset in assets}
+    if len(asset_classes) == 1:
+        repaired_draft.asset_class = next(iter(asset_classes))
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "provider_catalog_asset_recovery",
+            ]
+        )
+    )
+    return repaired
+
+
+def _augment_strategy_assets_from_resolvable_context(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    draft = response.candidate_strategy_draft
+    if draft.asset_universe:
+        return response
+    if not _llm_strategy_draft_has_non_asset_strategy_anchor(draft):
+        return response
+    assets = _resolved_asset_mentions_from_values(request.current_user_message)
+    if not assets:
+        return response
+    repaired = response.model_copy(deep=True)
+    repaired_draft = repaired.candidate_strategy_draft
+    repaired_draft.asset_universe = [asset.canonical_symbol for asset in assets]
+    asset_classes = {asset.asset_class for asset in assets}
+    if len(asset_classes) == 1:
+        repaired_draft.asset_class = next(iter(asset_classes))
+    repaired.missing_required_fields = [
+        field
+        for field in repaired.missing_required_fields
+        if field != "asset_universe"
+    ]
+    repaired.ambiguous_fields = [
+        field
+        for field in repaired.ambiguous_fields
+        if field.field_name != "asset_universe"
+    ]
+    if (
+        repaired.requires_clarification
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+        and bool(canonical_strategy_type(repaired_draft.strategy_type))
+        and _llm_strategy_draft_has_extractable_fields(repaired_draft)
+        and not _llm_signal_strategy_is_underfilled(repaired_draft)
+    ):
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "provider_catalog_asset_recovery",
+            ]
+        )
+    )
+    return repaired
+
+
+def _resolved_asset_mentions_from_values(*values: str | None) -> list[Any]:
+    resolved_assets: list[Any] = []
+    seen: set[str] = set()
+    for value in values:
+        if not value:
+            continue
+        for asset in _resolved_asset_mentions_from_message(value):
+            symbol = asset.canonical_symbol
+            if symbol in seen:
+                continue
+            seen.add(symbol)
+            resolved_assets.append(asset)
+            if len(resolved_assets) >= 5:
+                return resolved_assets
+    return resolved_assets
+
+
+def _llm_strategy_draft_has_non_asset_strategy_anchor(
+    draft: LLMStrategyDraft,
+) -> bool:
+    return any(
+        [
+            bool(canonical_strategy_type(draft.strategy_type)),
+            bool(draft.cadence),
+            _llm_strategy_draft_has_rule_or_indicator_fields(draft),
+        ]
+    )
+
+
+def _resolved_asset_mentions_from_message(message: str) -> list[Any]:
+    resolved_assets: list[Any] = []
+    seen: set[str] = set()
+    for phrase in _asset_candidate_phrases(message):
+        try:
+            resolution = _resolve_asset_candidate(
+                phrase,
+                field=f"asset_universe[{len(resolved_assets)}]",
+                source="llm_extraction",
+            )
+        except ValueError:
+            continue
+        if resolution.status != "resolved" or resolution.asset is None:
+            continue
+        if not _candidate_text_supports_resolved_asset(phrase, resolution.asset):
+            continue
+        symbol = resolution.asset.canonical_symbol
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+        resolved_assets.append(resolution.asset)
+        if len(resolved_assets) >= 5:
+            break
+    return resolved_assets
+
+
+def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
+    candidate = str(phrase or "").strip()
+    if not candidate:
+        return False
+    tokens = _asset_candidate_tokens(candidate)
+    if not tokens:
+        return False
+    lowered_tokens = [token.lower() for token in tokens]
+    symbol_texts = _asset_symbol_texts(asset)
+    compact_candidate = _compact_asset_candidate(candidate)
+
+    if len(tokens) != 1:
+        name_words = set(_asset_name_tokens(getattr(asset, "name", "")))
+        meaningful_tokens = [
+            token
+            for token in lowered_tokens
+            if token not in _ASSET_CONTEXT_WORDS and len(token) >= 2
+        ]
+        if compact_candidate in symbol_texts and len(compact_candidate) >= 2:
+            return True
+        return bool(meaningful_tokens) and all(
+            token in name_words for token in meaningful_tokens
+        )
+
+    token = tokens[0]
+    lowered = token.lower()
+    if lowered in _ASSET_MENTION_NOISE_TOKENS:
+        return False
+    compact_token = _compact_asset_candidate(token)
+    if len(compact_token) < 2:
+        return False
+
+    name_words = {
+        word
+        for word in _asset_name_tokens(getattr(asset, "name", ""))
+        if len(word) >= 3
+    }
+    if lowered in name_words:
+        return True
+
+    if _token_has_uppercase_letter(token):
+        return compact_token in symbol_texts and len(compact_token) >= 2
+    if compact_token in symbol_texts and len(compact_token) >= 3:
+        return True
+    if getattr(asset, "asset_class", None) == "crypto" and compact_token in symbol_texts:
+        return True
+    return len(lowered) >= 4 and compact_token in symbol_texts
+
+
+_ASSET_CONTEXT_WORDS = {
+    "asset",
+    "coin",
+    "company",
+    "crypto",
+    "equity",
+    "etf",
+    "pair",
+    "share",
+    "shares",
+    "stock",
+    "ticker",
+    "token",
+}
+
+_ASSET_MENTION_NOISE_TOKENS = {
+    "above",
+    "bb",
+    "below",
+    "bollinger",
+    "buy",
+    "buying",
+    "cross",
+    "crossed",
+    "crosses",
+    "crossing",
+    "day",
+    "days",
+    "ema",
+    "for",
+    "from",
+    "hold",
+    "holding",
+    "last",
+    "macd",
+    "ma",
+    "month",
+    "months",
+    "over",
+    "past",
+    "rsi",
+    "sell",
+    "selling",
+    "sma",
+    "the",
+    "to",
+    "today",
+    "under",
+    "week",
+    "weeks",
+    "when",
+    "with",
+    "year",
+    "years",
+}
+
+
+def _asset_symbol_texts(asset: Any) -> set[str]:
+    values = {
+        str(getattr(asset, "canonical_symbol", "") or ""),
+        str(getattr(asset, "raw_symbol", "") or ""),
+    }
+    return {
+        compact
+        for value in values
+        if (compact := _compact_asset_candidate(value))
+    }
+
+
+def _compact_asset_candidate(value: str) -> str:
+    compact: list[str] = []
+    for char in str(value or "").lower():
+        if char.isalnum():
+            compact.append(char)
+    return "".join(compact)
+
+
+def _token_has_uppercase_letter(value: str) -> bool:
+    return any(char.isalpha() and char.isupper() for char in str(value or ""))
+
+
+def _asset_name_tokens(name: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    for char in str(name or "").lower():
+        if char.isalnum():
+            current.append(char)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
+
+
+def _asset_candidate_phrases(message: str) -> list[str]:
+    tokens = _asset_candidate_tokens(message)
+    phrases: list[str] = []
+    seen: set[str] = set()
+    max_window = min(3, len(tokens))
+    for window_size in range(max_window, 0, -1):
+        for start in range(0, len(tokens) - window_size + 1):
+            phrase = " ".join(tokens[start : start + window_size]).strip()
+            if not phrase or phrase in seen:
+                continue
+            if not any(char.isalpha() for char in phrase):
+                continue
+            seen.add(phrase)
+            phrases.append(phrase)
+    return phrases
+
+
+def _asset_candidate_tokens(message: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    for char in str(message or ""):
+        if char.isalnum() or char in {"/", "-"}:
+            current.append(char)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
 
 
 async def _repair_pending_signal_rule_answer_if_needed(
@@ -1470,6 +1864,39 @@ def _response_needs_testable_idea_repair(
     return False
 
 
+def _response_needs_structured_strategy_repair(
+    *,
+    response: LLMInterpretationResponse,
+) -> bool:
+    if not response.requires_clarification:
+        return False
+    if response.intent not in {
+        "strategy_drafting",
+        "backtest_execution",
+        "unsupported_or_out_of_scope",
+    }:
+        return False
+    if response.semantic_turn_act in {
+        "answer_pending_need",
+        "approval",
+        "refine_current_idea",
+        "result_followup",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return False
+    if response.unsupported_constraints:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type):
+        return False
+    if _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft):
+        return False
+    if not _llm_strategy_draft_has_extractable_fields(draft):
+        return False
+    return bool(draft.raw_user_phrasing or draft.strategy_thesis)
+
+
 def _llm_strategy_draft_has_semantic_execution_anchor(
     draft: LLMStrategyDraft,
 ) -> bool:
@@ -1496,6 +1923,9 @@ def _llm_strategy_draft_has_semantic_execution_anchor(
     )
 
 
+_EXECUTABLE_TIMEFRAMES = {"1h", "2h", "4h", "6h", "12h", "1D"}
+
+
 def _response_needs_launch_field_fidelity_repair(
     *,
     response: LLMInterpretationResponse,
@@ -1517,7 +1947,7 @@ def _response_needs_launch_field_fidelity_repair(
         return False
     draft = response.candidate_strategy_draft
     if not _llm_value_is_empty(draft.timeframe):
-        return True
+        return str(draft.timeframe).strip() in _EXECUTABLE_TIMEFRAMES
     asset_class = str(draft.asset_class or "").strip().lower()
     return asset_class in {"crypto", "currency_pair"} and not _llm_value_is_empty(
         draft.date_range
@@ -1570,6 +2000,7 @@ def _response_needs_executable_strategy_grounding_audit(
     if response.task_relation != "new_task":
         return False
     if response.semantic_turn_act in {
+        "answer_pending_need",
         "approval",
         "refine_current_idea",
         "retry_failed_action",
@@ -1578,6 +2009,8 @@ def _response_needs_executable_strategy_grounding_audit(
     }:
         return False
     if "executable_strategy_grounding_audit" in response.reason_codes:
+        return False
+    if _response_needs_launch_field_fidelity_repair(response=response):
         return False
     draft = response.candidate_strategy_draft
     if canonical_strategy_type(draft.strategy_type) not in {
@@ -1593,14 +2026,7 @@ def _response_needs_executable_strategy_grounding_audit(
 def _draft_has_non_executable_timeframe_label(draft: LLMStrategyDraft) -> bool:
     if _llm_value_is_empty(draft.timeframe):
         return False
-    return str(draft.timeframe).strip() not in {
-        "1h",
-        "2h",
-        "4h",
-        "6h",
-        "12h",
-        "1D",
-    }
+    return str(draft.timeframe).strip() not in _EXECUTABLE_TIMEFRAMES
 
 
 def _draft_uses_launch_default_window(draft: LLMStrategyDraft) -> bool:
@@ -1721,6 +2147,7 @@ def _response_needs_stated_run_field_fidelity_audit(
     if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     if response.semantic_turn_act in {
+        "answer_pending_need",
         "approval",
         "refine_current_idea",
         "retry_failed_action",
@@ -1730,6 +2157,7 @@ def _response_needs_stated_run_field_fidelity_audit(
         return False
     if "stated_run_field_fidelity_audit" in response.reason_codes:
         return False
+    draft = response.candidate_strategy_draft
     if not any(
         code in response.reason_codes
         for code in {
@@ -1738,12 +2166,33 @@ def _response_needs_stated_run_field_fidelity_audit(
             "focused_repair_preserved_structured_context",
         }
     ):
-        return False
-    draft = response.candidate_strategy_draft
+        return _ready_response_has_unreconciled_stated_run_fields(draft)
     if "focused_repair_from_unsupported_context" in response.reason_codes:
         return draft.capital_amount is None
     if "signal_rule_plan_repair" in response.reason_codes:
-        return draft.capital_amount is None
+        return any(
+            [
+                draft.capital_amount is None
+                and _draft_contains_structured_capital_context(draft),
+                _llm_value_is_empty(draft.timeframe)
+                and _draft_contains_structured_timeframe_context(draft),
+                _draft_contains_structured_date_context(draft),
+            ]
+        )
+    return any(
+        [
+            draft.capital_amount is None
+            and _draft_contains_structured_capital_context(draft),
+            _llm_value_is_empty(draft.timeframe)
+            and _draft_contains_structured_timeframe_context(draft),
+            _draft_contains_structured_date_context(draft),
+        ]
+    )
+
+
+def _ready_response_has_unreconciled_stated_run_fields(
+    draft: LLMStrategyDraft,
+) -> bool:
     return any(
         [
             draft.capital_amount is None
@@ -1758,7 +2207,13 @@ def _response_needs_stated_run_field_fidelity_audit(
 
 def _draft_contains_structured_capital_context(draft: LLMStrategyDraft) -> bool:
     text = _structured_draft_context_text(draft)
-    return "$" in text or "usd" in text.casefold()
+    folded = text.casefold()
+    if "$" in text or "usd" in folded or "dollar" in folded:
+        return True
+    for token in _field_fidelity_tokens(folded):
+        if token.endswith("k") and any(character.isdigit() for character in token):
+            return True
+    return False
 
 
 def _draft_contains_structured_timeframe_context(draft: LLMStrategyDraft) -> bool:
@@ -1774,13 +2229,181 @@ def _draft_contains_structured_date_context(draft: LLMStrategyDraft) -> bool:
     )
 
 
+def _field_fidelity_tokens(text: str) -> list[str]:
+    separators = ",.;:!?()[]{}"
+    cleaned = text
+    for separator in separators:
+        cleaned = cleaned.replace(separator, " ")
+    return [token for token in cleaned.split() if token]
+
+
 def _structured_draft_context_text(draft: LLMStrategyDraft) -> str:
     values = (
+        draft.raw_user_phrasing,
         draft.strategy_thesis,
         draft.entry_logic,
         draft.exit_logic,
     )
     return " ".join(str(value) for value in values if value)
+
+
+async def _latest_result_routing_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    if not _response_needs_latest_result_routing_audit(response, request=request):
+        return response
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=_latest_result_routing_audit_messages(
+                response=response,
+                request=request,
+            ),
+            schema_model=LatestResultRoutingAudit,
+            schema_name="LatestResultRoutingAudit",
+            model_name=preferred_model,
+        )
+    except Exception as exc:
+        log_openrouter_failure(
+            task="interpretation",
+            model_name=preferred_model,
+            exc=exc,
+            message=(
+                "Latest result routing audit failed; preserving primary "
+                "interpreter decision"
+            ),
+        )
+        return response
+    if not isinstance(audit, LatestResultRoutingAudit):
+        return response
+    if not audit.targets_latest_result or audit.confidence < 0.6:
+        return response
+    return response.model_copy(
+        update={
+            "intent": "conversation_followup",
+            "requires_clarification": False,
+            "missing_required_fields": [],
+            "assistant_response": None,
+            "semantic_turn_act": "result_followup",
+            "result_followup_focus": audit.focus or "general",
+            "capability_question_focus": None,
+            "uses_latest_result_context": True,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "latest_result_routing_audit",
+                    ]
+                )
+            ),
+        }
+    )
+
+
+def _response_needs_latest_result_routing_audit(
+    response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
+) -> bool:
+    if not _request_has_latest_result(request):
+        return False
+    if response.semantic_turn_act == "result_followup":
+        return response.result_followup_focus in (None, "general", "what_tested")
+    if response.intent == "results_explanation":
+        return False
+    if _llm_strategy_draft_has_executable_shape(response.candidate_strategy_draft):
+        return response.task_relation == "continue"
+    if _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
+        return True
+    return bool(
+        response.capability_question_focus is not None
+        or (
+            response.task_relation == "continue"
+            and response.assistant_response is None
+        )
+    )
+
+
+def _response_targets_latest_result_followup(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    return (
+        _request_has_latest_result(request)
+        and response.semantic_turn_act == "result_followup"
+    )
+
+
+def _latest_result_routing_audit_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's post-result routing audit. Decide whether the "
+                "current user message should be answered from the latest completed "
+                "result artifact or as a general product/capability question. "
+                "Choose targets_latest_result=true for questions about what "
+                "happened, what was tested, assumptions in the run, drawdown, "
+                "benchmark comparison, or what experiment to try next from the "
+                "latest result. Choose false for new investing ideas, beginner "
+                "education, and direct questions about Argus capabilities that do "
+                "not depend on the latest result. If the primary interpreter copied "
+                "symbols, dates, timeframe, or strategy labels out of the latest "
+                "result but did not produce a new executable rule, treat that as "
+                "latest-result context rather than a new strategy. Use "
+                "why_underperformed for questions that ask why a result matched, "
+                "beat, lagged, or compared with its benchmark; use what_tested only "
+                "when the user is asking for the run setup itself."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Latest result fact bank JSON: "
+                + json.dumps(_latest_result_fact_bank_for_routing(request))
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Primary interpreter decision JSON: " + response.model_dump_json()
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _latest_result_fact_bank_for_routing(
+    request: InterpretationRequest,
+) -> dict[str, str]:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return {}
+    metadata = dict(snapshot.latest_backtest_result_reference.metadata)
+    fact_bank = result_followup_fact_bank(metadata)
+    return {
+        key: fact_bank[key]
+        for key in (
+            "symbols",
+            "strategy",
+            "date_range",
+            "total_return",
+            "benchmark_symbol",
+            "benchmark_return",
+            "benchmark_delta",
+            "max_drawdown",
+            "runnable_next_tests",
+        )
+        if key in fact_bank
+    }
 
 
 def _stated_run_field_fidelity_messages(
@@ -1830,11 +2453,14 @@ def _response_from_stated_run_field_fidelity_audit(
     if audit.timeframe and draft.timeframe != audit.timeframe:
         draft.timeframe = audit.timeframe
         changed = True
-    if audit.date_range not in (None, "", [], {}) and _llm_value_is_empty(
-        draft.date_range
-    ):
-        draft.date_range = audit.date_range
-        changed = True
+    if audit.date_range not in (None, "", [], {}):
+        date_range, date_changed = _date_range_with_fidelity_audit(
+            current=draft.date_range,
+            audited=audit.date_range,
+        )
+        if date_changed:
+            draft.date_range = date_range
+            changed = True
     if not changed:
         return None
     repaired.reason_codes = list(
@@ -1846,6 +2472,60 @@ def _response_from_stated_run_field_fidelity_audit(
         )
     )
     return repaired
+
+
+def _normalized_stated_field(value: Any) -> str:
+    if isinstance(value, dict):
+        return json.dumps(value, sort_keys=True, default=str)
+    return str(value or "").strip()
+
+
+def _date_range_with_fidelity_audit(
+    *,
+    current: Any,
+    audited: Any,
+) -> tuple[Any, bool]:
+    if _llm_value_is_empty(current):
+        return audited, True
+    if _normalized_stated_field(audited) == _normalized_stated_field(current):
+        return current, False
+    if isinstance(current, dict) and isinstance(audited, dict):
+        merged = dict(current)
+        changed = False
+        for key, audited_value in audited.items():
+            if audited_value in (None, "", [], {}):
+                continue
+            current_value = merged.get(key)
+            if current_value not in (None, "", [], {}) and _date_value_is_less_specific(
+                audited_value,
+                current_value,
+            ):
+                continue
+            if _normalized_stated_field(current_value) != _normalized_stated_field(
+                audited_value
+            ):
+                merged[key] = audited_value
+                changed = True
+        return merged, changed
+    if isinstance(audited, dict):
+        return audited, True
+    return current, False
+
+
+def _date_value_is_less_specific(candidate: Any, existing: Any) -> bool:
+    candidate_text = str(candidate or "").strip()
+    existing_text = str(existing or "").strip()
+    if not candidate_text or not existing_text:
+        return False
+    if candidate_text.casefold() in {"today", "current", "now"}:
+        return False
+    if existing_text.casefold() in {"today", "current", "now"}:
+        return True
+    candidate_digits = sum(1 for char in candidate_text if char.isdigit())
+    existing_digits = sum(1 for char in existing_text if char.isdigit())
+    return candidate_digits < existing_digits and existing_text.startswith(
+        candidate_text
+    )
 
 
 def _focused_strategy_extraction_has_material_fields(
@@ -1879,6 +2559,11 @@ def _strategy_extraction_repair_is_allowed(
 ) -> bool:
     if response.task_relation == "refine":
         return False
+    if response.semantic_turn_act == "unsupported_request":
+        return (
+            response.intent == "unsupported_or_out_of_scope"
+            and not response.unsupported_constraints
+        )
     return response.semantic_turn_act not in {
         "refine_current_idea",
         "answer_pending_need",
@@ -1886,6 +2571,30 @@ def _strategy_extraction_repair_is_allowed(
         "retry_failed_action",
         "result_followup",
     }
+
+
+async def _focused_strategy_repair_after_candidate_failures(
+    *,
+    request: InterpretationRequest,
+    preferred_model: str,
+) -> LLMInterpretationResponse | None:
+    seed_response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=request.current_user_message,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=request.current_user_message,
+            strategy_thesis=request.current_user_message,
+        ),
+        reason_codes=["structured_interpretation_candidates_failed"],
+        semantic_turn_act="new_idea",
+    )
+    return await _repair_incomplete_strategy_extraction(
+        failed_response=seed_response,
+        preferred_model=preferred_model,
+        request=request,
+    )
 
 
 def _focused_strategy_extraction_messages(
@@ -2371,6 +3080,35 @@ def _llm_strategy_draft_has_rule_or_indicator_fields(
     )
 
 
+def _llm_strategy_draft_has_structured_rule_or_indicator_fields(
+    draft: LLMStrategyDraft,
+) -> bool:
+    return any(
+        [
+            bool(draft.entry_rule),
+            bool(draft.exit_rule),
+            bool(draft.rule_spec),
+            bool(draft.indicator),
+            draft.indicator_period is not None,
+            draft.entry_threshold is not None,
+            draft.exit_threshold is not None,
+        ]
+    )
+
+
+def _llm_strategy_draft_has_executable_shape(draft: LLMStrategyDraft) -> bool:
+    strategy_type = canonical_strategy_type(draft.strategy_type)
+    if strategy_type == "buy_and_hold":
+        return bool(draft.asset_universe or draft.date_range)
+    if strategy_type == "dca":
+        return bool(draft.cadence)
+    if strategy_type == "signal_strategy":
+        return _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
+    return bool(
+        draft.cadence or _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
+    )
+
+
 def _llm_signal_strategy_is_underfilled(draft: LLMStrategyDraft) -> bool:
     if canonical_strategy_type(draft.strategy_type) != "signal_strategy":
         return False
@@ -2622,10 +3360,6 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         )
         merged_indicator_parameters.update(indicator_parameters)
         extra_parameters["indicator_parameters"] = merged_indicator_parameters
-    if field_provenance:
-        payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
-            field_provenance
-        )
     capital_parameters = {
         "initial_capital": initial_capital,
         "total_capital": total_capital,
@@ -2638,6 +3372,19 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
                 extra_parameters[key] = value
         if payload.get("capital_amount") is None and recurring_contribution is not None:
             payload["capital_amount"] = recurring_contribution
+        if payload.get("capital_amount") is None:
+            starting_capital = _non_dca_starting_capital_from_total_fields(
+                payload=payload,
+                initial_capital=initial_capital,
+                total_capital=total_capital,
+            )
+            if starting_capital is not None:
+                payload["capital_amount"] = starting_capital
+                field_provenance["capital_amount"] = "starting_capital"
+    if field_provenance:
+        payload.setdefault("extra_parameters", {})["field_provenance"] = dict(
+            field_provenance
+        )
     payload["date_range"] = normalize_date_range_candidate(
         payload.get("date_range"),
         raw_user_phrasing=payload.get("raw_user_phrasing"),
@@ -2651,6 +3398,17 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         for rule in draft.risk_rules
     ]
     return StrategySummary.model_validate(payload)
+
+
+def _non_dca_starting_capital_from_total_fields(
+    *,
+    payload: dict[str, Any],
+    initial_capital: Any,
+    total_capital: Any,
+) -> Any:
+    if canonical_strategy_type(payload.get("strategy_type")) == "dca_accumulation":
+        return None
+    return initial_capital if initial_capital is not None else total_capital
 
 
 def _grounded_initial_capital(
@@ -3101,18 +3859,10 @@ def _indicator_key_from_strategy(strategy: StrategySummary) -> str | None:
 
 
 def _unsupported_from_llm(item: LLMUnsupportedConstraint) -> UnsupportedConstraint:
-    explanation = item.explanation
-    if (
-        item.category == "unsupported_indicator_rule"
-        and not explanation.lower().startswith("i understand")
-    ):
-        explanation = (
-            "I understand the indicator rule, but "
-            + explanation[0].lower()
-            + explanation[1:]
-            if explanation
-            else "I understand the indicator rule, but Argus cannot execute that exact rule yet."
-        )
+    explanation = item.explanation or (
+        "That exact indicator rule is not executable yet, but Argus can reframe it "
+        "into a supported historical test."
+    )
     return UnsupportedConstraint(
         category=item.category,
         raw_value=item.raw_value,

@@ -19,6 +19,17 @@ def test_resolve_date_range_accepts_month_name_ranges() -> None:
     assert resolved.display == "January 1, 2010 - December 31, 2020"
 
 
+def test_resolve_date_range_accepts_month_year_to_today() -> None:
+    resolved = resolve_date_range(
+        "January 2022 to today",
+        today=date(2026, 5, 20),
+    )
+
+    assert resolved.payload == {"start": "2022-01-01", "end": "2026-05-20"}
+    assert resolved.display == "January 1, 2022 - May 20, 2026"
+    assert resolved.used_default is False
+
+
 def test_normalize_date_range_preserves_structured_month_name_ranges() -> None:
     normalized = normalize_date_range_candidate(
         {"start": "2020-02-07", "end": "2024-02-07"},

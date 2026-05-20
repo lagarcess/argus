@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from types import SimpleNamespace
 
@@ -6,7 +7,7 @@ from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.recovery.policy import should_retry
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.execute import execute_stage
-from argus.agent_runtime.stages.explain import explain_stage
+from argus.agent_runtime.stages.explain import explain_stage, explain_stage_async
 from argus.agent_runtime.stages.interpret import InterpretationRequest
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import (
@@ -1165,7 +1166,7 @@ def test_explain_stage_uses_result_payload_without_fabricating() -> None:
     assert "9.0%" in result.patch["assistant_response"]
     assert "Buy Tesla on pullbacks" in result.patch["assistant_response"]
     assert "return comparison only" in result.patch["assistant_response"]
-    assert "**Keep in mind:**" in result.patch["assistant_response"]
+    assert "Keep in mind:" in result.patch["assistant_response"]
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "same period" not in result.patch["assistant_response"].lower()
     assert "because" not in result.patch["assistant_response"].lower()
@@ -1379,7 +1380,7 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     assert result.outcome == "ready_to_respond"
     assert result.patch["assistant_response"].startswith("**Quick take**")
     assert (
-        "**Tested:** the confirmed strategy: Test a Tesla pullback idea."
+        "Tested: the confirmed strategy: Test a Tesla pullback idea."
         in result.patch["assistant_response"]
     )
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
@@ -1387,6 +1388,109 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     assert (
         "return comparison, not causal attribution" in result.patch["assistant_response"]
     )
+
+
+@pytest.mark.asyncio
+async def test_explain_stage_async_limits_llm_next_checks_to_supported_contract(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    captured: dict[str, object] = {}
+
+    async def fake_chat_completion(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return "The run lagged the benchmark.\n\n- Next check: adjust the signal periods."
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_chat_completion",
+        fake_chat_completion,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "signal_strategy",
+            "strategy_thesis": "Test TSLA with a 50/200 crossover",
+            "asset_universe": ["TSLA"],
+            "date_range": {"start": "2022-01-01", "end": "2026-05-20"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": -0.326, "benchmark_return": 0.552}
+    }
+
+    result = await explain_stage_async(state=state)
+
+    assert result.stage_patch["assistant_response"].startswith("**Quick take**")
+    assert "adjust the signal periods" in result.stage_patch["assistant_response"]
+    messages = captured["messages"]
+    assert isinstance(messages, list)
+    system_prompt = messages[0]["content"]
+    assert "allowed_next_experiments" in system_prompt
+    context = json.loads(messages[1]["content"])
+    allowed_kinds = {
+        option["kind"] for option in context["allowed_next_experiments"]
+    }
+    assert "adjust_signal_periods" in allowed_kinds
+    assert "trend_filter" not in allowed_kinds
+    assert "volatility_stop" not in allowed_kinds
+
+
+@pytest.mark.asyncio
+async def test_explain_stage_async_sends_benchmark_contract_for_grounded_comparison(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    captured: dict[str, object] = {}
+
+    async def fake_chat_completion(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return "The strategy lagged SPY.\n\n- Next check: adjust the signal periods."
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_chat_completion",
+        fake_chat_completion,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "signal_strategy",
+            "strategy_thesis": "Test TSLA with a 50/200 crossover",
+            "asset_universe": ["TSLA"],
+            "date_range": {"start": "2022-01-01", "end": "2026-05-20"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": -0.326, "benchmark_return": 0.552},
+        "explanation_context": {
+            "benchmark_symbol": "SPY",
+            "result_card": {
+                "benchmark_symbol": "SPY",
+                "context_packet_ids": ["packet-1"],
+            },
+        },
+    }
+
+    await explain_stage_async(state=state)
+
+    messages = captured["messages"]
+    assert isinstance(messages, list)
+    system_prompt = messages[0]["content"]
+    assert "Benchmark returns belong only to benchmark_contract.benchmark_symbol" in (
+        system_prompt
+    )
+    context = json.loads(messages[1]["content"])
+    assert context["benchmark_contract"] == {
+        "benchmark_symbol": "SPY",
+        "tested_symbols": ["TSLA"],
+        "benchmark_is_tested_asset": False,
+    }
+    assert captured["context_packet_ids"] == ["packet-1"]
 
 
 def test_explain_stage_varies_with_expertise_mode() -> None:
@@ -1424,9 +1528,9 @@ def test_explain_stage_varies_with_expertise_mode() -> None:
         "evidence check"
         in beginner_result.patch["assistant_response"].lower()
     )
-    assert "**keep in mind:**" in beginner_result.patch["assistant_response"].lower()
+    assert "keep in mind:" in beginner_result.patch["assistant_response"].lower()
     assert "return comparison only" in advanced_result.patch["assistant_response"].lower()
-    assert "**keep in mind:**" in advanced_result.patch["assistant_response"].lower()
+    assert "keep in mind:" in advanced_result.patch["assistant_response"].lower()
 
 
 def test_explain_stage_deterministic_fallback_avoids_report_tone() -> None:
@@ -1449,7 +1553,7 @@ def test_explain_stage_deterministic_fallback_avoids_report_tone() -> None:
     assert response.startswith("**Quick take**")
     assert "**Interpretation:**" not in response
     assert "**Caveat:**" not in response
-    assert "**Keep in mind:**" in response
+    assert "Keep in mind:" in response
 
 
 def test_explain_stage_uses_same_period_only_when_context_supports_it() -> None:

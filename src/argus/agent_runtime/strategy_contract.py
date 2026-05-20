@@ -260,7 +260,7 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         relative = _relative_period(normalized, today=current_date)
         if relative is not None:
             return relative
-        natural_explicit = _explicit_natural_range(normalized)
+        natural_explicit = _explicit_natural_range(normalized, today=current_date)
         if natural_explicit is not None:
             return natural_explicit
 
@@ -540,29 +540,36 @@ def _explicit_iso_range(value: str) -> DateRangeResolution | None:
     )
 
 
-def _explicit_natural_range(value: str) -> DateRangeResolution | None:
+def _explicit_natural_range(
+    value: str,
+    *,
+    today: date,
+) -> DateRangeResolution | None:
     tokens = _tokens(value)
     start: date | None = None
     end: date | None = None
     connectors = {"to", "through", "until", "till"}
-    for index in range(0, max(len(tokens) - 5, 0)):
-        candidate_start = _build_natural_date(
-            tokens[index],
-            tokens[index + 1],
-            tokens[index + 2],
+    for index in range(0, len(tokens)):
+        start_candidate = _natural_endpoint_candidate(
+            tokens,
+            index,
+            today=today,
+            endpoint="start",
         )
-        if candidate_start is None:
+        if start_candidate is None:
             continue
-        end_index = index + 4 if tokens[index + 3] in connectors else index + 3
-        if end_index + 2 >= len(tokens):
+        candidate_start, next_index = start_candidate
+        if next_index >= len(tokens) or tokens[next_index] not in connectors:
             continue
-        candidate_end = _build_natural_date(
-            tokens[end_index],
-            tokens[end_index + 1],
-            tokens[end_index + 2],
+        end_candidate = _natural_endpoint_candidate(
+            tokens,
+            next_index + 1,
+            today=today,
+            endpoint="end",
         )
-        if candidate_end is None:
+        if end_candidate is None:
             continue
+        candidate_end, _ = end_candidate
         start = candidate_start
         end = candidate_end
         break
@@ -573,6 +580,58 @@ def _explicit_natural_range(value: str) -> DateRangeResolution | None:
         start=start,
         end=end,
     )
+
+
+def _natural_endpoint_candidate(
+    tokens: list[str],
+    index: int,
+    *,
+    today: date,
+    endpoint: str,
+) -> tuple[date, int] | None:
+    if index >= len(tokens):
+        return None
+    token = tokens[index]
+    if token in {"today", "now", "present"}:
+        return today, index + 1
+    if index + 2 < len(tokens):
+        natural = _build_natural_date(tokens[index], tokens[index + 1], tokens[index + 2])
+        if natural is not None:
+            return natural, index + 3
+    if index + 1 < len(tokens):
+        month_year = _build_month_year_date(
+            tokens[index],
+            tokens[index + 1],
+            endpoint=endpoint,
+        )
+        if month_year is not None:
+            return month_year, index + 2
+    return None
+
+
+def _build_month_year_date(
+    month_value: Any,
+    year_value: Any,
+    *,
+    endpoint: str,
+) -> date | None:
+    month = MONTH_ALIASES.get(str(month_value or "").lower())
+    year = _int_or_none(year_value)
+    if month is None or year is None:
+        return None
+    day = 1 if endpoint == "start" else _last_day_of_month(year, month)
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _last_day_of_month(year: int, month: int) -> int:
+    if month == 12:
+        next_month = date(year + 1, 1, 1)
+    else:
+        next_month = date(year, month + 1, 1)
+    return (next_month - timedelta(days=1)).day
 
 
 def _parse_natural_date(value: str) -> date | None:

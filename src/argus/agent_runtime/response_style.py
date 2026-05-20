@@ -14,3 +14,24 @@ ARGUS_RESPONSE_STYLE_CONTRACT = (
 
 def argus_response_style_contract() -> str:
     return ARGUS_RESPONSE_STYLE_CONTRACT
+
+
+def with_response_heading(*, heading: str, body: str | None) -> str:
+    """Add lightweight presentation chrome without owning the assistant language."""
+
+    cleaned_heading = " ".join(str(heading or "").split()).strip()
+    cleaned_body = str(body or "").strip()
+    if not cleaned_heading or not cleaned_body:
+        return cleaned_body
+    markdown_heading = f"**{cleaned_heading}**"
+    if cleaned_body.startswith(markdown_heading) or cleaned_body.startswith("#"):
+        return cleaned_body
+    return f"{markdown_heading}\n\n{cleaned_body}"
+
+
+def result_followup_heading(focus: str | None) -> str:
+    if focus == "next_experiment":
+        return "Try next"
+    if focus == "max_drawdown":
+        return "Drawdown"
+    return "Readout"

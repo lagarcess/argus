@@ -64,6 +64,14 @@ class ResultFollowupDraft(BaseModel):
             "required_fact_id and do not invent IDs."
         )
     )
+    next_experiment_option_kinds: list[str] = Field(
+        default_factory=list,
+        description=(
+            "For next_experiment focus, optional supported option kinds copied from "
+            "next_experiment_options. The runtime renders option labels from the "
+            "structured fact bank, not from freeform text."
+        ),
+    )
 
 
 async def compose_result_followup_response(
@@ -220,8 +228,12 @@ def result_followup_llm_messages(
                 "they feel repetitive. Do not invent fact ids. Do not expose fact_bank "
                 "keys or schema names in the answer, including benchmark_delta, "
                 "total_return, max_drawdown, context_packet_facts, fact_ids, or "
-                "relative_performance_claim; translate them into plain language. Set "
-                "the first sentence as a plain takeaway, not a metric recap. For "
+                "relative_performance_claim; translate them into plain language. Fact "
+                "IDs are grounding metadata; they do not mean every fact needs to be "
+                "recited in the user-visible answer. Choose the one or two numbers "
+                "that best answer the question unless the user explicitly asks for a "
+                "full breakdown. Set the first sentence as a plain takeaway, not a "
+                "metric recap. For "
                 "why/how follow-ups, use one or two short paragraphs: first say what "
                 "the simulation shows, then say what it cannot prove. Do not write "
                 "like a report abstract. For next-experiment follow-ups, use a short "
@@ -378,6 +390,11 @@ def render_result_followup_draft(
     body = normalize_text(body)
     if not body:
         return None
+    if focus == "next_experiment":
+        return render_next_experiment_followup(
+            draft=draft,
+            fact_bank=fact_bank,
+        )
     rendered = body
     max_words = 360 if fact_bank.get("context_packet_facts") else 240
     if len(rendered.split()) > max_words:
@@ -609,14 +626,7 @@ def required_result_followup_fact_ids(
             if fact_id in fact_bank:
                 required.add(fact_id)
     elif focus == "why_underperformed":
-        for fact_id in (
-            "relative_performance",
-            "total_return",
-            "benchmark_symbol",
-            "benchmark_return",
-            "benchmark_delta",
-            "execution_note",
-        ):
+        for fact_id in ("relative_performance", "execution_note"):
             if fact_id in fact_bank:
                 required.add(fact_id)
         if has_context_facts:
@@ -682,11 +692,53 @@ def fallback_next_experiment_response(fact_bank: dict[str, str]) -> str:
         bullets = "\n".join(
             f"- {_ensure_sentence(_sentence_case(option))}" for option in options[:3]
         )
-        return "The next useful move is to isolate one assumption.\n\n" + bullets
+        return "A good next move is to isolate one assumption.\n\n" + bullets
     return _ensure_sentence(clean_fragment(fact_bank["runnable_next_tests"]))
 
 
-def structured_next_experiment_labels(fact_bank: dict[str, str]) -> list[str]:
+def render_next_experiment_followup(
+    *,
+    draft: ResultFollowupDraft,
+    fact_bank: dict[str, str],
+) -> str | None:
+    options = structured_next_experiment_options(fact_bank)
+    if not options:
+        return None
+    selected_options = selected_next_experiment_options(
+        options=options,
+        selected_kinds=draft.next_experiment_option_kinds,
+    )
+    if not selected_options:
+        selected_options = options[:3]
+    bullets = "\n".join(
+        f"- {_ensure_sentence(_sentence_case(str(option['label'])))}"
+        for option in selected_options[:3]
+    )
+    return "A good next move is to isolate one assumption.\n\n" + bullets
+
+
+def selected_next_experiment_options(
+    *,
+    options: list[dict[str, Any]],
+    selected_kinds: list[str],
+) -> list[dict[str, Any]]:
+    by_kind = {
+        str(option.get("kind") or ""): option
+        for option in options
+        if str(option.get("kind") or "")
+    }
+    selected: list[dict[str, Any]] = []
+    for kind_value in selected_kinds:
+        kind = str(kind_value or "").strip()
+        option = by_kind.get(kind)
+        if option is not None and option not in selected:
+            selected.append(option)
+    return selected
+
+
+def structured_next_experiment_options(
+    fact_bank: dict[str, str],
+) -> list[dict[str, Any]]:
     raw_options = fact_bank.get("next_experiment_options")
     if not raw_options:
         return []
@@ -696,12 +748,29 @@ def structured_next_experiment_labels(fact_bank: dict[str, str]) -> list[str]:
         return []
     if not isinstance(parsed, list):
         return []
-    labels: list[str] = []
+    options: list[dict[str, Any]] = []
     for option in parsed:
         if not isinstance(option, dict):
             continue
         if option.get("contract") != "supported_backtest_experiment":
             continue
+        label = clean_fragment(option.get("label"))
+        kind = clean_fragment(option.get("kind"))
+        if not label or not kind:
+            continue
+        options.append(
+            {
+                "kind": kind,
+                "label": label,
+                "contract": "supported_backtest_experiment",
+            }
+        )
+    return options
+
+
+def structured_next_experiment_labels(fact_bank: dict[str, str]) -> list[str]:
+    labels: list[str] = []
+    for option in structured_next_experiment_options(fact_bank):
         label = clean_fragment(option.get("label"))
         if label and label not in labels:
             labels.append(label)
@@ -722,7 +791,10 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
     benchmark_return = fact_bank.get("benchmark_return")
     benchmark_delta = fact_bank.get("benchmark_delta")
     delta_number = as_float(benchmark_delta)
-    if delta_number is not None and delta_number > 0:
+    relative_performance = fact_bank.get("relative_performance")
+    if relative_performance:
+        intro = _ensure_sentence(relative_performance)
+    elif delta_number is not None and delta_number > 0:
         if benchmark:
             intro = f"{symbols} beat {benchmark} in this run."
         else:
@@ -733,38 +805,47 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
         else:
             intro = f"{symbols} lagged the benchmark in this run."
     else:
-        intro = "Here is the performance context for this run."
+        intro = "This run mostly tells us how the confirmed setup behaved."
+    pieces = [intro]
     strategy_phrase = strategy_run_phrase(strategy)
-    context = f"The run used {article_for(strategy_phrase)} {strategy_phrase} on {symbols}"
+    context_parts = [f"{article_for(strategy_phrase)} {strategy_phrase} on {symbols}"]
     if date_range:
-        context += f" over {date_range}"
-    pieces = [intro, context + "."]
-    if total_return:
-        pieces.append(f"The strategy returned {total_return}.")
-    if benchmark and benchmark_return:
-        pieces.append(f"{benchmark} returned {benchmark_return}.")
-    elif benchmark:
-        pieces.append(f"The benchmark was {benchmark}.")
+        context_parts.append(f"over {date_range}")
+    pieces.append("The setup was " + " ".join(context_parts) + ".")
+    same_asset_benchmark = symbols_match_benchmark(symbols, benchmark)
+    if same_asset_benchmark and strategy == "buy and hold" and benchmark:
+        if total_return:
+            pieces.append(f"It returned {total_return}.")
+        pieces.append(
+            f"Because the benchmark was also {benchmark}, this is mainly the "
+            "asset's move over the window, not a separate strategy edge."
+        )
+    else:
+        if total_return:
+            pieces.append(f"The strategy returned {total_return}.")
+        if benchmark and benchmark_return:
+            pieces.append(f"{benchmark} returned {benchmark_return}.")
+        elif benchmark:
+            pieces.append(f"The benchmark was {benchmark}.")
     if benchmark_delta:
         pieces.append(f"The gap versus the benchmark was {benchmark_delta}.")
     if fact_bank.get("max_drawdown"):
         pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
     if delta_number is not None and delta_number < 0:
         pieces.append(
-            "For this kind of historical comparison, that mainly says the chosen "
-            "asset and holding window were weaker than the benchmark; it is not "
-            "causal proof by itself."
+            "The useful read is that this confirmed rule did not keep up over that "
+            "window; the run does not prove why."
         )
     elif delta_number is not None and delta_number > 0:
         pieces.append(
-            "That is a relative-performance fact from the run, not proof that the "
-            "same edge would persist."
+            "That is a relative-performance fact from the run, not proof the same "
+            "edge would persist."
         )
     if fact_bank.get("execution_note"):
         pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
     append_context_backdrop(pieces, fact_bank)
     if fact_bank.get("caveat"):
-        pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
+        pieces.append("Use it as historical simulation evidence, not a prediction or recommendation.")
     return " ".join(piece.strip() for piece in pieces if piece.strip())
 
 
@@ -773,7 +854,7 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
     strategy = fact_bank.get("strategy") or "strategy"
     strategy_phrase = strategy_run_phrase(strategy)
     pieces = [
-        f"I still have the latest run: {symbols} with {article_for(strategy_phrase)} {strategy_phrase}.",
+        f"I’ve got the latest run: {symbols} with {article_for(strategy_phrase)} {strategy_phrase}.",
     ]
     if fact_bank.get("date_range"):
         pieces.append(f"Period: {fact_bank['date_range']}.")
@@ -792,10 +873,17 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
     if fact_bank.get("execution_note"):
         pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
     append_context_backdrop(pieces, fact_bank)
-    if fact_bank.get("runnable_next_tests"):
+    labels = structured_next_experiment_labels(fact_bank)
+    if labels:
+        pieces.append(
+            "A useful next step would be to "
+            + clean_fragment(labels[0]).lower()
+            + "."
+        )
+    elif fact_bank.get("runnable_next_tests"):
         pieces.append(_ensure_sentence(clean_fragment(fact_bank["runnable_next_tests"])))
     if fact_bank.get("caveat"):
-        pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
+        pieces.append("Use it as historical simulation evidence, not a prediction or recommendation.")
     response = " ".join(piece.strip() for piece in pieces if piece.strip())
     return normalize_text(response) or None
 
@@ -803,14 +891,28 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
 def append_context_backdrop(pieces: list[str], fact_bank: dict[str, str]) -> None:
     if fact_bank.get("context_packet_facts"):
         pieces.append(
-            "Context backdrop: " + clean_fragment(fact_bank["context_packet_facts"]) + "."
+            "Careful backdrop: "
+            + first_context_fragment(fact_bank["context_packet_facts"])
+            + ". It can frame a follow-up question, but it does not prove "
+            "causality or change the simulated trades."
         )
-    if fact_bank.get("context_packet_limitations"):
-        pieces.append(
-            "Context limits: "
-            + clean_fragment(fact_bank["context_packet_limitations"])
-            + "."
-        )
+    elif fact_bank.get("context_packet_limitations"):
+        pieces.append(clean_fragment(fact_bank["context_packet_limitations"]) + ".")
+
+
+def symbols_match_benchmark(symbols: str, benchmark: str | None) -> bool:
+    if not symbols or not benchmark:
+        return False
+    normalized_symbols = symbols.replace(" ", "").upper()
+    normalized_benchmark = benchmark.strip().upper()
+    return normalized_symbols == normalized_benchmark
+
+
+def first_context_fragment(value: str) -> str:
+    text = clean_fragment(value)
+    if "; " in text:
+        text = text.split("; ", 1)[0]
+    return text
 
 
 def fallback_what_tested_response(fact_bank: dict[str, str]) -> str:

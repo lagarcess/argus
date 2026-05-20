@@ -265,6 +265,56 @@ describe("chat artifact history", () => {
     expect(normalized.actions).toEqual([]);
   });
 
+  test("normalization marks a run action complete once the result card exists", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+    const result: Message = {
+      id: "assistant-result",
+      role: "ai",
+      kind: "strategy_result",
+      result: {
+        strategyName: "AAPL buy and hold",
+        period: "past year",
+        metrics: [],
+      },
+    };
+
+    const [normalizedConfirmation] = normalizeConfirmationHistory([running, result]);
+
+    expect(normalizedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
+    expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
+    expect(normalizedConfirmation.actions).toEqual([]);
+  });
+
+  test("hydration closes active confirmation as complete when a result follows it", () => {
+    const result: Message = {
+      id: "assistant-result",
+      role: "ai",
+      kind: "strategy_result",
+      result: {
+        strategyName: "AAPL buy and hold",
+        period: "past year",
+        metrics: [],
+      },
+    };
+
+    const [normalizedConfirmation] = normalizeConfirmationHistory([
+      confirmationMessage(),
+      result,
+    ]);
+
+    expect(normalizedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
+    expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
+    expect(normalizedConfirmation.actions).toEqual([]);
+  });
+
   test("specific action effects beat broad fallback effects during hydration", () => {
     const [message] = applyConfirmationActionEffects([confirmationMessage()], [
       {

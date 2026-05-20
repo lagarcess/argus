@@ -86,7 +86,7 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
     "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
     "result_summary": OpenRouterProfile(
-        "result_summary", temperature=0.2, max_tokens=1600
+        "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=10
     ),
     "result_breakdown": OpenRouterProfile(
         "result_breakdown",
@@ -171,11 +171,11 @@ def resolve_openrouter_structured_model(
     *,
     task: OpenRouterTask = "interpretation",
 ) -> str:
-    candidates = openrouter_structured_model_candidates(model_name, task=task)
+    candidates = openrouter_model_candidates(model_name, task=task)
     return candidates[0] if candidates else ""
 
 
-def openrouter_structured_model_candidates(
+def openrouter_model_candidates(
     model_name: str | None = None,
     *,
     task: OpenRouterTask = "interpretation",
@@ -186,6 +186,14 @@ def openrouter_structured_model_candidates(
     return _unique_nonempty(
         [_env_model_value(name) for name in _TIER_CANDIDATE_ENV[tier]]
     )
+
+
+def openrouter_structured_model_candidates(
+    model_name: str | None = None,
+    *,
+    task: OpenRouterTask = "interpretation",
+) -> list[str]:
+    return openrouter_model_candidates(model_name, task=task)
 
 
 def _env_model_value(name: str) -> str:
@@ -418,6 +426,7 @@ async def invoke_openrouter_chat_completion(
     task: OpenRouterTask,
     messages: list[dict[str, str]],
     model_name: str | None = None,
+    context_packet_ids: list[str] | None = None,
 ) -> str | None:
     started_at = time.perf_counter()
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -431,11 +440,12 @@ async def invoke_openrouter_chat_completion(
             latency_ms=_elapsed_ms(started_at),
             outcome="skipped",
             failure_mode="missing_api_key",
+            context_packet_ids=context_packet_ids,
         )
         return None
 
-    resolved_model = resolve_openrouter_model(model_name, task=task)
-    if not resolved_model:
+    candidate_models = openrouter_model_candidates(model_name, task=task)
+    if not candidate_models:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
         record_openrouter_route_receipt(
             task=task,
@@ -445,59 +455,82 @@ async def invoke_openrouter_chat_completion(
             latency_ms=_elapsed_ms(started_at),
             outcome="skipped",
             failure_mode="missing_model",
+            context_packet_ids=context_packet_ids,
         )
         return None
 
     profile = OPENROUTER_PROFILES[task]
-    payload: dict[str, object] = {
-        "model": resolved_model,
-        "messages": messages,
-        "temperature": profile.temperature,
-        "max_tokens": profile.max_tokens,
-    }
-    try:
-        async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
-            response = await _post_openrouter_json_schema(
-                client=client,
-                api_key=api_key,
-                payload=payload,
+    last_exc: Exception | None = None
+    for index, candidate_model in enumerate(candidate_models):
+        attempt_started_at = time.perf_counter()
+        payload: dict[str, object] = {
+            "model": candidate_model,
+            "messages": messages,
+            "temperature": profile.temperature,
+            "max_tokens": profile.max_tokens,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
+                response = await _post_openrouter_json_schema(
+                    client=client,
+                    api_key=api_key,
+                    payload=payload,
+                )
+                data = response.json()
+                _raise_openrouter_payload_error(data)
+        except Exception as exc:
+            last_exc = exc
+            record_openrouter_route_receipt(
+                task=task,
+                model_name=candidate_model,
+                mode="chat_model",
+                schema_name=None,
+                latency_ms=_elapsed_ms(attempt_started_at),
+                outcome="failed",
+                failure_mode=type(exc).__name__,
+                context_packet_ids=context_packet_ids,
             )
-            data = response.json()
-            _raise_openrouter_payload_error(data)
-    except Exception as exc:
+            if index + 1 < len(candidate_models):
+                log_openrouter_failure(
+                    task=task,
+                    model_name=candidate_model,
+                    exc=exc,
+                    message="Chat completion failed; trying next configured model",
+                )
+                continue
+            raise
+
+        content = _openrouter_message_content(data).strip()
+        token_usage = openrouter_token_usage_from_payload(data)
+        if not content:
+            record_openrouter_route_receipt(
+                task=task,
+                model_name=candidate_model,
+                mode="chat_model",
+                schema_name=None,
+                latency_ms=_elapsed_ms(attempt_started_at),
+                outcome="failed",
+                failure_mode="empty_response",
+                token_usage=token_usage,
+                context_packet_ids=context_packet_ids,
+            )
+            if index + 1 < len(candidate_models):
+                continue
+            return None
         record_openrouter_route_receipt(
             task=task,
-            model_name=resolved_model,
+            model_name=candidate_model,
             mode="chat_model",
             schema_name=None,
-            latency_ms=_elapsed_ms(started_at),
-            outcome="failed",
-            failure_mode=type(exc).__name__,
+            latency_ms=_elapsed_ms(attempt_started_at),
+            outcome="succeeded",
+            token_usage=token_usage,
+            context_packet_ids=context_packet_ids,
         )
-        raise
-    content = _openrouter_message_content(data).strip()
-    if not content:
-        record_openrouter_route_receipt(
-            task=task,
-            model_name=resolved_model,
-            mode="chat_model",
-            schema_name=None,
-            latency_ms=_elapsed_ms(started_at),
-            outcome="failed",
-            failure_mode="empty_response",
-            token_usage=openrouter_token_usage_from_payload(data),
-        )
-        return None
-    record_openrouter_route_receipt(
-        task=task,
-        model_name=resolved_model,
-        mode="chat_model",
-        schema_name=None,
-        latency_ms=_elapsed_ms(started_at),
-        outcome="succeeded",
-        token_usage=openrouter_token_usage_from_payload(data),
-    )
-    return content
+        return content
+    if last_exc is not None:
+        raise last_exc
+    return None
 
 
 def invoke_openrouter_json_schema_sync(

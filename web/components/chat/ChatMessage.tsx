@@ -228,7 +228,7 @@ export default function ChatMessage({
             <div className="w-full max-w-[min(100%,660px)]">
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
             </div>
-          ) : message.contentPresentation === "result_breakdown" ? (
+          ) : message.contentPresentation === "result_breakdown" && message.content?.trim() ? (
             <ResultBreakdown content={message.content ?? ""} />
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">

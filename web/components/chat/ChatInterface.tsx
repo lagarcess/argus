@@ -73,6 +73,7 @@ type OnboardingChoice = {
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
+const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 
 type HydratedMessages = {
   messages: Message[];
@@ -88,6 +89,17 @@ function readActiveConversationId() {
   }
 }
 
+function readActiveConversationIdFromUrl() {
+  if (typeof window === "undefined") return null;
+  try {
+    const url = new URL(window.location.href);
+    const conversationId = url.searchParams.get(ACTIVE_CONVERSATION_QUERY_KEY);
+    return conversationId?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 function persistActiveConversationId(conversationId: string) {
   if (typeof window === "undefined") return;
   try {
@@ -97,6 +109,26 @@ function persistActiveConversationId(conversationId: string) {
   }
 }
 
+function persistActiveConversationRoute(conversationId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (url.pathname !== "/chat") return;
+    if (url.searchParams.get(ACTIVE_CONVERSATION_QUERY_KEY) === conversationId) {
+      return;
+    }
+    url.searchParams.set(ACTIVE_CONVERSATION_QUERY_KEY, conversationId);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+  } catch {
+    // URL state is a convenience for reload recovery; chat still works without it.
+  }
+}
+
+function rememberActiveConversationId(conversationId: string) {
+  persistActiveConversationId(conversationId);
+  persistActiveConversationRoute(conversationId);
+}
+
 function clearActiveConversationId() {
   if (typeof window === "undefined") return;
   try {
@@ -104,6 +136,29 @@ function clearActiveConversationId() {
   } catch {
     // Storage can be unavailable in restricted browser contexts.
   }
+}
+
+function clearActiveConversationRoute() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (url.pathname !== "/chat") return;
+    if (!url.searchParams.has(ACTIVE_CONVERSATION_QUERY_KEY)) return;
+    url.searchParams.delete(ACTIVE_CONVERSATION_QUERY_KEY);
+    const query = url.searchParams.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      query ? `${url.pathname}?${query}` : url.pathname,
+    );
+  } catch {
+    // URL state is optional recovery metadata.
+  }
+}
+
+function clearActiveConversationPointer() {
+  clearActiveConversationId();
+  clearActiveConversationRoute();
 }
 
 function latestInputActions(messages: Message[]) {
@@ -705,12 +760,13 @@ export default function ChatInterface() {
           await i18n.changeLanguage(resolvedLanguage);
         }
         const stage = meResponse?.user?.onboarding?.stage;
-        const activeConversationId = readActiveConversationId();
+        const activeConversationId = readActiveConversationIdFromUrl() ?? readActiveConversationId();
         if (activeConversationId) {
           try {
             const { items } = await getConversationMessages(activeConversationId, 50);
             if (cancelled) return;
             const hydrated = hydrateMessagesFromApi(items);
+            rememberActiveConversationId(activeConversationId);
             setConversationId(activeConversationId);
             setMessages(hydrated.messages);
             setInputActions(hydrated.inputActions);
@@ -721,13 +777,13 @@ export default function ChatInterface() {
 
             return;
           } catch {
-            clearActiveConversationId();
+            clearActiveConversationPointer();
           }
         }
 
         const { conversation } = await createConversation(resolvedLanguage);
         if (cancelled) return;
-        persistActiveConversationId(conversation.id);
+        rememberActiveConversationId(conversation.id);
         setConversationId(conversation.id);
         setMessages([]);
         setShowOnboardingGoalCards(
@@ -783,7 +839,7 @@ export default function ChatInterface() {
     setIsSidebarOpen(false);
     closeChatOptions();
     setCurrentView("chat");
-    persistActiveConversationId(convId);
+    rememberActiveConversationId(convId);
     setConversationId(convId);
     setMessages([]);
     setInputActions([]);
@@ -853,7 +909,7 @@ export default function ChatInterface() {
   const startNewChat = async () => {
     try {
       const { conversation } = await createConversation(i18n.language);
-      persistActiveConversationId(conversation.id);
+      rememberActiveConversationId(conversation.id);
       setConversationId(conversation.id);
       setIsSidebarOpen(false);
       setCurrentView("chat");
@@ -913,10 +969,18 @@ export default function ChatInterface() {
     actionArg?: ChatActionOption,
   ) => {
     const trimmed = text.trim();
-    if (!trimmed || !conversationId) return;
+    if (!trimmed) return;
+    const routeConversationId = readActiveConversationIdFromUrl();
+    const targetConversationId = routeConversationId ?? conversationId;
+    if (!targetConversationId) return;
     if (isStreamingResponse) return;
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
+
+    if (targetConversationId !== conversationId) {
+      rememberActiveConversationId(targetConversationId);
+      setConversationId(targetConversationId);
+    }
 
     setIsSidebarOpen(false);
     shouldAutoScrollRef.current = true;
@@ -1105,13 +1169,13 @@ export default function ChatInterface() {
       );
 
     try {
-      await streamToConversation(conversationId);
+      await streamToConversation(targetConversationId);
     } catch (err: unknown) {
       if (err instanceof ChatStreamError && err.status === 404 && !action?.type) {
         try {
-          clearActiveConversationId();
+          clearActiveConversationPointer();
           const { conversation } = await createConversation(i18n.language);
-          persistActiveConversationId(conversation.id);
+          rememberActiveConversationId(conversation.id);
           setConversationId(conversation.id);
           await streamToConversation(conversation.id);
           return;

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import json
-import time
 from typing import Any
 
-from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
+from argus.agent_runtime.response_style import (
+    ARGUS_RESPONSE_STYLE_CONTRACT,
+    with_response_heading,
+)
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     ConfirmationPayload,
@@ -19,15 +20,8 @@ from argus.domain.engine_launch.result_facts import (
 from argus.domain.engine_launch.result_facts import (
     resolved_rule_summary as result_rule_summary,
 )
-from argus.llm.openrouter import (
-    build_openrouter_model,
-    log_openrouter_failure,
-    merge_openrouter_token_usage,
-    openrouter_task_timeout_seconds,
-    openrouter_token_usage_from_message,
-    record_openrouter_route_receipt,
-)
-from langchain_core.messages import HumanMessage, SystemMessage
+from argus.domain.engine_launch.result_facts import structured_next_experiments
+from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 
 def explain_stage(*, state: RunState) -> StageResult:
@@ -59,33 +53,41 @@ def explain_stage(*, state: RunState) -> StageResult:
         explanation_context=explanation_context,
     )
     if total_return is None or benchmark_return is None:
+        response = _build_incomplete_result_response(
+            profile=profile,
+            tested_summary=tested_summary,
+            assumption_summary=assumption_summary,
+            caveat=caveat,
+            execution_note=execution_note,
+            rule_summary=rule_summary,
+        )
         return StageResult(
             outcome="ready_to_respond",
             stage_patch={
-                "assistant_response": _build_incomplete_result_response(
-                    profile=profile,
-                    tested_summary=tested_summary,
-                    assumption_summary=assumption_summary,
-                    caveat=caveat,
-                    execution_note=execution_note,
-                    rule_summary=rule_summary,
+                "assistant_response": with_response_heading(
+                    heading="Quick take",
+                    body=response,
                 )
             },
         )
+    response = _build_response(
+        total_return=total_return,
+        benchmark_return=benchmark_return,
+        same_period=same_period,
+        profile=profile,
+        tested_summary=tested_summary,
+        assumption_summary=assumption_summary,
+        caveat=caveat,
+        execution_note=execution_note,
+        rule_summary=rule_summary,
+    )
 
     return StageResult(
         outcome="ready_to_respond",
         stage_patch={
-            "assistant_response": _build_response(
-                total_return=total_return,
-                benchmark_return=benchmark_return,
-                same_period=same_period,
-                profile=profile,
-                tested_summary=tested_summary,
-                assumption_summary=assumption_summary,
-                caveat=caveat,
-                execution_note=execution_note,
-                rule_summary=rule_summary,
+            "assistant_response": with_response_heading(
+                heading="Quick take",
+                body=response,
             )
         },
     )
@@ -97,26 +99,29 @@ async def explain_stage_async(*, state: RunState) -> StageResult:
     if not isinstance(fallback_text, str) or not fallback_text:
         return fallback
 
-    streamed_text = await _stream_llm_explanation(
+    llm_text = await _llm_explanation(
         state=state,
         fallback_text=fallback_text,
     )
-    if streamed_text is None:
+    if llm_text is None:
         return fallback
     return StageResult(
         outcome=fallback.outcome,
-        stage_patch={**fallback.stage_patch, "assistant_response": streamed_text},
+        stage_patch={
+            **fallback.stage_patch,
+            "assistant_response": with_response_heading(
+                heading="Quick take",
+                body=llm_text,
+            ),
+        },
     )
 
 
-async def _stream_llm_explanation(
+async def _llm_explanation(
     *,
     state: RunState,
     fallback_text: str,
 ) -> str | None:
-    model = build_openrouter_model("result_summary")
-    if model is None:
-        return None
     strategy = _strategy_payload(state)
     result_payload = _result_payload(state)
     explanation_context = _explanation_context(state)
@@ -133,6 +138,12 @@ async def _stream_llm_explanation(
         ),
         "execution_note": result_execution_note(result_facts),
         "rule_summary": result_rule_summary(result_facts),
+        "allowed_next_experiments": structured_next_experiments(result_facts),
+        "benchmark_contract": _benchmark_contract(
+            strategy=strategy,
+            result_payload=result_payload,
+            explanation_context=explanation_context,
+        ),
         "strategy": _canonical_strategy_context(strategy),
         "result": result_payload,
         "explanation_context": explanation_context,
@@ -140,8 +151,9 @@ async def _stream_llm_explanation(
         "language": "use the user's current language preference if available",
     }
     messages = [
-        SystemMessage(
-            content=(
+        {
+            "role": "system",
+            "content": (
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 "You are Argus explaining a completed historical backtest. "
                 "Use only the supplied metrics and assumptions. Keep the response "
@@ -152,87 +164,121 @@ async def _stream_llm_explanation(
                 "If rule_summary is present, include it in the Test bullet. "
                 "If execution_note is present, include it because it explains a "
                 "flat or no-trade result. "
-                "Format the answer as markdown: a bold 'Quick take' label, one short "
-                "takeaway paragraph, then 3 to 5 bullets for Tested, Signal when "
-                "execution_note is present, Next check for no-trade results, "
-                "Assumptions, and Keep in mind. Keep it under 120 words. "
+                "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
+                "If that symbol differs from the tested asset, never describe the "
+                "benchmark return as buy-and-hold or holding the tested asset; say "
+                "the benchmark symbol returned it instead. "
+                "Format the answer like a short chat response, not a report: one "
+                "plain-English takeaway sentence, then 2 to 4 compact bullets for "
+                "what was tested, the main assumption, and a useful next check. "
+                "The next check must come from allowed_next_experiments when that "
+                "list is non-empty. Do not suggest unsupported filters, stops, "
+                "position sizing, external sentiment, or other mechanics not present "
+                "in allowed_next_experiments. "
+                "Do not add your own heading; the runtime adds a short presentation "
+                "label. Keep it under 120 words. "
                 "For no-trade results, say the strategy stayed in cash instead of "
                 "using dramatic market timing language. "
                 "Do not restate every result-card metric; interpret what matters."
-            )
-        ),
-        HumanMessage(content=json.dumps(context, default=str, sort_keys=True)),
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(context, default=str, sort_keys=True),
+        },
     ]
-    started_at = time.perf_counter()
     try:
-        chunks, token_usage = await asyncio.wait_for(
-            _collect_stream_chunks(model, messages),
-            timeout=openrouter_task_timeout_seconds("result_summary"),
+        return await invoke_openrouter_chat_completion(
+            task="result_summary",
+            messages=messages,
+            context_packet_ids=_context_packet_ids_from_explanation_context(
+                explanation_context
+            ),
         )
     except Exception as exc:
-        record_openrouter_route_receipt(
-            task="result_summary",
-            model_name=None,
-            mode="chat_model",
-            schema_name=None,
-            latency_ms=_elapsed_ms(started_at),
-            outcome="failed",
-            failure_mode=type(exc).__name__,
-        )
-        log_openrouter_failure(
-            task="result_summary",
-            model_name=None,
-            exc=exc,
-            message="Result explanation streaming failed; using deterministic fallback",
-        )
+        # The OpenRouter helper records per-model route receipts. This local fallback
+        # only preserves a recoverable answer when every configured model fails.
+        _ = exc
         return None
-    text = "".join(chunks).strip()
-    record_openrouter_route_receipt(
-        task="result_summary",
-        model_name=None,
-        mode="chat_model",
-        schema_name=None,
-        latency_ms=_elapsed_ms(started_at),
-        outcome="succeeded" if text else "failed",
-        failure_mode=None if text else "empty_response",
-        token_usage=token_usage,
+
+
+def _context_packet_ids_from_explanation_context(
+    explanation_context: dict[str, Any],
+) -> list[str]:
+    result_card = explanation_context.get("result_card")
+    candidates: list[Any] = [explanation_context.get("context_packet_ids")]
+    if isinstance(result_card, dict):
+        candidates.append(result_card.get("context_packet_ids"))
+    packet_ids: list[str] = []
+    for candidate in candidates:
+        values = candidate if isinstance(candidate, list) else [candidate]
+        for value in values:
+            packet_id = str(value or "").strip()
+            if packet_id and packet_id not in packet_ids:
+                packet_ids.append(packet_id)
+    return packet_ids
+
+
+def _benchmark_contract(
+    *,
+    strategy: dict[str, Any],
+    result_payload: dict[str, Any],
+    explanation_context: dict[str, Any],
+) -> dict[str, Any]:
+    tested_symbols = _symbol_list(strategy.get("asset_universe"))
+    benchmark_symbol = _first_symbol(
+        explanation_context.get("benchmark_symbol"),
+        result_payload.get("benchmark_symbol"),
+        _nested_dict_value(explanation_context, ("result_card", "benchmark_symbol")),
+        _nested_dict_value(explanation_context, ("benchmark_metrics", "symbol")),
+        _nested_dict_value(
+            explanation_context,
+            ("benchmark_metrics", "benchmark_symbol"),
+        ),
+        _nested_dict_value(explanation_context, ("config_snapshot", "benchmark_symbol")),
+        _nested_dict_value(result_payload, ("benchmark_metrics", "symbol")),
+        _nested_dict_value(result_payload, ("benchmark_metrics", "benchmark_symbol")),
     )
-    return text or None
+    tested_symbol_set = set(tested_symbols)
+    return {
+        "benchmark_symbol": benchmark_symbol,
+        "tested_symbols": tested_symbols,
+        "benchmark_is_tested_asset": bool(
+            benchmark_symbol and benchmark_symbol in tested_symbol_set
+        ),
+    }
 
 
-async def _collect_stream_chunks(
-    model: Any, messages: list[Any]
-) -> tuple[list[str], dict[str, int] | None]:
-    chunks: list[str] = []
-    token_usage: dict[str, int] | None = None
-    async for chunk in model.astream(messages):
-        token_usage = merge_openrouter_token_usage(
-            token_usage,
-            openrouter_token_usage_from_message(chunk),
-        )
-        content = _chunk_content(chunk)
-        if content:
-            chunks.append(content)
-    return chunks, token_usage
+def _symbol_list(value: Any) -> list[str]:
+    values = value if isinstance(value, list) else [value]
+    symbols: list[str] = []
+    for item in values:
+        symbol = _clean_symbol(item)
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+    return symbols
 
 
-def _chunk_content(chunk: Any) -> str:
-    content = getattr(chunk, "content", "")
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict) and isinstance(item.get("text"), str):
-                parts.append(item["text"])
-        return "".join(parts)
+def _first_symbol(*values: Any) -> str:
+    for value in values:
+        symbol = _clean_symbol(value)
+        if symbol:
+            return symbol
     return ""
 
 
-def _elapsed_ms(started_at: float) -> int:
-    return int((time.perf_counter() - started_at) * 1000)
+def _clean_symbol(value: Any) -> str:
+    symbol = str(value or "").strip().upper()
+    return symbol
+
+
+def _nested_dict_value(payload: Any, path: tuple[str, ...]) -> Any:
+    current = payload
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
 
 
 def _result_payload(state: RunState) -> dict[str, Any]:
@@ -506,22 +552,20 @@ def _result_readout_markdown(
     )
     tested = _tested_readout_line(tested_summary, rule_summary)
     lines = [
-        "**Quick take**",
-        "",
         takeaway,
         "",
-        f"- **Tested:** {tested}.",
+        f"- Tested: {tested}.",
     ]
     if execution_note:
-        lines.append(f"- **Signal:** {_compact_execution_note(execution_note)}")
+        lines.append(f"- Signal: {_compact_execution_note(execution_note)}")
     else:
-        lines.append(f"- **What that means:** {interpretation}")
+        lines.append(f"- What that means: {interpretation}")
     next_check = _next_check_line(execution_note=execution_note)
     if next_check:
-        lines.append(f"- **Next check:** {next_check}")
+        lines.append(f"- Next check: {next_check}")
     if assumption_summary:
-        lines.append(f"- **Assumptions:** {_strip_leading_label(assumption_summary)}")
-    lines.append(f"- **Keep in mind:** {caveat}")
+        lines.append(f"- Assumptions: {_strip_leading_label(assumption_summary)}")
+    lines.append(f"- Keep in mind: {caveat}")
     return "\n".join(lines)
 
 

@@ -4,7 +4,6 @@ from datetime import date
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_interpreter import (
-    FocusedStrategyExtraction,
     LLMInterpretationResponse,
     LLMRiskRule,
     LLMStrategyDraft,
@@ -658,38 +657,40 @@ async def test_underfilled_explicit_ma_crossover_is_normalized_without_model(
 
 
 @pytest.mark.asyncio
-async def test_money_only_underfilled_strategy_uses_focused_repair(
+async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
-    async def fake_focused_repair(**kwargs):
-        assert kwargs["schema_model"] is FocusedStrategyExtraction
-        return FocusedStrategyExtraction(
-            is_testable_strategy=True,
-            requires_clarification=False,
-            user_goal_summary="Test Tesla with a 50/200 moving-average crossover.",
-            strategy_type="signal_strategy",
-            strategy_thesis="Test Tesla with a 50/200 moving-average crossover.",
-            asset_universe=["TSLA"],
-            asset_class="equity",
-            date_range={"start": "2022-01-01", "end": "today"},
-            capital_amount=10000,
-            entry_rule={
-                "type": "moving_average_crossover",
-                "fast_indicator": "sma",
-                "fast_period": 50,
-                "slow_indicator": "sma",
-                "slow_period": 200,
-                "direction": "bullish",
-            },
-            exit_logic="50-day SMA crosses below 200-day SMA",
-        )
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        if symbol.lower() == "tesla":
+            return ResolvedAssetStub("TSLA", "equity", "Tesla Inc.", "TSLA")
+        raise ValueError("invalid_symbol")
+
+    async def field_fidelity_audit_stub(*, response, request, **kwargs):
+        del kwargs
+        assert "January 2022" in request.current_user_message
+        repaired = response.model_copy(deep=True)
+        repaired.candidate_strategy_draft.date_range = {
+            "start": "2022-01-01",
+            "end": "today",
+        }
+        repaired.reason_codes = [
+            *repaired.reason_codes,
+            "stated_run_field_fidelity_audit",
+        ]
+        return repaired
 
     monkeypatch.setattr(
         interpreter_module,
-        "invoke_openrouter_json_schema",
-        fake_focused_repair,
+        "resolve_asset",
+        resolve_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_stated_run_field_fidelity",
+        field_fidelity_audit_stub,
+        raising=False,
     )
 
     response = LLMInterpretationResponse(
@@ -730,6 +731,7 @@ async def test_money_only_underfilled_strategy_uses_focused_repair(
     draft = repaired.candidate_strategy_draft
     assert repaired.intent == "backtest_execution"
     assert repaired.requires_clarification is False
+    assert "signal_rule_plan_repair" in repaired.reason_codes
     assert draft.asset_universe == ["TSLA"]
     assert draft.date_range == {"start": "2022-01-01", "end": "today"}
     assert draft.capital_amount == 10000
@@ -739,45 +741,331 @@ async def test_money_only_underfilled_strategy_uses_focused_repair(
 
 
 @pytest.mark.asyncio
-async def test_unsupported_supported_rule_classification_gets_focused_repair(
+async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime import signal_rule_repair as repair_module
+
+    async def fail_if_model_called(**kwargs):
+        raise AssertionError("plain 50/200 crossover should use supported rule grammar")
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        if symbol.lower() == "tesla":
+            return ResolvedAssetStub("TSLA", "equity", "Tesla Inc.", "TSLA")
+        raise ValueError("invalid_symbol")
+
+    async def field_fidelity_audit_stub(*, response, request, **kwargs):
+        del kwargs
+        assert "January 2022" in request.current_user_message
+        repaired = response.model_copy(deep=True)
+        repaired.candidate_strategy_draft.date_range = {
+            "start": "2022-01-01",
+            "end": "today",
+        }
+        repaired.reason_codes = [
+            *repaired.reason_codes,
+            "stated_run_field_fidelity_audit",
+        ]
+        return repaired
+
+    monkeypatch.setattr(
+        repair_module,
+        "invoke_openrouter_json_schema",
+        fail_if_model_called,
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_stated_run_field_fidelity",
+        field_fidelity_audit_stub,
+        raising=False,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User asked for a 50/200 crossover test on Tesla.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            strategy_thesis=(
+                "The user wants to backtest a moving average crossover strategy "
+                "on Tesla stock from January 2022 to today with a $10,000 capital."
+            ),
+            capital_amount=10000,
+        ),
+        assistant_response=(
+            "I can't run a full 50/200 moving-average crossover yet."
+        ),
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = repaired.candidate_strategy_draft
+    assert repaired.intent == "backtest_execution"
+    assert repaired.requires_clarification is False
+    assert repaired.assistant_response is None
+    assert "provider_catalog_asset_recovery" in repaired.reason_codes
+    assert "signal_rule_plan_repair" in repaired.reason_codes
+    assert draft.strategy_type == "signal_strategy"
+    assert draft.asset_universe == ["TSLA"]
+    assert draft.asset_class == "equity"
+    assert draft.date_range == {"start": "2022-01-01", "end": "today"}
+    assert draft.capital_amount == 10000
+    assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"
+    assert draft.exit_logic == "50-day SMA crosses below 200-day SMA"
+
+
+@pytest.mark.asyncio
+async def test_structured_signal_draft_recovers_missing_asset_from_context(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime import signal_rule_repair as repair_module
+
+    async def fail_if_model_called(**kwargs):
+        del kwargs
+        raise AssertionError("catalog-backed asset recovery should not need a model")
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        if symbol.lower() in {"tesla", "tsla"}:
+            return ResolvedAssetStub("TSLA", "equity", "Tesla Inc.", "TSLA")
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fail_if_model_called,
+    )
+    monkeypatch.setattr(
+        repair_module,
+        "invoke_openrouter_json_schema",
+        fail_if_model_called,
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary=(
+            "Backtest a 50/200 moving-average crossover for Tesla."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="signal_strategy",
+            raw_user_phrasing=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            strategy_thesis=(
+                "Backtest a moving-average crossover strategy for Tesla (TSLA) "
+                "where entry occurs when the 50-day SMA crosses above the "
+                "200-day SMA between January 2022 and today, starting with "
+                "$10,000 capital."
+            ),
+            date_range={"start": "2022-01-01", "end": "today"},
+            capital_amount=10000,
+            entry_rule={
+                "type": "moving_average_crossover",
+                "direction": "bullish",
+                "fast_period": 50,
+                "slow_period": 200,
+                "fast_indicator": "sma",
+                "slow_indicator": "sma",
+            },
+            exit_rule={
+                "type": "moving_average_crossover",
+                "direction": "bearish",
+                "fast_period": 50,
+                "slow_period": 200,
+                "fast_indicator": "sma",
+                "slow_indicator": "sma",
+            },
+        ),
+        missing_required_fields=["asset_universe"],
+        assistant_response=(
+            "Just to confirm, are you testing this on TSLA stock?"
+        ),
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = repaired.candidate_strategy_draft
+    assert repaired.intent == "backtest_execution"
+    assert repaired.requires_clarification is False
+    assert repaired.assistant_response is None
+    assert repaired.missing_required_fields == []
+    assert "provider_catalog_asset_recovery" in repaired.reason_codes
+    assert draft.asset_universe == ["TSLA"]
+    assert draft.asset_class == "equity"
+    assert draft.entry_rule and draft.exit_rule
+
+
+@pytest.mark.asyncio
+async def test_structured_signal_draft_rejects_catalog_matches_not_supported_by_user_text(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+    from argus.agent_runtime import signal_rule_repair as repair_module
+
+    async def fail_if_model_called(**kwargs):
+        del kwargs
+        raise AssertionError("catalog-backed asset filtering should not need a model")
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        # Simulates a permissive provider catalog: any noisy phrase could resolve
+        # to a real asset, but recovery must only accept assets grounded in the
+        # user's actual words.
+        compact = "".join(char for char in str(symbol).upper() if char.isalnum())
+        if compact == "MA":
+            return ResolvedAssetStub("MA", "equity", "Mastercard Incorporated", "MA")
+        provider_symbol = compact[:4] or "NOPE"
+        return ResolvedAssetStub(
+            provider_symbol,
+            "equity",
+            "Unrelated Corp",
+            provider_symbol,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fail_if_model_called,
+    )
+    monkeypatch.setattr(
+        repair_module,
+        "invoke_openrouter_json_schema",
+        fail_if_model_called,
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Backtest a 50/200 moving-average crossover.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="signal_strategy",
+            raw_user_phrasing="buy when the 50 crosses the 200",
+            strategy_thesis=(
+                "Buy when the short-term trend (50-day MA) crosses above "
+                "the long-term trend (200-day MA)."
+            ),
+            entry_rule={
+                "type": "moving_average_crossover",
+                "direction": "bullish",
+                "fast_period": 50,
+                "slow_period": 200,
+                "fast_indicator": "sma",
+                "slow_indicator": "sma",
+            },
+            exit_rule={
+                "type": "moving_average_crossover",
+                "direction": "bearish",
+                "fast_period": 50,
+                "slow_period": 200,
+                "fast_indicator": "sma",
+                "slow_indicator": "sma",
+            },
+        ),
+        missing_required_fields=["asset_universe", "date_range"],
+        assistant_response="Which asset should I test?",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="buy when the 50 crosses the 200",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = repaired.candidate_strategy_draft
+    assert draft.asset_universe == []
+    assert draft.asset_class is None
+    assert "asset_universe" in repaired.missing_required_fields
+    assert "provider_catalog_asset_recovery" not in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_unsupported_supported_rule_classification_gets_signal_rule_repair(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     calls: list[str] = []
 
-    async def repair_stub(*, failed_response, request, **kwargs):
-        del kwargs
-        calls.append("focused_strategy_extraction")
-        return interpreter_module._response_from_focused_strategy_extraction(
-            extraction=interpreter_module.FocusedStrategyExtraction(
-                is_testable_strategy=True,
-                requires_clarification=False,
-                user_goal_summary="Test Tesla with a 50/200 moving-average crossover.",
-                strategy_type="signal_strategy",
-                strategy_thesis="Test Tesla with a 50/200 moving-average crossover.",
-                asset_universe=["TSLA"],
-                asset_class="equity",
-                date_range={"start": "2022-01-01", "end": "today"},
-                capital_amount=10000,
-                entry_rule={
-                    "type": "moving_average_crossover",
-                    "fast_indicator": "sma",
-                    "fast_period": 50,
-                    "slow_indicator": "sma",
-                    "slow_period": 200,
-                    "direction": "bullish",
-                },
-                exit_logic="50-day SMA crosses below 200-day SMA",
-            ),
-            request=request,
-            base_response=failed_response,
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        if symbol.lower() in {"tesla", "tsla"}:
+            return ResolvedAssetStub("TSLA", "equity", "Tesla Inc.", "TSLA")
+        raise ValueError("invalid_symbol")
+
+    async def plan_stub(**kwargs):
+        calls.append("signal_rule_plan")
+        intent = explicit_signal_rule_intent_from_text(kwargs["current_user_message"])
+        assert intent is not None
+        return SignalRulePlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="Test Tesla with a 50/200 moving-average crossover.",
+            strategy_thesis="Test Tesla with a 50/200 moving-average crossover.",
+            entry_logic=intent.entry_logic,
+            exit_logic=intent.exit_logic,
+            rule_spec=intent.rule_spec,
+            confidence=intent.confidence,
         )
 
+    async def field_fidelity_audit_stub(*, response, request, **kwargs):
+        del kwargs
+        calls.append("field_fidelity_audit")
+        repaired = response.model_copy(deep=True)
+        repaired.candidate_strategy_draft.date_range = {
+            "start": "2022-01-01",
+            "end": "today",
+        }
+        repaired.reason_codes = [
+            *repaired.reason_codes,
+            "stated_run_field_fidelity_audit",
+        ]
+        return repaired
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(interpreter_module, "repair_signal_rule_plan", plan_stub)
     monkeypatch.setattr(
         interpreter_module,
-        "_repair_incomplete_strategy_extraction",
-        repair_stub,
+        "_audit_stated_run_field_fidelity",
+        field_fidelity_audit_stub,
+        raising=False,
     )
 
     response = LLMInterpretationResponse(
@@ -819,7 +1107,7 @@ async def test_unsupported_supported_rule_classification_gets_focused_repair(
     )
 
     draft = repaired.candidate_strategy_draft
-    assert calls == ["focused_strategy_extraction"]
+    assert calls == ["signal_rule_plan", "field_fidelity_audit"]
     assert repaired.intent == "backtest_execution"
     assert repaired.requires_clarification is False
     assert repaired.unsupported_constraints == []
@@ -839,33 +1127,25 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
 
     calls: list[str] = []
 
-    async def repair_stub(*, failed_response, request, **kwargs):
-        del kwargs
-        calls.append("focused_strategy_extraction")
-        return interpreter_module._response_from_focused_strategy_extraction(
-            extraction=interpreter_module.FocusedStrategyExtraction(
-                is_testable_strategy=True,
-                requires_clarification=False,
-                user_goal_summary="Test Tesla with a 50/200 moving-average crossover.",
-                strategy_type="signal_strategy",
-                strategy_thesis=(
-                    "Test Tesla with a 50/200 moving-average crossover using $10,000."
-                ),
-                asset_universe=["TSLA"],
-                asset_class="equity",
-                date_range={"start": "2022-01-01", "end": "today"},
-                entry_rule={
-                    "type": "moving_average_crossover",
-                    "fast_indicator": "sma",
-                    "fast_period": 50,
-                    "slow_indicator": "sma",
-                    "slow_period": 200,
-                    "direction": "bullish",
-                },
-                exit_logic="50-day SMA crosses below 200-day SMA",
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        if symbol.lower() in {"tesla", "tsla"}:
+            return ResolvedAssetStub("TSLA", "equity", "Tesla Inc.", "TSLA")
+        raise ValueError("invalid_symbol")
+
+    async def plan_stub(**kwargs):
+        calls.append("signal_rule_plan")
+        intent = explicit_signal_rule_intent_from_text(kwargs["current_user_message"])
+        assert intent is not None
+        return SignalRulePlan(
+            outcome="ready_to_confirm",
+            user_goal_summary="Test Tesla with a 50/200 moving-average crossover.",
+            strategy_thesis=(
+                "Test Tesla with a 50/200 moving-average crossover using $10,000."
             ),
-            request=request,
-            base_response=failed_response,
+            entry_logic=intent.entry_logic,
+            exit_logic=intent.exit_logic,
+            rule_spec=intent.rule_spec,
+            confidence=intent.confidence,
         )
 
     async def field_fidelity_audit_stub(*, response, request, **kwargs):
@@ -883,11 +1163,8 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
         ]
         return repaired
 
-    monkeypatch.setattr(
-        interpreter_module,
-        "_repair_incomplete_strategy_extraction",
-        repair_stub,
-    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(interpreter_module, "repair_signal_rule_plan", plan_stub)
     monkeypatch.setattr(
         interpreter_module,
         "_audit_stated_run_field_fidelity",
@@ -932,7 +1209,7 @@ async def test_supported_rule_repair_audits_dropped_user_stated_capital(
         ),
     )
 
-    assert calls == ["focused_strategy_extraction", "field_fidelity_audit"]
+    assert calls == ["signal_rule_plan", "field_fidelity_audit"]
     assert repaired.candidate_strategy_draft.capital_amount == 10000
     assert (
         repaired.candidate_strategy_draft.field_provenance["capital_amount"]
@@ -1016,6 +1293,18 @@ def test_explicit_signal_rule_normalizer_rejects_vague_momentum() -> None:
     assert explicit_signal_rule_intent_from_text(
         "Test buying SPY when it starts rising."
     ) is None
+
+
+def test_explicit_signal_rule_normalizer_handles_plain_50_200_shorthand() -> None:
+    intent = explicit_signal_rule_intent_from_text(
+        "buy when the 50 crosses the 200 for Tesla"
+    )
+
+    assert intent is not None
+    assert intent.rule_spec["entry"]["conditions"][0]["left"]["period"] == 50
+    assert intent.rule_spec["entry"]["conditions"][0]["operator"] == "cross_above"
+    assert intent.rule_spec["entry"]["conditions"][0]["right"]["period"] == 200
+    assert intent.rule_spec["exit"]["conditions"][0]["operator"] == "cross_below"
 
 
 def test_signal_grounding_audit_blocks_invented_vague_momentum_rule() -> None:
@@ -1431,6 +1720,88 @@ async def test_llm_interpreter_audits_timeframe_sensitive_launch_fields_when_dro
     assert strategy.date_range == {"start": "2016-01-01", "end": "today"}
 
 
+@pytest.mark.asyncio
+async def test_llm_interpreter_audits_user_stated_capital_on_ready_launch(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def field_fidelity_audit_stub(*, response, request, **kwargs):
+        del kwargs
+        calls.append("field_fidelity_audit")
+        assert "10k" in request.current_user_message
+        repaired = response.model_copy(deep=True)
+        repaired.candidate_strategy_draft.capital_amount = 10000
+        repaired.candidate_strategy_draft.field_provenance["capital_amount"] = (
+            "starting_capital"
+        )
+        repaired.reason_codes = [
+            *repaired.reason_codes,
+            "stated_run_field_fidelity_audit",
+        ]
+        return repaired
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_stated_run_field_fidelity",
+        field_fidelity_audit_stub,
+        raising=False,
+    )
+
+    async def executable_grounding_audit_noop(*, response, **kwargs):
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_executable_strategy_grounding",
+        executable_grounding_audit_noop,
+        raising=False,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Buy and hold BTC from 2024 with $10,000.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="what if I bought Bitcoin at the start of 2024 with 10k?",
+            strategy_type="buy_and_hold",
+            strategy_thesis=(
+                "Evaluate Bitcoin from the start of 2024 with an initial capital "
+                "of $10,000."
+            ),
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            timeframe="daily",
+            date_range={"start": "2024-01-01", "end": "today"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "what if I bought Bitcoin at the start of 2024 with 10k?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls == ["field_fidelity_audit"]
+    assert ready_response.candidate_strategy_draft.capital_amount == 10000
+    assert (
+        ready_response.candidate_strategy_draft.field_provenance["capital_amount"]
+        == "starting_capital"
+    )
+
+
 def test_llm_interpreter_keeps_pending_artifact_assumptions_as_followup() -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -1570,7 +1941,7 @@ async def test_llm_interpreter_preserves_result_followup_during_pending_refineme
         )
     )
 
-    assert calls == ["LLMInterpretationResponse"]
+    assert calls == ["LLMInterpretationResponse", "LatestResultRoutingAudit"]
     assert result is not None
     assert result.intent == "results_explanation"
     assert result.semantic_turn_act == "result_followup"
@@ -1687,6 +2058,158 @@ def test_focused_strategy_extraction_preserves_non_executable_idea_as_recovery()
     assert response.candidate_strategy_draft.asset_universe == ["AAPL"]
     assert response.candidate_strategy_draft.date_range == "past year"
     assert "Sentiment/news signals" in response.unsupported_constraints[0].explanation
+
+
+@pytest.mark.asyncio
+async def test_underfilled_unsupported_strategy_draft_gets_structured_recovery(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def invoke_stub(**kwargs):
+        calls.append(kwargs["schema_name"])
+        return interpreter_module.FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            user_goal_summary="Trade Tesla using Reddit sentiment.",
+            strategy_type="sentiment_strategy",
+            strategy_thesis="Use Reddit sentiment as the entry signal for Tesla.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="past year",
+            entry_logic="Reddit sentiment turns positive",
+            assistant_response=(
+                "Sentiment is useful context, but it is not an executable rule yet."
+            ),
+        )
+
+    async def passthrough_signal_check(**kwargs):
+        return kwargs["response"]
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_signal_rule_checked_response",
+        passthrough_signal_check,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Trade Tesla using Reddit sentiment.",
+        assistant_response=(
+            "I can help you test a social media signal proxy using supported indicators."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="trade Tesla based on Reddit sentiment for the last year",
+            strategy_thesis="Trade Tesla using Reddit sentiment as a signal.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="past year",
+        ),
+        missing_required_fields=["entry_logic", "exit_logic"],
+        semantic_turn_act="new_idea",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message=(
+                "trade Tesla based on Reddit sentiment for the last year"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls == ["FocusedStrategyExtraction"]
+    assert repaired.intent == "unsupported_or_out_of_scope"
+    assert repaired.semantic_turn_act == "unsupported_request"
+    assert repaired.unsupported_constraints
+    assert repaired.unsupported_constraints[0].category == "unsupported_strategy_logic"
+    assert "social media signal proxy" not in str(
+        repaired.unsupported_constraints[0].explanation
+    ).lower()
+
+
+@pytest.mark.asyncio
+async def test_vague_valuation_prompt_with_short_copy_gets_structured_recovery(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def invoke_stub(**kwargs):
+        schema = kwargs["schema_model"]
+        return schema(
+            is_testable_strategy=True,
+            user_goal_summary="Explore whether buying Tesla when it looked cheap worked.",
+            strategy_type="valuation_strategy",
+            strategy_thesis="Use perceived undervaluation as the entry idea for Tesla.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            entry_logic="Perceived undervaluation or valuation looked cheap",
+            assistant_response=(
+                "Valuation is useful context, but Argus needs a supported historical "
+                "proxy before it can run the test."
+            ),
+        )
+
+    async def passthrough_signal_check(**kwargs):
+        return kwargs["response"]
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_signal_rule_checked_response",
+        passthrough_signal_check,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="Buy Tesla when it looked cheap.",
+        assistant_response="Totally —",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="what if I bought Tesla when it looked cheap?",
+            strategy_thesis=(
+                "Buy Tesla when perceived as undervalued and hold over a "
+                "specified period."
+            ),
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            entry_logic="Perceived undervaluation",
+        ),
+        missing_required_fields=["entry_logic", "date_range", "exit_logic"],
+        semantic_turn_act="new_idea",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="what if I bought Tesla when it looked cheap?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired.semantic_turn_act == "unsupported_request"
+    assert repaired.unsupported_constraints
+    assert repaired.assistant_response != "Totally —"
 
 
 def test_unsupported_free_text_strategy_response_needs_context_repair() -> None:
@@ -2153,7 +2676,9 @@ def test_llm_interpreter_humanizes_unsupported_simplification_labels(monkeypatch
         "Compare with buy and hold",
         "Try recurring buys",
     ]
-    assert result.unsupported_constraints[0].explanation.startswith("I understand")
+    explanation = result.unsupported_constraints[0].explanation
+    assert "MACD" in explanation
+    assert "directly executable" in explanation
 
 
 def test_llm_interpreter_drops_stale_unsupported_copy_for_executable_rsi_threshold(
@@ -2643,6 +3168,453 @@ def test_llm_interpreter_preserves_grounded_initial_capital(monkeypatch) -> None
     )
 
     assert result.candidate_strategy_draft.extra_parameters["initial_capital"] == 10000
+    assert result.candidate_strategy_draft.capital_amount == 10000
+
+
+def test_llm_interpreter_maps_grounded_total_capital_to_non_dca_starting_capital(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Test Tesla with a 50/200 crossover using $10,000.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            strategy_type="signal_strategy",
+            strategy_thesis="Test Tesla with a 50/200 moving-average crossover.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range={"start": "2022-01-01", "end": "today"},
+            total_capital=10000,
+            field_provenance={"total_capital": "total_capital"},
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.capital_amount == 10000
+    assert strategy.extra_parameters["total_capital"] == 10000
+    assert strategy.extra_parameters["field_provenance"]["capital_amount"] == (
+        "starting_capital"
+    )
+
+
+@pytest.mark.asyncio
+async def test_latest_result_routing_audit_repairs_capability_misroute(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def fake_json_schema(**kwargs):
+        calls.append(kwargs)
+        schema = kwargs["schema_model"]
+        return schema(
+            targets_latest_result=True,
+            focus="next_experiment",
+            confidence=0.92,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["TSLA"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": -32.6,
+                            "benchmark_return_pct": 54.9,
+                            "delta_vs_benchmark_pct": -87.5,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "signal_strategy"},
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what to try next.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_strategies",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="what should I try next?",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls
+    assert calls[0]["schema_model"] is interpreter_module.LatestResultRoutingAudit
+    assert repaired.semantic_turn_act == "result_followup"
+    assert repaired.result_followup_focus == "next_experiment"
+    assert repaired.capability_question_focus is None
+    assert "latest_result_routing_audit" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_latest_result_routing_audit_refines_general_followup_focus(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def fake_json_schema(**kwargs):
+        calls.append(kwargs)
+        schema = kwargs["schema_model"]
+        return schema(
+            targets_latest_result=True,
+            focus="next_experiment",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["TSLA"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": -32.6,
+                            "benchmark_return_pct": 54.9,
+                            "delta_vs_benchmark_pct": -87.5,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "signal_strategy"},
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what to try next.",
+        assistant_response=(
+            "Try MACD or a Bollinger Band filter next."
+        ),
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="what should I try next?",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls
+    assert calls[0]["schema_model"] is interpreter_module.LatestResultRoutingAudit
+    assert repaired.semantic_turn_act == "result_followup"
+    assert repaired.result_followup_focus == "next_experiment"
+    assert repaired.assistant_response is None
+    assert "latest_result_routing_audit" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_latest_result_routing_audit_repairs_copied_underfilled_strategy(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def fake_json_schema(**kwargs):
+        calls.append(kwargs)
+        schema = kwargs["schema_model"]
+        return schema(
+            targets_latest_result=True,
+            focus="why_underperformed",
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["TSLA"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": -32.6,
+                            "benchmark_return_pct": 54.9,
+                            "delta_vs_benchmark_pct": -87.5,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "signal_strategy"},
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        missing_required_fields=["entry_logic"],
+        user_goal_summary="User asks why the latest result happened.",
+        assistant_response=(
+            "The strategy likely missed the rally because the signal lagged."
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="why did that happen?",
+            strategy_type="signal_strategy",
+            strategy_thesis="why did that happen?",
+            asset_universe=["TSLA"],
+            date_range="2022-01-01 to 2026-05-20",
+            timeframe="1D",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="why did that happen?",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls
+    assert calls[0]["schema_model"] is interpreter_module.LatestResultRoutingAudit
+    assert repaired.semantic_turn_act == "result_followup"
+    assert repaired.result_followup_focus == "why_underperformed"
+    assert repaired.assistant_response is None
+    assert repaired.missing_required_fields == []
+    assert "latest_result_routing_audit" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_latest_result_routing_audit_refines_what_tested_when_user_asks_benchmark_why(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def fake_json_schema(**kwargs):
+        calls.append(kwargs)
+        schema = kwargs["schema_model"]
+        return schema(
+            targets_latest_result=True,
+            focus="why_underperformed",
+            confidence=0.88,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["BTC"],
+                "benchmark_symbol": "BTC",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 75.5,
+                            "benchmark_return_pct": 75.5,
+                            "delta_vs_benchmark_pct": 0.0,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "buy_and_hold"},
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks why the result matched the benchmark.",
+        assistant_response="I tested BTC buy and hold against BTC.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="what_tested",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="so why did it match BTC exactly?",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls
+    assert repaired.semantic_turn_act == "result_followup"
+    assert repaired.result_followup_focus == "why_underperformed"
+    assert repaired.assistant_response is None
+    assert "latest_result_routing_audit" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_latest_result_routing_audit_checks_copied_executable_result_shape(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[dict[str, object]] = []
+
+    async def fake_json_schema(**kwargs):
+        calls.append(kwargs)
+        schema = kwargs["schema_model"]
+        return schema(
+            targets_latest_result=True,
+            focus="why_underperformed",
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["BTC"],
+                "benchmark_symbol": "BTC",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 75.1,
+                            "benchmark_return_pct": 75.1,
+                            "delta_vs_benchmark_pct": 0.0,
+                        }
+                    }
+                },
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "resolved_strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "asset_universe": ["BTC"],
+                    },
+                },
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks why the latest BTC run matched BTC.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="why did it match BTC exactly?",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Explain why the BTC run matched BTC.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2026-05-20"},
+            timeframe="1D",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="why did it match BTC exactly?",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls
+    assert calls[0]["schema_model"] is interpreter_module.LatestResultRoutingAudit
+    assert repaired.semantic_turn_act == "result_followup"
+    assert repaired.result_followup_focus == "why_underperformed"
+    assert repaired.assistant_response is None
+    assert "latest_result_routing_audit" in repaired.reason_codes
 
 
 def test_llm_interpreter_honors_explicit_buy_and_hold_over_entry_like_phrase(

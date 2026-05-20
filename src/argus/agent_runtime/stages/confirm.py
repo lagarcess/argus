@@ -23,6 +23,16 @@ from argus.domain.market_data.capabilities import market_data_window_violation
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
     strategy = _strategy_payload(state.candidate_strategy_draft)
+    date_limit_recovery = _date_limit_recovery_patch(
+        strategy=strategy,
+        optional_parameter_status=state.optional_parameter_status,
+    )
+    if date_limit_recovery is not None:
+        return StageResult(
+            outcome="needs_clarification",
+            stage_patch=date_limit_recovery,
+        )
+
     missing_required_fields = _missing_required_fields(
         strategy=strategy, contract=contract
     )
@@ -33,15 +43,6 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
                 "assistant_prompt": None,
                 "missing_required_fields": missing_required_fields,
             },
-        )
-    date_limit_recovery = _date_limit_recovery_patch(
-        strategy=strategy,
-        optional_parameter_status=state.optional_parameter_status,
-    )
-    if date_limit_recovery is not None:
-        return StageResult(
-            outcome="needs_clarification",
-            stage_patch=date_limit_recovery,
         )
 
     optional_parameters = _resolve_optional_parameters(
@@ -603,4 +604,3 @@ def _resolved_cadence(
         if isinstance(cadence_value, str) and cadence_value:
             return cadence_value
     return None
-

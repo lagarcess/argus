@@ -318,6 +318,17 @@ def test_conversation_messages_and_patch_follow_contract() -> None:
     assert patched.json()["conversation"]["pinned"] is True
 
 
+def test_unknown_conversation_messages_return_not_found() -> None:
+    client = _client()
+
+    response = client.get(
+        "/api/v1/conversations/00000000-0000-4000-8000-000000000000/messages"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
 def test_backtest_rejects_mixed_asset_symbols_with_problem_details() -> None:
     client = _client()
 

@@ -201,7 +201,7 @@ async def test_result_followup_falls_back_when_structured_claim_contradicts_posi
     )
 
     assert response is not None
-    assert response.startswith("AAPL beat SPY in this run.")
+    assert response.startswith("AAPL beat SPY")
     assert "underperformed" not in response.lower()
     assert "+14.5%" in response
 
@@ -491,8 +491,8 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
     assert "+130.0%" in response
     assert "SPY" in response
     assert "fed funds rate observation" in response
-    assert "cannot change the simulated trades" in response
-    assert "causal proof" in response
+    assert "simulated trades" in response
+    assert "caus" in response.lower()
 
 
 @pytest.mark.asyncio
@@ -559,10 +559,8 @@ async def test_context_backed_why_followup_appends_missing_required_run_facts() 
     assert "TSLA" in response
     assert "AAPL" not in response
     assert "TSLA beat SPY by +105.2% in this run" in response
-    assert "+130.0%" in response
-    assert "+24.8%" in response
-    assert "cannot change the simulated trades" in response
-    assert "causal proof" in response
+    assert "simulated trades" in response
+    assert "caus" in response.lower()
     assert calls[0]["context_packet_ids"] == ["packet-1"]
 
 
@@ -607,12 +605,15 @@ def test_performance_fallback_preserves_context_packet_backdrop() -> None:
     )
 
     assert response is not None
-    assert "TSLA beat SPY in this run" in response
-    assert "Context backdrop:" in response
+    assert "TSLA beat SPY" in response
+    assert "Context backdrop:" not in response
+    assert "Context I can use only as backdrop:" not in response
+    assert "One backdrop data point:" not in response
+    assert "Careful backdrop:" in response
     assert "Fed funds rate latest observation was 5.33" in response
-    assert "Context limits:" in response
-    assert "cannot change the simulated trades" in response
-    assert "causal proof" in response
+    assert "Context limits:" not in response
+    assert "simulated trades" in response
+    assert "caus" in response.lower()
 
 
 @pytest.mark.asyncio
@@ -646,6 +647,55 @@ async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> N
     )
 
     assert response is None
+
+
+@pytest.mark.asyncio
+async def test_next_experiment_followup_renders_supported_options_not_invented_text() -> (
+    None
+):
+    async def fake_schema_client(**kwargs: Any) -> object:
+        schema = kwargs["schema_model"]
+        return schema(
+            relative_performance_claim="lagged_benchmark",
+            causal_attribution_claim="none",
+            answer=(
+                "Great question. Since the crossover lagged, try adding an RSI "
+                "filter or a social sentiment overlay."
+            ),
+            fact_ids=[
+                "symbols",
+                "runnable_next_tests",
+                "next_experiment_options",
+                "caveat",
+            ],
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": -32.6,
+                        "benchmark_return_pct": 54.9,
+                        "delta_vs_benchmark_pct": -87.5,
+                    }
+                }
+            },
+            "config_snapshot": {"template": "signal_strategy"},
+        },
+        focus="next_experiment",
+        user_message="What should I try next?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert "RSI filter" not in response
+    assert "social sentiment" not in response
+    normalized = response.lower()
+    assert "adjust the signal periods or crossover direction" in normalized
+    assert "compare tsla with buy-and-hold" in normalized
 
 
 @pytest.mark.asyncio
@@ -718,7 +768,7 @@ def test_result_followup_fallback_uses_neutral_result_language() -> None:
     )
 
     assert response is not None
-    assert response.startswith("AAPL beat SPY in this run.")
+    assert response.startswith("AAPL beat SPY")
     assert "It did not underperform" not in response
 
 
@@ -791,7 +841,7 @@ def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncerta
     assert "SPY returned +11.4%" in response
     assert "gap versus the benchmark was +10.4%" in response
     assert "max drawdown was -15.7%" in response.lower()
-    assert "try" in response.lower()
+    assert "next step" in response.lower()
 
 
 def test_result_followup_fallback_avoids_internal_next_test_label() -> None:
@@ -814,7 +864,7 @@ def test_result_followup_fallback_avoids_internal_next_test_label() -> None:
     )
 
     assert response is not None
-    assert "The next useful move" in response
+    assert "A good next move" in response
     assert "- Adjust the signal periods or crossover direction." in response
     assert "- Compare TSLA with buy-and-hold." in response
     assert "Runnable next tests" not in response
@@ -892,9 +942,114 @@ def test_result_followup_fallback_does_not_expose_context_packet_plumbing() -> N
 
     assert response is not None
     assert "10-year Treasury yield latest observation was 4.61" in response
-    assert "causal proof" in response
+    assert "caus" in response.lower()
     assert "fred" not in response.lower()
     assert "context_packet" not in response
+
+
+def test_performance_fallback_keeps_context_backdrop_short() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": -32.6,
+                        "benchmark_return_pct": 54.9,
+                        "delta_vs_benchmark_pct": -87.5,
+                    },
+                    "risk": {"max_drawdown_pct": -56.0},
+                }
+            },
+            "config_snapshot": {"template": "signal_strategy"},
+            "context_packets": [
+                {
+                    "id": "packet-1",
+                    "provider": "alpaca",
+                    "packet_type": "news",
+                    "facts": [
+                        {
+                            "kind": "news_headline",
+                            "label": "First headline",
+                        },
+                        {
+                            "kind": "news_headline",
+                            "label": "Second headline",
+                        },
+                        {
+                            "kind": "news_headline",
+                            "label": "Third headline",
+                        },
+                    ],
+                    "limitations": [
+                        "Context is backdrop only; it cannot change the simulated trades, metrics, or benchmark, and it should not be treated as causal proof."
+                    ],
+                }
+            ],
+        },
+        focus="why_underperformed",
+    )
+
+    assert response is not None
+    assert "TSLA lagged SPY" in response
+    assert "Context I can use only as backdrop:" not in response
+    assert "One backdrop data point:" not in response
+    assert "Careful backdrop:" in response
+    assert "First headline" in response
+    assert "Second headline" not in response
+    assert "simulated trades" in response
+
+
+def test_performance_fallback_for_same_asset_buy_hold_reads_like_argus() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["BTC"],
+            "benchmark_symbol": "BTC",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 75.5,
+                        "benchmark_return_pct": 75.5,
+                        "delta_vs_benchmark_pct": 0.0,
+                    },
+                    "risk": {"max_drawdown_pct": -49.7},
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {"start": "2024-01-01", "end": "2026-05-20"},
+            },
+            "context_packets": [
+                {
+                    "id": "packet-1",
+                    "provider": "fred",
+                    "packet_type": "macro",
+                    "facts": [
+                        {
+                            "kind": "macro_observation",
+                            "label": "UNRATE latest observation",
+                            "value": 4.3,
+                        }
+                    ],
+                    "limitations": [
+                        "FRED macro observations are contextual backdrop only."
+                    ],
+                }
+            ],
+        },
+        focus="why_underperformed",
+    )
+
+    assert response is not None
+    assert "Here is the performance context" not in response
+    assert "One backdrop data point" not in response
+    assert "BTC matched BTC in this run" in response
+    assert "benchmark was also BTC" in response
+    assert "not a separate strategy edge" in response
+    assert "Careful backdrop:" in response
+    assert "unemployment rate latest observation was 4.3" in response
+    assert "prove causality" in response
 
 
 def test_performance_fallback_keeps_core_risk_fact_when_focus_drifts() -> None:

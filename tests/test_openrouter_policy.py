@@ -14,6 +14,7 @@ from argus.agent_runtime.llm_interpreter import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
+    StatedRunFieldFidelityAudit,
 )
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.interpret import InterpretationRequest
@@ -588,7 +589,7 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
     )
 
     assert result is not None
-    assert seen_schema_names == [
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]
@@ -668,7 +669,7 @@ def test_default_interpreter_repairs_underfilled_new_signal_idea(
     )
 
     assert result is not None
-    assert seen_schema_names == [
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]
@@ -750,7 +751,7 @@ def test_default_interpreter_repairs_partial_signal_idea_without_rule_payload(
     )
 
     assert result is not None
-    assert seen_schema_names == [
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]
@@ -819,7 +820,7 @@ def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
     )
 
     assert result is not None
-    assert seen_schema_names == [
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]
@@ -889,6 +890,238 @@ def test_default_interpreter_repairs_social_sentiment_trade_misroute(
     assert result.semantic_turn_act == "unsupported_request"
     assert result.unsupported_constraints[0].category == "unsupported_strategy_logic"
     assert "Reddit sentiment" in result.unsupported_constraints[0].raw_value
+
+
+def test_default_interpreter_repairs_empty_unsupported_request_into_contract_recovery(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        seen_schema_names.append(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
+        if schema_model is LLMInterpretationResponse:
+            return LLMInterpretationResponse(
+                intent="unsupported_or_out_of_scope",
+                task_relation="new_task",
+                requires_clarification=True,
+                user_goal_summary="Trade based on Reddit sentiment.",
+                assistant_response=(
+                    "Reddit sentiment is not available as a trading rule."
+                ),
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="trade based on Reddit sentiment",
+                    strategy_thesis="Trade based on Reddit sentiment.",
+                ),
+                semantic_turn_act="unsupported_request",
+            )
+        assert schema_model is FocusedStrategyExtraction
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            user_goal_summary="Trade based on Reddit sentiment.",
+            strategy_type="reddit_sentiment",
+            strategy_thesis="Use Reddit sentiment as the trade signal.",
+            entry_logic="Reddit sentiment turns positive",
+            assistant_response="Reddit sentiment is not executable yet.",
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="trade based on Reddit sentiment",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen_schema_names == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+    ]
+    assert result.assistant_response is None
+    assert result.semantic_turn_act == "unsupported_request"
+    assert result.unsupported_constraints
+    assert result.unsupported_constraints[0].category == "unsupported_strategy_logic"
+    labels = [
+        option.label
+        for option in result.unsupported_constraints[0].simplification_options
+    ]
+    assert labels == [
+        "Use a supported RSI threshold rule",
+        "Compare with buy and hold",
+        "Use a supported moving-average crossover",
+    ]
+
+
+def test_default_interpreter_uses_focused_repair_after_structured_candidate_failures(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        seen_schema_names.append(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
+        if schema_model is LLMInterpretationResponse:
+            raise ValueError("general schema failed")
+        if schema_model is StatedRunFieldFidelityAudit:
+            return StatedRunFieldFidelityAudit()
+        assert schema_model is FocusedStrategyExtraction
+        return FocusedStrategyExtraction(
+            is_testable_strategy=True,
+            user_goal_summary="Backtest a TSLA 50/200 crossover.",
+            strategy_type="signal_strategy",
+            strategy_thesis="Backtest TSLA when the 50 SMA crosses the 200 SMA.",
+            asset_universe=["TSLA"],
+            date_range={"start": "2022-01-01", "end": "today"},
+            capital_amount=10000,
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen_schema_names == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+        "StatedRunFieldFidelityAudit",
+    ]
+    draft = result.candidate_strategy_draft
+    assert draft.strategy_type == "signal_strategy"
+    assert draft.asset_universe == ["TSLA"]
+    assert draft.entry_rule == {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+
+
+def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> object:
+        seen_schema_names.append(kwargs["schema_name"])
+        schema_model = kwargs["schema_model"]
+        if schema_model is LLMInterpretationResponse:
+            raise ValueError("general schema failed")
+        if schema_model is FocusedStrategyExtraction:
+            return FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                user_goal_summary="Backtest a TSLA 50/200 crossover.",
+                strategy_type="signal_strategy",
+                strategy_thesis=(
+                    "Backtest TSLA when the 50 SMA crosses the 200 SMA from "
+                    "January 2022 to today with 10k."
+                ),
+                asset_universe=["TSLA"],
+                date_range="past year",
+                entry_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 50,
+                    "slow_indicator": "sma",
+                    "slow_period": 200,
+                    "direction": "bullish",
+                },
+            )
+        assert schema_model is StatedRunFieldFidelityAudit
+        return StatedRunFieldFidelityAudit(
+            date_range={"start": "2022-01-01", "end": "today"},
+            capital_amount=10000,
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=(
+                "buy when the 50 crosses the 200 for Tesla from January 2022 "
+                "to today with 10k"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert seen_schema_names == [
+        "LLMInterpretationResponse",
+        "FocusedStrategyExtraction",
+        "StatedRunFieldFidelityAudit",
+    ]
+    draft = result.candidate_strategy_draft
+    assert draft.date_range == {"start": "2022-01-01", "end": "today"}
+    assert draft.capital_amount == 10000
+    assert "stated_run_field_fidelity_audit" in result.reason_codes
 
 
 def test_default_interpreter_blocks_auto_simplified_buy_hold_for_ambiguous_rule(
@@ -1632,7 +1865,9 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
     assert "non-template" in system_prompt.lower()
     assert "vary the section headings" in system_prompt.lower()
     assert "fact reference" in system_prompt.lower()
-    assert "professional markdown" in system_prompt.lower()
+    assert "plain-english" in system_prompt.lower()
+    assert "curiosity-forward" in system_prompt.lower()
+    assert "dense financial pdf" in system_prompt.lower()
     assert "capability truth" in system_prompt.lower()
     assert "profitable trades" in system_prompt.lower()
     assert "alternative benchmarks" in system_prompt.lower()
@@ -2298,3 +2533,71 @@ def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:
         "completion_tokens": 21,
         "total_tokens": 65,
     }
+
+
+def test_direct_chat_completion_tries_configured_fallback_and_records_usage(
+    monkeypatch,
+) -> None:
+    openrouter.clear_openrouter_route_receipts()
+    attempted_models: list[str] = []
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "choices": [{"message": {"content": "Plain-English result summary."}}],
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 7,
+                    "total_tokens": 19,
+                },
+            }
+
+    class FakeAsyncClient:
+        def __init__(self, **_kwargs: object) -> None:
+            return None
+
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def post(self, *_args: object, **kwargs: object) -> FakeResponse:
+            payload = kwargs["json"]
+            assert isinstance(payload, dict)
+            model = str(payload["model"])
+            attempted_models.append(model)
+            if model == "chat/primary":
+                raise openrouter.httpx.TimeoutException("slow primary")
+            return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+    monkeypatch.setattr(
+        openrouter.httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs)
+    )
+
+    result = asyncio.run(
+        openrouter.invoke_openrouter_chat_completion(
+            task="result_summary",
+            messages=[{"role": "user", "content": "summarize"}],
+            context_packet_ids=["packet-1"],
+        )
+    )
+
+    assert result == "Plain-English result summary."
+    assert attempted_models == ["chat/primary", "chat/fallback"]
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert [receipt.outcome for receipt in receipts] == ["failed", "succeeded"]
+    assert receipts[0].failure_mode == "TimeoutException"
+    assert receipts[1].fallback_used is True
+    assert receipts[1].token_usage == {
+        "prompt_tokens": 12,
+        "completion_tokens": 7,
+        "total_tokens": 19,
+    }
+    assert receipts[1].context_packet_ids == ["packet-1"]

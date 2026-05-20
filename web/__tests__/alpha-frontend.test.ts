@@ -100,11 +100,12 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(message).toContain("function ResultBreakdown");
     expect(message).toContain('aria-label="Result breakdown"');
-    expect(message).toContain('message.contentPresentation === "result_breakdown"');
+    expect(message).toContain('message.contentPresentation === "result_breakdown" && message.content?.trim()');
     expect(chat).toContain('action?.type === "show_breakdown"');
     expect(chat).toContain('contentPresentation:');
     expect(css).toContain(".argus-result-breakdown::before");
-    expect(css).toContain('content: "Breakdown"');
+    expect(css).toContain('content: ""');
+    expect(css).toContain("border-left");
     expect(css).not.toContain("argus-result-breakdown shadow");
   });
 
@@ -444,6 +445,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("readActiveConversationId");
     expect(chat).toContain("persistActiveConversationId");
     expect(chat).toContain("getConversationMessages(activeConversationId");
+    expect(chat).toContain("const routeConversationId = readActiveConversationIdFromUrl();");
+    expect(chat).toContain("const targetConversationId = routeConversationId ?? conversationId;");
+    expect(chat).toContain("await streamToConversation(targetConversationId);");
   });
 
   test("history menu reuses structured conversation hydration", () => {

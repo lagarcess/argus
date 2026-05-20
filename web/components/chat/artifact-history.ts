@@ -41,6 +41,17 @@ export function confirmationActionStatusLabel(
   return "Updated";
 }
 
+function completedRunConfirmationStatusLabel(message: Message, index: number, lastResultIndex: number) {
+  if (
+    index < lastResultIndex &&
+    message.confirmation?.confirmation_state === "superseded" &&
+    message.confirmation.statusLabel === "Running"
+  ) {
+    return "Run complete";
+  }
+  return message.confirmation?.statusLabel ?? (index < lastResultIndex ? "Run complete" : "Updated");
+}
+
 export function confirmationActionEffectFromAction(
   action: ChatActionOption | undefined,
 ): ConfirmationActionEffect | null {
@@ -262,6 +273,7 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
         ...message,
         confirmation: {
           ...message.confirmation,
+          statusLabel: completedRunConfirmationStatusLabel(message, index, lastResultIndex),
           actions: [],
         },
         actions: [],
@@ -280,7 +292,10 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
         actions: message.confirmation.actions ?? message.actions,
       };
     }
-    return supersedePriorConfirmations(message);
+    return supersedePriorConfirmations(
+      message,
+      index < lastResultIndex ? "Run complete" : "Updated",
+    );
   });
 }
 
