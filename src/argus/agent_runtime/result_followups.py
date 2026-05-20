@@ -4,7 +4,7 @@ import inspect
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
@@ -21,15 +21,38 @@ from argus.llm.openrouter import (
     record_openrouter_route_receipt,
 )
 
-
-class ResultFollowupPart(BaseModel):
-    kind: Literal["text", "fact"]
-    text: str = ""
-    fact_id: str | None = None
+RelativePerformanceClaim = Literal[
+    "beat_benchmark",
+    "lagged_benchmark",
+    "matched_benchmark",
+    "not_applicable",
+    "unknown",
+]
 
 
 class ResultFollowupDraft(BaseModel):
-    parts: list[ResultFollowupPart] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    relative_performance_claim: RelativePerformanceClaim = Field(
+        description=(
+            "Structured claim about strategy performance versus benchmark. Use the "
+            "supplied relative_performance_truth when it is known."
+        )
+    )
+    answer: str = Field(
+        description=(
+            "Conversational interpretation using only fact_bank values. Include exact "
+            "run facts when they help answer the user. Do not mention software, "
+            "routing, provider paths, or implementation changes unless fact_bank "
+            "explicitly contains that fact."
+        )
+    )
+    fact_ids: list[str] = Field(
+        description=(
+            "Fact IDs from fact_bank that the renderer must attach. Include every "
+            "required_fact_id and do not invent IDs."
+        )
+    )
 
 
 async def compose_result_followup_response(
@@ -97,6 +120,18 @@ async def compose_result_followup_response(
             task=llm_task,
             failure_mode="result_followup_draft_rejected",
         )
+        return None
+    claim_failure = result_followup_claim_failure(
+        draft=draft,
+        fact_bank=fact_bank,
+        focus=focus,
+    )
+    if claim_failure:
+        record_result_followup_fallback_receipt(
+            task=llm_task,
+            failure_mode=claim_failure,
+        )
+        return fallback_result_followup_response(metadata=metadata, focus=focus)
     return rendered
 
 
@@ -150,38 +185,59 @@ def result_followup_llm_messages(
             "content": (
                 "You are Argus, a chat-first investing backtest copilot. Answer the "
                 "user's follow-up using only the supplied fact_bank. Be conversational, "
-                "specific, and useful; do not sound like a fixed template. Put every "
-                "run-specific symbol, date, percentage, drawdown, benchmark, rule, "
-                "trade count, assumption, caveat, and next-test option in a fact part. "
-                "The final parts list must include every fact_id in required_fact_ids; "
-                "do not omit required fact ids even when they feel repetitive. "
-                "Use fact parts inline where the exact value belongs, and use text parts "
-                "for interpretation, education, and transitions. Text parts must not "
-                "repeat raw fact values; they should say what the fact means, while "
-                "fact parts provide the exact symbols, dates, returns, and caveats. Do not "
-                "start with a block of consecutive fact parts; weave facts into a short "
-                "answer. Correct "
+                "specific, and useful; do not sound like a fixed template. Return a "
+                "short natural-language answer plus fact_ids. The answer should use "
+                "the supplied facts naturally, while fact_ids tells the runtime which "
+                "symbols, dates, percentages, drawdowns, benchmarks, caveats, context "
+                "facts, and next-test options ground the answer. fact_ids must include every "
+                "fact_id in required_fact_ids; do not omit required fact ids even when "
+                "they feel repetitive. Do not invent fact ids. Set "
+                "relative_performance_claim to the supplied relative_performance_truth "
+                "when it is known, and keep the answer consistent with that claim. Correct "
                 "false premises directly. Explain what happened from metrics separately "
                 "from plausible non-causal market interpretation. Use context_packet_facts "
                 "only as possible backdrop, never as proof of causality unless the fact "
-                "directly says so. Offer only next tests listed in runnable_next_tests or "
+                "directly says so. Disallowed topics unless fact_bank explicitly includes "
+                "them: software changes, runtime changes, routing fixes, provider paths, "
+                "implementation details, or app internals. Do not repeat, negate, or explain "
+                "those terms just because the user mentioned them; treat them as irrelevant "
+                "conversation context and answer the investing result. Only suggest next "
+                "tests when focus is next_experiment; "
+                "when you do, offer only tests listed in runnable_next_tests or "
                 "next_experiment_options. Do not invent trades, prices, support, indicators, "
-                "predictions, investment advice, or unsupported mechanics."
+                "predictions, investment advice, unsupported mechanics, or unsupported "
+                "causes."
             ),
         },
         {
             "role": "user",
             "content": json.dumps(
                 {
-                    "question": user_message,
+                    "question": result_followup_focus_question(focus),
                     "focus": focus,
                     "fact_bank": fact_bank,
                     "required_fact_ids": sorted(required_fact_ids),
+                    "relative_performance_truth": relative_performance_truth(fact_bank),
                 },
                 default=str,
             ),
         },
     ]
+
+
+def result_followup_focus_question(focus: ResultFollowupFocus) -> str:
+    questions: dict[ResultFollowupFocus, str] = {
+        "general": "Explain the latest run using the available grounded facts.",
+        "why_underperformed": (
+            "Explain the result versus the benchmark, correcting the premise if the "
+            "strategy did not underperform."
+        ),
+        "max_drawdown": "Explain the max drawdown for the latest run.",
+        "what_tested": "Explain what was tested in the latest run.",
+        "next_experiment": "Suggest useful supported next experiments for this run.",
+        "assumptions": "Explain the assumptions used by the latest run.",
+    }
+    return questions.get(focus, questions["general"])
 
 
 def coerce_result_followup_draft(value: Any) -> ResultFollowupDraft | None:
@@ -193,6 +249,37 @@ def coerce_result_followup_draft(value: Any) -> ResultFollowupDraft | None:
         return None
 
 
+def result_followup_claim_failure(
+    *,
+    draft: ResultFollowupDraft,
+    fact_bank: dict[str, str],
+    focus: ResultFollowupFocus,
+) -> str | None:
+    if focus != "why_underperformed":
+        return None
+    truth = relative_performance_truth(fact_bank)
+    if truth in {"not_applicable", "unknown"}:
+        return None
+    if draft.relative_performance_claim in {"not_applicable", "unknown"}:
+        return "missing_relative_performance_claim"
+    if draft.relative_performance_claim != truth:
+        return "relative_performance_claim_contradiction"
+    return None
+
+
+def relative_performance_truth(
+    fact_bank: dict[str, str],
+) -> RelativePerformanceClaim:
+    delta_number = as_float(fact_bank.get("benchmark_delta"))
+    if delta_number is None:
+        return "unknown"
+    if delta_number > 0:
+        return "beat_benchmark"
+    if delta_number < 0:
+        return "lagged_benchmark"
+    return "matched_benchmark"
+
+
 def render_result_followup_draft(
     *,
     draft: ResultFollowupDraft,
@@ -200,76 +287,82 @@ def render_result_followup_draft(
     required_fact_ids: set[str],
     focus: ResultFollowupFocus,
 ) -> str | None:
-    if not draft.parts or len(draft.parts) > 24:
+    body = normalize_text(draft.answer)
+    if not body:
         return None
-    body = ""
-    fact_ids: list[str] = []
+    if len(draft.fact_ids) > 36:
+        return None
     used_fact_ids: set[str] = set()
-    pending_fact_ids: list[str] = []
-    text_parts = 0
-    for part in draft.parts:
-        if part.kind == "text":
-            if text_reuses_fact_value(part.text, fact_bank=fact_bank):
-                return None
-            body = append_sentence_piece(
-                body,
-                render_result_followup_fact_line(
-                    pending_fact_ids,
-                    fact_bank=fact_bank,
-                ),
-            )
-            pending_fact_ids = []
-            body = append_sentence_piece(body, part.text)
-            if normalize_text(part.text):
-                text_parts += 1
-            continue
-        fact_id = str(part.fact_id or "").strip()
+    ordered_fact_ids: list[str] = []
+    for fact_id_value in draft.fact_ids:
+        fact_id = str(fact_id_value or "").strip()
         if fact_id not in fact_bank:
             return None
-        pending_fact_ids.append(fact_id)
         if fact_id not in used_fact_ids:
-            fact_ids.append(fact_id)
+            ordered_fact_ids.append(fact_id)
             used_fact_ids.add(fact_id)
+
+    appendable_missing_fact_ids = appendable_missing_required_fact_ids(
+        missing_fact_ids=required_fact_ids - used_fact_ids,
+        fact_bank=fact_bank,
+        focus=focus,
+    )
+    ordered_fact_ids.extend(appendable_missing_fact_ids)
+    used_fact_ids.update(appendable_missing_fact_ids)
     body = append_sentence_piece(
         body,
         render_result_followup_fact_line(
-            pending_fact_ids,
+            appendable_missing_fact_ids,
             fact_bank=fact_bank,
         ),
     )
-
-    if text_parts == 0:
-        return None
     if not required_fact_ids.issubset(used_fact_ids):
         return None
     body = normalize_text(body)
     if not body:
         return None
-    rendered = apply_result_followup_fact_guardrails(
-        body,
-        fact_bank=fact_bank,
-        focus=focus,
-    )
-    if len(rendered.split()) > 240:
+    rendered = body
+    max_words = 360 if fact_bank.get("context_packet_facts") else 240
+    if len(rendered.split()) > max_words:
         return None
     return rendered.strip()
 
 
-def text_reuses_fact_value(text: Any, *, fact_bank: dict[str, str]) -> bool:
-    normalized_text = comparable_text(text)
-    if not normalized_text:
-        return False
-    exact_text = normalize_text(text).lower()
-    for value in fact_bank.values():
-        cleaned = clean_fragment(value)
-        if len(cleaned) < 3:
-            continue
-        if cleaned.lower() in exact_text:
-            return True
-        comparable_value = comparable_text(cleaned)
-        if len(comparable_value) >= 3 and comparable_value in normalized_text:
-            return True
-    return False
+def appendable_missing_required_fact_ids(
+    *,
+    missing_fact_ids: set[str],
+    fact_bank: dict[str, str],
+    focus: ResultFollowupFocus,
+) -> list[str]:
+    appendable_fact_ids = {
+        "context_packet_facts",
+        "context_packet_limitations",
+        "caveat",
+        "relative_performance",
+    }
+    if result_followup_uses_context_route(fact_bank=fact_bank, focus=focus):
+        appendable_fact_ids.update(
+            {
+                "symbols",
+                "strategy",
+                "date_range",
+                "benchmark_symbol",
+                "total_return",
+                "benchmark_return",
+                "benchmark_delta",
+                "max_drawdown",
+                "trade_count",
+                "rule_summary",
+                "execution_note",
+                "starting_capital",
+                "assumptions",
+            }
+        )
+    return [
+        fact_id
+        for fact_id in fact_bank
+        if fact_id in missing_fact_ids and fact_id in appendable_fact_ids
+    ]
 
 
 def render_result_followup_fact_line(
@@ -303,6 +396,7 @@ def _labeled_fact_fragment(fact_id: str, value: str) -> str:
         "total_return": "Strategy return",
         "benchmark_return": "Benchmark return",
         "benchmark_delta": "Gap versus benchmark",
+        "relative_performance": "Relative performance",
         "max_drawdown": "Max drawdown",
         "trade_count": "Trades",
         "starting_capital": "Starting capital",
@@ -362,6 +456,13 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
     )
     if benchmark_delta is not None:
         fact_bank["benchmark_delta"] = format_percent(benchmark_delta)
+        relative = relative_performance_label(
+            symbols=symbols,
+            benchmark=benchmark,
+            delta=benchmark_delta,
+        )
+        if relative:
+            fact_bank["relative_performance"] = relative
     drawdown = metric_number(
         metadata,
         paths=(
@@ -430,6 +531,7 @@ def required_result_followup_fact_ids(
                 required.add(fact_id)
     elif focus == "why_underperformed":
         for fact_id in (
+            "relative_performance",
             "total_return",
             "benchmark_symbol",
             "benchmark_return",
@@ -443,14 +545,7 @@ def required_result_followup_fact_ids(
         if has_context_limitations:
             required.add("context_packet_limitations")
     elif focus == "general" and include_context:
-        for fact_id in (
-            "total_return",
-            "benchmark_symbol",
-            "benchmark_return",
-            "benchmark_delta",
-            "execution_note",
-            "context_packet_facts",
-        ):
+        for fact_id in ("context_packet_facts",):
             if fact_id in fact_bank:
                 required.add(fact_id)
         if has_context_limitations:
@@ -500,46 +595,6 @@ def fallback_result_followup_response(
     if focus == "general":
         return fallback_general_result_followup_response(fact_bank)
     return fallback_performance_response(fact_bank)
-
-
-def apply_result_followup_fact_guardrails(
-    response: str,
-    *,
-    fact_bank: dict[str, str],
-    focus: ResultFollowupFocus | Literal["general"],
-) -> str:
-    cleaned = normalize_text(response)
-    if not cleaned:
-        return cleaned
-    if focus != "why_underperformed":
-        return cleaned
-    delta_number = as_float(fact_bank.get("benchmark_delta"))
-    if delta_number is None or delta_number <= 0:
-        return cleaned
-    lower = cleaned.lower()
-    if _contradicts_positive_benchmark_delta(lower):
-        return fallback_performance_response(fact_bank) or cleaned
-    if (
-        "did not underperform" in lower
-        or "outperform" in lower
-        or "beat " in lower
-        or "beat the benchmark" in lower
-    ):
-        return cleaned
-    return "It did not underperform in this run. " + cleaned
-
-
-def _contradicts_positive_benchmark_delta(response: str) -> bool:
-    normalized = comparable_text(response)
-    words = set(normalized.split())
-    if "underperformed" in words or "lagged" in words or "trailed" in words:
-        return True
-    contradiction_phrases = (
-        "lost to the benchmark",
-        "worse than the benchmark",
-        "behind the benchmark",
-    )
-    return any(phrase in normalized for phrase in contradiction_phrases)
 
 
 def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
@@ -595,6 +650,7 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
         )
     if fact_bank.get("execution_note"):
         pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
+    append_context_backdrop(pieces, fact_bank)
     if fact_bank.get("caveat"):
         pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
     return " ".join(piece.strip() for piece in pieces if piece.strip())
@@ -622,6 +678,7 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
         pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
     if fact_bank.get("execution_note"):
         pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
+    append_context_backdrop(pieces, fact_bank)
     if fact_bank.get("runnable_next_tests"):
         pieces.append(
             "Try next: " + clean_fragment(fact_bank["runnable_next_tests"]) + "."
@@ -630,6 +687,19 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
         pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
     response = " ".join(piece.strip() for piece in pieces if piece.strip())
     return normalize_text(response) or None
+
+
+def append_context_backdrop(pieces: list[str], fact_bank: dict[str, str]) -> None:
+    if fact_bank.get("context_packet_facts"):
+        pieces.append(
+            "Context backdrop: " + clean_fragment(fact_bank["context_packet_facts"]) + "."
+        )
+    if fact_bank.get("context_packet_limitations"):
+        pieces.append(
+            "Context limits: "
+            + clean_fragment(fact_bank["context_packet_limitations"])
+            + "."
+        )
 
 
 def fallback_what_tested_response(fact_bank: dict[str, str]) -> str:
@@ -701,15 +771,26 @@ def normalize_text(value: Any) -> str:
     return " ".join(str(value or "").split()).strip()
 
 
-def comparable_text(value: Any) -> str:
-    normalized = normalize_text(value).lower()
-    return " ".join(
-        "".join(char if char.isalnum() else " " for char in normalized).split()
-    )
-
-
 def clean_fragment(value: Any) -> str:
     return str(value or "").strip().rstrip(".; ")
+
+
+def relative_performance_label(
+    *,
+    symbols: str,
+    benchmark: str,
+    delta: float,
+) -> str | None:
+    subject = symbols or "The strategy"
+    benchmark_label = benchmark or "the benchmark"
+    if delta > 0:
+        return f"{subject} beat {benchmark_label} by {format_percent(delta)} in this run"
+    if delta < 0:
+        return (
+            f"{subject} lagged {benchmark_label} by "
+            f"{format_percent(abs(delta), signed=False)} in this run"
+        )
+    return f"{subject} matched {benchmark_label} in this run"
 
 
 def config_snapshot(metadata: dict[str, Any]) -> dict[str, Any]:

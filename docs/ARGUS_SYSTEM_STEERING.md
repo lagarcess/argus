@@ -20,8 +20,8 @@ Argus is currently a chat-first, simulation-grounded investing experimentation s
 Known state on `codex/context-intelligence-routing`:
 
 - Tiered OpenRouter routing exists through `ARGUS_*` model-tier environment variables.
-- Backward-compatible `AGENT_*` aliases still exist for older tools/scripts, but
-  `ARGUS_*` is the primary model-tier config path.
+- OpenRouter tier configuration is `ARGUS_*` only; legacy model aliases are no
+  longer part of the active runtime contract.
 - FRED environment configuration exists, and the minimal `ContextPacket` contract/provider wrappers now exist.
 - Alpaca and Kraken provide the current deterministic market-data truth layer for OHLCV and availability.
 - Alpaca should be considered near-term context for scoped news, corporate actions, most actives, and movers, but not as a generic dashboard feed.
@@ -311,8 +311,8 @@ Current state:
 - Launch router code should import focused runtime/chat modules directly.
 - Tests should import focused modules for helpers that now live outside the
   facade.
-- `AGENT_*` config is compatibility-only; `ARGUS_*` is the primary model-tier
-  config.
+- `ARGUS_*` model-tier config is the active runtime contract; legacy model
+  aliases should not be used by launch-path code, tests, or docs.
 - Some helpers appear obsolete or compatibility-only.
 
 Production risks:

@@ -241,9 +241,6 @@ Required model and data variables:
   for completed run explanations when Supabase persistence is active.
 - `ARGUS_CONTEXT_PACKET_BUDGET_SECONDS`: bounds provider collection latency for
   context packets. Simulation results must still persist without context.
-- `AGENT_MODEL`, `AGENT_STRUCTURED_MODEL`, and `AGENT_FALLBACK_MODEL` are
-  backward-compatible aliases only. New docs, scripts, and code should use
-  `ARGUS_*` names.
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
 - `ARGUS_PERSISTENCE_MODE`

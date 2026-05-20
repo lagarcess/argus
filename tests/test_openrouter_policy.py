@@ -263,22 +263,14 @@ def test_openrouter_structured_candidates_follow_task_tier(monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "structured/fallback")
     monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "context/primary")
     monkeypatch.setenv("ARGUS_CONTEXT_FALLBACK_MODEL", "context/fallback")
-    monkeypatch.setenv("AGENT_STRUCTURED_MODEL", "legacy/structured")
-    monkeypatch.setenv("AGENT_MODEL", "legacy/chat")
-    monkeypatch.setenv("AGENT_FALLBACK_MODEL", "legacy/fallback")
 
     assert openrouter_structured_model_candidates(task="interpretation") == [
         "structured/primary",
         "structured/fallback",
-        "legacy/structured",
-        "legacy/chat",
-        "legacy/fallback",
     ]
     assert openrouter_structured_model_candidates(task="result_breakdown") == [
         "context/primary",
         "context/fallback",
-        "legacy/chat",
-        "legacy/fallback",
     ]
 
 
@@ -300,34 +292,14 @@ def test_openrouter_factory_returns_none_without_key(monkeypatch) -> None:
     assert openrouter.build_openrouter_model("result_breakdown") is None
 
 
-def test_structured_model_uses_configured_models_unless_explicitly_overridden(
+def test_structured_model_uses_argus_tier_models_unless_explicitly_overridden(
     monkeypatch,
 ) -> None:
     monkeypatch.delenv("ARGUS_STRUCTURED_MODEL", raising=False)
     monkeypatch.delenv("ARGUS_STRUCTURED_FALLBACK_MODEL", raising=False)
-    monkeypatch.delenv("AGENT_STRUCTURED_MODEL", raising=False)
-    monkeypatch.setenv("AGENT_FALLBACK_MODEL", "deepseek/deepseek-v4-flash")
-    monkeypatch.setenv("AGENT_MODEL", "qwen/qwen3.5-9b")
 
-    assert resolve_openrouter_structured_model() == "qwen/qwen3.5-9b"
-    assert openrouter_structured_model_candidates() == [
-        "qwen/qwen3.5-9b",
-        "deepseek/deepseek-v4-flash",
-    ]
-
-    monkeypatch.setenv("AGENT_STRUCTURED_MODEL", "custom/structured")
-
-    assert resolve_openrouter_structured_model() == "custom/structured"
-    assert openrouter_structured_model_candidates() == [
-        "custom/structured",
-        "qwen/qwen3.5-9b",
-        "deepseek/deepseek-v4-flash",
-    ]
-
-    monkeypatch.delenv("AGENT_STRUCTURED_MODEL", raising=False)
-    monkeypatch.delenv("AGENT_MODEL", raising=False)
-
-    assert resolve_openrouter_structured_model() == "deepseek/deepseek-v4-flash"
+    assert resolve_openrouter_structured_model() == ""
+    assert openrouter_structured_model_candidates() == []
 
     monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "argus/structured")
 
@@ -1380,8 +1352,6 @@ def test_default_interpreter_coerces_strategy_draft_mislabeled_as_result_context
 def test_interpretation_llm_has_hard_turn_budget(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter
 
-    monkeypatch.setenv("AGENT_MODEL", "primary/model")
-    monkeypatch.delenv("AGENT_FALLBACK_MODEL", raising=False)
     monkeypatch.setattr(
         llm_interpreter,
         "build_openrouter_model",

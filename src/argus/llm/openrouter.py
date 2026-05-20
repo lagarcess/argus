@@ -103,44 +103,35 @@ OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
 }
 
 _TIER_PRIMARY_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
-    "utility": ("ARGUS_UTILITY_MODEL", "AGENT_MODEL"),
-    "chat": ("ARGUS_CHAT_MODEL", "AGENT_MODEL"),
-    "structured": ("ARGUS_STRUCTURED_MODEL", "AGENT_STRUCTURED_MODEL", "AGENT_MODEL"),
-    "context": ("ARGUS_CONTEXT_MODEL", "AGENT_MODEL"),
+    "utility": ("ARGUS_UTILITY_MODEL",),
+    "chat": ("ARGUS_CHAT_MODEL",),
+    "structured": ("ARGUS_STRUCTURED_MODEL",),
+    "context": ("ARGUS_CONTEXT_MODEL",),
 }
 
 _TIER_FALLBACK_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
-    "utility": ("ARGUS_UTILITY_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
-    "chat": ("ARGUS_CHAT_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
-    "structured": ("ARGUS_STRUCTURED_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
-    "context": ("ARGUS_CONTEXT_FALLBACK_MODEL", "AGENT_FALLBACK_MODEL"),
+    "utility": ("ARGUS_UTILITY_FALLBACK_MODEL",),
+    "chat": ("ARGUS_CHAT_FALLBACK_MODEL",),
+    "structured": ("ARGUS_STRUCTURED_FALLBACK_MODEL",),
+    "context": ("ARGUS_CONTEXT_FALLBACK_MODEL",),
 }
 
 _TIER_CANDIDATE_ENV: dict[OpenRouterModelTier, tuple[str, ...]] = {
     "utility": (
         "ARGUS_UTILITY_MODEL",
         "ARGUS_UTILITY_FALLBACK_MODEL",
-        "AGENT_MODEL",
-        "AGENT_FALLBACK_MODEL",
     ),
     "chat": (
         "ARGUS_CHAT_MODEL",
         "ARGUS_CHAT_FALLBACK_MODEL",
-        "AGENT_MODEL",
-        "AGENT_FALLBACK_MODEL",
     ),
     "structured": (
         "ARGUS_STRUCTURED_MODEL",
         "ARGUS_STRUCTURED_FALLBACK_MODEL",
-        "AGENT_STRUCTURED_MODEL",
-        "AGENT_MODEL",
-        "AGENT_FALLBACK_MODEL",
     ),
     "context": (
         "ARGUS_CONTEXT_MODEL",
         "ARGUS_CONTEXT_FALLBACK_MODEL",
-        "AGENT_MODEL",
-        "AGENT_FALLBACK_MODEL",
     ),
 }
 

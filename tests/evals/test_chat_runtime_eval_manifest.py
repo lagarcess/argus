@@ -135,7 +135,9 @@ def test_chat_runtime_eval_manifest_covers_conditional_buy_sell_regression() -> 
     }
 
     assert "buy and sell when it goes up" in prompts
-    assert "does not collapse conditional buy/sell language into buy-and-hold" in hard_checks
+    assert (
+        "does not collapse conditional buy/sell language into buy-and-hold" in hard_checks
+    )
 
 
 def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
@@ -146,9 +148,10 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
     assert {"rsi", "sma", "ema", "macd", "bbands"}.issubset(
         {item["key"] for item in context["executable_indicators"]}
     )
-    assert "asset resolution and provider availability" in context[
-        "deterministic_boundaries"
-    ]
+    assert (
+        "asset resolution and provider availability"
+        in context["deterministic_boundaries"]
+    )
 
     cases = iter_eval_cases(priority="must_pass")
     case = next(item for item in cases if item.prompt == "buy and sell when it goes up")
@@ -180,7 +183,7 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
 
 def test_eval_harness_parses_canonical_sse_frames() -> None:
     events = parse_sse_events(
-        '\n'.join(
+        "\n".join(
             [
                 'data: {"type":"stage_start","stage":"interpret"}',
                 'data: {"type":"token","content":"hello"}',

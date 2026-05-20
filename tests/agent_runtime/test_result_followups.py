@@ -6,9 +6,11 @@ from typing import Any
 import pytest
 from argus.agent_runtime.result_followups import (
     ResultFollowupDraft,
+    coerce_result_followup_draft,
     compose_result_followup_response,
     fallback_result_followup_response,
     result_followup_fact_bank,
+    result_followup_llm_messages,
 )
 from argus.llm import openrouter
 
@@ -21,18 +23,21 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
         calls.append(kwargs)
         schema = kwargs["schema_model"]
         return schema(
-            parts=[
-                {
-                    "kind": "text",
-                    "text": "This run beat the benchmark; the useful read is the spread, not a generic underperformance story.",
-                },
-                {"kind": "fact", "fact_id": "symbols"},
-                {"kind": "fact", "fact_id": "total_return"},
-                {"kind": "fact", "fact_id": "benchmark_symbol"},
-                {"kind": "fact", "fact_id": "benchmark_return"},
-                {"kind": "fact", "fact_id": "benchmark_delta"},
-                {"kind": "fact", "fact_id": "caveat"},
-            ]
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "AAPL beat SPY by +14.5% in this run: the strategy returned "
+                "+40.8% while SPY returned +26.4%, so the useful read is the "
+                "spread, not a generic underperformance story."
+            ),
+            fact_ids=[
+                "symbols",
+                "relative_performance",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "caveat",
+            ],
         )
 
     response = await compose_result_followup_response(
@@ -55,11 +60,12 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
     )
 
     assert response is not None
-    assert "This run beat the benchmark" in response
+    assert "AAPL beat SPY by +14.5%" in response
     assert "For this run" not in response
     assert "Strategy return:" not in response
     assert "Asset:" not in response
     assert "AAPL" in response
+    assert "beat SPY by +14.5%" in response
     assert "+40.8%" in response
     assert "SPY" in response
     assert "+26.4%" in response
@@ -70,25 +76,66 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
     assert calls[0]["schema_model"] is ResultFollowupDraft
 
 
+def test_result_followup_schema_uses_flat_answer_and_fact_id_contract() -> None:
+    draft = coerce_result_followup_draft(
+        {
+            "relative_performance_claim": "beat_benchmark",
+            "parts": [
+                {"kind": "text", "text": "The value belongs in a fact reference."},
+                {"kind": "fact", "text": "TSLA"},
+            ],
+        }
+    )
+
+    assert draft is None
+
+
+def test_result_followup_prompt_keeps_runtime_words_out_of_market_facts() -> None:
+    messages = result_followup_llm_messages(
+        fact_bank={
+            "symbols": "TSLA",
+            "total_return": "+130.0%",
+            "benchmark_symbol": "SPY",
+            "benchmark_return": "+24.8%",
+            "benchmark_delta": "+105.2%",
+            "caveat": "Historical simulation evidence, not a prediction.",
+        },
+        focus="why_underperformed",
+        user_message="explain this after the routing fix",
+        required_fact_ids={"symbols", "total_return", "caveat"},
+    )
+
+    system_prompt = messages[0]["content"]
+    payload = json.loads(messages[1]["content"])
+    assert "routing fixes" in system_prompt
+    assert "unless fact_bank explicitly includes" in system_prompt
+    assert "unsupported causes" in system_prompt
+    assert payload["question"] == (
+        "Explain the result versus the benchmark, correcting the premise if the "
+        "strategy did not underperform."
+    )
+    assert "routing fix" not in payload["question"]
+    assert "routing fix" not in json.dumps(payload["fact_bank"])
+
+
 @pytest.mark.asyncio
-async def test_result_followup_replaces_llm_answer_that_contradicts_positive_delta() -> (
+async def test_result_followup_falls_back_when_structured_claim_contradicts_positive_delta() -> (
     None
 ):
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
-            parts=[
-                {
-                    "kind": "text",
-                    "text": "It underperformed the benchmark, so the important read is the gap.",
-                },
-                {"kind": "fact", "fact_id": "symbols"},
-                {"kind": "fact", "fact_id": "total_return"},
-                {"kind": "fact", "fact_id": "benchmark_symbol"},
-                {"kind": "fact", "fact_id": "benchmark_return"},
-                {"kind": "fact", "fact_id": "benchmark_delta"},
-                {"kind": "fact", "fact_id": "caveat"},
-            ]
+            relative_performance_claim="lagged_benchmark",
+            answer="It underperformed the benchmark, so the important read is the gap.",
+            fact_ids=[
+                "symbols",
+                "relative_performance",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "caveat",
+            ],
         )
 
     response = await compose_result_followup_response(
@@ -127,14 +174,16 @@ async def test_result_followup_rejects_fact_only_template_output() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
-            parts=[
-                {"kind": "fact", "fact_id": "symbols"},
-                {"kind": "fact", "fact_id": "total_return"},
-                {"kind": "fact", "fact_id": "benchmark_symbol"},
-                {"kind": "fact", "fact_id": "benchmark_return"},
-                {"kind": "fact", "fact_id": "benchmark_delta"},
-                {"kind": "fact", "fact_id": "caveat"},
-            ]
+            relative_performance_claim="lagged_benchmark",
+            answer=" ",
+            fact_ids=[
+                "symbols",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "caveat",
+            ],
         )
 
     response = await compose_result_followup_response(
@@ -163,25 +212,29 @@ async def test_result_followup_rejects_fact_only_template_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_result_followup_rejects_text_that_repeats_fact_values() -> None:
+async def test_result_followup_accepts_semantic_language_with_required_fact_contract() -> (
+    None
+):
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
-            parts=[
-                {
-                    "kind": "text",
-                    "text": (
-                        "This historical simulation used AAPL from "
-                        "2025-05-14 to 2026-05-14 and returned +39.7%."
-                    ),
-                },
-                {"kind": "fact", "fact_id": "symbols"},
-                {"kind": "fact", "fact_id": "total_return"},
-                {"kind": "fact", "fact_id": "benchmark_symbol"},
-                {"kind": "fact", "fact_id": "benchmark_return"},
-                {"kind": "fact", "fact_id": "benchmark_delta"},
-                {"kind": "fact", "fact_id": "caveat"},
-            ]
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "The key read is the relationship between the run and "
+                "its benchmark: AAPL beat SPY by +12.4% in this run, with "
+                "a +39.7% strategy return versus +27.3% for SPY. The wording "
+                "can stay conversational because exact values are grounded by "
+                "fact ids."
+            ),
+            fact_ids=[
+                "symbols",
+                "relative_performance",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "caveat",
+            ],
         )
 
     response = await compose_result_followup_response(
@@ -207,7 +260,10 @@ async def test_result_followup_rejects_text_that_repeats_fact_values() -> None:
         invoke_json_schema_func=fake_schema_client,
     )
 
-    assert response is None
+    assert response is not None
+    assert "exact values are grounded by fact ids" in response
+    assert "AAPL beat SPY by +12.4% in this run" in response
+    assert "+39.7%" in response
 
 
 @pytest.mark.asyncio
@@ -215,10 +271,9 @@ async def test_result_followup_rejects_unknown_fact_ids() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
-            parts=[
-                {"kind": "text", "text": "Here is an invented fact."},
-                {"kind": "fact", "fact_id": "made_up_return"},
-            ]
+            relative_performance_claim="unknown",
+            answer="Here is an invented fact.",
+            fact_ids=["made_up_return"],
         )
 
     response = await compose_result_followup_response(
@@ -328,20 +383,20 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
         assert payload["focus"] == "general"
         assert "context_packet_facts" in payload["required_fact_ids"]
         return schema(
-            parts=[
-                {
-                    "kind": "text",
-                    "text": "The run result is performance evidence first; the attached macro packet is only backdrop.",
-                },
-                {"kind": "fact", "fact_id": "symbols"},
-                {"kind": "fact", "fact_id": "total_return"},
-                {"kind": "fact", "fact_id": "benchmark_symbol"},
-                {"kind": "fact", "fact_id": "benchmark_return"},
-                {"kind": "fact", "fact_id": "benchmark_delta"},
-                {"kind": "fact", "fact_id": "context_packet_facts"},
-                {"kind": "fact", "fact_id": "context_packet_limitations"},
-                {"kind": "fact", "fact_id": "caveat"},
-            ]
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "TSLA was stronger than SPY in this run: the strategy returned "
+                "+130.0% while SPY returned +24.8%, a +105.2% gap. The attached "
+                "FEDFUNDS latest observation is only backdrop."
+            ),
+            fact_ids=[
+                "symbols",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "context_packet_facts",
+            ],
         )
 
     response = await compose_result_followup_response(
@@ -393,16 +448,127 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
 
 
 @pytest.mark.asyncio
+async def test_context_backed_why_followup_appends_missing_required_run_facts() -> None:
+    async def fake_schema_client(**kwargs: Any) -> object:
+        assert kwargs["task"] == "result_breakdown"
+        schema = kwargs["schema_model"]
+        return schema(
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "The safest explanation is performance evidence first; "
+                "the attached macro packet can only be backdrop."
+            ),
+            fact_ids=[],
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 130.0,
+                        "benchmark_return_pct": 24.8,
+                        "delta_vs_benchmark_pct": 105.2,
+                    },
+                    "risk": {"max_drawdown_pct": -32.7},
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {"start": "2023-01-01", "end": "2023-12-31"},
+            },
+            "context_packets": [
+                {
+                    "id": "packet-1",
+                    "provider": "fred",
+                    "packet_type": "macro",
+                    "facts": [
+                        {
+                            "kind": "macro_observation",
+                            "label": "FEDFUNDS latest observation",
+                            "value": 5.33,
+                        }
+                    ],
+                    "limitations": [
+                        "FRED macro observations are contextual backdrop only."
+                    ],
+                }
+            ],
+        },
+        focus="why_underperformed",
+        user_message="why did TSLA beat SPY using the attached context?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert "performance evidence first" in response
+    assert "FEDFUNDS latest observation" in response
+    assert "TSLA" in response
+    assert "AAPL" not in response
+    assert "TSLA beat SPY by +105.2% in this run" in response
+    assert "+130.0%" in response
+    assert "+24.8%" in response
+    assert "contextual backdrop only" in response
+
+
+def test_performance_fallback_preserves_context_packet_backdrop() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 130.0,
+                        "benchmark_return_pct": 24.8,
+                        "delta_vs_benchmark_pct": 105.2,
+                    },
+                    "risk": {"max_drawdown_pct": -32.7},
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {"start": "2023-01-01", "end": "2023-12-31"},
+            },
+            "context_packets": [
+                {
+                    "id": "packet-1",
+                    "provider": "fred",
+                    "packet_type": "macro",
+                    "facts": [
+                        {
+                            "kind": "macro_observation",
+                            "label": "FEDFUNDS latest observation",
+                            "value": 5.33,
+                        }
+                    ],
+                    "limitations": [
+                        "FRED macro observations are contextual backdrop only."
+                    ],
+                }
+            ],
+        },
+        focus="why_underperformed",
+    )
+
+    assert response is not None
+    assert "TSLA beat SPY in this run" in response
+    assert "Context backdrop:" in response
+    assert "FEDFUNDS latest observation" in response
+    assert "Context limits:" in response
+    assert "contextual backdrop only" in response
+
+
+@pytest.mark.asyncio
 async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> None:
     async def fake_schema_client(**kwargs: Any) -> object:
         schema = kwargs["schema_model"]
         return schema(
-            parts=[
-                {"kind": "text", "text": "Here is generic performance context."},
-                {"kind": "fact", "fact_id": "symbols"},
-                {"kind": "fact", "fact_id": "total_return"},
-                {"kind": "fact", "fact_id": "caveat"},
-            ]
+            relative_performance_claim="unknown",
+            answer="Here is generic performance context.",
+            fact_ids=["symbols", "total_return", "caveat"],
         )
 
     response = await compose_result_followup_response(
