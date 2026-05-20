@@ -77,6 +77,9 @@ def _persist_route_receipts(
     receipts: list[OpenRouterRouteReceipt],
     user_id: str,
     conversation_id: str,
+    run_id: str | None = None,
+    message_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     if not receipts or api_state.supabase_gateway is None:
         return
@@ -85,6 +88,9 @@ def _persist_route_receipts(
             api_state.supabase_gateway.create_route_receipt(
                 user_id=user_id,
                 conversation_id=conversation_id,
+                run_id=run_id,
+                message_id=message_id,
+                metadata=metadata,
                 receipt=receipt.as_dict(),
             )
         except Exception as exc:
@@ -523,10 +529,9 @@ async def chat_stream(
 
         if cancel_confirmation_action and payload.action is not None:
             action_payload = payload.action.payload
-            raw_confirmation_id = (
-                action_payload.get("confirmation_id")
-                or action_payload.get("confirmationId")
-            )
+            raw_confirmation_id = action_payload.get(
+                "confirmation_id"
+            ) or action_payload.get("confirmationId")
             confirmation_id = (
                 str(raw_confirmation_id).strip()
                 if raw_confirmation_id is not None
@@ -633,11 +638,7 @@ async def chat_stream(
             try:
                 assistant_text = result_breakdown_message(run)
             finally:
-                _persist_route_receipts(
-                    receipts=end_openrouter_route_receipt_capture(receipt_token),
-                    user_id=user.id,
-                    conversation_id=conversation.id,
-                )
+                route_receipts = end_openrouter_route_receipt_capture(receipt_token)
             metadata = {
                 "conversation_mode": "result_review",
                 "chat_action": payload.action.model_dump(mode="python"),
@@ -653,6 +654,14 @@ async def chat_stream(
                 role="assistant",
                 content=assistant_text,
                 metadata=metadata,
+            )
+            _persist_route_receipts(
+                receipts=route_receipts,
+                user_id=user.id,
+                conversation_id=conversation.id,
+                run_id=run.id if run is not None else None,
+                message_id=assistant_message.id,
+                metadata={"chat_action": payload.action.type},
             )
             yield sse_data({"type": "token", "content": assistant_text})
             yield sse_data(
@@ -719,6 +728,9 @@ async def chat_stream(
             else None
         )
         streamed_text_parts: list[str] = []
+        receipt_run_id: str | None = None
+        receipt_message_id: str | None = None
+        receipt_metadata: dict[str, Any] = {}
 
         receipt_token = begin_openrouter_route_receipt_capture()
         try:
@@ -817,9 +829,7 @@ async def chat_stream(
                                 or confirmation_card.get("confirmationId")
                                 or api_state.store.new_id()
                             ),
-                            confirmation_payload=runtime_result[
-                                "confirmation_payload"
-                            ],
+                            confirmation_payload=runtime_result["confirmation_payload"],
                             confirmation_card=confirmation_card,
                         )
                         metadata["active_confirmation_reference"] = (
@@ -850,6 +860,7 @@ async def chat_stream(
                     if isinstance(failed_action_metadata, dict):
                         metadata["failed_action"] = dict(failed_action_metadata)
                 if run is not None:
+                    receipt_run_id = run.id
                     result_card = run.conversation_result_card
                     metadata["result_card"] = result_card
                     metadata["latest_run_id"] = run.id
@@ -857,6 +868,9 @@ async def chat_stream(
                     metadata["result_strategy_id"] = run.strategy_id
                     metadata["result_conversation_id"] = run.conversation_id
                     metadata["result_fact_bank"] = result_fact_bank(run)
+                    context_packets = run.conversation_result_card.get("context_packets")
+                    if isinstance(context_packets, list):
+                        metadata["context_packets"] = context_packets
                     runtime_result["run"] = run.model_dump(mode="json")
 
                 streamed_text = "".join(streamed_text_parts).strip()
@@ -874,6 +888,11 @@ async def chat_stream(
                         content=persisted_text,
                         metadata=metadata,
                     )
+                    receipt_message_id = assistant_message.id
+                receipt_metadata = {
+                    "stage_outcome": stage_status,
+                    "conversation_mode": metadata.get("conversation_mode"),
+                }
 
                 runtime_result["message_id"] = (
                     assistant_message.id if assistant_message is not None else None
@@ -916,6 +935,9 @@ async def chat_stream(
                 receipts=end_openrouter_route_receipt_capture(receipt_token),
                 user_id=user.id,
                 conversation_id=conversation.id,
+                run_id=receipt_run_id,
+                message_id=receipt_message_id,
+                metadata=receipt_metadata,
             )
 
     return StreamingResponse(

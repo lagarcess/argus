@@ -7,6 +7,11 @@ from argus.api.schemas import BacktestRun
 
 
 def result_fact_bank(run: BacktestRun) -> dict[str, Any]:
+    context_packets = (
+        run.conversation_result_card.get("context_packets")
+        if isinstance(run.conversation_result_card, dict)
+        else None
+    )
     return {
         "run_id": run.id,
         "conversation_id": run.conversation_id,
@@ -17,6 +22,7 @@ def result_fact_bank(run: BacktestRun) -> dict[str, Any]:
         "metrics": run.metrics,
         "config_snapshot": run.config_snapshot,
         "result_card": run.conversation_result_card,
+        "context_packets": context_packets if isinstance(context_packets, list) else [],
         "chart": run.chart,
         "trades": run.trades,
     }

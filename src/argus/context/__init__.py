@@ -11,6 +11,11 @@ from argus.context.providers import (
     build_alpaca_most_actives_packet,
     build_alpaca_news_packet,
     build_fred_macro_packet,
+    fetch_alpaca_corporate_actions_packet,
+    fetch_alpaca_market_movers_packet,
+    fetch_alpaca_most_actives_packet,
+    fetch_alpaca_news_packet,
+    fetch_fred_macro_packet,
     fred_context_series_from_env,
 )
 
@@ -25,5 +30,10 @@ __all__ = [
     "build_alpaca_most_actives_packet",
     "build_alpaca_news_packet",
     "build_fred_macro_packet",
+    "fetch_alpaca_corporate_actions_packet",
+    "fetch_alpaca_market_movers_packet",
+    "fetch_alpaca_most_actives_packet",
+    "fetch_alpaca_news_packet",
+    "fetch_fred_macro_packet",
     "fred_context_series_from_env",
 ]

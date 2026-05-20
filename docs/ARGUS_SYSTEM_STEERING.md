@@ -675,6 +675,7 @@ Corporate actions are closer to deterministic event context. News and movers are
 - Render in-memory cache or Redis-style key-value storage may cache hot OHLCV/provider responses and short-lived context lookups for latency.
 - Cache must not become simulation truth unless the cached object carries provider, scope, timestamp, and reproducible source metadata.
 - Context packets must expire or be marked stale by fact type: longer for closed historical OHLCV and FRED releases, medium for corporate actions, short for news, and very short for movers or most actives.
+- Context packet collection is best-effort and latency-bounded. Provider failures may remove context enrichment, but they must not block or rewrite completed simulation truth.
 - LLM freeform chat should not be broadly cached; cache only structured deterministic inputs or outputs when replay-safe.
 
 ### Deferred Context Systems

@@ -237,6 +237,10 @@ Required model and data variables:
   synthesis from run facts plus structured context packets.
 - `ARGUS_FRED_CONTEXT_SERIES`: curated comma-separated macro series for context
   packets. Default: `FEDFUNDS,DGS10,DGS2,T10Y2Y,CPIAUCSL,CPILFESL,UNRATE,PAYEMS,INDPRO,USREC`.
+- `ARGUS_CONTEXT_PACKETS_ENABLED`: enables best-effort context packet collection
+  for completed run explanations when Supabase persistence is active.
+- `ARGUS_CONTEXT_PACKET_BUDGET_SECONDS`: bounds provider collection latency for
+  context packets. Simulation results must still persist without context.
 - `AGENT_MODEL`, `AGENT_STRUCTURED_MODEL`, and `AGENT_FALLBACK_MODEL` are
   backward-compatible aliases only. New docs, scripts, and code should use
   `ARGUS_*` names.

@@ -5,6 +5,11 @@ from typing import Any
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat.context_packets import (
+    collect_context_packets_for_completed_run,
+    enrich_run_with_context_packets,
+    persist_context_packet_records,
+)
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import BacktestRun, Conversation, User
 from argus.domain.backtesting.config import classify_symbol, default_benchmark
@@ -161,6 +166,13 @@ def persist_runtime_backtest_run(
     if run is None:
         return None
 
+    context_packets = (
+        collect_context_packets_for_completed_run(run)
+        if api_state.supabase_gateway is not None
+        else []
+    )
+    run = enrich_run_with_context_packets(run, context_packets)
+
     api_state.store.backtest_runs[run.id] = run
     api_state.store.backtest_run_owners[run.id] = user.id
 
@@ -175,6 +187,20 @@ def persist_runtime_backtest_run(
                 error=str(exc),
                 run_id=run.id,
             )
+        else:
+            try:
+                persist_context_packet_records(
+                    gateway=api_state.supabase_gateway,
+                    user_id=user.id,
+                    run=run,
+                    packets=context_packets,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Context packet persistence failed; result card snapshot remains",
+                    error=str(exc),
+                    run_id=run.id,
+                )
 
     if conversation.id in api_state.store.conversations:
         api_state.store.conversations[conversation.id] = conversation.model_copy(

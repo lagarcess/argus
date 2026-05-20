@@ -1,0 +1,271 @@
+from __future__ import annotations
+
+from datetime import date
+from typing import Any
+
+from argus.api import state as api_state
+from argus.api.chat.artifacts import result_fact_bank
+from argus.api.chat.context_packets import (
+    collect_context_packets_for_completed_run,
+    enrich_run_with_context_packets,
+)
+from argus.api.chat.persistence import persist_runtime_backtest_run
+from argus.api.schemas import BacktestRun, Conversation, User
+from argus.context import (
+    ContextPacket,
+    build_alpaca_corporate_actions_packet,
+    build_alpaca_market_movers_packet,
+    build_alpaca_most_actives_packet,
+    build_alpaca_news_packet,
+    build_fred_macro_packet,
+)
+from argus.domain.store import AlphaStore, utcnow
+from argus.llm.openrouter import OpenRouterRouteReceipt
+
+
+def _run() -> BacktestRun:
+    return BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.0}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+        },
+        conversation_result_card={
+            "title": "AAPL Buy and Hold",
+            "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            "rows": [],
+            "assumptions": [],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+
+def _user() -> User:
+    return User(
+        id="user-1",
+        email="developer@argus.local",
+        username="mock-developer",
+        display_name="Mock Developer",
+        created_at=utcnow(),
+        updated_at=utcnow(),
+    )
+
+
+def _conversation() -> Conversation:
+    return Conversation(
+        id="conversation-1",
+        title="New Chat",
+        created_at=utcnow(),
+        updated_at=utcnow(),
+    )
+
+
+def _fred_packet(series_id: str = "CPIAUCSL") -> ContextPacket:
+    return build_fred_macro_packet(
+        series_id=series_id,
+        observations=[
+            {"date": "2025-11-01", "value": "310.0"},
+            {"date": "2025-12-01", "value": "311.5"},
+        ],
+        observation_start=date(2025, 1, 1),
+        observation_end=date(2025, 12, 31),
+    )
+
+
+def test_collect_context_packets_uses_run_window_and_current_provider_scope(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_CONTEXT_PACKETS_ENABLED", "true")
+    run = _run()
+
+    packets = collect_context_packets_for_completed_run(
+        run,
+        fred_series=("CPIAUCSL",),
+        budget_seconds=2.0,
+        fetch_fred_macro_packet_func=lambda **kwargs: _fred_packet(kwargs["series_id"]),
+        fetch_alpaca_news_packet_func=lambda **kwargs: build_alpaca_news_packet(
+            symbols=kwargs["symbols"],
+            news_items=[
+                {
+                    "id": "news-1",
+                    "headline": "Apple reports product update",
+                    "symbols": ["AAPL"],
+                    "created_at": "2025-12-01T00:00:00Z",
+                }
+            ],
+            start=kwargs["start"],
+            end=kwargs["end"],
+        ),
+        fetch_alpaca_corporate_actions_packet_func=(
+            lambda **kwargs: build_alpaca_corporate_actions_packet(
+                symbols=kwargs["symbols"],
+                corporate_actions=[
+                    {
+                        "id": "action-1",
+                        "symbol": "AAPL",
+                        "type": "split",
+                        "ex_date": "2025-06-01",
+                    }
+                ],
+                start=kwargs["start"],
+                end=kwargs["end"],
+            )
+        ),
+        fetch_alpaca_market_movers_packet_func=(
+            lambda **kwargs: build_alpaca_market_movers_packet(
+                market_type=kwargs["market_type"],
+                movers={"gainers": [{"symbol": "AAPL", "change": 1.2}]},
+            )
+        ),
+        fetch_alpaca_most_actives_packet_func=(
+            lambda **kwargs: build_alpaca_most_actives_packet(
+                by=kwargs["by"],
+                most_actives=[{"symbol": "AAPL", "volume": 123456}],
+            )
+        ),
+    )
+
+    packet_types = {packet.packet_type for packet in packets}
+    assert packet_types == {
+        "macro",
+        "news",
+        "corporate_actions",
+        "market_movers",
+        "most_actives",
+    }
+    assert all(packet.not_for == "simulation_truth" for packet in packets)
+
+
+def test_enriched_run_replays_attached_context_packet_facts() -> None:
+    enriched = enrich_run_with_context_packets(_run(), [_fred_packet()])
+    fact_bank = result_fact_bank(enriched)
+
+    assert enriched.conversation_result_card["context_packet_ids"]
+    assert fact_bank["context_packets"][0]["provider"] == "fred"
+    assert fact_bank["context_packets"][0]["not_for"] == "simulation_truth"
+
+
+def test_persist_runtime_backtest_run_attaches_immutable_context_packets(
+    monkeypatch,
+) -> None:
+    class Gateway:
+        def __init__(self) -> None:
+            self.runs: list[BacktestRun] = []
+            self.packets: list[dict[str, Any]] = []
+            self.attachments: list[dict[str, Any]] = []
+
+        def create_backtest_run(
+            self,
+            *,
+            user_id: str,
+            run: BacktestRun,
+        ) -> BacktestRun:
+            del user_id
+            self.runs.append(run)
+            return run
+
+        def create_context_packet(
+            self,
+            *,
+            user_id: str,
+            packet: dict[str, Any],
+        ) -> dict[str, Any]:
+            del user_id
+            self.packets.append(packet)
+            return packet
+
+        def attach_context_packet_to_run(
+            self,
+            *,
+            user_id: str,
+            attachment: dict[str, Any],
+        ) -> dict[str, Any]:
+            del user_id
+            self.attachments.append(attachment)
+            return attachment
+
+    gateway = Gateway()
+    monkeypatch.setattr(api_state, "store", AlphaStore())
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setattr(
+        "argus.api.chat.persistence.collect_context_packets_for_completed_run",
+        lambda run: [_fred_packet()],
+    )
+
+    run = persist_runtime_backtest_run(
+        user=_user(),
+        conversation=_conversation(),
+        result_card={
+            "title": "AAPL Buy and Hold",
+            "rows": [],
+            "assumptions": [],
+        },
+        envelope={
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "asset_universe": ["AAPL"],
+            },
+            "resolved_parameters": {
+                "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+                "benchmark_symbol": "SPY",
+            },
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.0}}},
+            "benchmark_metrics": {"benchmark_symbol": "SPY"},
+        },
+    )
+
+    assert run is not None
+    assert gateway.runs[0].conversation_result_card["context_packets"]
+    assert gateway.packets[0]["not_for"] == "simulation_truth"
+    assert gateway.attachments[0]["run_id"] == run.id
+    assert gateway.attachments[0]["immutable_snapshot"] is True
+
+
+def test_route_receipt_persistence_keeps_run_and_message_context(monkeypatch) -> None:
+    from argus.api.routers.agent import _persist_route_receipts
+
+    class Gateway:
+        def __init__(self) -> None:
+            self.receipts: list[dict[str, Any]] = []
+
+        def create_route_receipt(self, **kwargs: Any) -> dict[str, Any]:
+            self.receipts.append(kwargs)
+            return kwargs
+
+    gateway = Gateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+
+    _persist_route_receipts(
+        receipts=[
+            OpenRouterRouteReceipt(
+                task="result_summary",
+                tier="chat",
+                model="chat/primary",
+                fallback_model="chat/fallback",
+                mode="chat_model",
+                schema_name=None,
+                latency_ms=42,
+                outcome="succeeded",
+            )
+        ],
+        user_id="user-1",
+        conversation_id="conversation-1",
+        run_id="run-1",
+        message_id="message-1",
+        metadata={"stage_outcome": "ready_to_respond"},
+    )
+
+    assert gateway.receipts[0]["run_id"] == "run-1"
+    assert gateway.receipts[0]["message_id"] == "message-1"
+    assert gateway.receipts[0]["metadata"]["stage_outcome"] == "ready_to_respond"
