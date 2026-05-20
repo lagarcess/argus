@@ -423,12 +423,24 @@ def _missing_required_fields(capability_context: dict[str, Any]) -> list[str]:
 
 
 def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> str | None:
+    if _is_kraken_window_limit_error(error_message):
+        return (
+            "That date range is too wide for currency-pair data at the selected "
+            "bar size. "
+            "Use a shorter window, or choose 1h, 4h, or 1D bars based on what "
+            "still fits the idea."
+        )
+    if _is_provider_history_start_error(error_message):
+        return (
+            "That start date is earlier than the equity history Argus can use "
+            "right now. Choose a 2016-or-later start date and I can keep the "
+            "same idea."
+        )
     if _is_lookback_limit_error(error_message):
         return (
-            "That date range is longer than the current backtest engine supports. "
-            "Argus can run up to 3 years at a time right now. Choose a shorter "
-            "window, like February 7, 2021 - February 7, 2024, or change the "
-            "start and end dates."
+            "That date range is outside the available data history for the "
+            "selected asset and timeframe. Choose a shorter available window, or "
+            "change the start and end dates while keeping the same idea."
         )
     if error_type == "missing_required_input":
         return (
@@ -527,7 +539,21 @@ def _is_lookback_limit_error(error_message: str | None) -> bool:
     if not error_message:
         return False
     normalized = error_message.strip().lower()
-    return "invalid_lookback_window" in normalized or "lookback" in normalized
+    return "invalid_lookback_window" in normalized
+
+
+def _is_kraken_window_limit_error(error_message: str | None) -> bool:
+    if not error_message:
+        return False
+    normalized = error_message.strip().lower()
+    return "kraken_ohlc_window_exceeded" in normalized
+
+
+def _is_provider_history_start_error(error_message: str | None) -> bool:
+    if not error_message:
+        return False
+    normalized = error_message.strip().lower()
+    return "provider_history_start_unavailable" in normalized
 
 
 def _corrected_payload(capability_context: dict[str, Any]) -> dict[str, Any] | None:

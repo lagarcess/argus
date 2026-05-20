@@ -117,6 +117,8 @@ def test_chat_runtime_eval_layer_tracks_semantic_groundedness_and_receipts() -> 
         "latency_ms",
         "outcome",
         "failure_mode",
+        "token_usage",
+        "context_packet_ids",
     }
 
 
@@ -168,6 +170,8 @@ def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
                 "latency_ms": 123,
                 "outcome": "succeeded",
                 "failure_mode": None,
+                "token_usage": None,
+                "context_packet_ids": [],
             }
         ],
         capability_context=context,

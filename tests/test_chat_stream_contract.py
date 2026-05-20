@@ -62,40 +62,15 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(api_state, "supabase_gateway", None)
 
 
-def test_internal_agent_runtime_turn_uses_app_scoped_workflow(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from argus.api.routers import agent as agent_router
+def test_internal_agent_runtime_turn_is_not_exposed_by_launch_api() -> None:
+    paths = {
+        getattr(route, "path", "")
+        for route in app.routes
+        if getattr(route, "path", "")
+    }
 
-    seen_requests: list[Any] = []
-
-    def _workflow(request: Any = None) -> object:
-        seen_requests.append(request)
-        return object()
-
-    async def _run_agent_turn(**_: Any) -> dict[str, Any]:
-        return {"stage_outcome": "ready_to_respond"}
-
-    monkeypatch.setattr(
-        agent_router.api_state,
-        "get_agent_runtime_workflow",
-        _workflow,
-    )
-    monkeypatch.setattr(agent_router, "run_agent_turn", _run_agent_turn)
-
-    response = _client().post(
-        "/internal/agent-runtime/turn",
-        json={
-            "user_id": "u1",
-            "thread_id": "thread-internal",
-            "message": "Backtest Apple.",
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"stage_outcome": "ready_to_respond"}
-    assert len(seen_requests) == 1
-    assert seen_requests[0] is not None
+    assert "/api/v1/chat/stream" in paths
+    assert "/internal/agent-runtime/turn" not in paths
 
 
 def test_chat_stream_confirmation_uses_final_payload_without_named_events(
@@ -110,8 +85,8 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
             "type": "final",
             "payload": {
                 "stage_outcome": "await_approval",
-                "assistant_response": "I read this as AAPL buy and hold.",
-                    "confirmation_payload": {
+                "assistant_response": "Ready to test AAPL with buy and hold.",
+                "confirmation_payload": {
                         "strategy": {
                             "strategy_type": "buy_and_hold",
                             "asset_universe": ["AAPL"],
@@ -162,6 +137,7 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     assert response.text.count("data: [DONE]") == 1
     payload = _final_payload(response.text)
     assert payload["confirmation"]["actions"][0]["type"] == "run_backtest"
+    assert payload.get("assistant_response") is None
     assert payload["message_id"]
     assert "run" not in payload
 

@@ -48,6 +48,7 @@ async def clarify_stage_async(
     language: str = "en",
     prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
+    del prefilled_assistant_prompt
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
     optional_parameter_choices = _optional_parameter_choices(
@@ -60,49 +61,6 @@ async def clarify_stage_async(
         unsupported_constraints=unsupported_constraints,
         optional_parameter_choices=optional_parameter_choices,
     )
-    if prefilled_assistant_prompt and (
-        not unsupported_constraints and (ambiguous_fields or requested_fields)
-    ):
-        options = _simplification_options(unsupported_constraints)
-        response_intent = _response_intent(
-            kind="unsupported_recovery" if unsupported_constraints else "clarification",
-            state=state,
-            semantic_needs=(
-                ["simplification_choice"]
-                if unsupported_constraints
-                else _semantic_needs_from_required_fields(requested_fields)
-            ),
-            requested_fields=requested_fields,
-            facts={
-                **(
-                    {"unsupported_constraints": unsupported_constraints}
-                    if unsupported_constraints
-                    else {}
-                ),
-                **({"ambiguous_fields": ambiguous_fields} if ambiguous_fields else {}),
-            },
-            options=options,
-        )
-        return StageResult(
-            outcome="await_user_reply",
-            stage_patch={
-                "assistant_prompt": prefilled_assistant_prompt,
-                "response_intent": response_intent,
-                "requested_field": requested_fields[0]
-                if len(requested_fields) == 1
-                else None,
-                "requested_fields": requested_fields,
-                **(
-                    {
-                        "unsupported_constraints": unsupported_constraints,
-                        "simplification_options": options,
-                    }
-                    if unsupported_constraints
-                    else {}
-                ),
-                **({"ambiguous_fields": ambiguous_fields} if ambiguous_fields else {}),
-            },
-        )
 
     if unsupported_constraints:
         options = _simplification_options(unsupported_constraints)
@@ -127,7 +85,8 @@ async def clarify_stage_async(
                     language=language,
                 ),
                 "response_intent": response_intent,
-                "requested_field": None,
+                "requested_field": state.requested_field,
+                "missing_required_fields": list(state.missing_required_fields),
                 "unsupported_constraints": unsupported_constraints,
                 "simplification_options": options,
             },

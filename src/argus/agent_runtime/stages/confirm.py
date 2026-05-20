@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
@@ -19,6 +18,7 @@ from argus.agent_runtime.strategy_requirements import (
 )
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
+from argus.domain.market_data.capabilities import market_data_window_violation
 
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
@@ -34,25 +34,27 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
                 "missing_required_fields": missing_required_fields,
             },
         )
-    date_limit_prompt = _date_limit_prompt(strategy)
-    if date_limit_prompt is not None:
+    date_limit_recovery = _date_limit_recovery_patch(
+        strategy=strategy,
+        optional_parameter_status=state.optional_parameter_status,
+    )
+    if date_limit_recovery is not None:
         return StageResult(
-            outcome="await_user_reply",
-            stage_patch={
-                "assistant_prompt": date_limit_prompt,
-                "requested_field": "date_range",
-                "missing_required_fields": ["date_range"],
-            },
+            outcome="needs_clarification",
+            stage_patch=date_limit_recovery,
         )
 
     optional_parameters = _resolve_optional_parameters(
         contract=contract,
         optional_parameter_status=state.optional_parameter_status,
     )
-    unsupported_assumption = _unsupported_execution_assumption(optional_parameters)
+    unsupported_assumption = _unsupported_execution_assumption(
+        optional_parameters,
+        optional_parameter_status=state.optional_parameter_status,
+    )
     if unsupported_assumption is not None:
         return StageResult(
-            outcome="await_user_reply",
+            outcome="needs_clarification",
             stage_patch=unsupported_assumption,
         )
     card_assumptions = _visible_card_assumptions(
@@ -73,13 +75,14 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
         confirmation_payload=confirmation_payload,
     )
     if validation_result["outcome"] != "ready_to_confirm":
+        stage_patch = {
+            key: value
+            for key, value in validation_result.items()
+            if key not in {"outcome", "launch_payload"}
+        }
         return StageResult(
-            outcome="await_user_reply",
-            stage_patch={
-                "assistant_prompt": validation_result["assistant_prompt"],
-                "missing_required_fields": validation_result["missing_required_fields"],
-                "requested_field": validation_result["requested_field"],
-            },
+            outcome=str(validation_result["outcome"]),
+            stage_patch=stage_patch,
         )
     confirmation_payload["confirmation_id"] = confirmation_id
     confirmation_payload["artifact_id"] = confirmation_id
@@ -99,11 +102,7 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             "candidate_strategy_draft": strategy_with_assumptions,
             "confirmation_payload": confirmation_payload,
             "artifact_references": [confirmation_reference.model_dump(mode="python")],
-            "assistant_prompt": _build_confirmation_prompt(
-                contract=contract,
-                strategy=strategy_with_assumptions,
-                optional_parameters=optional_parameters,
-            ),
+            "assistant_prompt": None,
             "requested_field": None,
             "missing_required_fields": [],
         },
@@ -143,11 +142,22 @@ def _launch_validation_failure(error_code: str) -> dict[str, Any]:
             "outcome": "needs_clarification",
             "missing_required_fields": ["date_range"],
             "requested_field": "date_range",
-            "assistant_prompt": (
-                "That rule needs more historical bars than the selected window "
-                "can provide. Choose a longer date range, or use a shorter "
-                "indicator period so the backtest has enough data to evaluate "
-                "the signal."
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                {},
+                {
+                    "category": "data_window_too_short_for_rule",
+                    "raw_value": "selected date range",
+                    "explanation": (
+                        "The selected window does not provide enough bars for "
+                        "the confirmed signal rule."
+                    ),
+                    "simplification_options": [
+                        {"label": "Use a longer date range"},
+                        {"label": "Use a shorter indicator period"},
+                        {"label": "Choose a simpler supported rule"},
+                    ],
+                },
             ),
         }
     if error_code in {
@@ -160,22 +170,44 @@ def _launch_validation_failure(error_code: str) -> dict[str, Any]:
             "outcome": "needs_clarification",
             "missing_required_fields": ["entry_logic"],
             "requested_field": "entry_logic",
-            "assistant_prompt": (
-                "I understand the direction, but I need you to define the entry "
-                "rule in executable terms before I can make this ready to run. "
-                "For example: a percentage move, price above a moving average, "
-                "a moving-average crossover, an RSI threshold, a MACD crossover, "
-                "or a Bollinger Band touch."
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                {},
+                {
+                    "category": "unsupported_indicator_rule",
+                    "raw_value": error_code,
+                    "explanation": (
+                        "The strategy direction is understandable, but the "
+                        "entry rule is not executable as structured."
+                    ),
+                    "simplification_options": [
+                        {"label": "Use a supported RSI threshold rule"},
+                        {"label": "Use a supported moving-average crossover"},
+                        {"label": "Keep the full idea as a draft"},
+                    ],
+                },
             ),
         }
     return {
         "outcome": "needs_clarification",
         "missing_required_fields": [],
         "requested_field": None,
-        "assistant_prompt": (
-            "I understand the idea, but one part is not executable yet. Tell me "
-            "which rule, asset, or date range you want to adjust and I will keep "
-            "the draft intact."
+        "assistant_prompt": None,
+        "optional_parameter_status": _with_unsupported_constraint(
+            {},
+            {
+                "category": "launch_payload_not_executable",
+                "raw_value": error_code,
+                "explanation": (
+                    "One part of the draft is not executable in the current "
+                    "backtest engine."
+                ),
+                "simplification_options": [
+                    {"label": "Adjust the strategy rule"},
+                    {"label": "Adjust the asset"},
+                    {"label": "Adjust the date range"},
+                ],
+            },
         ),
     }
 
@@ -197,30 +229,116 @@ def _missing_required_fields(
     )
 
 
-def _date_limit_prompt(strategy: dict[str, Any]) -> str | None:
+def _date_limit_recovery_patch(
+    *,
+    strategy: dict[str, Any],
+    optional_parameter_status: dict[str, Any],
+) -> dict[str, Any] | None:
     raw_date_range = strategy.get("date_range")
     if raw_date_range in (None, ""):
         return None
     if _is_since_ipo_request(raw_date_range):
-        return (
-            "Since IPO is longer than the current backtest engine can run for most listed assets. "
-            "Argus supports up to 3 years per simulation right now. Do you want to use the latest "
-            "3-year window, or choose specific start and end dates?"
+        return _recoverable_constraint_patch(
+            optional_parameter_status=optional_parameter_status,
+            requested_field="date_range",
+            missing_required_fields=["date_range"],
+            constraint={
+                "category": "data_window_unavailable",
+                "raw_value": raw_date_range,
+                "explanation": (
+                    "The requested maximum-history window can reach earlier than "
+                    "the launch path can currently test."
+                ),
+                "simplification_options": [
+                    {"label": "Choose a specific start date"},
+                    {"label": "Use the maximum available launch window"},
+                    {"label": "Use a shorter recent window"},
+                ],
+            },
         )
     resolved = resolve_date_range(raw_date_range)
-    if (resolved.end - resolved.start).days <= 365 * 3:
+    asset_class = _strategy_asset_class(strategy)
+    timeframe = _strategy_timeframe(strategy)
+    if asset_class is None:
         return None
-    suggested_start = resolved.end - timedelta(days=365 * 3)
-    suggestion = (
-        f"{_format_date(suggested_start)} - {_format_date(resolved.end)}"
-        if suggested_start < resolved.end
-        else "a shorter window"
+    violation = market_data_window_violation(
+        asset_class=asset_class,
+        timeframe=timeframe,
+        start_date=resolved.start,
+        end_date=resolved.end,
     )
-    return (
-        "I understand the date range, but it is longer than the current backtest "
-        "engine can run. Argus supports up to 3 years per simulation right now. "
-        f"Do you want to use {suggestion}, or choose a different start and end date?"
-    )
+    if violation is None:
+        return None
+    if violation.code == "provider_history_start_unavailable":
+        return _recoverable_constraint_patch(
+            optional_parameter_status=optional_parameter_status,
+            requested_field="date_range",
+            missing_required_fields=["date_range"],
+            constraint={
+                "category": "data_window_unavailable",
+                "raw_value": raw_date_range,
+                "explanation": (
+                    "The requested start date is earlier than the available "
+                    "equity launch window."
+                ),
+                "simplification_options": [
+                    {"label": "Choose a start date in 2016 or later"},
+                    {"label": "Use the maximum available launch window"},
+                    {"label": "Use a shorter recent window"},
+                ],
+            },
+        )
+    if violation.code == "provider_timeframe_unavailable":
+        return _recoverable_constraint_patch(
+            optional_parameter_status=optional_parameter_status,
+            requested_field="timeframe",
+            missing_required_fields=["timeframe"],
+            constraint={
+                "category": "data_timeframe_unavailable",
+                "raw_value": timeframe,
+                "explanation": (
+                    "The selected bar size is not available for this currency "
+                    "test in the launch path."
+                ),
+                "simplification_options": [
+                    {"label": "Use 1h bars"},
+                    {"label": "Use 4h bars"},
+                    {"label": "Use 1D bars"},
+                ],
+            },
+        )
+    if violation.code == "kraken_ohlc_window_exceeded":
+        return _recoverable_constraint_patch(
+            optional_parameter_status=optional_parameter_status,
+            requested_field="date_range",
+            missing_required_fields=["date_range"],
+            constraint={
+                "category": "data_window_unavailable",
+                "raw_value": raw_date_range,
+                "explanation": (
+                    "The requested window is too wide for this currency test at "
+                    "the selected bar size."
+                ),
+                "simplification_options": [
+                    {"label": "Use a shorter window"},
+                    {"label": "Use 4h bars"},
+                    {"label": "Use 1D bars"},
+                ],
+            },
+        )
+    return None
+
+
+def _strategy_asset_class(strategy: dict[str, Any]) -> str | None:
+    asset_class = strategy.get("asset_class")
+    if asset_class in {"equity", "crypto", "currency_pair"}:
+        return str(asset_class)
+    return None
+
+
+def _strategy_timeframe(strategy: dict[str, Any]) -> str:
+    raw_timeframe = str(strategy.get("timeframe") or "1D").strip()
+    return "1D" if raw_timeframe.lower() == "1d" else raw_timeframe.lower()
 
 
 def _is_since_ipo_request(value: Any) -> bool:
@@ -228,10 +346,6 @@ def _is_since_ipo_request(value: Any) -> bool:
         return False
     normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
     return normalized in {"since_ipo", "max_available", "maximum_available"}
-
-
-def _format_date(value: date) -> str:
-    return f"{value.strftime('%B')} {value.day}, {value.year}"
 
 
 def _resolve_optional_parameters(
@@ -267,43 +381,103 @@ def _resolve_optional_parameters(
 
 def _unsupported_execution_assumption(
     optional_parameters: dict[str, dict[str, Any]],
+    *,
+    optional_parameter_status: dict[str, Any],
 ) -> dict[str, Any] | None:
     fees = _parameter_value(optional_parameters, "fees")
     if not _is_zero_assumption(fees):
-        return {
-            "assistant_prompt": (
-                "I can show this with no-fee assumptions, but the current backtest "
-                "engine does not apply custom trading fees yet. Should I keep no "
-                "fees, or adjust another part of the strategy?"
-            ),
-            "requested_field": "fees",
-            "missing_required_fields": ["fees"],
-        }
+        return _recoverable_constraint_patch(
+            optional_parameter_status=optional_parameter_status,
+            requested_field="fees",
+            missing_required_fields=["fees"],
+            constraint={
+                "category": "unsupported_execution_assumption",
+                "raw_value": "custom trading fees",
+                "explanation": (
+                    "The launch engine does not apply custom trading fees yet."
+                ),
+                "simplification_options": [
+                    {"label": "Keep no-fee assumptions"},
+                    {"label": "Adjust another strategy detail"},
+                    {"label": "Keep the idea as a draft"},
+                ],
+            },
+        )
 
     slippage = _parameter_value(optional_parameters, "slippage")
     if not _is_zero_assumption(slippage):
-        return {
-            "assistant_prompt": (
-                "I can show this with no-slippage assumptions, but the current "
-                "backtest engine does not simulate custom slippage yet. Should I "
-                "keep no slippage, or adjust another part of the strategy?"
-            ),
-            "requested_field": "slippage",
-            "missing_required_fields": ["slippage"],
-        }
+        return _recoverable_constraint_patch(
+            optional_parameter_status=optional_parameter_status,
+            requested_field="slippage",
+            missing_required_fields=["slippage"],
+            constraint={
+                "category": "unsupported_execution_assumption",
+                "raw_value": "custom slippage",
+                "explanation": (
+                    "The launch engine does not simulate custom slippage yet."
+                ),
+                "simplification_options": [
+                    {"label": "Keep no-slippage assumptions"},
+                    {"label": "Adjust another strategy detail"},
+                    {"label": "Keep the idea as a draft"},
+                ],
+            },
+        )
 
     engine_options = _parameter_value(optional_parameters, "engine_options")
     if isinstance(engine_options, dict) and engine_options:
-        return {
-            "assistant_prompt": (
-                "Those engine options are not executable in the current backtest "
-                "engine. Tell me the strategy rule, asset, or date range you want "
-                "to adjust and I will keep the draft intact."
-            ),
-            "requested_field": "engine_options",
-            "missing_required_fields": ["engine_options"],
-        }
+        return _recoverable_constraint_patch(
+            optional_parameter_status=optional_parameter_status,
+            requested_field="engine_options",
+            missing_required_fields=["engine_options"],
+            constraint={
+                "category": "unsupported_execution_assumption",
+                "raw_value": "custom engine options",
+                "explanation": (
+                    "Those engine options are not executable in the current "
+                    "launch backtest."
+                ),
+                "simplification_options": [
+                    {"label": "Adjust the strategy rule"},
+                    {"label": "Adjust the asset"},
+                    {"label": "Adjust the date range"},
+                ],
+            },
+        )
     return None
+
+
+def _recoverable_constraint_patch(
+    *,
+    optional_parameter_status: dict[str, Any],
+    requested_field: str | None,
+    missing_required_fields: list[str],
+    constraint: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "assistant_prompt": None,
+        "requested_field": requested_field,
+        "missing_required_fields": missing_required_fields,
+        "optional_parameter_status": _with_unsupported_constraint(
+            optional_parameter_status,
+            constraint,
+        ),
+    }
+
+
+def _with_unsupported_constraint(
+    optional_parameter_status: dict[str, Any],
+    constraint: dict[str, Any],
+) -> dict[str, Any]:
+    unsupported_constraints = [
+        item
+        for item in optional_parameter_status.get("unsupported_constraints", [])
+        if isinstance(item, dict)
+    ]
+    return {
+        **optional_parameter_status,
+        "unsupported_constraints": [*unsupported_constraints, constraint],
+    }
 
 
 def _is_zero_assumption(value: Any) -> bool:
@@ -313,97 +487,6 @@ def _is_zero_assumption(value: Any) -> bool:
         return float(value) == 0.0
     except (TypeError, ValueError):
         return False
-
-
-def _build_confirmation_prompt(
-    *,
-    contract: CapabilityContract,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, dict[str, Any]],
-) -> str:
-    strategy_type = _resolve_strategy_type(strategy, optional_parameters)
-    summary = _plain_language_strategy_summary(
-        strategy=strategy,
-        optional_parameters=optional_parameters,
-        strategy_type=strategy_type,
-    )
-    user_selected_lines = []
-    assumption_lines = []
-    for field_name, parameter in optional_parameters.items():
-        entry = _format_optional_assumption(
-            field_name=field_name,
-            parameter=parameter,
-            strategy=strategy,
-            strategy_type=strategy_type,
-        )
-        if entry is None:
-            continue
-        if parameter.get("source") == "user":
-            user_selected_lines.append(entry)
-        else:
-            assumption_lines.append(entry)
-
-    assumptions = [*user_selected_lines, *assumption_lines]
-    assumption_text = f" I will use {', '.join(assumptions)}." if assumptions else ""
-    return (
-        f"{summary}{assumption_text} Use the Run backtest button on the card "
-        "when you are ready, or tell me what to change."
-    )
-
-
-def _plain_language_strategy_summary(
-    *,
-    strategy: dict[str, Any],
-    optional_parameters: dict[str, dict[str, Any]],
-    strategy_type: str,
-) -> str:
-    assets = _asset_label(strategy.get("asset_universe"))
-    date_range = _format_value(strategy.get("date_range"))
-    strategy_type_label = _strategy_type_label(strategy_type)
-
-    if strategy_type == "buy_and_hold":
-        return f"I read this as a {strategy_type_label} backtest for {assets} over {date_range}."
-
-    if strategy_type == "dca_accumulation":
-        cadence = _resolved_cadence(strategy, optional_parameters)
-        cadence_phrase = f" on a {cadence} cadence" if cadence is not None else ""
-        return f"I read this as a {strategy_type_label} backtest for {assets}{cadence_phrase} over {date_range}."
-
-    entry_logic = _format_value(strategy.get("entry_logic"))
-    exit_logic = _format_value(strategy.get("exit_logic"))
-    article = _article_for(strategy_type_label)
-    return (
-        f"I read this as {article} {strategy_type_label} backtest for {assets}: "
-        f"entry rule: {entry_logic}; exit rule: {exit_logic}; over {date_range}."
-    )
-
-
-def _format_optional_assumption(
-    *,
-    field_name: str,
-    parameter: dict[str, Any],
-    strategy: dict[str, Any],
-    strategy_type: str,
-) -> str | None:
-    value = parameter.get("value")
-    if field_name == "initial_capital" and isinstance(value, int | float):
-        if strategy_type == "dca_accumulation":
-            contribution = _strategy_capital_amount(strategy)
-            if contribution is not None:
-                return f"${contribution:,.0f} recurring contribution"
-        return f"${float(value):,.0f} starting capital"
-    if field_name == "timeframe" and value:
-        return f"{value} bars"
-    if field_name == "fees":
-        return "no trading fees" if value in (0, 0.0, "0", "0.0") else f"{value} fees"
-    if field_name == "slippage":
-        return "no slippage" if value in (0, 0.0, "0", "0.0") else f"{value} slippage"
-    if field_name == "engine_options":
-        return None
-    if field_name == "cadence" and strategy_type == "dca_accumulation":
-        cadence = _resolved_cadence(strategy, {}) or value
-        return f"{cadence} cadence" if cadence else None
-    return None
 
 
 def _visible_card_assumptions(
@@ -521,36 +604,3 @@ def _resolved_cadence(
             return cadence_value
     return None
 
-
-def _strategy_type_label(strategy_type: str) -> str:
-    labels = {
-        "buy_and_hold": "buy-and-hold",
-        "dca_accumulation": "DCA accumulation",
-        "indicator_threshold": "indicator threshold",
-        "signal_strategy": "signal strategy",
-    }
-    return labels.get(strategy_type, strategy_type.replace("_", " "))
-
-
-def _article_for(value: str) -> str:
-    return "an" if value[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
-
-
-def _asset_label(value: Any) -> str:
-    if isinstance(value, list):
-        return ", ".join(str(item) for item in value) if value else "the selected asset"
-    if value is None or value == "":
-        return "the selected asset"
-    return str(value)
-
-
-def _format_value(value: Any) -> str:
-    if isinstance(value, dict):
-        if {"start", "end"}.intersection(value) or {"from", "to"}.intersection(value):
-            return resolve_date_range(value).display
-        return ", ".join(f"{key}: {nested_value}" for key, nested_value in value.items())
-    if isinstance(value, list):
-        return ", ".join(str(item) for item in value) if value else "none provided"
-    if value is None or value == "":
-        return "none provided"
-    return str(value)

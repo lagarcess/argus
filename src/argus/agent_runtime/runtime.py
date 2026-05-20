@@ -228,7 +228,11 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
         and explicit_prompt != OFFLINE_CLARIFICATION_FALLBACK
         and not should_prefer_composed_intent(run_state)
     ):
-        return result
+        if result.get("assistant_response") == explicit_prompt:
+            return result
+        patched = dict(result)
+        patched.setdefault("assistant_response", explicit_prompt)
+        return patched
     composed = compose_response_intent(run_state)
     if composed is None:
         return result
@@ -325,6 +329,8 @@ def _pending_strategy_payload(
     if not isinstance(missing_required_fields, list):
         missing_required_fields = list(run_state.missing_required_fields)
     requested_field = result.get("requested_field")
+    if requested_field in (None, ""):
+        requested_field = getattr(run_state, "requested_field", None)
     payload = {
         "strategy": strategy.model_dump(mode="python"),
         "requested_field": (

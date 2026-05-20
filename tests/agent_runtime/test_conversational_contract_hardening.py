@@ -1156,7 +1156,9 @@ def test_natural_language_approval_executes_only_after_confirmation_card(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "Run backtest" in result.patch["assistant_response"]
+    response_text = result.patch["assistant_response"].lower()
+    assert "visible card" in response_text
+    assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
 
 
@@ -1198,7 +1200,9 @@ def test_confirmation_replay_without_material_change_defers_to_card_action(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "Run backtest" in result.patch["assistant_response"]
+    response_text = result.patch["assistant_response"].lower()
+    assert "visible card" in response_text
+    assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
     assert "text_action_deferred_to_confirmation_card" in result.decision.reason_codes
 

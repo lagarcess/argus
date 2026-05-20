@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
 from argus.domain.engine_launch.result_facts import (
@@ -28,6 +29,7 @@ RelativePerformanceClaim = Literal[
     "not_applicable",
     "unknown",
 ]
+CausalAttributionClaim = Literal["none", "directly_supported", "unsupported"]
 
 
 class ResultFollowupDraft(BaseModel):
@@ -38,6 +40,15 @@ class ResultFollowupDraft(BaseModel):
             "Structured claim about strategy performance versus benchmark. Use the "
             "supplied relative_performance_truth when it is known."
         )
+    )
+    causal_attribution_claim: CausalAttributionClaim = Field(
+        default="none",
+        description=(
+            "Use unsupported if the answer claims or implies that a rule, macro "
+            "condition, news item, or context packet caused/helped/avoided the "
+            "performance without a directly supplied causal fact. Use directly_supported "
+            "only when fact_bank directly supports causality. Otherwise use none."
+        ),
     )
     answer: str = Field(
         description=(
@@ -75,6 +86,7 @@ async def compose_result_followup_response(
         focus=focus,
         include_context=use_context_route,
     )
+    context_packet_ids = context_packet_ids_from_fact_bank(fact_bank)
     llm_task = result_followup_llm_task(
         fact_bank=fact_bank,
         focus=focus,
@@ -90,6 +102,7 @@ async def compose_result_followup_response(
             ),
             schema_model=ResultFollowupDraft,
             schema_name="ResultFollowupDraft",
+            context_packet_ids=context_packet_ids,
         )
         if inspect.isawaitable(raw_response):
             raw_response = await raw_response
@@ -107,8 +120,16 @@ async def compose_result_followup_response(
         record_result_followup_fallback_receipt(
             task=llm_task,
             failure_mode="invalid_result_followup_draft",
+            context_packet_ids=context_packet_ids,
         )
         return None
+    if draft.causal_attribution_claim == "unsupported":
+        record_result_followup_fallback_receipt(
+            task=llm_task,
+            failure_mode="unsupported_causal_attribution_claim",
+            context_packet_ids=context_packet_ids,
+        )
+        return fallback_result_followup_response(metadata=metadata, focus=focus)
     rendered = render_result_followup_draft(
         draft=draft,
         fact_bank=fact_bank,
@@ -119,6 +140,7 @@ async def compose_result_followup_response(
         record_result_followup_fallback_receipt(
             task=llm_task,
             failure_mode="result_followup_draft_rejected",
+            context_packet_ids=context_packet_ids,
         )
         return None
     claim_failure = result_followup_claim_failure(
@@ -130,6 +152,7 @@ async def compose_result_followup_response(
         record_result_followup_fallback_receipt(
             task=llm_task,
             failure_mode=claim_failure,
+            context_packet_ids=context_packet_ids,
         )
         return fallback_result_followup_response(metadata=metadata, focus=focus)
     return rendered
@@ -160,6 +183,7 @@ def record_result_followup_fallback_receipt(
     *,
     task: OpenRouterTask,
     failure_mode: str,
+    context_packet_ids: list[str] | None = None,
 ) -> None:
     record_openrouter_route_receipt(
         task=task,
@@ -169,6 +193,7 @@ def record_result_followup_fallback_receipt(
         latency_ms=0,
         outcome="failed",
         failure_mode=failure_mode,
+        context_packet_ids=context_packet_ids,
     )
 
 
@@ -183,6 +208,7 @@ def result_followup_llm_messages(
         {
             "role": "system",
             "content": (
+                f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 "You are Argus, a chat-first investing backtest copilot. Answer the "
                 "user's follow-up using only the supplied fact_bank. Be conversational, "
                 "specific, and useful; do not sound like a fixed template. Return a "
@@ -191,9 +217,21 @@ def result_followup_llm_messages(
                 "symbols, dates, percentages, drawdowns, benchmarks, caveats, context "
                 "facts, and next-test options ground the answer. fact_ids must include every "
                 "fact_id in required_fact_ids; do not omit required fact ids even when "
-                "they feel repetitive. Do not invent fact ids. Set "
+                "they feel repetitive. Do not invent fact ids. Do not expose fact_bank "
+                "keys or schema names in the answer, including benchmark_delta, "
+                "total_return, max_drawdown, context_packet_facts, fact_ids, or "
+                "relative_performance_claim; translate them into plain language. Set "
+                "the first sentence as a plain takeaway, not a metric recap. For "
+                "why/how follow-ups, use one or two short paragraphs: first say what "
+                "the simulation shows, then say what it cannot prove. Do not write "
+                "like a report abstract. For next-experiment follow-ups, use a short "
+                "lead-in and two or three bullets from the provided options. Set "
                 "relative_performance_claim to the supplied relative_performance_truth "
-                "when it is known, and keep the answer consistent with that claim. Correct "
+                "when it is known, and keep the answer consistent with that claim. Set "
+                "causal_attribution_claim to unsupported if your answer claims or implies "
+                "that a strategy rule, macro backdrop, event, or context item caused, "
+                "helped, avoided, drove, or explained performance beyond the supplied "
+                "metrics. Correct "
                 "false premises directly. Explain what happened from metrics separately "
                 "from plausible non-causal market interpretation. Use context_packet_facts "
                 "only as possible backdrop, never as proof of causality unless the fact "
@@ -201,10 +239,12 @@ def result_followup_llm_messages(
                 "them: software changes, runtime changes, routing fixes, provider paths, "
                 "implementation details, or app internals. Do not repeat, negate, or explain "
                 "those terms just because the user mentioned them; treat them as irrelevant "
-                "conversation context and answer the investing result. Only suggest next "
-                "tests when focus is next_experiment; "
-                "when you do, offer only tests listed in runnable_next_tests or "
-                "next_experiment_options. Do not invent trades, prices, support, indicators, "
+                "conversation context and answer the investing result. Suggest next tests "
+                "when focus is next_experiment, or when user_message also asks what to try, "
+                "compare, refine, or improve next. When you do, offer only tests listed in "
+                "runnable_next_tests or next_experiment_options, and format them as two "
+                "or three short, separate bullets or numbered lines. Do not invent trades, "
+                "prices, support, indicators, "
                 "predictions, investment advice, unsupported mechanics, or unsupported "
                 "causes."
             ),
@@ -215,6 +255,7 @@ def result_followup_llm_messages(
                 {
                     "question": result_followup_focus_question(focus),
                     "focus": focus,
+                    "user_message": user_message,
                     "fact_bank": fact_bank,
                     "required_fact_ids": sorted(required_fact_ids),
                     "relative_performance_truth": relative_performance_truth(fact_bank),
@@ -238,6 +279,18 @@ def result_followup_focus_question(focus: ResultFollowupFocus) -> str:
         "assumptions": "Explain the assumptions used by the latest run.",
     }
     return questions.get(focus, questions["general"])
+
+
+def context_packet_ids_from_fact_bank(fact_bank: dict[str, str]) -> list[str]:
+    raw = str(fact_bank.get("context_packet_ids") or "").strip()
+    if not raw:
+        return []
+    packet_ids: list[str] = []
+    for value in raw.split(","):
+        packet_id = value.strip()
+        if packet_id and packet_id not in packet_ids:
+            packet_ids.append(packet_id)
+    return packet_ids
 
 
 def coerce_result_followup_draft(value: Any) -> ResultFollowupDraft | None:
@@ -290,6 +343,10 @@ def render_result_followup_draft(
     body = normalize_text(draft.answer)
     if not body:
         return None
+    if draft.causal_attribution_claim == "unsupported":
+        return None
+    if contains_user_visible_internal_fact_name(body):
+        return None
     if len(draft.fact_ids) > 36:
         return None
     used_fact_ids: set[str] = set()
@@ -326,6 +383,25 @@ def render_result_followup_draft(
     if len(rendered.split()) > max_words:
         return None
     return rendered.strip()
+
+
+INTERNAL_FACT_NAMES = (
+    "benchmark_delta",
+    "total_return",
+    "benchmark_return",
+    "max_drawdown",
+    "trade_count",
+    "context_packet_facts",
+    "context_packet_ids",
+    "fact_bank",
+    "fact_ids",
+    "relative_performance_claim",
+)
+
+
+def contains_user_visible_internal_fact_name(answer: str) -> bool:
+    normalized = answer.lower()
+    return any(name in normalized for name in INTERNAL_FACT_NAMES)
 
 
 def appendable_missing_required_fact_ids(
@@ -490,7 +566,10 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
     assumptions = assumptions_from_result_metadata(metadata)
     if assumptions:
         fact_bank["assumptions"] = "; ".join(clean_fragment(item) for item in assumptions)
-    context_facts = context_packet_fact_summary(_context_packets_from_metadata(metadata))
+    context_facts = context_packet_fact_summary(
+        _context_packets_from_metadata(metadata),
+        symbols=symbols_list(metadata),
+    )
     fact_bank.update(context_facts)
     fact_bank["caveat"] = (
         "Historical simulation evidence, not a prediction or trading recommendation"
@@ -587,7 +666,7 @@ def fallback_result_followup_response(
     if focus == "what_tested":
         return fallback_what_tested_response(fact_bank)
     if focus == "next_experiment":
-        return fact_bank["runnable_next_tests"] + "."
+        return fallback_next_experiment_response(fact_bank)
     if focus == "assumptions" and "assumptions" in fact_bank:
         return "The run used: " + fact_bank["assumptions"] + "."
     if focus == "why_underperformed":
@@ -595,6 +674,38 @@ def fallback_result_followup_response(
     if focus == "general":
         return fallback_general_result_followup_response(fact_bank)
     return fallback_performance_response(fact_bank)
+
+
+def fallback_next_experiment_response(fact_bank: dict[str, str]) -> str:
+    options = structured_next_experiment_labels(fact_bank)
+    if options:
+        bullets = "\n".join(
+            f"- {_ensure_sentence(_sentence_case(option))}" for option in options[:3]
+        )
+        return "The next useful move is to isolate one assumption.\n\n" + bullets
+    return _ensure_sentence(clean_fragment(fact_bank["runnable_next_tests"]))
+
+
+def structured_next_experiment_labels(fact_bank: dict[str, str]) -> list[str]:
+    raw_options = fact_bank.get("next_experiment_options")
+    if not raw_options:
+        return []
+    try:
+        parsed = json.loads(raw_options)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    labels: list[str] = []
+    for option in parsed:
+        if not isinstance(option, dict):
+            continue
+        if option.get("contract") != "supported_backtest_experiment":
+            continue
+        label = clean_fragment(option.get("label"))
+        if label and label not in labels:
+            labels.append(label)
+    return labels
 
 
 def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
@@ -623,7 +734,8 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
             intro = f"{symbols} lagged the benchmark in this run."
     else:
         intro = "Here is the performance context for this run."
-    context = f"The run used {article_for(strategy)} {strategy} strategy on {symbols}"
+    strategy_phrase = strategy_run_phrase(strategy)
+    context = f"The run used {article_for(strategy_phrase)} {strategy_phrase} on {symbols}"
     if date_range:
         context += f" over {date_range}"
     pieces = [intro, context + "."]
@@ -659,8 +771,9 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
 def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str | None:
     symbols = fact_bank.get("symbols") or "the latest run"
     strategy = fact_bank.get("strategy") or "strategy"
+    strategy_phrase = strategy_run_phrase(strategy)
     pieces = [
-        f"I still have the latest run: {symbols} with {article_for(strategy)} {strategy} strategy.",
+        f"I still have the latest run: {symbols} with {article_for(strategy_phrase)} {strategy_phrase}.",
     ]
     if fact_bank.get("date_range"):
         pieces.append(f"Period: {fact_bank['date_range']}.")
@@ -680,9 +793,7 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
         pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
     append_context_backdrop(pieces, fact_bank)
     if fact_bank.get("runnable_next_tests"):
-        pieces.append(
-            "Try next: " + clean_fragment(fact_bank["runnable_next_tests"]) + "."
-        )
+        pieces.append(_ensure_sentence(clean_fragment(fact_bank["runnable_next_tests"])))
     if fact_bank.get("caveat"):
         pieces.append(clean_fragment(fact_bank["caveat"]) + ".")
     response = " ".join(piece.strip() for piece in pieces if piece.strip())
@@ -705,8 +816,9 @@ def append_context_backdrop(pieces: list[str], fact_bank: dict[str, str]) -> Non
 def fallback_what_tested_response(fact_bank: dict[str, str]) -> str:
     symbols = fact_bank.get("symbols") or "the selected asset"
     strategy = fact_bank.get("strategy") or "strategy"
+    strategy_phrase = strategy_run_phrase(strategy)
     parts = [
-        f"I tested {symbols} with {article_for(strategy)} {strategy} strategy",
+        f"I tested {symbols} with {article_for(strategy_phrase)} {strategy_phrase}",
     ]
     if fact_bank.get("date_range"):
         parts.append(f"over {fact_bank['date_range']}")
@@ -754,6 +866,45 @@ def article_for(label: str) -> str:
     }:
         return "an"
     return "an" if stripped[0].lower() in {"a", "e", "i", "o", "u"} else "a"
+
+
+def strategy_run_phrase(label: str) -> str:
+    phrase = _humanized_strategy_phrase(label)
+    if not phrase:
+        return "strategy"
+    if phrase.endswith("strategy"):
+        return phrase
+    if phrase == "buy and hold":
+        return "buy and hold strategy"
+    return f"{phrase} strategy"
+
+
+def _humanized_strategy_phrase(label: str) -> str:
+    phrase = normalize_text(label).lower().replace("buy-and-hold", "buy and hold")
+    if not phrase:
+        return ""
+    words = phrase.split()
+    acronym_replacements = {
+        "rsi": "RSI",
+        "sma": "SMA",
+        "ema": "EMA",
+        "macd": "MACD",
+    }
+    return " ".join(acronym_replacements.get(word, word) for word in words)
+
+
+def _ensure_sentence(value: str) -> str:
+    cleaned = clean_fragment(value)
+    if not cleaned:
+        return ""
+    return cleaned if cleaned.endswith((".", "!", "?")) else cleaned + "."
+
+
+def _sentence_case(value: str) -> str:
+    cleaned = clean_fragment(value)
+    if not cleaned:
+        return ""
+    return cleaned[:1].upper() + cleaned[1:]
 
 
 def append_sentence_piece(current: str, piece: str) -> str:
@@ -836,14 +987,19 @@ def format_percent(value: float, *, signed: bool = True) -> str:
 
 
 def symbols_label(metadata: dict[str, Any]) -> str:
+    values = symbols_list(metadata)
+    return ", ".join(values)
+
+
+def symbols_list(metadata: dict[str, Any]) -> list[str]:
     symbols = metadata.get("symbols")
     if not isinstance(symbols, list) or not symbols:
         symbols = config_snapshot(metadata).get("symbols")
     if isinstance(symbols, list):
         values = [str(symbol).strip().upper() for symbol in symbols if str(symbol)]
         if values:
-            return ", ".join(values)
-    return ""
+            return values
+    return []
 
 
 def strategy_label(value: Any) -> str:

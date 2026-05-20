@@ -9,6 +9,7 @@ from argus.agent_runtime.result_followups import (
     coerce_result_followup_draft,
     compose_result_followup_response,
     fallback_result_followup_response,
+    render_result_followup_draft,
     result_followup_fact_bank,
     result_followup_llm_messages,
 )
@@ -110,12 +111,50 @@ def test_result_followup_prompt_keeps_runtime_words_out_of_market_facts() -> Non
     assert "routing fixes" in system_prompt
     assert "unless fact_bank explicitly includes" in system_prompt
     assert "unsupported causes" in system_prompt
+    assert "Do not expose fact_bank keys" in system_prompt
+    assert "benchmark_delta" in system_prompt
+    assert "translate them into plain language" in system_prompt
+    assert "user_message also asks what to try" in system_prompt
+    assert "separate bullets or numbered lines" in system_prompt
     assert payload["question"] == (
         "Explain the result versus the benchmark, correcting the premise if the "
         "strategy did not underperform."
     )
+    assert payload["user_message"] == "explain this after the routing fix"
     assert "routing fix" not in payload["question"]
     assert "routing fix" not in json.dumps(payload["fact_bank"])
+
+
+def test_result_followup_rejects_user_visible_internal_fact_names() -> None:
+    rendered = render_result_followup_draft(
+        draft=ResultFollowupDraft(
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "The benchmark_delta was +41.3 percentage points, so the strategy "
+                "beat SPY."
+            ),
+            fact_ids=[
+                "symbols",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "caveat",
+            ],
+        ),
+        fact_bank={
+            "symbols": "TSLA",
+            "total_return": "+64.0%",
+            "benchmark_symbol": "SPY",
+            "benchmark_return": "+22.7%",
+            "benchmark_delta": "+41.3%",
+            "caveat": "Historical simulation evidence, not a prediction.",
+        },
+        required_fact_ids={"symbols", "total_return", "caveat"},
+        focus="why_underperformed",
+    )
+
+    assert rendered is None
 
 
 @pytest.mark.asyncio
@@ -332,6 +371,7 @@ def test_result_followup_next_tests_respect_strategy_family() -> None:
     )
 
     assert "compare with buy-and-hold" not in buy_hold_facts["runnable_next_tests"]
+    assert "Runnable next tests" not in buy_hold_facts["runnable_next_tests"]
     assert "RSI threshold on AAPL" in buy_hold_facts["runnable_next_tests"]
     assert "compare NVDA with buy-and-hold" in signal_facts["runnable_next_tests"]
     options = json.loads(signal_facts["next_experiment_options"])
@@ -370,8 +410,12 @@ def test_result_followup_fact_bank_includes_context_packet_limitations() -> None
     )
 
     assert fact_bank["context_packet_ids"] == "packet-1"
-    assert "FEDFUNDS latest observation" in fact_bank["context_packet_facts"]
-    assert "contextual backdrop only" in fact_bank["context_packet_limitations"]
+    assert "Fed funds rate latest observation was 5.25" in fact_bank[
+        "context_packet_facts"
+    ]
+    assert "causal proof" in fact_bank["context_packet_limitations"]
+    assert "fred" not in fact_bank["context_packet_facts"].lower()
+    assert "FRED" not in fact_bank["context_packet_limitations"]
 
 
 @pytest.mark.asyncio
@@ -382,12 +426,15 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
         payload = json.loads(kwargs["messages"][1]["content"])
         assert payload["focus"] == "general"
         assert "context_packet_facts" in payload["required_fact_ids"]
+        assert "Fed funds rate latest observation was 5.33" in payload["fact_bank"][
+            "context_packet_facts"
+        ]
         return schema(
             relative_performance_claim="beat_benchmark",
             answer=(
                 "TSLA was stronger than SPY in this run: the strategy returned "
                 "+130.0% while SPY returned +24.8%, a +105.2% gap. The attached "
-                "FEDFUNDS latest observation is only backdrop."
+                "fed funds rate observation is only backdrop."
             ),
             fact_ids=[
                 "symbols",
@@ -443,13 +490,17 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
     assert "TSLA" in response
     assert "+130.0%" in response
     assert "SPY" in response
-    assert "FEDFUNDS latest observation" in response
-    assert "contextual backdrop only" in response
+    assert "fed funds rate observation" in response
+    assert "cannot change the simulated trades" in response
+    assert "causal proof" in response
 
 
 @pytest.mark.asyncio
 async def test_context_backed_why_followup_appends_missing_required_run_facts() -> None:
+    calls: list[dict[str, Any]] = []
+
     async def fake_schema_client(**kwargs: Any) -> object:
+        calls.append(kwargs)
         assert kwargs["task"] == "result_breakdown"
         schema = kwargs["schema_model"]
         return schema(
@@ -504,13 +555,15 @@ async def test_context_backed_why_followup_appends_missing_required_run_facts() 
 
     assert response is not None
     assert "performance evidence first" in response
-    assert "FEDFUNDS latest observation" in response
+    assert "Fed funds rate latest observation was 5.33" in response
     assert "TSLA" in response
     assert "AAPL" not in response
     assert "TSLA beat SPY by +105.2% in this run" in response
     assert "+130.0%" in response
     assert "+24.8%" in response
-    assert "contextual backdrop only" in response
+    assert "cannot change the simulated trades" in response
+    assert "causal proof" in response
+    assert calls[0]["context_packet_ids"] == ["packet-1"]
 
 
 def test_performance_fallback_preserves_context_packet_backdrop() -> None:
@@ -556,9 +609,10 @@ def test_performance_fallback_preserves_context_packet_backdrop() -> None:
     assert response is not None
     assert "TSLA beat SPY in this run" in response
     assert "Context backdrop:" in response
-    assert "FEDFUNDS latest observation" in response
+    assert "Fed funds rate latest observation was 5.33" in response
     assert "Context limits:" in response
-    assert "contextual backdrop only" in response
+    assert "cannot change the simulated trades" in response
+    assert "causal proof" in response
 
 
 @pytest.mark.asyncio
@@ -592,6 +646,53 @@ async def test_next_experiment_followup_requires_runnable_next_tests_fact() -> N
     )
 
     assert response is None
+
+
+@pytest.mark.asyncio
+async def test_result_followup_rejects_self_reported_unsupported_causality() -> None:
+    async def fake_schema_client(**kwargs: Any) -> object:
+        schema = kwargs["schema_model"]
+        return schema(
+            relative_performance_claim="beat_benchmark",
+            causal_attribution_claim="unsupported",
+            answer=(
+                "The RSI rule likely helped TSLA avoid the worst drops and caused "
+                "the outperformance."
+            ),
+            fact_ids=[
+                "symbols",
+                "total_return",
+                "benchmark_return",
+                "benchmark_delta",
+                "relative_performance",
+                "caveat",
+            ],
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 100.9,
+                        "benchmark_return_pct": 98.9,
+                        "delta_vs_benchmark_pct": 2.0,
+                    }
+                }
+            },
+            "config_snapshot": {"template": "indicator_threshold"},
+        },
+        focus="why_underperformed",
+        user_message="Why did that happen?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert "beat SPY" in response
+    assert "causal proof" not in response.lower()
+    assert "likely helped" not in response.lower()
 
 
 def test_result_followup_fallback_uses_neutral_result_language() -> None:
@@ -691,6 +792,109 @@ def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncerta
     assert "gap versus the benchmark was +10.4%" in response
     assert "max drawdown was -15.7%" in response.lower()
     assert "try" in response.lower()
+
+
+def test_result_followup_fallback_avoids_internal_next_test_label() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": -32.6,
+                        "benchmark_return_pct": 53.6,
+                        "delta_vs_benchmark_pct": -86.2,
+                    }
+                }
+            },
+            "config_snapshot": {"template": "signal_strategy"},
+        },
+        focus="next_experiment",
+    )
+
+    assert response is not None
+    assert "The next useful move" in response
+    assert "- Adjust the signal periods or crossover direction." in response
+    assert "- Compare TSLA with buy-and-hold." in response
+    assert "Runnable next tests" not in response
+    assert "{" not in response
+
+
+def test_result_followup_fallback_does_not_duplicate_strategy_word() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": -32.6,
+                        "benchmark_return_pct": 53.6,
+                        "delta_vs_benchmark_pct": -86.2,
+                    }
+                }
+            },
+            "config_snapshot": {"template": "signal_strategy"},
+        },
+        focus="why_underperformed",
+    )
+
+    assert response is not None
+    assert "signal strategy strategy" not in response
+    assert "signal strategy on TSLA" in response
+
+
+def test_result_followup_fallback_does_not_expose_context_packet_plumbing() -> None:
+    response = fallback_result_followup_response(
+        metadata={
+            "symbols": ["TSLA"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 27.5,
+                        "benchmark_return_pct": 23.8,
+                        "delta_vs_benchmark_pct": 3.8,
+                    },
+                    "risk": {"max_drawdown_pct": -17.7},
+                }
+            },
+            "config_snapshot": {
+                "template": "indicator_threshold",
+                "date_range": {"start": "2025-05-20", "end": "2026-05-20"},
+            },
+            "context_packets": [
+                {
+                    "id": "packet-1",
+                    "provider": "fred",
+                    "packet_type": "macro",
+                    "facts": [
+                        {
+                            "kind": "macro_observation",
+                            "label": "DGS10 latest observation",
+                            "value": 4.61,
+                        },
+                        {
+                            "kind": "macro_observation_change",
+                            "label": "DGS10 change from previous observation",
+                            "value": 0.02,
+                        },
+                    ],
+                    "limitations": [
+                        "FRED macro observations are contextual backdrop only."
+                    ],
+                }
+            ],
+        },
+        focus="general",
+    )
+
+    assert response is not None
+    assert "10-year Treasury yield latest observation was 4.61" in response
+    assert "causal proof" in response
+    assert "fred" not in response.lower()
+    assert "context_packet" not in response
 
 
 def test_performance_fallback_keeps_core_risk_fact_when_focus_drifts() -> None:

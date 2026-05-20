@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
+    context_packet_ids_from_fact_bank,
     fallback_result_followup_response,
+    record_result_followup_fallback_receipt,
+    result_followup_fact_bank,
+    result_followup_llm_task,
 )
 from argus.agent_runtime.stages.approval_guard import (
     decision_is_pure_approval,
@@ -50,9 +55,10 @@ CONFIRMATION_EDIT_ACTION_FIELDS = {
 }
 
 TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE = (
-    "I have that strategy ready. Use the Run backtest button on the visible card "
-    "when you want to start the simulation."
+    "That strategy is ready on the visible card. Use the card action when you "
+    "want to start the simulation."
 )
+RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
 
 
 def structured_action_stage_result_if_applicable(
@@ -475,7 +481,7 @@ def retry_failed_action_stage_result_if_applicable(
             "candidate_strategy_draft": strategy,
             "assistant_response": (
                 "I still have that failed setup. I rebuilt the draft so you can "
-                "use the Run backtest button on the card when you want to retry."
+                "review the card and retry when you are ready."
             ),
         },
     )
@@ -541,7 +547,7 @@ async def artifact_followup_stage_result_if_applicable(
     if reference is None:
         return None
     metadata = dict(reference.metadata)
-    response = await compose_result_followup_response(
+    response = await _compose_result_followup_with_timeout(
         metadata=metadata,
         focus=focus,
         user_message=current_user_message,
@@ -565,3 +571,28 @@ async def artifact_followup_stage_result_if_applicable(
         ),
         stage_patch={"assistant_response": response},
     )
+
+
+async def _compose_result_followup_with_timeout(
+    *,
+    metadata: dict[str, Any],
+    focus: str,
+    user_message: str,
+) -> str | None:
+    try:
+        return await asyncio.wait_for(
+            compose_result_followup_response(
+                metadata=metadata,
+                focus=focus,
+                user_message=user_message,
+            ),
+            timeout=RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        fact_bank = result_followup_fact_bank(metadata)
+        record_result_followup_fallback_receipt(
+            task=result_followup_llm_task(fact_bank=fact_bank, focus=focus),
+            failure_mode="result_followup_timeout",
+            context_packet_ids=context_packet_ids_from_fact_bank(fact_bank),
+        )
+        return None

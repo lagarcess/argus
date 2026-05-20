@@ -6,14 +6,13 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
-from pydantic import BaseModel
 
 from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
     confirmation_id_from_payload,
 )
 from argus.agent_runtime.resolution import mention_to_provenance
-from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
+from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
 from argus.api.artifact_naming import schedule_artifact_naming_after_stream
@@ -51,6 +50,7 @@ from argus.api.chat.result_actions import (
     missing_refine_strategy_action_turn,
     refine_strategy_action_turn,
 )
+from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.strategies import save_strategy_from_run
 from argus.api.chat.streaming import (
     runtime_result_card,
@@ -66,49 +66,11 @@ from argus.api.naming import get_starter_prompts, resolve_language
 from argus.api.schemas import BacktestRun, ChatStreamRequest, StarterPromptsResponse, User
 from argus.domain.supabase_gateway import QuotaExceededError
 from argus.llm.openrouter import (
-    OpenRouterRouteReceipt,
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
 )
 
 router = APIRouter(tags=["agent"])
-
-
-def _persist_route_receipts(
-    *,
-    receipts: list[OpenRouterRouteReceipt],
-    user_id: str,
-    conversation_id: str,
-    run_id: str | None = None,
-    message_id: str | None = None,
-    metadata: dict[str, Any] | None = None,
-) -> None:
-    if not receipts or api_state.supabase_gateway is None:
-        return
-    for receipt in receipts:
-        try:
-            api_state.supabase_gateway.create_route_receipt(
-                user_id=user_id,
-                conversation_id=conversation_id,
-                run_id=run_id,
-                message_id=message_id,
-                metadata=metadata,
-                receipt=receipt.as_dict(),
-            )
-        except Exception as exc:
-            logger.warning(
-                "Route receipt persistence failed; using in-memory receipt only",
-                error=str(exc),
-                user_id=user_id,
-                conversation_id=conversation_id,
-                llm_task=receipt.task,
-            )
-
-
-class InternalAgentRuntimeTurnRequest(BaseModel):
-    user_id: str
-    thread_id: str
-    message: str
 
 
 def _confirmation_artifact_id_from_runtime_result(
@@ -143,19 +105,6 @@ def _fallback_latest_result_has_context_packets(
     if snapshot is None:
         return False
     return result_reference_has_context_packets(snapshot.latest_backtest_result_reference)
-
-
-@router.post("/internal/agent-runtime/turn")
-async def internal_agent_runtime_turn(
-    payload: InternalAgentRuntimeTurnRequest,
-    request: Request,
-) -> dict[str, Any]:
-    return await run_agent_turn(
-        workflow=api_state.get_agent_runtime_workflow(request),
-        user=UserState(user_id=payload.user_id),
-        thread_id=payload.thread_id,
-        message=payload.message,
-    )
 
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
@@ -312,14 +261,16 @@ async def chat_stream(
             )
             if confirmation_fallback is not None:
                 runtime_fallback = confirmation_fallback
-            elif not checkpoint_has_pending_strategy(checkpoint_values):
+            else:
                 pending_fallback = pending_strategy_metadata_fallback_context(
                     user_id=user.id,
                     conversation_id=conversation.id,
                 )
                 if pending_fallback is not None:
                     runtime_fallback = pending_fallback
-                elif not checkpoint_has_latest_result(checkpoint_values):
+                elif not checkpoint_has_pending_strategy(
+                    checkpoint_values
+                ) and not checkpoint_has_latest_result(checkpoint_values):
                     result_fallback = latest_result_fallback_context(
                         user_id=user.id,
                         conversation_id=conversation.id,
@@ -336,24 +287,6 @@ async def chat_stream(
                         and _fallback_latest_result_has_context_packets(result_fallback)
                     ):
                         runtime_fallback = result_fallback
-            elif not checkpoint_has_latest_result(checkpoint_values):
-                result_fallback = latest_result_fallback_context(
-                    user_id=user.id,
-                    conversation_id=conversation.id,
-                )
-                if result_fallback is not None:
-                    runtime_fallback = result_fallback
-            elif not checkpoint_latest_result_has_context_packets(checkpoint_values):
-                result_fallback = latest_result_fallback_context(
-                    user_id=user.id,
-                    conversation_id=conversation.id,
-                )
-                if (
-                    result_fallback is not None
-                    and _fallback_latest_result_has_context_packets(result_fallback)
-                ):
-                    runtime_fallback = result_fallback
-
     mention_provenance = [
         mention_to_provenance(mention.model_dump(mode="python"), index=index)
         for index, mention in enumerate(payload.mentions)
@@ -686,7 +619,7 @@ async def chat_stream(
                 content=assistant_text,
                 metadata=metadata,
             )
-            _persist_route_receipts(
+            persist_route_receipts(
                 receipts=route_receipts,
                 user_id=user.id,
                 conversation_id=conversation.id,
@@ -802,8 +735,12 @@ async def chat_stream(
                     runtime_result,
                     confirmation_id=_confirmation_id_for_runtime_card(runtime_result),
                 )
+                confirmation_anchor_text: str | None = None
                 if confirmation_card is not None:
-                    assistant_text = str(confirmation_card["summary"])
+                    confirmation_anchor_text = str(confirmation_card["summary"])
+                    assistant_text = None
+                    runtime_result.pop("assistant_response", None)
+                    runtime_result.pop("assistant_prompt", None)
                 result_card = runtime_result_card(runtime_result)
                 envelope = runtime_result_envelope(runtime_result)
                 run = None
@@ -909,7 +846,9 @@ async def chat_stream(
                     assistant_text = streamed_text
                     runtime_result["assistant_response"] = streamed_text
 
-                persisted_text = assistant_text or streamed_text
+                persisted_text = (
+                    confirmation_anchor_text or assistant_text or streamed_text
+                )
                 assistant_message = None
                 if persisted_text:
                     assistant_message = create_message(
@@ -962,7 +901,7 @@ async def chat_stream(
             yield sse_done()
             return
         finally:
-            _persist_route_receipts(
+            persist_route_receipts(
                 receipts=end_openrouter_route_receipt_capture(receipt_token),
                 user_id=user.id,
                 conversation_id=conversation.id,

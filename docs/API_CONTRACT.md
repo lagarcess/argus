@@ -169,7 +169,7 @@ Errors follow RFC 9457 Problem Details.
   "type": "https://api.argus.app/problems/unsupported-timeframe",
   "title": "Unsupported Timeframe",
   "status": 422,
-  "detail": "Supported timeframes are 1h, 2h, 4h, 6h, 12h, and 1D. Lookback cannot exceed 3 years.",
+  "detail": "Supported timeframes are 1h, 2h, 4h, 6h, 12h, and 1D. Provider availability depends on asset class, timeframe, and date range.",
   "code": "unsupported_timeframe",
   "request_id": "uuid"
 }
@@ -684,7 +684,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 
 ### Timeframe & Lookback
 - **Supported:** "1h", "2h", "4h", "6h", "12h", "1D"
-- **Constraints:** No timeframe lower than "1h". Lookback cannot exceed 3 years. Daily defaults to a 12-month window when dates are omitted.
+- **Constraints:** No timeframe lower than "1h". Provider availability depends on asset class, timeframe, and date range: Alpaca equity history starts in 2016 for the launch path; Kraken OHLC currency-pair windows are limited to the latest 720 candles for the requested interval. Daily defaults to a 12-month window when dates are omitted.
 - *Return 422 for unsupported combinations.*
 
 ### Date Range

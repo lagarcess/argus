@@ -279,14 +279,53 @@ def normalize_date_range_candidate(
     raw_user_phrasing: str | None = None,
     today: date | None = None,
 ) -> Any:
-    del raw_user_phrasing, today
     if isinstance(value, dict):
+        if not _date_range_dict_uses_natural_endpoint(value):
+            relative_label = _relative_date_label_from_user_phrasing(
+                raw_user_phrasing,
+                today=today,
+            )
+            if relative_label is not None:
+                return relative_label
         return {
             key: nested_value
             for key, nested_value in value.items()
             if key in {"start", "end", "from", "to"}
         }
     return value
+
+
+def _date_range_dict_uses_natural_endpoint(value: dict[Any, Any]) -> bool:
+    endpoints = [value.get(key) for key in ("start", "end", "from", "to")]
+    endpoint_values = [endpoint for endpoint in endpoints if endpoint not in (None, "")]
+    return any(
+        isinstance(endpoint, str) and _parse_iso_date(endpoint) is None
+        for endpoint in endpoint_values
+    )
+
+
+def _relative_date_label_from_user_phrasing(
+    raw_user_phrasing: str | None,
+    *,
+    today: date | None,
+) -> str | None:
+    if not isinstance(raw_user_phrasing, str) or not raw_user_phrasing.strip():
+        return None
+    current_date = today or date.today()
+    normalized = _normalize_period_text(raw_user_phrasing)
+    year_to_date = _year_to_date(normalized, today=current_date)
+    if year_to_date is not None:
+        return year_to_date.label
+    since_year = _find_since_year(_tokens(normalized))
+    if since_year is not None:
+        return f"since {since_year}"
+    beginning_last_year = _beginning_last_year(normalized, today=current_date)
+    if beginning_last_year is not None:
+        return beginning_last_year.label
+    relative = _relative_period(normalized, today=current_date)
+    if relative is not None:
+        return relative.label
+    return None
 
 
 def format_display_date(value: date) -> str:

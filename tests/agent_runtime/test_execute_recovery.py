@@ -1080,13 +1080,13 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     assert reference.metadata["launch_payload"]["symbol"] == "MSFT"
 
 
-def test_execute_stage_translates_lookback_limit_to_human_recovery() -> None:
+def test_execute_stage_translates_provider_window_limit_to_human_recovery() -> None:
     tool = StubBacktestTool(
         responses=[
             {
                 "success": False,
                 "error_type": "parameter_validation_error",
-                "error_message": "invalid_lookback_window",
+                "error_message": "kraken_ohlc_window_exceeded",
                 "retryable": False,
                 "payload": None,
                 "capability_context": {},
@@ -1108,9 +1108,12 @@ def test_execute_stage_translates_lookback_limit_to_human_recovery() -> None:
 
     assert result.outcome == "execution_failed_terminally"
     prompt = result.patch["assistant_prompt"]
-    assert "invalid_lookback_window" not in prompt
-    assert "longer than the current backtest engine supports" in prompt
-    assert "up to 3 years" in prompt
+    assert "kraken_ohlc_window_exceeded" not in prompt
+    assert "Kraken" not in prompt
+    assert "provider" not in prompt.lower()
+    assert "720" not in prompt
+    assert "shorter window" in prompt
+    assert "1h" in prompt
 
 
 def test_execute_maps_unknown_tool_errors_into_runtime_taxonomy() -> None:
@@ -1162,7 +1165,7 @@ def test_explain_stage_uses_result_payload_without_fabricating() -> None:
     assert "9.0%" in result.patch["assistant_response"]
     assert "Buy Tesla on pullbacks" in result.patch["assistant_response"]
     assert "return comparison only" in result.patch["assistant_response"]
-    assert "**Caveat:**" in result.patch["assistant_response"]
+    assert "**Keep in mind:**" in result.patch["assistant_response"]
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
     assert "same period" not in result.patch["assistant_response"].lower()
     assert "because" not in result.patch["assistant_response"].lower()
@@ -1374,9 +1377,9 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     result = explain_stage(state=state)
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**Readout**")
+    assert result.patch["assistant_response"].startswith("**Quick take**")
     assert (
-        "**Test:** the confirmed strategy: Test a Tesla pullback idea."
+        "**Tested:** the confirmed strategy: Test a Tesla pullback idea."
         in result.patch["assistant_response"]
     )
     assert "Defaults: Initial capital." in result.patch["assistant_response"]
@@ -1416,14 +1419,37 @@ def test_explain_stage_varies_with_expertise_mode() -> None:
     beginner_result = explain_stage(state=beginner_state)
     advanced_result = explain_stage(state=advanced_state)
 
-    assert beginner_result.patch["assistant_response"].startswith("**Readout**")
+    assert beginner_result.patch["assistant_response"].startswith("**Quick take**")
     assert (
         "evidence check"
         in beginner_result.patch["assistant_response"].lower()
     )
-    assert "**caveat:**" in beginner_result.patch["assistant_response"].lower()
+    assert "**keep in mind:**" in beginner_result.patch["assistant_response"].lower()
     assert "return comparison only" in advanced_result.patch["assistant_response"].lower()
-    assert "**caveat:**" in advanced_result.patch["assistant_response"].lower()
+    assert "**keep in mind:**" in advanced_result.patch["assistant_response"].lower()
+
+
+def test_explain_stage_deterministic_fallback_avoids_report_tone() -> None:
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.effective_response_profile = ResponseProfile(
+        effective_tone="friendly",
+        effective_verbosity="medium",
+        effective_expertise_mode="beginner",
+    )
+    state.confirmation_payload = {
+        "strategy": {"strategy_thesis": "Test a Tesla pullback idea"},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.14, "benchmark_return": 0.09}
+    }
+
+    result = explain_stage(state=state)
+    response = result.patch["assistant_response"]
+
+    assert response.startswith("**Quick take**")
+    assert "**Interpretation:**" not in response
+    assert "**Caveat:**" not in response
+    assert "**Keep in mind:**" in response
 
 
 def test_explain_stage_uses_same_period_only_when_context_supports_it() -> None:

@@ -10,7 +10,7 @@
   "production_readiness_eval_layer": {
     "assertion_style": "semantic_contracts_not_exact_wording",
     "exact_strings_reserved_for": ["protocol", "static_ui", "safety_fallback"],
-    "receipt_fields": ["task", "tier", "model", "fallback_model", "latency_ms", "outcome", "failure_mode"],
+    "receipt_fields": ["task", "tier", "model", "fallback_model", "latency_ms", "outcome", "failure_mode", "token_usage", "context_packet_ids"],
     "capability_context_source": [
       "build_default_capability_contract",
       "EXECUTABLE_INDICATORS",

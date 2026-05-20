@@ -103,6 +103,8 @@ def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
             "latency_ms": 123,
             "outcome": "succeeded",
             "fallback_used": False,
+            "token_usage": {"prompt_tokens": 10, "completion_tokens": 5},
+            "context_packet_ids": ["packet-1"],
             "created_at": "2026-05-19T00:00:00+00:00",
         },
     )
@@ -113,6 +115,8 @@ def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     assert attachment_row["immutable_snapshot"] is True
     assert receipt_row["conversation_id"] == "conversation-1"
     assert receipt_row["latency_ms"] == 123
+    assert receipt_row["token_usage"] == {"prompt_tokens": 10, "completion_tokens": 5}
+    assert receipt_row["context_packet_ids"] == ["packet-1"]
 
 
 class _MockAuthAdmin:

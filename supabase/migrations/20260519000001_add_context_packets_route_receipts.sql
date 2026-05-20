@@ -46,6 +46,8 @@ create table if not exists public.route_receipts (
   outcome text not null check (outcome in ('succeeded', 'failed', 'skipped')),
   failure_mode text,
   fallback_used boolean not null default false,
+  token_usage jsonb,
+  context_packet_ids text[] not null default '{}'::text[],
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );

@@ -403,6 +403,97 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
     assert captured["thread_id"] == conversation["id"]
 
 
+def test_pending_strategy_metadata_fallback_is_used_even_when_checkpoint_has_pending(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _checkpoint(**_: Any) -> dict[str, Any]:
+        return {
+            "stage_outcome": "await_user_reply",
+            "latest_task_snapshot": TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="signal_strategy",
+                    strategy_thesis="Checkpoint has a pending draft.",
+                )
+            ),
+        }
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_for_confirmation",
+                "assistant_response": None,
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Which asset and period should I use?",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "await_user_reply",
+            "pending_strategy": {
+                "strategy": {
+                    "strategy_type": "signal_strategy",
+                    "strategy_thesis": "Buy on a 50/200 crossover.",
+                    "entry_logic": "50-day SMA crosses above 200-day SMA",
+                    "exit_logic": "50-day SMA crosses below 200-day SMA",
+                    "entry_rule": {
+                        "type": "moving_average_crossover",
+                        "fast_indicator": "sma",
+                        "fast_period": 50,
+                        "slow_indicator": "sma",
+                        "slow_period": 200,
+                        "direction": "bullish",
+                    },
+                    "exit_rule": {
+                        "type": "moving_average_crossover",
+                        "fast_indicator": "sma",
+                        "fast_period": 50,
+                        "slow_indicator": "sma",
+                        "slow_period": 200,
+                        "direction": "bearish",
+                    },
+                },
+                "requested_field": None,
+                "missing_required_fields": ["asset_universe", "date_range"],
+            },
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "TSLA over the last year",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot is not None
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.pending_strategy_summary.strategy_type == "signal_strategy"
+    assert captured["fallback_selected_thread_metadata"]["fallback_source"] == (
+        "pending_strategy_metadata"
+    )
+
+
 def test_visible_confirmation_metadata_fallback_carries_text_turn_context(
     monkeypatch,
 ) -> None:
@@ -501,8 +592,8 @@ def test_newer_confirmation_metadata_overrides_stale_result_checkpoint_for_text_
             "payload": {
                 "stage_outcome": "ready_to_respond",
                 "assistant_response": (
-                    "I have that strategy ready. Use the Run backtest button "
-                    "on the visible card when you want to start the simulation."
+                    "That strategy is ready on the visible card. Use the card "
+                    "action when you want to start the simulation."
                 ),
             },
         }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,3 +55,24 @@ def test_agent_router_does_not_route_new_code_through_chat_service_facade() -> N
     source = _source("src/argus/api/routers/agent.py")
 
     assert "argus.api.chat_service" not in source
+
+
+def test_launch_code_and_tests_do_not_import_chat_service_facade() -> None:
+    scanned_paths = [
+        path
+        for root in ("src/argus", "tests")
+        for path in (ROOT / root).rglob("*.py")
+        if path.name != "chat_service.py"
+    ]
+
+    for path in scanned_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported_names = {alias.name for alias in node.names}
+                assert "argus.api.chat_service" not in imported_names
+            if isinstance(node, ast.ImportFrom):
+                if node.module == "argus.api":
+                    imported_names = {alias.name for alias in node.names}
+                    assert "chat_service" not in imported_names
+                assert node.module != "argus.api.chat_service"

@@ -3,11 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
+from argus.agent_runtime.llm_clarifier import (
+    ClarificationResponse,
+    OpenRouterClarificationGenerator,
+)
 from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.state.models import ResponseIntent, RunState, StrategySummary
+from argus.llm import openrouter
 
 
 class RecordingClarifier:
@@ -79,7 +83,7 @@ def test_clarify_uses_generator_for_unsupported_recovery() -> None:
     )
 
 
-def test_clarify_uses_interpreter_authored_clarification_before_generator() -> None:
+def test_clarify_routes_interpreter_prefill_through_target_aware_generator() -> None:
     state = RunState.new(
         current_user_message="Run the MACD part only",
         recent_thread_history=[],
@@ -105,9 +109,9 @@ def test_clarify_uses_interpreter_authored_clarification_before_generator() -> N
     )
 
     assert result.outcome == "await_user_reply"
-    assert result.patch["assistant_prompt"] == assistant_prompt
+    assert result.patch["assistant_prompt"] == clarifier.question
     assert result.patch["requested_field"] == "entry_logic"
-    assert clarifier.requests == []
+    assert clarifier.requests[0].missing_required_fields == ["entry_logic"]
 
 
 def test_rule_clarification_preserves_known_asset_context() -> None:
@@ -138,6 +142,32 @@ def test_rule_clarification_preserves_known_asset_context() -> None:
     assert "NVDA" in prompt
     assert "simplified into one supported rule" in prompt
     assert "keep the full rule as a draft" in prompt
+
+
+def test_multi_field_signal_clarification_uses_plain_language() -> None:
+    state = RunState.new(
+        current_user_message="buy when the 50 crosses the 200",
+        recent_thread_history=[],
+    )
+    strategy = StrategySummary(
+        strategy_type="signal_strategy",
+        strategy_thesis="Buy when the 50-day moving average crosses the 200-day.",
+        entry_logic="50 crosses 200",
+    )
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["asset_target", "period"],
+        requested_fields=["asset_universe", "date_range"],
+        facts={"strategy": strategy.model_dump(mode="python")},
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "What should I test it on" in prompt
+    assert "date window" in prompt
+    assert "signal-rule" not in prompt
+    assert "direction" not in prompt
 
 
 def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> None:
@@ -234,6 +264,181 @@ def test_clarifier_system_prompt_guides_unsupported_recovery_context() -> None:
     assert "news sentiment turns positive" in context
 
 
+def test_clarifier_system_prompt_keeps_vague_ideas_on_supported_proxies() -> None:
+    clarifier = OpenRouterClarificationGenerator()
+    request = clarifier.request_model(
+        current_user_message="What if I bought Tesla when it looked cheap?",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["TSLA"],
+        ),
+        missing_required_fields=["date_range"],
+        response_intent={"kind": "clarification", "semantic_needs": ["period"]},
+    )
+
+    system_prompt = clarifier._messages(request)[0].content
+
+    assert "do not write a numbered requirements list" in system_prompt.lower()
+    assert "buy-and-hold baseline" in system_prompt
+    assert "supported RSI threshold" in system_prompt
+    assert "supported moving average crossover" in system_prompt
+    assert "Acknowledge valid finance concepts" in system_prompt
+    assert "P/E" in system_prompt
+    assert "current engine cannot execute P/E as a rule yet" in system_prompt
+    assert "Translate that concept to the closest supported proxy" in system_prompt
+    assert "name P/E or valuation as valid context" in system_prompt
+    assert "equity launch history starts in 2016" in system_prompt
+    assert "bounded recent-data window" in system_prompt
+    assert "do not silently widen the timeframe" in system_prompt
+    assert "Do not mention provider names" in system_prompt
+    assert "candle counts" in system_prompt
+    assert "Do not ask the user to define a moving-average trigger again" in system_prompt
+    assert "the 50 crosses the 200" in system_prompt
+    assert "Do not use headings or numbered lists" in system_prompt
+
+
+def test_openrouter_clarifier_uses_structured_response_contract(monkeypatch) -> None:
+    observed = {}
+    openrouter.clear_openrouter_route_receipts()
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        observed["task"] = task
+        observed["messages"] = messages
+        observed["schema_model"] = schema_model
+        observed["schema_name"] = schema_name
+        observed["model_name"] = model_name
+        openrouter.record_openrouter_route_receipt(
+            task=task,
+            model_name=model_name,
+            mode="json_schema",
+            schema_name=schema_name,
+            latency_ms=42,
+            outcome="succeeded",
+            token_usage={"input_tokens": 21, "output_tokens": 16},
+        )
+        return ClarificationResponse(
+            question=(
+                "Cheap can mean valuation, like P/E. For TSLA, I can use the "
+                "closest runnable proxy: buy-and-hold over a window you care "
+                "about. Which date window should I use?"
+            ),
+            question_targets=["period"],
+            directly_asks_user=True,
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="What if I bought Tesla when it looked cheap?",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="buy_and_hold",
+                asset_universe=["TSLA"],
+            ),
+            missing_required_fields=["date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["period"],
+            },
+            language="en",
+        )
+    )
+
+    assert question is not None
+    assert "TSLA" in question
+    assert "P/E" in question
+    assert "date window" in question.lower()
+    assert "missing_required_fields" not in question
+    assert observed["task"] == "clarification"
+    assert observed["schema_model"] is ClarificationResponse
+    assert observed["schema_name"] == "ClarificationResponse"
+    assert observed["model_name"] is None
+    assert any("P/E" in message["content"] for message in observed["messages"])
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert receipts[-1].task == "clarification"
+    assert receipts[-1].tier == "chat"
+    assert receipts[-1].outcome == "succeeded"
+    assert receipts[-1].token_usage == {"input_tokens": 21, "output_tokens": 16}
+
+
+def test_openrouter_clarifier_rejects_questions_outside_runtime_needs(
+    monkeypatch,
+) -> None:
+    openrouter.clear_openrouter_route_receipts()
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+    calls: list[str | None] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name
+        calls.append(model_name)
+        if model_name is None:
+            return ClarificationResponse(
+                question=(
+                    "Could you specify the exact trigger for the crossover before "
+                    "I test it?"
+                ),
+                question_targets=["rule_definition"],
+                directly_asks_user=True,
+            )
+        return ClarificationResponse(
+            question=(
+                "That crossover is clear enough to test. What asset should I use, "
+                "and what date window should I use?"
+            ),
+            question_targets=["asset_target", "period"],
+            directly_asks_user=True,
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="buy when the 50 crosses the 200",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="signal_strategy",
+                entry_logic="50-day SMA crosses above 200-day SMA",
+                exit_logic="50-day SMA crosses below 200-day SMA",
+                entry_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 50,
+                    "slow_indicator": "sma",
+                    "slow_period": 200,
+                    "direction": "bullish",
+                },
+            ),
+            missing_required_fields=["asset_universe", "date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["asset_target", "period"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert "What asset" in question
+    assert "date window" in question
+    assert calls == [None, "chat/fallback"]
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert receipts[-1].model == "chat/primary"
+    assert receipts[-1].failure_mode == "contract_violation"
+
+
 def test_default_unsupported_strategy_options_are_concrete() -> None:
     contract = build_default_capability_contract()
 
@@ -282,9 +487,11 @@ def test_confirm_stage_still_builds_confirmation_card() -> None:
     result = confirm_stage(state=state, contract=build_default_capability_contract())
 
     assert result.outcome == "await_approval"
-    assert "entry rule: RSI drops below 30" in result.patch["assistant_prompt"]
-    assert "buy when RSI drops below 30" not in result.patch["assistant_prompt"]
+    assert result.patch["assistant_prompt"] is None
     assert result.patch["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
+    assert result.patch["confirmation_payload"]["strategy"]["entry_logic"] == (
+        "RSI drops below 30"
+    )
     assert "$1,000 starting capital" in result.patch["candidate_strategy_draft"][
         "assumptions"
     ]
@@ -312,6 +519,35 @@ def test_confirm_stage_does_not_require_thesis_for_buy_and_hold() -> None:
     strategy = result.patch["confirmation_payload"]["strategy"]
     assert strategy["strategy_type"] == "buy_and_hold"
     assert strategy["asset_universe"] == ["AAPL"]
+
+
+def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
+    state = RunState.new(
+        current_user_message="Backtest Apple since 2015.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2015-01-01", "end": "2016-01-15"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert result.patch["assistant_prompt"] is None
+    assert result.patch["requested_field"] == "date_range"
+    constraint = result.patch["optional_parameter_status"][
+        "unsupported_constraints"
+    ][0]
+    assert constraint["category"] == "data_window_unavailable"
+    assert "provider" not in constraint["explanation"].lower()
+    assert any(
+        "2016" in option["label"]
+        for option in constraint["simplification_options"]
+    )
 
 
 def test_confirm_stage_resolves_indicator_from_strategy_type_alias() -> None:
@@ -519,9 +755,14 @@ def test_confirm_stage_blocks_unsupported_nonzero_fee_assumption() -> None:
 
     result = confirm_stage(state=state, contract=build_default_capability_contract())
 
-    assert result.outcome == "await_user_reply"
+    assert result.outcome == "needs_clarification"
     assert result.patch["requested_field"] == "fees"
-    assert "fees" in result.patch["assistant_prompt"].lower()
+    assert result.patch["assistant_prompt"] is None
+    constraint = result.patch["optional_parameter_status"][
+        "unsupported_constraints"
+    ][0]
+    assert constraint["category"] == "unsupported_execution_assumption"
+    assert constraint["raw_value"] == "custom trading fees"
 
 
 def test_confirm_stage_clarifies_vague_signal_before_ready_card() -> None:
@@ -593,6 +834,14 @@ def test_confirm_stage_blocks_signal_rule_when_window_cannot_cover_warmup() -> N
 
     result = confirm_stage(state=state, contract=build_default_capability_contract())
 
-    assert result.outcome == "await_user_reply"
-    assert "longer date range" in result.patch["assistant_prompt"].lower()
+    assert result.outcome == "needs_clarification"
+    assert result.patch["assistant_prompt"] is None
     assert result.patch["requested_field"] == "date_range"
+    constraint = result.patch["optional_parameter_status"][
+        "unsupported_constraints"
+    ][0]
+    assert constraint["category"] == "data_window_too_short_for_rule"
+    assert any(
+        option["label"] == "Use a longer date range"
+        for option in constraint["simplification_options"]
+    )

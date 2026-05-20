@@ -41,12 +41,8 @@ def compose_response_intent(state: RunState) -> str | None:
 
 
 def should_prefer_composed_intent(state: RunState) -> bool:
-    intent = state.response_intent
-    if intent is None:
-        return False
-    if intent.kind != "clarification":
-        return False
-    return "rule_definition" in intent.semantic_needs
+    del state
+    return False
 
 
 def _compose_clarification(intent: ResponseIntent) -> str:
@@ -55,16 +51,16 @@ def _compose_clarification(intent: ResponseIntent) -> str:
     context = _strategy_context(strategy)
 
     if needs == ["asset_target"]:
-        return f"{context}What asset should I use?"
+        return f"{context}Which asset should anchor the test?"
     if needs == ["period"]:
-        return f"{context}What time period should I test?"
+        return f"{context}Which date window should I use?"
     if needs == ["sizing_amount"]:
         return f"{context}How much should each recurring purchase be?"
     if needs == ["rule_definition"]:
         if _strategy_has_rule_detail(strategy):
             return (
-                f"{context}I have the rule direction, but the executable version "
-                "needs to be simplified into one supported rule. I can use a "
+                f"{context}The idea is clear, but the runnable version needs to "
+                "be simplified into one supported rule. I can use a "
                 "percentage move, a supported moving-average crossover, an RSI "
                 "threshold, or keep the full rule as a draft. Which direction "
                 "should I take?"
@@ -76,10 +72,10 @@ def _compose_clarification(intent: ResponseIntent) -> str:
             "full rule?"
         )
     if set(needs) == {"asset_target", "period"}:
-        return f"{context}What asset and time period should I use?"
+        return f"{context}What should I test it on, and what date window should I use?"
     if set(needs) == {"period", "rule_definition"}:
         return (
-            f"{context}What time period should I test, and what specific "
+            f"{context}Which date window should I use, and what specific "
             "testable rule should define the signal? For example: a percentage "
             "move, a moving-average crossover, price above an average, or an "
             "RSI threshold."
@@ -132,23 +128,23 @@ def _strategy_context(strategy: StrategySummary) -> str:
     assets = ", ".join(strategy.asset_universe)
     if strategy_type == "buy_and_hold":
         if assets:
-            return f"I understand this as a simple buy-and-hold test for {assets}. "
-        return "I understand this as a simple buy-and-hold test. "
+            return f"I can test buy-and-hold for {assets}. "
+        return "I can test a buy-and-hold idea. "
     if strategy_type == "dca_accumulation":
         if assets:
-            return f"I read this as recurring buys for {assets}. "
-        return "I read this as recurring buys. "
+            return f"I can test recurring buys for {assets}. "
+        return "I can test a recurring-buy idea. "
     if strategy_type == "indicator_threshold":
         if assets:
-            return f"I read this as an indicator-rule test for {assets}. "
-        return "I read this as an indicator-rule test. "
+            return f"I can set up that indicator idea for {assets}. "
+        return "I can set up that indicator idea. "
     if strategy_type == "signal_strategy":
         if assets:
-            return f"I read this as a signal-rule test for {assets}. "
-        return "I read this as a signal-rule test. "
+            return f"I can set up that signal idea for {assets}. "
+        return "I can set up that signal idea. "
     if assets:
-        return f"I understand the idea for {assets}. "
-    return "I understand the direction. "
+        return f"I can work with the idea for {assets}. "
+    return "I understand the shape of the idea. "
 
 
 def _strategy_has_rule_detail(strategy: StrategySummary) -> bool:
@@ -169,7 +165,7 @@ def _question_for_need(need: str) -> str:
         "asset_target": "What asset should I use?",
         "sizing_amount": "How much should each recurring purchase be?",
         "schedule": "How often should the purchases happen?",
-        "period": "What time period should I test?",
+        "period": "Which date window should I use?",
         "rule_definition": "What specific rule should I test?",
         "assumption": "Which assumption do you want to change?",
         "simplification_choice": "Which simplification should I use?",
@@ -204,7 +200,10 @@ def _human_option_label(label: str) -> str:
             "use a supported moving-average crossover"
         ),
     }
-    return labels.get(normalized, label.strip().replace("_", " "))
+    fallback = label.strip().replace("_", " ")
+    if fallback[:1].isupper() and fallback[1:2].islower():
+        fallback = fallback[:1].lower() + fallback[1:]
+    return labels.get(normalized, fallback)
 
 
 def _human_list(values: list[str]) -> str:

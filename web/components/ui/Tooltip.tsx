@@ -5,7 +5,9 @@ import { createPortal } from "react-dom";
 
 type TooltipProps = {
   content: string;
-  children: React.ReactElement;
+  children: React.ReactElement<
+    React.HTMLAttributes<HTMLElement> & React.RefAttributes<HTMLElement>
+  >;
   side?: "top" | "bottom" | "left" | "right";
   align?: "start" | "center" | "end";
   delay?: number;
@@ -77,26 +79,28 @@ export function Tooltip({
     };
   }, []);
 
-  const child = children as React.ReactElement<any>;
+  const child = children as React.ReactElement<
+    React.HTMLAttributes<HTMLElement> & React.RefAttributes<HTMLElement>
+  >;
   const childProps = child.props;
 
   // Use cloneElement to attach refs and events to children.
   const trigger = React.cloneElement(child, {
     ref: triggerRef,
     style: { ...childProps.style, cursor: "pointer" },
-    onMouseEnter: (e: React.MouseEvent) => {
+    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
       childProps.onMouseEnter?.(e);
       showTooltip();
     },
-    onMouseLeave: (e: React.MouseEvent) => {
+    onMouseLeave: (e: React.MouseEvent<HTMLElement>) => {
       childProps.onMouseLeave?.(e);
       hideTooltip();
     },
-    onFocus: (e: React.FocusEvent) => {
+    onFocus: (e: React.FocusEvent<HTMLElement>) => {
       childProps.onFocus?.(e);
       showTooltip();
     },
-    onBlur: (e: React.FocusEvent) => {
+    onBlur: (e: React.FocusEvent<HTMLElement>) => {
       childProps.onBlur?.(e);
       hideTooltip();
     },

@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
+from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.api.schemas import BacktestRun
 from argus.context.rendering import context_packet_fact_summary
 from argus.domain.engine_launch.result_facts import (
@@ -73,11 +74,13 @@ def llm_result_breakdown_message(
 ) -> str | None:
     fact_bank = result_breakdown_fact_bank(context)
     required_fact_ids = _required_result_breakdown_fact_ids(fact_bank)
+    context_packet_ids = _context_packet_ids_from_context(context)
     try:
         response = _invoke_breakdown_llm_with_budget(
             invoke_json_schema_func=invoke_json_schema_func,
             fact_bank=fact_bank,
             required_fact_ids=required_fact_ids,
+            context_packet_ids=context_packet_ids,
             timeout_seconds=timeout_seconds,
         )
     except FutureTimeoutError:
@@ -111,6 +114,7 @@ def _invoke_breakdown_llm_with_budget(
     invoke_json_schema_func: Any,
     fact_bank: dict[str, str],
     required_fact_ids: set[str],
+    context_packet_ids: list[str],
     timeout_seconds: float,
 ) -> object:
     def _invoke() -> object:
@@ -122,6 +126,7 @@ def _invoke_breakdown_llm_with_budget(
             ),
             schema_model=ResultBreakdownDraft,
             schema_name="ResultBreakdownDraft",
+            context_packet_ids=context_packet_ids,
         )
 
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="argus-breakdown")
@@ -144,17 +149,25 @@ def _result_breakdown_llm_messages(
         {
             "role": "system",
             "content": (
+                f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 "You are Argus, an investing backtest copilot. Explain the stored "
-                "backtest result using only the supplied fact_bank. Return flexible, "
-                "non-template professional markdown sections and vary the section "
-                "headings, order, and phrasing. Do not fill a fixed outline. Build "
+                "backtest result using only the supplied fact_bank. Write for a "
+                "normal person who is trying to keep exploring, not as a financial report. "
+                "Start with one warm takeaway before details. Return flexible, "
+                "non-template markdown sections and vary the section headings, "
+                "order, and phrasing. Do not fill a fixed outline. Build "
                 "each section from text parts and fact reference parts. Use text "
                 "parts for educational framing and fact reference parts for every "
                 "run-specific symbol, date, percentage, benchmark, assumption, rule, "
                 "execution note, and caveat. Fact references render as polished "
                 "canonical callouts, so do not manually copy or decorate fact values "
                 "inside text parts. Keep the writing polished, conversational, and "
-                "cohesive rather than fragmented. Respect capability truth in next "
+                "cohesive rather than fragmented. Do not expose fact_bank field names, "
+                "context packet language, provider names, source plumbing, app internals, "
+                "or implementation terms in user-facing prose. If context facts are "
+                "available, describe them naturally as market or macro backdrop. Keep "
+                "source/provider details internal unless they are part of a rendered "
+                "canonical fact callout. Respect capability truth in next "
                 "steps: runnable ideas must come from runnable_next_tests, while "
                 "draft-only or future ideas must be clearly labeled that way. Promote "
                 "discovery by naming one or two runnable next experiments, but do not "
@@ -264,7 +277,10 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
         fact_bank["assumptions"] = assumption_text
 
     fact_bank.update(
-        context_packet_fact_summary(_context_packets_from_context(context))
+        context_packet_fact_summary(
+            _context_packets_from_context(context),
+            symbols=_context_symbols(context),
+        )
     )
     fact_bank["caveat"] = (
         "This is historical simulation evidence, not a prediction or trading "
@@ -297,6 +313,31 @@ def _context_packets_from_context(context: dict[str, Any]) -> list[dict[str, Any
     if not isinstance(packets, list):
         return []
     return [packet for packet in packets if isinstance(packet, dict)]
+
+
+def _context_symbols(context: dict[str, Any]) -> list[str]:
+    symbols = context.get("symbols")
+    if isinstance(symbols, list):
+        return [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
+    config = context.get("config_snapshot")
+    if isinstance(config, dict):
+        config_symbols = config.get("symbols")
+        if isinstance(config_symbols, list):
+            return [
+                str(symbol).strip().upper()
+                for symbol in config_symbols
+                if str(symbol).strip()
+            ]
+    return []
+
+
+def _context_packet_ids_from_context(context: dict[str, Any]) -> list[str]:
+    packet_ids: list[str] = []
+    for packet in _context_packets_from_context(context):
+        packet_id = str(packet.get("id") or "").strip()
+        if packet_id and packet_id not in packet_ids:
+            packet_ids.append(packet_id)
+    return packet_ids
 
 
 def _coerce_result_breakdown_draft(value: Any) -> ResultBreakdownDraft | None:
@@ -338,7 +379,31 @@ def _render_result_breakdown_draft(
     rendered_text = "\n\n".join(rendered_sections).strip()
     if len(rendered_text.split()) > 520:
         return None
+    if _contains_user_visible_internal_breakdown_term(rendered_text):
+        return None
     return rendered_text
+
+
+INTERNAL_BREAKDOWN_TERMS = (
+    "alpaca",
+    "context packet",
+    "context_packet",
+    "data packet",
+    "fact_bank",
+    "fact id",
+    "fact_id",
+    "fred",
+    "kraken",
+    "provider",
+    "route receipt",
+    "source ids",
+    "source_ids",
+)
+
+
+def _contains_user_visible_internal_breakdown_term(answer: str) -> bool:
+    normalized = str(answer or "").casefold()
+    return any(term in normalized for term in INTERNAL_BREAKDOWN_TERMS)
 
 
 def _render_result_breakdown_parts(
@@ -448,7 +513,7 @@ def _render_result_breakdown_fact_block(
         _consume("assumptions")
 
     if _has("caveat"):
-        lines.append(f"**Caveat:** {fact_bank['caveat']}")
+        lines.append(f"**Keep in mind:** {fact_bank['caveat']}")
         _consume("caveat")
 
     if _has("runnable_next_tests"):
@@ -628,15 +693,16 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
         performance_lines.append(execution_summary)
 
     return (
-        "### Run Lens\n"
-        f"{' '.join(setup_lines)}\n\n"
-        "### Performance Read\n"
+        "### Quick Breakdown\n"
+        f"**What was tested:** {' '.join(setup_lines)}\n\n"
+        "**What the run showed:**\n"
         f"{' '.join(performance_lines)}\n\n"
-        "### Risk And Assumptions\n"
-        f"**Max drawdown:** {drawdown_text}. This is the largest peak-to-trough "
+        "**Risk to notice:** "
+        f"Max drawdown was {drawdown_text}. This is the largest peak-to-trough "
         f"decline captured by the simulation.\n\n"
+        "**Assumptions:**\n"
         f"{assumption_bullets}\n\n"
-        "### Discovery Path\n"
+        "**Keep in mind:** "
         "Use this as historical simulation evidence, not a prediction or trading "
         f"recommendation. {_ensure_sentence(fact_bank['runnable_next_tests'])}"
     )

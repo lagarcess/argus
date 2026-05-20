@@ -5,6 +5,7 @@ import json
 import time
 from typing import Any
 
+from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     ConfirmationPayload,
@@ -21,7 +22,9 @@ from argus.domain.engine_launch.result_facts import (
 from argus.llm.openrouter import (
     build_openrouter_model,
     log_openrouter_failure,
+    merge_openrouter_token_usage,
     openrouter_task_timeout_seconds,
+    openrouter_token_usage_from_message,
     record_openrouter_route_receipt,
 )
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -139,6 +142,7 @@ async def _stream_llm_explanation(
     messages = [
         SystemMessage(
             content=(
+                f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                 "You are Argus explaining a completed historical backtest. "
                 "Use only the supplied metrics and assumptions. Keep the response "
                 "concise, natural, and beginner-friendly. Do not invent metrics, "
@@ -148,10 +152,10 @@ async def _stream_llm_explanation(
                 "If rule_summary is present, include it in the Test bullet. "
                 "If execution_note is present, include it because it explains a "
                 "flat or no-trade result. "
-                "Format the answer as markdown: a bold 'Readout' label, one short "
-                "takeaway paragraph, then 3 to 5 bullets for Test, Signal when "
+                "Format the answer as markdown: a bold 'Quick take' label, one short "
+                "takeaway paragraph, then 3 to 5 bullets for Tested, Signal when "
                 "execution_note is present, Next check for no-trade results, "
-                "Assumptions, and Caveat. Keep it under 120 words. "
+                "Assumptions, and Keep in mind. Keep it under 120 words. "
                 "For no-trade results, say the strategy stayed in cash instead of "
                 "using dramatic market timing language. "
                 "Do not restate every result-card metric; interpret what matters."
@@ -161,7 +165,7 @@ async def _stream_llm_explanation(
     ]
     started_at = time.perf_counter()
     try:
-        chunks = await asyncio.wait_for(
+        chunks, token_usage = await asyncio.wait_for(
             _collect_stream_chunks(model, messages),
             timeout=openrouter_task_timeout_seconds("result_summary"),
         )
@@ -191,17 +195,25 @@ async def _stream_llm_explanation(
         latency_ms=_elapsed_ms(started_at),
         outcome="succeeded" if text else "failed",
         failure_mode=None if text else "empty_response",
+        token_usage=token_usage,
     )
     return text or None
 
 
-async def _collect_stream_chunks(model: Any, messages: list[Any]) -> list[str]:
+async def _collect_stream_chunks(
+    model: Any, messages: list[Any]
+) -> tuple[list[str], dict[str, int] | None]:
     chunks: list[str] = []
+    token_usage: dict[str, int] | None = None
     async for chunk in model.astream(messages):
+        token_usage = merge_openrouter_token_usage(
+            token_usage,
+            openrouter_token_usage_from_message(chunk),
+        )
         content = _chunk_content(chunk)
         if content:
             chunks.append(content)
-    return chunks
+    return chunks, token_usage
 
 
 def _chunk_content(chunk: Any) -> str:
@@ -494,22 +506,22 @@ def _result_readout_markdown(
     )
     tested = _tested_readout_line(tested_summary, rule_summary)
     lines = [
-        "**Readout**",
+        "**Quick take**",
         "",
         takeaway,
         "",
-        f"- **Test:** {tested}.",
+        f"- **Tested:** {tested}.",
     ]
     if execution_note:
         lines.append(f"- **Signal:** {_compact_execution_note(execution_note)}")
     else:
-        lines.append(f"- **Interpretation:** {interpretation}")
+        lines.append(f"- **What that means:** {interpretation}")
     next_check = _next_check_line(execution_note=execution_note)
     if next_check:
         lines.append(f"- **Next check:** {next_check}")
     if assumption_summary:
         lines.append(f"- **Assumptions:** {_strip_leading_label(assumption_summary)}")
-    lines.append(f"- **Caveat:** {caveat}")
+    lines.append(f"- **Keep in mind:** {caveat}")
     return "\n".join(lines)
 
 

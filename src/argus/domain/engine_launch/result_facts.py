@@ -47,10 +47,10 @@ def runnable_next_tests(facts: dict[str, Any]) -> str:
             labels = f"{labels}, or {options[-1]['label']}"
         else:
             labels = str(options[0]["label"])
-        return f"Runnable next tests: {labels}"
+        return f"Try next: {labels}"
 
     return (
-        "Runnable next tests: change the date range, test the same supported setup on "
+        "Try next: change the date range, test the same supported setup on "
         "a different same-class asset, or simplify the idea into a supported RSI or "
         "SMA/EMA rule"
     )

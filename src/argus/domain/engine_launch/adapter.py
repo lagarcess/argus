@@ -613,6 +613,8 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "indicator_period_out_of_bounds",
         "indicator_threshold_out_of_bounds",
         "missing_rule_group",
+        "provider_history_start_unavailable",
+        "kraken_ohlc_window_exceeded",
     }
     unsupported = {
         "cadence_required",
@@ -628,6 +630,7 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "unsupported_indicator_threshold",
         "unsupported_risk_rules",
         "unsupported_rule_operator",
+        "provider_timeframe_unavailable",
     }
     if error_code == "market_data_unavailable":
         return "upstream_dependency_error", "failed_upstream"

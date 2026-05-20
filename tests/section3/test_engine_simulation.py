@@ -261,7 +261,7 @@ def test_validate_backtest_config_rejects_out_of_bounds_indicator_threshold() ->
         engine.validate_backtest_config(config)
 
 
-def test_validate_backtest_config_rejects_lookback_over_three_years() -> None:
+def test_validate_backtest_config_allows_equity_history_beyond_three_years() -> None:
     config = engine.normalize_backtest_config(
         {
             "template": "dca_accumulation",
@@ -277,8 +277,52 @@ def test_validate_backtest_config_rejects_lookback_over_three_years() -> None:
             "parameters": {},
         }
     )
-    with pytest.raises(ValueError, match="invalid_lookback_window"):
+
+    engine.validate_backtest_config(config)
+
+
+def test_validate_backtest_config_rejects_equity_history_before_alpaca_window() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2015, 12, 31),
+            "end_date": date(2016, 1, 15),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+        }
+    )
+
+    with pytest.raises(ValueError) as excinfo:
         engine.validate_backtest_config(config)
+    assert str(excinfo.value) == "provider_history_start_unavailable"
+
+
+def test_validate_backtest_config_rejects_currency_pair_windows_by_kraken_candles() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "currency_pair",
+            "symbols": ["EURUSD"],
+            "timeframe": "1h",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 2, 15),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "EURUSD",
+            "parameters": {},
+        }
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        engine.validate_backtest_config(config)
+    assert str(excinfo.value) == "kraken_ohlc_window_exceeded"
 
 
 def test_build_benchmark_curve_aligns_and_normalizes() -> None:

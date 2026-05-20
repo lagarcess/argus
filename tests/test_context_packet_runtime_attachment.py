@@ -266,10 +266,22 @@ def test_persist_runtime_backtest_run_attaches_immutable_context_packets(
             },
             "metrics": {"aggregate": {"performance": {"total_return_pct": 12.0}}},
             "benchmark_metrics": {"benchmark_symbol": "SPY"},
+            "provider_metadata": {
+                "provider": "alpaca",
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "feed": "iex",
+            },
         },
     )
 
     assert run is not None
+    assert run.config_snapshot["provider_metadata"] == {
+        "provider": "alpaca",
+        "asset_class": "equity",
+        "timeframe": "1D",
+        "feed": "iex",
+    }
     assert gateway.runs[0].conversation_result_card["context_packets"]
     assert gateway.packets[0]["not_for"] == "simulation_truth"
     assert gateway.attachments[0]["run_id"] == run.id
@@ -277,7 +289,7 @@ def test_persist_runtime_backtest_run_attaches_immutable_context_packets(
 
 
 def test_route_receipt_persistence_keeps_run_and_message_context(monkeypatch) -> None:
-    from argus.api.routers.agent import _persist_route_receipts
+    from argus.api.chat.route_receipts import persist_route_receipts
 
     class Gateway:
         def __init__(self) -> None:
@@ -290,7 +302,7 @@ def test_route_receipt_persistence_keeps_run_and_message_context(monkeypatch) ->
     gateway = Gateway()
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
 
-    _persist_route_receipts(
+    persist_route_receipts(
         receipts=[
             OpenRouterRouteReceipt(
                 task="result_summary",
@@ -301,6 +313,8 @@ def test_route_receipt_persistence_keeps_run_and_message_context(monkeypatch) ->
                 schema_name=None,
                 latency_ms=42,
                 outcome="succeeded",
+                token_usage={"total_tokens": 17},
+                context_packet_ids=["packet-1"],
             )
         ],
         user_id="user-1",
@@ -313,3 +327,5 @@ def test_route_receipt_persistence_keeps_run_and_message_context(monkeypatch) ->
     assert gateway.receipts[0]["run_id"] == "run-1"
     assert gateway.receipts[0]["message_id"] == "message-1"
     assert gateway.receipts[0]["metadata"]["stage_outcome"] == "ready_to_respond"
+    assert gateway.receipts[0]["receipt"]["token_usage"] == {"total_tokens": 17}
+    assert gateway.receipts[0]["receipt"]["context_packet_ids"] == ["packet-1"]

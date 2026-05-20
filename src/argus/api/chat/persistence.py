@@ -114,6 +114,7 @@ def build_runtime_backtest_run(
     resolved_parameters_dict = (
         dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
     )
+    provider_metadata = envelope.get("provider_metadata")
     config_snapshot = {
         "template": resolved_strategy.get("strategy_type", "strategy"),
         "symbols": symbols,
@@ -123,6 +124,8 @@ def build_runtime_backtest_run(
         "resolved_strategy": resolved_strategy,
         "resolved_parameters": resolved_parameters_dict,
     }
+    if isinstance(provider_metadata, dict):
+        config_snapshot["provider_metadata"] = dict(provider_metadata)
 
     chart = (
         result_card.get("chart") if isinstance(result_card.get("chart"), dict) else None

@@ -4,15 +4,18 @@ import json
 import os
 import time
 from contextvars import ContextVar, Token
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Literal, TypeVar
 
 import httpx
+from dotenv import load_dotenv
 from langchain_openrouter import ChatOpenRouter
 from loguru import logger
 from pydantic import BaseModel
+
+load_dotenv()
 
 OpenRouterTask = Literal[
     "interpretation",
@@ -48,6 +51,8 @@ class OpenRouterRouteReceipt:
     outcome: Literal["succeeded", "failed", "skipped"]
     failure_mode: str | None = None
     fallback_used: bool = False
+    token_usage: dict[str, int] | None = None
+    context_packet_ids: list[str] = field(default_factory=list)
     created_at: str = ""
 
     def as_dict(self) -> dict[str, object]:
@@ -62,6 +67,8 @@ class OpenRouterRouteReceipt:
             "outcome": self.outcome,
             "failure_mode": self.failure_mode,
             "fallback_used": self.fallback_used,
+            "token_usage": self.token_usage,
+            "context_packet_ids": list(self.context_packet_ids),
             "created_at": self.created_at,
         }
 
@@ -76,7 +83,7 @@ _ROUTE_RECEIPT_CAPTURE: ContextVar[list[OpenRouterRouteReceipt] | None] = Contex
 
 OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "interpretation": OpenRouterProfile("interpretation", temperature=0, max_tokens=3200),
-    "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=1200),
+    "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
     "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
     "result_summary": OpenRouterProfile(
         "result_summary", temperature=0.2, max_tokens=1600
@@ -246,6 +253,8 @@ def record_openrouter_route_receipt(
     latency_ms: int,
     outcome: Literal["succeeded", "failed", "skipped"],
     failure_mode: str | None = None,
+    token_usage: dict[str, int] | None = None,
+    context_packet_ids: list[str] | None = None,
 ) -> OpenRouterRouteReceipt:
     tier = openrouter_model_tier_for_task(task)
     fallback_model = resolve_openrouter_model(fallback=True, task=task)
@@ -260,6 +269,8 @@ def record_openrouter_route_receipt(
         latency_ms=max(0, int(latency_ms)),
         outcome=outcome,
         failure_mode=failure_mode,
+        token_usage=normalize_openrouter_token_usage(token_usage),
+        context_packet_ids=_normalized_context_packet_ids(context_packet_ids),
         fallback_used=bool(
             fallback_model and resolved_model == fallback_model and resolved_model != ""
         ),
@@ -280,6 +291,8 @@ def record_openrouter_route_receipt(
         failure_mode=failure_mode,
         latency_ms=receipt.latency_ms,
         fallback_used=receipt.fallback_used,
+        token_usage=receipt.token_usage,
+        context_packet_ids=receipt.context_packet_ids,
     ).info("OpenRouter route receipt")
     return receipt
 
@@ -313,6 +326,7 @@ async def invoke_openrouter_json_schema(
     schema_model: type[SchemaModelT],
     schema_name: str,
     model_name: str | None = None,
+    context_packet_ids: list[str] | None = None,
 ) -> SchemaModelT | None:
     started_at = time.perf_counter()
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -326,6 +340,7 @@ async def invoke_openrouter_json_schema(
             latency_ms=_elapsed_ms(started_at),
             outcome="skipped",
             failure_mode="missing_api_key",
+            context_packet_ids=context_packet_ids,
         )
         return None
 
@@ -340,6 +355,7 @@ async def invoke_openrouter_json_schema(
             latency_ms=_elapsed_ms(started_at),
             outcome="skipped",
             failure_mode="missing_model",
+            context_packet_ids=context_packet_ids,
         )
         return None
 
@@ -381,6 +397,7 @@ async def invoke_openrouter_json_schema(
             latency_ms=_elapsed_ms(started_at),
             outcome="failed",
             failure_mode=type(exc).__name__,
+            context_packet_ids=context_packet_ids,
         )
         raise
     record_openrouter_route_receipt(
@@ -390,8 +407,97 @@ async def invoke_openrouter_json_schema(
         schema_name=schema_name,
         latency_ms=_elapsed_ms(started_at),
         outcome="succeeded",
+        token_usage=openrouter_token_usage_from_payload(data),
+        context_packet_ids=context_packet_ids,
     )
     return result
+
+
+async def invoke_openrouter_chat_completion(
+    *,
+    task: OpenRouterTask,
+    messages: list[dict[str, str]],
+    model_name: str | None = None,
+) -> str | None:
+    started_at = time.perf_counter()
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=model_name,
+            mode="chat_model",
+            schema_name=None,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="skipped",
+            failure_mode="missing_api_key",
+        )
+        return None
+
+    resolved_model = resolve_openrouter_model(model_name, task=task)
+    if not resolved_model:
+        logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=model_name,
+            mode="chat_model",
+            schema_name=None,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="skipped",
+            failure_mode="missing_model",
+        )
+        return None
+
+    profile = OPENROUTER_PROFILES[task]
+    payload: dict[str, object] = {
+        "model": resolved_model,
+        "messages": messages,
+        "temperature": profile.temperature,
+        "max_tokens": profile.max_tokens,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
+            response = await _post_openrouter_json_schema(
+                client=client,
+                api_key=api_key,
+                payload=payload,
+            )
+            data = response.json()
+            _raise_openrouter_payload_error(data)
+    except Exception as exc:
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=resolved_model,
+            mode="chat_model",
+            schema_name=None,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="failed",
+            failure_mode=type(exc).__name__,
+        )
+        raise
+    content = _openrouter_message_content(data).strip()
+    if not content:
+        record_openrouter_route_receipt(
+            task=task,
+            model_name=resolved_model,
+            mode="chat_model",
+            schema_name=None,
+            latency_ms=_elapsed_ms(started_at),
+            outcome="failed",
+            failure_mode="empty_response",
+            token_usage=openrouter_token_usage_from_payload(data),
+        )
+        return None
+    record_openrouter_route_receipt(
+        task=task,
+        model_name=resolved_model,
+        mode="chat_model",
+        schema_name=None,
+        latency_ms=_elapsed_ms(started_at),
+        outcome="succeeded",
+        token_usage=openrouter_token_usage_from_payload(data),
+    )
+    return content
 
 
 def invoke_openrouter_json_schema_sync(
@@ -401,6 +507,7 @@ def invoke_openrouter_json_schema_sync(
     schema_model: type[SchemaModelT],
     schema_name: str,
     model_name: str | None = None,
+    context_packet_ids: list[str] | None = None,
 ) -> SchemaModelT | None:
     started_at = time.perf_counter()
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -414,6 +521,7 @@ def invoke_openrouter_json_schema_sync(
             latency_ms=_elapsed_ms(started_at),
             outcome="skipped",
             failure_mode="missing_api_key",
+            context_packet_ids=context_packet_ids,
         )
         return None
 
@@ -428,6 +536,7 @@ def invoke_openrouter_json_schema_sync(
             latency_ms=_elapsed_ms(started_at),
             outcome="skipped",
             failure_mode="missing_model",
+            context_packet_ids=context_packet_ids,
         )
         return None
 
@@ -469,6 +578,7 @@ def invoke_openrouter_json_schema_sync(
             latency_ms=_elapsed_ms(started_at),
             outcome="failed",
             failure_mode=type(exc).__name__,
+            context_packet_ids=context_packet_ids,
         )
         raise
     record_openrouter_route_receipt(
@@ -478,8 +588,76 @@ def invoke_openrouter_json_schema_sync(
         schema_name=schema_name,
         latency_ms=_elapsed_ms(started_at),
         outcome="succeeded",
+        token_usage=openrouter_token_usage_from_payload(data),
+        context_packet_ids=context_packet_ids,
     )
     return result
+
+
+def openrouter_token_usage_from_payload(data: dict[str, object]) -> dict[str, int] | None:
+    usage = data.get("usage")
+    return normalize_openrouter_token_usage(usage if isinstance(usage, dict) else None)
+
+
+def openrouter_token_usage_from_message(message: object) -> dict[str, int] | None:
+    usage_metadata = getattr(message, "usage_metadata", None)
+    normalized = normalize_openrouter_token_usage(
+        usage_metadata if isinstance(usage_metadata, dict) else None
+    )
+    if normalized is not None:
+        return normalized
+    response_metadata = getattr(message, "response_metadata", None)
+    if not isinstance(response_metadata, dict):
+        return None
+    for key in ("token_usage", "usage"):
+        value = response_metadata.get(key)
+        normalized = normalize_openrouter_token_usage(
+            value if isinstance(value, dict) else None
+        )
+        if normalized is not None:
+            return normalized
+    return None
+
+
+def merge_openrouter_token_usage(
+    current: dict[str, int] | None,
+    incoming: dict[str, int] | None,
+) -> dict[str, int] | None:
+    if current is None:
+        return dict(incoming) if incoming is not None else None
+    if incoming is None:
+        return dict(current)
+    merged = dict(current)
+    for key, value in incoming.items():
+        merged[key] = value
+    return merged
+
+
+def normalize_openrouter_token_usage(
+    value: dict[str, object] | None,
+) -> dict[str, int] | None:
+    if not value:
+        return None
+    normalized: dict[str, int] = {}
+    for key, raw in value.items():
+        if not isinstance(key, str) or isinstance(raw, bool):
+            continue
+        if isinstance(raw, int):
+            normalized[key] = raw
+        elif isinstance(raw, float) and raw.is_integer():
+            normalized[key] = int(raw)
+    return normalized or None
+
+
+def _normalized_context_packet_ids(values: list[str] | None) -> list[str]:
+    if not values:
+        return []
+    normalized: list[str] = []
+    for value in values:
+        packet_id = str(value or "").strip()
+        if packet_id and packet_id not in normalized:
+            normalized.append(packet_id)
+    return normalized
 
 
 def _elapsed_ms(started_at: float) -> int:

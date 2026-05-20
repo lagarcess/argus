@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
-from pydantic import ValidationError
-
 from argus.context import (
     DEFAULT_FRED_CONTEXT_SERIES,
     ContextPacket,
@@ -16,6 +14,8 @@ from argus.context import (
     build_fred_macro_packet,
     fred_context_series_from_env,
 )
+from argus.context.rendering import context_packet_fact_summary
+from pydantic import ValidationError
 
 
 def test_fred_macro_packet_is_context_only_and_replayable_snapshot() -> None:
@@ -139,3 +139,36 @@ def test_alpaca_most_actives_packet_is_narrow_stocks_context() -> None:
     assert packet.scope == {"market_type": "stocks", "by": "volume"}
     assert packet.facts[0].kind == "most_active_stock"
     assert "not a product feed" in packet.limitations[0]
+
+
+def test_market_movers_render_only_when_they_match_run_symbols() -> None:
+    packet = build_alpaca_market_movers_packet(
+        market_type="stocks",
+        movers={
+            "gainers": [{"symbol": "TSLA", "percent_change": 5.1}],
+            "losers": [{"symbol": "AAPL", "percent_change": -2.1}],
+        },
+    ).storage_payload()
+
+    matching = context_packet_fact_summary([packet], symbols=["TSLA"])
+    unrelated = context_packet_fact_summary([packet], symbols=["MSFT"])
+
+    assert "TSLA changed 5.1%" in matching["context_packet_facts"]
+    assert "AAPL" not in matching["context_packet_facts"]
+    assert "context_packet_facts" not in unrelated
+
+
+def test_movers_and_most_actives_do_not_render_as_generic_feed_without_symbols() -> None:
+    movers = build_alpaca_market_movers_packet(
+        market_type="stocks",
+        movers={"gainers": [{"symbol": "INM", "percent_change": 135.05}]},
+    ).storage_payload()
+    actives = build_alpaca_most_actives_packet(
+        by="volume",
+        most_actives=[{"symbol": "NVDA", "volume": 123_000_000}],
+    ).storage_payload()
+
+    summary = context_packet_fact_summary([movers, actives])
+
+    assert "context_packet_facts" not in summary
+    assert "context_packet_limitations" in summary

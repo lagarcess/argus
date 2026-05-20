@@ -70,6 +70,14 @@ def conserve_semantic_constraints(
         if normalized_date_range != updated.date_range:
             updated.date_range = normalized_date_range
         reason_codes.append("semantic_date_constraint_preserved")
+    normalized_timeframe = _supported_timeframe_value(
+        updated.timeframe,
+        supported_timeframes=supported_timeframes,
+    )
+    if normalized_timeframe is not None:
+        updated.timeframe = normalized_timeframe
+        optional_values["timeframe"] = normalized_timeframe
+        reason_codes.append("semantic_timeframe_constraint_preserved")
 
     structured_signal_rule_reference = _strategy_has_signal_rule_payload(updated)
 
@@ -255,8 +263,25 @@ def _is_supported_timeframe_value(
     *,
     supported_timeframes: tuple[str, ...],
 ) -> bool:
+    return (
+        _supported_timeframe_value(value, supported_timeframes=supported_timeframes)
+        is not None
+    )
+
+
+def _supported_timeframe_value(
+    value: Any,
+    *,
+    supported_timeframes: tuple[str, ...],
+) -> str | None:
+    if not isinstance(value, str):
+        return None
     normalized = value.strip().lower()
-    return normalized in {str(item).strip().lower() for item in supported_timeframes}
+    for supported in supported_timeframes:
+        supported_value = str(supported).strip()
+        if normalized == supported_value.lower():
+            return supported_value
+    return None
 
 
 def _is_timeframe_constraint(constraint: UnsupportedConstraint) -> bool:

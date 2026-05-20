@@ -119,7 +119,7 @@ def task_snapshot_with_confirmation(strategy: StrategySummary) -> TaskSnapshot:
 def test_interpret_passes_raw_message_to_llm_without_regex_normalization() -> None:
     response = StructuredInterpretation(
         intent="conversation_followup",
-        task_relation="continue",
+        task_relation="new_task",
         requires_clarification=False,
         user_goal_summary="User is checking the product.",
         assistant_response="I can help turn an investing idea into a supported backtest.",
@@ -253,6 +253,44 @@ def test_interpret_uses_llm_extracted_strategy_fields(monkeypatch) -> None:
     assert strategy.asset_universe == ["TSLA"]
     assert strategy.exit_logic == "RSI rises above 70"
     assert strategy.date_range == "last 2 years"
+
+
+def test_interpret_preserves_llm_extracted_timeframe_as_user_assumption(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User supplied an hourly TSLA buy-and-hold test.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="Test TSLA on 1 hour candles over the past month.",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold TSLA on hourly bars.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="past month",
+            timeframe="1h",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="Test TSLA on 1 hour candles over the past month.",
+        response=response,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.timeframe == "1h"
+    assert result.patch["optional_parameter_status"]["timeframe"] == "1h"
+    assert "semantic_timeframe_constraint_preserved" in result.decision.reason_codes
 
 
 def test_pending_rule_answer_preserves_active_artifact_context(monkeypatch) -> None:
@@ -399,7 +437,7 @@ def test_pending_signal_subset_with_macd_shorthand_reaches_confirmation(
         ),
         missing_required_fields=["entry_logic"],
         assistant_response="The old volume clarification should not block this subset.",
-        semantic_turn_act="answer_pending_need",
+        semantic_turn_act="new_idea",
     )
 
     result, _interpreter = run_interpret_with_llm(
@@ -488,7 +526,7 @@ def test_interpret_approval_uses_semantic_turn_act() -> None:
     snapshot = task_snapshot_with_confirmation(pending)
     response = StructuredInterpretation(
         intent="backtest_execution",
-        task_relation="continue",
+        task_relation="new_task",
         requires_clarification=False,
         user_goal_summary="User approved the pending backtest.",
         candidate_strategy_draft=pending,
@@ -509,7 +547,9 @@ def test_interpret_approval_uses_semantic_turn_act() -> None:
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "Run backtest" in result.patch["assistant_response"]
+    response_text = result.patch["assistant_response"].lower()
+    assert "visible card" in response_text
+    assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
     assert result.decision.semantic_turn_act == "approval"
 
@@ -534,7 +574,7 @@ def test_interpret_approval_preserves_visible_artifact_without_re_resolving(
     snapshot = task_snapshot_with_confirmation(pending)
     response = StructuredInterpretation(
         intent="backtest_execution",
-        task_relation="continue",
+        task_relation="refine",
         requires_clarification=False,
         user_goal_summary="User approved the pending backtest.",
         candidate_strategy_draft=StrategySummary(),
@@ -551,7 +591,9 @@ def test_interpret_approval_preserves_visible_artifact_without_re_resolving(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "Run backtest" in result.patch["assistant_response"]
+    response_text = result.patch["assistant_response"].lower()
+    assert "visible card" in response_text
+    assert "simulation" in response_text
     assert "confirmation_payload" not in result.patch
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["TSLA"]
 
@@ -868,8 +910,10 @@ def test_result_followup_uses_latest_result_fact_bank() -> None:
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "-34.2%" in result.patch["assistant_response"]
-    assert "MSFT" in result.patch["assistant_response"]
+    response_text = result.patch["assistant_response"]
+    assert "34.2%" in response_text
+    assert "drawdown" in response_text.lower()
+    assert "MSFT" in response_text
 
 
 def test_result_followup_uses_latest_result_when_interpreter_unavailable(
@@ -986,6 +1030,204 @@ def test_result_followup_uses_llm_composer_before_fallback(monkeypatch: pytest.M
     assert captured["metadata"]["symbols"] == ["AAPL"]
     assert captured["focus"] == "why_underperformed"
     assert captured["user_message"] == "Why did this happen?"
+
+
+def test_empty_non_strategy_turn_after_result_falls_back_to_next_tests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def empty_compose_result_followup_response(**kwargs: Any) -> None:
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
+        empty_compose_result_followup_response,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-next-tests",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["TSLA"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 40.8,
+                            "benchmark_return_pct": 26.4,
+                            "delta_vs_benchmark_pct": 14.5,
+                        }
+                    }
+                },
+                "config_snapshot": {
+                    "template": "indicator_threshold",
+                    "symbols": ["TSLA"],
+                    "date_range": {"start": "2025-05-20", "end": "2026-05-20"},
+                },
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what to try next.",
+        semantic_turn_act="educational_question",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="what should I try next?",
+        response=response,
+        snapshot=snapshot,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    assert "Try next" in answer
+    assert "change the date range" in answer
+    assert result.decision.semantic_turn_act == "result_followup"
+    assert result.decision.result_followup_focus == "general"
+    assert "latest_result_empty_turn_recovery" in result.decision.reason_codes
+
+
+def test_unanchored_clarification_after_result_falls_back_to_next_tests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def empty_compose_result_followup_response(**kwargs: Any) -> None:
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
+        empty_compose_result_followup_response,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-next-tests",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["TSLA"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 40.8,
+                            "benchmark_return_pct": 26.4,
+                            "delta_vs_benchmark_pct": 14.5,
+                        }
+                    }
+                },
+                "config_snapshot": {
+                    "template": "indicator_threshold",
+                    "symbols": ["TSLA"],
+                    "date_range": {"start": "2025-05-20", "end": "2026-05-20"},
+                },
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User asks what to try next.",
+        assistant_response=(
+            "I understand the shape of the idea. I need one more detail before "
+            "I can turn this into a backtest."
+        ),
+        candidate_strategy_draft=StrategySummary(),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="what would be worth trying after that run?",
+        response=response,
+        snapshot=snapshot,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    assert "Try next" in answer
+    assert "one more detail" not in answer
+    assert result.decision.semantic_turn_act == "result_followup"
+    assert result.decision.requires_clarification is False
+    assert "latest_result_unanchored_turn_recovery" in result.decision.reason_codes
+
+
+def test_result_followup_timeout_falls_back_to_grounded_facts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncio
+
+    from argus.agent_runtime.stages import interpret_actions
+    from argus.llm import openrouter
+
+    async def slow_compose_result_followup_response(**kwargs: Any) -> str:
+        del kwargs
+        await asyncio.sleep(1)
+        return "late answer"
+
+    monkeypatch.setattr(
+        interpret_actions,
+        "RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS",
+        0.01,
+    )
+    monkeypatch.setattr(
+        interpret_actions,
+        "compose_result_followup_response",
+        slow_compose_result_followup_response,
+    )
+    openrouter.clear_openrouter_route_receipts()
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-followup-timeout",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["TSLA"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 27.5,
+                            "benchmark_return_pct": 23.8,
+                            "delta_vs_benchmark_pct": 3.8,
+                        },
+                        "risk": {"max_drawdown_pct": -17.7},
+                    }
+                },
+                "config_snapshot": {
+                    "template": "indicator_threshold",
+                    "symbols": ["TSLA"],
+                    "date_range": {"start": "2025-05-20", "end": "2026-05-20"},
+                },
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks why the result happened.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="why did that happen?",
+        response=response,
+        snapshot=snapshot,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    assert "TSLA" in answer
+    assert "27.5%" in answer
+    assert "Historical simulation evidence" in answer
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert receipts[-1].task == "result_summary"
+    assert receipts[-1].failure_mode == "result_followup_timeout"
 
 
 def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts(
@@ -1730,6 +1972,41 @@ def test_vague_signal_strategy_requires_executable_rule(monkeypatch) -> None:
     assert result.decision.missing_required_fields == ["entry_logic"]
 
 
+def test_unclassified_rule_like_strategy_requires_executable_rule_before_assets(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to buy and sell when price goes up.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_thesis="Buy when price starts rising and sell after gains.",
+            entry_logic="buy when price goes up",
+            exit_logic="sell when price goes up",
+        ),
+        missing_required_fields=["asset_universe", "date_range"],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="buy and sell when it goes up",
+        response=response,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.missing_required_fields[0] == "entry_logic"
+    assert "asset_universe" in result.decision.missing_required_fields
+    assert "date_range" in result.decision.missing_required_fields
+
+
 def test_non_executable_signal_rule_requires_rule_before_date(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -1907,6 +2184,159 @@ def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
     assert strategy.entry_rule == entry_rule
     assert strategy.exit_rule == exit_rule
     assert result.decision.missing_required_fields == []
+
+
+def test_pending_asset_date_answer_preserves_signal_family_when_llm_defaults_buy_hold(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy when the 50-day moving average crosses above the 200-day.",
+            entry_logic="50-day SMA crosses above 200-day SMA",
+            exit_logic="50-day SMA crosses below 200-day SMA",
+            entry_rule=entry_rule,
+            exit_rule=exit_rule,
+            extra_parameters={"entry_rule": entry_rule, "exit_rule": exit_rule},
+        )
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User answered the pending asset and date question.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold TSLA over the past year.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="past year",
+            extra_parameters={"raw_strategy_type": "buy_and_hold"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="TSLA over the last year",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "signal_strategy"
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.date_range == "past year"
+    assert strategy.entry_rule == entry_rule
+    assert strategy.exit_rule == exit_rule
+    assert strategy.entry_logic == "50-day SMA crosses above 200-day SMA"
+    assert strategy.exit_logic == "50-day SMA crosses below 200-day SMA"
+
+
+def test_ready_pending_signal_ignores_resolved_optional_ambiguity(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    entry_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bullish",
+    }
+    exit_rule = {
+        "type": "moving_average_crossover",
+        "fast_indicator": "sma",
+        "fast_period": 50,
+        "slow_indicator": "sma",
+        "slow_period": 200,
+        "direction": "bearish",
+    }
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="Buy when the 50-day moving average crosses above the 200-day.",
+            entry_logic="50-day SMA crosses above 200-day SMA",
+            exit_logic="50-day SMA crosses below 200-day SMA",
+            entry_rule=entry_rule,
+            exit_rule=exit_rule,
+            extra_parameters={"entry_rule": entry_rule, "exit_rule": exit_rule},
+        )
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User answered the pending asset and date question.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_thesis="Test TSLA with the 50/200 crossover over the past year.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="past year",
+        ),
+        ambiguous_fields=[
+            AmbiguousField(
+                field_name="exit_logic",
+                raw_value="optional alternate exit rule",
+                candidate_normalized_value="use the opposite moving-average cross",
+                reason_code="optional_exit_rule_suggestion",
+            )
+        ],
+        assistant_response=(
+            "Would you like to run it as-is, or add a simple exit rule?"
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="TSLA over the last year",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    assert result.decision.ambiguous_fields == []
+    assert result.decision.candidate_strategy_draft.strategy_type == "signal_strategy"
+    assert result.decision.candidate_strategy_draft.entry_rule == entry_rule
+    assert result.decision.candidate_strategy_draft.exit_rule == exit_rule
+    assert "assistant_response" not in result.stage_patch
 
 
 def test_pending_date_answer_removes_mislabeled_timeframe_constraint(
@@ -2956,7 +3386,8 @@ def test_interpreter_unavailable_reads_visible_confirmation_assumptions() -> Non
     answer = result.patch["assistant_response"]
     assert "$1,000 starting capital" in answer
     assert "Benchmark: SPY" in answer
-    assert "Run backtest button" in answer
+    assert "visible confirmation" in answer
+    assert "start the simulation" in answer
     assert "card controls" in answer
 
 
@@ -3053,7 +3484,8 @@ def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> 
         "start": "2025-05-13",
         "end": "2026-05-13",
     }
-    assert "Run backtest button" in result.patch["assistant_response"]
+    assert "review the card" in result.patch["assistant_response"]
+    assert "retry" in result.patch["assistant_response"]
 
 
 def test_pending_date_answer_is_not_treated_as_failed_action_retry(monkeypatch) -> None:

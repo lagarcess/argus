@@ -111,7 +111,29 @@ class FocusedStrategyExtraction(BaseModel):
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
-    date_range: str | dict[str, str] | None = None
+    asset_class: str | None = None
+    timeframe: str | None = Field(
+        default=None,
+        description=(
+            "User-stated candle/bar interval normalized to supported notation, "
+            "for example 1h for one-hour/hourly candles, 4h for four-hour bars, "
+            "or 1D for daily candles. Leave null only when the user did not state it."
+        ),
+    )
+    date_range: str | dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "User-stated test window. Preserve today/current as 'today' or the runtime "
+            "date when it appears as an endpoint."
+        ),
+    )
+    capital_amount: float | None = Field(
+        default=None,
+        description=(
+            "User-stated starting capital or recurring contribution amount. "
+            "Examples: $1k -> 1000, $500 -> 500."
+        ),
+    )
     entry_logic: str | None = None
     exit_logic: str | None = None
     entry_rule: dict[str, Any] | None = None

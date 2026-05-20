@@ -89,9 +89,11 @@ def runtime_confirmation_card(
         optional_parameters=optional_parameters,
     )
     summary_period = _confirmation_period_without_parentheses(date_range)
-    summary = (
-        f"I read this as {assets} using {_article_for(strategy_type)} "
-        f"{strategy_type} approach over {summary_period}."
+    summary = _confirmation_summary(
+        assets=assets,
+        strategy=strategy,
+        strategy_label=strategy_label,
+        period=summary_period,
     )
     active_confirmation_id = confirmation_id_from_payload(
         payload,
@@ -197,6 +199,32 @@ def _confirmation_assumptions(
     elif asset_class == "equity":
         assumptions.append("Benchmark: SPY")
     return assumptions
+
+
+def _confirmation_summary(
+    *,
+    assets: str,
+    strategy: dict[str, Any],
+    strategy_label: str,
+    period: str,
+) -> str:
+    strategy_type = executable_strategy_type(strategy)
+    if strategy_type == "buy_and_hold":
+        return f"Ready to test buy-and-hold for {assets} over {period}."
+    if _strategy_type_uses_cadence(strategy_type):
+        return f"Ready to test recurring buys for {assets} over {period}."
+    return f"Ready to test {assets} with {_summary_strategy_phrase(strategy_label)} over {period}."
+
+
+def _summary_strategy_phrase(strategy_label: str) -> str:
+    phrases = {
+        "RSI Threshold": "an RSI threshold",
+        "Dip Buying": "a dip-buying rule",
+        "Indicator Threshold": "an indicator threshold",
+        "Signal Strategy": "a signal strategy",
+        "Moving Average Crossover": "a moving-average crossover",
+    }
+    return phrases.get(strategy_label, strategy_label.strip().lower())
 
 
 def _optional_parameter_value(optional_parameters: dict[str, Any], key: str) -> Any:

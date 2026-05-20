@@ -82,7 +82,7 @@ def _conversation(client: TestClient) -> dict[str, Any]:
 def _confirmation_runtime_result() -> dict[str, Any]:
     return {
         "stage_outcome": "await_approval",
-        "assistant_response": "I read this as AAPL buy and hold.",
+        "assistant_response": "Ready to test AAPL with buy and hold.",
         "confirmation_payload": {
             "strategy": {
                 "strategy_type": "buy_and_hold",
@@ -217,8 +217,9 @@ def _stream_events_from_runtime(runtime):
 
 @pytest.fixture(autouse=True)
 def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import backtest_service, chat_service
+    from argus.api import backtest_service
     from argus.api import state as api_state
+    from argus.api.chat import persistence as chat_persistence
 
     monkeypatch.setattr(api_state, "supabase_gateway", None)
     monkeypatch.setattr(
@@ -227,7 +228,7 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
     )
     monkeypatch.setattr(
-        chat_service,
+        chat_persistence,
         "classify_symbol",
         lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
     )
@@ -592,9 +593,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert runtime_calls == 1
     assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
-    assert "### Performance Read" in breakdown
+    assert "### Quick Breakdown" in breakdown
     assert "**Total return:**" in breakdown
-    assert "### Discovery Path" in breakdown
+    assert "**Keep in mind:**" in breakdown
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert run_id in messages.text
     assistant = messages.json()["items"][-1]

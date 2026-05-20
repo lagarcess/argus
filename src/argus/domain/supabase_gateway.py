@@ -103,6 +103,7 @@ class SupabaseGateway:
         user_id = user.id
         for table in (
             "feedback",
+            "usage_counters",
             "collection_strategies",
             "backtest_runs",
             "messages",
@@ -426,6 +427,8 @@ class SupabaseGateway:
             "outcome": receipt["outcome"],
             "failure_mode": receipt.get("failure_mode"),
             "fallback_used": bool(receipt.get("fallback_used")),
+            "token_usage": receipt.get("token_usage"),
+            "context_packet_ids": receipt.get("context_packet_ids") or [],
             "metadata": metadata or {},
             "created_at": receipt.get("created_at") or _now_iso(),
         }

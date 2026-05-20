@@ -310,6 +310,7 @@ async def _stage_result_from_interpretation(
         *integrity_report.unsupported_constraints,
     ]
     constraint_filter_reason_codes: list[str] = []
+    ambiguity_filter_reason_codes: list[str] = []
     if expects_strategy_route:
         unsupported_constraints, constraint_filter_reason_codes = (
             filter_unsubstantiated_timeframe_constraints(
@@ -341,6 +342,12 @@ async def _stage_result_from_interpretation(
                 *ambiguous_fields,
                 *_ambiguous_fields_from_resolution(strategy.resolution_provenance),
             ]
+        )
+        ambiguous_fields, ambiguity_filter_reason_codes = (
+            _filter_resolved_strategy_ambiguities(
+                strategy=strategy,
+                fields=ambiguous_fields,
+            )
         )
         unsupported_constraints = _dedupe_unsupported_constraints(
             [
@@ -412,6 +419,7 @@ async def _stage_result_from_interpretation(
             ),
             *integrity_report.reason_codes,
             *constraint_filter_reason_codes,
+            *ambiguity_filter_reason_codes,
             *interpretation.reason_codes,
         ],
         effective_response_profile=effective_profile,
@@ -477,6 +485,15 @@ async def _stage_result_from_interpretation(
             decision=decision,
             stage_patch={"assistant_response": capability_answer},
         )
+    latest_result_recovery = await _latest_result_followup_recovery_if_applicable(
+        user=user,
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+        decision=decision,
+        assistant_response=interpretation.assistant_response,
+    )
+    if latest_result_recovery is not None:
+        return latest_result_recovery
     if (
         interpretation.assistant_response
         and not expects_strategy_route
@@ -925,6 +942,67 @@ async def _latest_result_followup_when_interpreter_unavailable(
     )
 
 
+async def _latest_result_followup_recovery_if_applicable(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    decision: InterpretDecision,
+    assistant_response: str | None,
+) -> StageResult | None:
+    unanchored_strategy_route = (
+        "unanchored_strategy_route_suppressed" in decision.reason_codes
+    )
+    if assistant_response and not unanchored_strategy_route:
+        return None
+    if _candidate_strategy_has_backtest_shape(decision.candidate_strategy_draft):
+        return None
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return None
+    if not current_user_message.strip():
+        return None
+    reference = snapshot.latest_backtest_result_reference
+    metadata = dict(reference.metadata)
+    response = await compose_result_followup_response(
+        metadata=metadata,
+        focus="general",
+        user_message=current_user_message,
+    )
+    if response is None:
+        response = fallback_result_followup_response(
+            metadata=metadata,
+            focus="general",
+        )
+    if response is None:
+        return None
+    effective_profile = resolve_effective_response_profile(
+        user=user,
+        explicit_overrides=None,
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision.model_copy(
+            update={
+                "intent": "conversation_followup",
+                "requires_clarification": False,
+                "missing_required_fields": [],
+                "effective_response_profile": effective_profile,
+                "semantic_turn_act": "result_followup",
+                "result_followup_focus": decision.result_followup_focus or "general",
+                "reason_codes": [
+                    *decision.reason_codes,
+                    (
+                        "latest_result_unanchored_turn_recovery"
+                        if unanchored_strategy_route
+                        else "latest_result_empty_turn_recovery"
+                    ),
+                ],
+            }
+        ),
+        stage_patch={"assistant_response": response},
+    )
+
+
 def _offline_recovery_message(
     snapshot: TaskSnapshot | None,
     *,
@@ -952,9 +1030,8 @@ def _offline_recovery_message(
             )
         assumptions_response = _draft_assumptions_response(snapshot)
         action_guidance = (
-            "The visible confirmation is still ready. Use the Run backtest button "
-            "on the card to start the simulation, or use the card controls to change "
-            "it."
+            "The visible confirmation is still ready. Use the card to start the "
+            "simulation, or use the card controls to change it."
         )
         if assumptions_response is not None:
             return f"{assumptions_response} {action_guidance}"
@@ -1001,6 +1078,11 @@ def _strategy_with_contextual_merge(
         semantic_turn_act in CONTEXTUAL_EDIT_TURN_ACTS
         or task_relation == "refine"
         or _strategy_supplies_contextual_rule_edit(prior=prior, strategy=strategy)
+        or _strategy_fills_pending_execution_context(
+            prior=prior,
+            strategy=strategy,
+            selected_thread_metadata=selected_thread_metadata,
+        )
         or _strategy_looks_like_pending_artifact_edit(
             prior=prior,
             strategy=strategy,
@@ -1016,6 +1098,18 @@ def _strategy_with_contextual_merge(
         and prior_strategy_family in SUPPORTED_STRATEGY_TYPES
         and incoming_strategy_family != prior_strategy_family
     )
+    preserve_prior_family = _should_preserve_pending_strategy_family(
+        prior=prior,
+        strategy=strategy,
+        incoming_strategy_family=incoming_strategy_family,
+        prior_strategy_family=prior_strategy_family,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=semantic_turn_act,
+        task_relation=task_relation,
+    )
+    if preserve_prior_family:
+        strategy_family_changed = False
+        incoming_strategy_family = prior_strategy_family
     merged = (
         _reset_contextual_strategy_definition(
             prior,
@@ -1030,7 +1124,21 @@ def _strategy_with_contextual_merge(
             continue
         if key == "strategy_thesis" and not strategy_family_changed:
             continue
+        if key == "strategy_type" and preserve_prior_family:
+            continue
         if value in (None, "", [], {}):
+            continue
+        if key == "extra_parameters":
+            if preserve_prior_family and isinstance(value, dict):
+                value = {
+                    nested_key: nested_value
+                    for nested_key, nested_value in value.items()
+                    if nested_key not in {"raw_strategy_type", "template"}
+                }
+            merged.extra_parameters = _merge_contextual_extra_parameters(
+                base=merged.extra_parameters,
+                incoming=value if isinstance(value, dict) else {},
+            )
             continue
         setattr(merged, key, value)
     if strategy_family_changed and incoming_strategy_family is not None:
@@ -1040,6 +1148,115 @@ def _strategy_with_contextual_merge(
     declared_family = _declared_strategy_family(merged)
     if declared_family in SUPPORTED_STRATEGY_TYPES:
         _clear_incompatible_strategy_rule_state(merged, declared_family)
+    return merged
+
+
+def _should_preserve_pending_strategy_family(
+    *,
+    prior: StrategySummary,
+    strategy: StrategySummary,
+    incoming_strategy_family: str | None,
+    prior_strategy_family: str,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: str | None,
+    task_relation: str,
+) -> bool:
+    # The LLM may label a pending-field answer as "refine"; the narrower
+    # semantic turn act and selected artifact context decide whether family
+    # changes are allowed.
+    del task_relation
+    if semantic_turn_act not in {"answer_pending_need", "new_idea"}:
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field in {"refinement", "entry_logic", "exit_logic"}:
+        return False
+    if not _strategy_fills_pending_execution_context(
+        prior=prior,
+        strategy=strategy,
+        selected_thread_metadata=selected_thread_metadata,
+    ):
+        return False
+    if (
+        incoming_strategy_family not in SUPPORTED_STRATEGY_TYPES
+        or prior_strategy_family not in SUPPORTED_STRATEGY_TYPES
+        or incoming_strategy_family == prior_strategy_family
+    ):
+        return False
+    if incoming_strategy_family not in {"buy_and_hold", "dca_accumulation"}:
+        return False
+    if not _strategy_supplies_executable_rule_edit(prior):
+        return False
+    if _strategy_supplies_executable_rule_edit(strategy):
+        return False
+    return True
+
+
+def _strategy_fills_pending_execution_context(
+    *,
+    prior: StrategySummary,
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+) -> bool:
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    context_fields = {
+        "asset_universe",
+        "date_range",
+        "timeframe",
+        "capital_amount",
+        "initial_capital",
+        "position_size",
+        "assumption",
+    }
+    if requested_field in context_fields:
+        return _strategy_supplies_execution_context(strategy)
+    return (
+        selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
+        and (
+            (not prior.asset_universe and bool(strategy.asset_universe))
+            or (prior.date_range in (None, "") and bool(strategy.date_range))
+            or (prior.timeframe in (None, "") and bool(strategy.timeframe))
+            or (prior.capital_amount is None and strategy.capital_amount is not None)
+            or (prior.position_size is None and strategy.position_size is not None)
+        )
+    )
+
+
+def _strategy_supplies_execution_context(strategy: StrategySummary) -> bool:
+    return bool(
+        strategy.asset_universe
+        or strategy.date_range
+        or strategy.timeframe
+        or strategy.capital_amount is not None
+        or strategy.position_size is not None
+    )
+
+
+def _merge_contextual_extra_parameters(
+    *,
+    base: dict[str, Any],
+    incoming: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(base or {})
+    for key, value in incoming.items():
+        if value in (None, "", [], {}):
+            continue
+        if (
+            key == "indicator_parameters"
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            nested = dict(merged[key])
+            for nested_key, nested_value in value.items():
+                if nested_value in (None, "", [], {}):
+                    continue
+                nested[nested_key] = nested_value
+            merged[key] = nested
+            continue
+        merged[key] = value
     return merged
 
 
@@ -1298,6 +1515,49 @@ def _ambiguous_fields_from_resolution(
     ]
 
 
+def _filter_resolved_strategy_ambiguities(
+    *,
+    strategy: StrategySummary,
+    fields: list[AmbiguousField],
+) -> tuple[list[AmbiguousField], list[str]]:
+    filtered: list[AmbiguousField] = []
+    suppressed = False
+    for field in fields:
+        field_name = _field_base(field.field_name)
+        if _strategy_field_is_executable(strategy=strategy, field_name=field_name):
+            suppressed = True
+            continue
+        filtered.append(field)
+    reason_codes = ["resolved_strategy_ambiguity_suppressed"] if suppressed else []
+    return filtered, reason_codes
+
+
+def _strategy_field_is_executable(
+    *,
+    strategy: StrategySummary,
+    field_name: str,
+) -> bool:
+    if field_name == "entry_logic":
+        return bool(
+            strategy_rule(strategy, "entry")
+            or _valid_rule_spec_from_strategy(strategy)
+            or canonical_indicator_parameters_from_strategy(strategy)
+        )
+    if field_name == "exit_logic":
+        return bool(
+            strategy_rule(strategy, "exit")
+            or _valid_rule_spec_from_strategy(strategy)
+            or canonical_indicator_parameters_from_strategy(strategy)
+        )
+    if field_name in {"entry_rule", "exit_rule", "rule_spec"}:
+        return bool(
+            strategy_rule(strategy, "entry")
+            or strategy_rule(strategy, "exit")
+            or _valid_rule_spec_from_strategy(strategy)
+        )
+    return False
+
+
 def _unsupported_constraints_from_resolution(
     provenance: list[ResolutionProvenance],
     *,
@@ -1359,15 +1619,23 @@ def _missing_fields_for_interpretation(
     )
     if not route_expected:
         return []
-    allowed_missing_fields = set(
-        missing_required_fields_for_strategy(strategy, contract=contract)
+    required_missing_fields = missing_required_fields_for_strategy(
+        strategy,
+        contract=contract,
     )
+    if executable_strategy_type(strategy) not in SUPPORTED_STRATEGY_TYPES:
+        required_missing_fields = list(
+            dict.fromkeys(["entry_logic", *required_missing_fields])
+        )
+    allowed_missing_fields = set(required_missing_fields)
     missing = [
         field
         for field in interpretation.missing_required_fields
         if isinstance(field, str) and field and field in allowed_missing_fields
     ]
-    missing.extend(missing_required_fields_for_strategy(strategy, contract=contract))
+    if "entry_logic" in required_missing_fields and "entry_logic" not in missing:
+        missing.insert(0, "entry_logic")
+    missing.extend(required_missing_fields)
     return list(dict.fromkeys(missing))
 
 

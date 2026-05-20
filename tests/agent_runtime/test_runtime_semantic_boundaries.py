@@ -67,6 +67,13 @@ def test_runtime_does_not_restore_raw_message_semantic_routers() -> None:
             "Apple to AAPL",
             "Tesla to TSLA",
             "Microsoft to MSFT",
+            "_message_looks_like_investing_experiment",
+            "_message_asks_for_capability_inventory",
+        ],
+        "src/argus/agent_runtime/stages/confirm.py": [
+            "Ready to test",
+            "Use the card to run it when you are ready",
+            "entry rule:",
         ],
     }
     violations: list[str] = []

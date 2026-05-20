@@ -226,9 +226,6 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         raising=False,
     )
-    monkeypatch.setattr(
-        agent_router, "run_agent_turn", _runtime_success_for_message_async
-    )
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
@@ -477,7 +474,7 @@ def test_backtest_rejects_unsupported_parameters_payload() -> None:
     assert response.json()["code"] == "unsupported_parameters"
 
 
-def test_backtest_rejects_lookback_over_three_years() -> None:
+def test_backtest_allows_equity_lookback_beyond_three_years() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
@@ -489,8 +486,24 @@ def test_backtest_rejects_lookback_over_three_years() -> None:
             "end_date": "2024-01-10",
         },
     )
+    assert response.status_code == 200
+    assert response.json()["run"]["asset_class"] == "equity"
+
+
+def test_backtest_rejects_equity_start_before_provider_history() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2015-12-31",
+            "end_date": "2016-01-15",
+        },
+    )
     assert response.status_code == 422
-    assert response.json()["code"] == "invalid_lookback_window"
+    assert response.json()["code"] == "provider_history_start_unavailable"
 
 
 def test_backtest_rejects_unknown_symbol() -> None:

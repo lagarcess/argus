@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import date
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel, Field
 
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
@@ -73,6 +75,44 @@ from argus.llm.openrouter import (
 )
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
+
+
+class StatedRunFieldFidelityAudit(BaseModel):
+    capital_amount: float | None = Field(
+        default=None,
+        description=(
+            "Starting capital explicitly stated by the current user message, "
+            "normalized as a number. Examples: 10k -> 10000, $500 -> 500. "
+            "Leave null when the user did not state starting capital."
+        ),
+    )
+    timeframe: str | None = Field(
+        default=None,
+        description=(
+            "User-stated bar interval, normalized to 1h, 4h, or 1D when present. "
+            "Leave null when the user did not state a timeframe."
+        ),
+    )
+    date_range: str | dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "User-stated date range. Preserve today/current as today or the runtime "
+            "date. Leave null when the user did not state a date range."
+        ),
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class ExecutableStrategyGroundingAudit(BaseModel):
+    outcome: str = Field(
+        description="grounded when the executable draft faithfully matches the user message; otherwise needs_clarification."
+    )
+    assistant_response: str | None = Field(
+        default=None,
+        description="Warm clarification to show the user when the draft was over-simplified.",
+    )
+    missing_required_fields: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
 class OpenRouterStructuredInterpreter:
@@ -347,17 +387,49 @@ class OpenRouterStructuredInterpreter:
             "symbols to asset_universe unless the user explicitly says to buy, hold, "
             "or test both as assets. When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
-            "never replace them with past year, last year, or another default period.\n\n"
+            "never replace them with past year, last year, or another default period. "
+            f"The current runtime date is {date.today().isoformat()}; if the user "
+            "says today, now, or current, preserve that endpoint as 'today' or the "
+            "current runtime date, not a stale model date.\n\n"
             "When the user says something like 'buy Nvidia when the 50-day moving average "
             "crosses above the 200-day', classify it as signal_strategy, preserve "
             "the crossover as entry_logic, and default the exit to the same fast "
             "average crossing back below the slow average when the user leaves the "
             "exit unspecified. Do not ask what the buy trigger is.\n\n"
+            "Common trader shorthand such as 'buy when the 50 crosses the 200', "
+            "'50/200 cross', or 'golden cross' also means a moving-average crossover. "
+            "If the user omits SMA/EMA, use SMA as the default assumption and expose "
+            "that assumption later in the confirmation card instead of asking them "
+            "to restate the trigger. Ask only for truly missing run facts such as "
+            "the asset or date window.\n\n"
             "Do not turn vague momentum language such as 'starts rising', 'big drops', "
             "'breaks out', or 'looks strong' into a moving-average crossover or any "
             "other executable signal by yourself. If the user does not name the "
             "indicator, threshold, crossover, or price rule, mark the entry rule as "
             "missing or ask for the executable definition.\n\n"
+            "Valuation and fundamental language is valid investing intent, not user "
+            "error. If the user says a stock looked cheap, undervalued, expensive, "
+            "or references P/E, earnings, revenue, margins, or fundamentals, preserve "
+            "that meaning. The current engine cannot execute valuation or fundamental "
+            "data as entry/exit rules, so do not pretend those rules are runnable. "
+            "Ask for a supported proxy when needed, such as buy-and-hold over the "
+            "period they care about, DCA, a supported RSI threshold, or a supported "
+            "moving-average/signal rule. Explain the boundary in product language: "
+            "the concept is financially real, but Argus needs an executable historical "
+            "price/indicator rule to simulate it today.\n\n"
+            "Use data-availability allowances as deterministic capability truth. "
+            "Equity launch history starts in 2016 for the current launch path, so "
+            "do not invent a shorter 3-year limit for equities. Currency-pair "
+            "intraday history has a bounded recent-data window, and this launch path "
+            "supports 1h, 4h, or 1D for currency-pair tests. Let deterministic "
+            "validation decide the exact runnable window. If the user asks for an "
+            "hourly/intraday timeframe or a long historical window, preserve those "
+            "requested fields in the structured draft; do not silently widen the "
+            "timeframe, shorten the dates, or reshape the request to make it runnable. "
+            "Validation and recovery will ask for an available window when needed. "
+            "Keep provider names, "
+            "candle counts, and provider plumbing out of user-facing language; "
+            "translate those facts into product capability wording.\n\n"
             "NLU ownership: you are the only intent and extraction layer. "
             "Extract symbols, company names, crypto assets, and currency pairs, date ranges, "
             "DCA cadence, recurring contribution amount, entry logic, exit logic, and "
@@ -414,6 +486,10 @@ class OpenRouterStructuredInterpreter:
             "or unsupported in a way that requires the user to choose a simplification. "
             "Starting capital, timeframe, benchmark, fees, and slippage have safe defaults; "
             "do not ask for them before confirmation unless the user explicitly wants to change them. "
+            "Safe defaults are only for missing fields. If the user states a timeframe, "
+            "date window, capital amount, benchmark, fee, slippage, cadence, or indicator "
+            "threshold, preserve that user-stated field even when it will need deterministic "
+            "validation or recovery before it can run. "
             "For DCA or recurring-buy plans, the recurring contribution amount is not a "
             "safe default. Do not invent it; if the user does not provide the amount and "
             "there is no prior strategy amount to preserve, leave capital_amount null and "
@@ -523,6 +599,7 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(response, request=request)
+    response = _clear_auto_simplified_strategy_when_rule_is_ambiguous(response)
     if _response_needs_signal_rule_plan(response):
         repaired_response = await _repair_incomplete_strategy_extraction(
             failed_response=response,
@@ -530,12 +607,52 @@ async def _response_ready_for_runtime(
             request=request,
         )
         if repaired_response is not None:
-            return repaired_response
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
     response = await _signal_rule_checked_response(
         response=response,
         preferred_model=preferred_model,
         request=request,
     )
+    grounded_response = await _audit_executable_strategy_grounding(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if grounded_response is not None:
+        response = grounded_response
+        if response.requires_clarification:
+            return response
+    if _response_needs_indicator_default_grounding_repair(
+        response=response,
+        request=request,
+    ):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            response = repaired_response
+    if _response_needs_indicator_parameter_repair(response):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            response = repaired_response
+    if _response_needs_launch_field_fidelity_repair(response=response):
+        repaired_response = await _repair_incomplete_strategy_extraction(
+            failed_response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if repaired_response is not None:
+            response = repaired_response
     if _response_needs_artifact_context_repair(response):
         repaired_response = await _repair_incomplete_strategy_extraction(
             failed_response=response,
@@ -543,7 +660,11 @@ async def _response_ready_for_runtime(
             request=request,
         )
         if repaired_response is not None:
-            return repaired_response
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
         raise ValueError(
             "OpenRouter unsupported clarification omitted recoverable artifact context"
         )
@@ -554,7 +675,25 @@ async def _response_ready_for_runtime(
             request=request,
         )
         if repaired_response is not None:
-            return repaired_response
+            return await _stated_run_field_audited_response(
+                response=repaired_response,
+                preferred_model=preferred_model,
+                request=request,
+            )
+    audited_response = await _audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if audited_response is not None:
+        response = audited_response
+    grounded_response = await _audit_executable_strategy_grounding(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if grounded_response is not None:
+        response = grounded_response
     if _structured_interpretation_has_required_shape(response, request=request):
         return response
 
@@ -574,8 +713,68 @@ async def _response_ready_for_runtime(
             request=request,
         )
     if planned_response is not None:
-        return planned_response
+        return await _stated_run_field_audited_response(
+            response=planned_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
     raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+
+
+async def _stated_run_field_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    grounded_response = await _audit_executable_strategy_grounding(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if grounded_response is not None:
+        response = grounded_response
+        if response.requires_clarification:
+            return response
+    audited_response = await _audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    return audited_response or response
+
+
+def _clear_auto_simplified_strategy_when_rule_is_ambiguous(
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    if not _response_has_ambiguous_rule_fields(response):
+        return response
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in {
+        "buy_and_hold",
+        "dca_accumulation",
+    }:
+        return response
+    repaired = response.model_copy(deep=True)
+    repaired.requires_clarification = True
+    repaired.assistant_response = None
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *response.reason_codes,
+                "blocked_auto_simplification_for_ambiguous_rule",
+            ]
+        )
+    )
+    repaired.candidate_strategy_draft.strategy_type = None
+    return repaired
+
+
+def _response_has_ambiguous_rule_fields(response: LLMInterpretationResponse) -> bool:
+    return any(
+        field.field_name in {"entry_logic", "exit_logic"}
+        for field in response.ambiguous_fields
+    )
 
 
 async def _plan_focused_artifact_edit(
@@ -636,6 +835,7 @@ async def _repair_incomplete_strategy_extraction(
         response = _response_from_focused_strategy_extraction(
             extraction=extraction,
             request=request,
+            base_response=failed_response,
         )
         response = _normalize_response_for_runtime_context(response, request=request)
         response = await _signal_rule_checked_response(
@@ -643,6 +843,13 @@ async def _repair_incomplete_strategy_extraction(
             preferred_model=model_name,
             request=request,
         )
+        audited_response = await _audit_stated_run_field_fidelity(
+            response=response,
+            preferred_model=model_name,
+            request=request,
+        )
+        if audited_response is not None:
+            response = audited_response
         if _structured_interpretation_has_required_shape(response, request=request):
             return response
     return None
@@ -1031,6 +1238,76 @@ def _response_needs_signal_rule_plan(response: LLMInterpretationResponse) -> boo
     return _llm_strategy_draft_has_extractable_fields(draft)
 
 
+def _response_needs_indicator_parameter_repair(
+    response: LLMInterpretationResponse,
+) -> bool:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    draft = response.candidate_strategy_draft
+    indicator_spec = _llm_draft_executable_indicator_spec(draft)
+    if indicator_spec is None:
+        return False
+    if not _llm_strategy_draft_has_extractable_fields(draft):
+        return False
+    missing_executable_parameter = any(
+        [
+            draft.indicator is None and indicator_spec is None,
+            draft.entry_threshold is None,
+            draft.exit_threshold is None,
+        ]
+    )
+    return missing_executable_parameter
+
+
+def _response_needs_indicator_default_grounding_repair(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    del request
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) != "indicator_threshold":
+        return False
+    indicator_spec = _llm_draft_executable_indicator_spec(draft)
+    if indicator_spec is None:
+        return False
+    default_like_fields = [
+        draft.indicator_period == indicator_spec.default_period,
+        draft.entry_threshold == indicator_spec.default_entry_threshold,
+        draft.exit_threshold == indicator_spec.default_exit_threshold,
+    ]
+    return any(default_like_fields)
+
+
+def _llm_draft_executable_indicator_spec(
+    draft: LLMStrategyDraft,
+):
+    for candidate in (
+        draft.indicator,
+        draft.strategy_type,
+        draft.extra_parameters.get("raw_strategy_type"),
+        draft.extra_parameters.get("indicator"),
+    ):
+        spec = executable_indicator_spec(candidate)
+        if spec is not None:
+            return spec
+    return None
+
+
 def _response_from_signal_rule_plan(
     *,
     response: LLMInterpretationResponse,
@@ -1171,87 +1448,419 @@ def _response_needs_testable_idea_repair(
     ).split("[", 1)[0]
     if requested_field:
         return False
-    if _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_semantic_execution_anchor(draft):
         return False
-    if response.intent != "conversation_followup":
-        return False
-    if response.semantic_turn_act not in {None, "educational_question"}:
-        return False
-    if _message_asks_for_capability_inventory(request.current_user_message):
-        return False
-    return _message_looks_like_investing_experiment(request.current_user_message)
+    if (
+        response.intent in {"strategy_drafting", "backtest_execution"}
+        and response.requires_clarification
+        and bool(response.assistant_response)
+        and bool(draft.raw_user_phrasing or draft.strategy_thesis)
+    ):
+        return True
+    if (
+        response.intent == "unsupported_or_out_of_scope"
+        and response.semantic_turn_act == "unsupported_request"
+    ):
+        return True
+    if response.intent in {"beginner_guidance", "conversation_followup"} and (
+        response.semantic_turn_act in {None, "educational_question", "new_idea"}
+    ):
+        return True
+    return False
 
 
-def _message_asks_for_capability_inventory(message: str) -> bool:
-    text = message.strip().lower()
-    inventory_terms = (
-        "indicators",
-        "strategies",
-        "assets",
-        "coins",
-        "symbols",
-        "markets",
-        "limits",
+def _llm_strategy_draft_has_semantic_execution_anchor(
+    draft: LLMStrategyDraft,
+) -> bool:
+    return any(
+        [
+            bool(draft.strategy_type),
+            bool(draft.asset_universe),
+            bool(draft.asset_class),
+            bool(draft.timeframe),
+            bool(draft.cadence),
+            bool(draft.entry_logic),
+            bool(draft.exit_logic),
+            bool(draft.entry_rule),
+            bool(draft.exit_rule),
+            bool(draft.rule_spec),
+            bool(draft.indicator),
+            draft.indicator_period is not None,
+            draft.entry_threshold is not None,
+            draft.exit_threshold is not None,
+            bool(draft.date_range),
+            bool(draft.risk_rules),
+            bool(draft.extra_parameters),
+        ]
     )
-    asks_inventory = (
-        text.startswith(("what ", "which "))
-        and any(term in text for term in inventory_terms)
-    )
-    capability_phrases = (
-        "what can you do",
-        "can you support",
-        "could you support",
-        "can you run",
-        "could you run",
-        "can you test",
-        "could you test",
-    )
-    return asks_inventory or any(phrase in text for phrase in capability_phrases)
 
 
-def _message_looks_like_investing_experiment(message: str) -> bool:
-    text = message.strip().lower()
-    if not text:
+def _response_needs_launch_field_fidelity_repair(
+    *,
+    response: LLMInterpretationResponse,
+) -> bool:
+    if response.requires_clarification:
         return False
-    normalized = f" {text}"
-    investing_actions = (
-        " buy",
-        " bought",
-        " hold",
-        " held",
-        " own",
-        " owned",
-        " invest",
-        " invested",
-        " dca",
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act in {
+        "answer_pending_need",
+        "approval",
+        "refine_current_idea",
+        "retry_failed_action",
+        "result_followup",
+        "unsupported_request",
+    }:
+        return False
+    if "focused_strategy_extraction_repair" in response.reason_codes:
+        return False
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.timeframe):
+        return True
+    asset_class = str(draft.asset_class or "").strip().lower()
+    return asset_class in {"crypto", "currency_pair"} and not _llm_value_is_empty(
+        draft.date_range
     )
-    curiosity_buy = "what if" in text and any(
-        action in normalized for action in investing_actions
+
+
+async def _audit_executable_strategy_grounding(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_executable_strategy_grounding_audit(response=response):
+        return None
+    messages = _executable_strategy_grounding_messages(
+        response=response,
+        request=request,
     )
-    explicit_backtest = "backtest" in text or "simulate" in text
-    action_test = any(word in text.split() for word in ("test", "try")) and (
-        any(action in normalized for action in investing_actions)
-        or " when " in normalized
+    for model_name in _unique_repair_models(preferred_model):
+        try:
+            audit = await invoke_openrouter_json_schema(
+                task="interpretation",
+                messages=messages,
+                schema_model=ExecutableStrategyGroundingAudit,
+                schema_name="ExecutableStrategyGroundingAudit",
+                model_name=model_name,
+            )
+        except Exception:
+            continue
+        if not isinstance(audit, ExecutableStrategyGroundingAudit):
+            continue
+        repaired = _response_from_executable_strategy_grounding_audit(
+            response=response,
+            audit=audit,
+        )
+        if repaired is not None:
+            return repaired
+        return None
+    return None
+
+
+def _response_needs_executable_strategy_grounding_audit(
+    *,
+    response: LLMInterpretationResponse,
+) -> bool:
+    if response.requires_clarification:
+        return False
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.task_relation != "new_task":
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "refine_current_idea",
+        "retry_failed_action",
+        "result_followup",
+        "unsupported_request",
+    }:
+        return False
+    if "executable_strategy_grounding_audit" in response.reason_codes:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) not in {
+        "buy_and_hold",
+        "dca_accumulation",
+    }:
+        return False
+    return _draft_has_non_executable_timeframe_label(
+        draft
+    ) or _draft_uses_launch_default_window(draft)
+
+
+def _draft_has_non_executable_timeframe_label(draft: LLMStrategyDraft) -> bool:
+    if _llm_value_is_empty(draft.timeframe):
+        return False
+    return str(draft.timeframe).strip() not in {
+        "1h",
+        "2h",
+        "4h",
+        "6h",
+        "12h",
+        "1D",
+    }
+
+
+def _draft_uses_launch_default_window(draft: LLMStrategyDraft) -> bool:
+    date_range_value = draft.date_range
+    if not isinstance(date_range_value, dict):
+        return False
+    start = str(date_range_value.get("start") or "").strip()
+    end = str(date_range_value.get("end") or "").strip()
+    return start == "2016-01-01" and end in {"today", date.today().isoformat()}
+
+
+def _executable_strategy_grounding_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's executable-strategy grounding audit. Decide whether "
+                "a runnable draft faithfully represents the current user message before "
+                "the product shows a confirmation card. Return grounded only when the "
+                "user actually supplied enough meaning for this executable draft. "
+                "Return needs_clarification when the draft silently turns a valuation, "
+                "fundamental, sentiment, news, vague momentum, or otherwise ambiguous "
+                "idea into buy-and-hold, DCA, or another executable strategy without "
+                "the user's choice. Valuation language like cheap, undervalued, or P/E "
+                "is financially valid context, but Argus needs a supported historical "
+                "proxy or explicit baseline before running it. Do not expose provider "
+                "plumbing. Write assistant_response in warm, plain English, with short "
+                "sentences and no report tone. Return only JSON matching the schema."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Structured draft JSON: "
+                f"{response.candidate_strategy_draft.model_dump(mode='json')}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _response_from_executable_strategy_grounding_audit(
+    *,
+    response: LLMInterpretationResponse,
+    audit: ExecutableStrategyGroundingAudit,
+) -> LLMInterpretationResponse | None:
+    if audit.outcome == "grounded":
+        return None
+    if audit.outcome != "needs_clarification" or not audit.assistant_response:
+        return None
+    repaired = response.model_copy(deep=True)
+    repaired.intent = "strategy_drafting"
+    repaired.requires_clarification = True
+    repaired.assistant_response = audit.assistant_response
+    repaired.missing_required_fields = list(
+        dict.fromkeys(audit.missing_required_fields or ["entry_logic"])
     )
-    recurring_buy = any(
-        action in normalized for action in (" buy", " invest", " dca")
-    ) and any(
-        cadence in text
-        for cadence in ("every", "daily", "weekly", "biweekly", "monthly", "quarterly")
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "executable_strategy_grounding_audit",
+                "executable_strategy_grounding_needs_clarification",
+            ]
+        )
     )
-    return bool(curiosity_buy or explicit_backtest or action_test or recurring_buy)
+    if canonical_strategy_type(
+        repaired.candidate_strategy_draft.strategy_type
+    ) in {"buy_and_hold", "dca_accumulation"}:
+        repaired.candidate_strategy_draft.strategy_type = None
+    return repaired
+
+
+async def _audit_stated_run_field_fidelity(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_stated_run_field_fidelity_audit(response=response):
+        return None
+    messages = _stated_run_field_fidelity_messages(
+        response=response,
+        request=request,
+    )
+    for model_name in _unique_repair_models(preferred_model):
+        try:
+            audit = await invoke_openrouter_json_schema(
+                task="interpretation",
+                messages=messages,
+                schema_model=StatedRunFieldFidelityAudit,
+                schema_name="StatedRunFieldFidelityAudit",
+                model_name=model_name,
+            )
+        except Exception:
+            continue
+        if not isinstance(audit, StatedRunFieldFidelityAudit):
+            continue
+        repaired = _response_from_stated_run_field_fidelity_audit(
+            response=response,
+            audit=audit,
+        )
+        if repaired is not None:
+            return repaired
+    return None
+
+
+def _response_needs_stated_run_field_fidelity_audit(
+    *,
+    response: LLMInterpretationResponse,
+) -> bool:
+    if response.requires_clarification:
+        return False
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "refine_current_idea",
+        "retry_failed_action",
+        "result_followup",
+        "unsupported_request",
+    }:
+        return False
+    if "stated_run_field_fidelity_audit" in response.reason_codes:
+        return False
+    if not any(
+        code in response.reason_codes
+        for code in {
+            "focused_strategy_extraction_repair",
+            "signal_rule_plan_repair",
+            "focused_repair_preserved_structured_context",
+        }
+    ):
+        return False
+    draft = response.candidate_strategy_draft
+    if "focused_repair_from_unsupported_context" in response.reason_codes:
+        return draft.capital_amount is None
+    if "signal_rule_plan_repair" in response.reason_codes:
+        return draft.capital_amount is None
+    return any(
+        [
+            draft.capital_amount is None
+            and _draft_contains_structured_capital_context(draft),
+            _llm_value_is_empty(draft.timeframe)
+            and _draft_contains_structured_timeframe_context(draft),
+            _llm_value_is_empty(draft.date_range)
+            and _draft_contains_structured_date_context(draft),
+        ]
+    )
+
+
+def _draft_contains_structured_capital_context(draft: LLMStrategyDraft) -> bool:
+    text = _structured_draft_context_text(draft)
+    return "$" in text or "usd" in text.casefold()
+
+
+def _draft_contains_structured_timeframe_context(draft: LLMStrategyDraft) -> bool:
+    text = _structured_draft_context_text(draft).casefold()
+    return any(token in text for token in ("hour", "daily", "bars", "candles"))
+
+
+def _draft_contains_structured_date_context(draft: LLMStrategyDraft) -> bool:
+    text = _structured_draft_context_text(draft).casefold()
+    return any(
+        token in text
+        for token in ("from", "since", "through", "until", "today", "year")
+    )
+
+
+def _structured_draft_context_text(draft: LLMStrategyDraft) -> str:
+    values = (
+        draft.strategy_thesis,
+        draft.entry_logic,
+        draft.exit_logic,
+    )
+    return " ".join(str(value) for value in values if value)
+
+
+def _stated_run_field_fidelity_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's run-field fidelity audit. Compare the current "
+                "user message with the structured draft and return only run fields "
+                "the user explicitly stated but the draft may have dropped or "
+                "reshaped. Do not infer defaults, fees, slippage, symbols, or rules. "
+                "If a field is absent from the current user message, return null "
+                "for that field. Normalize starting capital such as 10k or $10,000 "
+                "to 10000. Normalize one-hour/hourly bars to 1h, four-hour bars to "
+                "4h, and daily bars to 1D. Preserve today/current as today or the "
+                f"runtime date {date.today().isoformat()}. Return only JSON matching "
+                "the schema."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Structured draft JSON: "
+                f"{response.candidate_strategy_draft.model_dump(mode='json')}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _response_from_stated_run_field_fidelity_audit(
+    *,
+    response: LLMInterpretationResponse,
+    audit: StatedRunFieldFidelityAudit,
+) -> LLMInterpretationResponse | None:
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    changed = False
+    if audit.capital_amount is not None and draft.capital_amount != audit.capital_amount:
+        draft.capital_amount = audit.capital_amount
+        draft.field_provenance["capital_amount"] = "starting_capital"
+        changed = True
+    if audit.timeframe and draft.timeframe != audit.timeframe:
+        draft.timeframe = audit.timeframe
+        changed = True
+    if audit.date_range not in (None, "", [], {}) and _llm_value_is_empty(
+        draft.date_range
+    ):
+        draft.date_range = audit.date_range
+        changed = True
+    if not changed:
+        return None
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "stated_run_field_fidelity_audit",
+            ]
+        )
+    )
+    return repaired
 
 
 def _focused_strategy_extraction_has_material_fields(
     extraction: FocusedStrategyExtraction,
 ) -> bool:
     if not extraction.is_testable_strategy:
-        return bool(extraction.assistant_response)
+        return False
     return any(
         [
             bool(extraction.strategy_type),
             bool(extraction.asset_universe),
+            bool(extraction.asset_class),
+            bool(extraction.timeframe),
             bool(extraction.date_range),
+            extraction.capital_amount is not None,
             bool(extraction.entry_rule),
             bool(extraction.exit_rule),
             bool(extraction.rule_spec),
@@ -1303,21 +1912,37 @@ def _focused_strategy_extraction_messages(
                 "cannot express with these structured executable fields, do not force "
                 "it into signal_strategy or indicator_threshold. Preserve the idea in "
                 "user_goal_summary/assistant_response and mark it as needing a supported "
-                "executable simplification. Preserve user-stated asset names or symbols "
+                "executable simplification. Valuation/P/E language is financially valid "
+                "context, but it is not an executable rule in the current engine; preserve "
+                "the valuation meaning and route toward the closest supported proxy. "
+                "Preserve user-stated asset names or symbols "
                 "in asset_universe; the provider-backed resolver will validate and "
                 "canonicalize assets after interpretation. Natural date periods should "
-                "be compact strings such as 'past 2 years' or 'last 3 months'.\n\n"
+                "be compact strings such as 'past 2 years' or 'last 3 months'. If the "
+                "user gives a start date and says today, preserve the end as 'today' or "
+                f"{date.today().isoformat()}, not a stale model date. Preserve "
+                "user-stated timeframes such as 1 hour candles, hourly bars, 1h, "
+                "4 hour candles, 4h, daily candles, or 1D as timeframe. Normalize "
+                "one-hour/hourly to 1h, four-hour to 4h, and daily to 1D. Preserve "
+                "user-stated capital amounts as capital_amount; "
+                "do not silently widen the timeframe, shorten dates, or drop stated "
+                "money amounts to make a request look runnable.\n\n"
                 "For moving-average crossovers, set strategy_type to signal_strategy "
                 "and set entry_rule to {'type':'moving_average_crossover', "
                 "'fast_indicator':'sma' or 'ema', 'fast_period':number, "
                 "'slow_indicator':'sma' or 'ema', 'slow_period':number, "
                 "'direction':'bullish' for crosses above or 'bearish' for crosses "
                 "below}. If the user does not state an exit, leave exit_rule null "
-                "and set exit_logic to the opposite crossover default.\n\n"
+                "and set exit_logic to the opposite crossover default. Shorthand "
+                "like 'the 50 crosses the 200' or '50/200 cross' is enough to set "
+                "a bullish SMA 50/200 crossover unless the user says EMA or bearish.\n\n"
                 "For RSI threshold ideas, set strategy_type to indicator_threshold, "
                 "indicator to rsi, indicator_period only when supplied, and threshold "
-                "overrides as numbers. For explicit buy-and-hold ideas, set "
-                "strategy_type to buy_and_hold."
+                "overrides as numbers. If the user states only one threshold side, "
+                "fill that side and leave only the unstated side null so the runtime "
+                "can apply the supported default. Do not ask about RSI period; it has "
+                "a supported default. For explicit buy-and-hold ideas, set strategy_type "
+                "to buy_and_hold."
             )
         ),
         HumanMessage(content=request.current_user_message),
@@ -1328,9 +1953,16 @@ def _response_from_focused_strategy_extraction(
     *,
     extraction: FocusedStrategyExtraction,
     request: InterpretationRequest,
+    base_response: LLMInterpretationResponse | None = None,
 ) -> LLMInterpretationResponse:
     strategy_type = executable_strategy_type_from_extracted_fields(
         extraction.model_dump(mode="python")
+    )
+    entry_logic = extraction.entry_logic or moving_average_crossover_text(
+        extraction.entry_rule
+    )
+    exit_logic = extraction.exit_logic or moving_average_crossover_text(
+        extraction.exit_rule
     )
     if strategy_type is None:
         return LLMInterpretationResponse(
@@ -1343,9 +1975,12 @@ def _response_from_focused_strategy_extraction(
                 strategy_thesis=extraction.strategy_thesis
                 or extraction.user_goal_summary,
                 asset_universe=list(extraction.asset_universe),
+                asset_class=extraction.asset_class,
+                timeframe=extraction.timeframe,
                 date_range=extraction.date_range,
-                entry_logic=extraction.entry_logic,
-                exit_logic=extraction.exit_logic,
+                capital_amount=extraction.capital_amount,
+                entry_logic=entry_logic,
+                exit_logic=exit_logic,
                 indicator=extraction.indicator,
                 indicator_period=extraction.indicator_period,
                 entry_threshold=extraction.entry_threshold,
@@ -1360,9 +1995,9 @@ def _response_from_focused_strategy_extraction(
                 LLMUnsupportedConstraint(
                     category="unsupported_strategy_logic",
                     raw_value=(
-                        extraction.strategy_type
-                        or extraction.entry_logic
+                        extraction.entry_logic
                         or extraction.strategy_thesis
+                        or extraction.strategy_type
                         or extraction.user_goal_summary
                     ),
                     explanation=(
@@ -1380,7 +2015,7 @@ def _response_from_focused_strategy_extraction(
             reason_codes=["focused_strategy_extraction_unrecognized_contract"],
             semantic_turn_act="unsupported_request",
         )
-    return LLMInterpretationResponse(
+    response = LLMInterpretationResponse(
         intent="strategy_drafting"
         if extraction.requires_clarification
         else "backtest_execution",
@@ -1392,9 +2027,12 @@ def _response_from_focused_strategy_extraction(
             strategy_type=strategy_type,
             strategy_thesis=extraction.strategy_thesis or extraction.user_goal_summary,
             asset_universe=list(extraction.asset_universe),
+            asset_class=extraction.asset_class,
+            timeframe=extraction.timeframe,
             date_range=extraction.date_range,
-            entry_logic=extraction.entry_logic,
-            exit_logic=extraction.exit_logic,
+            capital_amount=extraction.capital_amount,
+            entry_logic=entry_logic,
+            exit_logic=exit_logic,
             entry_rule=extraction.entry_rule,
             exit_rule=extraction.exit_rule,
             rule_spec=extraction.rule_spec,
@@ -1409,6 +2047,67 @@ def _response_from_focused_strategy_extraction(
         reason_codes=["focused_strategy_extraction_repair"],
         semantic_turn_act="new_idea",
     )
+    return _merge_focused_repair_with_base(
+        response=response,
+        base_response=base_response,
+    )
+
+
+def _merge_focused_repair_with_base(
+    *,
+    response: LLMInterpretationResponse,
+    base_response: LLMInterpretationResponse | None,
+) -> LLMInterpretationResponse:
+    if base_response is None:
+        return response
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    base = base_response.candidate_strategy_draft
+    for field_name in (
+        "raw_user_phrasing",
+        "strategy_thesis",
+        "asset_universe",
+        "asset_class",
+        "date_range",
+        "timeframe",
+        "cadence",
+        "capital_amount",
+        "position_size",
+        "comparison_baseline",
+    ):
+        current_value = getattr(draft, field_name)
+        base_value = getattr(base, field_name)
+        if _llm_value_is_empty(current_value) and not _llm_value_is_empty(base_value):
+            setattr(draft, field_name, base_value)
+    if not repaired.user_goal_summary and base_response.user_goal_summary:
+        repaired.user_goal_summary = base_response.user_goal_summary
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *base_response.reason_codes,
+                *repaired.reason_codes,
+                "focused_repair_preserved_structured_context",
+                *(
+                    ["focused_repair_from_unsupported_context"]
+                    if _base_response_was_unsupported(base_response)
+                    else []
+                ),
+            ]
+        )
+    )
+    return repaired
+
+
+def _base_response_was_unsupported(response: LLMInterpretationResponse) -> bool:
+    return bool(
+        response.intent == "unsupported_or_out_of_scope"
+        or response.semantic_turn_act == "unsupported_request"
+        or response.unsupported_constraints
+    )
+
+
+def _llm_value_is_empty(value: Any) -> bool:
+    return value in (None, "", [], {})
 
 
 def _focused_artifact_edit_messages(
@@ -1941,6 +2640,7 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
             payload["capital_amount"] = recurring_contribution
     payload["date_range"] = normalize_date_range_candidate(
         payload.get("date_range"),
+        raw_user_phrasing=payload.get("raw_user_phrasing"),
     )
     if draft.strategy_type:
         payload.setdefault("extra_parameters", {})["raw_strategy_type"] = (
@@ -2040,6 +2740,7 @@ def _ground_strategy_in_current_turn(
             strategy.strategy_thesis = current_message
         strategy.date_range = normalize_date_range_candidate(
             strategy.date_range,
+            raw_user_phrasing=current_message,
         )
 
 

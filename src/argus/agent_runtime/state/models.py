@@ -269,6 +269,7 @@ class RunState(BaseModel):
     user_goal_summary: str | None = None
     candidate_strategy_draft: StrategySummary = Field(default_factory=StrategySummary)
     missing_required_fields: list[str] = Field(default_factory=list)
+    requested_field: str | None = None
     optional_parameter_status: dict[str, Any] = Field(default_factory=dict)
     effective_response_profile: ResponseProfile | None = None
     confirmation_payload: ConfirmationPayload | None = None

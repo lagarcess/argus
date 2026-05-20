@@ -8,6 +8,7 @@ from typing import Any, Literal
 from argus.domain.backtesting.rules import validate_rule_spec
 from argus.domain.indicators import normalize_indicator_parameters
 from argus.domain.market_data import resolve_asset
+from argus.domain.market_data.capabilities import validate_market_data_window
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
@@ -187,8 +188,12 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
         raise ValueError("invalid_date_range")
     if end > date.today():
         raise ValueError("invalid_date_range")
-    if (end - start).days > 365 * 3:
-        raise ValueError("invalid_lookback_window")
+    validate_market_data_window(
+        asset_class=config["asset_class"],
+        timeframe=config["timeframe"],
+        start_date=start,
+        end_date=end,
+    )
 
     if any(symbol in STABLECOINS for symbol in config["symbols"]):
         raise ValueError("stablecoin_not_supported")

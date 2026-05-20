@@ -173,6 +173,58 @@ class ApprovalInterpreter:
         )
 
 
+class IndicatorDateRepairInterpreter:
+    def __init__(self) -> None:
+        self.turns = 0
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.turns += 1
+        if self.turns == 1:
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="User wants a TSLA RSI threshold test.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing=request.current_user_message,
+                    strategy_type="indicator_threshold",
+                    strategy_thesis="Test TSLA with RSI threshold entries.",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2015-01-01", "end": "2024-12-31"},
+                    entry_logic="Buy when RSI(14) drops to 30 or below",
+                    exit_logic="Sell when RSI(14) rises to 55 or above",
+                    extra_parameters={
+                        "raw_strategy_type": "rsi_mean_reversion",
+                        "indicator": "rsi",
+                        "indicator_parameters": {
+                            "indicator": "rsi",
+                            "indicator_period": 14,
+                            "entry_threshold": 30,
+                            "exit_threshold": 55,
+                        },
+                    },
+                ),
+                confidence=0.94,
+                semantic_turn_act="new_idea",
+            )
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="refine",
+            requires_clarification=False,
+            user_goal_summary="User supplied the shorter supported date range.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="indicator_threshold",
+                date_range={"start": "2021-01-01", "end": "2024-01-01"},
+                extra_parameters={"raw_strategy_type": "indicator_threshold"},
+                refinement_of="prior strategy card",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
 def test_runtime_preserves_explicit_stage_prompt_over_composed_intent() -> None:
     run_state = RunState.new(
         current_user_message="use a 20-day SMA crossing above the 50-day SMA",
@@ -255,11 +307,11 @@ def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
     )
 
     assert "try again" not in result["assistant_prompt"].lower()
-    assert "What time period" in result["assistant_prompt"]
+    assert "date window" in result["assistant_prompt"]
     assert "specific testable rule" in result["assistant_prompt"]
 
 
-def test_runtime_uses_canonical_rule_definition_choices_over_generic_clarifier() -> None:
+def test_runtime_preserves_successful_llm_rule_clarification() -> None:
     run_state = RunState.new(
         current_user_message="Test buying SPY when it starts rising.",
         recent_thread_history=[],
@@ -286,9 +338,8 @@ def test_runtime_uses_canonical_rule_definition_choices_over_generic_clarifier()
         }
     )
 
-    assert "moving-average crossover" in result["assistant_prompt"]
-    assert "RSI threshold" in result["assistant_prompt"]
-    assert "percentage move" in result["assistant_prompt"]
+    assert result["assistant_prompt"].startswith("Could you please define")
+    assert result["assistant_prompt"].endswith("measurable criteria?")
     assert result["assistant_response"] == result["assistant_prompt"]
 
 
@@ -321,7 +372,8 @@ async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> Non
     assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
     assert result["pending_strategy"]["strategy"]["asset_universe"] == ["TSLA"]
     assert result["pending_strategy"]["missing_required_fields"] == []
-    assert "I read this as" in result["assistant_prompt"]
+    assert result.get("assistant_prompt") is None
+    assert "RSI" in result["confirmation_payload"]["strategy"]["entry_logic"]
 
 
 @pytest.mark.asyncio
@@ -346,9 +398,59 @@ async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) ->
     )
 
     assert result["stage_outcome"] == "await_user_reply"
-    assert "more historical bars" in result["assistant_prompt"]
+    assert "enough bars" in result["assistant_prompt"]
+    assert "longer date range" in result["assistant_prompt"]
     assert result["pending_strategy"]["requested_field"] == "date_range"
     assert "confirmation_payload" not in result
+
+
+@pytest.mark.asyncio
+async def test_workflow_preserves_indicator_parameters_when_user_repairs_date_range(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=IndicatorDateRepairInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+    thread_id = "thread-indicator-date-repair"
+
+    first = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="test tsla rsi below 30 and sell above 55 since 2015",
+    )
+
+    assert first["stage_outcome"] == "await_user_reply"
+    assert first["pending_strategy"]["requested_field"] == "date_range"
+
+    second = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="use jan 1 2021 to jan 1 2024",
+    )
+
+    assert second["stage_outcome"] == "await_approval"
+    strategy = second["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == ["TSLA"]
+    assert strategy["entry_logic"] == "Buy when RSI(14) drops to 30 or below"
+    assert strategy["extra_parameters"]["indicator"] == "rsi"
+    assert strategy["extra_parameters"]["indicator_parameters"] == {
+        "indicator": "rsi",
+        "indicator_period": 14,
+        "entry_threshold": 30,
+        "exit_threshold": 55,
+    }
+    assert second["pending_strategy"]["missing_required_fields"] == []
 
 
 @pytest.mark.asyncio
@@ -570,5 +672,6 @@ async def test_workflow_uses_checkpointer_for_thread_state(monkeypatch) -> None:
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.pending_strategy_summary.asset_universe == ["BTC"]
     assert second["stage_outcome"] == "ready_to_respond"
-    assert "Run backtest" in second["assistant_response"]
+    assert "visible card" in second["assistant_response"]
+    assert "simulation" in second["assistant_response"]
     assert "run" not in second

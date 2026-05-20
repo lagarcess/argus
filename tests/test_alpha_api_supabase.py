@@ -234,7 +234,6 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         raising=False,
     )
-    monkeypatch.setattr(agent_router, "run_agent_turn", _runtime_success_for_message)
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
