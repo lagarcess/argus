@@ -11,6 +11,31 @@ from argus.context.packets import ContextPacket, ContextPacketFact
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
 ALPACA_DATA_BASE = "https://data.alpaca.markets"
 
+DEFAULT_FRED_CONTEXT_SERIES: tuple[str, ...] = (
+    "FEDFUNDS",
+    "DGS10",
+    "DGS2",
+    "T10Y2Y",
+    "CPIAUCSL",
+    "CPILFESL",
+    "UNRATE",
+    "PAYEMS",
+    "INDPRO",
+    "USREC",
+)
+
+
+def fred_context_series_from_env(value: str | None = None) -> tuple[str, ...]:
+    raw = value if value is not None else os.getenv("ARGUS_FRED_CONTEXT_SERIES")
+    if not raw:
+        return DEFAULT_FRED_CONTEXT_SERIES
+    normalized: list[str] = []
+    for item in raw.split(","):
+        series_id = item.strip().upper()
+        if series_id and series_id not in normalized:
+            normalized.append(series_id)
+    return tuple(normalized) or DEFAULT_FRED_CONTEXT_SERIES
+
 
 def fetch_fred_macro_packet(
     *,

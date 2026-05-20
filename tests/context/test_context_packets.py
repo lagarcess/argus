@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from argus.context import (
+    DEFAULT_FRED_CONTEXT_SERIES,
     ContextPacket,
     attach_context_packet_to_run,
     build_alpaca_corporate_actions_packet,
@@ -13,6 +14,7 @@ from argus.context import (
     build_alpaca_most_actives_packet,
     build_alpaca_news_packet,
     build_fred_macro_packet,
+    fred_context_series_from_env,
 )
 
 
@@ -42,6 +44,26 @@ def test_fred_macro_packet_is_context_only_and_replayable_snapshot() -> None:
         ContextPacket.model_validate(
             {**packet.model_dump(mode="python"), "not_for": "execution_truth"}
         )
+
+
+def test_default_fred_context_series_prefers_adjusted_macro_context() -> None:
+    assert DEFAULT_FRED_CONTEXT_SERIES == (
+        "FEDFUNDS",
+        "DGS10",
+        "DGS2",
+        "T10Y2Y",
+        "CPIAUCSL",
+        "CPILFESL",
+        "UNRATE",
+        "PAYEMS",
+        "INDPRO",
+        "USREC",
+    )
+    assert fred_context_series_from_env(" unrate, cpiaucsl, UNRATE ") == (
+        "UNRATE",
+        "CPIAUCSL",
+    )
+    assert fred_context_series_from_env("") == DEFAULT_FRED_CONTEXT_SERIES
 
 
 def test_alpaca_news_packet_is_symbol_scoped_not_feed() -> None:

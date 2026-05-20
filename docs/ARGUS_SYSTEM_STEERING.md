@@ -642,6 +642,13 @@ Use FRED for macro regime context:
 - Recession indicators.
 - Broad liquidity or rate-cycle framing.
 
+Default curated series:
+
+- `FEDFUNDS`, `DGS10`, `DGS2`, and `T10Y2Y` for rate-cycle context.
+- `CPIAUCSL` and `CPILFESL` for seasonally adjusted inflation context.
+- `UNRATE`, `PAYEMS`, and `INDPRO` for seasonally adjusted labor and activity context.
+- `USREC` for recession-window context.
+
 FRED should answer questions like:
 
 - "What was the macro environment during this period?"

@@ -4,6 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from tests.evals.chat_runtime_eval_harness import (
+    build_semantic_judge_messages,
+    capability_context_payload,
+    iter_eval_cases,
+    parse_sse_events,
+)
+
 MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
 EXPECTED_QA_IDS = {f"QA {index}" for index in range(1, 15)}
 EXPECTED_WORKSTREAMS = {f"workstream_{index}" for index in range(1, 9)}
@@ -97,6 +104,11 @@ def test_chat_runtime_eval_layer_tracks_semantic_groundedness_and_receipts() -> 
         "safety_fallback",
     }
     assert set(layer["categories"]) == EXPECTED_EVAL_CATEGORIES
+    assert set(layer["capability_context_source"]) == {
+        "build_default_capability_contract",
+        "EXECUTABLE_INDICATORS",
+        "strategy_contract validators",
+    }
     assert set(layer["receipt_fields"]) >= {
         "task",
         "tier",
@@ -106,3 +118,80 @@ def test_chat_runtime_eval_layer_tracks_semantic_groundedness_and_receipts() -> 
         "outcome",
         "failure_mode",
     }
+
+
+def test_chat_runtime_eval_manifest_covers_conditional_buy_sell_regression() -> None:
+    manifest = _load_manifest()
+    prompts = {
+        prompt
+        for scenario in manifest["scenarios"]
+        for prompt in scenario["natural_prompt_variants"]
+    }
+    hard_checks = {
+        check
+        for scenario in manifest["scenarios"]
+        for step in scenario["conversation_steps"]
+        for check in step["hard_checks"]
+    }
+
+    assert "buy and sell when it goes up" in prompts
+    assert "does not collapse conditional buy/sell language into buy-and-hold" in hard_checks
+
+
+def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
+    context = capability_context_payload()
+
+    assert context["contract_version"] == "1.0"
+    assert "strategy_drafting" in context["supported_intents"]
+    assert {"rsi", "sma", "ema", "macd", "bbands"}.issubset(
+        {item["key"] for item in context["executable_indicators"]}
+    )
+    assert "asset resolution and provider availability" in context[
+        "deterministic_boundaries"
+    ]
+
+    cases = iter_eval_cases(priority="must_pass")
+    case = next(item for item in cases if item.prompt == "buy and sell when it goes up")
+    messages = build_semantic_judge_messages(
+        case=case,
+        assistant_response="I need a specific executable rule before I can run that.",
+        final_payload={"stage_outcome": "await_user_reply"},
+        route_receipts=[
+            {
+                "task": "interpretation",
+                "tier": "structured",
+                "model": "test/model",
+                "fallback_model": "test/fallback",
+                "latency_ms": 123,
+                "outcome": "succeeded",
+                "failure_mode": None,
+            }
+        ],
+        capability_context=context,
+    )
+
+    assert messages[0]["role"] == "system"
+    assert "Do not require exact wording" in messages[0]["content"]
+    payload = json.loads(messages[1]["content"])
+    assert payload["case"]["prompt"] == "buy and sell when it goes up"
+    assert payload["capability_context"]["executable_indicators"]
+    assert payload["runtime_output"]["route_receipts"][0]["task"] == "interpretation"
+
+
+def test_eval_harness_parses_canonical_sse_frames() -> None:
+    events = parse_sse_events(
+        '\n'.join(
+            [
+                'data: {"type":"stage_start","stage":"interpret"}',
+                'data: {"type":"token","content":"hello"}',
+                'data: {"type":"final","payload":{"stage_outcome":"ready_to_respond"}}',
+                "data: [DONE]",
+            ]
+        )
+    )
+
+    assert [event["type"] for event in events] == [
+        "stage_start",
+        "token",
+        "final",
+    ]

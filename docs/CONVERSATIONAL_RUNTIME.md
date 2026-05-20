@@ -235,6 +235,8 @@ Required model and data variables:
   JSON-schema artifact interpretation, repair, and draft edits.
 - `ARGUS_CONTEXT_MODEL` / `ARGUS_CONTEXT_FALLBACK_MODEL`: grounded context
   synthesis from run facts plus structured context packets.
+- `ARGUS_FRED_CONTEXT_SERIES`: curated comma-separated macro series for context
+  packets. Default: `FEDFUNDS,DGS10,DGS2,T10Y2Y,CPIAUCSL,CPILFESL,UNRATE,PAYEMS,INDPRO,USREC`.
 - `AGENT_MODEL`, `AGENT_STRUCTURED_MODEL`, and `AGENT_FALLBACK_MODEL` are
   backward-compatible aliases only. New docs, scripts, and code should use
   `ARGUS_*` names.
