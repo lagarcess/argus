@@ -139,6 +139,62 @@ def test_interpret_passes_raw_message_to_llm_without_regex_normalization() -> No
     assert result.outcome == "ready_to_respond"
 
 
+def test_result_followup_response_does_not_leave_underfilled_strategy_draft() -> None:
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["TSLA"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": -8.4,
+                            "benchmark_return_pct": 76.8,
+                            "max_drawdown_pct": -56.0,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "signal_strategy"},
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks why the latest result happened.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="signal_strategy",
+            strategy_thesis="why did that happen?",
+            asset_universe=["TSLA"],
+            date_range={"start": "2023-05-21", "end": "2026-05-21"},
+        ),
+        missing_required_fields=["entry_logic"],
+        assistant_response=(
+            "The rule went to cash during rallies, so it missed much of TSLA's upside."
+        ),
+        semantic_turn_act="result_followup",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="why did that happen?",
+        response=response,
+        snapshot=snapshot,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    assert "TSLA" in answer
+    assert "SPY" in answer
+    assert result.decision is not None
+    assert result.decision.semantic_turn_act == "result_followup"
+    assert result.decision.candidate_strategy_draft == StrategySummary()
+    assert result.decision.missing_required_fields == []
+
+
 def test_capability_question_answer_uses_indicator_registry_not_llm_copy() -> None:
     response = StructuredInterpretation(
         intent="conversation_followup",
@@ -166,6 +222,69 @@ def test_capability_question_answer_uses_indicator_registry_not_llm_copy() -> No
         result.patch["normalized_signals"]["capability_question_focus"]
         == "supported_indicators"
     )
+
+
+def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> None:
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for beginner education about dollar cost averaging.",
+        assistant_response=(
+            "Dollar cost averaging means investing the same amount on a regular "
+            "schedule, so the test is about the cadence and contribution size."
+        ),
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_strategies",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Can you explain dollar cost averaging like I'm completely new?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Dollar cost averaging" in answer
+    assert "Executable strategy families" not in answer
+
+
+def test_supported_strategy_capability_uses_chat_tier_for_natural_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "Dollar cost averaging is the recurring-buy version: pick an asset, "
+            "a cadence, and a contribution amount, then compare the historical path."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for beginner education about dollar cost averaging.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_strategies",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Can you explain dollar cost averaging like I'm completely new?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Dollar cost averaging" in answer
+    assert "Executable strategy families" not in answer
+    assert captured["task"] == "chat_composer"
+    assert "recurring buys/DCA" in captured["messages"][1]["content"]
 
 
 def test_interpret_social_opener_uses_llm_response() -> None:

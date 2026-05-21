@@ -2535,6 +2535,76 @@ def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:
     }
 
 
+def test_direct_json_schema_sync_tries_configured_fallback_for_utility_titles(
+    monkeypatch,
+) -> None:
+    from argus.api.naming import NameSuggestion
+
+    openrouter.clear_openrouter_route_receipts()
+    attempted_models: list[str] = []
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "choices": [{"message": {"content": '{"name":"Tesla Dip Test"}'}}],
+                "usage": {
+                    "prompt_tokens": 8,
+                    "completion_tokens": 4,
+                    "total_tokens": 12,
+                },
+            }
+
+    class FakeSyncClient:
+        def __init__(self, **_kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> "FakeSyncClient":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def post(self, *_args: object, **kwargs: object) -> FakeResponse:
+            payload = kwargs["json"]
+            assert isinstance(payload, dict)
+            model = str(payload["model"])
+            attempted_models.append(model)
+            if model == "utility/primary":
+                raise openrouter.httpx.TimeoutException("slow utility model")
+            return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_UTILITY_MODEL", "utility/primary")
+    monkeypatch.setenv("ARGUS_UTILITY_FALLBACK_MODEL", "utility/fallback")
+    monkeypatch.setattr(
+        openrouter.httpx, "Client", lambda **kwargs: FakeSyncClient(**kwargs)
+    )
+
+    result = openrouter.invoke_openrouter_json_schema_sync(
+        task="name_suggestion",
+        messages=[{"role": "user", "content": "Tesla dip-buying idea"}],
+        schema_model=NameSuggestion,
+        schema_name="name_suggestion",
+    )
+
+    assert result is not None
+    assert result.name == "Tesla Dip Test"
+    assert attempted_models == ["utility/primary", "utility/fallback"]
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert [receipt.outcome for receipt in receipts] == ["failed", "succeeded"]
+    assert receipts[0].failure_mode == "TimeoutException"
+    assert receipts[1].fallback_used is True
+    assert receipts[1].tier == "utility"
+    assert receipts[1].token_usage == {
+        "prompt_tokens": 8,
+        "completion_tokens": 4,
+        "total_tokens": 12,
+    }
+
+
 def test_direct_chat_completion_tries_configured_fallback_and_records_usage(
     monkeypatch,
 ) -> None:

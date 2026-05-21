@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
+from argus.api.chat.previews import plain_text_preview
 from argus.api.schemas import (
     BacktestRun,
     Collection,
@@ -55,10 +56,7 @@ def _row_one(result: Any) -> dict[str, Any] | None:
 
 
 def _message_preview(content: str, max_length: int = 180) -> str | None:
-    preview = " ".join(content.split())
-    if not preview:
-        return None
-    return preview[:max_length]
+    return plain_text_preview(content, max_length=max_length)
 
 
 @dataclass

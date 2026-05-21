@@ -352,8 +352,8 @@ async def invoke_openrouter_json_schema(
         )
         return None
 
-    resolved_model = resolve_openrouter_structured_model(model_name, task=task)
-    if not resolved_model:
+    candidate_models = openrouter_structured_model_candidates(model_name, task=task)
+    if not candidate_models:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
         record_openrouter_route_receipt(
             task=task,
@@ -368,57 +368,66 @@ async def invoke_openrouter_json_schema(
         return None
 
     profile = OPENROUTER_PROFILES[task]
-    payload = {
-        "model": resolved_model,
-        "messages": messages,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": schema_name,
-                "strict": True,
-                "schema": schema_model.model_json_schema(),
-            },
-        },
-        "temperature": profile.temperature,
-        "max_tokens": profile.max_tokens,
-    }
-    _disable_reasoning_for_structured_artifact(payload)
-    try:
-        async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
-            response = await _post_openrouter_json_schema(
-                client=client,
-                api_key=api_key,
-                payload=payload,
+    last_exc: Exception | None = None
+    for index, candidate_model in enumerate(candidate_models):
+        attempt_started_at = time.perf_counter()
+        payload = _json_schema_payload(
+            model=candidate_model,
+            messages=messages,
+            schema_model=schema_model,
+            schema_name=schema_name,
+            profile=profile,
+        )
+        try:
+            async with httpx.AsyncClient(timeout=profile.timeout_seconds) as client:
+                response = await _post_openrouter_json_schema(
+                    client=client,
+                    api_key=api_key,
+                    payload=payload,
+                )
+            data = response.json()
+            _raise_openrouter_payload_error(data)
+            content = _openrouter_message_content(data)
+            if not content:
+                raise ValueError(
+                    "OpenRouter JSON schema response did not include content"
+                )
+            result = schema_model.model_validate_json(content)
+        except Exception as exc:
+            last_exc = exc
+            record_openrouter_route_receipt(
+                task=task,
+                model_name=candidate_model,
+                mode="json_schema",
+                schema_name=schema_name,
+                latency_ms=_elapsed_ms(attempt_started_at),
+                outcome="failed",
+                failure_mode=type(exc).__name__,
+                context_packet_ids=context_packet_ids,
             )
-        data = response.json()
-        _raise_openrouter_payload_error(data)
-        content = _openrouter_message_content(data)
-        if not content:
-            raise ValueError("OpenRouter JSON schema response did not include content")
-        result = schema_model.model_validate_json(content)
-    except Exception as exc:
+            if index + 1 < len(candidate_models):
+                log_openrouter_failure(
+                    task=task,
+                    model_name=candidate_model,
+                    exc=exc,
+                    message="JSON schema completion failed; trying next configured model",
+                )
+                continue
+            raise
         record_openrouter_route_receipt(
             task=task,
-            model_name=resolved_model,
+            model_name=candidate_model,
             mode="json_schema",
             schema_name=schema_name,
-            latency_ms=_elapsed_ms(started_at),
-            outcome="failed",
-            failure_mode=type(exc).__name__,
+            latency_ms=_elapsed_ms(attempt_started_at),
+            outcome="succeeded",
+            token_usage=openrouter_token_usage_from_payload(data),
             context_packet_ids=context_packet_ids,
         )
-        raise
-    record_openrouter_route_receipt(
-        task=task,
-        model_name=resolved_model,
-        mode="json_schema",
-        schema_name=schema_name,
-        latency_ms=_elapsed_ms(started_at),
-        outcome="succeeded",
-        token_usage=openrouter_token_usage_from_payload(data),
-        context_packet_ids=context_packet_ids,
-    )
-    return result
+        return result
+    if last_exc is not None:
+        raise last_exc
+    return None
 
 
 async def invoke_openrouter_chat_completion(
@@ -558,8 +567,8 @@ def invoke_openrouter_json_schema_sync(
         )
         return None
 
-    resolved_model = resolve_openrouter_structured_model(model_name, task=task)
-    if not resolved_model:
+    candidate_models = openrouter_structured_model_candidates(model_name, task=task)
+    if not candidate_models:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
         record_openrouter_route_receipt(
             task=task,
@@ -574,57 +583,66 @@ def invoke_openrouter_json_schema_sync(
         return None
 
     profile = OPENROUTER_PROFILES[task]
-    payload = {
-        "model": resolved_model,
-        "messages": messages,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": schema_name,
-                "strict": True,
-                "schema": schema_model.model_json_schema(),
-            },
-        },
-        "temperature": profile.temperature,
-        "max_tokens": profile.max_tokens,
-    }
-    _disable_reasoning_for_structured_artifact(payload)
-    try:
-        with httpx.Client(timeout=profile.timeout_seconds) as client:
-            response = _post_openrouter_json_schema_sync(
-                client=client,
-                api_key=api_key,
-                payload=payload,
+    last_exc: Exception | None = None
+    for index, candidate_model in enumerate(candidate_models):
+        attempt_started_at = time.perf_counter()
+        payload = _json_schema_payload(
+            model=candidate_model,
+            messages=messages,
+            schema_model=schema_model,
+            schema_name=schema_name,
+            profile=profile,
+        )
+        try:
+            with httpx.Client(timeout=profile.timeout_seconds) as client:
+                response = _post_openrouter_json_schema_sync(
+                    client=client,
+                    api_key=api_key,
+                    payload=payload,
+                )
+            data = response.json()
+            _raise_openrouter_payload_error(data)
+            content = _openrouter_message_content(data)
+            if not content:
+                raise ValueError(
+                    "OpenRouter JSON schema response did not include content"
+                )
+            result = schema_model.model_validate_json(content)
+        except Exception as exc:
+            last_exc = exc
+            record_openrouter_route_receipt(
+                task=task,
+                model_name=candidate_model,
+                mode="json_schema",
+                schema_name=schema_name,
+                latency_ms=_elapsed_ms(attempt_started_at),
+                outcome="failed",
+                failure_mode=type(exc).__name__,
+                context_packet_ids=context_packet_ids,
             )
-        data = response.json()
-        _raise_openrouter_payload_error(data)
-        content = _openrouter_message_content(data)
-        if not content:
-            raise ValueError("OpenRouter JSON schema response did not include content")
-        result = schema_model.model_validate_json(content)
-    except Exception as exc:
+            if index + 1 < len(candidate_models):
+                log_openrouter_failure(
+                    task=task,
+                    model_name=candidate_model,
+                    exc=exc,
+                    message="JSON schema completion failed; trying next configured model",
+                )
+                continue
+            raise
         record_openrouter_route_receipt(
             task=task,
-            model_name=resolved_model,
+            model_name=candidate_model,
             mode="json_schema",
             schema_name=schema_name,
-            latency_ms=_elapsed_ms(started_at),
-            outcome="failed",
-            failure_mode=type(exc).__name__,
+            latency_ms=_elapsed_ms(attempt_started_at),
+            outcome="succeeded",
+            token_usage=openrouter_token_usage_from_payload(data),
             context_packet_ids=context_packet_ids,
         )
-        raise
-    record_openrouter_route_receipt(
-        task=task,
-        model_name=resolved_model,
-        mode="json_schema",
-        schema_name=schema_name,
-        latency_ms=_elapsed_ms(started_at),
-        outcome="succeeded",
-        token_usage=openrouter_token_usage_from_payload(data),
-        context_packet_ids=context_packet_ids,
-    )
-    return result
+        return result
+    if last_exc is not None:
+        raise last_exc
+    return None
 
 
 def openrouter_token_usage_from_payload(data: dict[str, object]) -> dict[str, int] | None:
@@ -699,6 +717,32 @@ def _elapsed_ms(started_at: float) -> int:
 
 def _disable_reasoning_for_structured_artifact(payload: dict[str, object]) -> None:
     payload["reasoning"] = {"effort": "none"}
+
+
+def _json_schema_payload(
+    *,
+    model: str,
+    messages: list[dict[str, str]],
+    schema_model: type[SchemaModelT],
+    schema_name: str,
+    profile: OpenRouterProfile,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "model": model,
+        "messages": messages,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_name,
+                "strict": True,
+                "schema": schema_model.model_json_schema(),
+            },
+        },
+        "temperature": profile.temperature,
+        "max_tokens": profile.max_tokens,
+    }
+    _disable_reasoning_for_structured_artifact(payload)
+    return payload
 
 
 async def _post_openrouter_json_schema(

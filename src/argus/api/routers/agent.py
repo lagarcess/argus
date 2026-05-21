@@ -15,7 +15,6 @@ from argus.agent_runtime.resolution import mention_to_provenance
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
-from argus.api.artifact_naming import schedule_artifact_naming_after_stream
 from argus.api.chat.actions import (
     chat_display_message,
     chat_request_message,
@@ -60,6 +59,7 @@ from argus.api.chat.streaming import (
     sse_data,
     sse_done,
 )
+from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
 from argus.api.message_store import create_message, load_runtime_thread_history
 from argus.api.naming import get_starter_prompts, resolve_language
@@ -329,6 +329,7 @@ async def chat_stream(
             assistant_message: str | None,
             current_run: BacktestRun | None = None,
             saved_strategy_id: str | None = None,
+            message_id: str | None = None,
         ) -> None:
             try:
                 schedule_artifact_naming_after_stream(
@@ -339,6 +340,8 @@ async def chat_stream(
                     saved_strategy_id=saved_strategy_id,
                     user_message=display_message,
                     assistant_message=assistant_message,
+                    message_id=message_id,
+                    run_id=current_run.id if current_run is not None else None,
                 )
             except Exception:
                 logger.opt(exception=True).warning(
@@ -588,6 +591,7 @@ async def chat_stream(
                     if metadata.get("saved_strategy_id")
                     else None
                 ),
+                message_id=assistant_message.id,
             )
             return
 
@@ -642,6 +646,7 @@ async def chat_stream(
             schedule_artifact_naming(
                 assistant_message=assistant_text,
                 current_run=run,
+                message_id=assistant_message.id,
             )
             return
 
@@ -673,6 +678,7 @@ async def chat_stream(
             schedule_artifact_naming(
                 assistant_message=turn.assistant_text,
                 current_run=run,
+                message_id=assistant_message.id,
             )
             return
 
@@ -881,6 +887,11 @@ async def chat_stream(
                 schedule_artifact_naming(
                     assistant_message=persisted_text,
                     current_run=run,
+                    message_id=(
+                        assistant_message.id
+                        if assistant_message is not None
+                        else None
+                    ),
                 )
                 return
         except Exception:

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import os
 from typing import Any
 
 from loguru import logger
@@ -110,66 +108,6 @@ def maybe_generate_saved_strategy_name(
         name=candidate,
     )
     return candidate
-
-
-def schedule_artifact_naming_after_stream(
-    *,
-    user_id: str,
-    conversation_id: str,
-    language: str | None,
-    current_run: BacktestRun | None = None,
-    saved_strategy_id: str | None = None,
-    user_message: str | None = None,
-    assistant_message: str | None = None,
-) -> None:
-    """Start fail-open background naming after the stream contract is complete."""
-
-    if _artifact_naming_disabled_for_pytest():
-        return
-
-    async def _run() -> None:
-        try:
-            await asyncio.to_thread(
-                maybe_generate_conversation_title,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                language=language,
-                current_run=current_run,
-                user_message=user_message,
-                assistant_message=assistant_message,
-            )
-            if saved_strategy_id is not None and current_run is not None:
-                await asyncio.to_thread(
-                    maybe_generate_saved_strategy_name,
-                    user_id=user_id,
-                    strategy_id=saved_strategy_id,
-                    run=current_run,
-                    language=language,
-                )
-        except Exception:
-            logger.opt(exception=True).warning(
-                "Artifact naming background job failed",
-                user_id=user_id,
-                conversation_id=conversation_id,
-                saved_strategy_id=saved_strategy_id,
-            )
-
-    try:
-        asyncio.get_running_loop().create_task(_run())
-    except RuntimeError:
-        logger.warning(
-            "Artifact naming skipped because no running event loop was available",
-            user_id=user_id,
-            conversation_id=conversation_id,
-            saved_strategy_id=saved_strategy_id,
-        )
-
-
-def _artifact_naming_disabled_for_pytest() -> bool:
-    return (
-        "PYTEST_CURRENT_TEST" in os.environ
-        and os.getenv("ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS") != "1"
-    )
 
 
 def _get_conversation(*, user_id: str, conversation_id: str) -> Conversation | None:

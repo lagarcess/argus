@@ -91,6 +91,7 @@ from argus.domain.indicators import (
     normalize_indicator_parameters,
 )
 from argus.domain.market_data import resolve_asset
+from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 
@@ -485,11 +486,13 @@ async def _stage_result_from_interpretation(
     )
     if followup_result is not None:
         return followup_result
-    capability_answer = _capability_answer_if_applicable(
+    capability_answer = await _capability_answer_if_applicable(
         focus=interpretation.capability_question_focus,
         semantic_turn_act=interpretation.semantic_turn_act,
         expects_strategy_route=expects_strategy_route,
         requires_clarification=requires_clarification,
+        assistant_response=interpretation.assistant_response,
+        current_user_message=state.current_user_message,
         capability_contract=capability_contract,
     )
     if capability_answer is not None:
@@ -577,12 +580,14 @@ def _repair_retry_route_when_pending_need_is_active(
     )
 
 
-def _capability_answer_if_applicable(
+async def _capability_answer_if_applicable(
     *,
     focus: CapabilityQuestionFocus | None,
     semantic_turn_act: SemanticTurnAct | None,
     expects_strategy_route: bool,
     requires_clarification: bool,
+    assistant_response: str | None,
+    current_user_message: str,
     capability_contract: Any,
 ) -> str | None:
     if (
@@ -592,7 +597,53 @@ def _capability_answer_if_applicable(
         or requires_clarification
     ):
         return None
+    if focus == "supported_strategies" and assistant_response:
+        return None
+    if focus == "supported_strategies":
+        composed = await _compose_supported_strategy_capability_answer(
+            current_user_message=current_user_message,
+            capability_contract=capability_contract,
+        )
+        if composed:
+            return composed
     return compose_capability_answer(focus=focus, contract=capability_contract)
+
+
+async def _compose_supported_strategy_capability_answer(
+    *,
+    current_user_message: str,
+    capability_contract: Any,
+) -> str | None:
+    fact_packet = compose_capability_answer(
+        focus="supported_strategies",
+        contract=capability_contract,
+    )
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus, a chat-first investing experimentation assistant. "
+                "Answer in warm, plain English. Keep it concise and useful for a "
+                "normal person. Use the supported-strategy facts as hard bounds. "
+                "Do not invent unsupported strategy families, predictions, or "
+                "investment advice. If the user asks about a concept such as dollar "
+                "cost averaging, explain it simply and connect it to the closest "
+                "runnable Argus experiment."
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"Supported-strategy facts: {fact_packet}",
+        },
+        {"role": "user", "content": current_user_message},
+    ]
+    try:
+        return await invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=messages,
+        )
+    except Exception:
+        return None
 
 
 def _route_contextual_money_answer(

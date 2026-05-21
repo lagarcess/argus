@@ -277,6 +277,59 @@ def test_chat_stream_artifact_naming_scheduler_failure_does_not_block_done(
     assert len(scheduled) == 1
 
 
+def test_chat_stream_finalizes_ai_title_after_meaningful_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": (
+                    "Dollar cost averaging means investing a fixed amount "
+                    "on a schedule."
+                ),
+            },
+        }
+
+    def _suggest_entity_name(**kwargs: Any) -> str:
+        assert kwargs["entity_type"] == "conversation"
+        assert "dollar cost averaging" in kwargs["context"].lower()
+        return "DCA Basics"
+
+    monkeypatch.setenv("ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS", "1")
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        "argus.api.artifact_naming.suggest_entity_name",
+        _suggest_entity_name,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Can you explain dollar cost averaging?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text.count("data: [DONE]") == 1
+    updated = api_state.store.conversations[conversation["id"]]
+    assert updated.title == "DCA Basics"
+    assert updated.title_source == "ai_generated"
+
+
 def test_chat_stream_persists_visible_streamed_text_for_non_card_reply(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

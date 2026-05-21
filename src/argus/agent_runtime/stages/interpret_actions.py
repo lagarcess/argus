@@ -65,6 +65,31 @@ TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE = (
 RESULT_FOLLOWUP_COMPOSER_TIMEOUT_SECONDS = 10.0
 
 
+def _result_followup_decision(
+    decision: InterpretDecision,
+    *,
+    focus: str | None = None,
+    reason_code: str | None = None,
+) -> InterpretDecision:
+    reason_codes = list(decision.reason_codes)
+    if reason_code is not None:
+        reason_codes.append(reason_code)
+    return decision.model_copy(
+        update={
+            "intent": "conversation_followup",
+            "requires_clarification": False,
+            "candidate_strategy_draft": StrategySummary(),
+            "missing_required_fields": [],
+            "ambiguous_fields": [],
+            "unsupported_constraints": [],
+            "resolution_provenance": [],
+            "semantic_turn_act": "result_followup",
+            "result_followup_focus": focus or decision.result_followup_focus or "general",
+            "reason_codes": reason_codes,
+        }
+    )
+
+
 def structured_action_stage_result_if_applicable(
     *,
     state: RunState,
@@ -536,13 +561,7 @@ async def artifact_followup_stage_result_if_applicable(
         if draft_response is not None:
             return StageResult(
                 outcome="ready_to_respond",
-                decision=decision.model_copy(
-                    update={
-                        "intent": "conversation_followup",
-                        "requires_clarification": False,
-                        "missing_required_fields": [],
-                    }
-                ),
+                decision=_result_followup_decision(decision, focus=focus),
                 stage_patch={"assistant_response": draft_response},
             )
     reference = (
@@ -565,14 +584,7 @@ async def artifact_followup_stage_result_if_applicable(
         return None
     return StageResult(
         outcome="ready_to_respond",
-        decision=decision.model_copy(
-            update={
-                "requires_clarification": False,
-                "missing_required_fields": [],
-                "semantic_turn_act": "result_followup",
-                "result_followup_focus": focus,
-            }
-        ),
+        decision=_result_followup_decision(decision, focus=focus),
         stage_patch={
             "assistant_response": with_response_heading(
                 heading=result_followup_heading(focus),
