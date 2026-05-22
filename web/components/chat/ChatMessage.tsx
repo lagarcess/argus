@@ -333,13 +333,13 @@ function ResultReadout({ content }: { content: string }) {
 
 function ResultBreakdown({ content }: { content: string }) {
   return (
-    <section
-      className="argus-result-breakdown prose dark:prose-invert max-w-none"
-      aria-label="Result breakdown"
-    >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-        {content}
-      </ReactMarkdown>
+    <section aria-label="Result breakdown">
+      <div className="argus-result-section-label">Breakdown</div>
+      <div className="argus-result-breakdown prose dark:prose-invert max-w-none">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
+      </div>
     </section>
   );
 }

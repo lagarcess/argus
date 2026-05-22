@@ -228,6 +228,51 @@ def test_conversation_title_finalizer_persists_utility_route_receipt(
     assert receipts[0]["metadata"]["runtime_artifact"] == "conversation_title"
 
 
+def test_conversation_title_finalizer_records_observable_skip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat import title_finalization
+
+    conversation = memory_conversation(
+        title="My renamed thread",
+        title_source="user_renamed",
+        language="en",
+    )
+    receipts: list[dict[str, Any]] = []
+
+    class FakeGateway:
+        def get_conversation(self, *, user_id: str, conversation_id: str):
+            del user_id
+            return api_state.store.conversations.get(conversation_id)
+
+        def create_route_receipt(self, **kwargs: Any) -> dict[str, Any]:
+            receipts.append(kwargs)
+            return kwargs
+
+    monkeypatch.setattr(api_state, "supabase_gateway", FakeGateway())
+    monkeypatch.setenv("ARGUS_UTILITY_MODEL", "utility/primary")
+    monkeypatch.setenv("ARGUS_UTILITY_FALLBACK_MODEL", "utility/fallback")
+
+    title = title_finalization.finalize_conversation_title_after_turn(
+        user_id=_user_id(),
+        conversation_id=conversation.id,
+        language="en",
+        current_run=_completed_run(conversation_id=conversation.id),
+        user_message="new text",
+        assistant_message="new answer",
+        message_id="message-1",
+    )
+
+    assert title is None
+    assert len(receipts) == 1
+    receipt = receipts[0]["receipt"]
+    assert receipt["task"] == "name_suggestion"
+    assert receipt["tier"] == "utility"
+    assert receipt["outcome"] == "skipped"
+    assert receipt["failure_mode"] == "title_not_generated"
+    assert receipts[0]["metadata"]["runtime_artifact"] == "conversation_title"
+
+
 def test_conversation_title_generation_never_overwrites_user_renamed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

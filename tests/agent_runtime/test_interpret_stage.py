@@ -287,6 +287,77 @@ def test_supported_strategy_capability_uses_chat_tier_for_natural_language(
     assert "recurring buys/DCA" in captured["messages"][1]["content"]
 
 
+def test_general_capability_education_uses_chat_tier_for_natural_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "Dollar cost averaging means buying a fixed amount on a schedule. "
+            "In Argus, the closest test is a recurring-buy Bitcoin simulation "
+            "over a period you choose."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for beginner education about dollar cost averaging.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="general",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Can you explain dollar cost averaging with Bitcoin in plain English?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Dollar cost averaging" in answer
+    assert "Executable strategy families" not in answer
+    assert captured["task"] == "chat_composer"
+    assert "Execution limits" in captured["messages"][1]["content"]
+
+
+def test_supported_strategy_capability_composer_failure_stays_human(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _failing_chat_completion(**_: Any) -> str:
+        raise RuntimeError("chat tier unavailable")
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _failing_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for beginner education about dollar cost averaging.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_strategies",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Can you explain dollar cost averaging like I'm completely new?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Executable strategy families" not in answer
+    assert "configuration" not in answer.lower()
+    assert "historical" in answer.lower()
+    assert "not investment advice" in answer.lower()
+
+
 def test_interpret_social_opener_uses_llm_response() -> None:
     response = StructuredInterpretation(
         intent="conversation_followup",
@@ -1085,7 +1156,7 @@ def test_result_followup_uses_latest_result_when_interpreter_unavailable(
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**Readout**")
+    assert result.patch["assistant_response"].startswith("**What happened**")
     assert "Grounded answer from the latest result facts." in result.patch[
         "assistant_response"
     ]
@@ -1144,7 +1215,7 @@ def test_result_followup_uses_llm_composer_before_fallback(monkeypatch: pytest.M
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**Readout**")
+    assert result.patch["assistant_response"].startswith("**What happened**")
     assert (
         "LLM-composed answer grounded in the result fact bank."
         in result.patch["assistant_response"]
@@ -1473,8 +1544,8 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
         requires_clarification=False,
         user_goal_summary="User asks what was tested.",
         assistant_response=(
-            "**Readout**\n\nThe strategy returned 40.4% while the benchmark returned "
-            "27.3%."
+            "**What happened**\n\nThe strategy returned 40.4% while the benchmark "
+            "returned 27.3%."
         ),
         semantic_turn_act="educational_question",
     )
@@ -1486,7 +1557,7 @@ def test_results_explanation_intent_uses_result_artifact_even_if_turn_act_drifts
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"].startswith("**Readout**")
+    assert result.patch["assistant_response"].startswith("**What happened**")
     assert "I tested AAPL" in result.patch["assistant_response"]
     assert result.decision.semantic_turn_act == "result_followup"
 
@@ -1542,8 +1613,8 @@ def test_underperformance_followup_corrects_false_premise_when_run_outperformed(
     assert "beat SPY" in answer
     assert "+33.4%" in answer
     assert "+26.5%" in answer
-    assert "The strategy returned +33.4%." in answer
-    assert "SPY returned +26.5%." in answer
+    assert "strategy returned +33.4%" in answer
+    assert "SPY returned +26.5%" in answer
     assert "while the gap" not in answer
 
 
@@ -1602,7 +1673,7 @@ def test_zero_return_followup_uses_result_reason_without_repeating_readout(
 
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
-    assert answer.startswith("**Readout**")
+    assert answer.startswith("**What happened**")
     assert "strategy returned 0.0%" in answer
     assert "SPY returned +8.9%" in answer
     assert "No entry trades were executed" in answer

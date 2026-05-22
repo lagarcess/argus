@@ -100,6 +100,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(message).toContain("function ResultBreakdown");
     expect(message).toContain('aria-label="Result breakdown"');
+    expect(message).toContain("argus-result-section-label");
+    expect(message).toContain("Breakdown");
     expect(message).toContain('message.contentPresentation === "result_breakdown" && message.content?.trim()');
     expect(chat).toContain('action?.type === "show_breakdown"');
     expect(chat).toContain('contentPresentation:');
@@ -538,10 +540,14 @@ describe("Argus Alpha frontend contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
     expect(chat).toContain("function schedulePostTurnHistoryRefresh");
+    expect(chat).toContain("listConversations");
+    expect(chat).toContain("title_source");
     expect(chat).toContain("window.setTimeout");
     expect(chat).toContain("1500");
     expect(chat).toContain("5000");
-    expect(chat).toContain("schedulePostTurnHistoryRefresh();");
+    expect(chat).toContain("9000");
+    expect(chat).toContain("13000");
+    expect(chat).toContain("schedulePostTurnHistoryRefresh(targetConversationId);");
   });
 
   test("feedback dialog provides rich feedback surfaces", () => {

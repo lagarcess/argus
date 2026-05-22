@@ -674,7 +674,7 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
     )
     rule_summary = str(context.get("rule_summary") or "").strip()
     execution_summary = str(context.get("execution_note") or "").strip()
-    assumption_bullets = "\n".join(f"- {line}" for line in assumption_lines)
+    assumption_text = "; ".join(line.rstrip(".") for line in assumption_lines)
     period_sentence = f" over {date_range}" if date_range else ""
     setup_lines = [
         f"{title} tested {symbols_text}{period_sentence} using the stored backtest configuration."
@@ -693,18 +693,16 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
         performance_lines.append(execution_summary)
 
     return (
-        "### Quick Breakdown\n"
-        f"**What was tested:** {' '.join(setup_lines)}\n\n"
-        "**What the run showed:**\n"
-        f"{' '.join(performance_lines)}\n\n"
-        "**Risk to notice:** "
-        f"Max drawdown was {drawdown_text}. This is the largest peak-to-trough "
-        f"decline captured by the simulation.\n\n"
-        "**Assumptions:**\n"
-        f"{assumption_bullets}\n\n"
-        "**Keep in mind:** "
+        "Here's the clean read on this run.\n\n"
+        f"- Tested: {' '.join(setup_lines)}\n"
+        f"- Result: {' '.join(performance_lines)}\n"
+        f"- Risk: Max drawdown was {drawdown_text}, the largest peak-to-trough "
+        "decline captured by the simulation.\n"
+        f"- Assumptions: {assumption_text or 'The stored run settings were used'}.\n"
+        "- Next step: "
+        f"{_ensure_sentence(fact_bank['runnable_next_tests'])}\n\n"
         "Use this as historical simulation evidence, not a prediction or trading "
-        f"recommendation. {_ensure_sentence(fact_bank['runnable_next_tests'])}"
+        "recommendation."
     )
 
 

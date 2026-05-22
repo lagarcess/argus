@@ -462,6 +462,21 @@ body {
   color: rgba(255, 255, 255, 0.86);
 }
 
+.argus-result-section-label {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 680;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.52);
+}
+
+.dark .argus-result-section-label {
+  color: rgba(255, 255, 255, 0.54);
+}
+
 .argus-result-breakdown {
   position: relative;
   max-width: 68ch;

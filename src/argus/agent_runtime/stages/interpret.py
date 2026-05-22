@@ -4,7 +4,10 @@ import asyncio
 import inspect
 from typing import Any
 
-from argus.agent_runtime.capabilities.answers import compose_capability_answer
+from argus.agent_runtime.capabilities.answers import (
+    compose_capability_answer,
+    compose_capability_recovery_answer,
+)
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
 from argus.agent_runtime.profile.response_profile import (
@@ -597,10 +600,11 @@ async def _capability_answer_if_applicable(
         or requires_clarification
     ):
         return None
-    if focus == "supported_strategies" and assistant_response:
+    if focus in {"supported_strategies", "general"} and assistant_response:
         return None
-    if focus == "supported_strategies":
-        composed = await _compose_supported_strategy_capability_answer(
+    if focus in {"supported_strategies", "general"}:
+        composed = await _compose_natural_capability_answer(
+            focus=focus,
             current_user_message=current_user_message,
             capability_contract=capability_contract,
         )
@@ -609,13 +613,14 @@ async def _capability_answer_if_applicable(
     return compose_capability_answer(focus=focus, contract=capability_contract)
 
 
-async def _compose_supported_strategy_capability_answer(
+async def _compose_natural_capability_answer(
     *,
+    focus: CapabilityQuestionFocus,
     current_user_message: str,
     capability_contract: Any,
 ) -> str | None:
     fact_packet = compose_capability_answer(
-        focus="supported_strategies",
+        focus=focus,
         contract=capability_contract,
     )
     messages = [
@@ -643,7 +648,10 @@ async def _compose_supported_strategy_capability_answer(
             messages=messages,
         )
     except Exception:
-        return None
+        return compose_capability_recovery_answer(
+            focus=focus,
+            contract=capability_contract,
+        )
 
 
 def _route_contextual_money_answer(

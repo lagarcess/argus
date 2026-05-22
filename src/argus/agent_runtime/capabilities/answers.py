@@ -31,6 +31,20 @@ def compose_capability_answer(
     return _general_answer(contract)
 
 
+def compose_capability_recovery_answer(
+    *,
+    focus: CapabilityQuestionFocus | None,
+    contract: CapabilityContract,
+) -> str:
+    if focus == "supported_strategies":
+        return _supported_strategies_recovery_answer(contract)
+    return (
+        "I can still keep this grounded. Tell me the asset, period, and the "
+        "idea you want to test, and I'll shape the closest runnable historical "
+        "experiment. This is simulation evidence, not investment advice."
+    )
+
+
 def _supported_indicators_answer() -> str:
     indicators = _join_labels(spec.label for spec in EXECUTABLE_INDICATORS.values())
     parameter_summary = "; ".join(
@@ -54,6 +68,20 @@ def _supported_strategies_answer() -> str:
         f"Recurring buys support {cadences} cadences when a contribution amount is provided. "
         "Indicator and signal strategies are runnable when the LLM can produce a valid "
         "engine rule and the capability layer validates it against the indicator registry."
+    )
+
+
+def _supported_strategies_recovery_answer(contract: CapabilityContract) -> str:
+    options = contract.get_simplification_options("unsupported_strategy_logic")
+    option_labels = _join_labels(option.label.lower() for option in options)
+    if not option_labels:
+        option_labels = _join_labels(EXECUTABLE_STRATEGY_FAMILIES)
+    return (
+        "I can still keep this grounded and runnable.\n\n"
+        f"The closest supported paths are to {option_labels}. Tell me the asset "
+        "and period you want to explore, plus any recurring contribution or "
+        "rule detail you already have.\n\n"
+        "This stays inside historical simulation, not investment advice."
     )
 
 

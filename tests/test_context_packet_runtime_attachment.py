@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from argus.api import state as api_state
 from argus.api.chat.artifacts import result_fact_bank
 from argus.api.chat.context_packets import (
+    ContextPacketCollectionResult,
+    collect_context_packet_result_for_completed_run,
     collect_context_packets_for_completed_run,
     enrich_run_with_context_packets,
 )
@@ -147,6 +149,72 @@ def test_collect_context_packets_uses_run_window_and_current_provider_scope(
     assert all(packet.not_for == "simulation_truth" for packet in packets)
 
 
+def test_context_packet_collection_skips_stale_packets_with_status(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_CONTEXT_PACKETS_ENABLED", "true")
+    stale_news = ContextPacket(
+        provider="alpaca",
+        packet_type="news",
+        retrieved_at=datetime.now(timezone.utc) - timedelta(days=2),
+        freshness="fresh",
+    )
+
+    result = collect_context_packet_result_for_completed_run(
+        _run(),
+        fred_series=(),
+        budget_seconds=2.0,
+        fetch_alpaca_news_packet_func=lambda **_: stale_news,
+        fetch_alpaca_corporate_actions_packet_func=lambda **_: (_ for _ in ()).throw(
+            RuntimeError("actions unavailable")
+        ),
+        fetch_alpaca_market_movers_packet_func=lambda **_: (_ for _ in ()).throw(
+            RuntimeError("movers unavailable")
+        ),
+        fetch_alpaca_most_actives_packet_func=lambda **_: (_ for _ in ()).throw(
+            RuntimeError("actives unavailable")
+        ),
+    )
+
+    assert result.packets == []
+    assert any(
+        status["provider_task"] == "alpaca:news"
+        and status["outcome"] == "stale"
+        and status["packet_id"] == stale_news.id
+        for status in result.statuses
+    )
+    assert {
+        status["provider_task"]
+        for status in result.statuses
+        if status["outcome"] == "skipped"
+    } == {
+        "alpaca:corporate_actions",
+        "alpaca:market_movers",
+        "alpaca:most_actives",
+    }
+
+
+def test_enriched_run_records_context_collection_status_without_live_fetch() -> None:
+    status = [
+        {
+            "provider_task": "alpaca:news",
+            "outcome": "stale",
+            "packet_id": "packet-1",
+            "freshness": "stale",
+        }
+    ]
+
+    enriched = enrich_run_with_context_packets(
+        _run(),
+        [],
+        collection_status=status,
+    )
+
+    assert enriched.conversation_result_card["context_packets"] == []
+    assert enriched.conversation_result_card["context_packet_ids"] == []
+    assert enriched.conversation_result_card["context_collection_status"] == status
+
+
 def test_enriched_run_replays_attached_context_packet_facts() -> None:
     enriched = enrich_run_with_context_packets(_run(), [_fred_packet()])
     fact_bank = result_fact_bank(enriched)
@@ -243,8 +311,11 @@ def test_persist_runtime_backtest_run_attaches_immutable_context_packets(
     monkeypatch.setattr(api_state, "store", AlphaStore())
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setattr(
-        "argus.api.chat.persistence.collect_context_packets_for_completed_run",
-        lambda run: [_fred_packet()],
+        "argus.api.chat.persistence.collect_context_packet_result_for_completed_run",
+        lambda run: ContextPacketCollectionResult(
+            packets=[_fred_packet()],
+            statuses=[],
+        ),
     )
 
     run = persist_runtime_backtest_run(

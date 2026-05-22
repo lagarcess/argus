@@ -2269,10 +2269,12 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
 
     text = result_breakdown_message(run)
 
-    assert "### Quick Breakdown" in text
-    assert "**What was tested:**" in text
-    assert "**Risk to notice:**" in text
-    assert "**Keep in mind:**" in text
+    assert "### Quick Breakdown" not in text
+    assert "Here's the clean read" in text
+    assert "- Tested:" in text
+    assert "- Result:" in text
+    assert "- Risk:" in text
+    assert "- Next step:" in text
     assert "**Total return:** +39.5%." in text
     assert "Entry rule: buy at the start of the period" in text
     assert "AAPL Buy and Hold" in text

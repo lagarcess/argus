@@ -14,6 +14,7 @@ from argus.api.schemas import BacktestRun
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
+    record_openrouter_route_receipt,
 )
 
 
@@ -31,8 +32,10 @@ def finalize_conversation_title_after_turn(
     """Finalize a conversation title as fail-open utility-tier polish."""
 
     receipt_token = begin_openrouter_route_receipt_capture()
+    fallback_outcome = "skipped"
+    fallback_failure_mode = "title_not_generated"
     try:
-        return maybe_generate_conversation_title(
+        title = maybe_generate_conversation_title(
             user_id=user_id,
             conversation_id=conversation_id,
             language=language,
@@ -40,7 +43,12 @@ def finalize_conversation_title_after_turn(
             user_message=user_message,
             assistant_message=assistant_message,
         )
+        if title is not None:
+            fallback_failure_mode = None
+        return title
     except Exception:
+        fallback_outcome = "failed"
+        fallback_failure_mode = "title_finalization_failed"
         logger.opt(exception=True).warning(
             "Conversation title finalization failed",
             user_id=user_id,
@@ -48,8 +56,21 @@ def finalize_conversation_title_after_turn(
         )
         return None
     finally:
+        receipts = end_openrouter_route_receipt_capture(receipt_token)
+        if not receipts and fallback_failure_mode:
+            receipts = [
+                record_openrouter_route_receipt(
+                    task="name_suggestion",
+                    model_name=None,
+                    mode="json_schema",
+                    schema_name="name_suggestion",
+                    latency_ms=0,
+                    outcome=fallback_outcome,
+                    failure_mode=fallback_failure_mode,
+                )
+            ]
         persist_route_receipts(
-            receipts=end_openrouter_route_receipt_capture(receipt_token),
+            receipts=receipts,
             user_id=user_id,
             conversation_id=conversation_id,
             run_id=run_id,

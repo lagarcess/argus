@@ -58,6 +58,15 @@ class ResultFollowupDraft(BaseModel):
             "explicitly contains that fact."
         )
     )
+    answer_blocks: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Preferred user-visible response shape. Provide one to three concise "
+            "plain-language blocks, each short enough to read in chat. The runtime "
+            "joins these blocks with paragraph spacing. Keep facts grounded in "
+            "fact_ids and do not use this for extra ungrounded claims."
+        ),
+    )
     fact_ids: list[str] = Field(
         description=(
             "Fact IDs from fact_bank that the renderer must attach. Include every "
@@ -221,7 +230,10 @@ def result_followup_llm_messages(
                 "user's follow-up using only the supplied fact_bank. Be conversational, "
                 "specific, and useful; do not sound like a fixed template. Return a "
                 "short natural-language answer plus fact_ids. The answer should use "
-                "the supplied facts naturally, while fact_ids tells the runtime which "
+                "the supplied facts naturally, while answer_blocks gives the renderer "
+                "the same answer as one to three short readable blocks. The renderer "
+                "prefers answer_blocks over answer when present, so do not pack the "
+                "answer into a single dense paragraph. fact_ids tells the runtime which "
                 "symbols, dates, percentages, drawdowns, benchmarks, caveats, context "
                 "facts, and next-test options ground the answer. fact_ids must include every "
                 "fact_id in required_fact_ids; do not omit required fact ids even when "
@@ -234,9 +246,11 @@ def result_followup_llm_messages(
                 "that best answer the question unless the user explicitly asks for a "
                 "full breakdown. Set the first sentence as a plain takeaway, not a "
                 "metric recap. For "
-                "why/how follow-ups, use one or two short paragraphs: first say what "
-                "the simulation shows, then say what it cannot prove. Do not write "
-                "like a report abstract. For next-experiment follow-ups, use a short "
+                "why/how follow-ups, use two short paragraphs or one short paragraph "
+                "plus one tiny caveat line: first say what the simulation shows, then "
+                "say what it cannot prove. Do not pack the whole answer into one "
+                "dense paragraph, and do not write like a report abstract. For "
+                "next-experiment follow-ups, use a short "
                 "lead-in and two or three bullets from the provided options. Set "
                 "relative_performance_claim to the supplied relative_performance_truth "
                 "when it is known, and keep the answer consistent with that claim. Set "
@@ -352,7 +366,7 @@ def render_result_followup_draft(
     required_fact_ids: set[str],
     focus: ResultFollowupFocus,
 ) -> str | None:
-    body = normalize_text(draft.answer)
+    body = render_result_followup_answer_body(draft)
     if not body:
         return None
     if draft.causal_attribution_claim == "unsupported":
@@ -387,7 +401,7 @@ def render_result_followup_draft(
     )
     if not required_fact_ids.issubset(used_fact_ids):
         return None
-    body = normalize_text(body)
+    body = normalize_response_body(body)
     if not body:
         return None
     if focus == "next_experiment":
@@ -400,6 +414,34 @@ def render_result_followup_draft(
     if len(rendered.split()) > max_words:
         return None
     return rendered.strip()
+
+
+MAX_UNSTRUCTURED_FOLLOWUP_WORDS = 56
+
+
+def render_result_followup_answer_body(draft: ResultFollowupDraft) -> str | None:
+    blocks: list[str] = []
+    for block in draft.answer_blocks:
+        cleaned = normalize_text(block)
+        if cleaned:
+            blocks.append(cleaned)
+    if blocks:
+        return "\n\n".join(blocks[:3])
+    body = normalize_text(draft.answer)
+    if not body:
+        return None
+    if len(body.split()) > MAX_UNSTRUCTURED_FOLLOWUP_WORDS:
+        return None
+    return body
+
+
+def normalize_response_body(value: Any) -> str:
+    blocks = [
+        normalize_text(block)
+        for block in str(value or "").split("\n\n")
+        if normalize_text(block)
+    ]
+    return "\n\n".join(blocks)
 
 
 INTERNAL_FACT_NAMES = (
@@ -806,47 +848,65 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
             intro = f"{symbols} lagged the benchmark in this run."
     else:
         intro = "This run mostly tells us how the confirmed setup behaved."
-    pieces = [intro]
+    detail_lines: list[str] = []
     strategy_phrase = strategy_run_phrase(strategy)
     context_parts = [f"{article_for(strategy_phrase)} {strategy_phrase} on {symbols}"]
     if date_range:
         context_parts.append(f"over {date_range}")
-    pieces.append("The setup was " + " ".join(context_parts) + ".")
+    detail_lines.append("Setup: " + " ".join(context_parts) + ".")
     same_asset_benchmark = symbols_match_benchmark(symbols, benchmark)
     if same_asset_benchmark and strategy == "buy and hold" and benchmark:
         if total_return:
-            pieces.append(f"It returned {total_return}.")
-        pieces.append(
+            detail_lines.append(f"Result: It returned {total_return}.")
+        detail_lines.append(
             f"Because the benchmark was also {benchmark}, this is mainly the "
             "asset's move over the window, not a separate strategy edge."
         )
     else:
+        result_parts: list[str] = []
         if total_return:
-            pieces.append(f"The strategy returned {total_return}.")
+            result_parts.append(f"the strategy returned {total_return}")
         if benchmark and benchmark_return:
-            pieces.append(f"{benchmark} returned {benchmark_return}.")
+            result_parts.append(f"{benchmark} returned {benchmark_return}")
         elif benchmark:
-            pieces.append(f"The benchmark was {benchmark}.")
-    if benchmark_delta:
-        pieces.append(f"The gap versus the benchmark was {benchmark_delta}.")
+            result_parts.append(f"the benchmark was {benchmark}")
+        if benchmark_delta:
+            result_parts.append(f"the gap versus the benchmark was {benchmark_delta}")
+        if result_parts:
+            detail_lines.append("Result: " + "; ".join(result_parts) + ".")
     if fact_bank.get("max_drawdown"):
-        pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
+        detail_lines.append(f"Risk: max drawdown was {fact_bank['max_drawdown']}.")
+    caveat_lines: list[str] = []
     if delta_number is not None and delta_number < 0:
-        pieces.append(
+        caveat_lines.append(
             "The useful read is that this confirmed rule did not keep up over that "
             "window; the run does not prove why."
         )
     elif delta_number is not None and delta_number > 0:
-        pieces.append(
+        caveat_lines.append(
             "That is a relative-performance fact from the run, not proof the same "
             "edge would persist."
         )
     if fact_bank.get("execution_note"):
-        pieces.append(clean_fragment(fact_bank["execution_note"]) + ".")
-    append_context_backdrop(pieces, fact_bank)
+        detail_lines.append(clean_fragment(fact_bank["execution_note"]) + ".")
+    context_sentence = context_backdrop_sentence(fact_bank)
+    if context_sentence:
+        caveat_lines.append(context_sentence)
     if fact_bank.get("caveat"):
-        pieces.append("Use it as historical simulation evidence, not a prediction or recommendation.")
-    return " ".join(piece.strip() for piece in pieces if piece.strip())
+        caveat_lines.append(
+            "Use it as historical simulation evidence, not a prediction or recommendation."
+        )
+    detail_block = "\n".join(f"- {line}" for line in detail_lines if line.strip())
+    caveat_block = " ".join(line.strip() for line in caveat_lines if line.strip())
+    return "\n\n".join(
+        block
+        for block in (
+            intro,
+            detail_block,
+            caveat_block,
+        )
+        if block
+    )
 
 
 def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str | None:
@@ -889,15 +949,22 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
 
 
 def append_context_backdrop(pieces: list[str], fact_bank: dict[str, str]) -> None:
+    backdrop = context_backdrop_sentence(fact_bank)
+    if backdrop:
+        pieces.append(backdrop)
+
+
+def context_backdrop_sentence(fact_bank: dict[str, str]) -> str:
     if fact_bank.get("context_packet_facts"):
-        pieces.append(
+        return (
             "Careful backdrop: "
             + first_context_fragment(fact_bank["context_packet_facts"])
             + ". It can frame a follow-up question, but it does not prove "
             "causality or change the simulated trades."
         )
-    elif fact_bank.get("context_packet_limitations"):
-        pieces.append(clean_fragment(fact_bank["context_packet_limitations"]) + ".")
+    if fact_bank.get("context_packet_limitations"):
+        return clean_fragment(fact_bank["context_packet_limitations"]) + "."
+    return ""
 
 
 def symbols_match_benchmark(symbols: str, benchmark: str | None) -> bool:

@@ -34,4 +34,8 @@ def result_followup_heading(focus: str | None) -> str:
         return "Try next"
     if focus == "max_drawdown":
         return "Drawdown"
-    return "Readout"
+    if focus == "what_tested":
+        return "What was tested"
+    if focus == "assumptions":
+        return "Assumptions"
+    return "What happened"

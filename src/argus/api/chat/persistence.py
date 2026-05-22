@@ -6,7 +6,7 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.chat.context_packets import (
-    collect_context_packets_for_completed_run,
+    collect_context_packet_result_for_completed_run,
     enrich_run_with_context_packets,
     persist_context_packet_records,
 )
@@ -169,12 +169,20 @@ def persist_runtime_backtest_run(
     if run is None:
         return None
 
-    context_packets = (
-        collect_context_packets_for_completed_run(run)
+    context_collection = (
+        collect_context_packet_result_for_completed_run(run)
         if api_state.supabase_gateway is not None
-        else []
+        else None
     )
-    run = enrich_run_with_context_packets(run, context_packets)
+    context_packets = context_collection.packets if context_collection else []
+    context_collection_status = (
+        context_collection.statuses if context_collection is not None else None
+    )
+    run = enrich_run_with_context_packets(
+        run,
+        context_packets,
+        collection_status=context_collection_status,
+    )
 
     api_state.store.backtest_runs[run.id] = run
     api_state.store.backtest_run_owners[run.id] = user.id

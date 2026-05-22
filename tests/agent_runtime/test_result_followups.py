@@ -91,6 +91,97 @@ def test_result_followup_schema_uses_flat_answer_and_fact_id_contract() -> None:
     assert draft is None
 
 
+@pytest.mark.asyncio
+async def test_result_followup_prefers_structured_answer_blocks() -> None:
+    async def fake_schema_client(**kwargs: Any) -> object:
+        schema = kwargs["schema_model"]
+        return schema(
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "This dense compatibility answer should not be the rendered response."
+            ),
+            answer_blocks=[
+                "AAPL beat SPY by +12.4% in this run.",
+                (
+                    "That is useful historical evidence, but it does not prove the "
+                    "same edge would persist."
+                ),
+            ],
+            fact_ids=[
+                "symbols",
+                "relative_performance",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "caveat",
+            ],
+        )
+
+    response = await compose_result_followup_response(
+        metadata={
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 39.7,
+                        "benchmark_return_pct": 27.3,
+                        "delta_vs_benchmark_pct": 12.4,
+                    }
+                }
+            },
+            "config_snapshot": {"template": "buy_and_hold"},
+        },
+        focus="why_underperformed",
+        user_message="why did this happen?",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert "compatibility answer" not in response
+    assert "AAPL beat SPY by +12.4% in this run.\n\nThat is useful" in response
+
+
+def test_result_followup_rejects_dense_unstructured_answer() -> None:
+    rendered = render_result_followup_draft(
+        draft=ResultFollowupDraft(
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "AAPL beat SPY in this run and the setup was a buy and hold strategy "
+                "over the stored window with a strong return, a benchmark comparison, "
+                "a drawdown observation, a macro backdrop note, a caveat about historical "
+                "simulation, and a next step all packed into one long paragraph that "
+                "reads like a compact report instead of a useful chat response."
+            ),
+            fact_ids=[
+                "symbols",
+                "relative_performance",
+                "total_return",
+                "benchmark_symbol",
+                "benchmark_return",
+                "benchmark_delta",
+                "max_drawdown",
+                "caveat",
+            ],
+        ),
+        fact_bank={
+            "symbols": "AAPL",
+            "relative_performance": "AAPL beat SPY by +12.4% in this run",
+            "total_return": "+39.7%",
+            "benchmark_symbol": "SPY",
+            "benchmark_return": "+27.3%",
+            "benchmark_delta": "+12.4%",
+            "max_drawdown": "16.8%",
+            "caveat": "Historical simulation evidence, not a prediction.",
+        },
+        required_fact_ids={"symbols", "relative_performance", "caveat"},
+        focus="why_underperformed",
+    )
+
+    assert rendered is None
+
+
 def test_result_followup_prompt_keeps_runtime_words_out_of_market_facts() -> None:
     messages = result_followup_llm_messages(
         fact_bank={

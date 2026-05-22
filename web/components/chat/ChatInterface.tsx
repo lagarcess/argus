@@ -23,6 +23,7 @@ import {
   getBacktestRun,
   getMe,
   getConversationMessages,
+  listConversations,
   listHistory,
   patchMe,
   resultCardFromConversationCard,
@@ -74,6 +75,7 @@ type OnboardingChoice = {
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
+const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
 
 type HydratedMessages = {
   messages: Message[];
@@ -630,6 +632,7 @@ export default function ChatInterface() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const chatOptionsRef = useRef<HTMLDivElement>(null);
+  const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   // ── Toast helper ───────────────────────────────────────────────────────────
@@ -684,10 +687,42 @@ export default function ChatInterface() {
     loadHistoryPage(null, false).catch(() => undefined);
   };
 
-  function schedulePostTurnHistoryRefresh() {
-    refreshHistory();
-    window.setTimeout(() => refreshHistory(), 1500);
-    window.setTimeout(() => refreshHistory(), 5000);
+  function clearPostTurnHistoryRefreshTimers() {
+    for (const timerId of postTurnHistoryRefreshTimersRef.current) {
+      window.clearTimeout(timerId);
+    }
+    postTurnHistoryRefreshTimersRef.current = [];
+  }
+
+  function schedulePostTurnHistoryRefresh(targetConversationId?: string | null) {
+    clearPostTurnHistoryRefreshTimers();
+    let settled = false;
+
+    const refreshAndCheckTitle = async () => {
+      if (settled) return;
+      await loadHistoryPage(null, false);
+      if (!targetConversationId) return;
+      try {
+        const { items } = await listConversations({ limit: 50 });
+        const conversation = items.find((item) => item.id === targetConversationId);
+        if (
+          conversation?.title_source === "ai_generated" ||
+          conversation?.title_source === "user_renamed"
+        ) {
+          settled = true;
+          await loadHistoryPage(null, false);
+        }
+      } catch {
+        // Title polish is fail-open; later scheduled refreshes can still pick it up.
+      }
+    };
+
+    for (const delay of POST_TURN_TITLE_REFRESH_DELAYS_MS) {
+      const timerId = window.setTimeout(() => {
+        void refreshAndCheckTitle();
+      }, delay);
+      postTurnHistoryRefreshTimersRef.current.push(timerId);
+    }
   }
 
   const loadMoreHistory = () => {
@@ -701,6 +736,16 @@ export default function ChatInterface() {
   useEffect(() => {
     loadHistoryPage(null, false).catch(() => undefined);
   }, [loadHistoryPage]);
+
+  useEffect(
+    () => () => {
+      for (const timerId of postTurnHistoryRefreshTimersRef.current) {
+        window.clearTimeout(timerId);
+      }
+      postTurnHistoryRefreshTimersRef.current = [];
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isSidebarOpen) {
@@ -1155,7 +1200,7 @@ export default function ChatInterface() {
       if (event.event === "done") {
         setStreamStatus(null);
         setIsStreamingResponse(false);
-        schedulePostTurnHistoryRefresh();
+        schedulePostTurnHistoryRefresh(targetConversationId);
       }
     };
 
@@ -1263,7 +1308,7 @@ export default function ChatInterface() {
           setStreamStatus(null);
           setIsStreamingResponse(false);
           setShowOnboardingGoalCards(false);
-          schedulePostTurnHistoryRefresh();
+          schedulePostTurnHistoryRefresh(conversationId);
         }
       });
       await patchMe({
@@ -1323,7 +1368,7 @@ export default function ChatInterface() {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
         }
         if (event.event === "done") {
-          schedulePostTurnHistoryRefresh();
+          schedulePostTurnHistoryRefresh(conversationId);
         }
       }, []);
     } catch (err: unknown) {
@@ -1363,7 +1408,7 @@ export default function ChatInterface() {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
         }
         if (event.event === "done") {
-          schedulePostTurnHistoryRefresh();
+          schedulePostTurnHistoryRefresh(conversationId);
         }
       }, []);
     } catch (err: unknown) {

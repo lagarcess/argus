@@ -593,9 +593,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert runtime_calls == 1
     assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
-    assert "### Quick Breakdown" in breakdown
-    assert "**Total return:**" in breakdown
-    assert "**Keep in mind:**" in breakdown
+    assert "### Quick Breakdown" not in breakdown
+    assert "- Result:" in breakdown
+    assert "- Next step:" in breakdown
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert run_id in messages.text
     assistant = messages.json()["items"][-1]
