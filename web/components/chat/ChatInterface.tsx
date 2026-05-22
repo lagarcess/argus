@@ -700,9 +700,9 @@ export default function ChatInterface() {
 
     const refreshAndCheckTitle = async () => {
       if (settled) return;
-      await loadHistoryPage(null, false);
-      if (!targetConversationId) return;
       try {
+        await loadHistoryPage(null, false);
+        if (!targetConversationId) return;
         const { items } = await listConversations({ limit: 50 });
         const conversation = items.find((item) => item.id === targetConversationId);
         if (
@@ -713,13 +713,13 @@ export default function ChatInterface() {
           await loadHistoryPage(null, false);
         }
       } catch {
-        // Title polish is fail-open; later scheduled refreshes can still pick it up.
+        // Title/sidebar refresh is fail-open; later scheduled attempts can still pick it up.
       }
     };
 
     for (const delay of POST_TURN_TITLE_REFRESH_DELAYS_MS) {
       const timerId = window.setTimeout(() => {
-        void refreshAndCheckTitle();
+        void refreshAndCheckTitle().catch(() => undefined);
       }, delay);
       postTurnHistoryRefreshTimersRef.current.push(timerId);
     }

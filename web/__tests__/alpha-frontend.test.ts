@@ -548,6 +548,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("9000");
     expect(chat).toContain("13000");
     expect(chat).toContain("schedulePostTurnHistoryRefresh(targetConversationId);");
+    expect(chat).toContain("Title/sidebar refresh is fail-open");
+    expect(chat).toContain("void refreshAndCheckTitle().catch(() => undefined);");
   });
 
   test("feedback dialog provides rich feedback surfaces", () => {
