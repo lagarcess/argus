@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -71,6 +72,7 @@ from argus.llm.openrouter import (
 )
 
 router = APIRouter(tags=["agent"])
+RUNTIME_EVENT_TIMEOUT_SECONDS = 45.0
 
 
 def _confirmation_artifact_id_from_runtime_result(
@@ -704,7 +706,7 @@ async def chat_stream(
 
         receipt_token = begin_openrouter_route_receipt_capture()
         try:
-            async for runtime_event in stream_agent_turn_events(
+            runtime_events = stream_agent_turn_events(
                 workflow=workflow,
                 user=runtime_user,
                 thread_id=conversation.id,
@@ -720,7 +722,16 @@ async def chat_stream(
                 ),
                 fallback_artifact_references=runtime_fallback.artifact_references,
                 fallback_confirmation_payload=runtime_fallback.confirmation_payload,
-            ):
+            )
+            final_seen = False
+            while True:
+                try:
+                    runtime_event = await asyncio.wait_for(
+                        anext(runtime_events),
+                        timeout=RUNTIME_EVENT_TIMEOUT_SECONDS,
+                    )
+                except StopAsyncIteration:
+                    break
                 event_type = runtime_event.get("type")
                 if event_type == "token":
                     content = str(runtime_event.get("content") or "")
@@ -734,6 +745,7 @@ async def chat_stream(
                 if event_type != "final":
                     continue
 
+                final_seen = True
                 runtime_result = dict(runtime_event.get("payload") or {})
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
@@ -894,6 +906,8 @@ async def chat_stream(
                     ),
                 )
                 return
+            if not final_seen:
+                raise RuntimeError("agent_runtime_missing_final")
         except Exception:
             logger.exception(
                 "Agent runtime chat streaming failed",

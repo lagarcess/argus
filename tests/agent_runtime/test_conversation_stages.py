@@ -114,6 +114,31 @@ def test_clarify_routes_interpreter_prefill_through_target_aware_generator() -> 
     assert clarifier.requests[0].missing_required_fields == ["entry_logic"]
 
 
+def test_beginner_guidance_uses_interpreter_prefill_without_second_llm() -> None:
+    state = RunState.new(
+        current_user_message="I want to create a new strategy.",
+        recent_thread_history=[],
+    )
+    state.intent = "beginner_guidance"
+    assistant_prompt = (
+        "Happy to start there. Pick an asset and a rough timeframe, or choose "
+        "buy-and-hold, recurring buys, RSI, or a moving-average crossover."
+    )
+    clarifier = RecordingClarifier("This should not be used.")
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        prefilled_assistant_prompt=assistant_prompt,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == assistant_prompt
+    assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+    assert clarifier.requests == []
+
+
 def test_rule_clarification_preserves_known_asset_context() -> None:
     state = RunState.new(
         current_user_message=(

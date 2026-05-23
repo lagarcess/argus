@@ -55,6 +55,9 @@ def _compose_clarification(intent: ResponseIntent) -> str:
     if needs == ["period"]:
         return f"{context}Which date window should I use?"
     if needs == ["sizing_amount"]:
+        dca_question = _dca_execution_question(strategy)
+        if dca_question:
+            return f"{context}{dca_question}"
         return f"{context}How much should each recurring purchase be?"
     if needs == ["rule_definition"]:
         if _strategy_has_rule_detail(strategy):
@@ -158,6 +161,41 @@ def _strategy_has_rule_detail(strategy: StrategySummary) -> bool:
             strategy.rule_spec,
         )
     )
+
+
+def _has_total_budget_context(strategy: StrategySummary) -> bool:
+    extra_parameters = strategy.extra_parameters or {}
+    return any(
+        extra_parameters.get(key) not in (None, "", [], {})
+        for key in ("initial_capital", "total_capital", "total_budget", "max_budget")
+    )
+
+
+def _dca_execution_question(strategy: StrategySummary) -> str | None:
+    if strategy.strategy_type != "dca_accumulation":
+        return None
+    clauses = ["how much should each recurring purchase be"]
+    if not _has_dca_cadence(strategy):
+        clauses.append("how often should those purchases happen")
+    question = _question_from_clauses(clauses)
+    if _has_total_budget_context(strategy):
+        question += " I will keep the total budget separate from the per-buy amount."
+    return question
+
+
+def _has_dca_cadence(strategy: StrategySummary) -> bool:
+    if strategy.cadence not in (None, "", [], {}):
+        return True
+    extra_parameters = strategy.extra_parameters or {}
+    return extra_parameters.get("cadence") not in (None, "", [], {})
+
+
+def _question_from_clauses(clauses: list[str]) -> str:
+    if not clauses:
+        return ""
+    if len(clauses) == 1:
+        return f"{clauses[0].capitalize()}?"
+    return f"{clauses[0].capitalize()}, and {clauses[1]}?"
 
 
 def _question_for_need(need: str) -> str:

@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from argus.agent_runtime.stages.interpret_types import (
+    ArtifactTarget,
     CapabilityQuestionFocus,
     ResultFollowupFocus,
 )
@@ -102,6 +103,7 @@ class LLMInterpretationResponse(BaseModel):
     ) = None
     result_followup_focus: ResultFollowupFocus | None = None
     capability_question_focus: CapabilityQuestionFocus | None = None
+    artifact_target: ArtifactTarget | None = None
 
 
 class FocusedStrategyExtraction(BaseModel):

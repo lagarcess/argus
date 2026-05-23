@@ -48,7 +48,6 @@ async def clarify_stage_async(
     language: str = "en",
     prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
-    del prefilled_assistant_prompt
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
     optional_parameter_choices = _optional_parameter_choices(
@@ -149,10 +148,12 @@ async def clarify_stage_async(
 
     if _is_beginner_guidance_turn(state):
         response_intent = _response_intent(kind="beginner_guidance", state=state)
+        prefilled = _usable_prefilled_prompt(prefilled_assistant_prompt)
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": await _generate_clarifying_question(
+                "assistant_prompt": prefilled
+                or await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -237,6 +238,13 @@ async def _generate_clarifying_question(
         result = clarification_generator(request)
         question = await result if inspect.isawaitable(result) else result
     return question or OFFLINE_CLARIFICATION_FALLBACK
+
+
+def _usable_prefilled_prompt(value: str | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
 
 
 def _response_intent(

@@ -57,6 +57,7 @@ from argus.agent_runtime.stages.interpret_actions import (
     structured_action_stage_result_if_applicable as _structured_action_stage_result_if_applicable,
 )
 from argus.agent_runtime.stages.interpret_types import (
+    ArtifactTarget,
     CapabilityQuestionFocus,
     InterpretationRequest,
     InterpretDecision,
@@ -103,7 +104,6 @@ STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "answer_pending_need",
     "refine_current_idea",
     "approval",
-    "unsupported_request",
 }
 
 CONTEXTUAL_EDIT_TURN_ACTS = {
@@ -230,6 +230,29 @@ async def _stage_result_from_interpretation(
         semantic_turn_act=interpretation.semantic_turn_act,
         task_relation=interpretation.task_relation,
     )
+    artifact_target, artifact_target_reason_codes = _validated_artifact_target(
+        interpretation=interpretation,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    (
+        incoming_strategy,
+        hidden_context_guard_reason_codes,
+        clear_assistant_response_for_hidden_context,
+    ) = _strategy_with_hidden_context_guard(
+        strategy=incoming_strategy,
+        interpretation=interpretation,
+        snapshot=snapshot,
+        artifact_target=artifact_target,
+        current_user_message=state.current_user_message,
+    )
+    if clear_assistant_response_for_hidden_context:
+        interpretation = interpretation.model_copy(
+            update={
+                "assistant_response": None,
+                "requires_clarification": True,
+            }
+        )
     incoming_strategy, supported_indicator_simplification_applied = (
         _strategy_with_supported_indicator_simplification(
             strategy=incoming_strategy,
@@ -437,6 +460,8 @@ async def _stage_result_from_interpretation(
             *integrity_report.reason_codes,
             *constraint_filter_reason_codes,
             *ambiguity_filter_reason_codes,
+            *artifact_target_reason_codes,
+            *hidden_context_guard_reason_codes,
             *interpretation.reason_codes,
         ],
         effective_response_profile=effective_profile,
@@ -450,6 +475,7 @@ async def _stage_result_from_interpretation(
         semantic_turn_act=interpretation.semantic_turn_act,
         result_followup_focus=interpretation.result_followup_focus,
         capability_question_focus=interpretation.capability_question_focus,
+        artifact_target=artifact_target,
     )
     if interpretation.capability_question_focus is not None:
         decision.normalized_signals["capability_question_focus"] = (
@@ -482,6 +508,12 @@ async def _stage_result_from_interpretation(
     )
     if pending_artifact_followup_result is not None:
         return pending_artifact_followup_result
+    pending_refinement_result = _pending_refinement_misroute_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+    )
+    if pending_refinement_result is not None:
+        return pending_refinement_result
     followup_result = await _artifact_followup_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -583,6 +615,179 @@ def _repair_retry_route_when_pending_need_is_active(
     )
 
 
+def _validated_artifact_target(
+    *,
+    interpretation: StructuredInterpretation,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> tuple[ArtifactTarget | None, list[str]]:
+    proposed = interpretation.artifact_target
+    reason_codes: list[str] = []
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field == "refinement" and snapshot is not None:
+        if snapshot.pending_strategy_summary is not None:
+            if proposed != "pending_refinement":
+                reason_codes.append("pending_refinement_overrode_latest_result")
+            return "pending_refinement", reason_codes
+    if proposed == "latest_result":
+        if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
+            return "latest_result", reason_codes
+        reason_codes.append("invalid_latest_result_target_cleared")
+        return "none", reason_codes
+    if proposed == "active_confirmation":
+        if snapshot is not None and snapshot.active_confirmation_reference is not None:
+            return "active_confirmation", reason_codes
+        reason_codes.append("invalid_active_confirmation_target_cleared")
+        return "none", reason_codes
+    if proposed in {"none", "pending_refinement"}:
+        return proposed, reason_codes
+    if (
+        interpretation.semantic_turn_act == "result_followup"
+        and snapshot is not None
+        and snapshot.latest_backtest_result_reference is not None
+    ):
+        reason_codes.append("legacy_result_followup_target_inferred")
+        return "latest_result", reason_codes
+    if (
+        interpretation.intent == "results_explanation"
+        and snapshot is not None
+        and snapshot.latest_backtest_result_reference is not None
+    ):
+        reason_codes.append("legacy_result_explanation_target_inferred")
+        return "latest_result", reason_codes
+    return proposed, reason_codes
+
+
+def _pending_refinement_misroute_result_if_applicable(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+) -> StageResult | None:
+    if decision.artifact_target != "pending_refinement":
+        return None
+    if decision.semantic_turn_act != "result_followup":
+        return None
+    if _candidate_strategy_has_backtest_shape(decision.candidate_strategy_draft):
+        return None
+    strategy = (
+        snapshot.pending_strategy_summary.model_copy(deep=True)
+        if snapshot is not None and snapshot.pending_strategy_summary is not None
+        else decision.candidate_strategy_draft
+    )
+    refined = decision.model_copy(
+        update={
+            "intent": "strategy_drafting",
+            "task_relation": "refine",
+            "requires_clarification": True,
+            "candidate_strategy_draft": strategy,
+            "missing_required_fields": ["refinement"],
+            "semantic_turn_act": "answer_pending_need",
+            "artifact_target": "pending_refinement",
+            "reason_codes": [
+                *decision.reason_codes,
+                "pending_refinement_result_followup_suppressed",
+            ],
+        }
+    )
+    return StageResult(
+        outcome="needs_clarification",
+        decision=refined,
+        stage_patch={
+            "requested_field": "refinement",
+            "missing_required_fields": ["refinement"],
+            "response_intent": {
+                "kind": "clarification",
+                "semantic_needs": ["rule_definition"],
+                "requested_fields": ["refinement"],
+                "facts": {"strategy": strategy.model_dump(mode="python")},
+                "options": [],
+            },
+        },
+    )
+
+
+def _strategy_with_hidden_context_guard(
+    *,
+    strategy: StrategySummary,
+    interpretation: StructuredInterpretation,
+    snapshot: TaskSnapshot | None,
+    artifact_target: ArtifactTarget | None,
+    current_user_message: str,
+) -> tuple[StrategySummary, list[str], bool]:
+    if artifact_target != "none":
+        return strategy, [], False
+    if interpretation.semantic_turn_act != "new_idea":
+        return strategy, [], False
+    if interpretation.task_relation != "new_task":
+        return strategy, [], False
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return strategy, [], False
+    prior = snapshot.pending_strategy_summary
+    if not prior.asset_universe or strategy.asset_universe != prior.asset_universe:
+        return strategy, [], False
+    if _strategy_has_fresh_execution_detail(strategy=strategy, prior=prior):
+        return strategy, [], False
+    if _message_explicitly_mentions_symbol(
+        current_user_message,
+        symbols=strategy.asset_universe,
+    ):
+        return strategy, [], False
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = []
+    updated.asset_class = None
+    updated.resolution_provenance = []
+    return updated, ["hidden_artifact_asset_context_cleared"], True
+
+
+def _strategy_has_fresh_execution_detail(
+    *,
+    strategy: StrategySummary,
+    prior: StrategySummary,
+) -> bool:
+    for field_name in (
+        "date_range",
+        "timeframe",
+        "cadence",
+        "entry_logic",
+        "exit_logic",
+        "entry_rule",
+        "exit_rule",
+        "rule_spec",
+        "capital_amount",
+        "position_size",
+        "comparison_baseline",
+    ):
+        value = getattr(strategy, field_name)
+        if value in (None, "", [], {}):
+            continue
+        if value != getattr(prior, field_name):
+            return True
+    return False
+
+
+def _message_explicitly_mentions_symbol(
+    message: str,
+    *,
+    symbols: list[str],
+) -> bool:
+    punctuation = ".,;:!?()[]{}<>\"'`"
+    token_map = str.maketrans({char: " " for char in punctuation})
+    tokens = set(message.translate(token_map).split())
+    cashtag_tokens = {
+        token.lstrip("$").casefold()
+        for token in tokens
+        if token.startswith("$")
+    }
+    return any(
+        symbol in tokens
+        or f"${symbol}" in tokens
+        or symbol.casefold() in cashtag_tokens
+        for symbol in symbols
+    )
+
+
 async def _capability_answer_if_applicable(
     *,
     focus: CapabilityQuestionFocus | None,
@@ -602,7 +807,7 @@ async def _capability_answer_if_applicable(
         return None
     if focus in {"supported_strategies", "general"} and assistant_response:
         return None
-    if focus in {"supported_strategies", "general"}:
+    if focus in {"supported_indicators", "supported_strategies", "general"}:
         composed = await _compose_natural_capability_answer(
             focus=focus,
             current_user_message=current_user_message,
@@ -648,6 +853,11 @@ async def _compose_natural_capability_answer(
             messages=messages,
         )
     except Exception:
+        if focus == "supported_indicators":
+            return compose_capability_answer(
+                focus=focus,
+                contract=capability_contract,
+            )
         return compose_capability_recovery_answer(
             focus=focus,
             contract=capability_contract,
@@ -1030,6 +1240,8 @@ async def _latest_result_followup_recovery_if_applicable(
     unanchored_strategy_route = (
         "unanchored_strategy_route_suppressed" in decision.reason_codes
     )
+    if decision.artifact_target != "latest_result":
+        return None
     if assistant_response and not unanchored_strategy_route:
         return None
     if _candidate_strategy_has_backtest_shape(decision.candidate_strategy_draft):

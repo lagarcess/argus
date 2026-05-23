@@ -22,6 +22,7 @@ from argus.agent_runtime.signal_rule_repair import (
 from argus.agent_runtime.stages.interpret import InterpretationRequest, interpret_stage
 from argus.agent_runtime.state.models import (
     ArtifactReference,
+    ConversationMessage,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -108,6 +109,50 @@ def test_llm_interpreter_prompt_routes_why_result_questions_to_performance_focus
     assert "why did this result happen" in prompt
     assert "why/how the result happened" in prompt
     assert "why_underperformed" in prompt
+
+
+def test_llm_interpreter_prompt_names_artifact_target_contract() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "artifact_target" in prompt
+    assert "latest_result only when" in prompt
+    assert "pending_refinement" in prompt
+    assert "do not let a completed result capture unrelated turns" in prompt
+
+
+def test_llm_interpreter_maps_latest_result_context_to_artifact_target() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        LLMInterpretationResponse(
+            intent="conversation_followup",
+            task_relation="continue",
+            user_goal_summary="User asked a standalone market-context question.",
+            assistant_response="I can turn that into a testable idea.",
+            uses_latest_result_context=False,
+            semantic_turn_act="unsupported_request",
+        ),
+        request=InterpretationRequest(
+            current_user_message="what are the top market movers?",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                latest_backtest_result_reference=ArtifactReference(
+                    artifact_kind="backtest_result",
+                    artifact_id="run-1",
+                    metadata={"result_card": {"title": "BTC run"}},
+                )
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.artifact_target == "none"
 
 
 def test_llm_interpreter_prompt_separates_benchmarks_from_asset_universe() -> None:
@@ -1569,6 +1614,444 @@ async def test_llm_interpreter_repairs_default_rsi_exit_when_current_turn_suppli
     assert result.candidate_strategy_draft.exit_logic == (
         "Sell when RSI(14) rises to 70 or above"
     )
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_does_not_repair_vague_strategy_start(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def post_guidance_llm_stub(**kwargs):
+        del kwargs
+        raise AssertionError(
+            "vague strategy starters should not enter executable repair or audit"
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_repair_incomplete_strategy_extraction",
+        post_guidance_llm_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_signal_rule_checked_response",
+        post_guidance_llm_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_executable_strategy_grounding",
+        post_guidance_llm_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_stated_run_field_fidelity",
+        post_guidance_llm_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_plan_pending_artifact_assumption_edit",
+        post_guidance_llm_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_plan_focused_artifact_edit",
+        post_guidance_llm_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants to create a strategy but gave no details yet.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="I want to create a new strategy.",
+            strategy_thesis="Create a new strategy.",
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="I want to create a new strategy.",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "beginner_guidance"
+    assert ready_response.semantic_turn_act == "new_idea"
+    assert ready_response.artifact_target == "none"
+    assert "vague_strategy_start_guidance" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_treats_empty_strategy_shell_as_guidance(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def post_guidance_llm_stub(**kwargs):
+        del kwargs
+        raise AssertionError(
+            "empty strategy shells should not enter executable repair or audit"
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_signal_rule_checked_response",
+        post_guidance_llm_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_executable_strategy_grounding",
+        post_guidance_llm_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_repair_incomplete_strategy_extraction",
+        post_guidance_llm_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Create a new strategy",
+        missing_required_fields=["entry_condition", "custom_rule_shape"],
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="I want to create a new strategy.",
+            strategy_thesis="I want to create a new strategy.",
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="I want to create a new strategy.",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "beginner_guidance"
+    assert ready_response.requires_clarification is True
+    assert ready_response.missing_required_fields == []
+    assert "vague_strategy_start_guidance" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_does_not_convert_capability_question_to_guidance() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks whether Bollinger Bands are supported.",
+        assistant_response="Yes, Bollinger Bands are supported for runnable rules.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_indicators",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="Can I use Bollinger Bands?",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "strategy_drafting"
+    assert ready_response.capability_question_focus == "supported_indicators"
+    assert "vague_strategy_start_guidance" not in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_repairs_pending_field_side_question_to_capability(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        assert kwargs["task"] == "interpretation"
+        return interpreter_module.CapabilitySideQuestionAudit(
+            is_capability_question=True,
+            focus="supported_indicators",
+            assistant_response=None,
+            confidence=0.88,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User is asking a side question.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Can I use Bollinger Bands?",
+            strategy_thesis="Can I use Bollinger Bands?",
+        ),
+        missing_required_fields=["asset_universe"],
+        confidence=0.62,
+        semantic_turn_act="answer_pending_need",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="Can I use Bollinger Bands?",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        selected_thread_metadata={"requested_field": "asset_universe"},
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "conversation_followup"
+    assert ready_response.semantic_turn_act == "educational_question"
+    assert ready_response.capability_question_focus == "supported_indicators"
+    assert ready_response.artifact_target == "none"
+    assert ready_response.missing_required_fields == []
+    assert "capability_side_question_audit" in ready_response.reason_codes
+    assert "vague_strategy_start_guidance" not in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_audits_capability_side_question_with_rule_shape(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "CapabilitySideQuestionAudit"
+        return interpreter_module.CapabilitySideQuestionAudit(
+            is_capability_question=True,
+            focus="supported_indicators",
+            assistant_response=None,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User asks whether Bollinger Bands are supported.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Can I use Bollinger Bands?",
+            strategy_thesis="User is asking whether Bollinger Bands are supported.",
+            strategy_type="signal_strategy",
+            entry_logic="Use Bollinger Bands as the signal concept.",
+        ),
+        missing_required_fields=["asset_universe"],
+        confidence=0.64,
+        semantic_turn_act="answer_pending_need",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="Can I use Bollinger Bands?",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        selected_thread_metadata={"requested_field": "asset_universe"},
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "conversation_followup"
+    assert ready_response.semantic_turn_act == "educational_question"
+    assert ready_response.capability_question_focus == "supported_indicators"
+    assert ready_response.candidate_strategy_draft.strategy_type is None
+    assert ready_response.missing_required_fields == []
+    assert "capability_side_question_audit" in ready_response.reason_codes
+    assert "vague_strategy_start_guidance" not in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_clears_ungrounded_lowercase_asset_extraction(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "AssetGroundingAudit"
+        return interpreter_module.AssetGroundingAudit(
+            grounded_symbols=[],
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User asks to walk through DCA.",
+        assistant_response="Great, let's set up a monthly DCA for ME.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Walk me through a DCA",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Monthly DCA for ME.",
+            asset_universe=["ME"],
+            cadence="monthly",
+        ),
+        missing_required_fields=["date_range", "capital_amount"],
+        confidence=0.7,
+        semantic_turn_act="answer_pending_need",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="Walk me through a DCA",
+        recent_thread_history=[],
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.candidate_strategy_draft.asset_universe == []
+    assert ready_response.assistant_response is None
+    assert "asset_grounding_audit_removed_unsubstantiated_symbols" in (
+        ready_response.reason_codes
+    )
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_preserves_recent_dca_strategy_family_when_user_supplies_run_facts(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "StrategyFamilyContinuityAudit"
+        return interpreter_module.StrategyFamilyContinuityAudit(
+            should_rebind_strategy_family=True,
+            strategy_type="dca_accumulation",
+            total_budget_not_recurring=True,
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User supplied LYFT, a date window, and total budget.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "I want to invest in LYFT from Feb 2020 to Feb 2025 "
+                "with $200,000 total"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis="Invest in LYFT over the requested period.",
+            asset_universe=["LYFT"],
+            date_range={"start": "2020-02-01", "end": "2025-02-28"},
+            capital_amount=200000,
+            field_provenance={"capital_amount": "total_capital"},
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "I want to invest in LYFT from Feb 2020 to Feb 2025 with $200,000 total"
+        ),
+        recent_thread_history=[
+            ConversationMessage(role="user", content="Walk me through a DCA"),
+            ConversationMessage(
+                role="assistant",
+                content=(
+                    "In Argus, DCA maps to recurring buys. Tell me the asset, "
+                    "period, amount, and schedule when you want to set one up."
+                ),
+            ),
+        ],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    draft = ready_response.candidate_strategy_draft
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.total_capital == 200000
+    assert draft.capital_amount is None
+    assert draft.field_provenance["total_capital"] == "total_budget"
+    assert "capital_amount" in ready_response.missing_required_fields
+    assert ready_response.requires_clarification is True
+    assert "strategy_family_continuity_rebound" in ready_response.reason_codes
+
+
+def test_provider_catalog_recovery_ignores_lowercase_symbol_only_verbs(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        compact = "".join(char for char in str(symbol).upper() if char.isalnum())
+        if compact == "TEST":
+            return ResolvedAssetStub(
+                "TEST",
+                "equity",
+                "YieldMax TSLA Performance & Distribution Target 25 ETF",
+                "TEST",
+            )
+        if compact in {"ME", "MEUSD"}:
+            return ResolvedAssetStub("ME", "crypto", "ME/USD", "ME/USD")
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    assets = interpreter_module._resolved_asset_mentions_from_message(
+        "test ME/USD buy and hold"
+    )
+
+    assert [asset.canonical_symbol for asset in assets] == ["ME"]
 
 
 @pytest.mark.asyncio

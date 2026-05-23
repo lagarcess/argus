@@ -195,7 +195,22 @@ def test_result_followup_response_does_not_leave_underfilled_strategy_draft() ->
     assert result.decision.missing_required_fields == []
 
 
-def test_capability_question_answer_uses_indicator_registry_not_llm_copy() -> None:
+def test_capability_question_answer_uses_indicator_registry_not_llm_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "Yes. Bollinger Bands are supported as a runnable indicator rule when "
+            "the setup can be turned into a clear entry and exit condition."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
     response = StructuredInterpretation(
         intent="conversation_followup",
         task_relation="continue",
@@ -216,12 +231,44 @@ def test_capability_question_answer_uses_indicator_registry_not_llm_copy() -> No
     assert result.outcome == "ready_to_respond"
     assert "I only support RSI" not in answer
     for spec in EXECUTABLE_INDICATORS.values():
-        assert spec.label in answer
-    assert "draft" in answer.lower()
+        assert spec.label in captured["messages"][1]["content"]
+    assert captured["task"] == "chat_composer"
     assert (
         result.patch["normalized_signals"]["capability_question_focus"]
         == "supported_indicators"
     )
+
+
+def test_supported_indicator_capability_composer_failure_uses_registry_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _failing_chat_completion(**_: Any) -> str:
+        raise RuntimeError("chat tier unavailable")
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _failing_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked which indicators Argus can execute.",
+        assistant_response="I only support RSI right now.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_indicators",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Can I use Bollinger Bands?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "I only support RSI" not in answer
+    for spec in EXECUTABLE_INDICATORS.values():
+        assert spec.label in answer
 
 
 def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> None:
@@ -1267,6 +1314,7 @@ def test_empty_non_strategy_turn_after_result_falls_back_to_next_tests(
         requires_clarification=False,
         user_goal_summary="User asks what to try next.",
         semantic_turn_act="educational_question",
+        artifact_target="latest_result",
     )
 
     result, _ = run_interpret_with_llm(
@@ -1286,7 +1334,7 @@ def test_empty_non_strategy_turn_after_result_falls_back_to_next_tests(
     )
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "general"
-    assert "latest_result_empty_turn_recovery" in result.decision.reason_codes
+    assert result.decision.artifact_target == "latest_result"
 
 
 def test_latest_result_recovery_preserves_next_experiment_focus(
@@ -1334,6 +1382,7 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
         user_goal_summary="User asks what to try next from the latest result.",
         semantic_turn_act="educational_question",
         result_followup_focus="next_experiment",
+        artifact_target="latest_result",
     )
 
     result, _ = run_interpret_with_llm(
@@ -1349,10 +1398,9 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     assert "A good next move is to isolate one assumption." in answer
     assert "change the date range" in answer_lower
     assert "try a supported rsi threshold on btc" in answer_lower
-    assert captured["focus"] == "next_experiment"
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "next_experiment"
-    assert "latest_result_empty_turn_recovery" in result.decision.reason_codes
+    assert result.decision.artifact_target == "latest_result"
 
 
 def test_unanchored_clarification_after_result_falls_back_to_next_tests(
@@ -1402,6 +1450,7 @@ def test_unanchored_clarification_after_result_falls_back_to_next_tests(
         ),
         candidate_strategy_draft=StrategySummary(),
         semantic_turn_act="new_idea",
+        artifact_target="latest_result",
     )
 
     result, _ = run_interpret_with_llm(
@@ -1418,7 +1467,7 @@ def test_unanchored_clarification_after_result_falls_back_to_next_tests(
     assert "one more detail" not in answer
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.requires_clarification is False
-    assert "latest_result_unanchored_turn_recovery" in result.decision.reason_codes
+    assert result.decision.artifact_target == "latest_result"
 
 
 def test_result_followup_timeout_falls_back_to_grounded_facts(

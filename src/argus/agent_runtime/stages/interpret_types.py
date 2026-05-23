@@ -54,6 +54,12 @@ CapabilityQuestionFocus = Literal[
     "assets",
     "general",
 ]
+ArtifactTarget = Literal[
+    "none",
+    "active_confirmation",
+    "pending_refinement",
+    "latest_result",
+]
 
 
 class InterpretDecision(BaseModel):
@@ -76,6 +82,7 @@ class InterpretDecision(BaseModel):
     semantic_turn_act: SemanticTurnAct | None = None
     result_followup_focus: ResultFollowupFocus | None = None
     capability_question_focus: CapabilityQuestionFocus | None = None
+    artifact_target: ArtifactTarget | None = None
 
     def to_patch(self) -> dict[str, Any]:
         ambiguous = [item.model_dump(mode="python") for item in self.ambiguous_fields]
@@ -149,6 +156,7 @@ class StructuredInterpretation(BaseModel):
     semantic_turn_act: SemanticTurnAct | None = None
     result_followup_focus: ResultFollowupFocus | None = None
     capability_question_focus: CapabilityQuestionFocus | None = None
+    artifact_target: ArtifactTarget | None = None
 
 
 class InterpretationRequest(BaseModel):
