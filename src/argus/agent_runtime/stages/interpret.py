@@ -5,6 +5,7 @@ import inspect
 from typing import Any
 
 from argus.agent_runtime.capabilities.answers import (
+    EXECUTABLE_STRATEGY_FAMILIES,
     compose_capability_answer,
     compose_capability_recovery_answer,
 )
@@ -59,6 +60,7 @@ from argus.agent_runtime.stages.interpret_actions import (
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
     CapabilityQuestionFocus,
+    ContextQuestionFocus,
     InterpretationRequest,
     InterpretDecision,
     SemanticTurnAct,
@@ -475,11 +477,16 @@ async def _stage_result_from_interpretation(
         semantic_turn_act=interpretation.semantic_turn_act,
         result_followup_focus=interpretation.result_followup_focus,
         capability_question_focus=interpretation.capability_question_focus,
+        context_question_focus=interpretation.context_question_focus,
         artifact_target=artifact_target,
     )
     if interpretation.capability_question_focus is not None:
         decision.normalized_signals["capability_question_focus"] = (
             interpretation.capability_question_focus
+        )
+    if interpretation.context_question_focus is not None:
+        decision.normalized_signals["context_question_focus"] = (
+            interpretation.context_question_focus
         )
     optional_parameter_stage_patch = _optional_parameter_stage_patch(
         decision=decision,
@@ -521,6 +528,21 @@ async def _stage_result_from_interpretation(
     )
     if followup_result is not None:
         return followup_result
+    context_answer = await _context_curiosity_answer_if_applicable(
+        focus=interpretation.context_question_focus,
+        semantic_turn_act=interpretation.semantic_turn_act,
+        expects_strategy_route=expects_strategy_route,
+        requires_clarification=requires_clarification,
+        assistant_response=interpretation.assistant_response,
+        current_user_message=state.current_user_message,
+        artifact_target=artifact_target,
+    )
+    if context_answer is not None:
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={"assistant_response": context_answer},
+        )
     capability_answer = await _capability_answer_if_applicable(
         focus=interpretation.capability_question_focus,
         semantic_turn_act=interpretation.semantic_turn_act,
@@ -545,6 +567,32 @@ async def _stage_result_from_interpretation(
     )
     if latest_result_recovery is not None:
         return latest_result_recovery
+    educational_recovery = await _educational_answer_recovery_if_needed(
+        semantic_turn_act=interpretation.semantic_turn_act,
+        expects_strategy_route=expects_strategy_route,
+        requires_clarification=requires_clarification,
+        assistant_response=interpretation.assistant_response,
+        current_user_message=state.current_user_message,
+    )
+    if educational_recovery is not None:
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={"assistant_response": educational_recovery},
+        )
+    unhandled_recovery = await _unhandled_response_recovery_if_needed(
+        semantic_turn_act=interpretation.semantic_turn_act,
+        expects_strategy_route=expects_strategy_route,
+        requires_clarification=requires_clarification,
+        assistant_response=interpretation.assistant_response,
+        current_user_message=state.current_user_message,
+    )
+    if unhandled_recovery is not None:
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={"assistant_response": unhandled_recovery},
+        )
     if (
         interpretation.assistant_response
         and not expects_strategy_route
@@ -807,15 +855,41 @@ async def _capability_answer_if_applicable(
         return None
     if focus in {"supported_strategies", "general"} and assistant_response:
         return None
-    if focus in {"supported_indicators", "supported_strategies", "general"}:
-        composed = await _compose_natural_capability_answer(
-            focus=focus,
-            current_user_message=current_user_message,
-            capability_contract=capability_contract,
-        )
-        if composed:
-            return composed
+    composed = await _compose_natural_capability_answer(
+        focus=focus,
+        current_user_message=current_user_message,
+        capability_contract=capability_contract,
+    )
+    if composed:
+        return composed
     return compose_capability_answer(focus=focus, contract=capability_contract)
+
+
+async def _context_curiosity_answer_if_applicable(
+    *,
+    focus: ContextQuestionFocus | None,
+    semantic_turn_act: SemanticTurnAct | None,
+    expects_strategy_route: bool,
+    requires_clarification: bool,
+    assistant_response: str | None,
+    current_user_message: str,
+    artifact_target: ArtifactTarget | None,
+) -> str | None:
+    if (
+        focus is None
+        or semantic_turn_act != "educational_question"
+        or expects_strategy_route
+        or requires_clarification
+    ):
+        return None
+    composed = await _compose_natural_context_curiosity_answer(
+        focus=focus,
+        current_user_message=current_user_message,
+        artifact_target=artifact_target,
+    )
+    if composed:
+        return composed
+    return assistant_response or _context_curiosity_recovery_answer(focus)
 
 
 async def _compose_natural_capability_answer(
@@ -862,6 +936,251 @@ async def _compose_natural_capability_answer(
             focus=focus,
             contract=capability_contract,
         )
+
+
+async def _compose_natural_context_curiosity_answer(
+    *,
+    focus: ContextQuestionFocus,
+    current_user_message: str,
+    artifact_target: ArtifactTarget | None,
+) -> str | None:
+    fact_packet = _context_curiosity_fact_packet(focus)
+    provenance_rule = (
+        "If you use visible artifact context, say so naturally with phrases like "
+        "'from this result' or 'from the current draft'."
+        if artifact_target in {"latest_result", "active_confirmation", "pending_refinement"}
+        else "Do not imply you used a prior result or hidden memory."
+    )
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus, a chat-first investing experimentation assistant. "
+                "Answer broad market or macro curiosity in warm, plain English. "
+                "Keep it concise. The opening sentence must give useful investing "
+                "context, not an apology, greeting, or capability rejection. Explain "
+                "any product boundary after the context and only if needed. Offer a "
+                "nearby historical testable path using only supported experiment "
+                "paths. Do not open with what Argus cannot do. Do not reject "
+                "standalone context questions; answer briefly, then connect them to "
+                "an experiment. Do not imply Argus is a live market-news product. "
+                "Do not invent current facts, prices, headlines, macro readings, "
+                "causality, or investment advice. Do not name data vendors in the "
+                "user-facing answer. Do not suggest live screens, feeds, event-driven "
+                "execution, unusual-volume scans, sector screens, filter pipelines, "
+                "or macro data as direct trading signals. "
+                f"{provenance_rule}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"Context-curiosity facts: {fact_packet}",
+        },
+        {
+            "role": "system",
+            "content": (
+                "Supported experiment paths: "
+                f"{_supported_experiment_fact_packet()}"
+            ),
+        },
+        {"role": "user", "content": current_user_message},
+    ]
+    try:
+        return await invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=messages,
+        )
+    except Exception:
+        return None
+
+
+def _context_curiosity_fact_packet(focus: ContextQuestionFocus) -> str:
+    facts = {
+        "macro_context": (
+            "Macro context can frame historical explanations and regime questions "
+            "such as inflation, rates, employment, recession indicators, and risk "
+            "backdrop. It is contextual only and cannot alter simulation truth or "
+            "become a trade signal. Good next steps are choosing a symbol/strategy "
+            "and comparing historical periods the user names. Allowed next steps: "
+            "ask the user to choose a symbol, strategy, and date windows; compare "
+            "buy-and-hold, recurring buys, or supported indicator rules across "
+            "those user-chosen windows."
+        ),
+        "corporate_events": (
+            "Corporate actions can provide symbol/date-scoped event context such "
+            "as splits and dividends around an equity run. They are valid context "
+            "for understanding what was happening around a historical period. They "
+            "are not direct event-trading rules, and they cannot rewrite completed "
+            "explanations or alter simulation truth. Good next steps are choosing "
+            "an equity symbol and date range, then testing a supported strategy "
+            "through that period. Allowed next steps: ask for an equity symbol and "
+            "date range around an event; test buy-and-hold, recurring buys, or a "
+            "supported indicator rule through the period. Do not propose earnings "
+            "plays, merger trades, event prediction, volume-impact models, or direct "
+            "event-driven rules."
+        ),
+        "market_movers": (
+            "Movers and most-actives context is very short-lived and narrow. It is "
+            "not a generic product feed, but it can help frame a symbol-scoped "
+            "historical experiment or a follow-up idea. Good next steps are choosing "
+            "a symbol or date window the user is curious about, then testing buy "
+            "and hold, recurring buys, or a supported indicator rule. Do not propose "
+            "top-gainer lists, screens, rankings, sector rotation screens, filter "
+            "pipelines, volume-surge tests, or volume-spike strategies."
+        ),
+    }
+    return facts[focus]
+
+
+def _supported_experiment_fact_packet() -> str:
+    families = "; ".join(EXECUTABLE_STRATEGY_FAMILIES)
+    return (
+        f"{families}. Macro, news, corporate-action, and movers context may frame "
+        "a question or explain backdrop, but cannot alter simulation truth or become "
+        "the executable rule."
+    )
+
+
+def _context_curiosity_recovery_answer(focus: ContextQuestionFocus) -> str:
+    if focus == "macro_context":
+        return (
+            "Macro conditions can be useful context for a historical test. Give me "
+            "a strategy or symbol and I can help compare how it behaved across "
+            "different rate or inflation backdrops."
+        )
+    if focus == "corporate_events":
+        return (
+            "Corporate events are most useful when tied to a symbol and period. "
+            "Give me an equity ticker and I can use events like splits or dividends "
+            "as context around a historical test."
+        )
+    return (
+        "A market move can be a useful starting point for an experiment. Give me "
+        "a symbol or idea and I can turn it into a historical test instead of a feed."
+    )
+
+
+async def _educational_answer_recovery_if_needed(
+    *,
+    semantic_turn_act: SemanticTurnAct | None,
+    expects_strategy_route: bool,
+    requires_clarification: bool,
+    assistant_response: str | None,
+    current_user_message: str,
+) -> str | None:
+    if (
+        semantic_turn_act != "educational_question"
+        or expects_strategy_route
+        or requires_clarification
+        or assistant_response
+    ):
+        return None
+    composed = await _compose_general_educational_answer(
+        current_user_message=current_user_message
+    )
+    if composed:
+        return composed
+    return (
+        "I can help turn that into a grounded historical experiment. Give me a "
+        "symbol, rough period, or market idea, and I will shape the closest "
+        "runnable test."
+    )
+
+
+async def _unhandled_response_recovery_if_needed(
+    *,
+    semantic_turn_act: SemanticTurnAct | None,
+    expects_strategy_route: bool,
+    requires_clarification: bool,
+    assistant_response: str | None,
+    current_user_message: str,
+) -> str | None:
+    if expects_strategy_route or requires_clarification or assistant_response:
+        return None
+    composed = await _compose_unhandled_conversation_answer(
+        semantic_turn_act=semantic_turn_act,
+        current_user_message=current_user_message,
+    )
+    if composed:
+        return composed
+    return (
+        "I can help turn that into a grounded historical experiment. Give me a "
+        "symbol, rough period, or market idea, and I will shape the closest "
+        "runnable test."
+    )
+
+
+async def _compose_general_educational_answer(*, current_user_message: str) -> str | None:
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus, a chat-first investing experimentation assistant. "
+                "The structured interpreter identified this as an educational or "
+                "broad investing-curiosity turn but did not produce user-facing prose. "
+                "Answer in warm, plain English. Start with useful context, keep it "
+                "concise, avoid report tone, do not name data vendors, do not imply "
+                "live news coverage, and do not give investment advice. End with one "
+                "nearby historical experiment or recoverable next step when useful."
+            ),
+        },
+        {"role": "user", "content": current_user_message},
+    ]
+    try:
+        response = await invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=messages,
+        )
+    except Exception:
+        return None
+    cleaned = str(response or "").strip()
+    return cleaned or None
+
+
+async def _compose_unhandled_conversation_answer(
+    *,
+    semantic_turn_act: SemanticTurnAct | None,
+    current_user_message: str,
+) -> str | None:
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus, a chat-first investing experimentation assistant. "
+                "The runtime has no executable strategy, no clarification contract, "
+                "and no user-facing answer for this turn. Recover by answering in "
+                "warm, plain English. Do not use report tone. Do not name data "
+                "vendors, imply live market-news coverage, invent current facts, "
+                "or give investment advice. Preserve continuity of exploration by "
+                "offering one nearby historical experiment or recoverable next step "
+                "from the supported experiment paths. Do not suggest live screens, "
+                "feeds, rankings, sector screens, filter pipelines, volume-surge "
+                "tests, event-driven execution, or macro data as direct trading "
+                "signals."
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"Semantic turn act: {semantic_turn_act or 'unspecified'}",
+        },
+        {
+            "role": "system",
+            "content": (
+                "Supported experiment paths: "
+                f"{_supported_experiment_fact_packet()}"
+            ),
+        },
+        {"role": "user", "content": current_user_message},
+    ]
+    try:
+        response = await invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=messages,
+        )
+    except Exception:
+        return None
+    cleaned = str(response or "").strip()
+    return cleaned or None
 
 
 def _route_contextual_money_answer(

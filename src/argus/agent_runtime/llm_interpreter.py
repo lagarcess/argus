@@ -636,6 +636,14 @@ class OpenRouterStructuredInterpreter:
             "education about an investing concept or a strategy family, such as what "
             "dollar cost averaging means; answer those with natural prose and connect "
             "the concept to the closest runnable Argus experiment when useful. "
+            "For standalone macro, market-event, or market-context curiosity that is "
+            "not asking for live feed output and is not tied to the latest result, set "
+            "context_question_focus instead of capability_question_focus. Use "
+            "macro_context for inflation, rates, Fed, recession, risk-on/off, or broad "
+            "macro backdrop; corporate_events for splits, dividends, corporate actions, "
+            "or earnings/event context; and market_movers for broad movers, most-active, "
+            "or unusual-move curiosity. Keep artifact_target=none unless the user "
+            "clearly targets a visible result or current draft. "
             "Retry turns should preserve the failed action payload; do "
             "not reinterpret the original investing idea from scratch. "
             "Social turns are conversation_followup with assistant_response and no "
@@ -694,6 +702,7 @@ class OpenRouterStructuredInterpreter:
             semantic_turn_act=response.semantic_turn_act,
             result_followup_focus=response.result_followup_focus,
             capability_question_focus=response.capability_question_focus,
+            context_question_focus=response.context_question_focus,
             artifact_target=_artifact_target_from_response(response),
         )
 
@@ -2951,6 +2960,7 @@ async def _latest_result_routing_audited_response(
             "semantic_turn_act": "result_followup",
             "result_followup_focus": audit.focus or "general",
             "capability_question_focus": None,
+            "context_question_focus": None,
             "uses_latest_result_context": True,
             "artifact_target": "latest_result",
             "reason_codes": list(

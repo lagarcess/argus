@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Iterable
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -325,6 +326,45 @@ def end_openrouter_route_receipt_capture(
     receipts = list(_ROUTE_RECEIPT_CAPTURE.get() or [])
     _ROUTE_RECEIPT_CAPTURE.reset(token)
     return receipts
+
+
+def summarize_openrouter_route_receipts(
+    receipts: Iterable[OpenRouterRouteReceipt] | None = None,
+) -> dict[str, object]:
+    """
+    Builds a small internal latency/failure waterfall from existing receipts.
+
+    This is diagnostic only. It must not bypass semantic arbitration,
+    capability validation, context replayability, or fallback observability.
+    """
+
+    active_receipts = list(receipts) if receipts is not None else get_openrouter_route_receipts()
+    route_waterfall = [
+        {
+            "task": receipt.task,
+            "tier": receipt.tier,
+            "model": receipt.model,
+            "fallback_model": receipt.fallback_model,
+            "latency_ms": receipt.latency_ms,
+            "outcome": receipt.outcome,
+            "failure_mode": receipt.failure_mode,
+            "fallback_used": receipt.fallback_used,
+            "context_packet_ids": list(receipt.context_packet_ids),
+        }
+        for receipt in active_receipts
+    ]
+    slowest = max(active_receipts, key=lambda receipt: receipt.latency_ms, default=None)
+    return {
+        "receipt_count": len(active_receipts),
+        "total_latency_ms": sum(receipt.latency_ms for receipt in active_receipts),
+        "failure_count": sum(1 for receipt in active_receipts if receipt.outcome == "failed"),
+        "fallback_count": sum(1 for receipt in active_receipts if receipt.fallback_used),
+        "slowest_task": slowest.task if slowest is not None else None,
+        "slowest_latency_ms": slowest.latency_ms if slowest is not None else 0,
+        "context_packet_ids": _unique_context_packet_ids(active_receipts),
+        "token_usage": _merged_receipt_token_usage(active_receipts),
+        "route_waterfall": route_waterfall,
+    }
 
 
 async def invoke_openrouter_json_schema(
@@ -709,6 +749,24 @@ def _normalized_context_packet_ids(values: list[str] | None) -> list[str]:
         if packet_id and packet_id not in normalized:
             normalized.append(packet_id)
     return normalized
+
+
+def _unique_context_packet_ids(receipts: Iterable[OpenRouterRouteReceipt]) -> list[str]:
+    normalized: list[str] = []
+    for receipt in receipts:
+        for packet_id in receipt.context_packet_ids:
+            if packet_id and packet_id not in normalized:
+                normalized.append(packet_id)
+    return normalized
+
+
+def _merged_receipt_token_usage(
+    receipts: Iterable[OpenRouterRouteReceipt],
+) -> dict[str, int] | None:
+    merged: dict[str, int] | None = None
+    for receipt in receipts:
+        merged = merge_openrouter_token_usage(merged, receipt.token_usage)
+    return merged
 
 
 def _elapsed_ms(started_at: float) -> int:

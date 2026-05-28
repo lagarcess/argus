@@ -155,6 +155,35 @@ def test_llm_interpreter_maps_latest_result_context_to_artifact_target() -> None
     assert result.artifact_target == "none"
 
 
+def test_llm_interpreter_maps_context_question_focus() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        LLMInterpretationResponse(
+            intent="conversation_followup",
+            task_relation="continue",
+            user_goal_summary="User asked for broad inflation context.",
+            assistant_response=None,
+            uses_latest_result_context=False,
+            semantic_turn_act="educational_question",
+            context_question_focus="macro_context",
+            artifact_target="none",
+        ),
+        request=InterpretationRequest(
+            current_user_message="what's happening to inflation right now?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert result.context_question_focus == "macro_context"
+    assert result.artifact_target == "none"
+    assert result.capability_question_focus is None
+
+
 def test_llm_interpreter_prompt_separates_benchmarks_from_asset_universe() -> None:
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()

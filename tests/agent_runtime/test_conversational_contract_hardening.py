@@ -1582,6 +1582,47 @@ def test_standalone_market_context_question_does_not_attach_to_latest_result() -
     assert result.patch["assistant_response"] == response.assistant_response
 
 
+def test_context_curiosity_does_not_silently_inherit_latest_result(monkeypatch) -> None:
+    async def _context_answer(**_: object) -> str:
+        return (
+            "Corporate actions are useful when they are tied to a symbol and period. "
+            "Pick an equity ticker and I can use those events as context around a test."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _context_answer,
+    )
+    result_reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-btc",
+        metadata={
+            "result_card": {"title": "BTC buy and hold"},
+            "metrics": {"total_return_pct": 75.5},
+        },
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked for corporate event context.",
+        semantic_turn_act="educational_question",
+        context_question_focus="corporate_events",
+        artifact_target="none",
+    )
+
+    result, _ = _interpret(
+        message="what can you tell me about corporate events?",
+        response=response,
+        snapshot=TaskSnapshot(latest_backtest_result_reference=result_reference),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.artifact_target == "none"
+    assert result.decision.context_question_focus == "corporate_events"
+    assert "Execution limits" not in result.patch["assistant_response"]
+
+
 def test_new_vague_strategy_does_not_inherit_hidden_snapshot_assets(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 

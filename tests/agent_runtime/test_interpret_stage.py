@@ -373,6 +373,247 @@ def test_general_capability_education_uses_chat_tier_for_natural_language(
     assert "Execution limits" in captured["messages"][1]["content"]
 
 
+def test_limits_capability_uses_chat_tier_for_natural_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "Argus keeps historical tests simple: long-only, one asset class per "
+            "run, and no real trades. If you have an idea, give me the asset and "
+            "period and I will shape the closest runnable test."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what Argus can and cannot do.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="limits",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="what can you actually run?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Execution limits:" not in answer
+    assert "one asset class" in answer
+    assert captured["task"] == "chat_composer"
+    assert "Execution limits" in captured["messages"][1]["content"]
+
+
+def test_standalone_context_curiosity_uses_chat_tier_without_capability_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "Inflation can matter because it changes rate expectations and risk "
+            "appetite. A useful next test is comparing the same strategy across "
+            "higher-rate and lower-rate periods."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for inflation context.",
+        semantic_turn_act="educational_question",
+        context_question_focus="macro_context",
+        artifact_target="none",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="what's happening to inflation right now?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Execution limits" not in answer
+    assert "Inflation" in answer
+    assert "test" in answer.lower()
+    assert result.decision.context_question_focus == "macro_context"
+    assert captured["task"] == "chat_composer"
+    assert "Do not open with what Argus cannot do" in captured["messages"][0]["content"]
+    fact_packet = captured["messages"][1]["content"]
+    assert "macro context" in fact_packet.lower()
+    assert "FRED" not in fact_packet
+
+
+@pytest.mark.parametrize(
+    ("focus", "message", "expected_fact"),
+    [
+        (
+            "corporate_events",
+            "what can you tell me about corporate events?",
+            "corporate actions",
+        ),
+        (
+            "market_movers",
+            "what are the top market movers?",
+            "movers and most-actives",
+        ),
+    ],
+)
+def test_standalone_event_context_uses_context_fact_bank_not_limits(
+    monkeypatch: pytest.MonkeyPatch,
+    focus: Any,
+    message: str,
+    expected_fact: str,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "That can be useful context, but I would treat it as a starting point "
+            "for a historical test rather than a live feed. Pick a symbol and I can "
+            "shape the closest runnable experiment."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks a standalone market context question.",
+        semantic_turn_act="educational_question",
+        context_question_focus=focus,
+        artifact_target="none",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message=message,
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Execution limits" not in answer
+    assert "live feed" in answer
+    assert result.decision.context_question_focus == focus
+    assert captured["task"] == "chat_composer"
+    assert "Do not open with what Argus cannot do" in captured["messages"][0]["content"]
+    assert "Do not reject standalone context questions" in captured["messages"][0][
+        "content"
+    ]
+    assert "Do not suggest live" in captured["messages"][0]["content"]
+    assert "opening sentence must give useful investing context" in captured[
+        "messages"
+    ][0]["content"]
+    fact_packet = captured["messages"][1]["content"]
+    assert expected_fact in fact_packet.lower()
+    supported_packet = captured["messages"][2]["content"]
+    assert "buy and hold" in supported_packet
+    assert "Bollinger Band" in supported_packet
+    if focus == "market_movers":
+        assert "Do not propose top-gainer lists" in fact_packet
+        assert "top-gainer lists" in fact_packet
+        assert "volume-surge tests" in fact_packet
+    if focus == "corporate_events":
+        assert "Do not propose earnings plays" in fact_packet
+    assert "Alpaca" not in fact_packet
+    assert "provider" not in captured["messages"][0]["content"].lower()
+
+
+def test_empty_educational_turn_uses_chat_tier_recovery_not_blank_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "Market movers can be a starting point for a historical test. Pick a "
+            "symbol or theme and I can help check whether similar jumps tended to "
+            "continue or reverse."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks broad market curiosity.",
+        semantic_turn_act="educational_question",
+        artifact_target="none",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="what are the top market movers?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert answer
+    assert "historical test" in answer
+    assert captured["task"] == "chat_composer"
+
+
+def test_unhandled_broad_turn_recovers_with_chat_tier_instead_of_blank_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "That is a useful starting point for an experiment. Pick a symbol or "
+            "time period and I can turn it into a grounded historical test."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks a broad investing question.",
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="what are the top market movers?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert answer
+    assert "historical test" in answer
+    assert captured["task"] == "chat_composer"
+    assert "no user-facing answer" in captured["messages"][0]["content"]
+    assert "Do not suggest live screens" in captured["messages"][0]["content"]
+    assert "Supported experiment paths" in captured["messages"][2]["content"]
+
+
 def test_supported_strategy_capability_composer_failure_stays_human(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
