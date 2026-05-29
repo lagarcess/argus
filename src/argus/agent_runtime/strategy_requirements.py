@@ -39,6 +39,8 @@ def missing_required_fields_for_strategy(
         ]
         if strategy.capital_amount is None:
             required.append("capital_amount")
+        if strategy.cadence is None:
+            required.append("cadence")
     if strategy_type == "buy_and_hold":
         required = ["asset_universe", "date_range"]
     if strategy_type == "signal_strategy":

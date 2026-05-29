@@ -526,6 +526,43 @@
         "silently picks inactive/delisted symbol"
       ],
       "judge_rubric": "Asset resolution should feel smart but not overconfident."
+    },
+    {
+      "id": "qa_15_runtime_arbitration_context_binding",
+      "qa_id": "QA 15",
+      "buckets": ["workstream_3", "workstream_4", "workstream_6"],
+      "priority": "must_pass",
+      "purpose": "Runtime mode binding prevents stale context, result overattachment, vague missing-field recovery, and capability contradictions.",
+      "natural_prompt_variants": [
+        "After pressing Refine strategy, say: run it over the last 6 years starting in February.",
+        "After a result, ask: what are the top market movers?",
+        "I want to create a new strategy.",
+        "Can I use Bollinger Bands?",
+        "Walk me through a DCA, then provide asset/date/total budget but no recurring buy amount."
+      ],
+      "conversation_steps": [
+        {
+          "actor": "user",
+          "semantic_target": "runtime_arbitration_context_binding",
+          "hard_checks": [
+            "pending refinement does not become generic next-experiment prose",
+            "standalone market-context questions do not attach to the latest result",
+            "hidden symbols are not silently introduced into vague new strategy turns",
+            "supported executable primitives such as Bollinger Bands are not called unsupported",
+            "missing DCA execution details are named specifically"
+          ]
+        }
+      ],
+      "artifact_checks": ["artifact target is validated against visible or pending context"],
+      "action_checks": ["visible card actions remain the only source for card-scoped execution"],
+      "reload_checks": ["pending refinement and latest result context remain distinguishable after reload"],
+      "forbidden_outcomes": [
+        "wrong runtime mode wins",
+        "stale symbols silently steer the user",
+        "supported capability is called unsupported",
+        "I need one more detail without naming the detail"
+      ],
+      "judge_rubric": "Argus should preserve semantic ownership: state binds the active artifact, capability truth comes from the engine contract, and language stays recoverable."
     }
   ]
 }

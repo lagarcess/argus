@@ -25,7 +25,7 @@ def plain_text_preview(content: str, max_length: int = 180) -> str | None:
 def _preview_from_markdown(content: str) -> str:
     parser = MarkdownIt("commonmark")
     tokens = parser.parse(content)
-    return _compact_text(" ".join(_token_text(tokens)))
+    return _compact_preview_tokens(_token_text(tokens))
 
 
 def _token_text(tokens: Iterable[Token]) -> Iterable[str]:
@@ -40,3 +40,23 @@ def _token_text(tokens: Iterable[Token]) -> Iterable[str]:
 
 def _compact_text(content: str) -> str:
     return " ".join(content.split())
+
+
+def _compact_preview_tokens(values: Iterable[str]) -> str:
+    """Join parsed markdown text for sidebar display without inferring intent."""
+
+    pieces = [str(value) for value in values if str(value)]
+    preview = ""
+    for piece in pieces:
+        text = _compact_text(piece)
+        if not text:
+            continue
+        if not preview:
+            preview = text
+        elif text[0] in ".,;:!?)]}":
+            preview += text
+        elif preview[-1:] in "([{":
+            preview += text
+        else:
+            preview += f" {text}"
+    return preview

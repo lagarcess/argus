@@ -343,6 +343,46 @@ def test_runtime_preserves_successful_llm_rule_clarification() -> None:
     assert result["assistant_response"] == result["assistant_prompt"]
 
 
+def test_runtime_preserves_specific_dca_execution_clarification() -> None:
+    run_state = RunState.new(
+        current_user_message=(
+            "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+            "$200,000 of capital"
+        ),
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["sizing_amount"],
+        requested_fields=["capital_amount"],
+        facts={
+            "strategy": {
+                "strategy_type": "dca_accumulation",
+                "asset_universe": ["LYFT"],
+                "asset_class": "equity",
+                "date_range": {"start": "2020-02-01", "end": "2025-02-28"},
+                "extra_parameters": {"initial_capital": 200000},
+            }
+        },
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "I can test recurring buys for LYFT. How much should each "
+                "recurring purchase be, and how often should those buys happen?"
+            ),
+        }
+    )
+
+    prompt = result["assistant_prompt"]
+    assert "LYFT" in prompt
+    assert "recurring purchase" in prompt
+    assert "how often" in prompt.lower()
+    assert "one more detail" not in prompt.lower()
+
+
 @pytest.mark.asyncio
 async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
     from argus.agent_runtime import resolution as resolution_module

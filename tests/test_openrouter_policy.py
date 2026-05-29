@@ -9,6 +9,7 @@ import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
+    AssetGroundingAudit,
     FocusedStrategyExtraction,
     LLMAmbiguousField,
     LLMInterpretationResponse,
@@ -553,6 +554,11 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
                     indicator="rsi",
                 ),
             )
+        if schema_model is AssetGroundingAudit:
+            return AssetGroundingAudit(
+                grounded_symbols=["TSLA"],
+                confidence=0.9,
+            )
         assert schema_model is FocusedStrategyExtraction
         return FocusedStrategyExtraction(
             is_testable_strategy=True,
@@ -589,8 +595,9 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
     )
 
     assert result is not None
-    assert seen_schema_names[:2] == [
+    assert seen_schema_names[:3] == [
         "LLMInterpretationResponse",
+        "AssetGroundingAudit",
         "FocusedStrategyExtraction",
     ]
     parameters = result.candidate_strategy_draft.extra_parameters[
@@ -2469,6 +2476,53 @@ def test_route_receipt_capture_collects_current_runtime_calls() -> None:
     }
     assert captured[0].context_packet_ids == ["packet-1"]
     assert captured[0].as_dict()["context_packet_ids"] == ["packet-1"]
+
+
+def test_route_receipt_latency_summary_keeps_failure_and_context_evidence() -> None:
+    openrouter.clear_openrouter_route_receipts()
+    openrouter.record_openrouter_route_receipt(
+        task="interpretation",
+        model_name="structured/primary",
+        mode="json_schema",
+        schema_name="LLMInterpretationResponse",
+        latency_ms=1200,
+        outcome="succeeded",
+        token_usage={"prompt_tokens": 50, "completion_tokens": 20},
+    )
+    openrouter.record_openrouter_route_receipt(
+        task="clarification",
+        model_name="chat/fallback",
+        mode="json_schema",
+        schema_name="ClarificationResponse",
+        latency_ms=4100,
+        outcome="failed",
+        failure_mode="TimeoutError",
+        token_usage={"total_tokens": 30},
+    )
+    openrouter.record_openrouter_route_receipt(
+        task="result_breakdown",
+        model_name="context/primary",
+        mode="json_schema",
+        schema_name="ResultBreakdown",
+        latency_ms=2400,
+        outcome="succeeded",
+        context_packet_ids=["packet-2", "packet-1"],
+    )
+
+    summary = openrouter.summarize_openrouter_route_receipts()
+
+    assert summary["receipt_count"] == 3
+    assert summary["total_latency_ms"] == 7700
+    assert summary["failure_count"] == 1
+    assert summary["slowest_task"] == "clarification"
+    assert summary["slowest_latency_ms"] == 4100
+    assert summary["context_packet_ids"] == ["packet-2", "packet-1"]
+    assert summary["token_usage"] == {
+        "prompt_tokens": 50,
+        "completion_tokens": 20,
+        "total_tokens": 30,
+    }
+    assert summary["route_waterfall"][1]["failure_mode"] == "TimeoutError"
 
 
 def test_direct_json_schema_records_openrouter_token_usage(monkeypatch) -> None:

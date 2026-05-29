@@ -8,7 +8,10 @@ from argus.agent_runtime.llm_clarifier import (
     OpenRouterClarificationGenerator,
 )
 from argus.agent_runtime.stages.clarify import clarify_stage
-from argus.agent_runtime.stages.compose import compose_response_intent
+from argus.agent_runtime.stages.compose import (
+    compose_response_intent,
+    should_prefer_composed_intent,
+)
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.state.models import ResponseIntent, RunState, StrategySummary
 from argus.llm import openrouter
@@ -47,6 +50,169 @@ def test_clarify_uses_generator_for_missing_required_fields() -> None:
     ]
     assert clarifier.requests[0].language == "en"
     assert "asset_universe" not in result.patch["assistant_prompt"]
+
+
+def test_clarify_dca_total_budget_expands_to_execution_details() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+            "$200,000 of capital"
+        ),
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = ["capital_amount"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["LYFT"],
+        asset_class="equity",
+        date_range={"start": "2020-02-01", "end": "2025-02-28"},
+        extra_parameters={"initial_capital": 200000},
+    )
+    clarifier = RecordingClarifier(
+        "How much should each recurring purchase be, and how often should it happen?"
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["response_intent"]["semantic_needs"] == [
+        "sizing_amount",
+        "schedule",
+    ]
+    request = clarifier.requests[0]
+    assert request.response_intent["semantic_needs"] == [
+        "sizing_amount",
+        "schedule",
+    ]
+
+
+def test_clarify_dca_missing_execution_fields_win_over_total_budget_constraint() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+            "$200,000 of capital"
+        ),
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = ["capital_amount", "cadence"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["LYFT"],
+        asset_class="equity",
+        date_range={"start": "2020-02-01", "end": "2025-02-28"},
+        extra_parameters={"total_capital": 200000},
+    )
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_dca_starting_principal",
+                "raw_value": "$200,000 starting principal",
+                "explanation": (
+                    "The current DCA backtest can only execute the recurring "
+                    "contribution."
+                ),
+                "simplification_options": [
+                    {"label": "Run recurring buys only"},
+                    {"label": "Adjust recurring contribution"},
+                    {"label": "Use buy and hold with starting capital"},
+                ],
+            }
+        ]
+    }
+    clarifier = RecordingClarifier(
+        "How much should each recurring purchase be, and how often should it happen?"
+    )
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["semantic_needs"] == [
+        "sizing_amount",
+        "schedule",
+    ]
+    assert result.patch["requested_fields"] == ["capital_amount", "cadence"]
+    assert clarifier.requests[0].unsupported_constraints == []
+
+
+def test_dca_amount_and_cadence_contract_can_override_under_specific_llm_copy() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+            "$200,000 of capital"
+        ),
+        recent_thread_history=[],
+    )
+    state.missing_required_fields = ["cadence", "capital_amount"]
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["schedule", "sizing_amount"],
+        requested_fields=["cadence", "capital_amount"],
+        facts={
+            "strategy": StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                extra_parameters={"total_capital": 200000},
+            ).model_dump(mode="python")
+        },
+    )
+
+    assert should_prefer_composed_intent(state) is True
+    copy = compose_response_intent(state)
+
+    assert copy is not None
+    assert "How much should each recurring purchase be" in copy
+    assert "how often should those purchases happen" in copy
+    assert "total budget" in copy.lower()
+
+
+def test_dca_full_setup_fallback_uses_single_plain_question() -> None:
+    state = RunState.new(
+        current_user_message="Walk me through a DCA",
+        recent_thread_history=[],
+    )
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=[
+            "asset_target",
+            "period",
+            "sizing_amount",
+            "schedule",
+        ],
+        requested_fields=[
+            "asset_universe",
+            "date_range",
+            "capital_amount",
+            "cadence",
+        ],
+        facts={
+            "strategy": StrategySummary(
+                strategy_type="dca_accumulation",
+            ).model_dump(mode="python")
+        },
+    )
+
+    copy = compose_response_intent(state)
+
+    assert copy is not None
+    assert "To test it" in copy
+    assert "asset" in copy
+    assert "date window" in copy
+    assert "recurring purchase amount" in copy
+    assert "purchase cadence" in copy
+    assert copy.count("?") == 0
 
 
 def test_clarify_uses_generator_for_unsupported_recovery() -> None:
@@ -112,6 +278,47 @@ def test_clarify_routes_interpreter_prefill_through_target_aware_generator() -> 
     assert result.patch["assistant_prompt"] == clarifier.question
     assert result.patch["requested_field"] == "entry_logic"
     assert clarifier.requests[0].missing_required_fields == ["entry_logic"]
+
+
+def test_beginner_guidance_uses_interpreter_prefill_without_second_llm() -> None:
+    state = RunState.new(
+        current_user_message="I want to create a new strategy.",
+        recent_thread_history=[],
+    )
+    state.intent = "beginner_guidance"
+    assistant_prompt = (
+        "Happy to start there. Pick an asset and a rough timeframe, or choose "
+        "buy-and-hold, recurring buys, RSI, or a moving-average crossover."
+    )
+    clarifier = RecordingClarifier("This should not be used.")
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+        prefilled_assistant_prompt=assistant_prompt,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] == assistant_prompt
+    assert result.patch["response_intent"]["kind"] == "beginner_guidance"
+    assert clarifier.requests == []
+
+
+def test_beginner_guidance_composed_fallback_is_explicit_degraded_recovery() -> None:
+    state = RunState.new(
+        current_user_message="I want to create a new strategy.",
+        recent_thread_history=[],
+    )
+    state.response_intent = ResponseIntent(kind="beginner_guidance")
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "couldn't" in prompt.lower()
+    assert "runnable historical test" in prompt.lower()
+    assert "tell me an asset" not in prompt.lower()
+    assert "say it in one sentence" not in prompt.lower()
 
 
 def test_rule_clarification_preserves_known_asset_context() -> None:
@@ -437,6 +644,512 @@ def test_openrouter_clarifier_rejects_questions_outside_runtime_needs(
     receipts = openrouter.get_openrouter_route_receipts()
     assert receipts[-1].model == "chat/primary"
     assert receipts[-1].failure_mode == "contract_violation"
+
+
+def test_openrouter_clarifier_rejects_vague_dca_detail_response(
+    monkeypatch,
+) -> None:
+    openrouter.clear_openrouter_route_receipts()
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+    calls: list[str | None] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name
+        calls.append(model_name)
+        if model_name is None:
+            return ClarificationResponse(
+                question=(
+                    "I can test recurring buys for LYFT. I need one more detail "
+                    "before I can turn this into a backtest."
+                ),
+                question_targets=["sizing_amount", "schedule"],
+                directly_asks_user=True,
+            )
+        return ClarificationResponse(
+            question=(
+                "I can test recurring buys for LYFT. How much should each recurring "
+                "purchase be, and how often should those buys happen?"
+            ),
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those buys happen?"
+            ),
+            question_targets=["sizing_amount", "schedule"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200,000 of capital"
+            ),
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                extra_parameters={"initial_capital": 200000},
+            ),
+            missing_required_fields=["capital_amount"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount", "schedule"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert "recurring purchase" in question
+    assert "how often" in question.lower()
+    assert calls == [None, "chat/fallback"]
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert receipts[-1].model == "chat/primary"
+    assert receipts[-1].failure_mode == "contract_violation"
+
+
+def test_openrouter_clarifier_renders_dca_contract_question(monkeypatch) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Got it — LYFT, $200k total, from Feb 2020 to Feb 2025. "
+                "To set up the DCA, how often would you like to make purchases?"
+            ),
+            direct_question="How often would you like to make purchases?",
+            question_targets=["sizing_amount", "schedule"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200,000 of capital"
+            ),
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                extra_parameters={"initial_capital": 200000},
+            ),
+            missing_required_fields=["capital_amount", "cadence"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount", "schedule"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert question.startswith("Got it")
+    assert "How much should each recurring purchase be" in question
+    assert "how often should those purchases happen" in question
+    assert question.lower().count("how often") == 1
+
+
+def test_openrouter_clarifier_preserves_initial_dca_setup_question(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Which asset should I use, what date range should I test, how much "
+                "should each recurring purchase be, and how often should purchases happen?"
+            ),
+            direct_question=(
+                "Which asset should I use, what date range should I test, how much "
+                "should each recurring purchase be, and how often should purchases happen?"
+            ),
+            question_targets=[
+                "asset_target",
+                "period",
+                "sizing_amount",
+                "schedule",
+            ],
+            directly_asks_user=True,
+            detail_targets=[
+                "asset",
+                "date_window",
+                "recurring_purchase_amount",
+                "purchase_cadence",
+            ],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Walk me through a DCA",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+            ),
+            missing_required_fields=[
+                "asset_universe",
+                "date_range",
+                "capital_amount",
+                "cadence",
+            ],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": [
+                    "asset_target",
+                    "period",
+                    "sizing_amount",
+                    "schedule",
+                ],
+            },
+        )
+    )
+
+    assert question is not None
+    assert "Which asset" in question
+    assert "date range" in question
+    assert "recurring purchase" in question
+    assert "how often" in question.lower()
+
+
+def test_openrouter_clarifier_deduplicates_embedded_direct_question(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Sure. I need four things: the asset, date range, recurring purchase "
+                "amount, and cadence. What asset are you thinking of, and what time "
+                "period should we look at."
+            ),
+            direct_question=(
+                "What asset are you thinking of, and what time period should we look at?"
+            ),
+            question_targets=["asset_target", "period"],
+            directly_asks_user=True,
+            detail_targets=["asset", "date_window"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Walk me through a DCA",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+            ),
+            missing_required_fields=["asset_universe", "date_range"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["asset_target", "period"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert question.lower().count("what asset") == 1
+    assert question.endswith("what time period should we look at?")
+
+
+def test_openrouter_clarifier_keeps_abbreviations_when_deduplicating_question(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Happy to walk through a DCA plan. To set it up, I need the asset, "
+                "date range, recurring purchase amount, and cadence (e.g., monthly). "
+                "Which asset, date range, recurring purchase amount, and purchase "
+                "cadence should I use for your DCA test?"
+            ),
+            direct_question=(
+                "Which asset, date range, recurring purchase amount, and purchase "
+                "cadence should I use for your DCA test?"
+            ),
+            question_targets=[
+                "asset_target",
+                "period",
+                "sizing_amount",
+                "schedule",
+            ],
+            directly_asks_user=True,
+            detail_targets=[
+                "asset",
+                "date_window",
+                "recurring_purchase_amount",
+                "purchase_cadence",
+            ],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="Walk me through a DCA",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+            ),
+            missing_required_fields=[
+                "asset_universe",
+                "date_range",
+                "capital_amount",
+                "cadence",
+            ],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": [
+                    "asset_target",
+                    "period",
+                    "sizing_amount",
+                    "schedule",
+                ],
+            },
+        )
+    )
+
+    assert question is not None
+    assert "(e.g., monthly)." in question
+    assert "e. g." not in question
+    assert question.count("Which asset") == 1
+
+
+def test_openrouter_clarifier_keeps_decimal_and_abbreviation_in_contract_context(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Got it — LYFT with a $200.00 total budget, e.g., your planned "
+                "cap. I need one more detail before this is runnable."
+            ),
+            direct_question="How often would you like to make purchases?",
+            question_targets=["sizing_amount", "schedule"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200.00 of capital"
+            ),
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                extra_parameters={"initial_capital": 200},
+            ),
+            missing_required_fields=["capital_amount", "cadence"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount", "schedule"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert "$200.00 total budget" in question
+    assert "e.g., your planned cap." in question
+    assert "How much should each recurring purchase be" in question
+
+
+def test_openrouter_clarifier_does_not_duplicate_contract_question_when_first(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen? I can use that to make the DCA runnable."
+            ),
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
+            question_targets=["sizing_amount", "schedule"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200.00 of capital"
+            ),
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                extra_parameters={"initial_capital": 200},
+            ),
+            missing_required_fields=["capital_amount", "cadence"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount", "schedule"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert question.count("How much should each recurring purchase be") == 1
+
+
+def test_openrouter_clarifier_uses_missing_fields_for_dca_amount_and_cadence(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "Great, a 5-year DCA plan for LYFT. You mentioned a total budget. "
+                "How often would you like to make purchases?"
+            ),
+            direct_question="How often would you like to make purchases?",
+            question_targets=["schedule"],
+            directly_asks_user=True,
+            detail_targets=["purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200,000 of capital"
+            ),
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+            ),
+            missing_required_fields=["cadence", "capital_amount"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["schedule"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert "How much should each recurring purchase be" in question
+    assert "how often should those purchases happen" in question
+
+
+def test_openrouter_clarifier_renders_dca_direct_question_when_wrapper_is_vague(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/primary")
+    monkeypatch.setenv("ARGUS_CHAT_FALLBACK_MODEL", "chat/fallback")
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "I can test recurring buys for LYFT. I need one more detail before "
+                "I can turn this into a backtest. How much would you like to invest "
+                "each month?"
+            ),
+            direct_question="How much would you like to invest each month?",
+            question_targets=["sizing_amount"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message="what detail?",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                cadence="monthly",
+            ),
+            missing_required_fields=["capital_amount"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert "How much would you like to invest each month?" in question
+    assert question.count("How much would you like to invest each month?") == 1
 
 
 def test_default_unsupported_strategy_options_are_concrete() -> None:

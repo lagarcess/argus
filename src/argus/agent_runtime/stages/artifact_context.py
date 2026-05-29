@@ -23,6 +23,8 @@ def decision_targets_result_artifact(
 ) -> bool:
     if snapshot is None or snapshot.latest_backtest_result_reference is None:
         return False
+    if decision.artifact_target is not None:
+        return decision.artifact_target == "latest_result"
     if decision.semantic_turn_act == "result_followup":
         return True
     return decision.intent == "results_explanation"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -275,6 +276,76 @@ def test_chat_stream_artifact_naming_scheduler_failure_does_not_block_done(
         "Short grounded summary."
     )
     assert len(scheduled) == 1
+
+
+def test_chat_stream_runtime_stall_emits_recoverable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _stalling_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stalling_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "what are the top market movers?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert events[0] == {"type": "stage_start", "stage": "interpret"}
+    assert events[-1]["type"] == "error"
+    assert events[-1]["code"] == "agent_runtime_failure"
+    assert "conversation is saved" in events[-1]["message"]
+    assert response.text.count("data: [DONE]") == 1
+
+
+def test_chat_stream_missing_runtime_final_emits_recoverable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _incomplete_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _incomplete_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "what are the top market movers?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert events[0] == {"type": "stage_start", "stage": "interpret"}
+    assert events[-1]["type"] == "error"
+    assert events[-1]["code"] == "agent_runtime_failure"
+    assert "conversation is saved" in events[-1]["message"]
+    assert response.text.count("data: [DONE]") == 1
 
 
 def test_chat_stream_finalizes_ai_title_after_meaningful_turn(

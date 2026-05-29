@@ -334,6 +334,40 @@ def test_dca_without_recurring_amount_still_requires_amount(monkeypatch) -> None
     assert result.decision.missing_required_fields == ["capital_amount"]
 
 
+def test_dca_without_cadence_does_not_silently_default_to_monthly(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants recurring Apple buys but did not choose cadence.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple recurring.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range="past year",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="buy Apple over the past year with recurring buys",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.candidate_strategy_draft.cadence is None
+    assert result.decision.missing_required_fields == ["capital_amount", "cadence"]
+
+
 def test_explicit_last_month_overrides_model_default_period(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -1426,3 +1460,377 @@ def test_refine_strategy_result_action_prompts_for_change_without_llm() -> None:
     assert "change" in result.patch["assistant_prompt"].lower()
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
     assert result.patch["response_intent"]["facts"]["latest_run_id"] == "run-1"
+
+
+def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime.stages import interpret_actions as action_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    async def _bad_followup(**_: object) -> str:
+        return "Try next: change the date range."
+
+    monkeypatch.setattr(
+        action_module,
+        "_compose_result_followup_with_timeout",
+        _bad_followup,
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    result_reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-1",
+        metadata={
+            "result_card": {"title": "AAPL buy and hold"},
+            "config_snapshot": {
+                "resolved_strategy": pending.model_dump(mode="python")
+            },
+        },
+    )
+    response = StructuredInterpretation(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="Model incorrectly treated a refinement answer as next steps.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="next_experiment",
+        artifact_target="latest_result",
+    )
+
+    result, _ = _interpret(
+        message="run it over the last 6 years starting in feb",
+        response=response,
+        snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+            latest_backtest_result_reference=result_reference,
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "refinement",
+            "source_result_run_id": "run-1",
+        },
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.artifact_target == "pending_refinement"
+    assert result.decision.semantic_turn_act == "answer_pending_need"
+    assert result.decision.missing_required_fields == ["refinement"]
+    assert "pending_refinement_overrode_latest_result" in result.decision.reason_codes
+
+
+def test_latest_result_followup_requires_validated_artifact_target(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret_actions as action_module
+
+    async def _grounded_followup(**_: object) -> str:
+        return "This answer used the latest result facts."
+
+    monkeypatch.setattr(
+        action_module,
+        "_compose_result_followup_with_timeout",
+        _grounded_followup,
+    )
+
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Bitcoin.",
+        asset_universe=["BTC"],
+        asset_class="crypto",
+        date_range="2024 to today",
+    )
+    result_reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-btc",
+        metadata={
+            "result_card": {"title": "BTC buy and hold"},
+            "config_snapshot": {
+                "resolved_strategy": pending.model_dump(mode="python")
+            },
+        },
+    )
+    response = StructuredInterpretation(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked why this result happened.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="why_underperformed",
+        artifact_target="latest_result",
+    )
+
+    result, _ = _interpret(
+        message="why did this happen?",
+        response=response,
+        snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            confirmed_strategy_summary=pending,
+            latest_backtest_result_reference=result_reference,
+        ),
+    )
+
+    assert result.decision.artifact_target == "latest_result"
+    assert result.decision.semantic_turn_act == "result_followup"
+
+
+def test_standalone_market_context_question_does_not_attach_to_latest_result() -> None:
+    result_reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-btc",
+        metadata={
+            "result_card": {"title": "BTC buy and hold"},
+            "metrics": {"total_return_pct": 75.5},
+        },
+    )
+    response = StructuredInterpretation(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asked for broad market movers.",
+        assistant_response=(
+            "I do not run a market-movers feed here. I can help turn one of those "
+            "ideas into a historical test instead."
+        ),
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+
+    result, _ = _interpret(
+        message="what are the top market movers?",
+        response=response,
+        snapshot=TaskSnapshot(latest_backtest_result_reference=result_reference),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.artifact_target == "none"
+    assert result.decision.semantic_turn_act == "unsupported_request"
+    assert result.patch["assistant_response"] == response.assistant_response
+
+
+def test_context_curiosity_does_not_silently_inherit_latest_result(monkeypatch) -> None:
+    async def _context_answer(**_: object) -> str:
+        return (
+            "Corporate actions are useful when they are tied to a symbol and period. "
+            "Pick an equity ticker and I can use those events as context around a test."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _context_answer,
+    )
+    result_reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-btc",
+        metadata={
+            "result_card": {"title": "BTC buy and hold"},
+            "metrics": {"total_return_pct": 75.5},
+        },
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asked for corporate event context.",
+        semantic_turn_act="educational_question",
+        context_question_focus="corporate_events",
+        artifact_target="none",
+    )
+
+    result, _ = _interpret(
+        message="what can you tell me about corporate events?",
+        response=response,
+        snapshot=TaskSnapshot(latest_backtest_result_reference=result_reference),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.artifact_target == "none"
+    assert result.decision.context_question_focus == "corporate_events"
+    assert "Execution limits" not in result.patch["assistant_response"]
+
+
+def test_new_vague_strategy_does_not_inherit_hidden_snapshot_assets(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    hidden_prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold WANT and GOLY.",
+        asset_universe=["WANT", "GOLY"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants to create a new strategy.",
+        assistant_response=(
+            "I see you're looking at WANT and GOLY. Which rule should I test?"
+        ),
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Create a new strategy.",
+            asset_universe=["WANT", "GOLY"],
+            asset_class="equity",
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    result, _ = _interpret(
+        message="I want to create a new strategy.",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=hidden_prior),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.artifact_target == "none"
+    assert result.decision.candidate_strategy_draft.asset_universe == []
+    assert result.decision.missing_required_fields == ["asset_universe", "date_range"]
+    assert result.patch.get("assistant_response") != response.assistant_response
+
+
+def test_new_strategy_keeps_explicit_cashtag_symbol_context(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    hidden_prior = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Prior TSLA idea.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants a fresh TSLA strategy.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Fresh TSLA idea.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+        ),
+        missing_required_fields=["date_range"],
+        confidence=0.81,
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+
+    result, _ = _interpret(
+        message="I want to create a $tsla strategy",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=hidden_prior),
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.candidate_strategy_draft.asset_universe == ["TSLA"]
+    assert "hidden_artifact_asset_context_cleared" not in result.decision.reason_codes
+
+
+def test_dca_total_budget_clarification_names_recurring_execution_detail() -> None:
+    from argus.agent_runtime.stages.compose import compose_response_intent
+    from argus.agent_runtime.state.models import ResponseIntent, RunState
+
+    state = RunState.new(
+        current_user_message=(
+            "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+            "$200,000 of capital"
+        ),
+        recent_thread_history=[],
+    )
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["sizing_amount", "schedule"],
+        requested_fields=["capital_amount", "cadence"],
+        facts={
+            "strategy": StrategySummary(
+                strategy_type="dca_accumulation",
+                strategy_thesis="Recurring buys for LYFT.",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                extra_parameters={"initial_capital": 200000},
+            ).model_dump(mode="python")
+        },
+    )
+
+    copy = compose_response_intent(state)
+
+    assert copy is not None
+    assert "LYFT" in copy
+    assert "recurring" in copy.lower()
+    assert "how much" in copy.lower()
+    assert "how often" in copy.lower()
+    assert "total budget" in copy.lower()
+    assert "one more detail" not in copy.lower()
+
+
+def test_dca_total_budget_clarification_does_not_reask_known_cadence() -> None:
+    from argus.agent_runtime.stages.compose import compose_response_intent
+    from argus.agent_runtime.state.models import ResponseIntent, RunState
+
+    state = RunState.new(
+        current_user_message=(
+            "I would like to invest in LYFT monthly over 5 years, "
+            "$200,000 total"
+        ),
+        recent_thread_history=[],
+    )
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["sizing_amount"],
+        requested_fields=["capital_amount"],
+        facts={
+            "strategy": StrategySummary(
+                strategy_type="dca_accumulation",
+                strategy_thesis="Monthly recurring buys for LYFT.",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                cadence="monthly",
+                extra_parameters={"total_capital": 200000},
+            ).model_dump(mode="python")
+        },
+    )
+
+    copy = compose_response_intent(state)
+
+    assert copy is not None
+    copy_lower = copy.lower()
+    assert "how much" in copy_lower
+    assert "total budget" in copy_lower
+    assert "how often" not in copy_lower
+
+
+def test_supported_bollinger_capability_is_not_recovered_as_unsupported() -> None:
+    from argus.agent_runtime.capabilities.answers import compose_capability_answer
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+
+    answer = compose_capability_answer(
+        focus="supported_indicators",
+        contract=build_default_capability_contract(),
+    )
+
+    assert "Bollinger Bands" in answer
+    assert "executable" in answer.lower()

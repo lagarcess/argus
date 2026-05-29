@@ -54,7 +54,7 @@ def _supported_indicators_answer() -> str:
     return (
         f"Executable indicators right now are {indicators}. "
         f"Defaults are configurable when you say them: {parameter_summary}. "
-        "Other pandas-ta catalog indicators can be used for drafting and discovery, "
+        "Other catalog indicators can be used for drafting and discovery, "
         "but they stay draft-only until Argus has an execution spec that maps their "
         "outputs, defaults, warmup, and rule operators into the backtesting engine."
     )
@@ -66,8 +66,8 @@ def _supported_strategies_answer() -> str:
     return (
         f"Executable strategy families right now are {families}. "
         f"Recurring buys support {cadences} cadences when a contribution amount is provided. "
-        "Indicator and signal strategies are runnable when the LLM can produce a valid "
-        "engine rule and the capability layer validates it against the indicator registry."
+        "Indicator and signal strategies are runnable when Argus can validate an "
+        "engine rule against the indicator registry."
     )
 
 

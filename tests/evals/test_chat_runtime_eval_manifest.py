@@ -12,7 +12,7 @@ from tests.evals.chat_runtime_eval_harness import (
 )
 
 MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
-EXPECTED_QA_IDS = {f"QA {index}" for index in range(1, 15)}
+EXPECTED_QA_IDS = {f"QA {index}" for index in range(1, 16)}
 EXPECTED_WORKSTREAMS = {f"workstream_{index}" for index in range(1, 9)}
 VALID_PRIORITIES = {"must_pass", "should_pass", "watch"}
 EXPECTED_EVAL_CATEGORIES = {
