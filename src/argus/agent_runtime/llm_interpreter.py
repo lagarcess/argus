@@ -2249,7 +2249,8 @@ def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
 
     token = tokens[0]
     lowered = token.lower()
-    if lowered in _ASSET_MENTION_NOISE_TOKENS:
+    has_uppercase_signal = _token_has_uppercase_letter(token)
+    if lowered in _ASSET_MENTION_NOISE_TOKENS and not has_uppercase_signal:
         return False
     compact_token = _compact_asset_candidate(token)
     if len(compact_token) < 2:
@@ -2263,13 +2264,9 @@ def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
     if lowered in name_words:
         return True
 
-    if _token_has_uppercase_letter(token):
+    if has_uppercase_signal:
         return compact_token in symbol_texts and len(compact_token) >= 2
-    if (
-        getattr(asset, "asset_class", None) == "crypto"
-        and compact_token in symbol_texts
-        and len(compact_token) >= 3
-    ):
+    if compact_token in symbol_texts and len(compact_token) >= 3:
         return True
     return False
 
@@ -2321,7 +2318,9 @@ _ASSET_MENTION_NOISE_TOKENS = {
     "the",
     "to",
     "today",
+    "test",
     "under",
+    "want",
     "week",
     "weeks",
     "when",

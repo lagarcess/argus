@@ -8,6 +8,7 @@ from argus.agent_runtime.llm_interpreter import (
     LLMRiskRule,
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
+    _candidate_text_supports_resolved_asset,
     _pending_signal_rule_planning_response,
     _recover_supported_signal_rule_from_draft_if_needed,
     _response_from_signal_grounding_audit,
@@ -38,6 +39,47 @@ class ResolvedAssetStub:
     asset_class: str
     name: str = ""
     raw_symbol: str = ""
+
+
+def test_candidate_text_supports_lowercase_equity_symbols_when_explicit() -> None:
+    assert _candidate_text_supports_resolved_asset(
+        "aapl",
+        ResolvedAssetStub("AAPL", "equity", name="Apple Inc."),
+    )
+    assert _candidate_text_supports_resolved_asset(
+        "tsla",
+        ResolvedAssetStub("TSLA", "equity", name="Tesla Inc."),
+    )
+
+
+def test_candidate_text_does_not_ground_short_lowercase_symbols_without_case_signal() -> None:
+    assert not _candidate_text_supports_resolved_asset(
+        "me",
+        ResolvedAssetStub("ME", "equity", name="23andMe Holding Co."),
+    )
+    assert _candidate_text_supports_resolved_asset(
+        "ME",
+        ResolvedAssetStub("ME", "equity", name="23andMe Holding Co."),
+    )
+
+
+def test_candidate_text_keeps_lowercase_action_words_from_becoming_assets() -> None:
+    assert not _candidate_text_supports_resolved_asset(
+        "test",
+        ResolvedAssetStub(
+            "TEST",
+            "equity",
+            name="YieldMax TSLA Performance & Distribution Target 25 ETF",
+        ),
+    )
+    assert not _candidate_text_supports_resolved_asset(
+        "want",
+        ResolvedAssetStub("WANT", "equity", name="Direxion Daily Consumer ETF"),
+    )
+    assert _candidate_text_supports_resolved_asset(
+        "WANT",
+        ResolvedAssetStub("WANT", "equity", name="Direxion Daily Consumer ETF"),
+    )
 
 
 def test_llm_interpreter_validates_asset_class_with_alpaca_resolver(monkeypatch) -> None:

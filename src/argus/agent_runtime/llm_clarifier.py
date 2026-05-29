@@ -467,14 +467,8 @@ def _content_word_set(text: str) -> set[str]:
 
 
 def _first_sentence(question: str) -> str:
-    stops = [
-        index
-        for index in (question.find("."), question.find("?"), question.find("!"))
-        if index >= 0
-    ]
-    if not stops:
-        return question.strip()
-    return question[: min(stops) + 1].strip()
+    sentences = _sentences(question)
+    return sentences[0] if sentences else question.strip()
 
 
 def _expected_question_targets(request: ClarificationRequest) -> set[PendingNeedName]:
