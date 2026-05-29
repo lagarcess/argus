@@ -1812,6 +1812,55 @@ async def test_llm_interpreter_does_not_convert_capability_question_to_guidance(
 
 
 @pytest.mark.asyncio
+async def test_llm_interpreter_repairs_unfocused_capability_answer(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "CapabilitySideQuestionAudit"
+        return interpreter_module.CapabilitySideQuestionAudit(
+            is_capability_question=True,
+            focus="supported_indicators",
+            assistant_response=None,
+            confidence=0.88,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks whether Bollinger Bands are supported.",
+        assistant_response="Bollinger Bands are not supported yet.",
+        semantic_turn_act="educational_question",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="Can I use Bollinger Bands?",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "conversation_followup"
+    assert ready_response.semantic_turn_act == "educational_question"
+    assert ready_response.capability_question_focus == "supported_indicators"
+    assert ready_response.assistant_response is None
+    assert "capability_side_question_audit" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_llm_interpreter_repairs_pending_field_side_question_to_capability(
     monkeypatch,
 ) -> None:
@@ -1925,6 +1974,185 @@ async def test_llm_interpreter_audits_capability_side_question_with_rule_shape(
     assert ready_response.missing_required_fields == []
     assert "capability_side_question_audit" in ready_response.reason_codes
     assert "vague_strategy_start_guidance" not in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_repairs_standalone_movers_to_context_focus(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        if kwargs["schema_name"] == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        assert kwargs["schema_name"] == "ContextQuestionAudit"
+        return interpreter_module.ContextQuestionAudit(
+            is_context_question=True,
+            focus="market_movers",
+            confidence=0.88,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User asks for top market movers.",
+        assistant_response="I can't pull live market movers.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="what are the top market movers?",
+            strategy_thesis="what are the top market movers?",
+        ),
+        missing_required_fields=[],
+        confidence=0.62,
+        semantic_turn_act="unsupported_request",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="what are the top market movers?",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "conversation_followup"
+    assert ready_response.semantic_turn_act == "educational_question"
+    assert ready_response.context_question_focus == "market_movers"
+    assert ready_response.capability_question_focus is None
+    assert ready_response.assistant_response is None
+    assert ready_response.missing_required_fields == []
+    assert "context_question_audit" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_lets_context_override_strategy_capability_label(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        if kwargs["schema_name"] == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        assert kwargs["schema_name"] == "ContextQuestionAudit"
+        return interpreter_module.ContextQuestionAudit(
+            is_context_question=True,
+            focus="market_movers",
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for top market movers.",
+        assistant_response="I cannot provide live movers, but try a threshold rule.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_strategies",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="what are the top market movers?",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.context_question_focus == "market_movers"
+    assert ready_response.capability_question_focus is None
+    assert ready_response.assistant_response is None
+    assert "context_question_audit" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_repairs_unsupported_movers_to_context_focus(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def audit_stub(**kwargs):
+        if kwargs["schema_name"] == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=False,
+                confidence=0.8,
+            )
+        assert kwargs["schema_name"] == "ContextQuestionAudit"
+        return interpreter_module.ContextQuestionAudit(
+            is_context_question=True,
+            focus="market_movers",
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+
+    async def no_strategy_repair(**kwargs):
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_repair_incomplete_strategy_extraction",
+        no_strategy_repair,
+    )
+    response = LLMInterpretationResponse(
+        intent="unsupported_or_out_of_scope",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks for current top market movers.",
+        assistant_response=None,
+        semantic_turn_act="unsupported_request",
+        capability_question_focus="general",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="what are the top market movers?",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.intent == "conversation_followup"
+    assert ready_response.semantic_turn_act == "educational_question"
+    assert ready_response.context_question_focus == "market_movers"
+    assert ready_response.capability_question_focus is None
+    assert ready_response.assistant_response is None
+    assert "context_question_audit" in ready_response.reason_codes
 
 
 @pytest.mark.asyncio
@@ -3508,6 +3736,64 @@ def test_llm_interpreter_preserves_user_since_year_when_model_defaults_period(
     assert strategy.cadence == "monthly"
 
 
+def test_llm_interpreter_rejects_invented_dca_cadence(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User supplied LYFT, dates, and total budget.",
+        requires_clarification=True,
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200,000 of capital"
+            ),
+            strategy_type="dca_accumulation",
+            strategy_thesis="DCA into LYFT.",
+            asset_universe=["LYFT"],
+            asset_class="equity",
+            date_range={"start": "2020-02-01", "end": "2025-02-28"},
+            cadence="monthly",
+            assumptions=[
+                "Invest equal dollar amounts at regular intervals (monthly) over the period."
+            ],
+        ),
+    )
+
+    result = interpreter._to_runtime_interpretation(
+        response,
+        request=InterpretationRequest(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200,000 of capital"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="dca_accumulation",
+                    strategy_thesis="DCA setup.",
+                )
+            ),
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    strategy = result.candidate_strategy_draft
+    assert strategy.cadence is None
+    assert strategy.assumptions == []
+    assert result.missing_required_fields == ["capital_amount", "cadence"]
+
+
 def test_llm_interpreter_rejects_invented_dca_contribution_amount(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
@@ -3548,6 +3834,68 @@ def test_llm_interpreter_rejects_invented_dca_contribution_amount(monkeypatch) -
     strategy = result.candidate_strategy_draft
     assert strategy.strategy_type == "dca_accumulation"
     assert strategy.capital_amount is None
+
+
+@pytest.mark.asyncio
+async def test_dca_contribution_role_audit_demotes_total_budget(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, model_name
+        assert schema_name == "DcaContributionRoleAudit"
+        return interpreter_module.DcaContributionRoleAudit(
+            recurring_contribution_explicit=False,
+            total_budget_not_recurring=True,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        user_goal_summary="User supplied total capital for a DCA setup.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200,000 of capital"
+            ),
+            strategy_type="dca_accumulation",
+            strategy_thesis="Recurring buys for LYFT.",
+            asset_universe=["LYFT"],
+            asset_class="equity",
+            date_range={"start": "2020-02-01", "end": "2025-02-28"},
+            capital_amount=200000,
+            field_provenance={"capital_amount": "recurring_contribution"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    audited = await interpreter_module._dca_contribution_role_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200,000 of capital"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = audited.candidate_strategy_draft
+    assert audited.requires_clarification is True
+    assert draft.capital_amount is None
+    assert draft.total_capital == 200000
+    assert "capital_amount" in audited.missing_required_fields
+    assert "dca_total_budget_role_audited" in audited.reason_codes
 
 
 def test_llm_interpreter_rejects_invented_initial_capital(monkeypatch) -> None:

@@ -19,5 +19,18 @@ def test_message_preview_renders_markdown_as_plain_text() -> None:
     assert "\n" not in preview
 
 
+def test_message_preview_keeps_markdown_punctuation_tight() -> None:
+    preview = message_preview(
+        "For the long haul, the simplest strategy is **buy and hold**. "
+        "It means buying an asset and sitting tight."
+    )
+
+    assert preview == (
+        "For the long haul, the simplest strategy is buy and hold. "
+        "It means buying an asset and sitting tight."
+    )
+    assert "hold ." not in preview
+
+
 def test_message_preview_returns_none_for_markdown_without_visible_text() -> None:
     assert message_preview("   \n\n") is None

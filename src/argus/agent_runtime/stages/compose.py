@@ -8,11 +8,7 @@ def compose_response_intent(state: RunState) -> str | None:
     if intent is None:
         return None
     if intent.kind == "beginner_guidance":
-        return (
-            "We can do this conversationally. Tell me an asset you are curious "
-            "about and a rough timeframe, or ask me to explain a market term first. "
-            "If you already have an idea, say it in one sentence and I will shape it."
-        )
+        return _llm_composition_unavailable_recovery()
     if intent.kind == "ambiguity_check":
         return (
             "I can keep working on the current idea or start a new backtest. "
@@ -41,8 +37,26 @@ def compose_response_intent(state: RunState) -> str | None:
 
 
 def should_prefer_composed_intent(state: RunState) -> bool:
-    del state
-    return False
+    intent = state.response_intent
+    if intent is None or intent.kind != "clarification":
+        return False
+    strategy = _strategy_from_intent(intent)
+    if strategy.strategy_type != "dca_accumulation":
+        return False
+    needs = set(intent.semantic_needs)
+    missing_fields = set(state.missing_required_fields)
+    return (
+        {"sizing_amount", "schedule"}.issubset(needs)
+        and {"capital_amount", "cadence"}.issubset(missing_fields)
+        and not {"asset_universe", "date_range"}.intersection(missing_fields)
+    )
+
+
+def _llm_composition_unavailable_recovery() -> str:
+    return (
+        "I couldn't shape that cleanly just now. Try giving me an asset and rough "
+        "time window, and I'll turn it into the closest runnable historical test."
+    )
 
 
 def _compose_clarification(intent: ResponseIntent) -> str:
@@ -59,6 +73,14 @@ def _compose_clarification(intent: ResponseIntent) -> str:
         if dca_question:
             return f"{context}{dca_question}"
         return f"{context}How much should each recurring purchase be?"
+    if set(needs) == {"sizing_amount", "schedule"}:
+        dca_question = _dca_execution_question(strategy)
+        if dca_question:
+            return f"{context}{dca_question}"
+        return (
+            f"{context}How much should each recurring purchase be, and how often "
+            "should those purchases happen?"
+        )
     if needs == ["rule_definition"]:
         if _strategy_has_rule_detail(strategy):
             return (
@@ -76,6 +98,11 @@ def _compose_clarification(intent: ResponseIntent) -> str:
         )
     if set(needs) == {"asset_target", "period"}:
         return f"{context}What should I test it on, and what date window should I use?"
+    if set(needs) == {"asset_target", "period", "sizing_amount", "schedule"}:
+        return (
+            f"{context}To test it, tell me the asset, date window, recurring "
+            "purchase amount, and purchase cadence."
+        )
     if set(needs) == {"period", "rule_definition"}:
         return (
             f"{context}Which date window should I use, and what specific "
@@ -93,7 +120,11 @@ def _compose_clarification(intent: ResponseIntent) -> str:
     if needs:
         questions = [_question_for_need(need) for need in needs]
         return f"{context}{' '.join(question for question in questions if question)}"
-    return f"{context}I need one more detail before I can turn this into a " "backtest."
+    return (
+        f"{context}I couldn't identify the exact missing input. Tell me the "
+        "asset, date window, or rule detail you want to use, and I'll keep the "
+        "draft intact."
+    )
 
 
 def _compose_unsupported_recovery(intent: ResponseIntent) -> str:

@@ -334,6 +334,40 @@ def test_dca_without_recurring_amount_still_requires_amount(monkeypatch) -> None
     assert result.decision.missing_required_fields == ["capital_amount"]
 
 
+def test_dca_without_cadence_does_not_silently_default_to_monthly(monkeypatch) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants recurring Apple buys but did not choose cadence.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple recurring.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range="past year",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="buy Apple over the past year with recurring buys",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    assert result.decision.candidate_strategy_draft.cadence is None
+    assert result.decision.missing_required_fields == ["capital_amount", "cadence"]
+
+
 def test_explicit_last_month_overrides_model_default_period(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -1725,8 +1759,8 @@ def test_dca_total_budget_clarification_names_recurring_execution_detail() -> No
     )
     state.response_intent = ResponseIntent(
         kind="clarification",
-        semantic_needs=["sizing_amount"],
-        requested_fields=["capital_amount"],
+        semantic_needs=["sizing_amount", "schedule"],
+        requested_fields=["capital_amount", "cadence"],
         facts={
             "strategy": StrategySummary(
                 strategy_type="dca_accumulation",
@@ -1745,6 +1779,7 @@ def test_dca_total_budget_clarification_names_recurring_execution_detail() -> No
     assert "LYFT" in copy
     assert "recurring" in copy.lower()
     assert "how much" in copy.lower()
+    assert "how often" in copy.lower()
     assert "total budget" in copy.lower()
     assert "one more detail" not in copy.lower()
 

@@ -23,6 +23,7 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.context.providers import build_alpaca_market_movers_packet
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 
 
@@ -479,13 +480,33 @@ def test_standalone_event_context_uses_context_fact_bank_not_limits(
     expected_fact: str,
 ) -> None:
     captured: dict[str, Any] = {}
+    completion_calls = 0
+    if focus == "market_movers":
+        monkeypatch.setattr(
+            "argus.agent_runtime.stages.interpret.fetch_alpaca_market_movers_packet",
+            lambda **_: build_alpaca_market_movers_packet(
+                market_type="stocks",
+                movers={
+                    "gainers": [{"symbol": "TSLA", "percent_change": 5.1}],
+                    "losers": [{"symbol": "AAPL", "percent_change": -2.1}],
+                },
+            ),
+        )
 
     async def _fake_chat_completion(**kwargs: Any) -> str:
+        nonlocal completion_calls
+        completion_calls += 1
         captured.update(kwargs)
+        if focus == "market_movers" and completion_calls > 1:
+            return (
+                "A short-lived movers snapshot can help pick test seeds like TSLA "
+                "or AAPL. Treat them as symbols to validate, not recommendations, "
+                "then choose one for a historical experiment."
+            )
         return (
             "That can be useful context, but I would treat it as a starting point "
-            "for a historical test rather than a live feed. Pick a symbol and I can "
-            "shape the closest runnable experiment."
+            "for a historical test. Pick a symbol and I can shape the closest "
+            "runnable experiment."
         )
 
     monkeypatch.setattr(
@@ -510,7 +531,6 @@ def test_standalone_event_context_uses_context_fact_bank_not_limits(
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
     assert "Execution limits" not in answer
-    assert "live feed" in answer
     assert result.decision.context_question_focus == focus
     assert captured["task"] == "chat_composer"
     assert "Do not open with what Argus cannot do" in captured["messages"][0]["content"]
@@ -518,20 +538,35 @@ def test_standalone_event_context_uses_context_fact_bank_not_limits(
         "content"
     ]
     assert "Do not suggest live" in captured["messages"][0]["content"]
+    assert "Do not propose a concrete executable rule unless" in captured["messages"][
+        0
+    ]["content"]
+    assert "price-jump" in captured["messages"][0]["content"]
     assert "opening sentence must give useful investing context" in captured[
         "messages"
     ][0]["content"]
     fact_packet = captured["messages"][1]["content"]
     assert expected_fact in fact_packet.lower()
-    supported_packet = captured["messages"][2]["content"]
+    live_packet = captured["messages"][2]["content"]
+    supported_packet = captured["messages"][3]["content"]
     assert "buy and hold" in supported_packet
     assert "Bollinger Band" in supported_packet
+    assert "unregistered triggers" in supported_packet
     if focus == "market_movers":
-        assert "Do not propose top-gainer lists" in fact_packet
-        assert "top-gainer lists" in fact_packet
-        assert "volume-surge tests" in fact_packet
+        assert "symbol seed" in fact_packet
+        assert "ranking feed" in fact_packet
+        assert "volume-surge test" in fact_packet
+        assert "TSLA" in live_packet
+        assert "AAPL" in live_packet
+        assert "not recommendations" in live_packet
+        assert "asset validation" in live_packet
+        assert "TSLA" in answer
+        assert completion_calls == 2
     if focus == "corporate_events":
         assert "Do not propose earnings plays" in fact_packet
+        assert "No live context packet" in live_packet
+        assert "historical test" in answer
+        assert completion_calls == 1
     assert "Alpaca" not in fact_packet
     assert "provider" not in captured["messages"][0]["content"].lower()
 
@@ -666,7 +701,22 @@ def test_interpret_social_opener_uses_llm_response() -> None:
     assert "beginner_language_detected" not in result.decision.reason_codes
 
 
-def test_unanchored_strategy_route_does_not_create_pending_draft() -> None:
+def test_unanchored_strategy_route_uses_chat_tier_without_pending_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_chat_completion(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return (
+            "For a long-term experiment, start with buy and hold or recurring buys. "
+            "Pick an asset and a date range, and I can shape the closest runnable test."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
     response = StructuredInterpretation(
         intent="strategy_drafting",
         task_relation="new_task",
@@ -687,10 +737,51 @@ def test_unanchored_strategy_route_does_not_create_pending_draft() -> None:
     )
 
     assert result.outcome == "ready_to_respond"
-    assert result.patch["assistant_response"] == response.assistant_response
+    assert result.patch["assistant_response"] != response.assistant_response
+    assert "buy and hold" in result.patch["assistant_response"]
+    assert captured["task"] == "chat_composer"
+    assert "Supported-strategy facts" in captured["messages"][1]["content"]
     assert result.decision.intent == "conversation_followup"
     assert result.decision.missing_required_fields == []
     assert result.decision.candidate_strategy_draft.asset_universe == []
+    assert "unanchored_strategy_route_suppressed" in result.decision.reason_codes
+
+
+def test_unanchored_strategy_route_composer_failure_is_degraded_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _failing_chat_completion(**_: Any) -> str:
+        raise RuntimeError("chat tier unavailable")
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _failing_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User sent a vague strategy start.",
+        assistant_response="I'm here. Tell me the investing idea you want to test.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="I want a new strategy",
+            strategy_thesis="I want a new strategy",
+        ),
+        missing_required_fields=["asset_universe", "entry_logic", "date_range"],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="I want a new strategy",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "couldn't" in answer.lower()
+    assert "runnable historical test" in answer.lower()
+    assert "buy and hold" not in answer.lower()
+    assert "recurring buys" not in answer.lower()
     assert "unanchored_strategy_route_suppressed" in result.decision.reason_codes
 
 

@@ -7,7 +7,12 @@ from typing import Protocol
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
 from argus.agent_runtime.stages.interpret import StageResult
-from argus.agent_runtime.state.models import PendingNeedName, ResponseIntent, RunState
+from argus.agent_runtime.state.models import (
+    PendingNeedName,
+    ResponseIntent,
+    RunState,
+    StrategySummary,
+)
 
 OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
 OFFLINE_CLARIFICATION_FALLBACK = (
@@ -59,6 +64,11 @@ async def clarify_stage_async(
         ambiguous_fields=ambiguous_fields,
         unsupported_constraints=unsupported_constraints,
         optional_parameter_choices=optional_parameter_choices,
+    )
+    unsupported_constraints = _blocking_unsupported_constraints(
+        state=state,
+        requested_fields=requested_fields,
+        unsupported_constraints=unsupported_constraints,
     )
 
     if unsupported_constraints:
@@ -257,6 +267,10 @@ def _response_intent(
     options: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     strategy = state.candidate_strategy_draft
+    semantic_needs = _expanded_semantic_needs(
+        strategy=strategy,
+        semantic_needs=semantic_needs or [],
+    )
     strategy_payload = (
         strategy.model_dump(mode="python")
         if hasattr(strategy, "model_dump")
@@ -266,7 +280,7 @@ def _response_intent(
     )
     payload = ResponseIntent(
         kind=kind,
-        semantic_needs=semantic_needs or [],
+        semantic_needs=semantic_needs,
         requested_fields=requested_fields or [],
         facts={
             "strategy": strategy_payload,
@@ -276,6 +290,23 @@ def _response_intent(
         options=options or [],
     )
     return payload.model_dump(mode="python")
+
+
+def _expanded_semantic_needs(
+    *,
+    strategy: StrategySummary,
+    semantic_needs: list[PendingNeedName],
+) -> list[PendingNeedName]:
+    needs = list(dict.fromkeys(semantic_needs))
+    if (
+        strategy.strategy_type == "dca_accumulation"
+        and "sizing_amount" in needs
+        and "schedule" not in needs
+        and strategy.cadence in (None, "", [], {})
+        and (strategy.extra_parameters or {}).get("cadence") in (None, "", [], {})
+    ):
+        needs.append("schedule")
+    return needs
 
 
 def _requested_fields(
@@ -302,7 +333,7 @@ def _requested_fields(
     return [
         field
         for field in state.missing_required_fields
-        if field in contract.required_fields or field == "capital_amount"
+        if field in contract.required_fields or field in {"capital_amount", "cadence"}
     ]
 
 
@@ -310,6 +341,7 @@ def _semantic_needs_from_required_fields(fields: list[str]) -> list[PendingNeedN
     field_map: dict[str, PendingNeedName] = {
         "asset_universe": "asset_target",
         "capital_amount": "sizing_amount",
+        "cadence": "schedule",
         "date_range": "period",
         "entry_logic": "rule_definition",
         "exit_logic": "rule_definition",
@@ -384,6 +416,33 @@ def _unsupported_constraints(
     ]
 
 
+def _blocking_unsupported_constraints(
+    *,
+    state: RunState,
+    requested_fields: list[str],
+    unsupported_constraints: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    if not unsupported_constraints:
+        return []
+    if not _dca_execution_details_are_still_missing(state, requested_fields):
+        return unsupported_constraints
+    return [
+        constraint
+        for constraint in unsupported_constraints
+        if constraint.get("category") != "unsupported_dca_starting_principal"
+    ]
+
+
+def _dca_execution_details_are_still_missing(
+    state: RunState,
+    requested_fields: list[str],
+) -> bool:
+    strategy = state.candidate_strategy_draft
+    if strategy.strategy_type != "dca_accumulation":
+        return False
+    return bool({"capital_amount", "cadence"}.intersection(requested_fields))
+
+
 def _simplification_options(
     unsupported_constraints: list[dict[str, object]],
 ) -> list[dict[str, object]]:
@@ -415,6 +474,6 @@ def _first_missing_required_field(
 ) -> str | None:
     required_fields = set(contract.required_fields)
     for field_name in missing_required_fields:
-        if field_name in required_fields or field_name == "capital_amount":
+        if field_name in required_fields or field_name in {"capital_amount", "cadence"}:
             return field_name
     return None

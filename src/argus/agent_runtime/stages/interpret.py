@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from dataclasses import dataclass
 from typing import Any
 
 from argus.agent_runtime.capabilities.answers import (
@@ -91,6 +92,11 @@ from argus.agent_runtime.strategy_requirements import (
 from argus.agent_runtime.strategy_requirements import (
     valid_rule_spec_from_strategy as _valid_rule_spec_from_strategy,
 )
+from argus.context import (
+    ContextPacket,
+    context_packet_freshness,
+    fetch_alpaca_market_movers_packet,
+)
 from argus.domain.indicators import (
     IndicatorExecutionSpec,
     executable_indicator_spec,
@@ -100,6 +106,13 @@ from argus.domain.market_data import resolve_asset
 from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
+_STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
+
+
+@dataclass(frozen=True)
+class _LiveContextCuriosityFacts:
+    content: str
+    packet_symbols: tuple[str, ...] = ()
 
 STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "new_idea",
@@ -305,10 +318,7 @@ async def _stage_result_from_interpretation(
                 "intent": "conversation_followup",
                 "task_relation": "continue",
                 "requires_clarification": False,
-                "assistant_response": (
-                    interpretation.assistant_response
-                    or _unanchored_strategy_route_response()
-                ),
+                "assistant_response": interpretation.assistant_response,
                 "semantic_turn_act": "educational_question",
                 "missing_required_fields": [],
             }
@@ -567,6 +577,19 @@ async def _stage_result_from_interpretation(
     )
     if latest_result_recovery is not None:
         return latest_result_recovery
+    unanchored_strategy_recovery = await _unanchored_strategy_route_answer_if_needed(
+        reason_codes=decision.reason_codes,
+        expects_strategy_route=expects_strategy_route,
+        requires_clarification=requires_clarification,
+        current_user_message=state.current_user_message,
+        capability_contract=capability_contract,
+    )
+    if unanchored_strategy_recovery is not None:
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={"assistant_response": unanchored_strategy_recovery},
+        )
     educational_recovery = await _educational_answer_recovery_if_needed(
         semantic_turn_act=interpretation.semantic_turn_act,
         expects_strategy_route=expects_strategy_route,
@@ -945,6 +968,7 @@ async def _compose_natural_context_curiosity_answer(
     artifact_target: ArtifactTarget | None,
 ) -> str | None:
     fact_packet = _context_curiosity_fact_packet(focus)
+    live_facts = await _live_context_curiosity_facts(focus)
     provenance_rule = (
         "If you use visible artifact context, say so naturally with phrases like "
         "'from this result' or 'from the current draft'."
@@ -968,13 +992,20 @@ async def _compose_natural_context_curiosity_answer(
                 "causality, or investment advice. Do not name data vendors in the "
                 "user-facing answer. Do not suggest live screens, feeds, event-driven "
                 "execution, unusual-volume scans, sector screens, filter pipelines, "
-                "or macro data as direct trading signals. "
+                "or macro data as direct trading signals. Do not propose a concrete "
+                "executable rule unless it is named in the supported experiment "
+                "paths; for example, do not invent price-jump, fixed-hold-period, "
+                "or custom ranking rules. "
                 f"{provenance_rule}"
             ),
         },
         {
             "role": "system",
             "content": f"Context-curiosity facts: {fact_packet}",
+        },
+        {
+            "role": "system",
+            "content": f"Available short-lived context packet: {live_facts.content}",
         },
         {
             "role": "system",
@@ -986,9 +1017,31 @@ async def _compose_natural_context_curiosity_answer(
         {"role": "user", "content": current_user_message},
     ]
     try:
-        return await invoke_openrouter_chat_completion(
+        answer = await invoke_openrouter_chat_completion(
             task="chat_composer",
             messages=messages,
+        )
+        if _context_answer_respects_live_packet(
+            answer=answer,
+            live_facts=live_facts,
+        ):
+            return answer
+        retry_messages = _context_packet_grounding_retry_messages(
+            messages=messages,
+            live_facts=live_facts,
+        )
+        retry_answer = await invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=retry_messages,
+        )
+        if _context_answer_respects_live_packet(
+            answer=retry_answer,
+            live_facts=live_facts,
+        ):
+            return retry_answer
+        return _packet_grounded_context_recovery_answer(
+            focus=focus,
+            live_facts=live_facts,
         )
     except Exception:
         return None
@@ -1021,15 +1074,214 @@ def _context_curiosity_fact_packet(focus: ContextQuestionFocus) -> str:
         ),
         "market_movers": (
             "Movers and most-actives context is very short-lived and narrow. It is "
-            "not a generic product feed, but it can help frame a symbol-scoped "
-            "historical experiment or a follow-up idea. Good next steps are choosing "
-            "a symbol or date window the user is curious about, then testing buy "
-            "and hold, recurring buys, or a supported indicator rule. Do not propose "
-            "top-gainer lists, screens, rankings, sector rotation screens, filter "
-            "pipelines, volume-surge tests, or volume-spike strategies."
+            "not a generic product feed, but it can help the user pick a current "
+            "symbol seed for a historical experiment. If a current movers packet is "
+            "available, you may mention up to five provided symbols as possible test "
+            "seeds, never as recommendations, and make clear that Argus will validate "
+            "the selected symbol before any run. Good next steps are choosing one "
+            "symbol or date window the user is curious about, then testing buy and "
+            "hold, recurring buys, or a supported indicator rule. Do not turn this "
+            "into a dashboard, ranking feed, sector-rotation screen, filter pipeline, "
+            "volume-surge test, or volume-spike strategy."
         ),
     }
     return facts[focus]
+
+
+async def _live_context_curiosity_facts(
+    focus: ContextQuestionFocus,
+) -> _LiveContextCuriosityFacts:
+    if focus != "market_movers":
+        return _LiveContextCuriosityFacts(
+            content=(
+                "No live context packet is collected for this standalone turn. Use "
+                "the static context-curiosity facts only."
+            )
+        )
+    packet = await _fetch_standalone_market_movers_packet()
+    if packet is None:
+        return _LiveContextCuriosityFacts(
+            content=(
+                "No current movers packet is available inside this turn. Do not "
+                "claim to have checked current movers; explain the concept and ask "
+                "the user to pick a symbol, theme, or date window for a historical "
+                "test."
+            )
+        )
+    return _LiveContextCuriosityFacts(
+        content=_market_movers_packet_fact_text(packet),
+        packet_symbols=tuple(_market_movers_packet_symbols(packet)),
+    )
+
+
+async def _fetch_standalone_market_movers_packet() -> ContextPacket | None:
+    try:
+        packet = await asyncio.wait_for(
+            asyncio.to_thread(
+                fetch_alpaca_market_movers_packet,
+                market_type="stocks",
+                top=5,
+            ),
+            timeout=_STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return None
+    freshness = context_packet_freshness(packet)
+    if freshness == "stale":
+        return None
+    if freshness != packet.freshness:
+        packet = packet.model_copy(update={"freshness": freshness})
+    return packet
+
+
+def _market_movers_packet_fact_text(packet: ContextPacket) -> str:
+    gainers: list[str] = []
+    losers: list[str] = []
+    for fact in packet.facts:
+        if fact.kind not in {"market_mover_gainer", "market_mover_loser"}:
+            continue
+        if not isinstance(fact.value, dict):
+            continue
+        symbol = str(fact.value.get("symbol") or "").strip().upper()
+        if not symbol:
+            continue
+        formatted = _format_market_mover_symbol(
+            symbol=symbol,
+            percent_change=fact.value.get("percent_change"),
+        )
+        if fact.kind == "market_mover_gainer":
+            gainers.append(formatted)
+        else:
+            losers.append(formatted)
+    sections = []
+    if gainers:
+        sections.append(f"current gainers: {', '.join(gainers[:5])}")
+    if losers:
+        sections.append(f"current losers: {', '.join(losers[:5])}")
+    if not sections:
+        return (
+            "A current movers packet was retrieved, but it contained no usable "
+            "symbol facts. Do not fabricate mover symbols."
+        )
+    retrieved_at = packet.retrieved_at.isoformat()
+    return (
+        "Short-lived movers packet retrieved at "
+        f"{retrieved_at}; { '; '.join(sections) }. Use these only as possible "
+        "historical-test seeds, not recommendations, predictions, causal evidence, "
+        "or simulation truth. Treat symbols as unvalidated until the user chooses "
+        "one and deterministic asset validation confirms it can run."
+    )
+
+
+def _market_movers_packet_symbols(packet: ContextPacket) -> list[str]:
+    symbols: list[str] = []
+    for fact in packet.facts:
+        if fact.kind not in {"market_mover_gainer", "market_mover_loser"}:
+            continue
+        if not isinstance(fact.value, dict):
+            continue
+        symbol = str(fact.value.get("symbol") or "").strip().upper()
+        if symbol:
+            symbols.append(symbol)
+    return list(dict.fromkeys(symbols))
+
+
+def _context_answer_respects_live_packet(
+    *,
+    answer: str | None,
+    live_facts: _LiveContextCuriosityFacts,
+) -> bool:
+    if not live_facts.packet_symbols:
+        return True
+    return bool(
+        answer
+        and _mentioned_packet_symbols(
+            text=answer,
+            symbols=live_facts.packet_symbols,
+        )
+    )
+
+
+def _mentioned_packet_symbols(
+    *,
+    text: str,
+    symbols: tuple[str, ...],
+) -> list[str]:
+    token_map = str.maketrans({char: " " for char in ".,;:!?()[]{}<>\"'`"})
+    tokens = {
+        token.strip("$").upper()
+        for token in text.translate(token_map).split()
+        if token.strip("$")
+    }
+    return [symbol for symbol in symbols if symbol.upper() in tokens]
+
+
+def _context_packet_grounding_retry_messages(
+    *,
+    messages: list[dict[str, str]],
+    live_facts: _LiveContextCuriosityFacts,
+) -> list[dict[str, str]]:
+    user_message = messages[-1]
+    grounding_message = {
+        "role": "system",
+        "content": (
+            "The previous draft did not use the available short-lived context "
+            "packet. Rewrite the answer using at least one provided packet symbol "
+            "as an unvalidated historical-test seed. Do not present the packet as "
+            "a live dashboard, recommendation, ranking feed, causal proof, or "
+            "simulation truth. Keep the user moving toward choosing a symbol and "
+            "a supported historical experiment."
+        ),
+    }
+    return [
+        *messages[:-1],
+        {
+            "role": "system",
+            "content": (
+                "Packet symbols that must ground this answer: "
+                f"{', '.join(live_facts.packet_symbols)}"
+            ),
+        },
+        grounding_message,
+        user_message,
+    ]
+
+
+def _packet_grounded_context_recovery_answer(
+    *,
+    focus: ContextQuestionFocus,
+    live_facts: _LiveContextCuriosityFacts,
+) -> str:
+    if focus == "market_movers" and live_facts.packet_symbols:
+        seeds = _join_context_symbols(live_facts.packet_symbols[:5])
+        return (
+            f"A short-lived movers snapshot can help pick experiment seeds: {seeds}. "
+            "Treat those as symbols to validate, not recommendations or a live "
+            "ranking. Pick one, and I can test buy-and-hold, recurring buys, or a "
+            "supported indicator rule over a historical window."
+        )
+    return _context_curiosity_recovery_answer(focus)
+
+
+def _join_context_symbols(symbols: tuple[str, ...]) -> str:
+    if not symbols:
+        return "a symbol you choose"
+    if len(symbols) == 1:
+        return symbols[0]
+    return f"{', '.join(symbols[:-1])}, or {symbols[-1]}"
+
+
+def _format_market_mover_symbol(*, symbol: str, percent_change: Any) -> str:
+    if percent_change in (None, ""):
+        return symbol
+    if isinstance(percent_change, int | float):
+        return f"{symbol} ({percent_change:+g}%)"
+    text = str(percent_change).strip()
+    if not text:
+        return symbol
+    if text.endswith("%"):
+        return f"{symbol} ({text})"
+    return f"{symbol} ({text}%)"
 
 
 def _supported_experiment_fact_packet() -> str:
@@ -1037,7 +1289,8 @@ def _supported_experiment_fact_packet() -> str:
     return (
         f"{families}. Macro, news, corporate-action, and movers context may frame "
         "a question or explain backdrop, but cannot alter simulation truth or become "
-        "the executable rule."
+        "the executable rule. Suggested next experiments must stay inside these "
+        "families instead of inventing unregistered triggers or holding-period rules."
     )
 
 
@@ -1060,6 +1313,66 @@ def _context_curiosity_recovery_answer(focus: ContextQuestionFocus) -> str:
     )
 
 
+async def _unanchored_strategy_route_answer_if_needed(
+    *,
+    reason_codes: list[str],
+    expects_strategy_route: bool,
+    requires_clarification: bool,
+    current_user_message: str,
+    capability_contract: Any,
+) -> str | None:
+    if (
+        "unanchored_strategy_route_suppressed" not in reason_codes
+        or expects_strategy_route
+        or requires_clarification
+    ):
+        return None
+    composed = await _compose_unanchored_strategy_recovery_answer(
+        current_user_message=current_user_message,
+        capability_contract=capability_contract,
+    )
+    if composed:
+        return composed
+    return _llm_composition_unavailable_recovery_answer()
+
+
+async def _compose_unanchored_strategy_recovery_answer(
+    *,
+    current_user_message: str,
+    capability_contract: Any,
+) -> str | None:
+    fact_packet = compose_capability_answer(
+        focus="supported_strategies",
+        contract=capability_contract,
+    )
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus, a chat-first investing experimentation assistant. "
+                "The user expressed a broad or vague investing strategy intention, "
+                "but deterministic validation found no executable strategy anchor "
+                "yet. Do not create a draft. Answer in warm, plain English. Give "
+                "useful beginner-friendly context, name only supported experiment "
+                "families from the facts, and offer one clear next step. Do not use "
+                "report tone, do not say generic filler like 'I'm here', and do not "
+                "give investment advice."
+            ),
+        },
+        {"role": "system", "content": f"Supported-strategy facts: {fact_packet}"},
+        {"role": "user", "content": current_user_message},
+    ]
+    try:
+        response = await invoke_openrouter_chat_completion(
+            task="chat_composer",
+            messages=messages,
+        )
+    except Exception:
+        return None
+    cleaned = str(response or "").strip()
+    return cleaned or None
+
+
 async def _educational_answer_recovery_if_needed(
     *,
     semantic_turn_act: SemanticTurnAct | None,
@@ -1080,11 +1393,7 @@ async def _educational_answer_recovery_if_needed(
     )
     if composed:
         return composed
-    return (
-        "I can help turn that into a grounded historical experiment. Give me a "
-        "symbol, rough period, or market idea, and I will shape the closest "
-        "runnable test."
-    )
+    return _llm_composition_unavailable_recovery_answer()
 
 
 async def _unhandled_response_recovery_if_needed(
@@ -1103,10 +1412,13 @@ async def _unhandled_response_recovery_if_needed(
     )
     if composed:
         return composed
+    return _llm_composition_unavailable_recovery_answer()
+
+
+def _llm_composition_unavailable_recovery_answer() -> str:
     return (
-        "I can help turn that into a grounded historical experiment. Give me a "
-        "symbol, rough period, or market idea, and I will shape the closest "
-        "runnable test."
+        "I couldn't shape that cleanly just now. Try giving me an asset and rough "
+        "time window, and I'll turn it into the closest runnable historical test."
     )
 
 
@@ -2350,10 +2662,6 @@ def _strategy_has_execution_anchor(strategy: StrategySummary) -> bool:
             strategy.extra_parameters,
         )
     )
-
-
-def _unanchored_strategy_route_response() -> str:
-    return "I'm here. Tell me the investing idea you want to test."
 
 
 def _dedupe_unsupported_constraints(

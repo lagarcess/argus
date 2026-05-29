@@ -44,6 +44,7 @@ from argus.agent_runtime.signal_rule_repair import (
 )
 from argus.agent_runtime.stages.interpret_types import (
     CapabilityQuestionFocus,
+    ContextQuestionFocus,
     InterpretationRequest,
     ResultFollowupFocus,
     StructuredInterpretation,
@@ -109,6 +110,24 @@ class CapabilitySideQuestionAudit(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class ContextQuestionAudit(BaseModel):
+    is_context_question: bool = Field(
+        description=(
+            "True only when the current user message asks for broad market, macro, "
+            "corporate-event, or movers context rather than supplying executable "
+            "strategy details."
+        )
+    )
+    focus: ContextQuestionFocus | None = Field(
+        default=None,
+        description=(
+            "Context focus when is_context_question is true. Use macro_context, "
+            "corporate_events, or market_movers."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
 class AssetGroundingAudit(BaseModel):
     grounded_symbols: list[str] = Field(
         default_factory=list,
@@ -141,6 +160,22 @@ class StrategyFamilyContinuityAudit(BaseModel):
             "True when a money amount in the current interpretation is a total budget, "
             "starting principal, or cap rather than a recurring DCA contribution."
         ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class DcaContributionRoleAudit(BaseModel):
+    recurring_contribution_explicit: bool = Field(
+        description=(
+            "True only when the current user message clearly states the money amount "
+            "as the amount invested on each recurring DCA purchase."
+        )
+    )
+    total_budget_not_recurring: bool = Field(
+        description=(
+            "True when the money amount is a total budget, starting capital, or "
+            "capital available across the whole DCA plan rather than each purchase."
+        )
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
@@ -572,7 +607,10 @@ class OpenRouterStructuredInterpreter:
             "field_provenance.capital_amount='recurring_contribution' only if the user "
             "explicitly stated that recurring contribution in the message; use "
             "'total_capital' when the number is merely a total budget, available cash, or "
-            "starting principal.\n\n"
+            "starting principal. When you set cadence, set "
+            "field_provenance.cadence='explicit_user' only when the user explicitly "
+            "stated the purchase schedule in the current message or visible active "
+            "draft context. Never infer monthly from a multi-year date range.\n\n"
             "If the user explicitly says buy and hold, hold, or buy-and-hold, classify it as "
             "buy_and_hold even when the sentence also contains a start date like Jan 1. "
             "A start date is the backtest period, not entry logic.\n\n"
@@ -952,6 +990,8 @@ def _response_needs_capability_side_question_audit(
 ) -> bool:
     if response.capability_question_focus is not None:
         return False
+    if response.context_question_focus is not None:
+        return False
     if response.semantic_turn_act in {
         "approval",
         "retry_failed_action",
@@ -968,6 +1008,12 @@ def _response_needs_capability_side_question_audit(
     if pending_field.split("[", 1)[0] == "refinement":
         return False
     if pending_field:
+        return True
+    if (
+        response.intent == "conversation_followup"
+        and response.semantic_turn_act == "educational_question"
+        and bool(response.assistant_response)
+    ):
         return True
     return _is_vague_strategy_start(response)
 
@@ -994,6 +1040,178 @@ def _capability_side_question_audit_messages(
                 "approvals, result follow-ups, market-news/feed requests, or provider "
                 "data requests. Choose one focus value only when true: "
                 "supported_indicators, supported_strategies, limits, assets, or general."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Current structured interpretation: "
+                f"{response.model_dump(mode='json', exclude_none=True)}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"Pending requested field, if any: {pending_field or 'none'}",
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+async def _context_question_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+    force: bool = False,
+) -> LLMInterpretationResponse:
+    if not force and not _response_needs_context_question_audit(
+        response=response, request=request
+    ):
+        return response
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=_context_question_audit_messages(
+                response=response,
+                request=request,
+            ),
+            schema_model=ContextQuestionAudit,
+            schema_name="ContextQuestionAudit",
+            model_name=preferred_model,
+        )
+    except Exception as exc:
+        log_openrouter_failure(
+            task="interpretation",
+            model_name=preferred_model,
+            exc=exc,
+            message="Context-question audit failed; preserving primary interpretation",
+        )
+        return response
+    if (
+        not isinstance(audit, ContextQuestionAudit)
+        or not audit.is_context_question
+        or audit.focus is None
+        or audit.confidence < 0.6
+    ):
+        return response
+    return response.model_copy(
+        update={
+            "intent": "conversation_followup",
+            "task_relation": "continue",
+            "requires_clarification": False,
+            "candidate_strategy_draft": LLMStrategyDraft(
+                raw_user_phrasing=request.current_user_message
+            ),
+            "missing_required_fields": [],
+            "ambiguous_fields": [],
+            "unsupported_constraints": [],
+            "assistant_response": None,
+            "semantic_turn_act": "educational_question",
+            "capability_question_focus": None,
+            "context_question_focus": audit.focus,
+            "artifact_target": "none",
+            "uses_latest_result_context": False,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "context_question_audit",
+                    ]
+                )
+            ),
+        }
+    )
+
+
+def _response_needs_context_question_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.context_question_focus is not None:
+        return False
+    if response.capability_question_focus not in {
+        None,
+        "general",
+        "limits",
+        "supported_strategies",
+    }:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "retry_failed_action",
+        "result_followup",
+    }:
+        return False
+    if _llm_strategy_draft_has_concrete_execution_target(
+        response.candidate_strategy_draft
+    ):
+        return False
+    pending_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).strip()
+    if pending_field.split("[", 1)[0] == "refinement":
+        return False
+    if _response_targets_latest_result_followup(response=response, request=request):
+        return False
+    if (
+        response.intent == "strategy_drafting"
+        and response.semantic_turn_act == "unsupported_request"
+        and response.requires_clarification
+        and not response.missing_required_fields
+    ):
+        return True
+    return (
+        response.intent == "conversation_followup"
+        and response.semantic_turn_act == "educational_question"
+    )
+
+
+async def _unsupported_context_question_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if (
+        response.intent != "unsupported_or_out_of_scope"
+        or response.semantic_turn_act != "unsupported_request"
+        or response.missing_required_fields
+        or response.context_question_focus is not None
+    ):
+        return None
+    repaired = await _context_question_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+        force=True,
+    )
+    return repaired if repaired is not response else None
+
+
+def _context_question_audit_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    pending_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).strip()
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's runtime arbitration audit. Decide whether the "
+                "current user message is standalone market or macro context "
+                "curiosity that should be answered as bounded context and connected "
+                "to a historical experiment. Use semantic meaning, not keywords. "
+                "Return true for macro backdrop, inflation/rates/Fed/recession, "
+                "corporate events such as splits/dividends/earnings context, or "
+                "movers/most-active/unusual-move curiosity. Return false when the "
+                "user supplies executable strategy details, answers a pending field, "
+                "asks what Argus supports, approves a run, or targets a visible "
+                "result. Choose one focus only when true: macro_context, "
+                "corporate_events, or market_movers."
             ),
         },
         {
@@ -1126,6 +1344,110 @@ def _response_needs_strategy_family_continuity_audit(
     )
 
 
+async def _dca_contribution_role_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    if not _response_needs_dca_contribution_role_audit(response):
+        return response
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=_dca_contribution_role_audit_messages(
+                response=response,
+                request=request,
+            ),
+            schema_model=DcaContributionRoleAudit,
+            schema_name="DcaContributionRoleAudit",
+            model_name=preferred_model,
+        )
+    except Exception as exc:
+        log_openrouter_failure(
+            task="interpretation",
+            model_name=preferred_model,
+            exc=exc,
+            message="DCA contribution role audit failed; preserving primary interpretation",
+        )
+        return response
+    if (
+        not isinstance(audit, DcaContributionRoleAudit)
+        or audit.confidence < 0.65
+        or audit.recurring_contribution_explicit
+        or not audit.total_budget_not_recurring
+    ):
+        return response
+    draft = response.candidate_strategy_draft.model_copy(deep=True)
+    _move_dca_total_budget_out_of_recurring_amount(draft)
+    missing_required_fields = list(
+        dict.fromkeys([*response.missing_required_fields, "capital_amount"])
+    )
+    return response.model_copy(
+        update={
+            "intent": "strategy_drafting",
+            "requires_clarification": True,
+            "candidate_strategy_draft": draft,
+            "missing_required_fields": missing_required_fields,
+            "assistant_response": None,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "dca_total_budget_role_audited",
+                    ]
+                )
+            ),
+        }
+    )
+
+
+def _response_needs_dca_contribution_role_audit(
+    response: LLMInterpretationResponse,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    return (
+        canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
+        and draft.capital_amount is not None
+        and response.semantic_turn_act not in {
+            "approval",
+            "result_followup",
+            "retry_failed_action",
+        }
+    )
+
+
+def _dca_contribution_role_audit_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's DCA money-role audit. Decide whether the money "
+                "amount in the current user message is the recurring contribution "
+                "for each DCA purchase, or a total budget/capital amount for the "
+                "whole plan. Use semantic meaning, not keywords. A recurring "
+                "contribution is explicit only when the user clearly ties the amount "
+                "to each recurring purchase. If the amount is merely available "
+                "capital, a budget, a starting principal, or an amount spread over "
+                "the date range, mark total_budget_not_recurring true. If ambiguous, "
+                "do not treat it as a recurring contribution."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Current structured interpretation: "
+                f"{response.model_dump(mode='json', exclude_none=True)}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
 def _strategy_family_continuity_audit_messages(
     *,
     response: LLMInterpretationResponse,
@@ -1206,7 +1528,24 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
+    response = await _latest_result_routing_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if _response_targets_latest_result_followup(response=response, request=request):
+        return response
+    response = await _context_question_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
     response = await _strategy_family_continuity_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    response = await _dca_contribution_role_audited_response(
         response=response,
         preferred_model=preferred_model,
         request=request,
@@ -1228,16 +1567,16 @@ async def _response_ready_for_runtime(
                     preferred_model=preferred_model,
                     request=request,
                 )
+            context_response = await _unsupported_context_question_audited_response(
+                response=response,
+                preferred_model=preferred_model,
+                request=request,
+            )
+            if context_response is not None:
+                return context_response
         return response
     response = _vague_strategy_start_as_guidance(response)
     if _is_vague_strategy_start_guidance(response):
-        return response
-    response = await _latest_result_routing_audited_response(
-        response=response,
-        preferred_model=preferred_model,
-        request=request,
-    )
-    if _response_targets_latest_result_followup(response=response, request=request):
         return response
     response = _augment_strategy_assets_from_resolvable_context(
         response=response,
@@ -1336,6 +1675,13 @@ async def _response_ready_for_runtime(
                 preferred_model=preferred_model,
                 request=request,
             )
+        context_response = await _unsupported_context_question_audited_response(
+            response=response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if context_response is not None:
+            return context_response
     audited_response = await _audit_stated_run_field_fidelity(
         response=response,
         preferred_model=preferred_model,
@@ -4271,8 +4617,6 @@ def _validate_capability_boundaries(
     if canonical_type == "signal_strategy":
         strategy.strategy_type = canonical_type
         _apply_signal_strategy_defaults(strategy)
-    if canonical_type == "dca_accumulation" and not strategy.cadence:
-        strategy.cadence = "monthly"
     if (
         canonical_type == "dca_accumulation"
         and strategy.capital_amount is not None
@@ -4280,11 +4624,38 @@ def _validate_capability_boundaries(
     ):
         strategy.capital_amount = None
         strategy.sizing_mode = None
+    if (
+        canonical_type == "dca_accumulation"
+        and strategy.cadence not in (None, "", [], {})
+        and not _dca_cadence_has_user_provenance(strategy=strategy, request=request)
+    ):
+        ungrounded_cadence = str(strategy.cadence).casefold()
+        strategy.cadence = None
+        strategy.assumptions = [
+            assumption
+            for assumption in strategy.assumptions
+            if ungrounded_cadence not in str(assumption).casefold()
+        ]
+    if canonical_type == "dca_accumulation":
+        _ensure_dca_missing_execution_fields(strategy=strategy, response=response)
     _remove_stale_indicator_constraints(
         response=response,
         strategy=strategy,
         current_message=request.current_user_message,
     )
+
+
+def _ensure_dca_missing_execution_fields(
+    *,
+    strategy: StrategySummary,
+    response: LLMInterpretationResponse,
+) -> None:
+    missing = list(response.missing_required_fields or [])
+    if strategy.capital_amount is None and "capital_amount" not in missing:
+        missing.append("capital_amount")
+    if strategy.cadence in (None, "", [], {}) and "cadence" not in missing:
+        missing.append("cadence")
+    response.missing_required_fields = missing
 
 
 def _remove_unstated_model_defaults(strategy: StrategySummary) -> None:
@@ -4488,6 +4859,54 @@ def _dca_amount_has_user_provenance(
         and prior.capital_amount is not None
         and strategy.capital_amount == prior.capital_amount
     )
+
+
+def _dca_cadence_has_user_provenance(
+    *,
+    strategy: StrategySummary,
+    request: InterpretationRequest,
+) -> bool:
+    cadence = str(strategy.cadence or "").strip().casefold()
+    if not cadence:
+        return False
+    field_provenance = strategy.extra_parameters.get("field_provenance")
+    if isinstance(field_provenance, dict):
+        cadence_source = field_provenance.get("cadence")
+        if cadence_source in {"user", "explicit_user", "prior", "visible_draft"}:
+            return True
+    if _message_contains_cadence_evidence(
+        cadence=cadence,
+        message=request.current_user_message,
+    ):
+        return True
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return False
+    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    return (
+        prior is not None
+        and prior.cadence not in (None, "", [], {})
+        and str(prior.cadence).strip().casefold() == cadence
+    )
+
+
+def _message_contains_cadence_evidence(*, cadence: str, message: str) -> bool:
+    words = set(_field_fidelity_tokens(message.casefold()))
+    compact_message = "".join(
+        char
+        for char in message.casefold()
+        if char.isalnum()
+    )
+    evidence_words = {
+        "daily": {"daily", "day", "days"},
+        "weekly": {"weekly", "week", "weeks"},
+        "biweekly": {"biweekly", "bi-weekly"},
+        "monthly": {"monthly", "month", "months"},
+        "quarterly": {"quarterly", "quarter", "quarters"},
+    }.get(cadence, {cadence})
+    if words.intersection(evidence_words):
+        return True
+    return cadence.replace("-", "") in compact_message
 
 
 def _strategy_has_indicator_parameters(strategy: StrategySummary) -> bool:

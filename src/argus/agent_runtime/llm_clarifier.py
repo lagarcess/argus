@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
@@ -20,6 +20,16 @@ from argus.llm.openrouter import (
     record_openrouter_route_receipt,
     resolve_openrouter_model,
 )
+
+ClarificationDetailTarget = Literal[
+    "asset",
+    "date_window",
+    "recurring_purchase_amount",
+    "purchase_cadence",
+    "rule_definition",
+    "assumption",
+    "simplification_choice",
+]
 
 
 class ClarificationRequest(BaseModel):
@@ -38,6 +48,14 @@ class ClarificationResponse(BaseModel):
     question: str = Field(
         description="The exact natural-language response the user should see."
     )
+    direct_question: str = Field(
+        default="",
+        description=(
+            "The shortest direct question that asks for the required user input. "
+            "For DCA sizing, this should ask for the recurring purchase amount; "
+            "when cadence is missing, ask for cadence too."
+        ),
+    )
     question_targets: list[PendingNeedName] = Field(
         description=(
             "The semantic needs directly asked for by question. Copy "
@@ -48,6 +66,14 @@ class ClarificationResponse(BaseModel):
         description=(
             "True only when question clearly gives the user a recoverable next step."
         )
+    )
+    detail_targets: list[ClarificationDetailTarget] = Field(
+        default_factory=list,
+        description=(
+            "Specific execution details the question asks for. For DCA sizing, use "
+            "recurring_purchase_amount; if cadence is missing too, include "
+            "purchase_cadence."
+        ),
     )
 
 
@@ -85,7 +111,7 @@ class OpenRouterClarificationGenerator:
                 response=response,
                 request=request,
             ):
-                yield response.question.strip()
+                yield _render_clarification_response(response, request=request).strip()
                 self.last_status = "used"
                 return
             _record_invalid_clarification_response(
@@ -125,7 +151,7 @@ class OpenRouterClarificationGenerator:
                 response=response,
                 request=request,
             ):
-                yield response.question.strip()
+                yield _render_clarification_response(response, request=request).strip()
                 self.last_status = "fallback_used"
                 return
             _record_invalid_clarification_response(
@@ -165,6 +191,7 @@ class OpenRouterClarificationGenerator:
             "optional_parameter_choices": request.optional_parameter_choices,
             "response_intent": request.response_intent,
             "expected_question_targets": sorted(_expected_question_targets(request)),
+            "expected_detail_targets": sorted(_expected_detail_targets(request)),
         }
         return [
             SystemMessage(
@@ -184,7 +211,12 @@ class OpenRouterClarificationGenerator:
                     "expected_question_targets is present in the context, copy it "
                     "exactly and ask only for those needs. When it contains more "
                     "than one target, the user-facing question must visibly ask "
-                    "for every target in one concise response. Set directly_asks_user "
+                    "for every target in one concise response. Also copy "
+                    "expected_detail_targets into detail_targets when present. "
+                    "When the expected target includes DCA sizing, direct_question "
+                    "must contain the concrete question the user needs to answer, "
+                    "not just an acknowledgement that another detail is needed. "
+                    "Set directly_asks_user "
                     "to true only when the question clearly gives the user a "
                     "recoverable next step.\n\n"
                     "For beginner or vague investing ideas, do not write a numbered "
@@ -203,7 +235,11 @@ class OpenRouterClarificationGenerator:
                     "that concept to the closest supported proxy and educate briefly "
                     "without making the user feel wrong. If the user says a stock "
                     "looked cheap, name P/E or valuation as valid context before "
-                    "offering a runnable proxy. Keep date guidance aligned with data "
+                    "offering a runnable proxy. For recurring-buy/DCA drafts, total "
+                    "budget is not automatically the per-purchase amount. If the "
+                    "expected target is sizing_amount, ask for the recurring purchase "
+                    "amount; if cadence is still missing, ask how often purchases "
+                    "should happen too. Keep date guidance aligned with data "
                     "availability truth: equity launch history starts in 2016, and "
                     "currency-pair intraday history has a bounded recent-data window. "
                     "For currency-pair tests, use 1h, 4h, or 1D rather than implying "
@@ -258,8 +294,187 @@ def _clarification_response_matches_request(
     expected_targets = _expected_question_targets(request)
     response_targets = set(response.question_targets)
     if expected_targets:
-        return response_targets == expected_targets
-    return not response_targets
+        if response_targets != expected_targets:
+            return False
+    elif response_targets:
+        return False
+    if _expects_dca_sizing_detail(request):
+        expected_detail_targets = _expected_detail_targets(request)
+        if expected_detail_targets and not expected_detail_targets.issubset(
+            set(response.detail_targets)
+        ):
+            return False
+        if not response.direct_question.strip():
+            return False
+    return True
+
+
+def _render_clarification_response(
+    response: ClarificationResponse,
+    *,
+    request: ClarificationRequest,
+) -> str:
+    question = response.question.strip()
+    contract_question = _contract_direct_question(request)
+    direct_question = contract_question or response.direct_question.strip()
+    if direct_question:
+        context = _clarification_context_without_embedded_question(
+            question,
+            direct_question=direct_question,
+            keep_first_sentence_only=bool(contract_question),
+        )
+        if context:
+            return f"{context} {direct_question}".strip()
+        return direct_question
+    return question
+
+
+def _contract_direct_question(request: ClarificationRequest) -> str:
+    expected_detail_targets = _expected_detail_targets(request)
+    missing_fields = set(request.missing_required_fields)
+    if request.candidate_strategy_draft.strategy_type != "dca_accumulation":
+        return ""
+    if (
+        expected_detail_targets == {
+            "recurring_purchase_amount",
+            "purchase_cadence",
+        }
+        or (
+            {"capital_amount", "cadence"}.issubset(missing_fields)
+            and not {"asset_universe", "date_range"}.intersection(missing_fields)
+        )
+    ):
+        return (
+            "How much should each recurring purchase be, and how often should those "
+            "purchases happen?"
+        )
+    return ""
+
+
+def _clarification_context_without_embedded_question(
+    question: str,
+    *,
+    direct_question: str,
+    keep_first_sentence_only: bool = False,
+) -> str:
+    if keep_first_sentence_only:
+        context = _first_sentence(question)
+        return context if context != question else ""
+    sentences = _sentences(question)
+    if not sentences:
+        return ""
+    direct_words = _content_word_set(direct_question)
+    while sentences and _is_embedded_direct_question(
+        sentences[-1],
+        direct_words=direct_words,
+    ):
+        sentences.pop()
+    context = " ".join(sentences).strip()
+    if not context:
+        return ""
+    if context[-1:] not in ".!:":
+        context += "."
+    return context
+
+
+def _sentences(text: str) -> list[str]:
+    sentences: list[str] = []
+    start = 0
+    for index, char in enumerate(text):
+        if not _is_sentence_boundary(text, index, char):
+            continue
+        end = index + 1
+        while end < len(text) and text[end] in "\"')]}":
+            end += 1
+        sentence = text[start:end].strip()
+        if sentence:
+            sentences.append(sentence)
+        start = end
+    trailing = text[start:].strip()
+    if trailing:
+        sentences.append(trailing)
+    return sentences
+
+
+def _is_sentence_boundary(text: str, index: int, char: str) -> bool:
+    if char in "?!":
+        return True
+    if char != ".":
+        return False
+    if _is_decimal_point(text, index):
+        return False
+    if _is_common_abbreviation_period(text, index):
+        return False
+    next_index = index + 1
+    while next_index < len(text) and text[next_index] in "\"')]}":
+        next_index += 1
+    while next_index < len(text) and text[next_index].isspace():
+        next_index += 1
+    if next_index >= len(text):
+        return True
+    next_char = text[next_index]
+    if next_char in ",;:":
+        return False
+    return not next_char.islower()
+
+
+def _is_decimal_point(text: str, index: int) -> bool:
+    return (
+        index > 0
+        and index + 1 < len(text)
+        and text[index - 1].isdigit()
+        and text[index + 1].isdigit()
+    )
+
+
+def _is_common_abbreviation_period(text: str, index: int) -> bool:
+    compact_window = "".join(
+        char.lower()
+        for char in text[max(0, index - 4) : index + 1]
+        if not char.isspace()
+    )
+    if compact_window.endswith(("e.g.", "i.e.")):
+        return True
+    if index + 1 < len(text) and text[index + 1].islower():
+        return True
+    return False
+
+
+def _is_embedded_direct_question(
+    sentence: str,
+    *,
+    direct_words: set[str],
+) -> bool:
+    if "?" in sentence:
+        return True
+    sentence_words = _content_word_set(sentence)
+    if not direct_words or not sentence_words:
+        return False
+    overlap = len(sentence_words.intersection(direct_words))
+    return overlap / len(direct_words) >= 0.6
+
+
+def _content_word_set(text: str) -> set[str]:
+    normalized_chars = [
+        char.lower() if char.isalnum() else " "
+        for char in text
+    ]
+    return {
+        token
+        for token in "".join(normalized_chars).split()
+        if len(token) > 2
+    }
+
+
+def _first_sentence(question: str) -> str:
+    stops = [
+        index
+        for index in (question.find("."), question.find("?"), question.find("!"))
+        if index >= 0
+    ]
+    if not stops:
+        return question.strip()
+    return question[: min(stops) + 1].strip()
 
 
 def _expected_question_targets(request: ClarificationRequest) -> set[PendingNeedName]:
@@ -268,6 +483,39 @@ def _expected_question_targets(request: ClarificationRequest) -> set[PendingNeed
         return set()
     valid_names = set(PendingNeedName.__args__)
     return {value for value in raw_needs if value in valid_names}
+
+
+def _expected_detail_targets(
+    request: ClarificationRequest,
+) -> set[ClarificationDetailTarget]:
+    expected_targets = _expected_question_targets(request)
+    strategy = request.candidate_strategy_draft
+    details: set[ClarificationDetailTarget] = set()
+    if "asset_target" in expected_targets:
+        details.add("asset")
+    if "period" in expected_targets:
+        details.add("date_window")
+    if "rule_definition" in expected_targets:
+        details.add("rule_definition")
+    if "assumption" in expected_targets:
+        details.add("assumption")
+    if "simplification_choice" in expected_targets:
+        details.add("simplification_choice")
+    if "sizing_amount" in expected_targets:
+        if strategy.strategy_type == "dca_accumulation":
+            details.add("recurring_purchase_amount")
+        else:
+            details.add("assumption")
+    if "schedule" in expected_targets:
+        details.add("purchase_cadence")
+    return details
+
+
+def _expects_dca_sizing_detail(request: ClarificationRequest) -> bool:
+    return (
+        request.candidate_strategy_draft.strategy_type == "dca_accumulation"
+        and "sizing_amount" in _expected_question_targets(request)
+    )
 
 
 def _record_invalid_clarification_response(
