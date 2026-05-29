@@ -98,6 +98,7 @@ from argus.context import (
     fetch_alpaca_market_movers_packet,
 )
 from argus.domain.indicators import (
+    EXECUTABLE_INDICATORS,
     IndicatorExecutionSpec,
     executable_indicator_spec,
     normalize_indicator_parameters,
@@ -945,9 +946,18 @@ async def _compose_natural_capability_answer(
         {"role": "user", "content": current_user_message},
     ]
     try:
-        return await invoke_openrouter_chat_completion(
+        answer = await invoke_openrouter_chat_completion(
             task="chat_composer",
             messages=messages,
+        )
+        if _capability_answer_respects_contract(
+            answer=answer,
+            focus=focus,
+        ):
+            return answer
+        return compose_capability_answer(
+            focus=focus,
+            contract=capability_contract,
         )
     except Exception:
         if focus == "supported_indicators":
@@ -961,6 +971,112 @@ async def _compose_natural_capability_answer(
         )
 
 
+def _capability_answer_respects_contract(
+    *,
+    answer: str | None,
+    focus: CapabilityQuestionFocus,
+) -> bool:
+    if not answer:
+        return False
+    if focus != "supported_indicators":
+        return True
+    return not _answer_contradicts_supported_indicators(answer)
+
+
+def _answer_contradicts_supported_indicators(answer: str) -> bool:
+    for sentence in _plain_sentences(answer):
+        tokens = _plain_word_tokens(sentence)
+        if not tokens:
+            continue
+        indicator_spans = _supported_indicator_token_spans(tokens)
+        if not indicator_spans:
+            continue
+        negative_positions = _negative_support_claim_positions(tokens)
+        for start, end in indicator_spans:
+            if any(start - 3 <= position <= end + 6 for position in negative_positions):
+                return True
+    return False
+
+
+def _plain_sentences(text: str) -> list[str]:
+    sentences: list[str] = []
+    start = 0
+    for index, char in enumerate(str(text or "")):
+        if char not in ".?!":
+            continue
+        sentence = text[start : index + 1].strip()
+        if sentence:
+            sentences.append(sentence)
+        start = index + 1
+    trailing = text[start:].strip()
+    if trailing:
+        sentences.append(trailing)
+    return sentences
+
+
+def _plain_word_tokens(text: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    for char in str(text or "").casefold():
+        if char.isalnum():
+            current.append(char)
+            continue
+        if char == "'":
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
+
+
+def _supported_indicator_token_spans(tokens: list[str]) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for spec in EXECUTABLE_INDICATORS.values():
+        terms = (spec.key, spec.label, *spec.aliases)
+        for term in terms:
+            term_tokens = _plain_word_tokens(term)
+            if not term_tokens:
+                continue
+            spans.extend(_token_sequence_spans(tokens, term_tokens))
+    return spans
+
+
+def _token_sequence_spans(
+    tokens: list[str],
+    sequence: list[str],
+) -> list[tuple[int, int]]:
+    if not sequence or len(sequence) > len(tokens):
+        return []
+    spans: list[tuple[int, int]] = []
+    last_start = len(tokens) - len(sequence)
+    for start in range(last_start + 1):
+        end = start + len(sequence)
+        if tokens[start:end] == sequence:
+            spans.append((start, end - 1))
+    return spans
+
+
+def _negative_support_claim_positions(tokens: list[str]) -> set[int]:
+    positions: set[int] = set()
+    negative_words = {"not", "never", "unsupported", "unavailable"}
+    support_words = {"allowed", "available", "executable", "runnable", "supported"}
+    action_words = {"execute", "run", "use"}
+    blocking_words = {"cannot", "cant"}
+    for index, token in enumerate(tokens):
+        if token in {"unsupported", "unavailable"}:
+            positions.add(index)
+            continue
+        previous = set(tokens[max(0, index - 3) : index])
+        if token in support_words and previous.intersection(negative_words):
+            positions.add(index)
+            continue
+        if token in action_words and previous.intersection(blocking_words):
+            positions.add(index)
+    return positions
+
+
 async def _compose_natural_context_curiosity_answer(
     *,
     focus: ContextQuestionFocus,
@@ -969,6 +1085,11 @@ async def _compose_natural_context_curiosity_answer(
 ) -> str | None:
     fact_packet = _context_curiosity_fact_packet(focus)
     live_facts = await _live_context_curiosity_facts(focus)
+    if focus == "market_movers" and not live_facts.packet_symbols:
+        return _packet_grounded_context_recovery_answer(
+            focus=focus,
+            live_facts=live_facts,
+        )
     provenance_rule = (
         "If you use visible artifact context, say so naturally with phrases like "
         "'from this result' or 'from the current draft'."
@@ -1125,6 +1246,8 @@ async def _fetch_standalone_market_movers_packet() -> ContextPacket | None:
             timeout=_STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS,
         )
     except Exception:
+        return None
+    if packet is None:
         return None
     freshness = context_packet_freshness(packet)
     if freshness == "stale":

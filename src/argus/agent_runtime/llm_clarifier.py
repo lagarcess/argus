@@ -359,6 +359,9 @@ def _clarification_context_without_embedded_question(
 ) -> str:
     if keep_first_sentence_only:
         context = _first_sentence(question)
+        direct_words = _content_word_set(direct_question)
+        if _is_embedded_direct_question(context, direct_words=direct_words):
+            return ""
         return context if context != question else ""
     sentences = _sentences(question)
     if not sentences:

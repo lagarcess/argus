@@ -2253,6 +2253,61 @@ async def test_llm_interpreter_clears_ungrounded_lowercase_asset_extraction(
 
 
 @pytest.mark.asyncio
+async def test_asset_grounding_audit_clears_lowercase_pronoun_even_with_run_context(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        calls.append(kwargs["schema_name"])
+        return interpreter_module.AssetGroundingAudit(
+            grounded_symbols=[],
+            confidence=0.2,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants to buy it last year.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="buy it last year",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy IT last year.",
+            asset_universe=["IT"],
+            date_range="last year",
+        ),
+        missing_required_fields=["capital_amount"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="buy it last year",
+        recent_thread_history=[],
+        user=UserState(user_id="u1"),
+    )
+
+    audited = await interpreter_module._asset_grounding_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls == ["AssetGroundingAudit"]
+    assert audited.candidate_strategy_draft.asset_universe == []
+    assert "asset_grounding_audit_low_confidence_cleared_suspicious_symbols" in (
+        audited.reason_codes
+    )
+
+
+@pytest.mark.asyncio
 async def test_llm_interpreter_preserves_recent_dca_strategy_family_when_user_supplies_run_facts(
     monkeypatch,
 ) -> None:

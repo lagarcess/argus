@@ -1002,6 +1002,58 @@ def test_openrouter_clarifier_keeps_decimal_and_abbreviation_in_contract_context
     assert "How much should each recurring purchase be" in question
 
 
+def test_openrouter_clarifier_does_not_duplicate_contract_question_when_first(
+    monkeypatch,
+) -> None:
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, schema_name, model_name
+        return ClarificationResponse(
+            question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen? I can use that to make the DCA runnable."
+            ),
+            direct_question=(
+                "How much should each recurring purchase be, and how often should "
+                "those purchases happen?"
+            ),
+            question_targets=["sizing_amount", "schedule"],
+            directly_asks_user=True,
+            detail_targets=["recurring_purchase_amount", "purchase_cadence"],
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_clarifier.invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    clarifier = OpenRouterClarificationGenerator()
+    question = clarifier(
+        clarifier.request_model(
+            current_user_message=(
+                "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+                "$200.00 of capital"
+            ),
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                asset_universe=["LYFT"],
+                asset_class="equity",
+                date_range={"start": "2020-02-01", "end": "2025-02-28"},
+                extra_parameters={"initial_capital": 200},
+            ),
+            missing_required_fields=["capital_amount", "cadence"],
+            response_intent={
+                "kind": "clarification",
+                "semantic_needs": ["sizing_amount", "schedule"],
+            },
+        )
+    )
+
+    assert question is not None
+    assert question.count("How much should each recurring purchase be") == 1
+
+
 def test_openrouter_clarifier_uses_missing_fields_for_dca_amount_and_cadence(
     monkeypatch,
 ) -> None:

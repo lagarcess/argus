@@ -9,6 +9,7 @@ import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
+    AssetGroundingAudit,
     FocusedStrategyExtraction,
     LLMAmbiguousField,
     LLMInterpretationResponse,
@@ -553,6 +554,11 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
                     indicator="rsi",
                 ),
             )
+        if schema_model is AssetGroundingAudit:
+            return AssetGroundingAudit(
+                grounded_symbols=["TSLA"],
+                confidence=0.9,
+            )
         assert schema_model is FocusedStrategyExtraction
         return FocusedStrategyExtraction(
             is_testable_strategy=True,
@@ -589,8 +595,9 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
     )
 
     assert result is not None
-    assert seen_schema_names[:2] == [
+    assert seen_schema_names[:3] == [
         "LLMInterpretationResponse",
+        "AssetGroundingAudit",
         "FocusedStrategyExtraction",
     ]
     parameters = result.candidate_strategy_draft.extra_parameters[

@@ -272,6 +272,37 @@ def test_supported_indicator_capability_composer_failure_uses_registry_fallback(
         assert spec.label in answer
 
 
+def test_supported_indicator_capability_contradiction_uses_registry_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _contradictory_chat_completion(**_: Any) -> str:
+        return "Bollinger Bands are not supported yet, but RSI is available."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _contradictory_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks whether Bollinger Bands are supported.",
+        semantic_turn_act="educational_question",
+        capability_question_focus="supported_indicators",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="Can I use Bollinger Bands?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "not supported" not in answer.lower()
+    for spec in EXECUTABLE_INDICATORS.values():
+        assert spec.label in answer
+
+
 def test_strategy_family_education_keeps_llm_language_over_registry_copy() -> None:
     response = StructuredInterpretation(
         intent="conversation_followup",
@@ -569,6 +600,49 @@ def test_standalone_event_context_uses_context_fact_bank_not_limits(
         assert completion_calls == 1
     assert "Alpaca" not in fact_packet
     assert "provider" not in captured["messages"][0]["content"].lower()
+
+
+def test_market_movers_without_packet_does_not_return_hallucinated_symbols(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completion_calls = 0
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.fetch_alpaca_market_movers_packet",
+        lambda **_: None,
+    )
+
+    async def _fake_chat_completion(**_: Any) -> str:
+        nonlocal completion_calls
+        completion_calls += 1
+        return "Current top movers include TSLA, NVDA, and AAPL right now."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _fake_chat_completion,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User asks for current top market movers.",
+        semantic_turn_act="educational_question",
+        context_question_focus="market_movers",
+        artifact_target="none",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="what are the top market movers?",
+        response=response,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert completion_calls == 0
+    assert "TSLA" not in answer
+    assert "NVDA" not in answer
+    assert "AAPL" not in answer
+    assert "historical test" in answer
 
 
 def test_empty_educational_turn_uses_chat_tier_recovery_not_blank_response(

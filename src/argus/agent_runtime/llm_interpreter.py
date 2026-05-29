@@ -769,10 +769,6 @@ async def _asset_grounding_audited_response(
     )
     if not suspicious_symbols:
         return response
-    if _llm_strategy_draft_has_non_asset_run_context(
-        response.candidate_strategy_draft
-    ):
-        return response
     try:
         audit = await invoke_openrouter_json_schema(
             task="interpretation",
@@ -798,7 +794,11 @@ async def _asset_grounding_audited_response(
             reason_code="asset_grounding_audit_unavailable_cleared_suspicious_symbols",
         )
     if not isinstance(audit, AssetGroundingAudit) or audit.confidence < 0.6:
-        return response
+        return _response_without_ungrounded_symbols(
+            response=response,
+            grounded_symbols=[],
+            reason_code="asset_grounding_audit_low_confidence_cleared_suspicious_symbols",
+        )
     return _response_without_ungrounded_symbols(
         response=response,
         grounded_symbols=audit.grounded_symbols,
@@ -829,30 +829,6 @@ def _suspicious_lowercase_asset_symbols(
         if folded in lower_tokens:
             suspicious.append(symbol)
     return suspicious
-
-
-def _llm_strategy_draft_has_non_asset_run_context(draft: LLMStrategyDraft) -> bool:
-    return any(
-        [
-            bool(draft.date_range),
-            bool(draft.timeframe),
-            bool(draft.entry_logic),
-            bool(draft.exit_logic),
-            bool(draft.entry_rule),
-            bool(draft.exit_rule),
-            bool(draft.rule_spec),
-            bool(draft.indicator),
-            draft.indicator_period is not None,
-            draft.entry_threshold is not None,
-            draft.exit_threshold is not None,
-            draft.capital_amount is not None,
-            draft.total_capital is not None,
-            draft.initial_capital is not None,
-            bool(draft.position_size),
-            bool(draft.risk_rules),
-            bool(draft.comparison_baseline),
-        ]
-    )
 
 
 def _response_without_ungrounded_symbols(
