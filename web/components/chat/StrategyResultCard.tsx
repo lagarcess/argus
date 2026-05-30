@@ -1,24 +1,37 @@
-import { ListTree, PencilLine, Save } from "lucide-react";
-import { StrategyResultPayload } from "./types";
+import { ChevronDown, ListTree, PencilLine, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { splitPeriodDisplay } from "./card-formatting";
-import ResultEquityChart from "./ResultEquityChart";
-import { type ChatActionOption } from "./types";
+import {
+  displayResultActionLabel,
+  heroDeltaEvidenceView,
+} from "@/lib/result-card-display";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
-import { displayResultActionLabel } from "@/lib/result-card-display";
+import ResultEquityChart from "./ResultEquityChart";
+import type { ChatActionOption, StrategyResultPayload } from "./types";
 
 type StrategyResultCardProps = {
   result: StrategyResultPayload;
   onAction?: (action: ChatActionOption) => void;
+  appearance?: "light" | "dark";
 };
 
-export default function StrategyResultCard({ result, onAction }: StrategyResultCardProps) {
+const actionClassName =
+  "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
+
+export default function StrategyResultCard({
+  appearance,
+  onAction,
+  result,
+}: StrategyResultCardProps) {
   const { t } = useTranslation();
-  const period = splitPeriodDisplay(result.period);
+  const view = heroDeltaEvidenceView(result);
   const symbols = result.symbols ?? [];
   const resultActions = result.actions ?? [];
-  const showBreakdownAction = resultActions.find((action) => action.type === "show_breakdown");
-  const refineStrategyAction = resultActions.find((action) => action.type === "refine_strategy");
+  const showBreakdownAction = resultActions.find(
+    (action) => action.type === "show_breakdown",
+  );
+  const refineStrategyAction = resultActions.find(
+    (action) => action.type === "refine_strategy",
+  );
   const saveAction = strategiesEnabled
     ? resultActions.find((action) => action.type === "save_strategy")
     : undefined;
@@ -36,73 +49,92 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
   const renderedActions = result.savedStrategyId || result.savingStrategy
     ? orderedActions.filter((action) => action.type !== "save_strategy")
     : orderedActions;
-  const showSavedState = strategiesEnabled && (result.savedStrategyId || result.savingStrategy);
-  const returnMetric = result.metrics.find((metric) => metric.label.toLowerCase().includes("return"));
-  const isNegative = returnMetric?.value.trim().startsWith("-");
-  const revealClass = isNegative ? "argus-result-reveal-caution" : "argus-result-reveal-positive";
-  const assumptionLine = result.assumptions?.filter(Boolean).join(" · ");
+  const showSavedState =
+    strategiesEnabled && (result.savedStrategyId || result.savingStrategy);
+  const revealClass =
+    view.hero.tone === "negative"
+      ? "argus-result-reveal-caution"
+      : "argus-result-reveal-positive";
+  const toneClassName =
+    view.hero.tone === "positive"
+      ? "text-[#5ba897]"
+      : view.hero.tone === "negative"
+        ? "text-[#d66d75]"
+        : "text-[#5a677d] dark:text-[#7da0ca]";
+  const trustGroups = [
+    t(
+      "chat.result_trust_strip",
+      "Historical simulation · No fees/slippage · Not advice",
+    ),
+  ];
+
   return (
-    <section className={`argus-card-reveal w-full rounded-[20px] border border-black/12 dark:border-white/12 bg-white dark:bg-[#1d2023] overflow-hidden ${revealClass}`}>
-      <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-black/8 dark:border-white/8">
+    <section
+      aria-label="Hero + Delta Evidence Card"
+      className={`argus-card-reveal ${revealClass} w-full overflow-hidden rounded-[20px] border border-[#c9c9cd] bg-white text-[#191c1f] dark:border-white/12 dark:bg-[#191c1f] dark:text-white`}
+    >
+      <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
         <div className="min-w-0">
-          {symbols.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <AssetSymbols symbols={symbols} />
-              <span className="text-[14px] font-medium leading-snug tracking-tight text-black dark:text-white sm:text-[15px]">
-                {result.strategyLabel ?? result.strategyName}
-              </span>
-            </div>
-          ) : (
-            <p className="text-[14px] sm:text-[15px] font-medium leading-snug tracking-tight text-black dark:text-white">
-              {result.strategyName}
-            </p>
-          )}
-          <p className="mt-1 text-[12px] leading-snug text-black/45 dark:text-white/45">
-            <span className="block">{period.label}</span>
-            {period.dates && <span className="block">{period.dates}</span>}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            {symbols.length > 0 && <AssetSymbols symbols={symbols} />}
+            <h3 className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px] text-[#191c1f] dark:text-white">
+              {result.strategyLabel ?? result.strategyName}
+            </h3>
+          </div>
+          <p className="mt-1.5 text-[13px] leading-snug tracking-[0.16px] text-[#8d969e]">
+            {view.timeframeDisplay
+              ? `${result.period} · ${view.timeframeDisplay}`
+              : result.period}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:text-white/70">
-            {result.statusLabel || t('chat.simulation_complete')}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-full border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70">
+            {result.statusLabel || t("chat.simulation_complete", "Simulation Complete")}
           </span>
         </div>
       </div>
 
-      {result.chart && <ResultEquityChart chart={result.chart} />}
+      {result.chart && (
+        <ResultEquityChart
+          appearanceOverride={appearance}
+          chart={result.chart}
+          presentation="heroDeltaEvidence"
+        />
+      )}
 
-      <div className="px-4 sm:px-5 py-5">
-        {result.metrics.length > 0 && (
-          <div className="mb-6">
-            <dt className="text-[12px] uppercase tracking-wider text-black/45 dark:text-white/45 font-semibold">
-              {result.metrics[0].label}
-            </dt>
-            <dd className="text-[32px] sm:text-[40px] font-bold tracking-tight text-black dark:text-white leading-tight">
-              {result.metrics[0].value}
-            </dd>
-          </div>
-        )}
+      <div className="px-4 pb-4 pt-3 sm:px-5 sm:pb-4 sm:pt-3.5">
+        <div>
+          <p className="text-[14px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
+            {view.hero.label}
+          </p>
+          <p
+            className={`mt-1 font-display text-[38px] font-medium leading-none tracking-[-0.38px] sm:text-[46px] ${toneClassName}`}
+          >
+            {view.hero.value}
+          </p>
+          <p className="mt-1.5 text-[15px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
+            {view.hero.detail}
+          </p>
+        </div>
 
-        <dl className="grid grid-cols-2 gap-4">
-          {result.metrics.slice(1).map((metric) => (
-            <div key={metric.label} className="flex flex-col gap-0.5">
-              <dt className="text-[12px] leading-snug text-black/45 dark:text-white/45">{metric.label}</dt>
-              <dd className="whitespace-normal break-words text-[15px] font-semibold leading-snug tracking-tight text-black dark:text-white">
-                {metric.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <StatRail metrics={[view.benchmark, view.worstDrop]} />
+
+        <TrustRail groups={trustGroups} />
+
+        <ExecutionDetails
+          details={view.details}
+          triggerLabel={t("chat.view_details", "View details")}
+        />
       </div>
 
       {(renderedActions.length > 0 || showSavedState) && (
-        <div className="flex flex-wrap gap-2 border-t border-black/8 px-4 py-3 dark:border-white/8 sm:px-5">
+        <div className="flex flex-wrap gap-2 border-t border-[#c9c9cd]/30 px-4 py-3.5 dark:border-white/[0.06] sm:px-5">
           {renderedActions.map((action) => (
             <button
               key={action.id ?? action.type ?? action.label}
               type="button"
               onClick={() => onAction?.(action)}
-              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22"
+              className={actionClassName}
             >
               <ResultActionIcon action={action} />
               {displayResultActionLabel(action)}
@@ -120,31 +152,134 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
           )}
         </div>
       )}
-
-      <div className="px-4 py-3 border-t border-black/8 dark:border-white/8 sm:px-5">
-        <div className="flex flex-col gap-1.5">
-          <p
-            aria-label={t("chat.result_trust_strip_label", "Result trust context")}
-            className="text-[11px] font-medium leading-snug text-black/50 dark:text-white/50"
-          >
-            {t(
-              "chat.result_trust_strip",
-              "Historical simulation · Not investment advice",
-            )}
-          </p>
-          {assumptionLine && (
-            <p className="text-[11px] leading-snug text-black/45 dark:text-white/45">
-              {assumptionLine}
-            </p>
-          )}
-          {result.benchmarkNote && (
-            <p className="text-[11px] leading-snug text-black/45 dark:text-white/45">
-              {result.benchmarkNote}
-            </p>
-          )}
-        </div>
-      </div>
     </section>
+  );
+}
+
+function StatRail({ metrics }: { metrics: { label: string; value: string }[] }) {
+  return (
+    <dl className="mt-3 grid gap-y-2.5 border-y border-[#c9c9cd]/22 py-2.5 dark:border-white/[0.04] sm:grid-cols-[minmax(0,1.55fr)_1px_minmax(104px,0.45fr)] sm:gap-x-5">
+      <StatItem metric={metrics[0]} variant="benchmark" />
+      <div
+        aria-hidden="true"
+        className="hidden h-8 self-center bg-[#c9c9cd]/18 dark:bg-white/[0.04] sm:block"
+      />
+      <StatItem metric={metrics[1]} />
+    </dl>
+  );
+}
+
+function StatItem({
+  metric,
+  variant = "default",
+}: {
+  metric?: { label: string; value: string };
+  variant?: "default" | "benchmark";
+}) {
+  if (!metric) return null;
+  const isBenchmark = variant === "benchmark";
+
+  return (
+    <div className="min-w-0">
+      <dt className="text-[13px] leading-snug tracking-[0.16px] text-[#8d969e]">
+        {metric.label}
+      </dt>
+      <dd
+        className={`mt-1.5 leading-snug tracking-[-0.08px] ${isBenchmark ? "text-[15px] font-normal text-[#505a63] dark:text-[#8d969e] sm:whitespace-nowrap" : "text-[16px] font-medium text-[#191c1f] dark:text-white"}`}
+      >
+        {isBenchmark ? <BenchmarkValue value={metric.value} /> : metric.value}
+      </dd>
+    </div>
+  );
+}
+
+function BenchmarkValue({ value }: { value: string }) {
+  const beatPrefix = "Beat by ";
+  const laggedPrefix = "Lagged by ";
+
+  if (value.startsWith(beatPrefix)) {
+    const remainder = value.slice(beatPrefix.length);
+    const firstSpaceIndex = remainder.indexOf(" ");
+    const numericValue =
+      firstSpaceIndex >= 0 ? remainder.slice(0, firstSpaceIndex) : remainder;
+    const unitLabel = firstSpaceIndex >= 0 ? remainder.slice(firstSpaceIndex) : "";
+
+    return (
+      <>
+        <span className="font-medium text-[#191c1f] dark:text-white">Beat</span>{" "}
+        <span>by </span>
+        <span className="font-medium text-[#191c1f] dark:text-white">
+          {numericValue}
+        </span>
+        <span>{unitLabel}</span>
+      </>
+    );
+  }
+
+  if (value.startsWith(laggedPrefix)) {
+    const remainder = value.slice(laggedPrefix.length);
+    const firstSpaceIndex = remainder.indexOf(" ");
+    const numericValue =
+      firstSpaceIndex >= 0 ? remainder.slice(0, firstSpaceIndex) : remainder;
+    const unitLabel = firstSpaceIndex >= 0 ? remainder.slice(firstSpaceIndex) : "";
+
+    return (
+      <>
+        <span className="font-medium text-[#191c1f] dark:text-white">Lagged</span>{" "}
+        <span>by </span>
+        <span className="font-medium text-[#191c1f] dark:text-white">
+          {numericValue}
+        </span>
+        <span>{unitLabel}</span>
+      </>
+    );
+  }
+
+  return value;
+}
+
+function TrustRail({ groups }: { groups: string[] }) {
+  return (
+    <div
+      aria-label="Result trust context"
+      className="mt-3 flex flex-col gap-1 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1"
+    >
+      {groups.map((group) => (
+        <p key={group}>{group}</p>
+      ))}
+    </div>
+  );
+}
+
+function ExecutionDetails({
+  details,
+  triggerLabel,
+}: {
+  details: { label: string; value: string }[];
+  triggerLabel: string;
+}) {
+  if (details.length === 0) return null;
+
+  return (
+    <details className="group mt-3 rounded-[14px] text-[11px] leading-snug tracking-[0.16px] text-[#8d969e]">
+      <summary className="inline-flex cursor-pointer select-none items-center gap-1 rounded-full border border-black/8 bg-black/[0.02] px-2.5 py-1 font-medium text-[#505a63] transition-colors marker:text-transparent hover:border-black/14 hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/14 dark:border-white/8 dark:bg-white/[0.03] dark:text-[#8d969e] dark:hover:border-white/14 dark:hover:bg-white/[0.06] dark:focus-visible:ring-white/14">
+        {triggerLabel}
+        <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+      </summary>
+      <dl className="mt-2 grid gap-x-5 gap-y-2 rounded-[12px] bg-black/[0.018] px-3 py-2.5 dark:bg-white/[0.025] sm:grid-cols-2">
+        {details.map((detail) => (
+          <div
+            key={`${detail.label}-${detail.value}`}
+            className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-x-3"
+          >
+            <dt className="text-[#8d969e]">{detail.label}</dt>
+            <dd className="break-words font-medium text-[#191c1f] dark:text-white/76">
+              {detail.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -163,11 +298,11 @@ function ResultActionIcon({ action }: { action: ChatActionOption }) {
 
 function AssetSymbols({ symbols }: { symbols: string[] }) {
   return (
-    <span className="flex flex-wrap gap-x-1.5 gap-y-1">
+    <span className="flex flex-wrap gap-1.5">
       {symbols.map((symbol) => (
         <span
           key={symbol}
-          className="rounded-[5px] border border-[#c2a44d]/25 bg-[#c2a44d]/10 px-1.5 py-0.5 text-[12px] font-semibold leading-none tracking-tight text-[#8b7329] dark:border-[#c2a44d]/30 dark:bg-[#c2a44d]/12 dark:text-[#d9c574]"
+          className="rounded-[7px] border border-[#c9c9cd]/65 px-2 py-1 text-[12px] font-medium leading-none tracking-[0.16px] text-[#505a63] dark:border-white/14 dark:text-[#8d969e]"
         >
           {symbol}
         </span>

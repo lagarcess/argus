@@ -485,10 +485,12 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
       const resultStrategyId = stringOrNull(metadata.result_strategy_id);
       const savedStrategyId = savedStrategyIdFromMetadata(metadata);
       const factBank = recordOrNull(metadata.result_fact_bank);
+      const configSnapshot = recordOrNull(factBank?.config_snapshot);
       const card = resultCardFromConversationCard(resultCard, {
         id: runId,
         strategy_id: resultStrategyId,
         benchmark_symbol: stringOrNull(factBank?.benchmark_symbol) ?? undefined,
+        config_snapshot: configSnapshot ?? undefined,
       });
       const resultActionContext = resultActionContextFromMetadata(metadata, card);
       const restoredActions = hydrateResultActions(card.actions ?? [], {

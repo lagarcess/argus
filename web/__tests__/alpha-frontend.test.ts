@@ -94,15 +94,17 @@ describe("Argus Alpha frontend contract", () => {
     );
   });
 
-  test("result cards render assumptions as a single line with a separate trust strip", () => {
+  test("result cards render a separate trust strip and compact assumption details", () => {
     const card = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
     const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
 
-    expect(card).toContain('join(" · ")');
+    expect(card).toContain("TrustRail");
+    expect(card).toContain("ExecutionDetails");
+    expect(card).toContain("view.details");
     expect(card).toContain("result_trust_strip");
     expect(card).toContain("Result trust context");
     expect(card).not.toContain("result.assumptions.map");
-    expect(en).toContain("Historical simulation · Not investment advice");
+    expect(en).toContain("Historical simulation · No fees/slippage · Not advice");
   });
 
   test("result readouts use a structured editorial treatment", () => {
@@ -141,7 +143,9 @@ describe("Argus Alpha frontend contract", () => {
     const chart = readFileSync(join(root, "components/chat/ResultEquityChart.tsx"), "utf-8");
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
-    expect(card).toContain("<ResultEquityChart chart={result.chart} />");
+    expect(card).toContain("<ResultEquityChart");
+    expect(card).toContain('presentation="heroDeltaEvidence"');
+    expect(card).toContain("appearanceOverride={appearance}");
     expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
     expect(card).toContain('action.type !== "save_strategy"');
     expect(labelHelper).toContain('"Explain result"');

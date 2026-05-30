@@ -281,7 +281,8 @@ export type ApiLanguage = "en" | "es-419";
 
 export function resultCardFromConversationCard(
   card: ConversationResultCard,
-  run?: Pick<BacktestRun, "id" | "strategy_id"> & Partial<Pick<BacktestRun, "benchmark_symbol">>,
+  run?: Pick<BacktestRun, "id" | "strategy_id"> &
+    Partial<Pick<BacktestRun, "benchmark_symbol" | "config_snapshot">>,
 ) {
   const rows = [...card.rows].sort(
     (a, b) => resultMetricDisplayOrder(a) - resultMetricDisplayOrder(b),
@@ -299,6 +300,7 @@ export function resultCardFromConversationCard(
     })),
     benchmarkNote: displayResultBenchmarkNote(card.benchmark_note),
     assumptions: card.assumptions,
+    configSnapshot: run?.config_snapshot,
     runId: run?.id,
     strategyId: run?.strategy_id ?? null,
     actions: card.actions.map((action) => ({
@@ -315,6 +317,7 @@ export function resultCardFromRun(run: BacktestRun) {
     symbols: run.symbols,
     template: String(run.config_snapshot?.template ?? ""),
     assetClass: run.asset_class,
+    configSnapshot: run.config_snapshot,
   };
 }
 

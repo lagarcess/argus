@@ -72,6 +72,8 @@ web/temp-next-build*/
 # Playwright / Testing
 playwright-report/
 test-results/
+.playwright-cli/
+output/playwright/result-card-playground*/
 
 # Editor swap files
 **/*.swp
