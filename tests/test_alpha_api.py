@@ -403,13 +403,12 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
         run["metrics"]["aggregate"]["performance"]["total_return_pct"], float
     )
     assert run["conversation_result_card"]["assumptions"] == [
-        "Universe: TSLA.",
-        "Simulation uses long-only preset.",
-        "Starting capital: $1,000.",
-        "Allocation: equal weight.",
-        "No slippage or fees included.",
-        "Benchmark: SPY.",
+        "Long-only",
+        "Equal weight",
+        "No fees/slippage",
+        "Benchmark: SPY",
     ]
+    assert run["conversation_result_card"]["benchmark_note"] is None
 
     history = client.get("/api/v1/history")
     assert history.status_code == 200

@@ -663,7 +663,7 @@ export default function ChatCommandPalette({
           title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
           description={t(
             "sidebar.delete_confirm.description",
-            "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+            "This removes “{{title}}” from your visible history.",
             { title: pendingDeleteItem?.title ?? t("common.conversation", "Conversation") },
           )}
           confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}

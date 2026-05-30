@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { splitPeriodDisplay } from "./card-formatting";
 import ResultEquityChart from "./ResultEquityChart";
 import { type ChatActionOption } from "./types";
+import { strategiesEnabled } from "@/lib/private-alpha-flags";
+import { displayResultActionLabel } from "@/lib/result-card-display";
 
 type StrategyResultCardProps = {
   result: StrategyResultPayload;
@@ -17,7 +19,9 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
   const resultActions = result.actions ?? [];
   const showBreakdownAction = resultActions.find((action) => action.type === "show_breakdown");
   const refineStrategyAction = resultActions.find((action) => action.type === "refine_strategy");
-  const saveAction = resultActions.find((action) => action.type === "save_strategy");
+  const saveAction = strategiesEnabled
+    ? resultActions.find((action) => action.type === "save_strategy")
+    : undefined;
   const orderedActions = [
     showBreakdownAction,
     refineStrategyAction,
@@ -32,9 +36,11 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
   const renderedActions = result.savedStrategyId || result.savingStrategy
     ? orderedActions.filter((action) => action.type !== "save_strategy")
     : orderedActions;
+  const showSavedState = strategiesEnabled && (result.savedStrategyId || result.savingStrategy);
   const returnMetric = result.metrics.find((metric) => metric.label.toLowerCase().includes("return"));
   const isNegative = returnMetric?.value.trim().startsWith("-");
   const revealClass = isNegative ? "argus-result-reveal-caution" : "argus-result-reveal-positive";
+  const assumptionLine = result.assumptions?.filter(Boolean).join(" · ");
   return (
     <section className={`argus-card-reveal w-full rounded-[20px] border border-black/12 dark:border-white/12 bg-white dark:bg-[#1d2023] overflow-hidden ${revealClass}`}>
       <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-black/8 dark:border-white/8">
@@ -89,7 +95,7 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
         </dl>
       </div>
 
-      {(renderedActions.length > 0 || result.savedStrategyId || result.savingStrategy) && (
+      {(renderedActions.length > 0 || showSavedState) && (
         <div className="flex flex-wrap gap-2 border-t border-black/8 px-4 py-3 dark:border-white/8 sm:px-5">
           {renderedActions.map((action) => (
             <button
@@ -99,10 +105,10 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22"
             >
               <ResultActionIcon action={action} />
-              {action.label}
+              {displayResultActionLabel(action)}
             </button>
           ))}
-          {(result.savedStrategyId || result.savingStrategy) && (
+          {showSavedState && (
             <button
               type="button"
               disabled
@@ -115,25 +121,29 @@ export default function StrategyResultCard({ result, onAction }: StrategyResultC
         </div>
       )}
 
-      {(result.benchmarkNote || (result.assumptions && result.assumptions.length > 0)) && (
-        <div className="px-4 sm:px-5 py-3 border-t border-black/8 dark:border-white/8 flex flex-col gap-1.5">
+      <div className="px-4 py-3 border-t border-black/8 dark:border-white/8 sm:px-5">
+        <div className="flex flex-col gap-1.5">
+          <p
+            aria-label={t("chat.result_trust_strip_label", "Result trust context")}
+            className="text-[11px] font-medium leading-snug text-black/50 dark:text-white/50"
+          >
+            {t(
+              "chat.result_trust_strip",
+              "Historical simulation · Not investment advice",
+            )}
+          </p>
+          {assumptionLine && (
+            <p className="text-[11px] leading-snug text-black/45 dark:text-white/45">
+              {assumptionLine}
+            </p>
+          )}
           {result.benchmarkNote && (
-            <p className="text-[12px] leading-[1.45] text-black/55 dark:text-white/55 italic">
+            <p className="text-[11px] leading-snug text-black/45 dark:text-white/45">
               {result.benchmarkNote}
             </p>
           )}
-          {result.assumptions && result.assumptions.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {result.assumptions.map((text, idx) => (
-                <span key={idx} className="flex min-w-0 items-start gap-1.5 whitespace-normal break-words text-[11px] leading-snug text-black/45 dark:text-white/45">
-                  <span className="w-1 h-1 rounded-full bg-black/20 dark:bg-white/20" />
-                  {text}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }

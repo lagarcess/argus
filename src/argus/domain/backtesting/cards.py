@@ -54,65 +54,49 @@ def build_result_card(
 
     status_label = "Simulación Completa" if is_es else "Simulation Complete"
 
-    benchmark_note = f"Universe: {symbols}. Benchmark: {config['benchmark_symbol']}."
     if is_es:
-        benchmark_note = f"Universo: {symbols}. Referencia: {config['benchmark_symbol']}."
         assumptions = [
-            f"Universo: {symbols}.",
-            "La simulación utiliza el preajuste solo-largo.",
-            f"Capital inicial: ${config['starting_capital']:,.0f}.",
-            "Asignación: igual peso.",
-            "No se incluyen deslizamientos ni comisiones.",
-            f"Referencia: {config['benchmark_symbol']}.",
+            "Solo largo",
+            "Peso igual",
+            "Sin comisiones/deslizamiento",
+            f"Referencia: {config['benchmark_symbol']}",
         ]
         if bool(realism["enabled"]):
-            assumptions[4] = (
-                "Realismo de ejecución habilitado (comisiones/deslizamiento aplicados)."
-            )
+            assumptions[2] = "Realismo de ejecución activado"
     else:
         assumptions = [
-            f"Universe: {symbols}.",
-            "Simulation uses long-only preset.",
-            (
-                f"Recurring contribution: ${config['starting_capital']:,.0f}."
-                if is_dca
-                else f"Starting capital: ${config['starting_capital']:,.0f}."
-            ),
-            "Allocation: equal weight.",
-            "No slippage or fees included.",
-            f"Benchmark: {config['benchmark_symbol']}.",
+            "Long-only",
+            "Equal weight",
+            "No fees/slippage",
+            f"Benchmark: {config['benchmark_symbol']}",
         ]
         if bool(realism["enabled"]):
-            assumptions[4] = "Execution realism enabled (fees/slippage applied)."
+            assumptions[2] = "Execution realism enabled"
 
     rows = [
         {
-            "key": "total_return_pct",
-            "label": "Retorno Total (%)" if is_es else "Total Return (%)",
-            "value": f"{performance['total_return_pct']:+.1f}%",
-        },
-        {
             "key": "cash_value",
-            "label": (
-                "Valor Final ($)"
-                if is_es and is_dca
-                else "Valor en Efectivo ($)"
-                if is_es
-                else "Final Value ($)"
-                if is_dca
-                else "Cash Value ($)"
-            ),
+            "label": "Valor final" if is_es else "Ending value",
             "value": f"{_format_money(capital_basis)} -> {_format_money(ending_capital)}",
         },
         {
-            "key": "max_drawdown_pct",
-            "label": "Máxima Caída" if is_es else "Max Drawdown",
-            "value": f"{risk['max_drawdown_pct']:.1f}%",
+            "key": "total_return_pct",
+            "label": "Retorno total" if is_es else "Total return",
+            "value": f"{performance['total_return_pct']:+.1f}%",
         },
         {
             "key": "benchmark_delta",
-            "label": "Vs referencia" if is_es else "Vs benchmark",
+            "label": (
+                f"Comparado con {config['benchmark_symbol']}"
+                if is_es
+                else f"Compared with {config['benchmark_symbol']}"
+            ),
             "value": f"{performance['delta_vs_benchmark_pct']:+.1f} pts vs {config['benchmark_symbol']}",
+        },
+        {
+            "key": "max_drawdown_pct",
+            "label": "Peor caída" if is_es else "Worst drop",
+            "value": f"{risk['max_drawdown_pct']:.1f}%",
         },
     ]
     if _should_show_win_rate(config, efficiency):
@@ -128,21 +112,21 @@ def build_result_card(
         {
             "id": "show-breakdown",
             "type": "show_breakdown",
-            "label": "Ver desglose" if is_es else "Show a breakdown",
+            "label": "Explicar resultado" if is_es else "Explain result",
             "presentation": "result",
             "payload": {},
         },
         {
             "id": "save-strategy",
             "type": "save_strategy",
-            "label": "Guardar estrategia" if is_es else "Save strategy",
+            "label": "Guardar" if is_es else "Save",
             "presentation": "result",
             "payload": {},
         },
         {
             "id": "refine-strategy",
             "type": "refine_strategy",
-            "label": "Refinar estrategia" if is_es else "Refine strategy",
+            "label": "Refinar idea" if is_es else "Refine idea",
             "presentation": "result",
             "payload": {},
         },
@@ -161,7 +145,7 @@ def build_result_card(
         "status_label": status_label,
         "rows": rows,
         "assumptions": assumptions,
-        "benchmark_note": benchmark_note,
+        "benchmark_note": None,
         "actions": actions,
         "chart": chart,
     }

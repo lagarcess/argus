@@ -1809,6 +1809,71 @@ def test_latest_result_recovery_preserves_next_experiment_focus(
     assert result.decision.artifact_target == "latest_result"
 
 
+def test_latest_result_save_request_is_history_preserved_when_strategies_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def unexpected_compose_result_followup_response(**kwargs: Any) -> str:
+        del kwargs
+        raise AssertionError("save intent should use the private-alpha guard")
+
+    composed_save_response: dict[str, Any] = {}
+
+    async def compose_private_alpha_save_response(**kwargs: Any) -> str:
+        composed_save_response.update(kwargs)
+        return "I cannot move this into Strategies here, but the run stays reachable from this chat and Recents."
+
+    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "false")
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.compose_result_followup_response",
+        unexpected_compose_result_followup_response,
+    )
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.compose_private_alpha_save_response",
+        compose_private_alpha_save_response,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-save-request",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
+                "config_snapshot": {
+                    "template": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "date_range": {"start": "2025-01-01", "end": "2026-01-01"},
+                },
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks to save the latest result.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+        artifact_target="latest_result",
+        reason_codes=["latest_result_save_requested"],
+    )
+
+    result, _ = run_interpret_with_llm(
+        message="save this",
+        response=response,
+        snapshot=snapshot,
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    assert "Saved" not in answer
+    assert "Strategy was saved" not in answer
+    assert composed_save_response["user_message"] == "save this"
+    assert composed_save_response["metadata"]["symbols"] == ["AAPL"]
+    assert "latest_result_save_requested" in result.decision.reason_codes
+
+
 def test_unanchored_clarification_after_result_falls_back_to_next_tests(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

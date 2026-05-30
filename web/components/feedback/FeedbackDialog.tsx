@@ -96,6 +96,9 @@ export default function FeedbackDialog({
 
   const isRating = type === "rating";
   const isBug = type === "bug";
+  const isFeature = type === "feature";
+  const hasConversationContext =
+    typeof context?.conversation_id === "string" && context.conversation_id.length > 0;
 
   const typeOptions: FeedbackTypeOption[] = [
     {
@@ -434,7 +437,9 @@ export default function FeedbackDialog({
               {!isRating && (
                 <div>
                   <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                    {t("feedback.attachments", "Attachments")}
+                    {t("feedback.attachments_with_count", "Attachments ({{count}}/5)", {
+                      count: files.length,
+                    })}
                   </label>
                   <button
                     type="button"
@@ -443,7 +448,12 @@ export default function FeedbackDialog({
                   >
                     <Paperclip className="mb-2 h-5 w-5 text-black/40 dark:text-white/40" />
                     <span className="text-[13px] text-black/60 dark:text-white/60">
-                      {t("feedback.attach_files", "Click to attach files (max 5)")}
+                      {isFeature
+                        ? t(
+                            "feedback.attach_files_feature",
+                            "Optional: add a screenshot, sketch, or example.",
+                          )
+                        : t("feedback.attach_files", "Click to attach files (max 5)")}
                     </span>
                   </button>
                   <input
@@ -492,10 +502,15 @@ export default function FeedbackDialog({
                     htmlFor="consent"
                     className="cursor-pointer select-none text-[13px] leading-snug text-black/60 dark:text-white/60"
                   >
-                    {t(
-                      "feedback.consent",
-                      "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
-                    )}
+                    {isFeature
+                      ? t(
+                          "feedback.consent_feature",
+                          "I consent to the Argus team using this feature request and contacting me if follow-up would help.",
+                        )
+                      : t(
+                          "feedback.consent",
+                          "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
+                        )}
                   </label>
                 </div>
               )}
@@ -508,10 +523,15 @@ export default function FeedbackDialog({
               )}
 
               <p className="text-[12px] leading-relaxed text-black/45 dark:text-white/45">
-                {t(
-                  "feedback.footer_note",
-                  "Your conversation will be included with your feedback to help improve Argus.",
-                )}{" "}
+                {hasConversationContext
+                  ? t(
+                      "feedback.footer_note_conversation",
+                      "Your current conversation context may be included to help us understand this feedback.",
+                    )
+                  : t(
+                      "feedback.footer_note",
+                      "App context like this page and timestamp may be included to help us understand this feedback.",
+                    )}{" "}
                 <button
                   type="button"
                   className="font-medium text-black underline underline-offset-2 hover:text-black/70 dark:text-white dark:hover:text-white/70"

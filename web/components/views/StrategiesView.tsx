@@ -103,7 +103,7 @@ type StrategiesViewProps = {
   searchText: string;
   onSearchChange: (val: string) => void;
   isSidebarOpen: boolean;
-  onTriggerPrompt?: (type: "strategy" | "collection", customPrompt?: string) => void;
+  onTriggerPrompt?: (type: "strategy", customPrompt?: string) => void;
 };
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────

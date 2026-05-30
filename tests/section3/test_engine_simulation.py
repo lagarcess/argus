@@ -539,22 +539,38 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     card = engine.build_result_card(config, metrics)
     row_keys = [row["key"] for row in card["rows"]]
     assert row_keys[:4] == [
-        "total_return_pct",
         "cash_value",
-        "max_drawdown_pct",
+        "total_return_pct",
         "benchmark_delta",
+        "max_drawdown_pct",
     ]
     assert "win_rate" in row_keys
     actions = [a["type"] for a in card["actions"]]
     assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
-    assert card["actions"][0]["label"] == "Show a breakdown"
+    assert card["actions"][0]["label"] == "Explain result"
+    assert card["actions"][1]["label"] == "Save"
+    assert card["actions"][2]["label"] == "Refine idea"
+    labels = [row["label"] for row in card["rows"][:4]]
+    assert labels == [
+        "Ending value",
+        "Total return",
+        "Compared with SPY",
+        "Worst drop",
+    ]
+    assert card["assumptions"] == [
+        "Long-only",
+        "Equal weight",
+        "No fees/slippage",
+        "Benchmark: SPY",
+    ]
+    assert card["benchmark_note"] is None
 
     # Case 2: Multi-symbol (between 2 and 4)
     config["symbols"] = ["AAPL", "MSFT"]
     card = engine.build_result_card(config, metrics)
     actions = [a["type"] for a in card["actions"]]
     assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
-    assert card["actions"][1]["label"] == "Save strategy"
+    assert card["actions"][1]["label"] == "Save"
 
     # Case 3: Max symbols (5)
     config["symbols"] = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"]
@@ -565,7 +581,7 @@ def test_build_result_card_actions_by_symbol_count() -> None:
 
     # Verify Spanish labels
     card = engine.build_result_card(config, metrics, language="es-419")
-    assert card["actions"][1]["label"] == "Guardar estrategia"
+    assert card["actions"][1]["label"] == "Guardar"
 
 
 def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:
@@ -597,10 +613,10 @@ def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> 
     card = engine.build_result_card(config, metrics)
 
     assert [row["key"] for row in card["rows"]] == [
-        "total_return_pct",
         "cash_value",
-        "max_drawdown_pct",
+        "total_return_pct",
         "benchmark_delta",
+        "max_drawdown_pct",
     ]
 
 

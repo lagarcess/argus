@@ -5,10 +5,13 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime.result_followups import (
+    PrivateAlphaSaveDraft,
     ResultFollowupDraft,
     coerce_result_followup_draft,
+    compose_private_alpha_save_response,
     compose_result_followup_response,
     fallback_result_followup_response,
+    render_private_alpha_save_draft,
     render_result_followup_draft,
     result_followup_fact_bank,
     result_followup_llm_messages,
@@ -75,6 +78,64 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
     assert "causal proof" not in response
     assert calls[0]["task"] == "result_summary"
     assert calls[0]["schema_model"] is ResultFollowupDraft
+
+
+@pytest.mark.asyncio
+async def test_private_alpha_save_response_uses_llm_fact_contract() -> None:
+    calls: list[dict[str, Any]] = []
+
+    async def fake_schema_client(**kwargs: Any) -> object:
+        calls.append(kwargs)
+        schema = kwargs["schema_model"]
+        return schema(
+            answer="Compatibility answer.",
+            answer_blocks=[
+                (
+                    "I cannot move this into Strategies here, but the completed "
+                    "run stays reachable from this chat and Recents."
+                )
+            ],
+            fact_ids=["save_surface_status", "retrieval_path", "symbols"],
+            claims_strategy_was_saved=False,
+            points_to_hidden_surface=False,
+        )
+
+    response = await compose_private_alpha_save_response(
+        metadata={
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "metrics": {
+                "aggregate": {"performance": {"total_return_pct": 12.4}}
+            },
+        },
+        user_message="save this",
+        invoke_json_schema_func=fake_schema_client,
+    )
+
+    assert response is not None
+    assert "Saved" not in response
+    assert calls[0]["task"] == "chat_composer"
+    assert calls[0]["schema_model"] is PrivateAlphaSaveDraft
+    assert "save_surface_status" in calls[0]["messages"][1]["content"]
+    assert "retrieval_path" in calls[0]["messages"][1]["content"]
+
+
+def test_private_alpha_save_response_rejects_hidden_strategy_claims() -> None:
+    rendered = render_private_alpha_save_draft(
+        draft=PrivateAlphaSaveDraft(
+            answer="Saved it to Strategies.",
+            fact_ids=["save_surface_status", "retrieval_path"],
+            claims_strategy_was_saved=True,
+            points_to_hidden_surface=False,
+        ),
+        fact_bank={
+            "save_surface_status": "Strategies are disabled",
+            "retrieval_path": "Runs stay available in conversation history",
+        },
+        required_fact_ids={"save_surface_status", "retrieval_path"},
+    )
+
+    assert rendered is None
 
 
 def test_result_followup_schema_uses_flat_answer_and_fact_id_contract() -> None:

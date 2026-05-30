@@ -4336,6 +4336,223 @@ async def test_latest_result_routing_audit_refines_general_followup_focus(
 
 
 @pytest.mark.asyncio
+async def test_latest_result_routing_audit_marks_save_request(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fake_json_schema(**kwargs):
+        schema = kwargs["schema_model"]
+        return schema(
+            targets_latest_result=True,
+            save_requested=True,
+            focus="general",
+            confidence=0.92,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 35.0,
+                            "benchmark_return_pct": 24.0,
+                            "delta_vs_benchmark_pct": 11.0,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "buy_and_hold"},
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks to save the latest result.",
+        assistant_response="I can explain the latest result.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="save this",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired.artifact_target == "latest_result"
+    assert repaired.assistant_response is None
+    assert "latest_result_routing_audit" in repaired.reason_codes
+    assert "latest_result_save_requested" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_latest_result_save_audit_can_mark_general_routing(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[type] = []
+
+    async def fake_json_schema(**kwargs):
+        schema = kwargs["schema_model"]
+        calls.append(schema)
+        if schema is interpreter_module.LatestResultRoutingAudit:
+            return schema(
+                targets_latest_result=True,
+                save_requested=False,
+                focus="general",
+                confidence=0.92,
+            )
+        return schema(save_requested=True, confidence=0.94)
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 35.0,
+                            "benchmark_return_pct": 24.0,
+                            "delta_vs_benchmark_pct": 11.0,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "buy_and_hold"},
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks to save the latest result.",
+        assistant_response="I can explain the latest result.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="general",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="save this",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls == [
+        interpreter_module.LatestResultRoutingAudit,
+        interpreter_module.LatestResultSaveAudit,
+    ]
+    assert "latest_result_save_requested" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_latest_result_save_audit_runs_after_non_general_result_focus(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[type] = []
+
+    async def fake_json_schema(**kwargs):
+        schema = kwargs["schema_model"]
+        calls.append(schema)
+        if schema is interpreter_module.LatestResultRoutingAudit:
+            return schema(
+                targets_latest_result=True,
+                save_requested=False,
+                focus="why_underperformed",
+                confidence=0.9,
+            )
+        return schema(save_requested=True, confidence=0.94)
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-save-focus",
+            artifact_status="completed",
+            metadata={
+                "symbols": ["AAPL"],
+                "benchmark_symbol": "SPY",
+                "metrics": {
+                    "aggregate": {
+                        "performance": {
+                            "total_return_pct": 103.0,
+                            "benchmark_return_pct": 47.0,
+                            "delta_vs_benchmark_pct": 56.0,
+                        }
+                    }
+                },
+                "config_snapshot": {"template": "buy_and_hold"},
+            },
+        )
+    )
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks to save the latest result.",
+        assistant_response="I can explain what happened.",
+        semantic_turn_act="result_followup",
+        result_followup_focus="why_underperformed",
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="structured/primary",
+        request=InterpretationRequest(
+            current_user_message="save this",
+            recent_thread_history=[],
+            latest_task_snapshot=snapshot,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert calls == [
+        interpreter_module.LatestResultRoutingAudit,
+        interpreter_module.LatestResultSaveAudit,
+    ]
+    assert repaired.result_followup_focus == "why_underperformed"
+    assert "latest_result_save_requested" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_latest_result_routing_audit_repairs_copied_underfilled_strategy(
     monkeypatch,
 ) -> None:

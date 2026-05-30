@@ -55,8 +55,11 @@
     "rating_placeholder": "Cuéntanos más sobre tu experiencia...",
     "details_placeholder": "¿Qué tienes en mente?",
     "attachments": "Adjuntos",
+    "attachments_with_count": "Adjuntos ({{count}}/5)",
     "attach_files": "Haz clic para adjuntar archivos (máx. 5)",
+    "attach_files_feature": "Opcional: agrega una captura, boceto o ejemplo.",
     "consent": "Autorizo al equipo de Argus a procesar estos comentarios y contactarme si necesitan más detalles.",
+    "consent_feature": "Autorizo al equipo de Argus a usar esta solicitud de función y contactarme si necesitan más contexto.",
     "rating_positive_prompt": "¿Qué salió bien?",
     "rating_negative_prompt": "¿Qué salió mal?",
     "subheading": {
@@ -87,7 +90,8 @@
     "placeholder_details": "Compartir detalles (opcional)",
     "success": "¡Gracias por tus comentarios!",
     "error": "Error al enviar comentarios. Inténtalo de nuevo.",
-    "footer_note": "Tu conversación se incluirá con tus comentarios para ayudar a mejorar Argus.",
+    "footer_note": "Se puede incluir contexto de la app, como esta página y la hora, para entender mejor tus comentarios.",
+    "footer_note_conversation": "Se puede incluir el contexto de tu conversación actual para entender mejor estos comentarios.",
     "tags": {
       "positive": {
         "accurate": "Preciso y completo",
@@ -151,6 +155,8 @@
     "error_offline": "Argus aún no ha podido conectarse a la API. Inicia el servicio FastAPI y envía tu idea de nuevo.",
     "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
+    "result_trust_strip": "Simulación histórica · No es asesoría de inversión",
+    "result_trust_strip_label": "Contexto de confianza del resultado",
     "new_chat_ready": "Nuevo chat listo. ¿Qué idea deberíamos probar?",
     "resume_prompt": "Reanudando \"{{title}}\". ¿Qué te gustaría explorar ahora?",
     "try_new_strategy": "Probar una nueva estrategia",
@@ -397,6 +403,20 @@
       "errors": {
         "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
       }
+    },
+    "signup": {
+      "subtitle": "Crea tu cuenta de alpha privada",
+      "name_placeholder": "Nombre",
+      "submit": "Registrarse",
+      "loading": "Creando cuenta...",
+      "new_account": "¿nuevo en argus?"
+    },
+    "password": {
+      "show": "Mostrar contrasena",
+      "hide": "Ocultar contrasena"
+    },
+    "errors": {
+      "generic": "Algo salio mal. Intentalo de nuevo."
     }
   },
   "landing": {

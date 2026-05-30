@@ -705,6 +705,14 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 **Supported auth mode:**
 - email + password
 
+**Private-alpha access:**
+- Private-alpha signup and login are gated by the server-side Supabase `private_alpha_allowlist` table.
+- `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
+- `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
+- Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
+- The allowlist is intentionally minimal: `email`, `role`, `disabled_at`, `created_at`, and `updated_at`. Real invite email tracking is deferred until there is an invite workflow.
+- Access is not controlled by a frontend flag or comma-separated deployed env var.
+
 **Potential later modes:**
 - username + password mapped to email-backed identity
 - OAuth
@@ -732,6 +740,18 @@ Create account.
 }
 ```
 
+**Private-alpha blocked response:**
+```json
+{
+  "type": "https://api.argus.app/problems/private-alpha-access-required",
+  "title": "Private Alpha Access",
+  "status": 403,
+  "detail": "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
+  "code": "private_alpha_access_required",
+  "request_id": "uuid"
+}
+```
+
 ## `POST /auth/login`
 
 **Request:**
@@ -750,6 +770,8 @@ Create account.
   "session": {}
 }
 ```
+
+**Private-alpha blocked response:** same `403 private_alpha_access_required` shape as signup.
 
 ## `POST /auth/logout`
 
@@ -1007,7 +1029,10 @@ Soft delete conversation.
 - A DCA draft that contains unsupported starting principal / total capital semantics must route to clarification or simplification, not to a confident `Ready to run` card for both amounts.
 - `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
 - A runnable draft produced after a missing-field answer must emit confirmation before execution.
-- `show_breakdown` and `save_strategy` require canonical result run context.
+- `show_breakdown` and `save_strategy` require canonical result run context. In
+  private alpha, `save_strategy` must also respect server-side Strategies
+  gating (for example `ARGUS_STRATEGIES_ENABLED=false`) and must not create a
+  hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose.
 
 **Request:**
@@ -1227,7 +1252,10 @@ Soft delete.
 
 # 14. Collections
 
-Launch flag: collection endpoints remain part of the API contract and the tables remain in Supabase, but dedicated collection UI should be hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`. Strategy saving from chat must use result/run state and should not depend on collections being visible.
+Private-alpha flag: collection endpoints remain part of the API contract and the
+tables remain in Supabase, but Collections are indefinitely deferred from the UI.
+Keep `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`; no visible private-alpha path
+should create, attach, manage, search, or explain Collections.
 
 ## `GET /collections`
 

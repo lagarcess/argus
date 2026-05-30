@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
+import httpx
+
 from argus.api.chat.previews import plain_text_preview
 from argus.api.schemas import (
     BacktestRun,
@@ -19,7 +21,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.store import utcnow
-from supabase import Client, create_client
+from supabase import Client, ClientOptions, create_client
 
 
 class QuotaExceededError(Exception):
@@ -59,9 +61,21 @@ def _message_preview(content: str, max_length: int = 180) -> str | None:
     return plain_text_preview(content, max_length=max_length)
 
 
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def _supabase_client_options() -> ClientOptions:
+    return ClientOptions(
+        httpx_client=httpx.Client(http2=False, timeout=120),
+        postgrest_client_timeout=120,
+    )
+
+
 @dataclass
 class SupabaseGateway:
     client: Client
+    auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -74,7 +88,19 @@ class SupabaseGateway:
             raise RuntimeError(
                 "Supabase mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
             )
-        return cls(client=create_client(url, key))
+        auth_key = (
+            os.getenv("SUPABASE_ANON_KEY")
+            or os.getenv("SUPABASE_ANON_PUBLIC_KEY")
+            or key
+        )
+        return cls(
+            client=create_client(url, key, options=_supabase_client_options()),
+            auth_client=create_client(
+                url,
+                auth_key,
+                options=_supabase_client_options(),
+            ),
+        )
 
     def new_id(self) -> str:
         return str(uuid4())
@@ -204,7 +230,8 @@ class SupabaseGateway:
         username: str | None = None,
     ) -> dict[str, Any]:
         try:
-            response = self.client.auth.sign_up(
+            auth_client = self.auth_client or self.client
+            response = auth_client.auth.sign_up(
                 {
                     "email": email,
                     "password": password,
@@ -219,9 +246,27 @@ class SupabaseGateway:
         except Exception as e:
             raise RuntimeError(f"Signup failed: {e}") from e
 
+    def private_alpha_role_for_email(self, email: str) -> str | None:
+        rows = (
+            self.client.table("private_alpha_allowlist")
+            .select("email,role,disabled_at")
+            .eq("email", _normalize_email(email))
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        if not row or row.get("disabled_at") is not None:
+            return None
+        role = str(row.get("role") or "user").strip().lower()
+        return role if role in {"admin", "developer", "user"} else "user"
+
+    def private_alpha_email_allowed(self, email: str) -> bool:
+        return self.private_alpha_role_for_email(email) is not None
+
     def login(self, email: str, password: str) -> dict[str, Any]:
         try:
-            response = self.client.auth.sign_in_with_password(
+            auth_client = self.auth_client or self.client
+            response = auth_client.auth.sign_in_with_password(
                 {"email": email, "password": password}
             )
             if not response.session:
@@ -889,9 +934,17 @@ class SupabaseGateway:
 
     def get_or_create_profile_for_auth_user(self, auth_user: dict[str, Any]) -> User:
         user_id = auth_user["id"]
+        email = str(auth_user.get("email") or "").strip()
+        allowlist_role = self.private_alpha_role_for_email(email)
+        is_admin = allowlist_role in {"admin", "developer"}
         # Try to get existing profile
         existing = self.get_user(user_id=user_id)
         if existing is not None:
+            if is_admin and not existing.is_admin:
+                return self.update_user(
+                    user_id=user_id,
+                    updates={"id": user_id, "is_admin": True},
+                )
             return existing
 
         now = _now_iso()
@@ -899,12 +952,13 @@ class SupabaseGateway:
         # Canonical defaults per requirements
         payload = {
             "id": user_id,
-            "email": auth_user.get("email"),
+            "email": email,
             "username": user_metadata.get("username"),
             "display_name": user_metadata.get("display_name"),
             "language": "en",
             "locale": "en-US",
             "theme": "dark",
+            "is_admin": is_admin,
             "onboarding": {
                 "completed": False,
                 "stage": "language_selection",

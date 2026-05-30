@@ -7,6 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { getMe, patchMe, ApiUser } from "@/lib/argus-api";
 import { DevModeBadge } from "@/components/ui/DevModeBadge";
 import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
+import { privateAlphaOnboardingEnabled } from "@/lib/private-alpha-flags";
 
 const GOAL_IDS = [
   "learn_basics",
@@ -42,11 +43,31 @@ export function OnboardingGate({
     async function checkUser() {
       try {
         const me = await getMe();
-        setUser(me.user);
-        if (me.user.onboarding.completed || me.user.onboarding.stage === "ready") {
+        let resolvedUser = me.user;
+        if (
+          !privateAlphaOnboardingEnabled &&
+          !me.user.onboarding.completed &&
+          me.user.onboarding.stage !== "ready"
+        ) {
+          const patched = await patchMe({
+            onboarding: {
+              stage: "ready",
+              language_confirmed: true,
+              primary_goal: "surprise_me",
+              completed: true,
+            },
+          });
+          resolvedUser = patched.user;
+        }
+        setUser(resolvedUser);
+        if (
+          !privateAlphaOnboardingEnabled ||
+          resolvedUser.onboarding.completed ||
+          resolvedUser.onboarding.stage === "ready"
+        ) {
           setStep("done");
         } else {
-          setStep(me.user.onboarding.stage === "primary_goal_selection" ? "goal" : "language");
+          setStep(resolvedUser.onboarding.stage === "primary_goal_selection" ? "goal" : "language");
         }
       } catch (err: unknown) {
         const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
@@ -69,8 +90,11 @@ export function OnboardingGate({
   }, []);
 
   useEffect(() => {
-    const isPreview = new URLSearchParams(window.location.search).get("preview") === "true";
-    if (!isPreview && user && step === "done" && postCompleteHref) {
+    const params = new URLSearchParams(window.location.search);
+    const authMode = params.get("auth");
+    const isPreview = params.get("preview") === "true";
+    const isAuthEntry = authMode === "signup" || authMode === "login";
+    if (!isPreview && !isAuthEntry && user && step === "done" && postCompleteHref) {
       router.replace(postCompleteHref);
     }
   }, [postCompleteHref, router, step, user]);
@@ -117,9 +141,12 @@ export function OnboardingGate({
     }
   };
 
-  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "true";
+  const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const authMode = params?.get("auth");
+  const isPreview = params?.get("preview") === "true";
+  const isAuthEntry = authMode === "signup" || authMode === "login";
 
-  if (isLoading && !isPreview) {
+  if (isLoading && !isPreview && !isAuthEntry) {
     return (
       <>
         <DevModeBadge />
@@ -130,8 +157,8 @@ export function OnboardingGate({
     );
   }
 
-  if (step === "done" || isPreview) {
-    if (!isPreview && user && postCompleteHref) return null;
+  if (step === "done" || isPreview || isAuthEntry) {
+    if (!isPreview && !isAuthEntry && user && postCompleteHref) return null;
     return (
       <>
         <DevModeBadge />
@@ -144,7 +171,7 @@ export function OnboardingGate({
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white dark:bg-[#141517] p-6 text-black dark:text-white transition-colors duration-300">
       <DevModeBadge />
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <h1 className="font-display mb-2 text-4xl font-medium tracking-tight">argus</h1>
+        <h1 className="font-display mb-2 text-center text-4xl font-medium tracking-tight">argus</h1>
 
         {step === "language" && (
           <div className="mt-8 space-y-6">

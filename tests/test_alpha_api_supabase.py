@@ -135,6 +135,74 @@ def _fake_fetch_price_series(
     )["close"]
 
 
+def test_gateway_auth_flows_use_separate_auth_client():
+    service_client = MagicMock()
+    auth_client = MagicMock()
+
+    signup_response = MagicMock()
+    signup_response.user = object()
+    signup_response.model_dump.return_value = {"user": {"id": "auth-user"}}
+    auth_client.auth.sign_up.return_value = signup_response
+
+    login_response = MagicMock()
+    login_response.session = object()
+    login_response.model_dump.return_value = {"session": {"access_token": "token"}}
+    auth_client.auth.sign_in_with_password.return_value = login_response
+
+    gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
+
+    assert gateway.signup(email="alpha@example.com", password="password") == {
+        "user": {"id": "auth-user"}
+    }
+    assert gateway.login(email="alpha@example.com", password="password") == {
+        "session": {"access_token": "token"}
+    }
+
+    auth_client.auth.sign_up.assert_called_once()
+    auth_client.auth.sign_in_with_password.assert_called_once()
+    service_client.auth.sign_up.assert_not_called()
+    service_client.auth.sign_in_with_password.assert_not_called()
+
+
+def test_gateway_private_alpha_role_reads_active_allowlist_row():
+    client_mock = MagicMock()
+    query = MagicMock()
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.limit.return_value = query
+    query.execute.return_value.data = [
+        {"email": "lagarces1@gmail.com", "role": "admin", "disabled_at": None}
+    ]
+    client_mock.table.return_value = query
+
+    gateway = SupabaseGateway(client=client_mock)
+
+    assert gateway.private_alpha_role_for_email(" LAGARCES1@gmail.com ") == "admin"
+    assert gateway.private_alpha_email_allowed("LAGARCES1@gmail.com") is True
+    client_mock.table.assert_called_with("private_alpha_allowlist")
+
+
+def test_gateway_private_alpha_role_ignores_disabled_allowlist_row():
+    client_mock = MagicMock()
+    query = MagicMock()
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.limit.return_value = query
+    query.execute.return_value.data = [
+        {
+            "email": "disabled@example.com",
+            "role": "user",
+            "disabled_at": "2026-05-30T00:00:00Z",
+        }
+    ]
+    client_mock.table.return_value = query
+
+    gateway = SupabaseGateway(client=client_mock)
+
+    assert gateway.private_alpha_role_for_email("disabled@example.com") is None
+    assert gateway.private_alpha_email_allowed("disabled@example.com") is False
+
+
 def _runtime_success_result(
     *,
     symbol: str = "TSLA",
@@ -245,6 +313,11 @@ def mock_gateway():
     gateway = MagicMock(spec=SupabaseGateway)
     gateway.get_user.return_value = _mock_profile()
     gateway.get_or_create_mock_user.return_value = _mock_profile()
+    gateway.get_auth_user_from_token.return_value = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "email": "developer@argus.local",
+    }
+    gateway.private_alpha_email_allowed.return_value = True
     gateway.count_completed_runs.return_value = 1
     gateway.list_messages.return_value = []
     with patch("argus.api.state.supabase_gateway", gateway):
@@ -353,7 +426,8 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock
     assert run["config_snapshot"]["starting_capital"] == 1000
     assert run["config_snapshot"]["benchmark_symbol"] == "SPY"
     assert "_execution_realism" not in run["config_snapshot"]
-    assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY."
+    assert run["conversation_result_card"]["assumptions"][-1] == "Benchmark: SPY"
+    assert run["conversation_result_card"]["benchmark_note"] is None
     mock_gateway.create_backtest_run.assert_called_once()
     called_run = mock_gateway.create_backtest_run.call_args.kwargs["run"]
     assert isinstance(called_run, BacktestRun)
@@ -536,6 +610,11 @@ def test_profile_creation_on_first_login(mock_gateway):
 
     os.environ["NEXT_PUBLIC_MOCK_AUTH"] = "false"
     os.environ["ARGUS_MOCK_AUTH"] = "false"
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "email": "developer@argus.local",
+    }
+    mock_gateway.private_alpha_email_allowed.return_value = True
 
     # simulate user not found initially
     mock_gateway.get_user.return_value = None
@@ -545,7 +624,31 @@ def test_profile_creation_on_first_login(mock_gateway):
 
     response = client.get("/api/v1/me", headers={"Authorization": "Bearer valid-token"})
     assert response.status_code == 200
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with(
+        "developer@argus.local"
+    )
     mock_gateway.get_or_create_profile_for_auth_user.assert_called_once()
+
+
+def test_authenticated_request_blocks_private_alpha_email_without_access(mock_gateway):
+    import os
+
+    os.environ["NEXT_PUBLIC_MOCK_AUTH"] = "false"
+    os.environ["ARGUS_MOCK_AUTH"] = "false"
+    mock_gateway.get_auth_user_from_token.return_value = {
+        "id": "user-1",
+        "email": "disabled@example.com",
+    }
+    mock_gateway.private_alpha_email_allowed.return_value = False
+
+    response = client.get("/api/v1/me", headers={"Authorization": "Bearer valid-token"})
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "private_alpha_access_required"
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with(
+        "disabled@example.com"
+    )
+    mock_gateway.get_or_create_profile_for_auth_user.assert_not_called()
 
 
 def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
@@ -553,6 +656,7 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
 
     email = os.environ.get("MOCK_USER_EMAIL", "developer@argus.local")
     password = os.environ.get("MOCK_USER_PASSWORD", "password")
+    mock_gateway.private_alpha_email_allowed.return_value = True
     mock_gateway.login.return_value = {
         "session": {
             "access_token": "access-token-123",
@@ -568,8 +672,113 @@ def test_login_sets_session_cookie_for_browser_auth(mock_gateway):
     )
 
     assert response.status_code == 200
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with(email)
+    assert "mark_private_alpha_login" not in [
+        call[0] for call in mock_gateway.method_calls
+    ]
     assert response.cookies.get("sb-auth-token") == "access-token-123"
     assert response.cookies.get("sb-refresh-token") == "refresh-token-123"
+
+
+def test_feedback_submission_persists_with_user_ownership(mock_gateway):
+    profile = _mock_profile()
+    mock_gateway.get_or_create_mock_user.return_value = profile
+
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "general",
+            "message": "The private alpha flow feels clear.",
+            "context": {"surface": "settings", "metadata": {"path": "/chat"}},
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True}
+    mock_gateway.create_feedback.assert_called_once_with(
+        user_id=profile.id,
+        feedback_type="general",
+        message="The private alpha flow feels clear.",
+        context={"surface": "settings", "metadata": {"path": "/chat"}},
+    )
+
+
+def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatch):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = True
+    mock_gateway.signup.return_value = {
+        "session": {
+            "access_token": "access-token-123",
+            "refresh_token": "refresh-token-123",
+            "expires_in": 3600,
+        },
+        "user": {"id": "user-1", "email": "beta@example.com"},
+    }
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={"email": "beta@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with(
+        "beta@example.com"
+    )
+    mock_gateway.signup.assert_called_once()
+    assert "mark_private_alpha_signup_accepted" not in [
+        call[0] for call in mock_gateway.method_calls
+    ]
+    assert response.cookies.get("sb-auth-token") == "access-token-123"
+
+
+def test_signup_blocks_email_before_supabase_creation_when_not_allowlisted(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = False
+
+    response = client.post(
+        "/api/v1/auth/signup",
+        json={"email": "stranger@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "private_alpha_access_required"
+    assert "private alpha" in response.json()["detail"].lower()
+    mock_gateway.signup.assert_not_called()
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with(
+        "stranger@example.com"
+    )
+    assert "mark_private_alpha_signup_accepted" not in [
+        call[0] for call in mock_gateway.method_calls
+    ]
+
+
+def test_login_blocks_email_when_private_alpha_access_is_disabled(
+    mock_gateway,
+    monkeypatch,
+):
+    monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
+    monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
+    mock_gateway.private_alpha_email_allowed.return_value = False
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "disabled@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "private_alpha_access_required"
+    mock_gateway.login.assert_not_called()
+    mock_gateway.private_alpha_email_allowed.assert_called_once_with(
+        "disabled@example.com"
+    )
+    assert "mark_private_alpha_login" not in [
+        call[0] for call in mock_gateway.method_calls
+    ]
 
 
 def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):

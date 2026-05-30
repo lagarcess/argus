@@ -206,13 +206,19 @@ Purpose:
 - reinforce continuity
 - help users return repeatedly
 
-Dedicated surfaces still exist for Strategies and Collections.
+Private-alpha launch keeps the visible product surface to Chat, Recents/history,
+completed result cards, and minimal account/settings/feedback. Dedicated
+Strategies and Collections surfaces are not visible under private-alpha defaults.
 
 ---
 
 # 8. Collections (MVP Replacement for Portfolios)
 
-Launch note: collections remain a valid product object and database model, but the dedicated collections UI is feature-gated for the first production chat/backtest launch. Use `NEXT_PUBLIC_COLLECTIONS_ENABLED=false` to hide collection navigation and collection-only controls while preserving the schema for later rollout.
+Private-alpha note: collections remain a valid product object and database model,
+but Collections are indefinitely deferred from the private-alpha UI. Keep
+`NEXT_PUBLIC_COLLECTIONS_ENABLED=false` and hide collection navigation, pickers,
+actions, search results, settings links, and empty states. No visible
+private-alpha path should create, attach, or manage collections.
 
 Collections are lightweight saved groupings of related strategies.
 
@@ -241,6 +247,11 @@ Strategies are saved executable ideas backed by supported templates.
 The Strategies surface gives users a quick way to evaluate performance at a glance without requiring deep chart interaction.
 
 Strategies are saved from completed result state. The chat result card owns the Save Strategy control because a saved strategy should come from a real run, not an unexecuted confirmation draft.
+
+Private-alpha note: when `NEXT_PUBLIC_STRATEGIES_ENABLED=false`, hide the
+Strategies surface and the result-card Save action. Completed runs remain
+revisitable through conversation/history/Recents, while Refine idea remains
+available on the result card.
 
 ## Surface Goals
 

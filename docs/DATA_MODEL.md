@@ -34,6 +34,7 @@ Supabase Postgres is the canonical state store.
 
 Supabase owns:
 
+- private-alpha access allowlist
 - user profiles
 - preferences
 - conversations
@@ -53,6 +54,7 @@ Render/FastAPI owns orchestration and compute, not long-term state.
 Alpha MVP requires these primary entities:
 
 ```text
+private_alpha_allowlist
 profiles
 conversations
 messages
@@ -131,7 +133,35 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `username` is optional for Alpha.
 ---
 
-# 6. conversations
+# 6. private_alpha_allowlist
+
+Server-side access list for private alpha. This table is checked before signup
+and login; it should not be exposed as a frontend product surface.
+
+### Fields
+- `email`: `text` (Primary Key, lowercased)
+- `role`: `text` (Default: `user`)
+- `disabled_at`: `timestamptz` (Nullable)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Enums
+- **role**: `admin`, `developer`, `user`
+
+### Notes
+- Rows are managed directly in Supabase during private alpha. No invite
+  dashboard, waitlist, referral system, or public invite-code flow is part of
+  this pass.
+- Add a new private-alpha user with only an `email`; set `role` only for
+  `admin` or `developer` access. Use `disabled_at` to revoke access.
+- If an email is missing or `disabled_at` is set, `/auth/signup` and
+  `/auth/login` return `403 private_alpha_access_required`; authenticated API
+  requests must also reject disabled/unlisted emails after token validation.
+- The table may contain emails for existing Supabase Auth users; seeding the
+  allowlist must not create auth users by itself.
+---
+
+# 7. conversations
 
 Represents an isolated chat thread. Each conversation represents a single investing "idea journey."
 
@@ -416,13 +446,18 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - Users may only `SELECT`, `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`.
 
 ### Tables Requiring RLS
-- `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_runs`, `feedback`, `usage_counters`.
+- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_runs`, `feedback`, `usage_counters`.
+
+### Private Alpha Allowlist
+- No `anon` or `authenticated` role access is required.
+- Backend service-role access checks the table before auth signup/login.
 
 ---
 
 # 19. Indexing Requirements
 
 ### Critical Performance Indexes
+- **private_alpha_allowlist**: `(email)` with active-row partial index
 - **profiles**: `(id)`, `(username)`
 - **conversations**: `(user_id, updated_at DESC)`, `(user_id, archived, deleted_at)`, `(user_id, pinned)`
 - **messages**: `(conversation_id, created_at DESC)`

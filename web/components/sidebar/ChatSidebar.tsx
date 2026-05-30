@@ -27,7 +27,7 @@ import type { HistoryItem, SearchItem } from "@/lib/argus-api";
 
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
-type View = "chat" | "strategies" | "collections" | "settings";
+type View = "chat" | "strategies" | "settings";
 
 export type ChatSidebarProps = {
   /** Whether the sidebar is expanded or collapsed */
@@ -59,7 +59,6 @@ export type ChatSidebarProps = {
   onNavigate: (view: View) => void;
   onOpenItem: (item: HistoryItem | SearchItem) => void;
   onLoadMoreHistory: () => void;
-  onOpenSettings: () => void;
   onOpenSearch: () => void;
   /** Callback when a chat is mutated (pin/archive/delete/rename) so parent can refresh */
   onHistoryMutated?: () => void;
@@ -69,6 +68,8 @@ export type ChatSidebarProps = {
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   /** Sidebar preference handler */
   onOpenSidebarPreference?: () => void;
+  strategiesEnabled?: boolean;
+  omnisearchEnabled?: boolean;
 };
 
 // ─── Date grouping helpers ────────────────────────────────────────────────────
@@ -136,12 +137,13 @@ export default function ChatSidebar({
   onNavigate,
   onOpenItem,
   onLoadMoreHistory,
-  onOpenSettings,
   onOpenSearch,
   onHistoryMutated,
   onLogout,
   onFeedback,
   onOpenSidebarPreference,
+  strategiesEnabled = false,
+  omnisearchEnabled = false,
 }: ChatSidebarProps) {
   const { t } = useTranslation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -357,21 +359,25 @@ export default function ChatSidebar({
           iconSize={20}
         />
 
-        <SidebarNavButton
-          icon={Search}
-          label={t("common.search", "Search")}
-          collapsed={!isOpen}
-          onClick={onOpenSearch}
-          iconSize={20}
-        />
+        {omnisearchEnabled && (
+          <SidebarNavButton
+            icon={Search}
+            label={t("common.search", "Search")}
+            collapsed={!isOpen}
+            onClick={onOpenSearch}
+            iconSize={20}
+          />
+        )}
 
-        <SidebarNavButton
-          icon={Compass}
-          label={t("common.strategies")}
-          active={currentView === "strategies"}
-          collapsed={!isOpen}
-          onClick={() => onNavigate("strategies")}
-        />
+        {strategiesEnabled && (
+          <SidebarNavButton
+            icon={Compass}
+            label={t("common.strategies")}
+            active={currentView === "strategies"}
+            collapsed={!isOpen}
+            onClick={() => onNavigate("strategies")}
+          />
+        )}
 
         {/* Recents Accordion */}
         <div className="mb-2 mt-2">

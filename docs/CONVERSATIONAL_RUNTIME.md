@@ -118,7 +118,7 @@ Result actions are available only after a completed run:
 - `refine_strategy`
 - `save_strategy`
 
-`save_strategy` belongs inside the result card. It saves from canonical run/result state, not reconstructed frontend prose.
+`save_strategy` belongs inside the result card when Strategies are enabled. It saves from canonical run/result state, not reconstructed frontend prose. Under private-alpha defaults (`NEXT_PUBLIC_STRATEGIES_ENABLED=false`, `ARGUS_STRATEGIES_ENABLED=false`), hide Save in the UI and respond to save intent by reminding the user that the result remains available in conversation/history instead of creating a hidden strategy object.
 
 ## Persistence Boundary
 
@@ -145,7 +145,10 @@ short affirmative answer, deterministic guardrails may accept only that stored
 candidate for that stored field after LLM interpretation. This keeps ordinary
 language LLM-first while preventing repeated binary clarifications.
 
-Collections remain in the schema but launch UI for collections is feature-gated with `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
+Collections remain in the schema, but Collections are indefinitely deferred from
+private alpha. Keep `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`; no sidebar entry,
+settings link, picker, command/search result, result action, onboarding path, or
+empty state should expose Collections.
 
 ## Fully Supported
 

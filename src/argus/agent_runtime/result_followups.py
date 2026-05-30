@@ -83,6 +83,45 @@ class ResultFollowupDraft(BaseModel):
     )
 
 
+class PrivateAlphaSaveDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answer: str = Field(
+        description=(
+            "A short natural-language response. It must explain that the latest "
+            "completed run cannot be promoted into Strategies while that surface is "
+            "off, and that the run remains retrievable through the conversation or "
+            "Recents/history. Do not claim that a Strategy was created."
+        )
+    )
+    answer_blocks: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Preferred user-visible response as one or two concise chat paragraphs. "
+            "The renderer joins these blocks and uses them instead of answer when "
+            "present."
+        ),
+    )
+    fact_ids: list[str] = Field(
+        description=(
+            "Fact IDs from fact_bank grounding the answer. Must include "
+            "save_surface_status and retrieval_path."
+        )
+    )
+    claims_strategy_was_saved: bool = Field(
+        description=(
+            "True if the answer says or implies a Strategy was created, saved to "
+            "Strategies, or stored in a hidden strategy library."
+        )
+    )
+    points_to_hidden_surface: bool = Field(
+        description=(
+            "True if the answer tells the user to open Strategies, Collections, "
+            "or another hidden private-alpha surface."
+        )
+    )
+
+
 async def compose_result_followup_response(
     *,
     metadata: dict[str, Any],
@@ -173,6 +212,133 @@ async def compose_result_followup_response(
         )
         return fallback_result_followup_response(metadata=metadata, focus=focus)
     return rendered
+
+
+async def compose_private_alpha_save_response(
+    *,
+    metadata: dict[str, Any],
+    user_message: str,
+    invoke_json_schema_func=invoke_openrouter_json_schema,
+    log_openrouter_failure_func=log_openrouter_failure,
+) -> str | None:
+    fact_bank = result_followup_fact_bank(metadata)
+    fact_bank["save_surface_status"] = (
+        "The Strategies library and Save action are not exposed in private alpha"
+    )
+    fact_bank["retrieval_path"] = (
+        "Completed runs remain available in the current conversation and through "
+        "Recents/history"
+    )
+    required_fact_ids = {"save_surface_status", "retrieval_path"}
+    context_packet_ids = context_packet_ids_from_fact_bank(fact_bank)
+    try:
+        raw_response = invoke_json_schema_func(
+            task="chat_composer",
+            messages=private_alpha_save_llm_messages(
+                fact_bank=fact_bank,
+                user_message=user_message,
+                required_fact_ids=required_fact_ids,
+            ),
+            schema_model=PrivateAlphaSaveDraft,
+            schema_name="PrivateAlphaSaveDraft",
+            context_packet_ids=context_packet_ids,
+        )
+        if inspect.isawaitable(raw_response):
+            raw_response = await raw_response
+    except Exception as exc:
+        log_openrouter_failure_func(
+            task="chat_composer",
+            model_name=None,
+            exc=exc,
+            message="LLM private-alpha save response failed; using guarded fallback",
+        )
+        return None
+
+    draft = coerce_private_alpha_save_draft(raw_response)
+    if draft is None:
+        return None
+    return render_private_alpha_save_draft(
+        draft=draft,
+        fact_bank=fact_bank,
+        required_fact_ids=required_fact_ids,
+    )
+
+
+def private_alpha_save_llm_messages(
+    *,
+    fact_bank: dict[str, str],
+    user_message: str,
+    required_fact_ids: set[str],
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
+                "The user is asking to save, bookmark, or keep the latest completed "
+                "backtest result. In private alpha, Strategies and Save are not "
+                "exposed as a user-facing destination, so do not claim a Strategy "
+                "was created and do not point the user to hidden surfaces. Use the "
+                "fact_bank as hard product truth, but own the wording naturally. "
+                "Keep the response short. It should make the user feel that their "
+                "work is not lost while being clear that no hidden strategy object "
+                "was created."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "user_message": user_message,
+                    "fact_bank": fact_bank,
+                    "required_fact_ids": sorted(required_fact_ids),
+                },
+                default=str,
+            ),
+        },
+    ]
+
+
+def coerce_private_alpha_save_draft(value: Any) -> PrivateAlphaSaveDraft | None:
+    if isinstance(value, PrivateAlphaSaveDraft):
+        return value
+    try:
+        return PrivateAlphaSaveDraft.model_validate(value)
+    except (TypeError, ValidationError):
+        return None
+
+
+def render_private_alpha_save_draft(
+    *,
+    draft: PrivateAlphaSaveDraft,
+    fact_bank: dict[str, str],
+    required_fact_ids: set[str],
+) -> str | None:
+    if draft.claims_strategy_was_saved or draft.points_to_hidden_surface:
+        return None
+    body = render_result_followup_answer_body(draft)
+    if not body or contains_user_visible_internal_fact_name(body):
+        return None
+    used_fact_ids: set[str] = set()
+    for fact_id_value in draft.fact_ids:
+        fact_id = str(fact_id_value or "").strip()
+        if fact_id not in fact_bank:
+            return None
+        used_fact_ids.add(fact_id)
+    if not required_fact_ids.issubset(used_fact_ids):
+        return None
+    body = normalize_response_body(body)
+    if not body or len(body.split()) > 120:
+        return None
+    return body
+
+
+def fallback_private_alpha_save_response() -> str:
+    return (
+        "I cannot promote this into Strategies while that surface is off for private "
+        "alpha, but the completed run is still part of this chat and can be reopened "
+        "from the conversation or Recents."
+    )
 
 
 def result_followup_llm_task(

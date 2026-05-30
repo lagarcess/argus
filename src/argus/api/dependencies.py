@@ -45,6 +45,19 @@ def problem(
     return HTTPException(status_code=status_code, detail=body, headers=headers)
 
 
+def private_alpha_access_problem(request: Request) -> HTTPException:
+    return problem(
+        request,
+        status_code=403,
+        code="private_alpha_access_required",
+        title="Private Alpha Access",
+        detail=(
+            "Argus is in private alpha right now. Use the email that was "
+            "invited, or ask the Argus team for access."
+        ),
+    )
+
+
 def auth_response(request: Request, payload: dict[str, Any]) -> JSONResponse:
     response = JSONResponse(payload)
     session = payload.get("session")
@@ -144,5 +157,9 @@ def current_user(request: Request) -> User:
             title="Unauthorized",
             detail="Invalid or expired access token.",
         ) from None
+
+    auth_email = str(auth_user.get("email") or "")
+    if not api_state.supabase_gateway.private_alpha_email_allowed(auth_email):
+        raise private_alpha_access_problem(request)
 
     return api_state.supabase_gateway.get_or_create_profile_for_auth_user(auth_user)
