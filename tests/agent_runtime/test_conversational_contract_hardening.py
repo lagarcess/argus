@@ -477,6 +477,112 @@ def test_dca_recurring_amount_from_user_text_is_preserved(monkeypatch) -> None:
     assert strategy.cadence == "weekly"
 
 
+def test_dca_tsla_monthly_recurring_contribution_does_not_ask_total_budget(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants monthly TSLA recurring buys.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Tesla monthly.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range="last year",
+            cadence="monthly",
+            capital_amount=500,
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                }
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="test buying $500 of TSLA every month last year",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.cadence == "monthly"
+    assert strategy.capital_amount == 500
+    assert result.decision.missing_required_fields == []
+    assert result.decision.unsupported_constraints == []
+
+
+def test_dca_contribution_cap_does_not_overwrite_recurring_contribution(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants quarterly MSFT recurring buys with a cap.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Microsoft quarterly.",
+            asset_universe=["MSFT"],
+            asset_class="equity",
+            date_range={"start": "2021-01-01", "end": "2023-12-31"},
+            cadence="quarterly",
+            capital_amount=750,
+            extra_parameters={
+                "contribution_cap": 9000,
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "contribution_cap": "cap",
+                },
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message=(
+            "try buying $750 of MSFT quarterly from 2021 through 2023 with a "
+            "$9,000 cap"
+        ),
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["MSFT"]
+    assert strategy.cadence == "quarterly"
+    assert strategy.capital_amount == 750
+    assert result.decision.missing_required_fields == []
+    assert result.patch["optional_parameter_status"]["initial_capital"] == 9000
+    constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
+    assert constraints[0]["category"] == "unsupported_dca_starting_principal"
+    assert constraints[0]["raw_value"] == "$9,000 contribution cap"
+    assert "contribution cap" in constraints[0]["explanation"]
+    assert "starting principal" not in constraints[0]["explanation"]
+
+
 def test_dca_same_turn_starting_principal_does_not_overwrite_recurring(
     monkeypatch,
 ) -> None:
@@ -898,7 +1004,7 @@ def test_dca_max_budget_language_preserves_separate_recurring_contribution(
             cadence="weekly",
             capital_amount=20000,
             extra_parameters={
-                "initial_capital": 100000,
+                "max_budget": 100000,
                 "field_provenance": {
                     "capital_amount": "recurring_contribution",
                 },
@@ -919,6 +1025,9 @@ def test_dca_max_budget_language_preserves_separate_recurring_contribution(
     assert result.patch["optional_parameter_status"]["initial_capital"] == 100000
     constraints = result.patch["optional_parameter_status"]["unsupported_constraints"]
     assert constraints[0]["category"] == "unsupported_dca_starting_principal"
+    assert constraints[0]["raw_value"] == "$100,000 maximum budget"
+    assert "maximum budget" in constraints[0]["explanation"]
+    assert "starting principal" not in constraints[0]["explanation"]
 
 
 def test_may_date_reference_blocks_default_past_year_confirmation(

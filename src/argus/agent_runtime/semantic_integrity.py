@@ -106,7 +106,8 @@ def conserve_semantic_constraints(
             optional_values["initial_capital"] = money_evidence.total_capital
             unsupported_constraints.append(
                 _unsupported_dca_starting_principal_constraint(
-                    money_evidence.total_capital
+                    money_evidence.total_capital,
+                    source=money_evidence.total_capital_source,
                 )
             )
             reason_codes.append("semantic_dca_starting_principal_deferred")
@@ -171,6 +172,7 @@ def filter_unsubstantiated_timeframe_constraints(
 class _MoneyRoleEvidence:
     recurring_contribution: float | None = None
     total_capital: float | None = None
+    total_capital_source: str | None = None
 
 
 def _structured_money_role_evidence(
@@ -192,16 +194,23 @@ def _structured_money_role_evidence(
             "dca_contribution",
         ),
     )
-    total = _first_number(
+    total_key, total = _first_number_with_key(
         extra,
         (
             "initial_capital",
             "starting_capital",
             "starting_principal",
+            "initial_lump_sum",
+            "initial_lump",
+            "lump_sum",
             "total_capital",
             "total_budget",
             "max_budget",
             "investment_budget",
+            "cap",
+            "contribution_cap",
+            "capital_cap",
+            "investment_cap",
         ),
     )
 
@@ -210,12 +219,20 @@ def _structured_money_role_evidence(
         "initial_capital",
         "starting_capital",
         "starting_principal",
+        "initial_lump_sum",
+        "initial_lump",
+        "lump_sum",
         "total_capital",
         "total_budget",
         "max_budget",
         "investment_budget",
+        "cap",
+        "contribution_cap",
+        "capital_cap",
+        "investment_cap",
     }:
         total = total if total is not None else _coerce_number(strategy.capital_amount)
+        total_key = total_key or capital_source
     elif capital_source in {
         "recurring_contribution",
         "contribution_amount",
@@ -245,6 +262,7 @@ def _structured_money_role_evidence(
     return _MoneyRoleEvidence(
         recurring_contribution=recurring,
         total_capital=total,
+        total_capital_source=total_key or capital_source or None,
     )
 
 
@@ -314,11 +332,19 @@ def _strategy_has_signal_rule_payload(strategy: StrategySummary) -> bool:
 
 
 def _first_number(payload: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+    _, value = _first_number_with_key(payload, keys)
+    return value
+
+
+def _first_number_with_key(
+    payload: dict[str, Any],
+    keys: tuple[str, ...],
+) -> tuple[str | None, float | None]:
     for key in keys:
         value = _coerce_number(payload.get(key))
         if value is not None:
-            return value
-    return None
+            return key, value
+    return None, None
 
 
 def _coerce_number(value: Any) -> float | None:
@@ -349,17 +375,20 @@ def _coerce_number(value: Any) -> float | None:
 
 def _unsupported_dca_starting_principal_constraint(
     total_capital: float,
+    *,
+    source: str | None = None,
 ) -> UnsupportedConstraint:
     formatted = _format_money(total_capital)
+    role_label = _dca_total_capital_role_label(source)
     # TODO(dca-engine): Support starting principal, contribution ceilings, and
     # recurring contributions as separate DCA execution inputs across engine
     # launch models, LangGraph contracts, confirmation cards, result assumptions,
     # and capability wording.
     return UnsupportedConstraint(
         category="unsupported_dca_starting_principal",
-        raw_value=f"{formatted} starting principal",
+        raw_value=f"{formatted} {role_label}",
         explanation=(
-            f"I understand {formatted} as starting principal, but the current "
+            f"I understand {formatted} as a {role_label}, but the current "
             "DCA backtest can only execute the recurring contribution. Starting "
             "principal and contribution caps are not executable in the same DCA "
             "run yet."
@@ -382,6 +411,19 @@ def _unsupported_dca_starting_principal_constraint(
             ),
         ],
     )
+
+
+def _dca_total_capital_role_label(source: str | None) -> str:
+    normalized = str(source or "").strip().lower()
+    if normalized in {"cap", "contribution_cap", "capital_cap", "investment_cap"}:
+        return "contribution cap"
+    if normalized in {"initial_lump_sum", "initial_lump", "lump_sum"}:
+        return "initial lump sum"
+    if normalized == "max_budget":
+        return "maximum budget"
+    if normalized in {"total_capital", "total_budget", "investment_budget"}:
+        return "total budget"
+    return "starting principal"
 
 
 def _invalid_date_range_constraint(value: Any) -> UnsupportedConstraint | None:

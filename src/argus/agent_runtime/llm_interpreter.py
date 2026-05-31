@@ -4546,10 +4546,17 @@ _TOTAL_CAPITAL_SOURCES = {
     "initial_capital",
     "starting_capital",
     "starting_principal",
+    "initial_lump_sum",
+    "initial_lump",
+    "lump_sum",
     "total_capital",
     "total_budget",
     "max_budget",
     "investment_budget",
+    "cap",
+    "contribution_cap",
+    "capital_cap",
+    "investment_cap",
 }
 
 _RECURRING_CAPITAL_SOURCES = {
