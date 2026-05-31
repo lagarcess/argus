@@ -304,6 +304,17 @@ async def _stage_result_from_interpretation(
             semantic_turn_act=interpretation.semantic_turn_act,
         )
     )
+    incoming_strategy, requested_asset_answer_applied = (
+        _strategy_with_requested_asset_answer_resolution(
+            strategy=incoming_strategy,
+            explicit_strategy=interpretation.candidate_strategy_draft,
+            prior_strategy=_active_strategy_from_snapshot(snapshot),
+            selected_thread_metadata=selected_thread_metadata,
+            current_user_message=state.current_user_message,
+            semantic_turn_act=interpretation.semantic_turn_act,
+            pending_resolution_applied=pending_resolution_applied,
+        )
+    )
     if (
         expects_strategy_route
         and interpretation.semantic_turn_act != "retry_failed_action"
@@ -493,6 +504,11 @@ async def _stage_result_from_interpretation(
             *(
                 ["pending_resolution_candidate_affirmed"]
                 if pending_resolution_applied
+                else []
+            ),
+            *(
+                ["requested_asset_answer_checked_provider"]
+                if requested_asset_answer_applied
                 else []
             ),
             *integrity_report.reason_codes,
@@ -1704,6 +1720,72 @@ def _strategy_with_pending_resolution_affirmation(
         if not _is_ambiguous_asset_resolution(item)
     ]
     return updated, True
+
+
+def _strategy_with_requested_asset_answer_resolution(
+    *,
+    strategy: StrategySummary,
+    explicit_strategy: StrategySummary,
+    prior_strategy: StrategySummary | None,
+    selected_thread_metadata: dict[str, Any],
+    current_user_message: str,
+    semantic_turn_act: str | None,
+    pending_resolution_applied: bool,
+) -> tuple[StrategySummary, bool]:
+    if pending_resolution_applied:
+        return strategy, False
+    if semantic_turn_act != "answer_pending_need":
+        return strategy, False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "asset_universe":
+        return strategy, False
+    asset_answer = _requested_asset_answer_candidate(
+        explicit_strategy=explicit_strategy,
+        current_user_message=current_user_message,
+    )
+    if not asset_answer:
+        return strategy, False
+    resolution = _resolve_asset_candidate(
+        asset_answer,
+        field="asset_universe[0]",
+        source="llm_extraction",
+    )
+    updated = (prior_strategy or strategy).model_copy(deep=True)
+    existing_provenance: list[ResolutionProvenance | dict[str, Any]] = []
+    for item in updated.resolution_provenance:
+        if _field_base(_provenance_field(item)) != "asset_universe":
+            existing_provenance.append(item)
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [*existing_provenance, resolution.provenance]
+    )
+    if resolution.status == "resolved" and resolution.asset is not None:
+        updated.asset_universe = [resolution.asset.canonical_symbol]
+        updated.asset_class = resolution.asset.asset_class
+    else:
+        updated.asset_universe = []
+        updated.asset_class = None
+    return updated, True
+
+
+def _provenance_field(item: ResolutionProvenance | dict[str, Any]) -> str:
+    if isinstance(item, ResolutionProvenance):
+        return item.field
+    field = item.get("field")
+    return field if isinstance(field, str) else ""
+
+
+def _requested_asset_answer_candidate(
+    *,
+    explicit_strategy: StrategySummary,
+    current_user_message: str,
+) -> str:
+    for symbol in explicit_strategy.asset_universe:
+        candidate = str(symbol or "").strip()
+        if candidate:
+            return candidate
+    return current_user_message.strip()
 
 
 def _strategy_with_supported_indicator_simplification(

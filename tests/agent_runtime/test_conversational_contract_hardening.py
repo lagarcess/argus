@@ -1053,6 +1053,239 @@ def test_change_asset_answer_patches_requested_field_only(monkeypatch) -> None:
     assert strategy.capital_amount is None
 
 
+def test_requested_asset_answer_resolves_google_through_provider_path(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[str] = []
+    provider_assets = {
+        "google": ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc."),
+        "googl": ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc."),
+    }
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        provider_queries.append(symbol)
+        return provider_assets[symbol.strip().lower()]
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        capital_amount=10000,
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the replacement asset.",
+        candidate_strategy_draft=StrategySummary(),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="google",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert provider_queries[0] == "google"
+    assert "AAPL" not in provider_queries
+    assert strategy.asset_universe == ["GOOGL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == "past year"
+    assert strategy.capital_amount == 10000
+
+
+def test_requested_asset_answer_ignores_unrelated_llm_draft_fields(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub("GOOGL", "equity")
+        if symbol.strip().lower() == "google"
+        else ResolvedAssetStub(symbol.strip().upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=10000,
+    )
+    pending.resolution_provenance = [
+        {
+            "field": "date_range",
+            "raw_text": "2024 dates",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "confidence": "high",
+        },
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Apple",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "AAPL",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        },
+    ]
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the replacement asset.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"start": "2023-01-01", "end": "2023-12-31"},
+            capital_amount=25000,
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="google",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["GOOGL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert strategy.capital_amount == 10000
+    assert any(
+        item.field == "date_range" and item.raw_text == "2024 dates"
+        for item in strategy.resolution_provenance
+    )
+    assert all(
+        item.raw_text != "Apple" for item in strategy.resolution_provenance
+    )
+
+
+def test_requested_asset_answer_with_explicit_asset_ignores_unrelated_draft_fields(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[str] = []
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        provider_queries.append(symbol)
+        return ResolvedAssetStub("GOOGL", "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=10000,
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the replacement asset.",
+        candidate_strategy_draft=StrategySummary(
+            asset_universe=["google"],
+            date_range={"start": "2023-01-01", "end": "2023-12-31"},
+            capital_amount=25000,
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="google",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert provider_queries[0] == "google"
+    assert "AAPL" not in provider_queries
+    assert strategy.asset_universe == ["GOOGL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert strategy.capital_amount == 10000
+
+
+def test_requested_asset_answer_resolves_ticker_through_provider_path(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[str] = []
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        provider_queries.append(symbol)
+        return ResolvedAssetStub(symbol.strip().upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+        capital_amount=10000,
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the replacement asset.",
+        candidate_strategy_draft=StrategySummary(),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="msft",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert provider_queries[0] == "msft"
+    assert "AAPL" not in provider_queries
+    assert strategy.asset_universe == ["MSFT"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == "past year"
+    assert strategy.capital_amount == 10000
+
+
 def test_affirmative_asset_clarification_uses_pending_resolution_candidate(
     monkeypatch,
 ) -> None:
