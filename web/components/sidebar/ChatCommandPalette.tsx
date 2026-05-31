@@ -37,6 +37,7 @@ type ChatCommandPaletteProps = {
   onOpenConversation: (conversationId: string) => void;
   activeConversationId: string | null;
   onMutated?: () => void;
+  onConversationRemoved?: (conversationId: string) => void;
 };
 
 type LayoutMode = "expanded" | "collapsed";
@@ -153,6 +154,7 @@ export default function ChatCommandPalette({
   onOpenConversation,
   activeConversationId,
   onMutated,
+  onConversationRemoved,
 }: ChatCommandPaletteProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
@@ -326,7 +328,8 @@ export default function ChatCommandPalette({
     await patchConversation(item.conversationId, { archived: true });
     removeLocalConversation(item.conversationId);
     onMutated?.();
-  }, [onMutated, removeLocalConversation]);
+    onConversationRemoved?.(item.conversationId);
+  }, [onConversationRemoved, onMutated, removeLocalConversation]);
 
   const handleDelete = useCallback((item: DisplayItem) => {
     setPendingDeleteItem(item);
@@ -343,11 +346,12 @@ export default function ChatCommandPalette({
       await apiDeleteConversation(pendingDeleteItem.conversationId);
       removeLocalConversation(pendingDeleteItem.conversationId);
       onMutated?.();
+      onConversationRemoved?.(pendingDeleteItem.conversationId);
       setPendingDeleteItem(null);
     } finally {
       setIsDeleting(false);
     }
-  }, [isDeleting, onMutated, pendingDeleteItem, removeLocalConversation]);
+  }, [isDeleting, onConversationRemoved, onMutated, pendingDeleteItem, removeLocalConversation]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

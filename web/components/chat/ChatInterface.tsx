@@ -41,6 +41,7 @@ import {
   type SearchItem,
 } from "@/lib/argus-api";
 import {
+  chatExploratorySuggestionsEnabled,
   collectionsEnabled,
   omnisearchEnabled,
   privateAlphaOnboardingEnabled,
@@ -614,6 +615,7 @@ export default function ChatInterface() {
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
+  const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -894,9 +896,8 @@ export default function ChatInterface() {
     setCurrentView("chat");
     rememberActiveConversationId(convId);
     setConversationId(convId);
-    setMessages([]);
-    setInputActions([]);
     setStreamStatus(t('common.loading'));
+    setIsHydratingConversation(true);
     try {
       const { items } = await getConversationMessages(convId, 50);
       const hydrated = hydrateMessagesFromApi(items);
@@ -913,6 +914,7 @@ export default function ChatInterface() {
       ]);
     } finally {
       setStreamStatus(null);
+      setIsHydratingConversation(false);
     }
   };
 
@@ -980,6 +982,12 @@ export default function ChatInterface() {
       return null;
     }
   };
+
+  const handleConversationRemoved = useCallback((removedConversationId: string) => {
+    refreshHistory();
+    if (removedConversationId !== conversationId) return;
+    void startNewChat();
+  }, [conversationId, refreshHistory, startNewChat]);
 
   const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
@@ -1479,6 +1487,8 @@ export default function ChatInterface() {
   const latestAssistantContent =
     [...messages].reverse().find((message) => message.role === "ai")?.content?.trim() ?? "";
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
+  const showExploratorySuggestions =
+    chatExploratorySuggestionsEnabled && showSuggestions;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1512,6 +1522,7 @@ export default function ChatInterface() {
           }
         }}
         onHistoryMutated={refreshHistory}
+        onConversationRemoved={handleConversationRemoved}
         onLogout={() => {
           void handleLogout();
         }}
@@ -1537,6 +1548,7 @@ export default function ChatInterface() {
           }}
           activeConversationId={conversationId}
           onMutated={refreshHistory}
+          onConversationRemoved={handleConversationRemoved}
         />
       )}
 
@@ -1713,55 +1725,55 @@ export default function ChatInterface() {
                   </div>
                 )}
 
-                {/* Show/Hide Suggestions Toggle */}
-                <div className="mt-4">
+                {/* Starter Actions / Chips */}
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => setShowSuggestions(!showSuggestions)}
-                    className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'What if I bought Tesla after big drops?'))}
+                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
-                    {showSuggestions ? t('chat.hide_suggestions') : t('chat.show_suggestions')}
+                    <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
+                    {t('chat.starter_actions.tsla.label', 'Buy Tesla after drops')}
+                  </button>
+                  <button
+                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'What if I bought Bitcoin when it has been rising?'))}
+                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                  >
+                    <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
+                    {t('chat.starter_actions.btc.label', 'Test Bitcoin strength')}
+                  </button>
+                  <button
+                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'What if I bought a fixed amount every month?'))}
+                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                  >
+                    <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
+                    {t('chat.starter_actions.dca.label', 'Buy every month')}
                   </button>
                 </div>
 
-                <div className={`mt-6 w-full flex flex-col items-center transition-all duration-500 ease-in-out overflow-hidden ${ showSuggestions ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none' }`}>
-                  {/* Starter Actions / Chips */}
-                  <div className="flex flex-wrap items-center justify-center gap-3">
-                      <button
-                        onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Show me TSLA analysis'))}
-                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                      >
-                        <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
-                        {t('chat.starter_actions.tsla.label', 'TSLA Analysis')}
-                      </button>
-                      <button
-                        onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Show me BTC trends'))}
-                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                      >
-                        <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
-                        {t('chat.starter_actions.btc.label', 'BTC Trends')}
-                      </button>
-                      <button
-                        onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Explain DCA strategy'))}
-                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                      >
-                        <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
-                        {t('chat.starter_actions.dca.label', 'DCA Strategy')}
-                      </button>
-                    </div>
-
-                    {/* Example Questions */}
-                    <div className="mt-12 flex flex-col items-center gap-4 text-center">
-                      <button onClick={() => handleSend(t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
-                        {t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?')}
-                      </button>
-                      <button onClick={() => handleSend(t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
-                        {t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.')}
-                      </button>
-                      <button onClick={() => handleSend(t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
-                        {t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?')}
-                      </button>
-                    </div>
+                {chatExploratorySuggestionsEnabled && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowSuggestions(!showSuggestions)}
+                      className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+                    >
+                      {showSuggestions ? t('chat.hide_suggestions') : t('chat.show_suggestions')}
+                    </button>
                   </div>
+                )}
+
+                {showExploratorySuggestions && (
+                  <div className="mt-8 flex flex-col items-center gap-4 text-center">
+                    <button onClick={() => handleSend(t('chat.example_queries.q1', 'What if I bought Apple after big drops?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                      {t('chat.example_queries.q1', 'What if I bought Apple after big drops?')}
+                    </button>
+                    <button onClick={() => handleSend(t('chat.example_queries.q2', 'What if I bought Bitcoin when it starts rising?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                      {t('chat.example_queries.q2', 'What if I bought Bitcoin when it starts rising?')}
+                    </button>
+                    <button onClick={() => handleSend(t('chat.example_queries.q3', 'What if I bought Tesla every month?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                      {t('chat.example_queries.q3', 'What if I bought Tesla every month?')}
+                    </button>
+                  </div>
+                )}
                 </div>
             ) : (
               <>
@@ -1828,7 +1840,7 @@ export default function ChatInterface() {
                         </button>
                       </div>
                     )}
-                    {composerActions.length > 0 && !streamStatus && !isStreamingResponse && (
+                    {composerActions.length > 0 && !streamStatus && !isStreamingResponse && !isHydratingConversation && (
                       <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {composerActions.map((action) => (
                           <button
@@ -1842,7 +1854,7 @@ export default function ChatInterface() {
                         ))}
                       </div>
                     )}
-                    <ChatInput onSend={handleSend} disabled={isStreamingResponse} />
+                    <ChatInput onSend={handleSend} disabled={isStreamingResponse || isHydratingConversation} />
                   </div>
                 </div>
               </>

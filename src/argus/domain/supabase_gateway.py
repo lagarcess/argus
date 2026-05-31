@@ -535,7 +535,12 @@ class SupabaseGateway:
         ).eq("id", conversation_id).eq("user_id", user_id).execute()
 
     def list_history_rows(
-        self, *, user_id: str, limit: int | None, deleted: bool = False
+        self,
+        *,
+        user_id: str,
+        limit: int | None,
+        archived: bool = False,
+        deleted: bool = False,
     ) -> dict[str, list[dict[str, Any]]]:
         query_runs = (
             self.client.table("backtest_runs")
@@ -544,8 +549,9 @@ class SupabaseGateway:
         )
         query_chats = (
             self.client.table("conversations")
-            .select("id,title,last_message_preview,pinned,updated_at,deleted_at")
+            .select("id,title,last_message_preview,pinned,updated_at,deleted_at,archived")
             .eq("user_id", user_id)
+            .eq("archived", archived)
         )
         query_strategies = (
             self.client.table("strategies")

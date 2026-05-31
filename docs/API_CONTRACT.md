@@ -1449,6 +1449,8 @@ Mixed recent activity feed.
 - `cursor`
 - `type=all|chat|strategy|collection|run`
 - `asset_class=equity|crypto|currency_pair` (Optional filter)
+- `archived=false` (Optional; archived conversations are excluded by default)
+- `deleted=false` (Optional; soft-deleted items are excluded by default)
 
 **Response:**
 ```json

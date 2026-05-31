@@ -18,6 +18,7 @@ def history(
     request: Request,
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = Query(None),
+    archived: bool = Query(False),
     deleted: bool = Query(False),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedHistory:
@@ -25,6 +26,7 @@ def history(
         raw = api_state.supabase_gateway.list_history_rows(
             user_id=user.id,
             limit=None,
+            archived=archived,
             deleted=deleted,
         )
         items: list[HistoryItem] = []
@@ -91,7 +93,7 @@ def history(
                 conversation.deleted_at is not None
                 if deleted
                 else conversation.deleted_at is None
-            ):
+            ) and conversation.archived is archived:
                 items.append(
                     HistoryItem(
                         type="chat",

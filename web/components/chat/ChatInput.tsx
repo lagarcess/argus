@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, AtSign } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { searchDiscovery, type DiscoveryItem } from "@/lib/argus-api";
+import { chatExploratorySuggestionsEnabled } from "@/lib/private-alpha-flags";
 import {
   composerMentions,
   deleteTokenBeforeOffset,
@@ -22,6 +23,8 @@ type ChatInputProps = {
   disabled?: boolean;
 };
 
+const EMPTY_CHAT_PROMPTS: string[] = [];
+
 export default function ChatInput({ onSend, disabled = false }: ChatInputProps) {
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
@@ -40,10 +43,11 @@ export default function ChatInput({ onSend, disabled = false }: ChatInputProps) 
   const activeMentionOffsetRef = useRef<number | null>(null);
   const composerIsEmpty = !composerHasContent;
 
-  const prompts = useMemo(() => {
+  const localizedPrompts = useMemo(() => {
     const p = t("chat.placeholder_prompts", { returnObjects: true });
     return Array.isArray(p) ? p : [];
   }, [t]);
+  const prompts = chatExploratorySuggestionsEnabled ? localizedPrompts : EMPTY_CHAT_PROMPTS;
 
   useEffect(() => {
     setIsMounted(true);

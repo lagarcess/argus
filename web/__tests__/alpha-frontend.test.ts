@@ -85,6 +85,25 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain('aria-label="Archived chats"');
   });
 
+  test("private-alpha defaults hide exploratory chat suggestions while keeping starter chips", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    const flags = readFileSync(join(root, "lib/private-alpha-flags.ts"), "utf-8");
+    const envExample = readFileSync(join(root, ".env.local.example"), "utf-8");
+
+    expect(flags).toContain("NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED");
+    expect(flags).toContain("chatExploratorySuggestionsEnabled");
+    expect(envExample).toContain("NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false");
+    expect(chat).toContain("chatExploratorySuggestionsEnabled");
+    expect(chat).toContain("showExploratorySuggestions");
+    expect(chat).toContain("chat.starter_actions.tsla.value");
+    expect(chat).toContain("chat.starter_actions.btc.value");
+    expect(chat).toContain("chat.starter_actions.dca.value");
+    expect(chat).toContain("showExploratorySuggestions &&");
+    expect(input).toContain("chatExploratorySuggestionsEnabled");
+    expect(input).toContain("const prompts = chatExploratorySuggestionsEnabled");
+  });
+
   test("chat result messages preserve assistant explanation next to card", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");

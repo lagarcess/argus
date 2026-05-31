@@ -834,6 +834,50 @@ def test_search_supabase_returns_cursor_page_and_supported_types(mock_gateway):
     )
 
 
+def test_history_supabase_requests_non_archived_rows_by_default(mock_gateway):
+    mock_gateway.list_history_rows.return_value = {
+        "runs": [],
+        "conversations": [],
+        "strategies": [],
+        "collections": [],
+    }
+
+    response = client.get(
+        "/api/v1/history",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.list_history_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=None,
+        deleted=False,
+        archived=False,
+    )
+
+
+def test_history_supabase_can_request_archived_rows(mock_gateway):
+    mock_gateway.list_history_rows.return_value = {
+        "runs": [],
+        "conversations": [],
+        "strategies": [],
+        "collections": [],
+    }
+
+    response = client.get(
+        "/api/v1/history?archived=true",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_gateway.list_history_rows.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        limit=None,
+        deleted=False,
+        archived=True,
+    )
+
+
 def test_conversations_cursor_supabase_pages_without_duplicates(mock_gateway):
     now = utcnow()
     mock_gateway.list_conversations.return_value = [

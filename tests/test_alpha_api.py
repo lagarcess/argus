@@ -415,6 +415,74 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     assert [item["type"] for item in history.json()["items"]] == ["run", "chat"]
 
 
+def test_history_excludes_archived_and_deleted_chats_by_default() -> None:
+    client = _client()
+
+    client.post("/api/v1/conversations", json={"title": "Active idea"})
+    archived = client.post(
+        "/api/v1/conversations", json={"title": "Archived idea"}
+    ).json()["conversation"]
+    deleted = client.post("/api/v1/conversations", json={"title": "Deleted idea"}).json()[
+        "conversation"
+    ]
+
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{archived['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/v1/conversations/{deleted['id']}").status_code == 200
+
+    response = client.get("/api/v1/history")
+
+    assert response.status_code == 200
+    chat_titles = [
+        item["title"] for item in response.json()["items"] if item["type"] == "chat"
+    ]
+    assert chat_titles == ["Active idea"]
+
+
+def test_history_can_return_archived_chats_without_deleted_chats() -> None:
+    client = _client()
+
+    active = client.post("/api/v1/conversations", json={"title": "Active idea"}).json()[
+        "conversation"
+    ]
+    archived = client.post(
+        "/api/v1/conversations", json={"title": "Archived idea"}
+    ).json()["conversation"]
+    deleted = client.post("/api/v1/conversations", json={"title": "Deleted idea"}).json()[
+        "conversation"
+    ]
+
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{archived['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{deleted['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/v1/conversations/{deleted['id']}").status_code == 200
+
+    response = client.get("/api/v1/history?archived=true")
+
+    assert response.status_code == 200
+    chat_titles = [
+        item["title"] for item in response.json()["items"] if item["type"] == "chat"
+    ]
+    assert chat_titles == ["Archived idea"]
+    assert active["id"] not in {item["id"] for item in response.json()["items"]}
+
+
 def test_execution_realism_payload_is_ignored_when_feature_flag_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

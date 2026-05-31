@@ -62,6 +62,8 @@ export type ChatSidebarProps = {
   onOpenSearch: () => void;
   /** Callback when a chat is mutated (pin/archive/delete/rename) so parent can refresh */
   onHistoryMutated?: () => void;
+  /** Callback when archive/delete removes a chat from the active recents surface */
+  onConversationRemoved?: (conversationId: string) => void;
   /** Logout handler */
   onLogout: () => void;
   /** Feedback handler */
@@ -139,6 +141,7 @@ export default function ChatSidebar({
   onLoadMoreHistory,
   onOpenSearch,
   onHistoryMutated,
+  onConversationRemoved,
   onLogout,
   onFeedback,
   onOpenSidebarPreference,
@@ -229,10 +232,11 @@ export default function ChatSidebar({
     try {
       await patchConversation(id, { archived: true });
       onHistoryMutated?.();
+      onConversationRemoved?.(id);
     } catch (err) {
       console.error("Failed to archive conversation", err);
     }
-  }, [onHistoryMutated]);
+  }, [onConversationRemoved, onHistoryMutated]);
 
   const handleRequestDelete = useCallback((id: string) => {
     setPendingDeleteId(id);
@@ -244,13 +248,14 @@ export default function ChatSidebar({
     try {
       await apiDeleteConversation(pendingDeleteId);
       onHistoryMutated?.();
+      onConversationRemoved?.(pendingDeleteId);
     } catch (err) {
       console.error("Failed to delete conversation", err);
     } finally {
       setIsDeleting(false);
       setPendingDeleteId(null);
     }
-  }, [isDeleting, onHistoryMutated, pendingDeleteId]);
+  }, [isDeleting, onConversationRemoved, onHistoryMutated, pendingDeleteId]);
 
   const handleStartRename = useCallback((id: string) => {
     const item = chatItems.find((i) => i.id === id);

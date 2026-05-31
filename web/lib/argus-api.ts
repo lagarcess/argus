@@ -558,10 +558,11 @@ export async function deleteConversation(conversationId: string) {
 
 // ─── History ──────────────────────────────────────────────────────────────────
 
-export async function listHistory(params: { limit?: number; cursor?: string; deleted?: boolean } = {}) {
-  const { limit = 20, cursor, deleted } = params;
+export async function listHistory(params: { limit?: number; cursor?: string; archived?: boolean; deleted?: boolean } = {}) {
+  const { limit = 20, cursor, archived, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
+  if (archived !== undefined) searchParams.append("archived", String(archived));
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
 
   return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(

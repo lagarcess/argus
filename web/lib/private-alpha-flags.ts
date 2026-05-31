@@ -9,3 +9,6 @@ export const omnisearchEnabled =
 
 export const privateAlphaOnboardingEnabled =
   process.env.NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED === "true";
+
+export const chatExploratorySuggestionsEnabled =
+  process.env.NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED === "true";
