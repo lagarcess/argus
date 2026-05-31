@@ -5,7 +5,10 @@ from typing import Any
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.state.models import StrategySummary
-from argus.agent_runtime.strategy_contract import executable_strategy_type
+from argus.agent_runtime.strategy_contract import (
+    executable_strategy_type,
+    has_partial_explicit_date_range,
+)
 
 
 def missing_required_fields_for_strategy(
@@ -55,6 +58,8 @@ def missing_required_fields_for_strategy(
         if isinstance(value, list):
             if not value:
                 missing.append(field_name)
+        elif field_name == "date_range" and has_partial_explicit_date_range(value):
+            missing.append(field_name)
         elif value is None or value == "":
             missing.append(field_name)
     if strategy_type == "signal_strategy" and not strategy_has_executable_signal_rule(

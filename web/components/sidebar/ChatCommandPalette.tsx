@@ -325,10 +325,10 @@ export default function ChatCommandPalette({
   }, [cancelRename, editingTitle, isSubmittingEdit, onMutated, updateLocalTitle]);
 
   const handleArchive = useCallback(async (item: DisplayItem) => {
-    await patchConversation(item.conversationId, { archived: true });
     removeLocalConversation(item.conversationId);
-    onMutated?.();
     onConversationRemoved?.(item.conversationId);
+    await patchConversation(item.conversationId, { archived: true });
+    onMutated?.();
   }, [onConversationRemoved, onMutated, removeLocalConversation]);
 
   const handleDelete = useCallback((item: DisplayItem) => {
@@ -342,11 +342,11 @@ export default function ChatCommandPalette({
   const handleConfirmDelete = useCallback(async () => {
     if (!pendingDeleteItem || isDeleting) return;
     setIsDeleting(true);
+    removeLocalConversation(pendingDeleteItem.conversationId);
+    onConversationRemoved?.(pendingDeleteItem.conversationId);
     try {
       await apiDeleteConversation(pendingDeleteItem.conversationId);
-      removeLocalConversation(pendingDeleteItem.conversationId);
       onMutated?.();
-      onConversationRemoved?.(pendingDeleteItem.conversationId);
       setPendingDeleteItem(null);
     } finally {
       setIsDeleting(false);

@@ -271,6 +271,13 @@ function hasResultActionContext(runId: string | undefined, conversationId: strin
   return Boolean(runId && conversationId);
 }
 
+function historyItemBelongsToConversation(
+  item: HistoryItem,
+  targetConversationId: string,
+) {
+  return item.id === targetConversationId || item.conversation_id === targetConversationId;
+}
+
 function hydrateResultActions(
   actions: ChatActionOption[],
   context: {
@@ -684,9 +691,9 @@ export default function ChatInterface() {
   // ── History ────────────────────────────────────────────────────────────────
 
   /** Imperative refresh — safe to call from event handlers */
-  const refreshHistory = () => {
+  const refreshHistory = useCallback(() => {
     loadHistoryPage(null, false).catch(() => undefined);
-  };
+  }, [loadHistoryPage]);
 
   function clearPostTurnHistoryRefreshTimers() {
     for (const timerId of postTurnHistoryRefreshTimersRef.current) {
@@ -956,7 +963,7 @@ export default function ChatInterface() {
 
   // ── Start new chat ─────────────────────────────────────────────────────────
 
-  const startNewChat = async () => {
+  const startNewChat = useCallback(async () => {
     try {
       const { conversation } = await createConversation(i18n.language);
       rememberActiveConversationId(conversation.id);
@@ -981,9 +988,12 @@ export default function ChatInterface() {
       console.error("Failed to start new chat:", err);
       return null;
     }
-  };
+  }, [i18n.language, refreshHistory]);
 
   const handleConversationRemoved = useCallback((removedConversationId: string) => {
+    setHistoryItems((prev) =>
+      prev.filter((item) => !historyItemBelongsToConversation(item, removedConversationId)),
+    );
     refreshHistory();
     if (removedConversationId !== conversationId) return;
     void startNewChat();

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 from argus.domain.supabase_gateway import SupabaseGateway
@@ -201,3 +202,163 @@ def test_mock_user_lookup_preserves_existing_profile_onboarding():
     assert client.upserted_profile is None
     assert user.onboarding.completed is True
     assert user.onboarding.primary_goal == "test_stock_idea"
+
+
+class _HistoryClient:
+    def __init__(self) -> None:
+        self.rows_by_table: dict[str, list[dict[str, Any]]] = {
+            "conversations": [
+                {
+                    "id": "conv-other",
+                    "user_id": "user-1",
+                    "title": "Other active idea",
+                    "last_message_preview": None,
+                    "pinned": False,
+                    "archived": False,
+                    "deleted_at": None,
+                    "updated_at": "2026-05-31T00:00:00+00:00",
+                },
+                {
+                    "id": "conv-active",
+                    "user_id": "user-1",
+                    "title": "Active idea",
+                    "last_message_preview": None,
+                    "pinned": False,
+                    "archived": False,
+                    "deleted_at": None,
+                    "updated_at": "2026-05-31T00:00:00+00:00",
+                },
+                {
+                    "id": "conv-archived",
+                    "user_id": "user-1",
+                    "title": "Archived idea",
+                    "last_message_preview": None,
+                    "pinned": False,
+                    "archived": True,
+                    "deleted_at": None,
+                    "updated_at": "2026-05-31T00:00:00+00:00",
+                },
+                {
+                    "id": "conv-deleted",
+                    "user_id": "user-1",
+                    "title": "Deleted idea",
+                    "last_message_preview": None,
+                    "pinned": False,
+                    "archived": False,
+                    "deleted_at": "2026-05-31T01:00:00+00:00",
+                    "updated_at": "2026-05-31T00:00:00+00:00",
+                },
+            ],
+            "backtest_runs": [
+                {
+                    "id": "run-active",
+                    "user_id": "user-1",
+                    "conversation_id": "conv-active",
+                    "conversation_result_card": {"title": "AAPL run", "rows": []},
+                    "created_at": "2026-05-31T00:00:00+00:00",
+                },
+                {
+                    "id": "run-archived",
+                    "user_id": "user-1",
+                    "conversation_id": "conv-archived",
+                    "conversation_result_card": {"title": "TSLA run", "rows": []},
+                    "created_at": "2026-05-31T00:00:00+00:00",
+                },
+                {
+                    "id": "run-deleted",
+                    "user_id": "user-1",
+                    "conversation_id": "conv-deleted",
+                    "conversation_result_card": {"title": "MSFT run", "rows": []},
+                    "created_at": "2026-05-31T00:00:00+00:00",
+                },
+                {
+                    "id": "run-orphan",
+                    "user_id": "user-1",
+                    "conversation_id": None,
+                    "conversation_result_card": {"title": "Direct run", "rows": []},
+                    "created_at": "2026-05-31T00:00:00+00:00",
+                },
+            ],
+            "strategies": [],
+            "collections": [],
+        }
+
+    def table(self, table_name: str):
+        return _HistoryTable(self.rows_by_table[table_name])
+
+
+class _HistoryTable:
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self.rows = list(rows)
+
+    def select(self, *_args: object, **_kwargs: object):
+        return self
+
+    def eq(self, key: str, value: object):
+        self.rows = [row for row in self.rows if row.get(key) == value]
+        return self
+
+    def in_(self, key: str, values: list[object]):
+        expected = {str(value) for value in values}
+        self.rows = [
+            row for row in self.rows if row.get(key) is not None and str(row[key]) in expected
+        ]
+        return self
+
+    def is_(self, key: str, value: object):
+        if value == "null":
+            self.rows = [row for row in self.rows if row.get(key) is None]
+        return self
+
+    @property
+    def not_(self):
+        return _HistoryNotFilter(self)
+
+    def order(self, *_args: object, **_kwargs: object):
+        return self
+
+    def limit(self, count: int):
+        self.rows = self.rows[:count]
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=list(self.rows))
+
+
+class _HistoryNotFilter:
+    def __init__(self, query: _HistoryTable) -> None:
+        self.query = query
+
+    def is_(self, key: str, value: object):
+        if value == "null":
+            self.query.rows = [
+                row for row in self.query.rows if row.get(key) is not None
+            ]
+        return self.query
+
+
+def test_gateway_history_filters_runs_by_parent_conversation_state() -> None:
+    gateway = SupabaseGateway(client=_HistoryClient())
+
+    default_rows = gateway.list_history_rows(user_id="user-1", limit=100)
+    archived_rows = gateway.list_history_rows(
+        user_id="user-1",
+        limit=100,
+        archived=True,
+    )
+    deleted_rows = gateway.list_history_rows(
+        user_id="user-1",
+        limit=100,
+        deleted=True,
+    )
+
+    assert {row["id"] for row in default_rows["runs"]} == {
+        "run-active",
+        "run-orphan",
+    }
+    assert {
+        row["id"]
+        for row in gateway.list_history_rows(user_id="user-1", limit=1)["runs"]
+    } == {"run-active"}
+    assert {row["id"] for row in archived_rows["runs"]} == {"run-archived"}
+    assert {row["id"] for row in deleted_rows["runs"]} == {"run-deleted"}

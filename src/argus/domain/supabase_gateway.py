@@ -61,6 +61,41 @@ def _message_preview(content: str, max_length: int = 180) -> str | None:
     return plain_text_preview(content, max_length=max_length)
 
 
+def _filter_history_runs_by_conversation_state(
+    runs: list[dict[str, Any]],
+    conversations: list[dict[str, Any]],
+    *,
+    archived: bool,
+    deleted: bool,
+) -> list[dict[str, Any]]:
+    conversations_by_id = {
+        str(row["id"]): row for row in conversations if row.get("id") is not None
+    }
+    include_orphan_runs = not archived and not deleted
+    filtered: list[dict[str, Any]] = []
+
+    for run in runs:
+        conversation_id = run.get("conversation_id")
+        if conversation_id is None:
+            if include_orphan_runs:
+                filtered.append(run)
+            continue
+        conversation = conversations_by_id.get(str(conversation_id))
+        if conversation is None:
+            if include_orphan_runs:
+                filtered.append(run)
+            continue
+        deleted_matches = (
+            conversation.get("deleted_at") is not None
+            if deleted
+            else conversation.get("deleted_at") is None
+        )
+        if deleted_matches and bool(conversation.get("archived", False)) == archived:
+            filtered.append(run)
+
+    return filtered
+
+
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -544,7 +579,7 @@ class SupabaseGateway:
     ) -> dict[str, list[dict[str, Any]]]:
         query_runs = (
             self.client.table("backtest_runs")
-            .select("id,conversation_result_card,created_at")
+            .select("id,conversation_id,conversation_result_card,created_at")
             .eq("user_id", user_id)
         )
         query_chats = (
@@ -596,6 +631,16 @@ class SupabaseGateway:
             chats = ordered_chats.limit(limit).execute().data or []
             strategies = ordered_strategies.limit(limit).execute().data or []
             collections = ordered_collections.limit(limit).execute().data or []
+        run_parent_conversations = self._fetch_history_run_conversation_states(
+            user_id=user_id,
+            runs=runs,
+        )
+        runs = _filter_history_runs_by_conversation_state(
+            runs,
+            run_parent_conversations,
+            archived=archived,
+            deleted=deleted,
+        )
 
         return {
             "runs": runs,
@@ -603,6 +648,31 @@ class SupabaseGateway:
             "strategies": strategies,
             "collections": collections,
         }
+
+    def _fetch_history_run_conversation_states(
+        self,
+        *,
+        user_id: str,
+        runs: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        conversation_ids = sorted(
+            {
+                str(run["conversation_id"])
+                for run in runs
+                if run.get("conversation_id") is not None
+            }
+        )
+        if not conversation_ids:
+            return []
+        return (
+            self.client.table("conversations")
+            .select("id,archived,deleted_at")
+            .eq("user_id", user_id)
+            .in_("id", conversation_ids)
+            .execute()
+            .data
+            or []
+        )
 
     def search_rows(
         self, *, user_id: str, query: str, limit: int | None

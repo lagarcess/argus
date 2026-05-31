@@ -128,7 +128,16 @@ class FocusedStrategyExtraction(BaseModel):
         default=None,
         description=(
             "User-stated test window. Preserve today/current as 'today' or the runtime "
-            "date when it appears as an endpoint."
+            "date only when it appears as an endpoint. If the user gives only a start "
+            "or only an end, preserve only that endpoint and include date_range in "
+            "missing_required_fields."
+        ),
+    )
+    comparison_baseline: str | None = Field(
+        default=None,
+        description=(
+            "User-stated benchmark/comparison asset such as SPY, QQQ, BTC, or IWM. "
+            "Leave null only when the user did not state a benchmark."
         ),
     )
     capital_amount: float | None = Field(

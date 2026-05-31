@@ -12,6 +12,7 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     format_display_date,
+    has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
 )
@@ -71,6 +72,9 @@ def conserve_semantic_constraints(
         if normalized_date_range != updated.date_range:
             updated.date_range = normalized_date_range
         reason_codes.append("semantic_date_constraint_preserved")
+    if has_partial_explicit_date_range(updated.date_range):
+        blocking_missing_fields.append("date_range")
+        reason_codes.append("partial_date_range_requires_clarification")
     invalid_date_constraint = _invalid_date_range_constraint(updated.date_range)
     if invalid_date_constraint is not None:
         unsupported_constraints.append(invalid_date_constraint)

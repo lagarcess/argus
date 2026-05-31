@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import calendar
 import inspect
 import os
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from argus.agent_runtime.capabilities.answers import (
@@ -171,6 +173,15 @@ async def interpret_stage_async(
         return structured_action_result
     selected_metadata = dict(selected_thread_metadata or {})
     if structured_interpreter is None:
+        pending_date_result = await _pending_date_answer_result_when_interpreter_unavailable(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
+        if pending_date_result is not None:
+            return pending_date_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -189,6 +200,15 @@ async def interpret_stage_async(
         ),
     )
     if interpretation is None:
+        pending_date_result = await _pending_date_answer_result_when_interpreter_unavailable(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
+        if pending_date_result is not None:
+            return pending_date_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -204,6 +224,180 @@ async def interpret_stage_async(
         capability_contract=capability_contract,
         selected_thread_metadata=selected_metadata,
     )
+
+
+async def _pending_date_answer_result_when_interpreter_unavailable(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    interpretation = _pending_date_answer_interpretation_when_unavailable(
+        current_user_message=state.current_user_message,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    if interpretation is None:
+        return None
+    return await _stage_result_from_interpretation(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        interpretation=interpretation,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+def _pending_date_answer_interpretation_when_unavailable(
+    *,
+    current_user_message: str,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation | None:
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return None
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return None
+    endpoint_role = _pending_date_endpoint_role(snapshot.pending_strategy_summary)
+    endpoint = _parse_pending_date_endpoint_answer(
+        current_user_message,
+        endpoint_role=endpoint_role,
+    )
+    if endpoint is None:
+        return None
+    return StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the requested date range detail.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={endpoint_role: endpoint.isoformat()},
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="answer_pending_need",
+        reason_codes=["deterministic_pending_date_answer_fallback"],
+    )
+
+
+def _pending_date_endpoint_role(strategy: StrategySummary) -> str:
+    date_range = strategy.date_range
+    if isinstance(date_range, dict):
+        has_start = bool(date_range.get("start") or date_range.get("from"))
+        has_end = bool(date_range.get("end") or date_range.get("to"))
+        if has_start and not has_end:
+            return "end"
+        if has_end and not has_start:
+            return "start"
+    return "end"
+
+
+def _parse_pending_date_endpoint_answer(
+    message: str,
+    *,
+    endpoint_role: str,
+) -> date | None:
+    folded = str(message or "").strip().casefold()
+    if not folded:
+        return None
+    if any(
+        token in folded
+        for token in ("today", "now", "present", "current", "through now")
+    ):
+        return date.today()
+    tokens = _date_answer_tokens(folded)
+    year = _first_year_token(tokens)
+    if year is None:
+        return None
+    month = _first_month_token(tokens)
+    day = _first_day_token(tokens, year=year)
+    if month is not None and day is not None:
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
+    is_end = endpoint_role == "end" or any(
+        token in tokens for token in ("end", "through", "until", "to")
+    )
+    if month is not None:
+        day = calendar.monthrange(year, month)[1] if is_end else 1
+        return date(year, month, day)
+    return date(year, 12, 31) if is_end else date(year, 1, 1)
+
+
+def _date_answer_tokens(value: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    for char in value:
+        if char.isalnum():
+            current.append(char)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
+
+
+def _first_year_token(tokens: list[str]) -> int | None:
+    for token in tokens:
+        if len(token) == 4 and token.isdigit():
+            year = int(token)
+            if 1900 <= year <= 2100:
+                return year
+    return None
+
+
+_MONTH_NAME_TO_NUMBER = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+
+
+def _first_month_token(tokens: list[str]) -> int | None:
+    for token in tokens:
+        month = _MONTH_NAME_TO_NUMBER.get(token)
+        if month is not None:
+            return month
+    return None
+
+
+def _first_day_token(tokens: list[str], *, year: int) -> int | None:
+    for token in tokens:
+        if not token.isdigit() or int(token) == year:
+            continue
+        day = int(token)
+        if 1 <= day <= 31:
+            return day
+    return None
 
 
 async def _call_structured_interpreter(
@@ -232,6 +426,11 @@ async def _stage_result_from_interpretation(
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
     interpretation = _repair_retry_route_when_pending_need_is_active(
+        interpretation=interpretation,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    interpretation = _repair_fresh_restatement_route_when_pending_need_is_active(
         interpretation=interpretation,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
@@ -346,9 +545,17 @@ async def _stage_result_from_interpretation(
     )
     benchmark_reason_codes: list[str] = []
     if expects_strategy_route:
-        strategy, benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
+        strategy, benchmark_reason_codes = _strategy_with_user_stated_benchmark(
+            strategy=strategy,
+            current_user_message=state.current_user_message,
+        )
+        strategy, separate_benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
             strategy
         )
+        benchmark_reason_codes = [
+            *benchmark_reason_codes,
+            *separate_benchmark_reason_codes,
+        ]
     strategy, optional_parameter_values = _route_contextual_money_answer(
         strategy=strategy,
         selected_thread_metadata=selected_thread_metadata,
@@ -732,6 +939,73 @@ def _repair_retry_route_when_pending_need_is_active(
                 *interpretation.reason_codes,
                 "retry_route_repaired_to_pending_need",
             ],
+        }
+    )
+
+
+def _repair_fresh_restatement_route_when_pending_need_is_active(
+    *,
+    interpretation: StructuredInterpretation,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation:
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return interpretation
+    if snapshot.latest_backtest_result_reference is not None:
+        return interpretation
+    if interpretation.semantic_turn_act in {
+        "approval",
+        "new_idea",
+        "retry_failed_action",
+        "unsupported_request",
+    }:
+        return interpretation
+    if interpretation.intent not in {"conversation_followup", "strategy_drafting"}:
+        return interpretation
+    prior_outcome = str(selected_thread_metadata.get("last_stage_outcome") or "")
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if (
+        prior_outcome not in {"await_user_reply", "needs_clarification"}
+        and not requested_field
+        and selected_thread_metadata.get("fallback_source")
+        != "pending_strategy_metadata"
+    ):
+        return interpretation
+    prior = snapshot.pending_strategy_summary
+    candidate = _strategy_with_contextual_merge(
+        strategy=interpretation.candidate_strategy_draft,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act="new_idea",
+        task_relation="new_task",
+    )
+    if not _strategy_has_execution_anchor(candidate):
+        return interpretation
+    if not candidate.strategy_type or not candidate.asset_universe or not candidate.date_range:
+        return interpretation
+    if not _strategy_has_fresh_execution_detail(strategy=candidate, prior=prior):
+        return interpretation
+    return interpretation.model_copy(
+        update={
+            "intent": "backtest_execution",
+            "task_relation": "new_task",
+            "requires_clarification": False,
+            "assistant_response": None,
+            "candidate_strategy_draft": candidate,
+            "missing_required_fields": [],
+            "semantic_turn_act": "new_idea",
+            "result_followup_focus": None,
+            "artifact_target": "none",
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *interpretation.reason_codes,
+                        "fresh_restatement_followup_route_repaired",
+                    ]
+                )
+            ),
         }
     )
 
@@ -2716,6 +2990,83 @@ def _strategy_with_separate_benchmark_symbol(
         return updated, []
     updated.asset_universe = list(dict.fromkeys(filtered_assets))
     return updated, ["benchmark_symbol_removed_from_asset_universe"]
+
+
+def _strategy_with_user_stated_benchmark(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str,
+) -> tuple[StrategySummary, list[str]]:
+    current = _normalized_symbol(strategy.comparison_baseline)
+    benchmark = _user_stated_benchmark_symbol(
+        current_user_message=current_user_message,
+        traded_symbols=set(strategy.asset_universe or []),
+        existing_benchmark=current,
+    )
+    if benchmark is None:
+        return strategy, []
+    if current == benchmark:
+        return strategy, []
+    updated = strategy.model_copy(deep=True)
+    updated.comparison_baseline = benchmark
+    return updated, ["user_stated_benchmark_preserved"]
+
+
+def _user_stated_benchmark_symbol(
+    *,
+    current_user_message: str,
+    traded_symbols: set[str],
+    existing_benchmark: str | None = None,
+) -> str | None:
+    tokens = _asset_candidate_tokens(current_user_message)
+    traded = {
+        symbol.strip().upper()
+        for symbol in traded_symbols
+        if isinstance(symbol, str) and symbol.strip()
+    }
+    connectors = {"against", "benchmark", "versus", "vs", "with"}
+    for index, token in enumerate(tokens):
+        if token.lower() not in connectors:
+            continue
+        for window_size in range(1, min(3, len(tokens) - index - 1) + 1):
+            phrase = " ".join(tokens[index + 1 : index + 1 + window_size])
+            symbol = _resolved_symbol_from_benchmark_phrase(phrase)
+            if symbol is None:
+                continue
+            if existing_benchmark is not None and symbol == existing_benchmark:
+                return symbol
+            if symbol not in traded:
+                return symbol
+    return None
+
+
+def _resolved_symbol_from_benchmark_phrase(phrase: str) -> str | None:
+    try:
+        resolution = _resolve_asset_candidate(
+            phrase,
+            field="comparison_baseline",
+            source="llm_extraction",
+        )
+    except ValueError:
+        return None
+    if resolution.status != "resolved" or resolution.asset is None:
+        return None
+    return resolution.asset.canonical_symbol.strip().upper()
+
+
+def _asset_candidate_tokens(message: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    for char in str(message or ""):
+        if char.isalnum() or char in {"/", "-"}:
+            current.append(char)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
 
 
 def _normalized_symbol(value: Any) -> str | None:

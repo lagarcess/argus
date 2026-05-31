@@ -81,6 +81,55 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
     assert "$10,000 starting capital" not in card["assumptions"]
 
 
+def test_runtime_confirmation_card_uses_explicit_benchmark_assumption() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Compare Apple with QQQ.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "comparison_baseline": "QQQ",
+                    "capital_amount": 1000.0,
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                },
+                "optional_parameters": {
+                    "initial_capital": {
+                        "label": "Initial capital",
+                        "source": "default",
+                        "value": 1000.0,
+                    },
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "AAPL",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 1000,
+                    "position_size": None,
+                    "parameters": {},
+                    "risk_rules": [],
+                    "benchmark_symbol": "QQQ",
+                },
+                "validation": {"executable": True},
+            },
+        }
+    )
+
+    assert card is not None
+    assert "Benchmark: QQQ" in card["assumptions"]
+    assert "Benchmark: SPY" not in card["assumptions"]
+
+
 def test_runtime_confirmation_card_carries_active_confirmation_identity() -> None:
     card = runtime_confirmation_card(
         {

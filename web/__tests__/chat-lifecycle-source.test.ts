@@ -23,7 +23,14 @@ describe("chat archive/delete lifecycle source contract", () => {
     const palette = readFileSync(join(root, "components/sidebar/ChatCommandPalette.tsx"), "utf-8");
 
     expect(chat).toContain("handleConversationRemoved");
+    expect(chat).toContain("historyItemBelongsToConversation");
+    expect(chat).toContain("setHistoryItems((prev) =>");
     expect(chat).toContain("onConversationRemoved={handleConversationRemoved}");
+    expect(sidebar).toContain("function historyConversationId");
+    expect(sidebar).toContain("const itemConversationId = historyConversationId(item)");
+    expect(sidebar).toContain("item.id === itemConversationId ? item : { ...item, id: itemConversationId }");
+    expect(sidebar).toContain('aria-current={isActiveConversation ? "page" : undefined}');
+    expect(sidebar).toContain('data-active-conversation={isActiveConversation ? "true" : undefined}');
     expect(sidebar).toContain("onConversationRemoved?.(id)");
     expect(sidebar).toContain("onConversationRemoved?.(pendingDeleteId)");
     expect(palette).toContain("onConversationRemoved?.(item.conversationId)");

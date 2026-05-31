@@ -165,6 +165,8 @@ def strategy_can_be_approved(strategy: StrategySummary | dict[str, Any]) -> bool
     strategy_type = executable_strategy_type(payload)
     if strategy_type not in SUPPORTED_STRATEGY_TYPES:
         return False
+    if has_partial_explicit_date_range(payload.get("date_range")):
+        return False
     if not _has_value(payload.get("asset_universe")) or not _has_value(
         payload.get("date_range")
     ):
@@ -254,6 +256,9 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         since = _since_year(normalized, today=current_date)
         if since is not None:
             return since
+        calendar_year = _calendar_year(normalized)
+        if calendar_year is not None:
+            return calendar_year
         beginning_last_year = _beginning_last_year(normalized, today=current_date)
         if beginning_last_year is not None:
             return beginning_last_year
@@ -293,6 +298,24 @@ def normalize_date_range_candidate(
             if key in {"start", "end", "from", "to"}
         }
     return value
+
+
+def has_partial_explicit_date_range(value: Any) -> bool:
+    """Return true when a structured date range has only one endpoint."""
+
+    if not isinstance(value, dict):
+        return False
+    start = _first_present_endpoint(value, "start", "from")
+    end = _first_present_endpoint(value, "end", "to")
+    return (start is not None) != (end is not None)
+
+
+def _first_present_endpoint(value: dict[Any, Any], *keys: str) -> Any | None:
+    for key in keys:
+        endpoint = value.get(key)
+        if endpoint not in (None, "", [], {}):
+            return endpoint
+    return None
 
 
 def _date_range_dict_uses_natural_endpoint(value: dict[Any, Any]) -> bool:
@@ -687,6 +710,28 @@ def _since_year(value: str, *, today: date) -> DateRangeResolution | None:
         start=date(year, 1, 1),
         end=today,
     )
+
+
+def _calendar_year(value: str) -> DateRangeResolution | None:
+    tokens = _tokens(value)
+    for index, token in enumerate(tokens):
+        if not _is_four_digit_year(token):
+            continue
+        year = int(token)
+        previous = tokens[index - 1] if index > 0 else ""
+        if len(tokens) == 1 or previous in {
+            "in",
+            "during",
+            "throughout",
+            "for",
+            "over",
+        }:
+            return DateRangeResolution(
+                label=str(year),
+                start=date(year, 1, 1),
+                end=date(year, 12, 31),
+            )
+    return None
 
 
 def _beginning_last_year(value: str, *, today: date) -> DateRangeResolution | None:

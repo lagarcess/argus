@@ -122,6 +122,10 @@ function groupByDate(
   return groups;
 }
 
+function historyConversationId(item: HistoryItem): string {
+  return item.conversation_id ?? item.id;
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ChatSidebar({
@@ -229,12 +233,13 @@ export default function ChatSidebar({
   }, [onHistoryMutated]);
 
   const handleArchive = useCallback(async (id: string) => {
+    onConversationRemoved?.(id);
     try {
       await patchConversation(id, { archived: true });
       onHistoryMutated?.();
-      onConversationRemoved?.(id);
     } catch (err) {
       console.error("Failed to archive conversation", err);
+      onHistoryMutated?.();
     }
   }, [onConversationRemoved, onHistoryMutated]);
 
@@ -245,12 +250,13 @@ export default function ChatSidebar({
   const handleConfirmDelete = useCallback(async () => {
     if (!pendingDeleteId || isDeleting) return;
     setIsDeleting(true);
+    onConversationRemoved?.(pendingDeleteId);
     try {
       await apiDeleteConversation(pendingDeleteId);
       onHistoryMutated?.();
-      onConversationRemoved?.(pendingDeleteId);
     } catch (err) {
       console.error("Failed to delete conversation", err);
+      onHistoryMutated?.();
     } finally {
       setIsDeleting(false);
       setPendingDeleteId(null);
@@ -428,31 +434,40 @@ export default function ChatSidebar({
                           {group.label}
                         </span>
                       </div>
-                      {group.items.map((item) => (
-                        <div
-                          key={`chat:${item.id}`}
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            // Only navigate if click was on this element or its text children,
-                            // not on nested interactive elements (three-dot menu)
-                            const target = e.target as HTMLElement;
-                            if (target.closest('[data-actions]')) return;
-                            if (renamingId !== item.id) {
-                              onOpenItem(item);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && renamingId !== item.id) {
-                              onOpenItem(item);
-                            }
-                          }}
-                          className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 ${
-                            conversationId === item.id
-                              ? "bg-black/5 dark:bg-white/5"
-                              : "hover:bg-black/5 dark:hover:bg-white/5"
-                          }`}
-                        >
+                      {group.items.map((item) => {
+                        const itemConversationId = historyConversationId(item);
+                        const isActiveConversation = conversationId === itemConversationId;
+                        const conversationActionItem =
+                          item.id === itemConversationId ? item : { ...item, id: itemConversationId };
+
+                        return (
+                          <div
+                            key={`chat:${item.id}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-current={isActiveConversation ? "page" : undefined}
+                            data-active-conversation={isActiveConversation ? "true" : undefined}
+                            data-conversation-id={itemConversationId}
+                            onClick={(e) => {
+                              // Only navigate if click was on this element or its text children,
+                              // not on nested interactive elements (three-dot menu)
+                              const target = e.target as HTMLElement;
+                              if (target.closest('[data-actions]')) return;
+                              if (renamingId !== item.id) {
+                                onOpenItem(item);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && renamingId !== item.id) {
+                                onOpenItem(item);
+                              }
+                            }}
+                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 ${
+                              isActiveConversation
+                                ? "bg-black/5 dark:bg-white/5"
+                                : "hover:bg-black/5 dark:hover:bg-white/5"
+                            }`}
+                          >
                           <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
                           <div className="min-w-0 flex-1 pl-3 pr-10">
                             {renamingId === item.id ? (
@@ -496,7 +511,7 @@ export default function ChatSidebar({
                           {renamingId !== item.id && (
                             <div data-actions className="absolute right-2 top-1/2 -translate-y-1/2">
                               <RecentChatActions
-                                item={item}
+                                item={conversationActionItem}
                                 onPin={handlePin}
                                 onRename={handleStartRename}
                                 onArchive={handleArchive}
@@ -504,8 +519,9 @@ export default function ChatSidebar({
                               />
                             </div>
                           )}
-                        </div>
-                      ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                   {/* Infinite scroll sentinel */}

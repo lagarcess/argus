@@ -3995,6 +3995,64 @@ async def test_dca_contribution_role_audit_demotes_total_budget(monkeypatch) -> 
     assert "dca_total_budget_role_audited" in audited.reason_codes
 
 
+@pytest.mark.asyncio
+async def test_dca_contribution_role_audit_preserves_current_recurring_amount(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def unexpected_json_schema(**_kwargs):
+        raise AssertionError("current-message recurring evidence should skip LLM audit")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        unexpected_json_schema,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="Buy NVDA every week in 2024.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="What if I bought $250 of NVDA every week in 2024?",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy NVDA weekly.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"end": "2024-12-31"},
+            capital_amount=250,
+            cadence=None,
+            field_provenance={"capital_amount": "starting_capital"},
+        ),
+        requires_clarification=True,
+        missing_required_fields=["capital_amount", "cadence", "date_range"],
+        semantic_turn_act="new_idea",
+    )
+
+    audited = await interpreter_module._dca_contribution_role_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message="What if I bought $250 of NVDA every week in 2024?",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = audited.candidate_strategy_draft
+    assert draft.capital_amount == 250
+    assert draft.cadence == "weekly"
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert draft.field_provenance["cadence"] == "explicit_user"
+    assert "capital_amount" not in audited.missing_required_fields
+    assert "cadence" not in audited.missing_required_fields
+    assert "date_range" in audited.missing_required_fields
+    assert "dca_recurring_contribution_grounded_in_current_message" in (
+        audited.reason_codes
+    )
+
+
 def test_llm_interpreter_rejects_invented_initial_capital(monkeypatch) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
 

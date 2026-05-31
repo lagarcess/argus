@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -7,7 +8,13 @@ from fastapi import APIRouter, Depends, Query, Request
 from argus.api import state as api_state
 from argus.api.dependencies import current_user
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
-from argus.api.schemas import HistoryItem, PaginatedHistory, User
+from argus.api.schemas import (
+    BacktestRun,
+    Conversation,
+    HistoryItem,
+    PaginatedHistory,
+    User,
+)
 from argus.api.search_utils import search_type_rank
 
 router = APIRouter(prefix="/api/v1", tags=["history"])
@@ -76,8 +83,16 @@ def history(
             )
     else:
         items = []
-        for run in api_state.store.backtest_runs.values():
-            if not deleted:
+        for run_id, run in api_state.store.backtest_runs.items():
+            owner_id = api_state.store.backtest_run_owners.get(run_id)
+            if owner_id is not None and owner_id != user.id:
+                continue
+            if _run_matches_history_filters(
+                run,
+                api_state.store.conversations,
+                archived=archived,
+                deleted=deleted,
+            ):
                 items.append(
                     HistoryItem(
                         type="run",
@@ -188,3 +203,36 @@ def history(
         last = page_items[-1]
         next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
     return PaginatedHistory(items=page_items, next_cursor=next_cursor)
+
+
+def _conversation_matches_history_filters(
+    conversation: Conversation,
+    *,
+    archived: bool,
+    deleted: bool,
+) -> bool:
+    deleted_matches = (
+        conversation.deleted_at is not None
+        if deleted
+        else conversation.deleted_at is None
+    )
+    return deleted_matches and conversation.archived == archived
+
+
+def _run_matches_history_filters(
+    run: BacktestRun,
+    conversations: Mapping[str, Conversation],
+    *,
+    archived: bool,
+    deleted: bool,
+) -> bool:
+    if not run.conversation_id:
+        return not archived and not deleted
+    conversation = conversations.get(run.conversation_id)
+    if conversation is None:
+        return not archived and not deleted
+    return _conversation_matches_history_filters(
+        conversation,
+        archived=archived,
+        deleted=deleted,
+    )

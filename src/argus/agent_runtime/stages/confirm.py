@@ -520,12 +520,33 @@ def _visible_card_assumptions(
     if slippage in (0, 0.0, "0", "0.0"):
         assumptions.append("No slippage")
 
+    benchmark_assumption = _visible_card_benchmark_assumption(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+    )
+    if benchmark_assumption:
+        assumptions.append(benchmark_assumption)
+    return assumptions
+
+
+def _visible_card_benchmark_assumption(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, dict[str, Any]],
+) -> str | None:
+    for value in (
+        _parameter_value(optional_parameters, "benchmark_symbol"),
+        strategy.get("comparison_baseline"),
+        strategy.get("benchmark_symbol"),
+    ):
+        if isinstance(value, str) and value.strip():
+            return f"Benchmark: {value.strip().upper()}"
     asset_class = strategy.get("asset_class")
     if asset_class == "crypto":
-        assumptions.append("Benchmark: BTC")
-    elif asset_class == "equity":
-        assumptions.append("Benchmark: SPY")
-    return assumptions
+        return "Benchmark: BTC"
+    if asset_class == "equity":
+        return "Benchmark: SPY"
+    return None
 
 
 def _parameter_value(

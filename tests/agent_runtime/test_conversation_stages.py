@@ -1211,6 +1211,34 @@ def test_confirm_stage_still_builds_confirmation_card() -> None:
     assert "1D bars" in result.patch["candidate_strategy_draft"]["assumptions"]
 
 
+def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "If I bought AAPL at the start of 2024 through the end of 2024, "
+            "how did it compare with QQQ?"
+        ),
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Compare Apple buy and hold with QQQ.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        comparison_baseline="QQQ",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    assumptions = result.patch["candidate_strategy_draft"]["assumptions"]
+    assert "Benchmark: QQQ" in assumptions
+    assert "Benchmark: SPY" not in assumptions
+    assert result.patch["confirmation_payload"]["launch_payload"]["benchmark_symbol"] == (
+        "QQQ"
+    )
+
+
 def test_confirm_stage_does_not_require_thesis_for_buy_and_hold() -> None:
     state = RunState.new(
         current_user_message="Backtest buy and hold Apple over the past year.",

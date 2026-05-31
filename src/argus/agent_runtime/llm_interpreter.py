@@ -61,6 +61,7 @@ from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     executable_strategy_type,
     executable_strategy_type_from_extracted_fields,
+    has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
 )
@@ -200,7 +201,16 @@ class StatedRunFieldFidelityAudit(BaseModel):
         default=None,
         description=(
             "User-stated date range. Preserve today/current as today or the runtime "
-            "date. Leave null when the user did not state a date range."
+            "date only when the user stated it. If the user stated only one endpoint, "
+            "return only that endpoint. Leave null when the user did not state a date "
+            "range."
+        ),
+    )
+    comparison_baseline: str | None = Field(
+        default=None,
+        description=(
+            "Benchmark or comparison asset explicitly stated by the current user "
+            "message. Leave null when the user did not state one."
         ),
     )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
@@ -1348,6 +1358,12 @@ async def _dca_contribution_role_audited_response(
 ) -> LLMInterpretationResponse:
     if not _response_needs_dca_contribution_role_audit(response):
         return response
+    grounded_recurring_response = _response_with_current_message_dca_recurring_evidence(
+        response=response,
+        request=request,
+    )
+    if grounded_recurring_response is not None:
+        return grounded_recurring_response
     try:
         audit = await invoke_openrouter_json_schema(
             task="interpretation",
@@ -1409,6 +1425,53 @@ def _response_needs_dca_contribution_role_audit(
             "approval",
             "result_followup",
             "retry_failed_action",
+        }
+    )
+
+
+def _response_with_current_message_dca_recurring_evidence(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) != "dca_accumulation":
+        return None
+    cadence = draft.cadence or _dca_cadence_from_current_message(
+        request.current_user_message
+    )
+    if not _message_contains_recurring_amount_evidence(
+        amount=draft.capital_amount,
+        cadence=cadence,
+        message=request.current_user_message,
+    ):
+        return None
+    updated = draft.model_copy(deep=True)
+    updated.cadence = cadence
+    field_provenance = dict(updated.field_provenance or {})
+    field_provenance["capital_amount"] = "recurring_contribution"
+    if cadence:
+        field_provenance["cadence"] = "explicit_user"
+    updated.field_provenance = field_provenance
+    missing_required_fields = [
+        field
+        for field in response.missing_required_fields
+        if field not in {"capital_amount", "cadence"}
+    ]
+    return response.model_copy(
+        update={
+            "candidate_strategy_draft": updated,
+            "missing_required_fields": missing_required_fields,
+            "requires_clarification": bool(missing_required_fields),
+            "assistant_response": None,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "dca_recurring_contribution_grounded_in_current_message",
+                    ]
+                )
+            ),
         }
     )
 
@@ -3121,12 +3184,27 @@ async def _audit_stated_run_field_fidelity(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
-    if not _response_needs_stated_run_field_fidelity_audit(response=response):
+    if not _response_needs_stated_run_field_fidelity_audit(
+        response=response,
+        request=request,
+    ):
         return None
+    deterministic_repair = _response_from_current_message_run_field_contract(
+        response=response,
+        request=request,
+    )
+    if deterministic_repair is not None:
+        response = deterministic_repair
+        if not _response_needs_stated_run_field_fidelity_audit(
+            response=response,
+            request=request,
+        ):
+            return response
     messages = _stated_run_field_fidelity_messages(
         response=response,
         request=request,
     )
+    best_repaired: LLMInterpretationResponse | None = None
     for model_name in _unique_repair_models(preferred_model):
         try:
             audit = await invoke_openrouter_json_schema(
@@ -3145,23 +3223,125 @@ async def _audit_stated_run_field_fidelity(
             audit=audit,
         )
         if repaired is not None:
-            return repaired
-    return None
+            if not _stated_run_field_audit_omitted_expected_fields(
+                response=response,
+                audit=audit,
+                request=request,
+            ):
+                return repaired
+            if best_repaired is None:
+                best_repaired = repaired
+    return best_repaired or deterministic_repair
+
+
+def _response_from_current_message_run_field_contract(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    """Preserve obvious run facts from the current turn when audit models omit them."""
+
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    current_message = request.current_user_message
+    changed = False
+
+    date_range = _date_range_from_current_message(current_message)
+    if (
+        date_range is not None
+        and _draft_date_range_needs_stated_run_field_audit(
+            draft,
+            current_message=current_message,
+        )
+    ):
+        draft.date_range = date_range
+        if has_partial_explicit_date_range(date_range):
+            repaired.requires_clarification = True
+            repaired.assistant_response = None
+            repaired.missing_required_fields = list(
+                dict.fromkeys([*repaired.missing_required_fields, "date_range"])
+            )
+        else:
+            repaired.missing_required_fields = [
+                field
+                for field in repaired.missing_required_fields
+                if str(field).split("[", 1)[0] != "date_range"
+            ]
+            repaired.ambiguous_fields = [
+                field
+                for field in repaired.ambiguous_fields
+                if field.field_name.split("[", 1)[0] != "date_range"
+            ]
+        changed = True
+
+    comparison_baseline = _comparison_baseline_from_current_message(
+        draft,
+        current_message=current_message,
+    )
+    if comparison_baseline and draft.comparison_baseline != comparison_baseline:
+        draft.comparison_baseline = comparison_baseline
+        changed = True
+
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        dca_changed = _preserve_dca_current_message_execution_fields(
+            draft=draft,
+            current_message=current_message,
+        )
+        if dca_changed:
+            repaired.missing_required_fields = [
+                field
+                for field in repaired.missing_required_fields
+                if str(field).split("[", 1)[0] not in {"capital_amount", "cadence"}
+            ]
+            repaired.ambiguous_fields = [
+                field
+                for field in repaired.ambiguous_fields
+                if field.field_name.split("[", 1)[0]
+                not in {"capital_amount", "cadence"}
+            ]
+            changed = True
+
+    if (
+        changed
+        and repaired.requires_clarification
+        and not has_partial_explicit_date_range(draft.date_range)
+        and not repaired.missing_required_fields
+        and not repaired.ambiguous_fields
+        and not repaired.unsupported_constraints
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
+    ):
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+
+    if not changed:
+        return None
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "current_message_run_field_contract_repair",
+            ]
+        )
+    )
+    return repaired
 
 
 def _response_needs_stated_run_field_fidelity_audit(
     *,
     response: LLMInterpretationResponse,
+    request: InterpretationRequest | None = None,
 ) -> bool:
-    if response.requires_clarification:
+    if (
+        response.requires_clarification
+        and not _llm_strategy_draft_has_concrete_execution_target(
+            response.candidate_strategy_draft
+        )
+    ):
         return False
     if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return False
     if response.semantic_turn_act in {
-        "answer_pending_need",
         "approval",
-        "refine_current_idea",
-        "retry_failed_action",
         "result_followup",
         "unsupported_request",
     }:
@@ -3169,6 +3349,19 @@ def _response_needs_stated_run_field_fidelity_audit(
     if "stated_run_field_fidelity_audit" in response.reason_codes:
         return False
     draft = response.candidate_strategy_draft
+    current_message = request.current_user_message if request is not None else ""
+    requested_field = ""
+    if request is not None:
+        requested_field = str(
+            request.selected_thread_metadata.get("requested_field") or ""
+        ).split("[", 1)[0]
+    if response.semantic_turn_act == "answer_pending_need":
+        if requested_field != "date_range":
+            return False
+        return _draft_contains_structured_date_context(
+            draft,
+            current_message=current_message,
+        )
     if not any(
         code in response.reason_codes
         for code in {
@@ -3177,9 +3370,17 @@ def _response_needs_stated_run_field_fidelity_audit(
             "focused_repair_preserved_structured_context",
         }
     ):
-        return _ready_response_has_unreconciled_stated_run_fields(draft)
+        return _ready_response_has_unreconciled_stated_run_fields(
+            draft,
+            current_message=current_message,
+        )
     if "focused_repair_from_unsupported_context" in response.reason_codes:
-        return draft.capital_amount is None
+        return draft.capital_amount is None or (
+            _draft_comparison_baseline_conflicts_with_current_message(
+                draft,
+                current_message=current_message,
+            )
+        )
     if "signal_rule_plan_repair" in response.reason_codes:
         return any(
             [
@@ -3187,7 +3388,14 @@ def _response_needs_stated_run_field_fidelity_audit(
                 and _draft_contains_structured_capital_context(draft),
                 _llm_value_is_empty(draft.timeframe)
                 and _draft_contains_structured_timeframe_context(draft),
-                _draft_contains_structured_date_context(draft),
+                _draft_date_range_needs_stated_run_field_audit(
+                    draft,
+                    current_message=current_message,
+                ),
+                _draft_comparison_baseline_conflicts_with_current_message(
+                    draft,
+                    current_message=current_message,
+                ),
             ]
         )
     return any(
@@ -3196,13 +3404,22 @@ def _response_needs_stated_run_field_fidelity_audit(
             and _draft_contains_structured_capital_context(draft),
             _llm_value_is_empty(draft.timeframe)
             and _draft_contains_structured_timeframe_context(draft),
-            _draft_contains_structured_date_context(draft),
+            _draft_date_range_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            ),
+            _draft_comparison_baseline_conflicts_with_current_message(
+                draft,
+                current_message=current_message,
+            ),
         ]
     )
 
 
 def _ready_response_has_unreconciled_stated_run_fields(
     draft: LLMStrategyDraft,
+    *,
+    current_message: str = "",
 ) -> bool:
     return any(
         [
@@ -3210,9 +3427,155 @@ def _ready_response_has_unreconciled_stated_run_fields(
             and _draft_contains_structured_capital_context(draft),
             _llm_value_is_empty(draft.timeframe)
             and _draft_contains_structured_timeframe_context(draft),
-            _llm_value_is_empty(draft.date_range)
-            and _draft_contains_structured_date_context(draft),
+            _draft_date_range_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            ),
+            _draft_comparison_baseline_conflicts_with_current_message(
+                draft,
+                current_message=current_message,
+            ),
         ]
+    )
+
+
+def _draft_date_range_needs_stated_run_field_audit(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str = "",
+) -> bool:
+    date_context = _draft_contains_structured_date_context(
+        draft,
+        current_message=current_message,
+    )
+    if _llm_value_is_empty(draft.date_range):
+        return date_context
+    if _draft_date_range_has_unstated_current_endpoint(
+        draft.date_range,
+        current_message=current_message,
+    ):
+        return True
+    if has_partial_explicit_date_range(draft.date_range):
+        current_message_range = _date_range_from_current_message(current_message)
+        return current_message_range is not None and not has_partial_explicit_date_range(
+            current_message_range
+        )
+    if isinstance(draft.date_range, str) and date_context:
+        normalized_range = draft.date_range.strip().casefold()
+        return bool(normalized_range and normalized_range not in current_message.casefold())
+    return False
+
+
+def _draft_date_range_has_unstated_current_endpoint(
+    date_range_value: Any,
+    *,
+    current_message: str = "",
+) -> bool:
+    if not isinstance(date_range_value, dict):
+        return False
+    if _message_states_current_date_endpoint(current_message):
+        return False
+    for key in ("end", "to"):
+        endpoint = date_range_value.get(key)
+        if _date_endpoint_is_runtime_current(endpoint):
+            return True
+    return False
+
+
+def _message_states_current_date_endpoint(message: str) -> bool:
+    folded = str(message or "").casefold()
+    return any(
+        token in folded
+        for token in (
+            "today",
+            "now",
+            "present",
+            "current",
+            "to date",
+            "through now",
+            "until now",
+        )
+    )
+
+
+def _date_endpoint_is_runtime_current(value: Any) -> bool:
+    if value in (None, "", [], {}):
+        return False
+    normalized = str(value).strip().casefold()
+    return normalized in {
+        "today",
+        "now",
+        "present",
+        "current",
+        "current_date",
+        date.today().isoformat(),
+    }
+
+
+def _draft_comparison_baseline_conflicts_with_current_message(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str = "",
+) -> bool:
+    if not _message_uses_comparison_language(current_message):
+        return False
+    mentioned_assets = _resolved_asset_mentions_from_message(current_message)
+    if not mentioned_assets:
+        return _llm_value_is_empty(draft.comparison_baseline)
+    universe_symbols = {
+        str(symbol or "").strip().upper()
+        for symbol in (draft.asset_universe or [])
+        if str(symbol or "").strip()
+    }
+    stated_comparison_symbols = [
+        str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        for asset in mentioned_assets
+        if str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        not in universe_symbols
+    ]
+    if not stated_comparison_symbols:
+        return _llm_value_is_empty(draft.comparison_baseline)
+    baseline = str(draft.comparison_baseline or "").strip().upper()
+    return not baseline or any(
+        symbol != baseline for symbol in stated_comparison_symbols
+    )
+
+
+def _comparison_baseline_from_current_message(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str = "",
+) -> str | None:
+    if not _message_uses_comparison_language(current_message):
+        return None
+    mentioned_assets = _resolved_asset_mentions_from_message(current_message)
+    if not mentioned_assets:
+        return None
+    universe_symbols = {
+        str(symbol or "").strip().upper()
+        for symbol in (draft.asset_universe or [])
+        if str(symbol or "").strip()
+    }
+    for asset in mentioned_assets:
+        symbol = str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        if symbol and symbol not in universe_symbols:
+            return symbol
+    return None
+
+
+def _message_uses_comparison_language(message: str) -> bool:
+    folded = str(message or "").casefold()
+    return any(
+        token in folded
+        for token in (
+            "compare",
+            "compared",
+            "comparison",
+            "versus",
+            " vs ",
+            "benchmark",
+            "against",
+        )
     )
 
 
@@ -3232,12 +3595,142 @@ def _draft_contains_structured_timeframe_context(draft: LLMStrategyDraft) -> boo
     return any(token in text for token in ("hour", "daily", "bars", "candles"))
 
 
-def _draft_contains_structured_date_context(draft: LLMStrategyDraft) -> bool:
-    text = _structured_draft_context_text(draft).casefold()
-    return any(
+def _draft_contains_structured_date_context(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str = "",
+) -> bool:
+    text = _structured_draft_context_text(
+        draft,
+        extra_text=current_message,
+    ).casefold()
+    if any(
         token in text
-        for token in ("from", "since", "through", "until", "today", "year")
+        for token in (
+            "from",
+            "since",
+            "through",
+            "until",
+            "today",
+            "year",
+            "start",
+            "beginning",
+            "end",
+        )
+    ):
+        return True
+    for token in _field_fidelity_tokens(text):
+        if len(token) == 4 and token.isdigit():
+            year = int(token)
+            if 1900 <= year <= 2100:
+                return True
+    return False
+
+
+def _date_range_from_current_message(message: str) -> dict[str, str] | None:
+    tokens = _field_fidelity_tokens(str(message or "").casefold())
+    start_endpoint = _date_endpoint_from_marker_tokens(
+        tokens,
+        markers={"start", "starting", "beginning"},
+        endpoint="start",
     )
+    end_endpoint = _date_endpoint_from_marker_tokens(
+        tokens,
+        markers={"end", "ending"},
+        endpoint="end",
+    )
+    if start_endpoint is not None and end_endpoint is not None:
+        return {"start": start_endpoint, "end": end_endpoint}
+    if start_endpoint is not None and not _tokens_after_year_include_date_endpoint(
+        tokens,
+        endpoint=start_endpoint,
+    ):
+        return {"start": start_endpoint}
+    if end_endpoint is not None:
+        return {"end": end_endpoint}
+    calendar_year = _calendar_year_date_range_from_tokens(tokens)
+    if calendar_year is not None:
+        return calendar_year
+    return None
+
+
+def _calendar_year_date_range_from_tokens(tokens: list[str]) -> dict[str, str] | None:
+    for index, token in enumerate(tokens):
+        if not (len(token) == 4 and token.isdigit()):
+            continue
+        year = int(token)
+        if year < 1900 or year > date.today().year:
+            continue
+        previous = tokens[index - 1] if index > 0 else ""
+        if len(tokens) == 1 or previous in {
+            "in",
+            "during",
+            "throughout",
+            "for",
+            "over",
+        }:
+            return {"start": f"{year}-01-01", "end": f"{year}-12-31"}
+    return None
+
+
+def _date_endpoint_from_marker_tokens(
+    tokens: list[str],
+    *,
+    markers: set[str],
+    endpoint: str,
+) -> str | None:
+    for index, token in enumerate(tokens):
+        if token not in markers:
+            continue
+        year_index = _first_year_token_index(tokens, start=index + 1, limit=index + 5)
+        if year_index is None:
+            continue
+        year = int(tokens[year_index])
+        if endpoint == "end":
+            return date(year, 12, 31).isoformat()
+        return date(year, 1, 1).isoformat()
+    return None
+
+
+def _first_year_token_index(
+    tokens: list[str],
+    *,
+    start: int,
+    limit: int,
+) -> int | None:
+    for index in range(max(start, 0), min(limit, len(tokens))):
+        token = tokens[index]
+        if len(token) != 4 or not token.isdigit():
+            continue
+        year = int(token)
+        if 1900 <= year <= 2100:
+            return index
+    return None
+
+
+def _tokens_after_year_include_date_endpoint(
+    tokens: list[str],
+    *,
+    endpoint: str,
+) -> bool:
+    year = endpoint.split("-", 1)[0]
+    try:
+        index = tokens.index(year)
+    except ValueError:
+        return False
+    endpoint_tokens = {
+        "to",
+        "through",
+        "until",
+        "till",
+        "end",
+        "ending",
+        "today",
+        "now",
+        "present",
+        "current",
+    }
+    return any(token in endpoint_tokens for token in tokens[index + 1 :])
 
 
 def _field_fidelity_tokens(text: str) -> list[str]:
@@ -3248,8 +3741,13 @@ def _field_fidelity_tokens(text: str) -> list[str]:
     return [token for token in cleaned.split() if token]
 
 
-def _structured_draft_context_text(draft: LLMStrategyDraft) -> str:
+def _structured_draft_context_text(
+    draft: LLMStrategyDraft,
+    *,
+    extra_text: str = "",
+) -> str:
     values = (
+        extra_text,
         draft.raw_user_phrasing,
         draft.strategy_thesis,
         draft.entry_logic,
@@ -3500,8 +3998,21 @@ def _stated_run_field_fidelity_messages(
                 "for that field. Normalize starting capital such as 10k or $10,000 "
                 "to 10000. Normalize one-hour/hourly bars to 1h, four-hour bars to "
                 "4h, and daily bars to 1D. Preserve today/current as today or the "
-                f"runtime date {date.today().isoformat()}. Return only JSON matching "
-                "the schema."
+                f"runtime date {date.today().isoformat()} only when the user stated "
+                "today/current. If the user stated only a start or only an end date, "
+                "return only that endpoint; do not infer the missing endpoint or "
+                "rewrite the unstated endpoint. For pending date answers such as "
+                "'end of 2023' or 'through December 2024', return only the end "
+                "endpoint. Date phrases such as 'at the start of 2024', 'from "
+                "the beginning of 2024', or 'since 2024' state only a start "
+                "endpoint unless the message also states an end. Return explicit "
+                "comparison assets as comparison_baseline, "
+                "not asset_universe. Phrases like compare with, compared against, "
+                "versus, vs, or benchmark name a comparison_baseline when followed "
+                "by an asset. If the draft has a default benchmark but the current "
+                "message states a different comparison asset, return the user-stated "
+                "comparison asset. Return "
+                "only JSON matching the schema."
             ),
         },
         {
@@ -3538,6 +4049,11 @@ def _response_from_stated_run_field_fidelity_audit(
         if date_changed:
             draft.date_range = date_range
             changed = True
+    if audit.comparison_baseline:
+        baseline = str(audit.comparison_baseline).strip().upper()
+        if baseline and draft.comparison_baseline != baseline:
+            draft.comparison_baseline = baseline
+            changed = True
     if not changed:
         return None
     repaired.reason_codes = list(
@@ -3549,6 +4065,25 @@ def _response_from_stated_run_field_fidelity_audit(
         )
     )
     return repaired
+
+
+def _stated_run_field_audit_omitted_expected_fields(
+    *,
+    response: LLMInterpretationResponse,
+    audit: StatedRunFieldFidelityAudit,
+    request: InterpretationRequest,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    if (
+        not _llm_value_is_empty(draft.date_range)
+        and _draft_contains_structured_date_context(
+            draft,
+            current_message=request.current_user_message,
+        )
+        and audit.date_range in (None, "", [], {})
+    ):
+        return True
+    return False
 
 
 def _normalized_stated_field(value: Any) -> str:
@@ -3567,6 +4102,10 @@ def _date_range_with_fidelity_audit(
     if _normalized_stated_field(audited) == _normalized_stated_field(current):
         return current, False
     if isinstance(current, dict) and isinstance(audited, dict):
+        if _date_range_audit_has_partial_endpoint(audited):
+            return audited, _normalized_stated_field(audited) != _normalized_stated_field(
+                current
+            )
         merged = dict(current)
         changed = False
         for key, audited_value in audited.items():
@@ -3587,6 +4126,12 @@ def _date_range_with_fidelity_audit(
     if isinstance(audited, dict):
         return audited, True
     return current, False
+
+
+def _date_range_audit_has_partial_endpoint(value: dict[str, Any]) -> bool:
+    start = value.get("start") or value.get("from")
+    end = value.get("end") or value.get("to")
+    return (start not in (None, "", [], {})) != (end not in (None, "", [], {}))
 
 
 def _date_value_is_less_specific(candidate: Any, existing: Any) -> bool:
@@ -3617,6 +4162,7 @@ def _focused_strategy_extraction_has_material_fields(
             bool(extraction.asset_class),
             bool(extraction.timeframe),
             bool(extraction.date_range),
+            bool(extraction.comparison_baseline),
             extraction.capital_amount is not None,
             bool(extraction.entry_rule),
             bool(extraction.exit_rule),
@@ -3703,10 +4249,14 @@ def _focused_strategy_extraction_messages(
                 "the valuation meaning and route toward the closest supported proxy. "
                 "Preserve user-stated asset names or symbols "
                 "in asset_universe; the provider-backed resolver will validate and "
-                "canonicalize assets after interpretation. Natural date periods should "
+                "canonicalize assets after interpretation. Preserve user-stated "
+                "benchmark/comparison assets such as QQQ, SPY, BTC, or IWM in "
+                "comparison_baseline, not asset_universe. Natural date periods should "
                 "be compact strings such as 'past 2 years' or 'last 3 months'. If the "
                 "user gives a start date and says today, preserve the end as 'today' or "
-                f"{date.today().isoformat()}, not a stale model date. Preserve "
+                f"{date.today().isoformat()}, not a stale model date. If the user gives "
+                "only a start or only an end, preserve only that endpoint and include "
+                "date_range in missing_required_fields; do not infer today. Preserve "
                 "user-stated timeframes such as 1 hour candles, hourly bars, 1h, "
                 "4 hour candles, 4h, daily candles, or 1D as timeframe. Normalize "
                 "one-hour/hourly to 1h, four-hour to 4h, and daily to 1D. Preserve "
@@ -3764,6 +4314,7 @@ def _response_from_focused_strategy_extraction(
                 asset_class=extraction.asset_class,
                 timeframe=extraction.timeframe,
                 date_range=extraction.date_range,
+                comparison_baseline=extraction.comparison_baseline,
                 capital_amount=extraction.capital_amount,
                 entry_logic=entry_logic,
                 exit_logic=exit_logic,
@@ -3816,6 +4367,7 @@ def _response_from_focused_strategy_extraction(
             asset_class=extraction.asset_class,
             timeframe=extraction.timeframe,
             date_range=extraction.date_range,
+            comparison_baseline=extraction.comparison_baseline,
             capital_amount=extraction.capital_amount,
             entry_logic=entry_logic,
             exit_logic=exit_logic,
@@ -4916,6 +5468,13 @@ def _dca_amount_has_user_provenance(
             "dca_contribution",
         }:
             return True
+    if _message_contains_recurring_amount_evidence(
+        amount=strategy.capital_amount,
+        cadence=strategy.cadence
+        or _dca_cadence_from_current_message(request.current_user_message),
+        message=request.current_user_message,
+    ):
+        return True
     snapshot = request.latest_task_snapshot
     if snapshot is None:
         return False
@@ -4925,6 +5484,152 @@ def _dca_amount_has_user_provenance(
         and prior.capital_amount is not None
         and strategy.capital_amount == prior.capital_amount
     )
+
+
+def _preserve_dca_current_message_execution_fields(
+    *,
+    draft: LLMStrategyDraft,
+    current_message: str,
+) -> bool:
+    changed = False
+    cadence = draft.cadence or _dca_cadence_from_current_message(current_message)
+    if cadence and draft.cadence != cadence:
+        draft.cadence = cadence
+        changed = True
+    amount = draft.capital_amount or draft.total_capital or draft.initial_capital
+    if (
+        amount is not None
+        and _message_contains_recurring_amount_evidence(
+            amount=amount,
+            cadence=cadence,
+            message=current_message,
+        )
+    ):
+        if draft.capital_amount != amount:
+            draft.capital_amount = amount
+            changed = True
+        if draft.total_capital == amount:
+            draft.total_capital = None
+            changed = True
+        if draft.initial_capital == amount:
+            draft.initial_capital = None
+            changed = True
+        field_provenance = dict(draft.field_provenance or {})
+        if field_provenance.get("capital_amount") != "recurring_contribution":
+            field_provenance["capital_amount"] = "recurring_contribution"
+            changed = True
+        if cadence and field_provenance.get("cadence") != "explicit_user":
+            field_provenance["cadence"] = "explicit_user"
+            changed = True
+        draft.field_provenance = field_provenance
+    return changed
+
+
+def _message_contains_recurring_amount_evidence(
+    *,
+    amount: Any,
+    cadence: Any,
+    message: str,
+) -> bool:
+    amount_value = _money_token_value(amount)
+    if amount_value is None:
+        return False
+    cadence_words = _cadence_evidence_words(cadence)
+    if not cadence_words:
+        return False
+    tokens = _field_fidelity_tokens(message.casefold())
+    for index, token in enumerate(tokens):
+        token_value = _money_token_value(token)
+        if token_value is None or abs(token_value - amount_value) > 0.0001:
+            continue
+        if _money_token_has_total_budget_context(tokens, index):
+            continue
+        if _money_token_has_recurring_context(tokens, index, cadence_words):
+            return True
+    return False
+
+
+def _dca_cadence_from_current_message(message: str) -> str | None:
+    tokens = _field_fidelity_tokens(message.casefold())
+    words = set(tokens)
+    compact_message = "".join(char for char in message.casefold() if char.isalnum())
+    candidates = {
+        "biweekly": {"biweekly", "bi-weekly"},
+        "weekly": {"weekly", "week", "weeks"},
+        "monthly": {"monthly", "month", "months"},
+        "quarterly": {"quarterly", "quarter", "quarters"},
+        "daily": {"daily", "day", "days"},
+    }
+    for cadence, evidence in candidates.items():
+        if words.intersection(evidence) or cadence.replace("-", "") in compact_message:
+            return cadence
+    return None
+
+
+def _money_token_value(value: Any) -> float | None:
+    if isinstance(value, int | float):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower().replace("$", "").replace(",", "")
+    if not normalized:
+        return None
+    multiplier = 1.0
+    if normalized.endswith("k"):
+        multiplier = 1000.0
+        normalized = normalized[:-1]
+    elif normalized.endswith("m"):
+        multiplier = 1_000_000.0
+        normalized = normalized[:-1]
+    try:
+        return float(normalized) * multiplier
+    except ValueError:
+        return None
+
+
+def _cadence_evidence_words(cadence: Any) -> set[str]:
+    normalized = str(cadence or "").strip().casefold()
+    return {
+        "daily": {"daily", "day", "days"},
+        "weekly": {"weekly", "week", "weeks"},
+        "biweekly": {"biweekly", "bi-weekly"},
+        "monthly": {"monthly", "month", "months"},
+        "quarterly": {"quarterly", "quarter", "quarters"},
+    }.get(normalized, set())
+
+
+def _money_token_has_total_budget_context(tokens: list[str], index: int) -> bool:
+    window = set(tokens[max(index - 4, 0) : index + 5])
+    return bool(
+        window.intersection(
+            {
+                "budget",
+                "total",
+                "available",
+                "cap",
+                "maximum",
+                "max",
+                "principal",
+                "starting",
+            }
+        )
+    )
+
+
+def _money_token_has_recurring_context(
+    tokens: list[str],
+    index: int,
+    cadence_words: set[str],
+) -> bool:
+    window = tokens[max(index - 4, 0) : index + 8]
+    window_words = set(window)
+    has_cadence = bool(window_words.intersection(cadence_words))
+    if not has_cadence:
+        return False
+    if window_words.intersection({"every", "each", "per"}):
+        return True
+    following = tokens[index + 1 : index + 4]
+    return bool(set(following).intersection(cadence_words))
 
 
 def _dca_cadence_has_user_provenance(

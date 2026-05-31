@@ -84,9 +84,13 @@ def runtime_confirmation_card(
             }
         )
 
+    launch_payload = payload.get("launch_payload")
+    if not isinstance(launch_payload, dict):
+        launch_payload = {}
     assumptions = _confirmation_assumptions(
         strategy=strategy,
         optional_parameters=optional_parameters,
+        launch_payload=launch_payload,
     )
     summary_period = _confirmation_period_without_parentheses(date_range)
     summary = _confirmation_summary(
@@ -165,6 +169,7 @@ def _confirmation_assumptions(
     *,
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any] | None = None,
 ) -> list[str]:
     assumptions: list[str] = []
     strategy_type = executable_strategy_type(strategy)
@@ -193,12 +198,36 @@ def _confirmation_assumptions(
     slippage = _optional_parameter_value(optional_parameters, "slippage")
     if slippage in (0, 0.0, "0", "0.0"):
         assumptions.append("No slippage")
+    benchmark_assumption = _confirmation_benchmark_assumption(
+        strategy=strategy,
+        optional_parameters=optional_parameters,
+        launch_payload=launch_payload or {},
+    )
+    if benchmark_assumption:
+        assumptions.append(benchmark_assumption)
+    return assumptions
+
+
+def _confirmation_benchmark_assumption(
+    *,
+    strategy: dict[str, Any],
+    optional_parameters: dict[str, Any],
+    launch_payload: dict[str, Any],
+) -> str | None:
+    for value in (
+        launch_payload.get("benchmark_symbol"),
+        _optional_parameter_value(optional_parameters, "benchmark_symbol"),
+        strategy.get("comparison_baseline"),
+        strategy.get("benchmark_symbol"),
+    ):
+        if isinstance(value, str) and value.strip():
+            return f"Benchmark: {value.strip().upper()}"
     asset_class = strategy.get("asset_class")
     if asset_class == "crypto":
-        assumptions.append("Benchmark: BTC")
-    elif asset_class == "equity":
-        assumptions.append("Benchmark: SPY")
-    return assumptions
+        return "Benchmark: BTC"
+    if asset_class == "equity":
+        return "Benchmark: SPY"
+    return None
 
 
 def _confirmation_summary(
