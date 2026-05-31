@@ -11,6 +11,7 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
+    format_display_date,
     normalize_date_range_candidate,
     resolve_date_range,
 )
@@ -70,6 +71,11 @@ def conserve_semantic_constraints(
         if normalized_date_range != updated.date_range:
             updated.date_range = normalized_date_range
         reason_codes.append("semantic_date_constraint_preserved")
+    invalid_date_constraint = _invalid_date_range_constraint(updated.date_range)
+    if invalid_date_constraint is not None:
+        unsupported_constraints.append(invalid_date_constraint)
+        blocking_missing_fields.append("date_range")
+        reason_codes.append("invalid_date_range_requires_correction")
     normalized_timeframe = _supported_timeframe_value(
         updated.timeframe,
         supported_timeframes=supported_timeframes,
@@ -376,6 +382,49 @@ def _unsupported_dca_starting_principal_constraint(
             ),
         ],
     )
+
+
+def _invalid_date_range_constraint(value: Any) -> UnsupportedConstraint | None:
+    if value in (None, "", [], {}):
+        return None
+    try:
+        resolution = resolve_date_range(value)
+    except Exception:
+        return None
+    if resolution.used_default or resolution.start <= resolution.end:
+        return None
+    start = format_display_date(resolution.start)
+    end = format_display_date(resolution.end)
+    return UnsupportedConstraint(
+        category="invalid_date_range",
+        raw_value=_format_date_range_value(value),
+        explanation=(
+            f"I read the date window as {start} to {end}, but the end date has "
+            "to come after the start date."
+        ),
+        simplification_options=[
+            SimplificationOption(
+                label="Choose an end date after the start date",
+                replacement_values={"requested_field": "date_range"},
+            ),
+            SimplificationOption(
+                label="Choose a start date before the end date",
+                replacement_values={"requested_field": "date_range"},
+            ),
+            SimplificationOption(
+                label="Use a different date window",
+                replacement_values={"requested_field": "date_range"},
+            ),
+        ],
+    )
+
+
+def _format_date_range_value(value: Any) -> str:
+    if isinstance(value, dict):
+        start = value.get("start") or value.get("from") or "?"
+        end = value.get("end") or value.get("to") or "?"
+        return f"{start} to {end}"
+    return str(value)
 
 
 def _dedupe_unsupported_constraints(

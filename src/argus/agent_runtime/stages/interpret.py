@@ -333,6 +333,11 @@ async def _stage_result_from_interpretation(
         if expects_strategy_route
         else incoming_strategy
     )
+    benchmark_reason_codes: list[str] = []
+    if expects_strategy_route:
+        strategy, benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
+            strategy
+        )
     strategy, optional_parameter_values = _route_contextual_money_answer(
         strategy=strategy,
         selected_thread_metadata=selected_thread_metadata,
@@ -456,6 +461,22 @@ async def _stage_result_from_interpretation(
         or unsupported_constraints
         or missing_required_fields
     )
+    post_validation_reason_codes = [
+        *benchmark_reason_codes,
+        *(
+            ["fresh_complete_restatement_started_new_confirmation"]
+            if _fresh_complete_restatement_started_new_confirmation(
+                interpretation=interpretation,
+                selected_thread_metadata=selected_thread_metadata,
+                expects_strategy_route=expects_strategy_route,
+                requires_clarification=requires_clarification,
+                ambiguous_fields=ambiguous_fields,
+                unsupported_constraints=unsupported_constraints,
+                missing_required_fields=missing_required_fields,
+            )
+            else []
+        ),
+    ]
     decision = InterpretDecision(
         intent=interpretation.intent,
         task_relation=interpretation.task_relation,
@@ -479,6 +500,7 @@ async def _stage_result_from_interpretation(
             *ambiguity_filter_reason_codes,
             *artifact_target_reason_codes,
             *hidden_context_guard_reason_codes,
+            *post_validation_reason_codes,
             *interpretation.reason_codes,
         ],
         effective_response_profile=effective_profile,
@@ -1888,7 +1910,7 @@ def _offline_interpreter_unavailable_result(
         intent="conversation_followup",
         task_relation="continue",
         requires_clarification=False,
-        user_goal_summary="The LLM interpreter was unavailable for this turn.",
+        user_goal_summary="Structured interpretation was unavailable for this turn.",
         candidate_strategy_draft=StrategySummary(),
         missing_required_fields=[],
         optional_parameter_opportunity=[],
@@ -1966,8 +1988,8 @@ async def _latest_result_followup_when_interpreter_unavailable(
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary=(
-            "The LLM interpreter was unavailable; answered from the latest "
-            "result artifact facts."
+            "Structured interpretation was unavailable; answered from the "
+            "latest result artifact facts."
         ),
         candidate_strategy_draft=StrategySummary(),
         missing_required_fields=[],
@@ -2137,13 +2159,12 @@ def _offline_recovery_message(
             return (
                 f"I still have the {assets} {strategy_label} draft in this chat, "
                 "but I could not safely apply that assumption change, so I left "
-                "the visible draft unchanged. Please retry the change in a moment."
+                "the current draft unchanged. Please retry the change in a moment."
             )
         if snapshot.active_confirmation_reference is None:
             return (
                 f"I still have the {assets} {strategy_label} draft in this chat, "
-                "but the interpreter was unavailable before I could safely apply that "
-                "change. Please retry in a moment."
+                "but I could not safely apply that change. Please retry in a moment."
             )
         assumptions_response = _draft_assumptions_response(snapshot)
         action_guidance = (
@@ -2154,18 +2175,16 @@ def _offline_recovery_message(
             return f"{assumptions_response} {action_guidance}"
         return (
             f"I still have the {assets} {strategy_label} draft in this chat, "
-            "but the interpreter was unavailable before I could safely apply that "
-            f"change. {action_guidance}"
+            f"but I could not safely apply that change. {action_guidance}"
         )
     if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
         return (
-            "I still have the latest result in this chat, but the interpreter was "
-            "unavailable before I could safely answer that follow-up. Please retry in "
-            "a moment."
+            "I still have the latest result in this chat, but I could not safely "
+            "answer that follow-up. Please retry in a moment."
         )
     return (
-        "I saved your message, but the interpreter was unavailable before I could "
-        "turn it into a reliable draft. Please retry in a moment."
+        "I saved your message, but I could not turn it into a reliable draft. "
+        "Please retry in a moment."
     )
 
 
@@ -2245,6 +2264,11 @@ def _strategy_with_contextual_merge(
             continue
         if value in (None, "", [], {}):
             continue
+        if key == "date_range" and isinstance(value, dict):
+            value = _merged_contextual_date_range(
+                base=merged.date_range,
+                incoming=value,
+            )
         if key == "extra_parameters":
             if preserve_prior_family and isinstance(value, dict):
                 value = {
@@ -2266,6 +2290,32 @@ def _strategy_with_contextual_merge(
     if declared_family in SUPPORTED_STRATEGY_TYPES:
         _clear_incompatible_strategy_rule_state(merged, declared_family)
     return merged
+
+
+def _merged_contextual_date_range(
+    *,
+    base: Any,
+    incoming: dict[str, Any],
+) -> dict[str, Any]:
+    incoming_endpoints = {
+        "start": incoming.get("start") or incoming.get("from"),
+        "end": incoming.get("end") or incoming.get("to"),
+    }
+    incoming_endpoints = {
+        key: value
+        for key, value in incoming_endpoints.items()
+        if value not in (None, "", [], {})
+    }
+    if set(incoming_endpoints) == {"start", "end"}:
+        return incoming
+    if not isinstance(base, dict):
+        return incoming
+    merged = {
+        "start": base.get("start") or base.get("from"),
+        "end": base.get("end") or base.get("to"),
+    }
+    merged.update(incoming_endpoints)
+    return {key: value for key, value in merged.items() if value not in (None, "")}
 
 
 def _should_preserve_pending_strategy_family(
@@ -2565,6 +2615,34 @@ def _strategy_with_execution_defaults(strategy: StrategySummary) -> StrategySumm
     return updated
 
 
+def _strategy_with_separate_benchmark_symbol(
+    strategy: StrategySummary,
+) -> tuple[StrategySummary, list[str]]:
+    benchmark = _normalized_symbol(strategy.comparison_baseline)
+    if benchmark is None:
+        return strategy, []
+    updated = strategy.model_copy(deep=True)
+    updated.comparison_baseline = benchmark
+    assets = [_normalized_symbol(symbol) for symbol in updated.asset_universe]
+    normalized_assets = [symbol for symbol in assets if symbol is not None]
+    filtered_assets = [
+        symbol
+        for symbol in normalized_assets
+        if symbol != benchmark
+    ]
+    if len(filtered_assets) == len(normalized_assets):
+        return updated, []
+    updated.asset_universe = list(dict.fromkeys(filtered_assets))
+    return updated, ["benchmark_symbol_removed_from_asset_universe"]
+
+
+def _normalized_symbol(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().upper()
+    return normalized or None
+
+
 def _resolve_asset_candidate(
     query: str,
     *,
@@ -2817,6 +2895,35 @@ def _strategy_is_semantically_confirmable(
         and not unsupported_constraints
         and not missing_required_fields
     )
+
+
+def _fresh_complete_restatement_started_new_confirmation(
+    *,
+    interpretation: StructuredInterpretation,
+    selected_thread_metadata: dict[str, Any],
+    expects_strategy_route: bool,
+    requires_clarification: bool,
+    ambiguous_fields: list[AmbiguousField],
+    unsupported_constraints: list[UnsupportedConstraint],
+    missing_required_fields: list[str],
+) -> bool:
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if not requested_field:
+        return False
+    if interpretation.semantic_turn_act != "new_idea":
+        return False
+    if interpretation.task_relation != "new_task":
+        return False
+    return _strategy_is_semantically_confirmable(
+        expects_strategy_route=expects_strategy_route,
+        ambiguous_fields=ambiguous_fields,
+        unsupported_constraints=unsupported_constraints,
+        missing_required_fields=missing_required_fields,
+    ) and not requires_clarification
 
 
 def _strategy_route_expected(

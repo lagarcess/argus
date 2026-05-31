@@ -82,7 +82,12 @@ def draft_assumptions_response(snapshot: TaskSnapshot | None) -> str | None:
         assumptions = inferred_strategy_assumptions(snapshot.pending_strategy_summary)
     if not assumptions:
         return None
-    return "For the visible draft, I am using: " + "; ".join(assumptions) + "."
+    draft_label = (
+        "visible draft"
+        if snapshot.active_confirmation_reference is not None
+        else "current draft"
+    )
+    return f"For the {draft_label}, I am using: " + "; ".join(assumptions) + "."
 
 
 def active_confirmation_assumptions(snapshot: TaskSnapshot) -> list[str]:

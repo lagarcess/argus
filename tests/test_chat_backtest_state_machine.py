@@ -1034,7 +1034,8 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
     second_text = _stream_payloads(second.text, "token")[0]["text"]
     assert "help you choose a sensible next step" in first_text
     assert "What should trigger the buy?" not in second_text
-    assert "interpreter was unavailable" in second_text
+    assert "reliable draft" in second_text
+    assert "interpreter" not in second_text.lower()
 
 
 def test_discovery_endpoints_return_assets_and_indicators(

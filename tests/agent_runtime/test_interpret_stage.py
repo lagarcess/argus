@@ -1505,7 +1505,7 @@ def test_interpret_answers_pending_draft_assumption_followup_without_approval() 
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "For the visible draft" in result.patch["assistant_response"]
+    assert "For the current draft" in result.patch["assistant_response"]
     assert "Long-only" in result.patch["assistant_response"]
     assert result.decision.semantic_turn_act == "result_followup"
 
@@ -3368,7 +3368,10 @@ def test_interpreter_unavailable_does_not_parse_pending_date_from_text(
     assert result.outcome == "ready_to_respond"
     assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
     assert result.decision.candidate_strategy_draft.asset_universe == []
-    assert "interpreter was unavailable" in result.patch["assistant_response"].lower()
+    assert "could not safely apply that change" in result.patch[
+        "assistant_response"
+    ].lower()
+    assert "interpreter" not in result.patch["assistant_response"].lower()
 
 
 def test_pending_date_answer_does_not_bypass_structured_interpreter_response(
@@ -3534,7 +3537,10 @@ def test_interpreter_unavailable_does_not_infer_missing_signal_rule_from_text(
     assert result.outcome == "ready_to_respond"
     assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
     assert result.decision.candidate_strategy_draft.entry_rule is None
-    assert "interpreter was unavailable" in result.patch["assistant_response"].lower()
+    assert "could not safely apply that change" in result.patch[
+        "assistant_response"
+    ].lower()
+    assert "interpreter" not in result.patch["assistant_response"].lower()
 
 
 def test_explicit_relative_date_reference_clears_llm_date_ambiguity(
@@ -4175,7 +4181,10 @@ def test_indicator_simplification_does_not_regex_parse_when_interpreter_unavaila
     assert result.outcome == "ready_to_respond"
     assert result.decision.candidate_strategy_draft.asset_universe == []
     assert result.decision.reason_codes == ["llm_interpreter_unavailable"]
-    assert "interpreter was unavailable" in result.patch["assistant_response"].lower()
+    assert "could not safely apply that change" in result.patch[
+        "assistant_response"
+    ].lower()
+    assert "interpreter" not in result.patch["assistant_response"].lower()
     assert "nvda signal strategy draft" in result.patch["assistant_response"].lower()
 
 
@@ -4269,7 +4278,8 @@ def test_interpreter_unavailable_during_assumption_edit_does_not_answer_stale_as
     answer = result.patch["assistant_response"]
     assert "could not safely apply that assumption change" in answer
     assert "$1,000 starting capital" not in answer
-    assert "left the visible draft unchanged" in answer
+    assert "left the current draft unchanged" in answer
+    assert "interpreter" not in answer.lower()
 
 
 def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> None:

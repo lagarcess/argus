@@ -1834,3 +1834,199 @@ def test_supported_bollinger_capability_is_not_recovered_as_unsupported() -> Non
 
     assert "Bollinger Bands" in answer
     assert "executable" in answer.lower()
+
+
+def test_invalid_date_answer_after_pending_clarification_asks_for_correction(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple against QQQ.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        comparison_baseline="QQQ",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied an end date before the pending start date.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"end": "2023-12-31"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="end of 2023",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "date_range",
+        },
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.comparison_baseline == "QQQ"
+    assert result.decision.missing_required_fields == ["date_range"]
+    assert any(
+        constraint.category == "invalid_date_range"
+        for constraint in result.decision.unsupported_constraints
+    )
+    assert "invalid_date_range_requires_correction" in result.decision.reason_codes
+
+
+def test_fresh_complete_restatement_after_failed_clarification_starts_confirmation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple against QQQ.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        comparison_baseline="QQQ",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User restated a complete executable idea.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Microsoft against QQQ.",
+            asset_universe=["MSFT"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="QQQ",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="Actually test MSFT vs QQQ from Jan 1 2024 to Dec 31 2024",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "date_range",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["MSFT"]
+    assert strategy.comparison_baseline == "QQQ"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert "fresh_complete_restatement_started_new_confirmation" in (
+        result.decision.reason_codes
+    )
+    assert "assistant_response" not in result.patch
+
+
+def test_benchmark_symbol_is_removed_from_asset_universe_and_kept_as_benchmark(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.upper()
+        return ResolvedAssetStub(normalized, "crypto")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test ETH against BTC.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold ETH against BTC.",
+            asset_universe=["ETH", "BTC"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="BTC",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="test ETH vs BTC in 2024",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["ETH"]
+    assert strategy.comparison_baseline == "BTC"
+    assert "benchmark_symbol_removed_from_asset_universe" in (
+        result.decision.reason_codes
+    )
+    from argus.agent_runtime.stages.execute import _launch_payload
+
+    launch_state = RunState.new(current_user_message="", recent_thread_history=[])
+    launch_state.candidate_strategy_draft = strategy
+    launch_payload = _launch_payload(launch_state)
+    assert launch_payload["symbols"] == ["ETH"]
+    assert launch_payload["benchmark_symbol"] == "BTC"
+
+
+def test_benchmark_only_asset_universe_requires_traded_asset(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.upper()
+        return ResolvedAssetStub(normalized, "crypto")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants a crypto backtest against BTC.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Compare a crypto asset against BTC.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="BTC",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="test it against BTC in 2024",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == []
+    assert strategy.comparison_baseline == "BTC"
+    assert "asset_universe" in result.decision.missing_required_fields
+    assert "benchmark_symbol_removed_from_asset_universe" in (
+        result.decision.reason_codes
+    )

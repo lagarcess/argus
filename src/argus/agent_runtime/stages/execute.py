@@ -288,7 +288,11 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         "cadence": _resolve_cadence(strategy, optional_parameters, strategy_type),
         "parameters": _resolve_parameters(optional_parameters),
         "risk_rules": _resolve_risk_rules(strategy),
-        "benchmark_symbol": _resolve_benchmark_symbol(symbol, optional_parameters),
+        "benchmark_symbol": _resolve_benchmark_symbol(
+            symbol,
+            optional_parameters,
+            strategy=strategy,
+        ),
         "language": language,
     }
 
@@ -944,10 +948,18 @@ def _resolve_risk_rules(strategy: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def _resolve_benchmark_symbol(symbol: str, optional_parameters: dict[str, Any]) -> str:
+def _resolve_benchmark_symbol(
+    symbol: str,
+    optional_parameters: dict[str, Any],
+    *,
+    strategy: dict[str, Any],
+) -> str:
     value = _resolve_optional_value(optional_parameters, "benchmark_symbol")
     if isinstance(value, str) and value:
         return value.strip().upper()
+    benchmark = strategy.get("comparison_baseline")
+    if isinstance(benchmark, str) and benchmark.strip():
+        return benchmark.strip().upper()
     try:
         asset = resolve_asset(symbol)
     except Exception:
