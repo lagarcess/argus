@@ -2,14 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Menu,
-  Plus,
   ChevronDown,
   Trash2,
   Pin,
   Edit2,
   Search,
-  Settings,
   X,
   Play,
   AlertCircle,
@@ -124,8 +121,6 @@ function StrategySkeleton() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function StrategiesView({
-  onMenuClick,
-  onAddClick,
   searchText,
   onSearchChange,
   isSidebarOpen,
