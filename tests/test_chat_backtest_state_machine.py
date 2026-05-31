@@ -962,6 +962,23 @@ def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
     assert "Strategy was saved" not in text
     assert composed_save_response["user_message"] == "save this strategy"
     assert composed_save_response["metadata"]["run_id"] == run_id
+    assert composed_save_response["metadata"]["symbols"] == ["AAPL"]
+    assert composed_save_response["metadata"]["benchmark_symbol"] == "SPY"
+    assert composed_save_response["metadata"]["metrics"] == {
+        "aggregate": {"performance": {"total_return_pct": 12.4}}
+    }
+    assert composed_save_response["metadata"]["config_snapshot"] == {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "start_date": "2025-05-03",
+        "end_date": "2026-05-03",
+        "starting_capital": 10000,
+        "benchmark_symbol": "SPY",
+    }
+    assert composed_save_response["metadata"]["result_card"]["title"] == (
+        "AAPL buy and hold"
+    )
     assert client.get("/api/v1/strategies").json()["items"] == []
 
 

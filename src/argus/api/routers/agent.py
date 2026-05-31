@@ -30,7 +30,11 @@ from argus.api.chat.actions import (
     run_for_result_action,
     stale_confirmation_action_message,
 )
-from argus.api.chat.artifacts import result_fact_bank, saved_strategy_metadata
+from argus.api.chat.artifacts import (
+    result_fact_bank,
+    result_followup_metadata_from_run,
+    saved_strategy_metadata,
+)
 from argus.api.chat.breakdown import result_breakdown_message
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.chat.onboarding import (
@@ -573,7 +577,7 @@ async def chat_stream(
                 metadata["result_run_id"] = run.id
                 metadata["result_strategy_id"] = run.strategy_id
                 assistant_text = await compose_private_alpha_save_response(
-                    metadata=run_fact_bank,
+                    metadata=result_followup_metadata_from_run(run),
                     user_message=chat_request_message(payload),
                 )
                 if assistant_text is None:
@@ -922,9 +926,7 @@ async def chat_stream(
                     assistant_message=persisted_text,
                     current_run=run,
                     message_id=(
-                        assistant_message.id
-                        if assistant_message is not None
-                        else None
+                        assistant_message.id if assistant_message is not None else None
                     ),
                 )
                 return
