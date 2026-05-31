@@ -28,6 +28,25 @@ def result_fact_bank(run: BacktestRun) -> dict[str, Any]:
     }
 
 
+def result_followup_metadata_from_run(run: BacktestRun) -> dict[str, Any]:
+    context_packets = (
+        run.conversation_result_card.get("context_packets")
+        if isinstance(run.conversation_result_card, dict)
+        else None
+    )
+    return {
+        "run_id": run.id,
+        "symbols": list(run.symbols),
+        "benchmark_symbol": run.benchmark_symbol,
+        "metrics": run.metrics,
+        "config_snapshot": run.config_snapshot,
+        "result_card": run.conversation_result_card,
+        "context_packets": context_packets if isinstance(context_packets, list) else [],
+        "chart": run.chart,
+        "trades": run.trades,
+    }
+
+
 def result_reference_from_run(run: BacktestRun) -> ArtifactReference:
     return ArtifactReference(
         artifact_kind="backtest_result",

@@ -18,6 +18,8 @@ import { type ResultChartMarker, type ResultChartPayload } from "./types";
 
 type ResultEquityChartProps = {
   chart: ResultChartPayload;
+  presentation?: "default" | "heroDeltaEvidence";
+  appearanceOverride?: "light" | "dark";
 };
 
 type TooltipState = {
@@ -30,18 +32,34 @@ type TooltipState = {
 
 const CHART_POSITIVE_COLOR = "#70a38d";
 const CHART_NEGATIVE_COLOR = "#b85c5c";
+const CHART_POSITIVE_COLOR_DARK_EVIDENCE = "#7fb39f";
+const CHART_NEGATIVE_COLOR_DARK_EVIDENCE = "#c67378";
+const CHART_POSITIVE_COLOR_LIGHT = "#4f9f8f";
+const CHART_NEGATIVE_COLOR_LIGHT = "#aa5555";
 const CHART_POSITIVE_FILL_DARK = "rgba(112, 163, 141, 0.18)";
 const CHART_POSITIVE_FILL_LIGHT = "rgba(112, 163, 141, 0.12)";
+const CHART_POSITIVE_FILL_LIGHT_RESTRAINED = "rgba(91, 168, 151, 0.10)";
 const CHART_NEGATIVE_FILL_DARK = "rgba(184, 92, 92, 0.14)";
 const CHART_NEGATIVE_FILL_LIGHT = "rgba(184, 92, 92, 0.10)";
+const CHART_NEGATIVE_FILL_LIGHT_RESTRAINED = "rgba(184, 92, 92, 0.08)";
 const BUY_POSITIVE_MARKER_COLOR = "#70a38d";
 const SELL_NEGATIVE_MARKER_COLOR = "#b85c5c";
+const BUY_RESTRAINED_MARKER_COLOR = "rgba(112, 163, 141, 0.42)";
+const SELL_RESTRAINED_MARKER_COLOR = "rgba(184, 92, 92, 0.38)";
 
-export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
+export default function ResultEquityChart({
+  chart,
+  appearanceOverride,
+  presentation = "default",
+}: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const isDark = resolvedTheme === "dark";
+  const isDark = appearanceOverride
+    ? appearanceOverride === "dark"
+    : resolvedTheme === "dark";
+  const isHeroDeltaEvidence = presentation === "heroDeltaEvidence";
+  const chartHeight = isHeroDeltaEvidence ? 164 : 168;
   const data = useMemo<BaselineData<Time>[]>(
     () =>
       chart.series.map((point) => ({
@@ -73,18 +91,26 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
 
     const chartApi = createChart(container, {
       width: container.clientWidth,
-      height: 168,
+      height: chartHeight,
       autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: isDark ? "rgba(255,255,255,0.42)" : "rgba(0,0,0,0.42)",
+        textColor: isDark
+          ? "rgba(255,255,255,0.42)"
+          : isHeroDeltaEvidence
+            ? "rgba(0,0,0,0.52)"
+            : "rgba(0,0,0,0.42)",
         // TODO(launch): Provide correct TradingView attribution before launch.
         attributionLogo: false,
       },
       grid: {
         vertLines: { color: "transparent" },
         horzLines: {
-          color: isDark ? "rgba(255,255,255,0.055)" : "rgba(0,0,0,0.055)",
+          color: isDark
+            ? "rgba(255,255,255,0.055)"
+            : isHeroDeltaEvidence
+              ? "rgba(0,0,0,0.095)"
+              : "rgba(0,0,0,0.055)",
         },
       },
       rightPriceScale: {
@@ -124,11 +150,27 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
     const series = chartApi.addSeries(BaselineSeries, {
       baseValue: { type: "price", price: baseValue },
       lineWidth: 2,
-      topLineColor: CHART_POSITIVE_COLOR,
-      bottomLineColor: CHART_NEGATIVE_COLOR,
-      topFillColor1: isDark ? CHART_POSITIVE_FILL_DARK : CHART_POSITIVE_FILL_LIGHT,
+      topLineColor: isHeroDeltaEvidence
+        ? isDark
+          ? CHART_POSITIVE_COLOR_DARK_EVIDENCE
+          : CHART_POSITIVE_COLOR_LIGHT
+        : CHART_POSITIVE_COLOR,
+      bottomLineColor: isHeroDeltaEvidence
+        ? isDark
+          ? CHART_NEGATIVE_COLOR_DARK_EVIDENCE
+          : CHART_NEGATIVE_COLOR_LIGHT
+        : CHART_NEGATIVE_COLOR,
+      topFillColor1: isDark
+        ? CHART_POSITIVE_FILL_DARK
+        : isHeroDeltaEvidence
+          ? CHART_POSITIVE_FILL_LIGHT_RESTRAINED
+          : CHART_POSITIVE_FILL_LIGHT,
       topFillColor2: "rgba(112, 163, 141, 0.00)",
-      bottomFillColor1: isDark ? CHART_NEGATIVE_FILL_DARK : CHART_NEGATIVE_FILL_LIGHT,
+      bottomFillColor1: isDark
+        ? CHART_NEGATIVE_FILL_DARK
+        : isHeroDeltaEvidence
+          ? CHART_NEGATIVE_FILL_LIGHT_RESTRAINED
+          : CHART_NEGATIVE_FILL_LIGHT,
       bottomFillColor2: "rgba(184, 92, 92, 0.00)",
       priceLineVisible: false,
       lastValueVisible: false,
@@ -139,6 +181,7 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       visibleRange: chartApi.timeScale().getVisibleLogicalRange(),
       chartWidth: container.clientWidth,
       dataIndexByTime,
+      restrained: isHeroDeltaEvidence,
     };
     const markersApi = createSeriesMarkers(
       series as ISeriesApi<"Baseline", Time>,
@@ -152,6 +195,7 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
           visibleRange,
           chartWidth: container.clientWidth,
           dataIndexByTime,
+          restrained: isHeroDeltaEvidence,
         }),
       );
     };
@@ -182,13 +226,24 @@ export default function ResultEquityChart({ chart }: ResultEquityChartProps) {
       chartApi.timeScale().unsubscribeVisibleLogicalRangeChange(updateVisibleMarkers);
       chartApi.remove();
     };
-  }, [chart, data, dataIndexByTime, eventByTime, isDark]);
+  }, [chart, chartHeight, data, dataIndexByTime, eventByTime, isDark, isHeroDeltaEvidence]);
 
   if (data.length === 0) return null;
 
   return (
-    <div className="relative border-y border-black/8 dark:border-white/8 bg-black/[0.012] dark:bg-white/[0.018]">
-      <div ref={containerRef} className="h-[168px] w-full" data-testid="result-equity-chart" />
+    <div
+      className={
+        isHeroDeltaEvidence
+          ? "relative border-t border-black/[0.025] bg-transparent dark:border-white/[0.025] dark:bg-transparent"
+          : "relative border-y border-black/8 bg-black/[0.012] dark:border-white/8 dark:bg-white/[0.018]"
+      }
+    >
+      <div
+        ref={containerRef}
+        className="w-full"
+        data-testid="result-equity-chart"
+        style={{ height: chartHeight }}
+      />
       {tooltip && (
         <div
           className="pointer-events-none absolute z-10 min-w-[148px] rounded-[10px] border border-black/10 bg-white/95 px-3 py-2 text-[11px] leading-snug text-black/70 dark:border-white/10 dark:bg-[#1d2023]/95 dark:text-white/75"
@@ -240,6 +295,7 @@ type VisibleTradeMarkerInput = {
   visibleRange: LogicalRange | null;
   chartWidth: number;
   dataIndexByTime: Map<string, number>;
+  restrained?: boolean;
 };
 
 export function selectVisibleTradeMarkers({
@@ -289,7 +345,7 @@ export function buildVisibleSeriesMarkers(
     chartWidth: input.chartWidth,
   });
   return visibleMarkers.map((marker, index) =>
-    toSeriesMarker(marker, labeledIndexes.has(index)),
+    toSeriesMarker(marker, labeledIndexes.has(index), input.restrained),
   );
 }
 
@@ -323,13 +379,24 @@ function selectLabeledMarkerIndexes({
   return new Set([...indexes].sort((a, b) => a - b).slice(0, budget));
 }
 
-function toSeriesMarker(marker: ResultChartMarker, showLabel: boolean): SeriesMarker<Time> {
+function toSeriesMarker(
+  marker: ResultChartMarker,
+  showLabel: boolean,
+  restrained = false,
+): SeriesMarker<Time> {
   const isEntry = marker.type === "entry";
   return {
     time: normalizeChartTime(marker.time) as Time,
     position: isEntry ? "belowBar" : "aboveBar",
-    color: isEntry ? BUY_POSITIVE_MARKER_COLOR : SELL_NEGATIVE_MARKER_COLOR,
+    color: isEntry
+      ? restrained
+        ? BUY_RESTRAINED_MARKER_COLOR
+        : BUY_POSITIVE_MARKER_COLOR
+      : restrained
+        ? SELL_RESTRAINED_MARKER_COLOR
+        : SELL_NEGATIVE_MARKER_COLOR,
     shape: isEntry ? "arrowUp" : "arrowDown",
     text: showLabel ? (isEntry ? "Buy" : "Sell") : undefined,
+    ...(restrained ? { size: 0.46 } : {}),
   };
 }

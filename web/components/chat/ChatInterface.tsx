@@ -10,7 +10,6 @@ import {
   TrendingUp,
   Bitcoin,
   LineChart,
-  Layers,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
@@ -25,6 +24,7 @@ import {
   getConversationMessages,
   listConversations,
   listHistory,
+  logoutFromApi,
   patchMe,
   resultCardFromConversationCard,
   resultCardFromRun,
@@ -40,8 +40,12 @@ import {
   type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
-import CollectionPicker from "./CollectionPicker";
-import CollectionsView from "../views/CollectionsView";
+import {
+  collectionsEnabled,
+  omnisearchEnabled,
+  privateAlphaOnboardingEnabled,
+  strategiesEnabled,
+} from "@/lib/private-alpha-flags";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
@@ -65,7 +69,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-type View = "chat" | "strategies" | "collections" | "settings";
+type View = "chat" | "strategies" | "settings";
 type OnboardingChoice = {
   goal: PrimaryGoal;
   title: string;
@@ -480,9 +484,13 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
           : m.conversation_id;
       const resultStrategyId = stringOrNull(metadata.result_strategy_id);
       const savedStrategyId = savedStrategyIdFromMetadata(metadata);
+      const factBank = recordOrNull(metadata.result_fact_bank);
+      const configSnapshot = recordOrNull(factBank?.config_snapshot);
       const card = resultCardFromConversationCard(resultCard, {
         id: runId,
         strategy_id: resultStrategyId,
+        benchmark_symbol: stringOrNull(factBank?.benchmark_symbol) ?? undefined,
+        config_snapshot: configSnapshot ?? undefined,
       });
       const resultActionContext = resultActionContextFromMetadata(metadata, card);
       const restoredActions = hydrateResultActions(card.actions ?? [], {
@@ -551,7 +559,6 @@ function chatStreamErrorText(detail: string | undefined, fallback: string) {
 
 export default function ChatInterface() {
   const { t, i18n } = useTranslation();
-  const collectionsEnabled = process.env.NEXT_PUBLIC_COLLECTIONS_ENABLED === "true";
 
   const onboardingChoices = useMemo<OnboardingChoice[]>(
     () => [
@@ -599,7 +606,7 @@ export default function ChatInterface() {
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [activeChatOptionsPanel, setActiveChatOptionsPanel] = useState<
-    "none" | "history" | "collection"
+    "none" | "history"
   >("none");
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
@@ -609,14 +616,6 @@ export default function ChatInterface() {
   const [isStreamingResponse, setIsStreamingResponse] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
-  const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
-    runId: string;
-    strategyId: string | null;
-    strategyName: string;
-    symbols: string[];
-    template: string;
-    assetClass: AssetClass;
-  } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
   const [feedbackState, setFeedbackState] = useState<{
@@ -678,7 +677,7 @@ export default function ChatInterface() {
     );
     setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
     setHistoryNextCursor(next_cursor);
-  }, [collectionsEnabled]);
+  }, []);
 
   // ── History ────────────────────────────────────────────────────────────────
 
@@ -766,6 +765,7 @@ export default function ChatInterface() {
   }, []);
 
   useEffect(() => {
+    if (!omnisearchEnabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
         return;
@@ -777,6 +777,12 @@ export default function ChatInterface() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!strategiesEnabled && currentView === "strategies") {
+      setCurrentView("chat");
+    }
+  }, [currentView]);
 
   const handleSetSidebarMode = (mode: SidebarMode) => {
     setSidebarMode(mode);
@@ -816,6 +822,7 @@ export default function ChatInterface() {
             setMessages(hydrated.messages);
             setInputActions(hydrated.inputActions);
             setShowOnboardingGoalCards(
+              privateAlphaOnboardingEnabled &&
               hydrated.messages.length === 0
               && (stage === "language_selection" || stage === "primary_goal_selection"),
             );
@@ -832,7 +839,8 @@ export default function ChatInterface() {
         setConversationId(conversation.id);
         setMessages([]);
         setShowOnboardingGoalCards(
-          stage === "language_selection" || stage === "primary_goal_selection",
+          privateAlphaOnboardingEnabled &&
+          (stage === "language_selection" || stage === "primary_goal_selection"),
         );
 
       } catch {
@@ -931,13 +939,8 @@ export default function ChatInterface() {
       void loadConversation(item.id);
       return;
     }
-    if (item.type === "strategy") {
+    if (strategiesEnabled && item.type === "strategy") {
       setCurrentView("strategies");
-      setIsSidebarOpen(false);
-      return;
-    }
-    if (item.type === "collection") {
-      setCurrentView("collections");
       setIsSidebarOpen(false);
       return;
     }
@@ -964,7 +967,8 @@ export default function ChatInterface() {
         const me = await getMe();
         const stage = me.user.onboarding.stage;
         setShowOnboardingGoalCards(
-          stage === "language_selection" || stage === "primary_goal_selection",
+          privateAlphaOnboardingEnabled &&
+          (stage === "language_selection" || stage === "primary_goal_selection"),
         );
       } catch {
         setShowOnboardingGoalCards(false);
@@ -977,7 +981,7 @@ export default function ChatInterface() {
     }
   };
 
-  const handleTriggerPrompt = async (type: 'strategy' | 'collection', customPrompt?: string) => {
+  const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
     setCurrentView("chat");
     setIsSidebarOpen(false);
@@ -987,20 +991,10 @@ export default function ChatInterface() {
     if (!newConvId) return;
 
     // 3. Define the localized prompt or use custom
-    let prompt: string;
-    if (customPrompt) {
-      prompt = customPrompt;
-    } else {
-      const promptKey = type === 'strategy'
-        ? 'chat.trigger_create_strategy'
-        : 'chat.trigger_create_collection';
-
-      const fallback = type === 'strategy'
-        ? 'I want to create a new strategy.'
-        : 'I want to create a new collection.';
-
-      prompt = t(promptKey, fallback);
-    }
+    const prompt = customPrompt ?? t(
+      'chat.trigger_create_strategy',
+      'I want to create a new strategy.',
+    );
 
     // 4. Send it
     void handleSend(prompt);
@@ -1337,6 +1331,13 @@ export default function ChatInterface() {
 
   const handleSaveStrategyAction = async (action: ChatActionOption) => {
     if (!conversationId) return;
+    if (!strategiesEnabled) {
+      showToast(t(
+        "chat.private_alpha_result_kept",
+        "This result is already kept in conversation/history.",
+      ));
+      return;
+    }
     const runId = resultActionRunId(action) ?? null;
     const streamInput: ChatActionRequest = {
       type: "save_strategy",
@@ -1380,6 +1381,16 @@ export default function ChatInterface() {
     }
     finally {
       setMessages((prev) => markResultCardSaving(prev, runId, false));
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutFromApi();
+    } catch {
+      // Even if the network is unavailable, leave the authenticated surface.
+    } finally {
+      window.location.href = "/";
     }
   };
 
@@ -1433,43 +1444,8 @@ export default function ChatInterface() {
       void handleCancelConfirmationAction(action);
       return;
     }
-    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
-      if (action.payload) {
-        setCollectionPickerTarget({
-          runId: String(action.payload.run_id ?? ""),
-          strategyId: action.payload.strategy_id == null ? null : String(action.payload.strategy_id),
-          strategyName: String(action.payload.strategy_name ?? "My strategy"),
-          symbols: Array.isArray(action.payload.symbols) ? action.payload.symbols.map(String) : [],
-          template: String(action.payload.template ?? ""),
-          assetClass: assetClassOrUndefined(action.payload.asset_class) ?? "equity",
-        });
-        return;
-      }
-    }
     if (value === "/action:new-chat") {
       void startNewChat();
-      return;
-    }
-    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
-      // Format: /action:add-to-collection:<runId>:<strategyId>:<symbols>:<assetClass>
-      const parts = value.split(":");
-      const runId = parts[2];
-      const strategyId = parts[3] || null;
-      const symbols = (parts[4] ?? "").split(",").filter(Boolean);
-      const assetClass = (parts[5] ?? "equity") as AssetClass;
-      // Find the result card title from messages for strategy name
-      const resultMsg = messages.find(
-        (m) => m.kind === "strategy_result" && m.result,
-      );
-      const strategyName = resultMsg?.result?.strategyName ?? "My strategy";
-      setCollectionPickerTarget({
-        runId,
-        strategyId,
-        strategyName,
-        symbols,
-        template: "rsi_mean_reversion",
-        assetClass,
-      });
       return;
     }
     setInputActions(consumeInputAction(action, inputActions));
@@ -1496,25 +1472,6 @@ export default function ChatInterface() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showChatOptions]);
-
-  const handleAddToCollection = () => {
-    // Find the latest strategy result in the message list
-    const lastStrategyMsg = [...messages].reverse().find(m => m.kind === "strategy_result" && m.result);
-    if (lastStrategyMsg?.result) {
-      const res = lastStrategyMsg.result;
-      setCollectionPickerTarget({
-        runId: res.runId ?? "",
-        strategyId: res.strategyId ?? null,
-        strategyName: res.strategyName,
-        symbols: res.symbols ?? [],
-        template: res.template ?? "",
-        assetClass: res.assetClass ?? "equity",
-      });
-      closeChatOptions();
-    } else {
-      showToast(t('chat.error_load'));
-    }
-  };
 
   const composerActions = hasActiveArtifactActionSet(messages)
     ? []
@@ -1549,11 +1506,14 @@ export default function ChatInterface() {
         }}
         onOpenItem={openHistoryItem}
         onLoadMoreHistory={loadMoreHistory}
-        onOpenSettings={() => setCurrentView("settings")}
-        onOpenSearch={() => setSearchOverlayOpen(true)}
+        onOpenSearch={() => {
+          if (omnisearchEnabled) {
+            setSearchOverlayOpen(true);
+          }
+        }}
         onHistoryMutated={refreshHistory}
         onLogout={() => {
-          window.location.href = "/";
+          void handleLogout();
         }}
         onFeedback={(type) => {
           setFeedbackState({
@@ -1564,9 +1524,11 @@ export default function ChatInterface() {
         }}
         onOpenSidebarPreference={() => setIsSidebarPreferenceModalOpen(true)}
         mode={sidebarMode}
+        strategiesEnabled={strategiesEnabled}
+        omnisearchEnabled={omnisearchEnabled}
       />
 
-      {searchOverlayOpen && (
+      {omnisearchEnabled && searchOverlayOpen && (
         <ChatCommandPalette
           onClose={() => setSearchOverlayOpen(false)}
           onOpenConversation={(convId) => {
@@ -1592,7 +1554,6 @@ export default function ChatInterface() {
           <h1 className="font-display pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
             {currentView === "chat" && (messages.length > 0 ? t('common.conversation', 'Conversation') : t('chat.new_chat'))}
             {currentView === "strategies" && t('common.strategies')}
-            {currentView === "collections" && t('common.collections')}
           </h1>
 
           {/* Action Button (Always Right-Anchored) */}
@@ -1620,16 +1581,6 @@ export default function ChatInterface() {
                           <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
                           {t('chat.new_chat')}
                         </button>
-                        {collectionsEnabled && (
-                          <button
-                            type="button"
-                            onClick={handleAddToCollection}
-                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            {t('common.add_to_collection')}
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
@@ -1694,9 +1645,9 @@ export default function ChatInterface() {
                 )}
               </div>
             )}
-            {(currentView === "strategies" || currentView === "collections") && (
+            {strategiesEnabled && currentView === "strategies" && (
               <button
-                onClick={() => handleTriggerPrompt(currentView === "strategies" ? "strategy" : "collection")}
+                onClick={() => handleTriggerPrompt("strategy")}
                 className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                 aria-label="New item"
               >
@@ -1899,20 +1850,10 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {currentView === "strategies" && (
+        {strategiesEnabled && currentView === "strategies" && (
           <StrategiesView
             onMenuClick={() => setIsSidebarOpen((o) => !o)}
             onAddClick={() => handleTriggerPrompt('strategy')}
-            searchText={searchText}
-            onSearchChange={setSearchText}
-            isSidebarOpen={isSidebarOpen}
-            onTriggerPrompt={handleTriggerPrompt}
-          />
-        )}
-        {collectionsEnabled && currentView === "collections" && (
-          <CollectionsView
-            onMenuClick={() => setIsSidebarOpen((o) => !o)}
-            onAddClick={() => handleTriggerPrompt('collection')}
             searchText={searchText}
             onSearchChange={setSearchText}
             isSidebarOpen={isSidebarOpen}
@@ -1923,7 +1864,7 @@ export default function ChatInterface() {
           <SettingsView
             onClose={() => setCurrentView("chat")}
             onLogout={() => {
-              window.location.href = "/";
+              void handleLogout();
             }}
             onFeedback={(type, context) => {
               setFeedbackState({
@@ -1936,24 +1877,6 @@ export default function ChatInterface() {
           />
         )}
       </section>
-
-      {/* ── Collection picker sheet ── */}
-      {collectionsEnabled && collectionPickerTarget && (
-        <CollectionPicker
-          strategyId={collectionPickerTarget.strategyId}
-          strategyFallback={{
-            name: collectionPickerTarget.strategyName,
-            template: collectionPickerTarget.template,
-            asset_class: collectionPickerTarget.assetClass,
-            symbols: collectionPickerTarget.symbols,
-          }}
-          onClose={() => setCollectionPickerTarget(null)}
-          onSuccess={(collectionName) => {
-            setCollectionPickerTarget(null);
-            showToast(t('chat.added_to_collection', { name: collectionName }));
-          }}
-        />
-      )}
 
       {/* ── Feedback Dialog ── */}
       <FeedbackDialog

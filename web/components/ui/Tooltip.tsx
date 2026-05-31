@@ -21,7 +21,6 @@ export function Tooltip({
   content,
   children,
   side = "right",
-  align = "center",
   delay = 300,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);

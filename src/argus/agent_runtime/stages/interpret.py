@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -24,7 +25,9 @@ from argus.agent_runtime.response_style import (
     with_response_heading,
 )
 from argus.agent_runtime.result_followups import (
+    compose_private_alpha_save_response,
     compose_result_followup_response,
+    fallback_private_alpha_save_response,
     fallback_result_followup_response,
 )
 from argus.agent_runtime.rule_specs import (
@@ -108,6 +111,7 @@ from argus.llm.openrouter import invoke_openrouter_chat_completion
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
+_LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
 
 
 @dataclass(frozen=True)
@@ -532,6 +536,13 @@ async def _stage_result_from_interpretation(
     )
     if pending_refinement_result is not None:
         return pending_refinement_result
+    private_alpha_save_result = await _private_alpha_save_request_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+    )
+    if private_alpha_save_result is not None:
+        return private_alpha_save_result
     followup_result = await _artifact_followup_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -1994,9 +2005,10 @@ async def _latest_result_followup_recovery_if_applicable(
     unanchored_strategy_route = (
         "unanchored_strategy_route_suppressed" in decision.reason_codes
     )
+    save_requested = _latest_result_save_requested(decision)
     if decision.artifact_target != "latest_result":
         return None
-    if assistant_response and not unanchored_strategy_route:
+    if assistant_response and not unanchored_strategy_route and not save_requested:
         return None
     if _candidate_strategy_has_backtest_shape(decision.candidate_strategy_draft):
         return None
@@ -2007,18 +2019,26 @@ async def _latest_result_followup_recovery_if_applicable(
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     focus = decision.result_followup_focus or "general"
-    response = await compose_result_followup_response(
-        metadata=metadata,
-        focus=focus,
-        user_message=current_user_message,
-    )
-    if response is None:
-        response = fallback_result_followup_response(
+    if save_requested and not _strategies_enabled():
+        response = await compose_private_alpha_save_response(
+            metadata=metadata,
+            user_message=current_user_message,
+        )
+        if response is None:
+            response = fallback_private_alpha_save_response()
+    else:
+        response = await compose_result_followup_response(
             metadata=metadata,
             focus=focus,
+            user_message=current_user_message,
         )
-    if response is None:
-        return None
+        if response is None:
+            response = fallback_result_followup_response(
+                metadata=metadata,
+                focus=focus,
+            )
+        if response is None:
+            return None
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -2044,12 +2064,60 @@ async def _latest_result_followup_recovery_if_applicable(
             }
         ),
         stage_patch={
-            "assistant_response": with_response_heading(
-                heading=result_followup_heading(focus),
-                body=response,
+            "assistant_response": (
+                response
+                if save_requested and not _strategies_enabled()
+                else with_response_heading(
+                    heading=result_followup_heading(focus),
+                    body=response,
+                )
             )
         },
     )
+
+
+async def _private_alpha_save_request_result_if_applicable(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+) -> StageResult | None:
+    if not _latest_result_save_requested(decision):
+        return None
+    if _strategies_enabled():
+        return None
+    if decision.artifact_target != "latest_result":
+        return None
+    if snapshot is None or snapshot.latest_backtest_result_reference is None:
+        return None
+    response = await compose_private_alpha_save_response(
+        metadata=dict(snapshot.latest_backtest_result_reference.metadata),
+        user_message=current_user_message,
+    )
+    if response is None:
+        response = fallback_private_alpha_save_response()
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision.model_copy(
+            update={
+                "intent": "conversation_followup",
+                "requires_clarification": False,
+                "missing_required_fields": [],
+                "semantic_turn_act": "result_followup",
+                "result_followup_focus": decision.result_followup_focus or "general",
+            }
+        ),
+        stage_patch={"assistant_response": response},
+    )
+
+
+def _strategies_enabled() -> bool:
+    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _latest_result_save_requested(decision: InterpretDecision) -> bool:
+    return _LATEST_RESULT_SAVE_REQUESTED_REASON in decision.reason_codes
 
 
 def _offline_recovery_message(

@@ -16,14 +16,10 @@ import {
   Archive,
   History,
   RotateCcw,
-  Trash,
   Loader2,
   MessageSquare,
   BarChart2,
-  Layers,
-  MessageSquareWarning,
   Sparkles,
-  MessageSquarePlus,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -33,13 +29,12 @@ import {
   listHistory,
   patchConversation,
   patchStrategy,
-  deleteConversation,
-  deleteStrategy,
   type Conversation,
   type HistoryItem,
   type ApiUser,
 } from "@/lib/argus-api";
 import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
+import { strategiesEnabled } from "@/lib/private-alpha-flags";
 
 type SettingsViewProps = {
   onClose: () => void;
@@ -48,6 +43,22 @@ type SettingsViewProps = {
 };
 
 type SubView = "main" | "archived" | "deleted";
+
+function isDeletedItemVisible(item: HistoryItem) {
+  if (item.type === "chat") return true;
+  if (item.type === "strategy") return strategiesEnabled;
+  return false;
+}
+
+function deletedItemTypeLabel(
+  item: HistoryItem,
+  t: ReturnType<typeof useTranslation>["t"],
+) {
+  if (item.type === "strategy") {
+    return t("settings.data.strategy_item", "Strategy");
+  }
+  return t("settings.data.chat_item", "Chat");
+}
 
 export default function SettingsView({ onClose, onLogout, onFeedback }: SettingsViewProps) {
   const { t, i18n } = useTranslation();
@@ -85,16 +96,14 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
 
   useEffect(() => {
     if (activeSubView === "archived") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLoading(true);
       listConversations({ archived: true })
         .then(({ items }) => setArchivedChats(items))
         .finally(() => setIsLoading(false));
     } else if (activeSubView === "deleted") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLoading(true);
       listHistory({ deleted: true })
-        .then(({ items }) => setDeletedItems(items))
+        .then(({ items }) => setDeletedItems(items.filter(isDeletedItemVisible)))
         .finally(() => setIsLoading(false));
     }
   }, [activeSubView]);
@@ -138,6 +147,8 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
   };
 
   const handleRestoreDeleted = async (item: HistoryItem) => {
+    if (!isDeletedItemVisible(item)) return;
+
     try {
       if (item.type === "chat") {
         await patchConversation(item.id, { deleted_at: null });
@@ -256,14 +267,14 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-4">
                     <div className="shrink-0 w-8 h-8 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-black/40 dark:text-white/40">
-                      {item.type === "chat" ? <MessageSquare className="w-4 h-4" /> : item.type === "strategy" ? <BarChart2 className="w-4 h-4" /> : <Layers className="w-4 h-4" />}
+                      {item.type === "strategy" ? <BarChart2 className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-[15px] font-medium text-black dark:text-white truncate">
                         {item.title}
                       </span>
                       <span className="text-[12px] text-black/40 dark:text-white/40 truncate uppercase tracking-wider font-bold">
-                        {item.type}
+                        {deletedItemTypeLabel(item, t)}
                       </span>
                     </div>
                   </div>

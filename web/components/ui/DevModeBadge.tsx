@@ -1,13 +1,9 @@
 "use client";
 
-import { useTranslation } from "react-i18next";
 import { Terminal, RefreshCw } from "lucide-react";
 import { patchMe } from "@/lib/argus-api";
-import { useRouter } from "next/navigation";
 
 export function DevModeBadge() {
-  const { t } = useTranslation();
-  const router = useRouter();
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
 
   const handleResetOnboarding = async () => {

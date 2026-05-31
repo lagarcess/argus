@@ -760,9 +760,12 @@ def test_show_breakdown_action_rejects_mismatched_conversation_context(
     assert "result_run_id" not in assistant["metadata"]
 
 
-def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
+def test_save_strategy_action_creates_strategy_from_latest_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from argus.api import state as api_state
 
+    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "true")
     client = _client()
     conversation = _conversation(client)
     user_id = client.get("/api/v1/me").json()["user"]["id"]
@@ -874,6 +877,109 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
     assert [strategy["id"] for strategy in strategies_after_duplicate] == [
         saved_strategy_id
     ]
+
+
+def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    composed_save_response: dict[str, Any] = {}
+
+    async def compose_private_alpha_save_response(**kwargs: Any) -> str:
+        composed_save_response.update(kwargs)
+        return "I cannot move this into Strategies here, but the run stays reachable from this chat and Recents."
+
+    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "false")
+    monkeypatch.setattr(
+        "argus.api.routers.agent.compose_private_alpha_save_response",
+        compose_private_alpha_save_response,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    user_id = client.get("/api/v1/me").json()["user"]["id"]
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2025-05-03",
+            "end_date": "2026-05-03",
+            "starting_capital": 10000,
+            "benchmark_symbol": "SPY",
+        },
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "date_range": {
+                "start": "2025-05-03",
+                "end": "2026-05-03",
+                "display": "May 3, 2025 to May 3, 2026",
+            },
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return (%)",
+                    "value": "+12.4%",
+                }
+            ],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[run_id] = user_id
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "save_strategy",
+                "label": "Save strategy",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run_id,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "Saved" not in text
+    assert "Strategy was saved" not in text
+    assert composed_save_response["user_message"] == "save this strategy"
+    assert composed_save_response["metadata"]["run_id"] == run_id
+    assert composed_save_response["metadata"]["symbols"] == ["AAPL"]
+    assert composed_save_response["metadata"]["benchmark_symbol"] == "SPY"
+    assert composed_save_response["metadata"]["metrics"] == {
+        "aggregate": {"performance": {"total_return_pct": 12.4}}
+    }
+    assert composed_save_response["metadata"]["config_snapshot"] == {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "start_date": "2025-05-03",
+        "end_date": "2026-05-03",
+        "starting_capital": 10000,
+        "benchmark_symbol": "SPY",
+    }
+    assert composed_save_response["metadata"]["result_card"]["title"] == (
+        "AAPL buy and hold"
+    )
+    assert client.get("/api/v1/strategies").json()["items"] == []
 
 
 def test_chat_stream_requires_message_or_action() -> None:

@@ -34,6 +34,7 @@ Supabase Postgres is the canonical state store.
 
 Supabase owns:
 
+- private-alpha access allowlist
 - user profiles
 - preferences
 - conversations
@@ -53,6 +54,7 @@ Render/FastAPI owns orchestration and compute, not long-term state.
 Alpha MVP requires these primary entities:
 
 ```text
+private_alpha_allowlist
 profiles
 conversations
 messages
@@ -131,7 +133,35 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `username` is optional for Alpha.
 ---
 
-# 6. conversations
+# 6. private_alpha_allowlist
+
+Server-side access list for private alpha. This table is checked before signup
+and login; it should not be exposed as a frontend product surface.
+
+### Fields
+- `email`: `text` (Primary Key, lowercased)
+- `role`: `text` (Default: `user`)
+- `disabled_at`: `timestamptz` (Nullable)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Enums
+- **role**: `admin`, `developer`, `user`
+
+### Notes
+- Rows are managed directly in Supabase during private alpha. No invite
+  dashboard, waitlist, referral system, or public invite-code flow is part of
+  this pass.
+- Add a new private-alpha user with only an `email`; set `role` only for
+  `admin` or `developer` access. Use `disabled_at` to revoke access.
+- If an email is missing or `disabled_at` is set, `/auth/signup` and
+  `/auth/login` return `403 private_alpha_access_required`; authenticated API
+  requests must also reject disabled/unlisted emails after token validation.
+- The table may contain emails for existing Supabase Auth users; seeding the
+  allowlist must not create auth users by itself.
+---
+
+# 7. conversations
 
 Represents an isolated chat thread. Each conversation represents a single investing "idea journey."
 
@@ -157,7 +187,7 @@ Represents an isolated chat thread. Each conversation represents a single invest
 - `language` can be stored at the thread level for continuity, but the user profile remains the primary source.
 ---
 
-# 7. messages
+# 8. messages
 
 Represents individual messages within a conversation.
 
@@ -178,7 +208,7 @@ Represents individual messages within a conversation.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
 ---
 
-# 8. strategies
+# 9. strategies
 
 Represents a saved, executable strategy idea backed by an engine template.
 
@@ -214,7 +244,7 @@ Represents a saved, executable strategy idea backed by an engine template.
 - Display metrics are derived from the most recent `backtest_runs`, not stored statically here.
 ---
 
-# 9. collections
+# 10. collections
 
 Collections grouping related strategies. These serve as lightweight organizational themes in Alpha.
 
@@ -235,7 +265,7 @@ Collections grouping related strategies. These serve as lightweight organization
 - **Asset Mixing**: Collections may contain both Equity and Crypto strategies, but they cannot be executed as a mixed-asset batch.
 ---
 
-# 10. collection_strategies
+# 11. collection_strategies
 
 Join table mapping strategies to collections.
 
@@ -250,7 +280,7 @@ Join table mapping strategies to collections.
 - `UNIQUE(collection_id, strategy_id)`
 ---
 
-# 11. backtest_runs
+# 12. backtest_runs
 
 Represents an immutable result of a simulation. Every run is reproducible from its `config_snapshot`.
 
@@ -285,7 +315,7 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
 ---
 
-# 12. Backtest Metrics Shape
+# 13. Backtest Metrics Shape
 
 Backtest results use a standardized nested shape.
 
@@ -315,7 +345,7 @@ Backtest results use a standardized nested shape.
   - Currency-pair groups vs the tested pair itself
 ---
 
-# 13. usage_counters
+# 14. usage_counters
 
 Tracks resource consumption for quotas and limits.
 
@@ -345,7 +375,7 @@ Tracks resource consumption for quotas and limits.
 
 ---
 
-# 14. feedback
+# 15. feedback
 
 Stores user-submitted bug reports and feature requests.
 
@@ -361,7 +391,7 @@ Stores user-submitted bug reports and feature requests.
 - **type**: `bug`, `feature`, `general`
 ---
 
-# 15. Soft Delete & Archive Rules
+# 16. Soft Delete & Archive Rules
 
 ### Soft Delete
 Used for **conversations**, **strategies**, and **collections**. These items should be filtered out by default but remain in the DB for "Recently Deleted" recovery.
@@ -370,7 +400,7 @@ Used for **conversations**, **strategies**, and **collections**. These items sho
 Used specifically for **conversations** to hide them from the primary sidebar without deleting the data.
 ---
 
-# 16. Recents / History Model
+# 17. Recents / History Model
 
 Recents is a mixed-type feed displaying activity across the platform.
 
@@ -393,7 +423,7 @@ Recents is a mixed-type feed displaying activity across the platform.
 ```
 ---
 
-# 17. Search Model
+# 18. Search Model
 
 Alpha supports keyword-based search across core entities.
 
@@ -408,7 +438,7 @@ Semantic search using embeddings is deferred until post-Alpha.
 
 ---
 
-# 18. RLS Ownership Rules
+# 19. RLS Ownership Rules
 
 Every user-owned table must enforce strict Row Level Security (RLS).
 
@@ -416,13 +446,18 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - Users may only `SELECT`, `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`.
 
 ### Tables Requiring RLS
-- `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_runs`, `feedback`, `usage_counters`.
+- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_runs`, `feedback`, `usage_counters`.
+
+### Private Alpha Allowlist
+- No `anon` or `authenticated` role access is required.
+- Backend service-role access checks the table before auth signup/login.
 
 ---
 
-# 19. Indexing Requirements
+# 20. Indexing Requirements
 
 ### Critical Performance Indexes
+- **private_alpha_allowlist**: `(email)` with active-row partial index
 - **profiles**: `(id)`, `(username)`
 - **conversations**: `(user_id, updated_at DESC)`, `(user_id, archived, deleted_at)`, `(user_id, pinned)`
 - **messages**: `(conversation_id, created_at DESC)`
@@ -438,7 +473,7 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **usage_counters unique**: `(user_id, resource, period, period_start)`
 ---
 
-# 20. Naming & Title Defaults
+# 21. Naming & Title Defaults
 
 AI-generated names and titles are the default for conversations, strategies, and collections.
 
@@ -451,7 +486,7 @@ AI-generated names and titles are the default for conversations, strategies, and
 
 ---
 
-# 21. Usage Controls, Quotas, and Limits
+# 22. Usage Controls, Quotas, and Limits
 
 Argus Alpha MVP implements three defensive layers to protect system stability and manage compute/LLM costs while maintaining a generous user experience. These are "fair use" guardrails, not monetization tiers.
 
@@ -476,7 +511,7 @@ Generous usage boundaries tracked via the `usage_counters` table.
 
 ---
 
-# 22. Backend Enforcement Model
+# 23. Backend Enforcement Model
 
 ### Enforcement Flow
 1. **Authenticate**: Resolve `user_id` from session.
@@ -496,7 +531,7 @@ Users with `profiles.is_admin = true` may have quota and rate-limit checks bypas
 
 ---
 
-# 23. Historical State & Reproducibility (SCD)
+# 24. Historical State & Reproducibility (SCD)
 
 Full Slowly Changing Dimension (SCD) systems (e.g., Type 2 historical tracking) are **NOT required for Alpha MVP**.
 
@@ -513,7 +548,7 @@ Full Slowly Changing Dimension (SCD) systems (e.g., Type 2 historical tracking) 
 
 ---
 
-# 24. Data Model Decision Filter
+# 25. Data Model Decision Filter
 
 When adding or changing a table, ask:
 

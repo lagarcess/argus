@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -13,6 +14,10 @@ from argus.agent_runtime.confirmation_artifacts import (
     confirmation_id_from_payload,
 )
 from argus.agent_runtime.resolution import mention_to_provenance
+from argus.agent_runtime.result_followups import (
+    compose_private_alpha_save_response,
+    fallback_private_alpha_save_response,
+)
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
@@ -25,7 +30,11 @@ from argus.api.chat.actions import (
     run_for_result_action,
     stale_confirmation_action_message,
 )
-from argus.api.chat.artifacts import result_fact_bank, saved_strategy_metadata
+from argus.api.chat.artifacts import (
+    result_fact_bank,
+    result_followup_metadata_from_run,
+    saved_strategy_metadata,
+)
 from argus.api.chat.breakdown import result_breakdown_message
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.chat.onboarding import (
@@ -73,6 +82,11 @@ from argus.llm.openrouter import (
 
 router = APIRouter(tags=["agent"])
 RUNTIME_EVENT_TIMEOUT_SECONDS = 45.0
+
+
+def _strategies_enabled() -> bool:
+    raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _confirmation_artifact_id_from_runtime_result(
@@ -556,6 +570,18 @@ async def chat_stream(
                     "I could not find the completed backtest to save. Run the "
                     "strategy again, then save it from the result card."
                 )
+            elif not _strategies_enabled():
+                run_fact_bank = result_fact_bank(run)
+                metadata["result_fact_bank"] = run_fact_bank
+                metadata["latest_run_id"] = run.id
+                metadata["result_run_id"] = run.id
+                metadata["result_strategy_id"] = run.strategy_id
+                assistant_text = await compose_private_alpha_save_response(
+                    metadata=result_followup_metadata_from_run(run),
+                    user_message=chat_request_message(payload),
+                )
+                if assistant_text is None:
+                    assistant_text = fallback_private_alpha_save_response()
             else:
                 strategy = save_strategy_from_run(user=user, run=run)
                 metadata.update(saved_strategy_metadata(run, strategy.id))
@@ -900,9 +926,7 @@ async def chat_stream(
                     assistant_message=persisted_text,
                     current_run=run,
                     message_id=(
-                        assistant_message.id
-                        if assistant_message is not None
-                        else None
+                        assistant_message.id if assistant_message is not None else None
                     ),
                 )
                 return

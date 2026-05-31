@@ -213,11 +213,15 @@ Required proof:
 
 Minimum local commands:
 
-- `NUMBA_DISABLE_JIT=1 poetry run pytest -q`
+- `poetry run pytest -q`
 - `poetry run ruff check src tests`
 - `cd web && bun test`
 - `cd web && bun run lint`
 - `cd web && bun run build`
+
+Use `NUMBA_DISABLE_JIT=1` only as a narrowly documented local workaround for
+known Numba/vectorbt environment failures. Do not include it in the default test
+path unless the failure has been reproduced and the non-JIT fallback is proven.
 
 If CI is unavailable or not run, the closure report must say so plainly.
 

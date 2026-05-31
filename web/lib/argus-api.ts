@@ -6,6 +6,12 @@ import type {
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
 import { normalizeEnabledLanguage } from "./language-features";
+import {
+  displayResultActionLabel,
+  displayResultBenchmarkNote,
+  displayResultMetricLabel,
+  resultMetricDisplayOrder,
+} from "./result-card-display";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -58,7 +64,7 @@ export type ConversationResultCard = {
   };
   status_label: string;
   rows: ApiMetricRow[];
-  benchmark_note?: string;
+  benchmark_note?: string | null;
   assumptions: string[];
   actions: ChatActionOption[];
   chart?: ResultChartPayload | null;
@@ -111,6 +117,17 @@ export type ApiUser = {
     language_confirmed: boolean;
     primary_goal: PrimaryGoal | null;
   };
+};
+
+type AuthSessionPayload = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+};
+
+type AuthResponsePayload = {
+  session?: AuthSessionPayload | null;
+  user?: Record<string, unknown> | null;
 };
 
 /** Backend message shape (distinct from the frontend chat Message type) */
@@ -264,20 +281,32 @@ export type ApiLanguage = "en" | "es-419";
 
 export function resultCardFromConversationCard(
   card: ConversationResultCard,
-  run?: Pick<BacktestRun, "id" | "strategy_id">,
+  run?: Pick<BacktestRun, "id" | "strategy_id"> &
+    Partial<Pick<BacktestRun, "benchmark_symbol" | "config_snapshot">>,
 ) {
+  const rows = [...card.rows].sort(
+    (a, b) => resultMetricDisplayOrder(a) - resultMetricDisplayOrder(b),
+  );
+
   return {
     strategyName: card.title,
     strategyLabel: card.strategy_label,
     symbols: card.symbols,
     period: card.date_range.display,
     statusLabel: card.status_label,
-    metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
-    benchmarkNote: card.benchmark_note,
+    metrics: rows.map((row) => ({
+      label: displayResultMetricLabel(row, run?.benchmark_symbol),
+      value: row.value,
+    })),
+    benchmarkNote: displayResultBenchmarkNote(card.benchmark_note),
     assumptions: card.assumptions,
+    configSnapshot: run?.config_snapshot,
     runId: run?.id,
     strategyId: run?.strategy_id ?? null,
-    actions: card.actions,
+    actions: card.actions.map((action) => ({
+      ...action,
+      label: displayResultActionLabel(action),
+    })),
     chart: card.chart ?? null,
   };
 }
@@ -288,6 +317,7 @@ export function resultCardFromRun(run: BacktestRun) {
     symbols: run.symbols,
     template: String(run.config_snapshot?.template ?? ""),
     assetClass: run.asset_class,
+    configSnapshot: run.config_snapshot,
   };
 }
 
@@ -343,6 +373,7 @@ async function apiFetch<T>(
   console.log(`[argus-api] Fetching ${API_BASE}${path}`, options);
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...authHeaders, ...(options?.headers || {}) },
+    credentials: "include",
     ...options,
   });
   if (!response.ok) {
@@ -361,6 +392,50 @@ async function apiFetch<T>(
     throw error;
   }
   return response.json() as Promise<T>;
+}
+
+async function unauthenticatedApiFetch<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers || {}),
+    },
+    credentials: "include",
+    ...options,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const detail = (body as { detail?: unknown }).detail;
+    const message =
+      typeof detail === "object" && detail !== null && "detail" in detail
+        ? String((detail as { detail?: unknown }).detail ?? "")
+        : typeof detail === "string"
+          ? detail
+          : `API error ${response.status}`;
+    const error = new Error(message) as Error & { status: number; code: string };
+    error.status = response.status;
+    error.code = String((body as Record<string, unknown>).code ?? "unknown");
+    throw error;
+  }
+  return response.json() as Promise<T>;
+}
+
+async function persistBrowserSession(payload: AuthResponsePayload) {
+  const session = payload.session;
+  if (!session?.access_token || !session.refresh_token) {
+    return;
+  }
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return;
+  }
+  await supabase.auth.setSession({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+  });
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -395,6 +470,37 @@ export async function getStarterPrompts() {
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export async function signupWithEmail(payload: {
+  email: string;
+  password: string;
+  display_name?: string | null;
+  username?: string | null;
+}) {
+  const response = await unauthenticatedApiFetch<AuthResponsePayload>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  await persistBrowserSession(response);
+  return response;
+}
+
+export async function loginWithEmail(payload: { email: string; password: string }) {
+  const response = await unauthenticatedApiFetch<AuthResponsePayload>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  await persistBrowserSession(response);
+  return response;
+}
+
+export async function logoutFromApi() {
+  try {
+    return await apiFetch<{ success: boolean }>("/auth/logout", { method: "POST" });
+  } finally {
+    await getSupabaseClient()?.auth.signOut().catch(() => null);
+  }
+}
 
 export async function createConversation(language?: string | null) {
   const payload: { title: null; language?: ApiLanguage } = { title: null };

@@ -72,6 +72,7 @@ export type StrategyResultPayload = {
   symbols?: string[];
   template?: string;
   assetClass?: AssetClass;
+  configSnapshot?: Record<string, unknown>;
   period: string;
   benchmarkNote?: string;
   statusLabel?: string;

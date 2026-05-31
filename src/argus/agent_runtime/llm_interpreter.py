@@ -225,11 +225,28 @@ class LatestResultRoutingAudit(BaseModel):
             "latest completed result artifact instead of general capability copy."
         )
     )
+    save_requested: bool = Field(
+        default=False,
+        description=(
+            "True when the user is asking to save, keep, bookmark, or promote "
+            "the latest completed result artifact."
+        ),
+    )
     focus: ResultFollowupFocus | None = Field(
         default=None,
         description=(
             "Closest result follow-up focus when targets_latest_result is true."
         ),
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class LatestResultSaveAudit(BaseModel):
+    save_requested: bool = Field(
+        description=(
+            "True only when the user is asking to save, keep, bookmark, or "
+            "promote the latest completed result artifact."
+        )
     )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
@@ -656,7 +673,10 @@ class OpenRouterStructuredInterpreter:
             "about a visible confirmation or draft should set semantic_turn_act="
             "result_followup and result_followup_focus=assumptions even when no "
             "completed run exists; use the active draft/card context instead of "
-            "regenerating a new card. "
+            "regenerating a new card. If the user asks to save, keep, bookmark, "
+            "or promote the latest completed result, set semantic_turn_act="
+            "result_followup, result_followup_focus=general, artifact_target="
+            "latest_result, and include reason_codes=['latest_result_save_requested']. "
             "Set artifact_target to latest_result only when the current user message "
             "is actually about the latest completed run. Set artifact_target to "
             "pending_refinement when the user is answering a Refine strategy prompt. "
@@ -3272,6 +3292,15 @@ async def _latest_result_routing_audited_response(
         return response
     if not audit.targets_latest_result or audit.confidence < 0.6:
         return response
+    save_requested = audit.save_requested
+    if not save_requested:
+        save_requested = await _latest_result_save_request_audit(
+            preferred_model=preferred_model,
+            request=request,
+        )
+    reason_codes = ["latest_result_routing_audit"]
+    if save_requested:
+        reason_codes.append("latest_result_save_requested")
     return response.model_copy(
         update={
             "intent": "conversation_followup",
@@ -3288,7 +3317,7 @@ async def _latest_result_routing_audited_response(
                 dict.fromkeys(
                     [
                         *response.reason_codes,
-                        "latest_result_routing_audit",
+                        *reason_codes,
                     ]
                 )
             ),
@@ -3304,9 +3333,9 @@ def _response_needs_latest_result_routing_audit(
     if not _request_has_latest_result(request):
         return False
     if response.semantic_turn_act == "result_followup":
-        return response.result_followup_focus in (None, "general", "what_tested")
+        return True
     if response.intent == "results_explanation":
-        return False
+        return True
     if _llm_strategy_draft_has_executable_shape(response.candidate_strategy_draft):
         return response.task_relation == "continue"
     if _llm_strategy_draft_has_extractable_fields(response.candidate_strategy_draft):
@@ -3351,7 +3380,12 @@ def _latest_result_routing_audit_messages(
                 "not depend on the latest result. If the primary interpreter copied "
                 "symbols, dates, timeframe, or strategy labels out of the latest "
                 "result but did not produce a new executable rule, treat that as "
-                "latest-result context rather than a new strategy. Use "
+                "latest-result context rather than a new strategy. Set "
+                "save_requested=true when the user is asking to save, keep, "
+                "bookmark, or promote the latest completed result artifact. "
+                "Examples that must set save_requested=true when a latest result "
+                "exists: 'save this', 'save this result', 'keep this', "
+                "'bookmark this run', 'save that strategy from the result'. Use "
                 "why_underperformed for questions that ask why a result matched, "
                 "beat, lagged, or compared with its benchmark; use what_tested only "
                 "when the user is asking for the run setup itself."
@@ -3372,6 +3406,56 @@ def _latest_result_routing_audit_messages(
         },
         {"role": "user", "content": request.current_user_message},
     ]
+
+
+async def _latest_result_save_request_audit(
+    *,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> bool:
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="interpretation",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Argus's latest-result save-intent audit. "
+                        "Classify only whether the current user message asks to "
+                        "save, keep, bookmark, store, or promote the latest "
+                        "completed result artifact. Return false for explanation, "
+                        "breakdown, refinement, rerun, or education requests. "
+                        "If a latest result exists, messages like 'save this', "
+                        "'save this result', 'keep this', 'bookmark this run', "
+                        "or 'save that strategy from the result' are save requests."
+                    ),
+                },
+                {
+                    "role": "system",
+                    "content": (
+                        "Latest result fact bank JSON: "
+                        + json.dumps(_latest_result_fact_bank_for_routing(request))
+                    ),
+                },
+                {"role": "user", "content": request.current_user_message},
+            ],
+            schema_model=LatestResultSaveAudit,
+            schema_name="LatestResultSaveAudit",
+            model_name=preferred_model,
+        )
+    except Exception as exc:
+        log_openrouter_failure(
+            task="interpretation",
+            model_name=preferred_model,
+            exc=exc,
+            message="Latest result save-intent audit failed; preserving routing audit",
+        )
+        return False
+    return bool(
+        isinstance(audit, LatestResultSaveAudit)
+        and audit.save_requested
+        and audit.confidence >= 0.6
+    )
 
 
 def _latest_result_fact_bank_for_routing(

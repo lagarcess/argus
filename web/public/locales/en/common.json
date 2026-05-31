@@ -55,8 +55,11 @@
     "rating_placeholder": "Tell us more about your experience...",
     "details_placeholder": "What's on your mind?",
     "attachments": "Attachments",
+    "attachments_with_count": "Attachments ({{count}}/5)",
     "attach_files": "Click to attach files (max 5)",
+    "attach_files_feature": "Optional: add a screenshot, sketch, or example.",
     "consent": "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
+    "consent_feature": "I consent to the Argus team using this feature request and contacting me if follow-up would help.",
     "rating_positive_prompt": "What went well?",
     "rating_negative_prompt": "What went wrong?",
     "subheading": {
@@ -87,7 +90,8 @@
     "placeholder_details": "Share details (optional)",
     "success": "Thank you for your feedback!",
     "error": "Failed to send feedback. Please try again.",
-    "footer_note": "Your conversation will be included with your feedback to help improve Argus.",
+    "footer_note": "App context like this page and timestamp may be included to help us understand this feedback.",
+    "footer_note_conversation": "Your current conversation context may be included to help us understand this feedback.",
     "tags": {
       "positive": {
         "accurate": "Accurate and complete",
@@ -151,6 +155,9 @@
     "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
     "error_load": "Could not load that conversation. Try again.",
     "error_backtest": "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
+    "result_trust_strip": "Historical simulation · No fees/slippage · Not advice",
+    "result_trust_strip_label": "Result trust context",
+    "view_details": "View details",
     "new_chat_ready": "New chat ready. What idea should we test?",
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
     "try_new_strategy": "Try a new strategy",
@@ -181,6 +188,45 @@
     "saved": "Saved",
     "saving": "Saving",
     "simulation_complete": "Simulation Complete",
+    "result_card": {
+      "ending_value": "Ending value",
+      "total_return": "Total return",
+      "compared_with_benchmark": "Compared with benchmark",
+      "compared_with_symbol": "Compared with {{symbol}}",
+      "worst_drop": "Worst drop",
+      "explain_result": "Explain result",
+      "refine_idea": "Refine idea",
+      "save": "Save",
+      "unavailable": "Unavailable",
+      "return_unavailable": "return unavailable",
+      "change": "change",
+      "gain": "gain",
+      "loss": "loss",
+      "total_return_suffix": "total return",
+      "benchmark_unavailable": "Benchmark unavailable",
+      "percentage_points": "{{value}} percentage points",
+      "in_line_with": "In line with {{symbol}}",
+      "beat_by": "Beat by {{value}}",
+      "lagged_by": "Lagged by {{value}}",
+      "details": {
+        "starting_capital": "Starting capital",
+        "date_range": "Date range",
+        "timeframe": "Timeframe",
+        "side": "Side",
+        "allocation": "Allocation",
+        "benchmark": "Benchmark",
+        "cadence": "Cadence",
+        "contribution": "Contribution",
+        "entry_rule": "Entry rule",
+        "exit_rule": "Exit rule"
+      },
+      "timeframe": {
+        "daily": "Daily data",
+        "hourly": "Hourly data",
+        "interval": "{{amount}}-{{unit}} data",
+        "generic": "{{value}} data"
+      }
+    },
       "status": {
         "understanding": "Thinking...",
         "interpret": "Understanding your idea...",
@@ -301,6 +347,8 @@
       "deleted_retention_note": "Items stay here temporarily before permanent deletion.",
       "deleted_item_note": "Eligible for permanent deletion soon",
       "no_deleted_items": "No recently deleted items",
+      "chat_item": "Chat",
+      "strategy_item": "Strategy",
       "delete_all_conversations": "Delete all conversations",
       "security": "Security"
     },
@@ -400,6 +448,20 @@
       "errors": {
         "supabase_not_configured": "Supabase auth is not configured."
       }
+    },
+    "signup": {
+      "subtitle": "Create your private alpha account",
+      "name_placeholder": "Name",
+      "submit": "Sign up",
+      "loading": "Creating account...",
+      "new_account": "new to argus?"
+    },
+    "password": {
+      "show": "Show password",
+      "hide": "Hide password"
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again."
     }
   },
   "landing": {
