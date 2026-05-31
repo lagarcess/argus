@@ -1,6 +1,7 @@
 import { ChevronDown, ListTree, PencilLine, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
+  type ResultCardDisplayCopy,
   displayResultActionLabel,
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
@@ -22,8 +23,12 @@ export default function StrategyResultCard({
   onAction,
   result,
 }: StrategyResultCardProps) {
-  const { t } = useTranslation();
-  const view = heroDeltaEvidenceView(result);
+  const { t, i18n } = useTranslation();
+  const resultCardCopy = resultDisplayCopy(t);
+  const view = heroDeltaEvidenceView(result, {
+    copy: resultCardCopy,
+    locale: i18n.language,
+  });
   const symbols = result.symbols ?? [];
   const resultActions = result.actions ?? [];
   const showBreakdownAction = resultActions.find(
@@ -61,12 +66,7 @@ export default function StrategyResultCard({
       : view.hero.tone === "negative"
         ? "text-[#d66d75]"
         : "text-[#5a677d] dark:text-[#7da0ca]";
-  const trustGroups = [
-    t(
-      "chat.result_trust_strip",
-      "Historical simulation · No fees/slippage · Not advice",
-    ),
-  ];
+  const trustGroups = view.trustGroups;
 
   return (
     <section
@@ -137,7 +137,7 @@ export default function StrategyResultCard({
               className={actionClassName}
             >
               <ResultActionIcon action={action} />
-              {displayResultActionLabel(action)}
+              {displayResultActionLabel(action, { copy: resultCardCopy })}
             </button>
           ))}
           {showSavedState && (
@@ -187,55 +187,10 @@ function StatItem({
       <dd
         className={`mt-1.5 leading-snug tracking-[-0.08px] ${isBenchmark ? "text-[15px] font-normal text-[#505a63] dark:text-[#8d969e] sm:whitespace-nowrap" : "text-[16px] font-medium text-[#191c1f] dark:text-white"}`}
       >
-        {isBenchmark ? <BenchmarkValue value={metric.value} /> : metric.value}
+        {metric.value}
       </dd>
     </div>
   );
-}
-
-function BenchmarkValue({ value }: { value: string }) {
-  const beatPrefix = "Beat by ";
-  const laggedPrefix = "Lagged by ";
-
-  if (value.startsWith(beatPrefix)) {
-    const remainder = value.slice(beatPrefix.length);
-    const firstSpaceIndex = remainder.indexOf(" ");
-    const numericValue =
-      firstSpaceIndex >= 0 ? remainder.slice(0, firstSpaceIndex) : remainder;
-    const unitLabel = firstSpaceIndex >= 0 ? remainder.slice(firstSpaceIndex) : "";
-
-    return (
-      <>
-        <span className="font-medium text-[#191c1f] dark:text-white">Beat</span>{" "}
-        <span>by </span>
-        <span className="font-medium text-[#191c1f] dark:text-white">
-          {numericValue}
-        </span>
-        <span>{unitLabel}</span>
-      </>
-    );
-  }
-
-  if (value.startsWith(laggedPrefix)) {
-    const remainder = value.slice(laggedPrefix.length);
-    const firstSpaceIndex = remainder.indexOf(" ");
-    const numericValue =
-      firstSpaceIndex >= 0 ? remainder.slice(0, firstSpaceIndex) : remainder;
-    const unitLabel = firstSpaceIndex >= 0 ? remainder.slice(firstSpaceIndex) : "";
-
-    return (
-      <>
-        <span className="font-medium text-[#191c1f] dark:text-white">Lagged</span>{" "}
-        <span>by </span>
-        <span className="font-medium text-[#191c1f] dark:text-white">
-          {numericValue}
-        </span>
-        <span>{unitLabel}</span>
-      </>
-    );
-  }
-
-  return value;
 }
 
 function TrustRail({ groups }: { groups: string[] }) {
@@ -309,4 +264,93 @@ function AssetSymbols({ symbols }: { symbols: string[] }) {
       ))}
     </span>
   );
+}
+
+function resultDisplayCopy(t: ReturnType<typeof useTranslation>["t"]): ResultCardDisplayCopy {
+  return {
+    endingValueLabel: t("chat.result_card.ending_value", "Ending value"),
+    totalReturnLabel: t("chat.result_card.total_return", "Total return"),
+    comparedWithBenchmarkLabel: t(
+      "chat.result_card.compared_with_benchmark",
+      "Compared with benchmark",
+    ),
+    comparedWithSymbolLabel: (symbol) =>
+      t("chat.result_card.compared_with_symbol", {
+        defaultValue: "Compared with {{symbol}}",
+        symbol,
+      }),
+    worstDropLabel: t("chat.result_card.worst_drop", "Worst drop"),
+    explainResultAction: t("chat.result_card.explain_result", "Explain result"),
+    refineIdeaAction: t("chat.result_card.refine_idea", "Refine idea"),
+    saveAction: t("chat.result_card.save", "Save"),
+    unavailable: t("chat.result_card.unavailable", "Unavailable"),
+    returnUnavailable: t(
+      "chat.result_card.return_unavailable",
+      "return unavailable",
+    ),
+    changeNoun: t("chat.result_card.change", "change"),
+    gainNoun: t("chat.result_card.gain", "gain"),
+    lossNoun: t("chat.result_card.loss", "loss"),
+    totalReturnSuffix: t(
+      "chat.result_card.total_return_suffix",
+      "total return",
+    ),
+    benchmarkUnavailable: t(
+      "chat.result_card.benchmark_unavailable",
+      "Benchmark unavailable",
+    ),
+    percentagePoints: (value) =>
+      t("chat.result_card.percentage_points", {
+        defaultValue: "{{value}} percentage points",
+        value,
+      }),
+    inLineWith: (symbol) =>
+      t("chat.result_card.in_line_with", {
+        defaultValue: "In line with {{symbol}}",
+        symbol,
+      }),
+    beatBy: (value) =>
+      t("chat.result_card.beat_by", {
+        defaultValue: "Beat by {{value}}",
+        value,
+      }),
+    laggedBy: (value) =>
+      t("chat.result_card.lagged_by", {
+        defaultValue: "Lagged by {{value}}",
+        value,
+      }),
+    trustStrip: t(
+      "chat.result_trust_strip",
+      "Historical simulation · No fees/slippage · Not advice",
+    ),
+    startingCapitalLabel: t(
+      "chat.result_card.details.starting_capital",
+      "Starting capital",
+    ),
+    dateRangeLabel: t("chat.result_card.details.date_range", "Date range"),
+    timeframeLabel: t("chat.result_card.details.timeframe", "Timeframe"),
+    sideLabel: t("chat.result_card.details.side", "Side"),
+    allocationLabel: t("chat.result_card.details.allocation", "Allocation"),
+    benchmarkLabel: t("chat.result_card.details.benchmark", "Benchmark"),
+    cadenceLabel: t("chat.result_card.details.cadence", "Cadence"),
+    contributionLabel: t(
+      "chat.result_card.details.contribution",
+      "Contribution",
+    ),
+    entryRuleLabel: t("chat.result_card.details.entry_rule", "Entry rule"),
+    exitRuleLabel: t("chat.result_card.details.exit_rule", "Exit rule"),
+    dailyData: t("chat.result_card.timeframe.daily", "Daily data"),
+    hourlyData: t("chat.result_card.timeframe.hourly", "Hourly data"),
+    intervalData: (amount, unit) =>
+      t("chat.result_card.timeframe.interval", {
+        amount,
+        defaultValue: "{{amount}}-{{unit}} data",
+        unit,
+      }),
+    timeframeData: (value) =>
+      t("chat.result_card.timeframe.generic", {
+        defaultValue: "{{value}} data",
+        value,
+      }),
+  };
 }

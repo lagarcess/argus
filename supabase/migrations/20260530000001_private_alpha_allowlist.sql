@@ -23,34 +23,3 @@ drop trigger if exists set_private_alpha_allowlist_updated_at
 create trigger set_private_alpha_allowlist_updated_at
 before update on public.private_alpha_allowlist
 for each row execute function public.set_updated_at();
-
-insert into public.private_alpha_allowlist (
-  email,
-  role
-)
-values
-  (
-    'lagarces1@gmail.com',
-    'admin'
-  ),
-  (
-    'developer@argus.local',
-    'developer'
-  ),
-  (
-    'garceslg3@gmail.com',
-    'user'
-  ),
-  (
-    'dev@argus.io',
-    'user'
-  )
-on conflict (email) do update
-set
-  role = excluded.role,
-  disabled_at = null,
-  updated_at = now();
-
-update public.profiles
-set is_admin = true, updated_at = now()
-where lower(email) = 'lagarces1@gmail.com';

@@ -11,8 +11,99 @@ type ActionLike = {
   label?: string;
 };
 
-function benchmarkLabel(benchmarkSymbol?: string | null) {
-  return benchmarkSymbol ? `Compared with ${benchmarkSymbol}` : "Compared with benchmark";
+export type ResultCardDisplayCopy = {
+  endingValueLabel: string;
+  totalReturnLabel: string;
+  comparedWithBenchmarkLabel: string;
+  comparedWithSymbolLabel: (symbol: string) => string;
+  worstDropLabel: string;
+  explainResultAction: string;
+  refineIdeaAction: string;
+  saveAction: string;
+  unavailable: string;
+  returnUnavailable: string;
+  changeNoun: string;
+  gainNoun: string;
+  lossNoun: string;
+  totalReturnSuffix: string;
+  benchmarkUnavailable: string;
+  percentagePoints: (value: string) => string;
+  inLineWith: (symbol: string) => string;
+  beatBy: (value: string) => string;
+  laggedBy: (value: string) => string;
+  trustStrip: string;
+  startingCapitalLabel: string;
+  dateRangeLabel: string;
+  timeframeLabel: string;
+  sideLabel: string;
+  allocationLabel: string;
+  benchmarkLabel: string;
+  cadenceLabel: string;
+  contributionLabel: string;
+  entryRuleLabel: string;
+  exitRuleLabel: string;
+  dailyData: string;
+  hourlyData: string;
+  intervalData: (amount: number, unit: string) => string;
+  timeframeData: (value: string) => string;
+};
+
+export type ResultCardDisplayOptions = {
+  copy?: Partial<ResultCardDisplayCopy>;
+  locale?: string;
+};
+
+export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
+  endingValueLabel: "Ending value",
+  totalReturnLabel: "Total return",
+  comparedWithBenchmarkLabel: "Compared with benchmark",
+  comparedWithSymbolLabel: (symbol) => `Compared with ${symbol}`,
+  worstDropLabel: "Worst drop",
+  explainResultAction: "Explain result",
+  refineIdeaAction: "Refine idea",
+  saveAction: "Save",
+  unavailable: "Unavailable",
+  returnUnavailable: "return unavailable",
+  changeNoun: "change",
+  gainNoun: "gain",
+  lossNoun: "loss",
+  totalReturnSuffix: "total return",
+  benchmarkUnavailable: "Benchmark unavailable",
+  percentagePoints: (value) => `${value} percentage points`,
+  inLineWith: (symbol) => `In line with ${symbol}`,
+  beatBy: (value) => `Beat by ${value}`,
+  laggedBy: (value) => `Lagged by ${value}`,
+  trustStrip: "Historical simulation · No fees/slippage · Not advice",
+  startingCapitalLabel: "Starting capital",
+  dateRangeLabel: "Date range",
+  timeframeLabel: "Timeframe",
+  sideLabel: "Side",
+  allocationLabel: "Allocation",
+  benchmarkLabel: "Benchmark",
+  cadenceLabel: "Cadence",
+  contributionLabel: "Contribution",
+  entryRuleLabel: "Entry rule",
+  exitRuleLabel: "Exit rule",
+  dailyData: "Daily data",
+  hourlyData: "Hourly data",
+  intervalData: (amount, unit) => `${amount}-${unit} data`,
+  timeframeData: (value) => `${value} data`,
+};
+
+function resultCardCopy(options?: ResultCardDisplayOptions) {
+  return {
+    ...defaultResultCardDisplayCopy,
+    ...options?.copy,
+  };
+}
+
+function benchmarkLabel(
+  benchmarkSymbol: string | null | undefined,
+  copy = defaultResultCardDisplayCopy,
+) {
+  return benchmarkSymbol
+    ? copy.comparedWithSymbolLabel(benchmarkSymbol)
+    : copy.comparedWithBenchmarkLabel;
 }
 
 export function resultMetricDisplayOrder(metric: MetricLike) {
@@ -55,13 +146,15 @@ export function resultMetricDisplayOrder(metric: MetricLike) {
 export function displayResultMetricLabel(
   metric: MetricLike,
   benchmarkSymbol?: string | null,
+  options?: ResultCardDisplayOptions,
 ) {
+  const copy = resultCardCopy(options);
   if (
     metric.key === "total_return_pct" ||
     metric.label === "Total Return (%)" ||
     metric.label === "Total Return"
   ) {
-    return "Total return";
+    return copy.totalReturnLabel;
   }
   if (
     metric.key === "cash_value" ||
@@ -69,14 +162,14 @@ export function displayResultMetricLabel(
     metric.label === "Cash Value ($)" ||
     metric.label === "Final Value ($)"
   ) {
-    return "Ending value";
+    return copy.endingValueLabel;
   }
   if (
     metric.key === "max_drawdown_pct" ||
     metric.key === "max_drawdown" ||
     metric.label === "Max Drawdown"
   ) {
-    return "Worst drop";
+    return copy.worstDropLabel;
   }
   if (
     metric.key === "benchmark_delta" ||
@@ -86,20 +179,24 @@ export function displayResultMetricLabel(
     if (metric.label.startsWith("Compared with ")) {
       return metric.label;
     }
-    return benchmarkLabel(benchmarkSymbol);
+    return benchmarkLabel(benchmarkSymbol, copy);
   }
   return metric.label;
 }
 
-export function displayResultActionLabel(action: ActionLike) {
+export function displayResultActionLabel(
+  action: ActionLike,
+  options?: ResultCardDisplayOptions,
+) {
+  const copy = resultCardCopy(options);
   if (action.type === "show_breakdown") {
-    return "Explain result";
+    return copy.explainResultAction;
   }
   if (action.type === "refine_strategy") {
-    return "Refine idea";
+    return copy.refineIdeaAction;
   }
   if (action.type === "save_strategy") {
-    return "Save";
+    return copy.saveAction;
   }
   return action.label ?? "";
 }
@@ -143,62 +240,92 @@ type HeroDeltaEvidenceView = {
 
 const CURRENCY_VALUE_PATTERN = /[-+]?\$[\d,]+(?:\.\d+)?\s?[KMBkmb]?/g;
 const PERCENT_VALUE_PATTERN = /[-+]?\d+(?:\.\d+)?%/;
-const TRUST_STRIP = "Historical simulation · No fees/slippage · Not advice";
-
 export function heroDeltaEvidenceView(
   result: StrategyResultPayload,
+  options?: ResultCardDisplayOptions,
 ): HeroDeltaEvidenceView {
-  const endingValue = findMetric(result, "Ending value");
-  const totalReturn = findMetric(result, "Total return");
-  const benchmark = findMetricByPrefix(result, "Compared with");
-  const worstDrop = findMetric(result, "Worst drop");
-  const parsedEndingValue = parseEndingValue(endingValue?.value);
+  const copy = resultCardCopy(options);
+  const endingValue = findMetric(result, [
+    copy.endingValueLabel,
+    "Ending value",
+    "Cash Value ($)",
+    "Final Value ($)",
+  ]);
+  const totalReturn = findMetric(result, [
+    copy.totalReturnLabel,
+    "Total return",
+    "Total Return",
+    "Total Return (%)",
+  ]);
+  const benchmark = findBenchmarkMetric(result, copy);
+  const worstDrop = findMetric(result, [
+    copy.worstDropLabel,
+    "Worst drop",
+    "Max Drawdown",
+  ]);
+  const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
   const totalReturnValue = normalizeSignedPercent(totalReturn?.value);
   const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
-  const facts = executionFacts(result, parsedEndingValue?.start);
+  const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
+  const benchmarkSymbol = facts.benchmark ?? benchmarkSymbolFromMetric(benchmark);
 
   return {
     hero: {
-      value: parsedEndingValue?.endingDisplay ?? endingValue?.value ?? "Unavailable",
-      label: "Ending value",
-      detail: heroDetail(parsedEndingValue?.change, totalReturnValue),
+      value: parsedEndingValue?.endingDisplay ?? endingValue?.value ?? copy.unavailable,
+      label: copy.endingValueLabel,
+      detail: heroDetail(parsedEndingValue?.change, totalReturnValue, copy, options?.locale),
       tone,
     },
     benchmark: {
-      label: benchmark?.label ?? "Compared with benchmark",
-      value: benchmarkDisplayValue(benchmark),
+      label: benchmarkLabel(benchmarkSymbol, copy),
+      value: benchmarkDisplayValue(benchmark, copy),
     },
     worstDrop: {
-      label: "Worst drop",
-      value: worstDrop?.value ?? "Unavailable",
+      label: copy.worstDropLabel,
+      value: worstDrop?.value ?? copy.unavailable,
     },
     timeframeDisplay: facts.timeframeDisplay,
-    trustGroups: compactTrustGroups(),
+    trustGroups: compactTrustGroups(copy),
     details: facts.details,
   };
 }
 
-export function compactTrustGroups() {
-  return [TRUST_STRIP];
+export function compactTrustGroups(copy = defaultResultCardDisplayCopy) {
+  return [copy.trustStrip];
 }
 
-export function compactTrustStrip() {
-  return compactTrustGroups().join(" · ");
+export function compactTrustStrip(copy = defaultResultCardDisplayCopy) {
+  return compactTrustGroups(copy).join(" · ");
 }
 
-function findMetric(result: StrategyResultPayload, label: string) {
+function findMetric(result: StrategyResultPayload, labels: string[]) {
+  const normalizedLabels = labels.map((label) => label.toLowerCase());
   return result.metrics.find(
-    (metric) => metric.label.toLowerCase() === label.toLowerCase(),
+    (metric) => normalizedLabels.includes(metric.label.toLowerCase()),
   );
 }
 
-function findMetricByPrefix(result: StrategyResultPayload, prefix: string) {
+function findBenchmarkMetric(
+  result: StrategyResultPayload,
+  copy = defaultResultCardDisplayCopy,
+) {
+  const labels = [
+    "vs benchmark",
+    "compared with ",
+    "comparado con ",
+    copy.comparedWithBenchmarkLabel.toLowerCase(),
+  ];
   return result.metrics.find((metric) =>
-    metric.label.toLowerCase().startsWith(prefix.toLowerCase()),
+    labels.some((label) => metric.label.toLowerCase().startsWith(label)),
   );
 }
 
-function executionFacts(result: StrategyResultPayload, parsedStartingCapital?: number) {
+function executionFacts(
+  result: StrategyResultPayload,
+  parsedStartingCapital: number | undefined,
+  copy: ResultCardDisplayCopy,
+  locale?: string,
+) {
   const assumptions = normalizedAssumptions(result);
   const config = result.configSnapshot;
   const resolvedParameters = recordValue(config?.resolved_parameters);
@@ -213,7 +340,7 @@ function executionFacts(result: StrategyResultPayload, parsedStartingCapital?: n
     assumptionValue(assumptions, "Benchmark") ??
     benchmarkFromMetric(result);
   const contribution =
-    contributionFromStructuredFacts(resolvedParameters, parameters) ??
+    contributionFromStructuredFacts(resolvedParameters, parameters, locale) ??
     contributionFromAssumptions(assumptions);
   const entryRule = assumptionValue(assumptions, "Entry");
   const exitRule = assumptionValue(assumptions, "Exit");
@@ -226,20 +353,21 @@ function executionFacts(result: StrategyResultPayload, parsedStartingCapital?: n
   const details: EvidenceMetric[] = [
     startingCapital == null
       ? undefined
-      : { label: "Starting capital", value: formatCurrency(startingCapital) },
-    { label: "Date range", value: result.period },
-    timeframe ? { label: "Timeframe", value: timeframe } : undefined,
-    side ? { label: "Side", value: side } : undefined,
-    allocation ? { label: "Allocation", value: allocation } : undefined,
-    benchmark ? { label: "Benchmark", value: benchmark } : undefined,
-    contribution?.cadence ? { label: "Cadence", value: contribution.cadence } : undefined,
-    contribution?.amount ? { label: "Contribution", value: contribution.amount } : undefined,
-    entryRule ? { label: "Entry rule", value: entryRule } : undefined,
-    exitRule ? { label: "Exit rule", value: exitRule } : undefined,
+      : { label: copy.startingCapitalLabel, value: formatCurrency(startingCapital, locale) },
+    { label: copy.dateRangeLabel, value: result.period },
+    timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
+    side ? { label: copy.sideLabel, value: side } : undefined,
+    allocation ? { label: copy.allocationLabel, value: allocation } : undefined,
+    benchmark ? { label: copy.benchmarkLabel, value: benchmark } : undefined,
+    contribution?.cadence ? { label: copy.cadenceLabel, value: contribution.cadence } : undefined,
+    contribution?.amount ? { label: copy.contributionLabel, value: contribution.amount } : undefined,
+    entryRule ? { label: copy.entryRuleLabel, value: entryRule } : undefined,
+    exitRule ? { label: copy.exitRuleLabel, value: exitRule } : undefined,
   ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 
   return {
-    timeframeDisplay: formatTimeframeForDisplay(timeframe),
+    timeframeDisplay: formatTimeframeForDisplay(timeframe, copy),
+    benchmark,
     details,
   };
 }
@@ -288,6 +416,7 @@ function contributionFromAssumptions(assumptions: string[]) {
 function contributionFromStructuredFacts(
   resolvedParameters?: Record<string, unknown>,
   parameters?: Record<string, unknown>,
+  locale?: string,
 ) {
   const rawCadence =
     stringValue(resolvedParameters?.cadence) ?? stringValue(parameters?.dca_cadence);
@@ -297,7 +426,7 @@ function contributionFromStructuredFacts(
   const amount = numberValue(resolvedParameters?.capital_amount);
   return {
     cadence,
-    amount: amount == null ? undefined : formatCurrency(amount),
+    amount: amount == null ? undefined : formatCurrency(amount, locale),
   };
 }
 
@@ -305,26 +434,29 @@ function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-export function formatTimeframeForDisplay(timeframe?: string) {
+export function formatTimeframeForDisplay(
+  timeframe?: string,
+  copy = defaultResultCardDisplayCopy,
+) {
   const value = timeframe?.trim();
   if (!value) return undefined;
 
   const normalized = value.toLowerCase().replace(/\s+/g, "");
   if (normalized === "daily" || normalized === "1d" || normalized === "1day") {
-    return "Daily data";
+    return copy.dailyData;
   }
   if (normalized === "hourly" || normalized === "1h" || normalized === "1hour") {
-    return "Hourly data";
+    return copy.hourlyData;
   }
 
   const compactMatch = normalized.match(/^(\d+)(m|minute|minutes|h|hour|hours|d|day|days|w|week|weeks)$/);
   if (compactMatch) {
     const amount = Number(compactMatch[1]);
     const unit = compactMatch[2][0];
-    return `${amount}-${timeframeUnitLabel(unit)} data`;
+    return copy.intervalData(amount, timeframeUnitLabel(unit));
   }
 
-  return `${value} data`;
+  return copy.timeframeData(value);
 }
 
 function timeframeUnitLabel(unit: string) {
@@ -342,12 +474,19 @@ function sentenceCase(value: string) {
 }
 
 function benchmarkFromMetric(result: StrategyResultPayload) {
-  const metric = findMetricByPrefix(result, "Compared with");
+  const metric = findBenchmarkMetric(result);
   const match = metric?.label.match(/^Compared with\s+(.+)$/i);
-  return match?.[1]?.trim();
+  return match?.[1]?.trim() ?? benchmarkSymbolFromMetric(metric);
 }
 
-function parseEndingValue(value?: string) {
+function benchmarkSymbolFromMetric(metric?: EvidenceMetric) {
+  const valueSymbol = metric?.value.match(/\bvs\s+([A-Z0-9.-]+)\b/i)?.[1];
+  if (valueSymbol) return valueSymbol;
+  const labelSymbol = metric?.label.match(/^Compared with\s+(.+)$/i)?.[1]?.trim();
+  return labelSymbol;
+}
+
+function parseEndingValue(value?: string, locale?: string) {
   const matches = value?.match(CURRENCY_VALUE_PATTERN) ?? [];
   if (matches.length === 0) return undefined;
 
@@ -361,7 +500,7 @@ function parseEndingValue(value?: string) {
     start,
     ending,
     change: start == null ? undefined : ending - start,
-    endingDisplay: formatCurrency(ending),
+    endingDisplay: formatCurrency(ending, locale),
   };
 }
 
@@ -386,15 +525,20 @@ function normalizeSignedPercent(value?: string) {
   return `${sign}${numeric.toFixed(1)}%`;
 }
 
-function heroDetail(change?: number, totalReturn?: string) {
-  const returnLabel = totalReturn ?? "return unavailable";
+function heroDetail(
+  change: number | undefined,
+  totalReturn: string | undefined,
+  copy: ResultCardDisplayCopy,
+  locale?: string,
+) {
+  const returnLabel = totalReturn ?? copy.returnUnavailable;
   if (change == null) return returnLabel;
   if (Math.abs(change) < 0.5) {
-    return `$0 change · ${returnLabel} total return`;
+    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${copy.totalReturnSuffix}`;
   }
   const sign = change > 0 ? "+" : "-";
-  const noun = change > 0 ? "gain" : "loss";
-  return `${sign}${formatCurrency(Math.abs(change))} ${noun} · ${returnLabel} total return`;
+  const noun = change > 0 ? copy.gainNoun : copy.lossNoun;
+  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${copy.totalReturnSuffix}`;
 }
 
 function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
@@ -405,28 +549,47 @@ function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
   return basis > 0 ? "positive" : "negative";
 }
 
-function benchmarkDisplayValue(metric?: EvidenceMetric) {
+function benchmarkDisplayValue(
+  metric: EvidenceMetric | undefined,
+  copy: ResultCardDisplayCopy,
+) {
   const value = metric?.value.trim();
-  if (!value) return "Benchmark unavailable";
+  if (!value) return copy.benchmarkUnavailable;
   const benchmarkValue = value.match(
     /^([+-]?\d+(?:\.\d+)?)\s+(?:percentage points|pts)\s+vs\s+([A-Z0-9.-]+)$/i,
   );
   if (benchmarkValue) {
     const numericValue = Number(benchmarkValue[1]);
     const benchmarkSymbol = benchmarkValue[2];
-    if (Math.abs(numericValue) < 0.05) return `In line with ${benchmarkSymbol}`;
-    const direction = numericValue > 0 ? "Beat" : "Lagged";
-    return `${direction} by ${Math.abs(numericValue).toFixed(1)} percentage points`;
+    if (Math.abs(numericValue) < 0.05) return copy.inLineWith(benchmarkSymbol);
+    const valueText = copy.percentagePoints(Math.abs(numericValue).toFixed(1));
+    return numericValue > 0 ? copy.beatBy(valueText) : copy.laggedBy(valueText);
+  }
+  const namedBenchmarkValue = value.match(
+    /^(Beat|Lagged)\s+(?:[A-Z0-9.-]+\s+)?by\s+([+-]?\d+(?:\.\d+)?)\s+(?:percentage points|pts)$/i,
+  );
+  if (namedBenchmarkValue) {
+    const direction = namedBenchmarkValue[1].toLowerCase();
+    const valueText = copy.percentagePoints(
+      Math.abs(Number(namedBenchmarkValue[2])).toFixed(1),
+    );
+    return direction === "beat" ? copy.beatBy(valueText) : copy.laggedBy(valueText);
   }
   return value
-    .replace(/^Beat\s+[A-Z0-9.-]+\s+by\s+/i, "Beat by ")
-    .replace(/^Lagged\s+[A-Z0-9.-]+\s+by\s+/i, "Lagged by ")
-    .replace(/^In line with\s+([A-Z0-9.-]+)$/i, "In line with $1")
+    .replace(/^Beat\s+[A-Z0-9.-]+\s+by\s+(.+)$/i, (_, amount: string) =>
+      copy.beatBy(amount),
+    )
+    .replace(/^Lagged\s+[A-Z0-9.-]+\s+by\s+(.+)$/i, (_, amount: string) =>
+      copy.laggedBy(amount),
+    )
+    .replace(/^In line with\s+([A-Z0-9.-]+)$/i, (_, symbol: string) =>
+      copy.inLineWith(symbol),
+    )
     .replace(/\bpts\b/gi, "percentage points");
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+function formatCurrency(value: number, locale = "en-US") {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,

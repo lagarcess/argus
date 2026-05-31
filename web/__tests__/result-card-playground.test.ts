@@ -9,6 +9,7 @@ import {
 import {
   compactTrustGroups,
   compactTrustStrip,
+  defaultResultCardDisplayCopy,
   formatTimeframeForDisplay,
   heroDeltaEvidenceView,
 } from "../lib/result-card-playground-display";
@@ -166,6 +167,38 @@ describe("result card playground", () => {
     expect(formatTimeframeForDisplay("2h")).toBe("2-hour data");
     expect(formatTimeframeForDisplay("12h")).toBe("12-hour data");
     expect(formatTimeframeForDisplay("15m")).toBe("15-minute data");
+  });
+
+  test("keeps result card display copy configurable while Spanish is disabled", () => {
+    const spanish = heroDeltaEvidenceView(resultCardPlaygroundFixtures[0].result, {
+      copy: {
+        ...defaultResultCardDisplayCopy,
+        endingValueLabel: "Valor final",
+        comparedWithSymbolLabel: (symbol) => `Comparado con ${symbol}`,
+        worstDropLabel: "Peor caída",
+        gainNoun: "ganancia",
+        totalReturnSuffix: "rendimiento total",
+        percentagePoints: (value) => `${value} puntos porcentuales`,
+        beatBy: (value) => `Superó por ${value}`,
+        startingCapitalLabel: "Capital inicial",
+        timeframeLabel: "Temporalidad",
+        benchmarkLabel: "Referencia",
+        dailyData: "Datos diarios",
+      },
+      locale: "es-419",
+    });
+
+    expect(spanish.hero.label).toBe("Valor final");
+    expect(spanish.hero.detail).toContain("ganancia");
+    expect(spanish.hero.detail).toContain("rendimiento total");
+    expect(spanish.benchmark.label).toBe("Comparado con SPY");
+    expect(spanish.benchmark.value).toBe("Superó por 27.9 puntos porcentuales");
+    expect(spanish.worstDrop.label).toBe("Peor caída");
+    expect(spanish.timeframeDisplay).toBe("Datos diarios");
+    expect(spanish.details).toContainEqual({
+      label: "Capital inicial",
+      value: "USD\u00a01,000",
+    });
   });
 
   test("builds calm trust and detail groups without duplicate universe prose", () => {

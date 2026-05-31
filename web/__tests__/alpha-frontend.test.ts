@@ -69,6 +69,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain("CollectionPicker");
     expect(sidebar).not.toContain("Collections");
     expect(settings).not.toContain("collection");
+    expect(settings).toContain("items.filter(isDeletedItemVisible)");
+    expect(settings).toContain("strategiesEnabled");
+    expect(settings).not.toContain("<Layers");
+    expect(settings).not.toContain("{item.type}");
     expect(palette).toContain('item.type !== "chat"');
   });
 
