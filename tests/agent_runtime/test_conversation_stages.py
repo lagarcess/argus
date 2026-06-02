@@ -4,8 +4,8 @@ from pathlib import Path
 
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import (
-    ClarificationResponse,
     ClarificationRequest,
+    ClarificationResponse,
     OpenRouterClarificationGenerator,
     _render_clarification_response,
 )

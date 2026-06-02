@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from datetime import date
 
 import pytest
-from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.asset_text_grounding import (
     _candidate_text_supports_resolved_asset,
 )
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_interpreter import (
     LLMInterpretationResponse,
     LLMRiskRule,

@@ -18,6 +18,7 @@ from argus.domain.market_data import ResolvedAsset, is_ticker_like_query
 from argus.domain.market_data import resolve_asset as resolve_market_asset
 from argus.domain.market_data import search_assets as search_market_assets
 
+
 @dataclass(frozen=True)
 class AssetResolution:
     status: ResolutionStatus

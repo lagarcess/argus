@@ -6,7 +6,6 @@ from typing import Any
 
 from argus.agent_runtime.resolution import AssetResolution
 
-
 ResolveAssetCandidate = Callable[
     [str],
     AssetResolution | None,

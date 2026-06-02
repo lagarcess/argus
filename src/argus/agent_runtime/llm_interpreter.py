@@ -28,18 +28,6 @@ from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.result_followups import result_followup_fact_bank
-from argus.agent_runtime.run_field_contract import (
-    current_message_dca_cadence as _dca_cadence_from_current_message,
-)
-from argus.agent_runtime.run_field_contract import (
-    current_message_date_range as _date_range_from_current_message,
-)
-from argus.agent_runtime.run_field_contract import (
-    field_fidelity_tokens as _field_fidelity_tokens,
-)
-from argus.agent_runtime.run_field_contract import (
-    message_states_bar_timeframe as _message_states_bar_timeframe,
-)
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     moving_average_crossover_text,
@@ -48,6 +36,18 @@ from argus.agent_runtime.rule_specs import (
 )
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
+)
+from argus.agent_runtime.run_field_contract import (
+    current_message_date_range as _date_range_from_current_message,
+)
+from argus.agent_runtime.run_field_contract import (
+    current_message_dca_cadence as _dca_cadence_from_current_message,
+)
+from argus.agent_runtime.run_field_contract import (
+    field_fidelity_tokens as _field_fidelity_tokens,
+)
+from argus.agent_runtime.run_field_contract import (
+    message_states_bar_timeframe as _message_states_bar_timeframe,
 )
 from argus.agent_runtime.signal_rule_repair import (
     SignalRuleGroundingAudit,

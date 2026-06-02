@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from argus.agent_runtime.asset_text_grounding import (
+    grounded_asset_mention_has_name_support,
+    grounded_asset_mentions_from_text,
+)
 from argus.agent_runtime.capabilities.answers import (
     EXECUTABLE_STRATEGY_FAMILIES,
     compose_capability_answer,
@@ -15,10 +19,6 @@ from argus.agent_runtime.capabilities.answers import (
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
-from argus.agent_runtime.asset_text_grounding import (
-    grounded_asset_mention_has_name_support,
-    grounded_asset_mentions_from_text,
-)
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -36,11 +36,6 @@ from argus.agent_runtime.result_followups import (
     fallback_private_alpha_save_response,
     fallback_result_followup_response,
 )
-from argus.agent_runtime.run_field_contract import (
-    current_message_date_range,
-    current_message_execution_context_tokens,
-    message_states_bar_timeframe,
-)
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
 )
@@ -48,6 +43,11 @@ from argus.agent_runtime.rule_specs import (
     moving_average_crossover_text,
     opposite_moving_average_crossover_rule,
     strategy_rule,
+)
+from argus.agent_runtime.run_field_contract import (
+    current_message_date_range,
+    current_message_execution_context_tokens,
+    message_states_bar_timeframe,
 )
 from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,

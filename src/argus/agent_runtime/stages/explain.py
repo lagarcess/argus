@@ -3,14 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
-from argus.agent_runtime.result_followups import as_float as followup_as_float
 from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     with_response_heading,
 )
-from argus.agent_runtime.strategy_contract import display_strategy_type
+from argus.agent_runtime.result_followups import as_float as followup_as_float
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     ConfirmationPayload,
@@ -18,6 +15,7 @@ from argus.agent_runtime.state.models import (
     ResponseProfile,
     RunState,
 )
+from argus.agent_runtime.strategy_contract import display_strategy_type
 from argus.domain.engine_launch.result_facts import (
     execution_note as result_execution_note,
 )
@@ -26,7 +24,7 @@ from argus.domain.engine_launch.result_facts import (
 )
 from argus.domain.engine_launch.result_facts import structured_next_experiments
 from argus.llm.openrouter import invoke_openrouter_json_schema
-
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 QuickTakeRelativeClaim = Literal[
     "beat_benchmark",
