@@ -4215,7 +4215,18 @@ def test_indicator_simplification_does_not_regex_parse_when_interpreter_unavaila
     assert "draft" not in result.patch["assistant_response"].lower()
 
 
-def test_interpreter_unavailable_reads_visible_confirmation_assumptions() -> None:
+def test_interpreter_unavailable_reads_visible_confirmation_assumptions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def unavailable_active_confirmation_recovery(**kwargs: Any) -> None:
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret."
+        "compose_active_confirmation_interpreter_recovery",
+        unavailable_active_confirmation_recovery,
+    )
     snapshot = TaskSnapshot(
         pending_strategy_summary=StrategySummary(
             strategy_type="buy_and_hold",
@@ -4258,6 +4269,73 @@ def test_interpreter_unavailable_reads_visible_confirmation_assumptions() -> Non
     assert "visible confirmation" in answer
     assert "start the simulation" in answer
     assert "card controls" in answer
+
+
+def test_interpreter_unavailable_active_confirmation_can_answer_side_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_compose_active_confirmation_interpreter_recovery(
+        **kwargs: Any,
+    ) -> str:
+        captured.update(kwargs)
+        return (
+            "Dollar cost averaging spreads recurring purchases over time while "
+            "the current confirmation stays ready."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret."
+        "compose_active_confirmation_interpreter_recovery",
+        fake_compose_active_confirmation_interpreter_recovery,
+        raising=False,
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy ETH every two weeks.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2022-01-01", "end": "2023-12-31"},
+            capital_amount=125,
+            cadence="biweekly",
+        ),
+        active_confirmation_reference=ArtifactReference(
+            artifact_kind="confirmation",
+            artifact_id="confirmation-1",
+            artifact_status="active",
+            metadata={
+                "confirmation_card": {
+                    "assumptions": [
+                        "$125 recurring contribution",
+                        "1D bars",
+                        "No fees",
+                        "No slippage",
+                        "Benchmark: BTC",
+                    ]
+                }
+            },
+        ),
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="explain what dollar cost averaging means",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        structured_interpreter=RecordingInterpreter(None),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    answer = result.patch["assistant_response"]
+    assert "spreads recurring purchases" in answer
+    assert "$125 recurring contribution" not in answer
+    assert "Benchmark: BTC" not in answer
+    assert captured["current_user_message"] == "explain what dollar cost averaging means"
+    assert "Benchmark: BTC" in captured["assumptions_response"]
 
 
 def test_interpreter_unavailable_during_assumption_edit_does_not_answer_stale_assumptions() -> None:

@@ -388,6 +388,7 @@ def test_buy_and_hold_adapter_propagates_explicit_benchmark_to_card_and_context(
     assert result.result_card is not None
     assert result.result_card["rows"][0]["value"] == "$1,000 -> $1,350"
     assert result.result_card["rows"][2]["label"] == "Compared with QQQ"
+    assert result.result_card["rows"][2]["value"] == "Beat by 8.1 percentage points"
     assert "Benchmark: QQQ" in result.result_card["assumptions"]
     assert result.explanation_context is not None
     assert result.explanation_context["benchmark_symbol"] == "QQQ"

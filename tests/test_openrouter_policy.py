@@ -1497,11 +1497,11 @@ def test_default_interpreter_retries_stale_prior_strategy_replay(
 ) -> None:
     from argus.agent_runtime import llm_interpreter
 
-    calls: list[str] = []
+    calls: list[tuple[str, str]] = []
 
     async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
         model_name = str(kwargs["model_name"])
-        calls.append(model_name)
+        calls.append((model_name, str(kwargs["schema_name"])))
         if model_name == "primary/model":
             return LLMInterpretationResponse(
                 intent="backtest_execution",
@@ -1556,7 +1556,10 @@ def test_default_interpreter_retries_stale_prior_strategy_replay(
     )
 
     assert result is not None
-    assert calls == ["primary/model", "primary/model", "fallback/model"]
+    assert calls == [
+        ("primary/model", "LLMInterpretationResponse"),
+        ("primary/model", "AssetGroundingAudit"),
+    ]
     assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
 
 
@@ -1565,11 +1568,11 @@ def test_default_interpreter_plans_stale_artifact_edit_before_fallback(
 ) -> None:
     from argus.agent_runtime import llm_interpreter
 
-    calls: list[str] = []
+    calls: list[tuple[str, str]] = []
 
     async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
         model_name = str(kwargs["model_name"])
-        calls.append(model_name)
+        calls.append((model_name, str(kwargs["schema_name"])))
         wire_text = "\n".join(message["content"] for message in kwargs["messages"])
         if "Focused artifact edit planning" not in wire_text:
             return LLMInterpretationResponse(
@@ -1626,7 +1629,10 @@ def test_default_interpreter_plans_stale_artifact_edit_before_fallback(
     )
 
     assert result is not None
-    assert calls == ["primary/model", "primary/model"]
+    assert calls == [
+        ("primary/model", "LLMInterpretationResponse"),
+        ("primary/model", "AssetGroundingAudit"),
+    ]
     assert interpreter.last_status == "used"
     assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
 
@@ -1861,11 +1867,17 @@ def test_default_interpreter_rejects_result_explanation_without_latest_result(
 ) -> None:
     from argus.agent_runtime import llm_interpreter
 
-    calls: list[str] = []
+    calls: list[tuple[str, str]] = []
 
     async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
         model_name = str(kwargs["model_name"])
-        calls.append(model_name)
+        schema_name = str(kwargs["schema_name"])
+        calls.append((model_name, schema_name))
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return StatedRunFieldFidelityAudit(
+                comparison_baseline="SPY",
+                date_range="last year",
+            )
         if model_name == "primary/model":
             return LLMInterpretationResponse(
                 intent="results_explanation",
@@ -1911,10 +1923,15 @@ def test_default_interpreter_rejects_result_explanation_without_latest_result(
         )
     )
 
-    assert calls == ["primary/model", "fallback/model"]
+    assert calls == [
+        ("primary/model", "LLMInterpretationResponse"),
+        ("fallback/model", "LLMInterpretationResponse"),
+        ("fallback/model", "StatedRunFieldFidelityAudit"),
+    ]
     assert result is not None
     assert result.intent == "backtest_execution"
     assert result.candidate_strategy_draft.asset_universe == ["MSFT"]
+    assert result.candidate_strategy_draft.comparison_baseline == "SPY"
 
 
 def test_default_interpreter_coerces_strategy_draft_mislabeled_as_result_context(
@@ -2077,7 +2094,7 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
                         {"kind": "text", "text": " returned "},
                         {"kind": "fact", "fact_id": "benchmark_return"},
                         {"kind": "text", "text": ", leaving "},
-                        {"kind": "fact", "fact_id": "benchmark_delta"},
+                        {"kind": "fact", "fact_id": "benchmark_comparison"},
                         {"kind": "text", "text": " of relative performance."},
                     ],
                 },
@@ -2138,10 +2155,37 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     assert "+39.5%" in text
     assert "SPY" in text
     assert "+25.6%" in text
-    assert "+13.9%" in text
+    assert "Beat by 13.9 percentage points" in text
     assert "-13.8%" in text
     assert "Universe: AAPL." in text
     assert "not a prediction" in text.lower()
+
+
+def test_result_breakdown_fact_bank_uses_user_safe_benchmark_comparison() -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    fact_bank = chat_service.result_breakdown_fact_bank(
+        {
+            "title": "AAPL Buy and Hold",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "QQQ",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 15.1,
+                        "benchmark_return_pct": 20.4,
+                        "delta_vs_benchmark_pct": -5.3,
+                        "max_drawdown_pct": -11.3,
+                    }
+                }
+            },
+            "assumptions": ["Universe: AAPL.", "Benchmark: QQQ."],
+        }
+    )
+
+    assert fact_bank["benchmark_comparison"] == "Lagged by 5.3 percentage points"
+    assert fact_bank["benchmark_delta_magnitude"] == "5.3 percentage points"
+    assert "benchmark_delta" not in fact_bank
 
 
 def test_result_breakdown_fact_parts_join_with_professional_spacing(
@@ -2174,7 +2218,7 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
                         {"kind": "text", "text": "at"},
                         {"kind": "fact", "fact_id": "benchmark_return"},
                         {"kind": "text", "text": "for a relative spread of"},
-                        {"kind": "fact", "fact_id": "benchmark_delta"},
+                        {"kind": "fact", "fact_id": "benchmark_comparison"},
                         {"kind": "text", "text": "."},
                     ],
                 },
@@ -2220,7 +2264,7 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     assert "**Test:** BABA Buy and Hold, last month." in text
     assert "**Performance:** total return +1.7%." in text
     assert (
-        "**Performance:** SPY benchmark return +26.6%; relative performance -24.9%."
+        "**Performance:** SPY benchmark return +26.6%; Lagged by 24.9 percentage points."
         in text
     )
     assert "**Risk marker:** max drawdown -36.8%." in text
@@ -2297,7 +2341,7 @@ def test_result_breakdown_rejects_user_visible_internal_context_terms(
                         {"kind": "fact", "fact_id": "total_return"},
                         {"kind": "fact", "fact_id": "benchmark_symbol"},
                         {"kind": "fact", "fact_id": "benchmark_return"},
-                        {"kind": "fact", "fact_id": "benchmark_delta"},
+                        {"kind": "fact", "fact_id": "benchmark_comparison"},
                         {"kind": "fact", "fact_id": "max_drawdown"},
                         {"kind": "fact", "fact_id": "assumptions"},
                         {"kind": "fact", "fact_id": "caveat"},
@@ -2437,11 +2481,15 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     text = result_breakdown_message(run)
 
     assert "### Quick Breakdown" not in text
-    assert "Here's the clean read" in text
-    assert "- Tested:" in text
-    assert "- Result:" in text
-    assert "- Risk:" in text
-    assert "- Next step:" in text
+    assert "deeper read" in text
+    assert "**Setup.**" in text
+    assert "**How to read it.**" in text
+    assert "**Risk and assumptions.**" in text
+    assert "**Useful next check.**" in text
+    assert "- Tested:" not in text
+    assert "- Result:" not in text
+    assert "- Risk:" not in text
+    assert "- Next step:" not in text
     assert "**Total return:** +39.5%." in text
     assert "Entry rule: buy at the start of the period" in text
     assert "AAPL Buy and Hold" in text

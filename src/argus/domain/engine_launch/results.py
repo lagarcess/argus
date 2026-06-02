@@ -49,6 +49,14 @@ USER_SAFE_FAILURE_MESSAGES = {
         "That date range is not valid for a backtest. Choose a start and end date "
         "in chronological order and I will keep the strategy intact."
     ),
+    "invalid_chronological_date_range": (
+        "The end date needs to come after the start date. Choose a valid date "
+        "window and I will keep the strategy intact."
+    ),
+    "future_end_date": (
+        "That end date is later than the latest date Argus can backtest. Choose "
+        "an end date up to today and I will keep the strategy intact."
+    ),
 }
 
 
@@ -63,6 +71,8 @@ USER_SAFE_FAILURE_DETAILS = {
     "indicator_threshold_out_of_bounds": "invalid_parameter",
     "market_data_unavailable": "market_data_issue",
     "invalid_date_range": "invalid_date_window",
+    "invalid_chronological_date_range": "invalid_date_window",
+    "future_end_date": "future_date_window",
     "capital_amount_required": "invalid_parameter",
     "position_size_required": "invalid_parameter",
     "capital_amount_not_applicable": "invalid_parameter",

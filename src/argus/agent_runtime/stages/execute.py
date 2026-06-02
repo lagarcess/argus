@@ -78,6 +78,7 @@ def execute_stage(
                 assistant_prompt = _fallback_prompt(
                     error_type=failure_classification,
                     error_message=_as_optional_str(envelope.get("error_message")),
+                    capability_context=capability_context,
                 )
                 return StageResult(
                     outcome="execution_failed_terminally",
@@ -109,6 +110,7 @@ def execute_stage(
                 assistant_prompt = _fallback_prompt(
                     error_type=failure_classification,
                     error_message=_as_optional_str(envelope.get("error_message")),
+                    capability_context=capability_context,
                 )
                 return StageResult(
                     outcome="needs_clarification",
@@ -149,6 +151,7 @@ def execute_stage(
             assistant_prompt = _fallback_prompt(
                 error_type=failure_classification,
                 error_message=_as_optional_str(envelope.get("error_message")),
+                capability_context=capability_context,
             )
             return StageResult(
                 outcome="execution_failed_terminally",
@@ -427,7 +430,12 @@ def _missing_required_fields(capability_context: dict[str, Any]) -> list[str]:
     return [str(field_name) for field_name in missing_fields]
 
 
-def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> str | None:
+def _fallback_prompt(
+    *,
+    error_type: str | None,
+    error_message: str | None,
+    capability_context: dict[str, Any] | None = None,
+) -> str | None:
     if _is_kraken_window_limit_error(error_message):
         return (
             "That date range is too wide for currency-pair data at the selected "
@@ -464,6 +472,11 @@ def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> st
             "Should I keep working on the current idea, or are you starting a new backtest?"
         )
     if error_type == "parameter_validation_error":
+        if _failure_detail(capability_context) == "future_date_window":
+            return user_safe_failure_message(
+                failure_reason="future_end_date",
+                failure_category=error_type,
+            )
         return (
             "I could not run this because one detail is not valid for the current "
             "backtest. Adjust the asset, rules, or dates and I can try again from "
@@ -478,6 +491,13 @@ def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> st
         "The backtest could not complete. Try again from the current setup or "
         "adjust it first."
     )
+
+
+def _failure_detail(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    detail = value.get("failure_detail")
+    return str(detail).strip() if detail is not None else None
 
 
 def _recoverable_execution_prompt(
@@ -955,12 +975,15 @@ def _resolve_benchmark_symbol(
     *,
     strategy: dict[str, Any],
 ) -> str:
-    value = _resolve_optional_value(optional_parameters, "benchmark_symbol")
-    if isinstance(value, str) and value:
-        return value.strip().upper()
     benchmark = strategy.get("comparison_baseline")
     if isinstance(benchmark, str) and benchmark.strip():
         return benchmark.strip().upper()
+    strategy_benchmark = strategy.get("benchmark_symbol")
+    if isinstance(strategy_benchmark, str) and strategy_benchmark.strip():
+        return strategy_benchmark.strip().upper()
+    value = _resolve_optional_value(optional_parameters, "benchmark_symbol")
+    if isinstance(value, str) and value:
+        return value.strip().upper()
     try:
         asset = resolve_asset(symbol)
     except Exception:

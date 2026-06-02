@@ -84,6 +84,16 @@ def raise_backtest_problem(
             "Invalid Date Range",
             "start_date must be before end_date and end_date cannot be in the future.",
         ),
+        "invalid_chronological_date_range": (
+            422,
+            "Invalid Date Range",
+            "start_date must be before end_date.",
+        ),
+        "future_end_date": (
+            422,
+            "Future End Date",
+            "end_date cannot be later than today.",
+        ),
         "provider_history_start_unavailable": (
             422,
             "History Unavailable",

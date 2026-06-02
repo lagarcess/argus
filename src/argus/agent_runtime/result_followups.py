@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.stages.interpret_types import ResultFollowupFocus
 from argus.context.rendering import context_packet_fact_summary
+from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
@@ -30,6 +31,12 @@ RelativePerformanceClaim = Literal[
     "unknown",
 ]
 CausalAttributionClaim = Literal["none", "directly_supported", "unsupported"]
+
+
+INTERNAL_ONLY_FACT_IDS = frozenset({"benchmark_comparison_claim"})
+BENCHMARK_COMPARISON_CLAIMS = frozenset(
+    {"beat_benchmark", "lagged_benchmark", "matched_benchmark"}
+)
 
 
 class ResultFollowupDraft(BaseModel):
@@ -387,6 +394,7 @@ def result_followup_llm_messages(
     user_message: str,
     required_fact_ids: set[str],
 ) -> list[dict[str, str]]:
+    public_fact_bank = public_result_followup_fact_bank(fact_bank)
     return [
         {
             "role": "system",
@@ -405,7 +413,8 @@ def result_followup_llm_messages(
                 "fact_id in required_fact_ids; do not omit required fact ids even when "
                 "they feel repetitive. Do not invent fact ids. Do not expose fact_bank "
                 "keys or schema names in the answer, including benchmark_delta, "
-                "total_return, max_drawdown, context_packet_facts, fact_ids, or "
+                "benchmark_comparison_claim, total_return, max_drawdown, "
+                "context_packet_facts, fact_ids, or "
                 "relative_performance_claim; translate them into plain language. Fact "
                 "IDs are grounding metadata; they do not mean every fact needs to be "
                 "recited in the user-visible answer. Choose the one or two numbers "
@@ -448,7 +457,7 @@ def result_followup_llm_messages(
                     "question": result_followup_focus_question(focus),
                     "focus": focus,
                     "user_message": user_message,
-                    "fact_bank": fact_bank,
+                    "fact_bank": public_fact_bank,
                     "required_fact_ids": sorted(required_fact_ids),
                     "relative_performance_truth": relative_performance_truth(fact_bank),
                 },
@@ -471,6 +480,14 @@ def result_followup_focus_question(focus: ResultFollowupFocus) -> str:
         "assumptions": "Explain the assumptions used by the latest run.",
     }
     return questions.get(focus, questions["general"])
+
+
+def public_result_followup_fact_bank(fact_bank: dict[str, str]) -> dict[str, str]:
+    return {
+        fact_id: value
+        for fact_id, value in fact_bank.items()
+        if fact_id not in INTERNAL_ONLY_FACT_IDS
+    }
 
 
 def context_packet_ids_from_fact_bank(fact_bank: dict[str, str]) -> list[str]:
@@ -515,6 +532,9 @@ def result_followup_claim_failure(
 def relative_performance_truth(
     fact_bank: dict[str, str],
 ) -> RelativePerformanceClaim:
+    claim = str(fact_bank.get("benchmark_comparison_claim") or "").strip()
+    if claim in BENCHMARK_COMPARISON_CLAIMS:
+        return claim  # type: ignore[return-value]
     delta_number = as_float(fact_bank.get("benchmark_delta"))
     if delta_number is None:
         return "unknown"
@@ -612,6 +632,7 @@ def normalize_response_body(value: Any) -> str:
 
 INTERNAL_FACT_NAMES = (
     "benchmark_delta",
+    "benchmark_comparison_claim",
     "total_return",
     "benchmark_return",
     "max_drawdown",
@@ -650,6 +671,8 @@ def appendable_missing_required_fact_ids(
                 "benchmark_symbol",
                 "total_return",
                 "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_delta_magnitude",
                 "benchmark_delta",
                 "max_drawdown",
                 "trade_count",
@@ -696,6 +719,8 @@ def _labeled_fact_fragment(fact_id: str, value: str) -> str:
         "benchmark_symbol": "Benchmark",
         "total_return": "Strategy return",
         "benchmark_return": "Benchmark return",
+        "benchmark_comparison": "Benchmark comparison",
+        "benchmark_delta_magnitude": "Benchmark gap",
         "benchmark_delta": "Gap versus benchmark",
         "relative_performance": "Relative performance",
         "max_drawdown": "Max drawdown",
@@ -756,7 +781,10 @@ def result_followup_fact_bank(metadata: dict[str, Any]) -> dict[str, str]:
         paths=(("metrics", "aggregate", "performance", "delta_vs_benchmark_pct"),),
     )
     if benchmark_delta is not None:
-        fact_bank["benchmark_delta"] = format_percent(benchmark_delta)
+        comparison = benchmark_comparison_from_delta(benchmark_delta)
+        fact_bank["benchmark_comparison_claim"] = comparison.claim
+        fact_bank["benchmark_comparison"] = comparison.user_phrase
+        fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
         relative = relative_performance_label(
             symbols=symbols,
             benchmark=benchmark,
@@ -988,7 +1016,12 @@ def structured_next_experiment_labels(fact_bank: dict[str, str]) -> list[str]:
 def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
     if not any(
         fact_bank.get(key)
-        for key in ("total_return", "benchmark_return", "benchmark_delta")
+        for key in (
+            "total_return",
+            "benchmark_return",
+            "benchmark_comparison",
+            "benchmark_delta",
+        )
     ):
         return None
     symbols = fact_bank.get("symbols") or "the strategy"
@@ -998,16 +1031,17 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
     benchmark = fact_bank.get("benchmark_symbol")
     benchmark_return = fact_bank.get("benchmark_return")
     benchmark_delta = fact_bank.get("benchmark_delta")
-    delta_number = as_float(benchmark_delta)
+    benchmark_comparison = fact_bank.get("benchmark_comparison")
+    relative_truth = relative_performance_truth(fact_bank)
     relative_performance = fact_bank.get("relative_performance")
     if relative_performance:
         intro = _ensure_sentence(relative_performance)
-    elif delta_number is not None and delta_number > 0:
+    elif relative_truth == "beat_benchmark":
         if benchmark:
             intro = f"{symbols} beat {benchmark} in this run."
         else:
             intro = f"{symbols} beat the benchmark in this run."
-    elif delta_number is not None and delta_number < 0:
+    elif relative_truth == "lagged_benchmark":
         if benchmark:
             intro = f"{symbols} lagged {benchmark} in this run."
         else:
@@ -1036,19 +1070,24 @@ def fallback_performance_response(fact_bank: dict[str, str]) -> str | None:
             result_parts.append(f"{benchmark} returned {benchmark_return}")
         elif benchmark:
             result_parts.append(f"the benchmark was {benchmark}")
-        if benchmark_delta:
+        if benchmark_comparison:
+            result_parts.append(
+                "the benchmark comparison was "
+                + clean_fragment(benchmark_comparison).lower()
+            )
+        elif benchmark_delta:
             result_parts.append(f"the gap versus the benchmark was {benchmark_delta}")
         if result_parts:
             detail_lines.append("Result: " + "; ".join(result_parts) + ".")
     if fact_bank.get("max_drawdown"):
         detail_lines.append(f"Risk: max drawdown was {fact_bank['max_drawdown']}.")
     caveat_lines: list[str] = []
-    if delta_number is not None and delta_number < 0:
+    if relative_truth == "lagged_benchmark":
         caveat_lines.append(
             "The useful read is that this confirmed rule did not keep up over that "
             "window; the run does not prove why."
         )
-    elif delta_number is not None and delta_number > 0:
+    elif relative_truth == "beat_benchmark":
         caveat_lines.append(
             "That is a relative-performance fact from the run, not proof the same "
             "edge would persist."
@@ -1092,7 +1131,11 @@ def fallback_general_result_followup_response(fact_bank: dict[str, str]) -> str 
         )
     elif fact_bank.get("benchmark_symbol"):
         pieces.append(f"Benchmark: {fact_bank['benchmark_symbol']}.")
-    if fact_bank.get("benchmark_delta"):
+    if fact_bank.get("benchmark_comparison"):
+        pieces.append(
+            f"Benchmark comparison: {fact_bank['benchmark_comparison']}."
+        )
+    elif fact_bank.get("benchmark_delta"):
         pieces.append(f"The gap versus the benchmark was {fact_bank['benchmark_delta']}.")
     if fact_bank.get("max_drawdown"):
         pieces.append(f"The max drawdown was {fact_bank['max_drawdown']}.")
@@ -1172,7 +1215,9 @@ def fallback_what_tested_response(fact_bank: dict[str, str]) -> str:
         )
     elif fact_bank.get("benchmark_symbol"):
         extras.append(f"The benchmark was {fact_bank['benchmark_symbol']}")
-    if fact_bank.get("benchmark_delta"):
+    if fact_bank.get("benchmark_comparison"):
+        extras.append(f"Benchmark comparison: {fact_bank['benchmark_comparison']}")
+    elif fact_bank.get("benchmark_delta"):
         extras.append(f"The gap versus the benchmark was {fact_bank['benchmark_delta']}")
     if fact_bank.get("assumptions"):
         extras.append(f"Assumptions: {fact_bank['assumptions']}")
@@ -1269,12 +1314,16 @@ def relative_performance_label(
 ) -> str | None:
     subject = symbols or "The strategy"
     benchmark_label = benchmark or "the benchmark"
-    if delta > 0:
-        return f"{subject} beat {benchmark_label} by {format_percent(delta)} in this run"
-    if delta < 0:
+    comparison = benchmark_comparison_from_delta(delta)
+    if comparison.claim == "beat_benchmark":
+        return (
+            f"{subject} beat {benchmark_label} by "
+            f"{comparison.magnitude_points} in this run"
+        )
+    if comparison.claim == "lagged_benchmark":
         return (
             f"{subject} lagged {benchmark_label} by "
-            f"{format_percent(abs(delta), signed=False)} in this run"
+            f"{comparison.magnitude_points} in this run"
         )
     return f"{subject} matched {benchmark_label} in this run"
 

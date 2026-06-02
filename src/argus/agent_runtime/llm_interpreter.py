@@ -14,6 +14,9 @@ from argus.agent_runtime.artifact_edit_planner import (
     plan_artifact_assumption_edit,
 )
 from argus.agent_runtime.asset_text_grounding import grounded_asset_mentions_from_text
+from argus.agent_runtime.benchmark_evidence import (
+    current_message_has_extra_provider_asset_for_benchmark,
+)
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
@@ -80,6 +83,9 @@ from argus.agent_runtime.strategy_contract import (
     has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
+)
+from argus.agent_runtime.turn_execution_evidence import (
+    current_turn_has_material_execution_evidence,
 )
 from argus.domain.backtesting.rules import (
     canonicalize_rule_spec,
@@ -183,15 +189,18 @@ class AssetAnswerCandidateAudit(BaseModel):
             "One to three likely public market symbols for the current asset answer, "
             "normalized as tickers or crypto symbols. A common public-company or "
             "public-asset name is a valid answer even when the user did not type the "
-            "ticker. Leave empty when the answer is ambiguous, unsupported, or not "
-            "an asset answer."
+            "ticker. Return likely candidates in preference order when the answer is "
+            "recognizable. Leave empty only when there is no credible candidate, the "
+            "answer is unsupported, or the answer is not an asset answer."
         ),
     )
     needs_clarification: bool = Field(
         default=False,
         description=(
             "True when multiple plausible assets remain and the user should choose "
-            "instead of the runtime guessing."
+            "instead of the runtime guessing. If candidate_symbols is non-empty, "
+            "the runtime will still validate those candidates in order before "
+            "falling back to clarification."
         ),
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -945,7 +954,7 @@ async def _asset_grounding_audited_response(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
-    suspicious_symbols = _suspicious_lowercase_asset_symbols(
+    suspicious_symbols = _suspicious_extracted_asset_symbols(
         response=response,
         request=request,
     )
@@ -988,12 +997,18 @@ async def _asset_grounding_audited_response(
     )
 
 
-def _suspicious_lowercase_asset_symbols(
+def _suspicious_extracted_asset_symbols(
     *,
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> list[str]:
-    symbols = [str(symbol).strip().upper() for symbol in response.candidate_strategy_draft.asset_universe if str(symbol).strip()]
+    if _selected_requested_field_base(request) == "asset_universe":
+        return []
+    symbols = [
+        str(symbol).strip().upper()
+        for symbol in response.candidate_strategy_draft.asset_universe
+        if str(symbol).strip()
+    ]
     if not symbols:
         return []
     raw_tokens = set(request.current_user_message.translate(_ASSET_TOKEN_MAP).split())
@@ -1003,14 +1018,51 @@ def _suspicious_lowercase_asset_symbols(
         for token in raw_tokens
         if token.startswith("$")
     }
+    grounded_symbols = {
+        str(asset.canonical_symbol).strip().upper()
+        for asset in _resolved_asset_mentions_from_message(request.current_user_message)
+        if str(getattr(asset, "canonical_symbol", "")).strip()
+    }
+    context_symbols = _context_inheritable_asset_symbols(
+        response=response,
+        request=request,
+        current_grounded_symbols=grounded_symbols,
+    )
     suspicious: list[str] = []
     for symbol in symbols:
         folded = symbol.casefold()
         if symbol in raw_tokens or f"${symbol}" in raw_tokens or folded in cashtag_tokens:
             continue
+        if symbol in grounded_symbols or symbol in context_symbols:
+            continue
         if folded in lower_tokens:
             suspicious.append(symbol)
+            continue
+        suspicious.append(symbol)
     return suspicious
+
+
+def _context_inheritable_asset_symbols(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    current_grounded_symbols: set[str],
+) -> set[str]:
+    if (
+        response.semantic_turn_act == "answer_pending_need"
+        and _selected_requested_field_base(request) != "asset_universe"
+    ):
+        return _prior_strategy_symbols(request)
+    if current_grounded_symbols:
+        return set()
+    if response.semantic_turn_act not in {
+        "answer_pending_need",
+        "approval",
+        "refine_current_idea",
+        "retry_failed_action",
+    }:
+        return set()
+    return _prior_strategy_symbols(request)
 
 
 def _response_without_ungrounded_symbols(
@@ -1089,17 +1141,17 @@ def _response_from_requested_asset_answer_candidate_audit(
     request: InterpretationRequest,
     audit: Any,
 ) -> LLMInterpretationResponse | None:
-    if (
-        not isinstance(audit, AssetAnswerCandidateAudit)
-        or audit.needs_clarification
-        or audit.confidence < 0.6
-    ):
+    if not isinstance(audit, AssetAnswerCandidateAudit) or audit.confidence < 0.6:
+        return None
+    candidate_symbols = [
+        str(symbol or "").strip()
+        for symbol in audit.candidate_symbols[:3]
+        if str(symbol or "").strip()
+    ]
+    if audit.needs_clarification and not candidate_symbols:
         return None
     prior_symbols = _prior_strategy_symbols(request)
-    for index, symbol in enumerate(audit.candidate_symbols[:3]):
-        candidate = str(symbol or "").strip()
-        if not candidate:
-            continue
+    for index, candidate in enumerate(candidate_symbols):
         resolution = _resolve_asset_candidate(
             candidate,
             field=f"asset_universe[{index}]",
@@ -1212,6 +1264,11 @@ def _requested_asset_answer_candidate_audit_messages(
     snapshot = request.latest_task_snapshot
     if snapshot is not None:
         prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    interpretation_context = response.model_dump(
+        mode="json",
+        exclude_none=True,
+        exclude={"assistant_response", "user_goal_summary"},
+    )
     return [
         {
             "role": "system",
@@ -1227,7 +1284,11 @@ def _requested_asset_answer_candidate_audit_messages(
                 "context; do not copy that classification. Do not preserve the prior "
                 "asset unless the current answer explicitly asks for it. Do not invent "
                 "support for private companies, themes, sectors, or vague references. "
-                "Return an empty list when the answer is ambiguous or not an asset."
+                "If a common public asset maps to multiple listed share classes or "
+                "similar instruments, return likely symbols in preference order so "
+                "provider validation can check them. Return an empty list only when "
+                "there is no credible ordering, the answer is unsupported, or it is "
+                "not an asset."
             ),
         },
         {
@@ -1239,9 +1300,13 @@ def _requested_asset_answer_candidate_audit_messages(
         },
         {
             "role": "system",
+            "content": f"Current asset answer: {request.current_user_message.strip()}",
+        },
+        {
+            "role": "system",
             "content": (
-                "Current structured interpretation: "
-                f"{response.model_dump(mode='json', exclude_none=True)}"
+                "Current structured interpretation context without assistant prose: "
+                f"{interpretation_context}"
             ),
         },
         {"role": "user", "content": request.current_user_message},
@@ -1264,12 +1329,12 @@ def _asset_grounding_audit_messages(
             "role": "system",
             "content": (
                 "You are Argus's asset-grounding audit. The interpreter extracted "
-                "asset symbols that may have come from ordinary lowercase words in "
-                "the current user message. Return only the extracted symbols that "
-                "the user clearly intended as assets or tickers. Do not treat "
-                "pronouns, helper words, verbs, or generic conversation words as "
-                "assets. Keep a symbol when the user clearly named the company, "
-                "asset, ticker, or cashtag. Do not invent new symbols."
+                "asset symbols that may not be grounded in the current user message "
+                "or safely inherited artifact context. Return only the extracted "
+                "symbols that the user clearly intended as assets or tickers. Do "
+                "not treat pronouns, helper words, verbs, or generic conversation "
+                "words as assets. Keep a symbol when the user clearly named the "
+                "company, asset, ticker, or cashtag. Do not invent new symbols."
             ),
         },
         {
@@ -1316,6 +1381,12 @@ async def _capability_side_question_audited_response(
             exc=exc,
             message="Capability side-question audit failed; preserving primary interpretation",
         )
+        fallback_response = _capability_audit_unavailable_response_if_safe(
+            response=response,
+            request=request,
+        )
+        if fallback_response is not None:
+            return fallback_response
         return response
     if (
         not isinstance(audit, CapabilitySideQuestionAudit)
@@ -1370,6 +1441,8 @@ def _response_needs_capability_side_question_audit(
         response.candidate_strategy_draft
     ):
         return False
+    if _response_had_unsubstantiated_asset_removed(response):
+        return True
     pending_field = str(
         request.selected_thread_metadata.get("requested_field") or ""
     ).strip()
@@ -1384,6 +1457,56 @@ def _response_needs_capability_side_question_audit(
     ):
         return True
     return _is_vague_strategy_start(response)
+
+
+def _response_had_unsubstantiated_asset_removed(
+    response: LLMInterpretationResponse,
+) -> bool:
+    return any(
+        reason_code.startswith("asset_grounding_audit_")
+        and (
+            "removed_unsubstantiated" in reason_code
+            or "cleared_suspicious" in reason_code
+        )
+        for reason_code in response.reason_codes
+    )
+
+
+def _capability_audit_unavailable_response_if_safe(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_had_unsubstantiated_asset_removed(response):
+        return None
+    if _request_current_turn_has_material_execution_evidence(request):
+        return None
+    return response.model_copy(
+        update={
+            "intent": "conversation_followup",
+            "task_relation": "continue",
+            "requires_clarification": False,
+            "candidate_strategy_draft": LLMStrategyDraft(
+                raw_user_phrasing=request.current_user_message
+            ),
+            "missing_required_fields": [],
+            "ambiguous_fields": [],
+            "unsupported_constraints": [],
+            "assistant_response": None,
+            "semantic_turn_act": "educational_question",
+            "capability_question_focus": None,
+            "artifact_target": "none",
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "capability_side_question_audit",
+                        "capability_side_question_audit_unavailable_after_asset_grounding",
+                    ]
+                )
+            ),
+        }
+    )
 
 
 def _capability_side_question_audit_messages(
@@ -1768,7 +1891,17 @@ def _response_needs_dca_contract_audit(
         return False
     draft = response.candidate_strategy_draft
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
-        return _dca_response_needs_semantic_field_audit(response)
+        return _dca_response_needs_semantic_field_audit(
+            response
+        ) or _current_message_has_dca_contract_shape(
+            response=response,
+            request=request,
+        )
+    if not _current_message_has_dca_contract_shape(
+        response=response,
+        request=request,
+    ):
+        return False
     if response.capability_question_focus is not None:
         return _llm_strategy_draft_has_extractable_fields(draft) or bool(
             draft.raw_user_phrasing or draft.strategy_thesis
@@ -1781,6 +1914,18 @@ def _response_needs_dca_contract_audit(
         response.requires_clarification
         and not canonical_strategy_type(draft.strategy_type)
         and _llm_strategy_draft_has_extractable_fields(draft)
+    )
+
+
+def _current_message_has_dca_contract_shape(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if _dca_cadence_from_current_message(request.current_user_message) is None:
+        return False
+    return _draft_contains_structured_capital_context(
+        response.candidate_strategy_draft
     )
 
 
@@ -1960,7 +2105,7 @@ async def _dca_contribution_role_audited_response(
         return response
     if not isinstance(audit, DcaContributionRoleAudit) or audit.confidence < 0.65:
         return response
-    if audit.recurring_contribution_explicit and not audit.total_budget_not_recurring:
+    if audit.recurring_contribution_explicit:
         draft = response.candidate_strategy_draft.model_copy(deep=True)
         if draft.field_provenance.get("capital_amount") != "recurring_contribution":
             draft.field_provenance["capital_amount"] = "recurring_contribution"
@@ -1991,6 +2136,11 @@ async def _dca_contribution_role_audited_response(
                             *response.reason_codes,
                             "dca_recurring_contribution_grounded_in_current_message",
                         ]
+                        + (
+                            ["dca_total_budget_preserved_as_context"]
+                            if audit.total_budget_not_recurring
+                            else []
+                        )
                     )
                 ),
             }
@@ -2522,6 +2672,13 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
+    response = await _latest_result_routing_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if _response_targets_latest_result_followup(response=response, request=request):
+        return response
     response = await _asset_grounding_audited_response(
         response=response,
         preferred_model=preferred_model,
@@ -2532,12 +2689,11 @@ async def _response_ready_for_runtime(
         preferred_model=preferred_model,
         request=request,
     )
-    response = await _latest_result_routing_audited_response(
-        response=response,
-        preferred_model=preferred_model,
-        request=request,
-    )
-    if _response_targets_latest_result_followup(response=response, request=request):
+    if (
+        response.artifact_target == "none"
+        and "capability_side_question_audit" in response.reason_codes
+        and _response_had_unsubstantiated_asset_removed(response)
+    ):
         return response
     response = await _context_question_audited_response(
         response=response,
@@ -4238,7 +4394,10 @@ def _ready_response_has_unreconciled_stated_run_fields(
 ) -> bool:
     return any(
         [
-            _draft_missing_comparison_baseline_needs_stated_run_field_audit(draft),
+            _draft_missing_comparison_baseline_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            ),
             draft.capital_amount is None
             and _draft_contains_structured_capital_context(draft),
             _llm_value_is_empty(draft.timeframe)
@@ -4253,11 +4412,30 @@ def _ready_response_has_unreconciled_stated_run_fields(
 
 def _draft_missing_comparison_baseline_needs_stated_run_field_audit(
     draft: LLMStrategyDraft,
+    *,
+    current_message: str,
 ) -> bool:
-    return (
-        _llm_value_is_empty(draft.comparison_baseline)
-        and _llm_strategy_draft_has_concrete_execution_target(draft)
+    if not _llm_value_is_empty(draft.comparison_baseline):
+        return False
+    if not _llm_strategy_draft_has_concrete_execution_target(draft):
+        return False
+    return current_message_has_extra_provider_asset_for_benchmark(
+        draft,
+        current_message=current_message,
+        resolved_asset_mentions=_resolved_asset_mentions_from_message(current_message),
+        resolve_candidate=_resolve_benchmark_candidate_from_message,
     )
+
+
+def _resolve_benchmark_candidate_from_message(query: str) -> AssetResolution | None:
+    try:
+        return _resolve_asset_candidate(
+            query,
+            field="comparison_baseline",
+            source="user_mention",
+        )
+    except ValueError:
+        return None
 
 
 def _response_needs_current_message_date_repair(
@@ -4345,23 +4523,28 @@ def _draft_date_range_needs_stated_run_field_audit(
     *,
     current_message: str = "",
 ) -> bool:
-    date_context = _draft_contains_structured_date_context(
-        draft,
-        current_message=current_message,
-    )
     if _llm_value_is_empty(draft.date_range):
         return False
+    current_message_range = _date_range_from_current_message(current_message)
+    if (
+        current_message_range is not None
+        and not has_partial_explicit_date_range(current_message_range)
+        and isinstance(draft.date_range, dict)
+        and not has_partial_explicit_date_range(draft.date_range)
+        and _normalized_stated_field(draft.date_range)
+        != _normalized_stated_field(current_message_range)
+    ):
+        return True
     if _draft_date_range_has_unstated_current_endpoint(
         draft.date_range,
         current_message=current_message,
     ):
         return True
     if has_partial_explicit_date_range(draft.date_range):
-        current_message_range = _date_range_from_current_message(current_message)
         return current_message_range is not None and not has_partial_explicit_date_range(
             current_message_range
         )
-    if isinstance(draft.date_range, str) and date_context:
+    if isinstance(draft.date_range, str) and current_message_range is not None:
         normalized_range = draft.date_range.strip().casefold()
         return bool(normalized_range and normalized_range not in current_message.casefold())
     return False
@@ -4834,12 +5017,10 @@ def _stated_run_field_audit_omitted_expected_fields(
     request: InterpretationRequest,
 ) -> bool:
     draft = response.candidate_strategy_draft
+    expected_date_range = _date_range_from_current_message(request.current_user_message)
     if (
         not _llm_value_is_empty(draft.date_range)
-        and _draft_contains_structured_date_context(
-            draft,
-            current_message=request.current_user_message,
-        )
+        and expected_date_range is not None
         and audit.date_range in (None, "", [], {})
     ):
         return True
@@ -4969,6 +5150,10 @@ async def _focused_strategy_repair_after_candidate_failures(
     request: InterpretationRequest,
     preferred_model: str,
 ) -> LLMInterpretationResponse | None:
+    if _request_has_active_strategy_context(
+        request
+    ) and not _request_current_turn_has_material_execution_evidence(request):
+        return None
     seed_response = LLMInterpretationResponse(
         intent="strategy_drafting",
         task_relation="new_task",
@@ -5740,6 +5925,19 @@ def _request_has_active_strategy_context(request: InterpretationRequest) -> bool
         snapshot.pending_strategy_summary
         or snapshot.confirmed_strategy_summary
         or snapshot.active_confirmation_reference
+    )
+
+
+def _request_current_turn_has_material_execution_evidence(
+    request: InterpretationRequest,
+) -> bool:
+    return current_turn_has_material_execution_evidence(
+        request.current_user_message,
+        has_provider_asset_mention=bool(
+            _resolved_asset_mentions_from_message(request.current_user_message)
+        ),
+        active_strategy_context=_request_has_active_strategy_context(request),
+        requested_field=request.selected_thread_metadata.get("requested_field"),
     )
 
 

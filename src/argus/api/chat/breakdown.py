@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field, ValidationError
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.api.schemas import BacktestRun
 from argus.context.rendering import context_packet_fact_summary
+from argus.domain.benchmark_comparison import (
+    benchmark_comparison_from_delta,
+)
 from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
@@ -251,9 +254,9 @@ def result_breakdown_fact_bank(context: dict[str, Any]) -> dict[str, str]:
         row_keys=("delta_vs_benchmark_pct", "benchmark_delta"),
     )
     if delta_vs_benchmark is not None:
-        fact_bank["benchmark_delta"] = _format_result_breakdown_percent(
-            delta_vs_benchmark
-        )
+        comparison = benchmark_comparison_from_delta(delta_vs_benchmark)
+        fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
+        fact_bank["benchmark_comparison"] = comparison.user_phrase
 
     max_drawdown = _result_breakdown_metric(
         context,
@@ -472,6 +475,7 @@ def _render_result_breakdown_fact_block(
         "benchmark_symbol",
         "benchmark_return",
         "benchmark_delta",
+        "benchmark_comparison",
     ):
         performance_parts: list[str] = []
         if "total_return" in remaining:
@@ -483,7 +487,9 @@ def _render_result_breakdown_fact_block(
             )
         elif "benchmark_symbol" in remaining and benchmark:
             performance_parts.append(f"benchmark {benchmark}")
-        if "benchmark_delta" in remaining:
+        if "benchmark_comparison" in remaining:
+            performance_parts.append(fact_bank["benchmark_comparison"])
+        elif "benchmark_delta" in remaining:
             performance_parts.append(
                 f"relative performance {fact_bank['benchmark_delta']}"
             )
@@ -494,6 +500,7 @@ def _render_result_breakdown_fact_block(
             "benchmark_symbol",
             "benchmark_return",
             "benchmark_delta",
+            "benchmark_comparison",
         )
 
     if _has("max_drawdown"):
@@ -586,7 +593,9 @@ def _required_result_breakdown_fact_ids(fact_bank: dict[str, str]) -> set[str]:
             required.add(fact_id)
     if "benchmark_return" in fact_bank:
         required.add("benchmark_return")
-    if "benchmark_delta" in fact_bank:
+    if "benchmark_comparison" in fact_bank:
+        required.add("benchmark_comparison")
+    elif "benchmark_delta" in fact_bank:
         required.add("benchmark_delta")
     return required
 
@@ -663,7 +672,7 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
         else "the available benchmark return"
     )
     delta_text = (
-        _format_result_breakdown_percent(delta_vs_benchmark)
+        benchmark_comparison_from_delta(delta_vs_benchmark).user_phrase
         if delta_vs_benchmark is not None
         else "the stored benchmark spread"
     )
@@ -685,22 +694,22 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
     performance_lines = [
         (
             f"**Total return:** {total_return_text}. The comparison benchmark was "
-            f"{benchmark or 'the stored benchmark'} at {benchmark_text}, leaving the "
-            f"run at {delta_text} versus the benchmark."
+            f"{benchmark or 'the stored benchmark'} at {benchmark_text}. "
+            f"{delta_text} versus the benchmark. This is a comparison of "
+            "historical returns, not an explanation of why the move happened."
         )
     ]
     if execution_summary:
         performance_lines.append(execution_summary)
 
     return (
-        "Here's the clean read on this run.\n\n"
-        f"- Tested: {' '.join(setup_lines)}\n"
-        f"- Result: {' '.join(performance_lines)}\n"
-        f"- Risk: Max drawdown was {drawdown_text}, the largest peak-to-trough "
-        "decline captured by the simulation.\n"
-        f"- Assumptions: {assumption_text or 'The stored run settings were used'}.\n"
-        "- Next step: "
-        f"{_ensure_sentence(fact_bank['runnable_next_tests'])}\n\n"
+        "Here's the deeper read on the completed run.\n\n"
+        f"**Setup.** {' '.join(setup_lines)}\n\n"
+        f"**How to read it.** {' '.join(performance_lines)}\n\n"
+        f"**Risk and assumptions.** Max drawdown was {drawdown_text}, the largest "
+        "peak-to-trough decline captured by the simulation. The run used "
+        f"{assumption_text or 'the stored run settings'}.\n\n"
+        f"**Useful next check.** {_ensure_sentence(fact_bank['runnable_next_tests'])}\n\n"
         "Use this as historical simulation evidence, not a prediction or trading "
         "recommendation."
     )

@@ -1644,6 +1644,171 @@ def test_plain_text_after_pending_edit_prompt_passes_requested_field_to_runtime(
     assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
 
 
+def test_confirmation_action_asset_edit_round_trips_through_api_metadata(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+    from argus.agent_runtime.graph.workflow import build_workflow
+    from argus.agent_runtime.stages.interpret_types import (
+        InterpretationRequest,
+        StructuredInterpretation,
+    )
+    from argus.agent_runtime.state.models import StrategySummary
+    from langgraph.checkpoint.memory import MemorySaver
+
+    class _ResolvedAssetStub:
+        def __init__(self, canonical_symbol: str, asset_class: str) -> None:
+            self.canonical_symbol = canonical_symbol
+            self.asset_class = asset_class
+
+    class _ProviderBackedAssetAnswerInterpreter:
+        async def ainvoke(
+            self, request: InterpretationRequest
+        ) -> StructuredInterpretation:
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User supplied the replacement asset.",
+                candidate_strategy_draft=StrategySummary(asset_universe=["GOOGL"]),
+                confidence=0.9,
+                semantic_turn_act="answer_pending_need",
+            )
+
+    def _resolve_asset(query: str) -> _ResolvedAssetStub:
+        normalized = query.strip().casefold()
+        if normalized in {"google", "googl"}:
+            return _ResolvedAssetStub("GOOGL", "equity")
+        return _ResolvedAssetStub(query.strip().upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", _resolve_asset)
+    app.state.agent_runtime_workflow = build_workflow(
+        structured_interpreter=_ProviderBackedAssetAnswerInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+
+    client = _client()
+    app.state.agent_runtime_workflow = build_workflow(
+        structured_interpreter=_ProviderBackedAssetAnswerInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to test TSLA with an RSI threshold.",
+        metadata={
+            "conversation_mode": "confirm",
+            "agent_runtime_stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "rsi_threshold",
+                    "strategy_thesis": "Test TSLA with an RSI threshold rule.",
+                    "asset_universe": ["TSLA"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "entry_logic": "Buy when RSI(14) drops to 30 or below",
+                    "exit_logic": "Sell when RSI(14) rises to 55 or above",
+                    "extra_parameters": {
+                        "indicator": "rsi",
+                        "indicator_parameters": {
+                            "indicator": "rsi",
+                            "indicator_period": 14,
+                            "entry_threshold": 30,
+                            "exit_threshold": 55,
+                        },
+                    },
+                },
+                "optional_parameters": {},
+                "launch_payload": {
+                    "strategy_type": "rsi_threshold",
+                    "symbol": "TSLA",
+                    "symbols": ["TSLA"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "entry_rule": "rsi_below",
+                    "exit_rule": "rsi_above",
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 1000,
+                    "parameters": {
+                        "indicator": "rsi",
+                        "indicator_period": 14,
+                        "entry_threshold": 30,
+                        "exit_threshold": 55,
+                    },
+                    "risk_rules": [],
+                    "benchmark_symbol": "SPY",
+                    "language": "en",
+                },
+                "validation": {"status": "ready_to_run", "executable": True},
+            },
+            "confirmation_card": {
+                "confirmation_id": "confirm-tsla-rsi",
+                "confirmation_state": "active",
+                "title": "TSLA rsi threshold",
+                "statusLabel": "Ready to run",
+                "summary": "Ready to test TSLA with an RSI threshold.",
+                "rows": [
+                    {"label": "Strategy", "value": "RSI Threshold"},
+                    {"label": "Assets", "value": "TSLA"},
+                    {"label": "Period", "value": "January 1, 2024 - December 31, 2024"},
+                ],
+                "assumptions": ["Benchmark: SPY"],
+                "actions": [
+                    {
+                        "id": "change-asset",
+                        "type": "change_asset",
+                        "label": "Change asset",
+                        "presentation": "confirmation",
+                        "payload": {"confirmation_id": "confirm-tsla-rsi"},
+                    }
+                ],
+            },
+        },
+    )
+
+    change_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "change_asset",
+                "label": "Change asset",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-tsla-rsi"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert change_response.status_code == 200
+    change_final = _stream_payloads(change_response.text, "final")[0]
+    assert change_final["pending_strategy"]["requested_field"] == "asset_universe"
+
+    answer_response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "google",
+            "language": "en",
+        },
+    )
+
+    assert answer_response.status_code == 200
+    answer_final = _stream_payloads(answer_response.text, "final")[0]
+    assert answer_final["confirmation_payload"]["strategy"]["asset_universe"] == [
+        "GOOGL"
+    ]
+    assert answer_final["confirmation_payload"]["strategy"]["entry_logic"] == (
+        "Buy when RSI(14) drops to 30 or below"
+    )
+    assert answer_final["confirmation_payload"]["strategy"]["exit_logic"] == (
+        "Sell when RSI(14) rises to 55 or above"
+    )
+
+
 def test_retry_after_reload_carries_latest_failed_action_reference(monkeypatch) -> None:
     from argus.api.routers import agent as agent_router
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from argus.agent_runtime.resolution import AssetResolution
+from argus.domain.market_data import is_ticker_like_query
 
 ResolveAssetCandidate = Callable[
     [str],
@@ -52,6 +53,61 @@ def grounded_asset_mentions_from_text(
         mentions.append(
             GroundedAssetMention(
                 raw_text=phrase,
+                asset=resolution.asset,
+                resolution=resolution,
+            )
+        )
+        if len(mentions) >= limit:
+            break
+    return mentions
+
+
+def provider_ticker_mentions_from_text(
+    text: str,
+    *,
+    resolve_candidate: ResolveAssetCandidate,
+    excluded_tokens: set[str] | None = None,
+    limit: int = 5,
+) -> list[GroundedAssetMention]:
+    """Return exact provider-backed ticker mentions from user text.
+
+    This is intentionally narrower than general asset grounding. It supports
+    contract repair for fields like explicit benchmarks where a user may type a
+    lowercase ETF/ticker symbol, while still avoiding company-name alias tables
+    or broad natural-language routing shortcuts.
+    """
+
+    mentions: list[GroundedAssetMention] = []
+    seen: set[str] = set()
+    excluded = {
+        token.strip().lstrip("$").lower()
+        for token in (excluded_tokens or set())
+        if token.strip()
+    }
+    for token in _asset_candidate_tokens(text):
+        candidate = token.lstrip("$").strip()
+        if not candidate or candidate.lower() in excluded:
+            continue
+        if not is_ticker_like_query(candidate):
+            continue
+        resolution = resolve_candidate(candidate)
+        if resolution is None:
+            continue
+        if resolution.status != "resolved" or resolution.asset is None:
+            continue
+        if _compact_asset_candidate(candidate) not in _asset_symbol_texts(
+            resolution.asset
+        ):
+            continue
+        symbol = str(
+            getattr(resolution.asset, "canonical_symbol", "") or ""
+        ).upper()
+        if not symbol or symbol in seen:
+            continue
+        seen.add(symbol)
+        mentions.append(
+            GroundedAssetMention(
+                raw_text=token,
                 asset=resolution.asset,
                 resolution=resolution,
             )

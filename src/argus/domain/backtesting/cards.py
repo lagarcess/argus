@@ -4,6 +4,9 @@ from datetime import date
 from typing import Any
 
 from argus.domain.backtesting.execution import _execution_realism_settings
+from argus.domain.benchmark_comparison import (
+    benchmark_comparison_from_delta,
+)
 
 
 def _format_money(value: float) -> str:
@@ -90,7 +93,9 @@ def build_result_card(
                 if is_es
                 else f"Compared with {config['benchmark_symbol']}"
             ),
-            "value": f"{performance['delta_vs_benchmark_pct']:+.1f} pts vs {config['benchmark_symbol']}",
+            "value": benchmark_comparison_from_delta(
+                performance["delta_vs_benchmark_pct"]
+            ).user_phrase,
         },
         {
             "key": "max_drawdown_pct",

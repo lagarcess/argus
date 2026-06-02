@@ -49,7 +49,8 @@ export type ChatActionOption = {
     | "refine_strategy"
     | "save_strategy"
     | "retry_failed_action"
-    | "retry_last_turn";
+    | "retry_last_turn"
+    | "retry_load_conversation";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;

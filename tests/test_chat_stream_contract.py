@@ -348,6 +348,45 @@ def test_chat_stream_missing_runtime_final_emits_recoverable_error(
     assert response.text.count("data: [DONE]") == 1
 
 
+def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _incomplete_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _incomplete_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "what if I bought $125 of BTC every two weeks in 2022?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant_message = messages[-1]
+    assert assistant_message["role"] == "assistant"
+    assert assistant_message["metadata"]["retry_last_turn"] == {
+        "message": "what if I bought $125 of BTC every two weeks in 2022?"
+    }
+    assert assistant_message["metadata"]["agent_runtime_stage_outcome"] == (
+        "agent_runtime_failure"
+    )
+
+
 def test_chat_stream_finalizes_ai_title_after_meaningful_turn(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

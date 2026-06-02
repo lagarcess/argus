@@ -6,6 +6,7 @@ import {
   legacyPersistedRunFixture,
   resultCardPlaygroundFixtures,
 } from "../lib/result-card-playground-fixtures";
+import { resultCardFromConversationCard } from "../lib/argus-api";
 import {
   compactTrustGroups,
   compactTrustStrip,
@@ -226,6 +227,75 @@ describe("result card playground", () => {
 
     expect(structured.benchmark.label).toBe("Compared with QQQ");
     expect(structured.benchmark.value).toBe("Beat by 8.1 percentage points");
+    expect(structured.details).toContainEqual({ label: "Benchmark", value: "QQQ" });
+    expect(structured.details).not.toContainEqual({ label: "Benchmark", value: "SPY" });
+  });
+
+  test("prefers resolved explicit benchmark over stale top-level default", () => {
+    const structured = heroDeltaEvidenceView({
+      ...resultCardPlaygroundFixtures[0].result,
+      metrics: [
+        { label: "Ending value", value: "$1,000 -> $1,350" },
+        { label: "Total return", value: "+35.0%" },
+        { label: "Compared with QQQ", value: "+8.1 percentage points vs QQQ" },
+        { label: "Worst drop", value: "-15.5%" },
+      ],
+      assumptions: ["Long-only", "Equal weight", "No fees/slippage", "Benchmark: SPY"],
+      configSnapshot: {
+        timeframe: "1D",
+        benchmark_symbol: "SPY",
+        resolved_parameters: {
+          timeframe: "1D",
+          benchmark_symbol: "QQQ",
+        },
+      },
+    });
+
+    expect(structured.benchmark.label).toBe("Compared with QQQ");
+    expect(structured.details).toContainEqual({ label: "Benchmark", value: "QQQ" });
+    expect(structured.details).not.toContainEqual({ label: "Benchmark", value: "SPY" });
+  });
+
+  test("uses structured benchmark facts before stale persisted metric labels", () => {
+    const mapped = resultCardFromConversationCard(
+      {
+        ...legacyPersistedRunFixture.conversation_result_card,
+        rows: [
+          { key: "cash_value", label: "Cash Value ($)", value: "$1,000 -> $1,350" },
+          { key: "total_return_pct", label: "Total Return (%)", value: "+35.0%" },
+          {
+            key: "benchmark_delta",
+            label: "Compared with SPY",
+            value: "Beat by 8.1 percentage points",
+          },
+          { key: "max_drawdown_pct", label: "Max Drawdown", value: "-15.5%" },
+        ],
+        assumptions: [
+          "Long-only",
+          "Equal weight",
+          "No fees/slippage",
+          "Benchmark: SPY",
+        ],
+      },
+      {
+        id: "run-with-qqq",
+        strategy_id: null,
+        benchmark_symbol: "QQQ",
+        config_snapshot: {
+          timeframe: "1D",
+          benchmark_symbol: "QQQ",
+          resolved_parameters: {
+            benchmark_symbol: "QQQ",
+            timeframe: "1D",
+          },
+        },
+      },
+    );
+
+    expect(mapped.metrics[2].label).toBe("Compared with QQQ");
+
+    const structured = heroDeltaEvidenceView(mapped);
+    expect(structured.benchmark.label).toBe("Compared with QQQ");
     expect(structured.details).toContainEqual({ label: "Benchmark", value: "QQQ" });
     expect(structured.details).not.toContainEqual({ label: "Benchmark", value: "SPY" });
   });

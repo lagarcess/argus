@@ -120,17 +120,30 @@ describe("Argus Alpha frontend contract", () => {
   test("failed-action retry stays a structured footer action and message menus close on focus loss", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const hydration = readFileSync(join(root, "lib/chat-message-hydration.ts"), "utf-8");
     const retry = readFileSync(join(root, "lib/chat-retry-actions.ts"), "utf-8");
+    const sendState = readFileSync(join(root, "lib/chat-send-state.ts"), "utf-8");
 
-    expect(chat).toContain("failedActionRetryActionFromMetadata(metadata)");
-    expect(chat).toContain("retryLastTurnActionFromMessage(trimmed)");
+    expect(chat).toContain("hydrateTextMessageFromApi(m,");
+    expect(hydration).toContain("failedActionRetryActionFromMetadata(metadata)");
+    expect(hydration).toContain("retryLastTurnActionFromMetadata(metadata");
+    expect(chat).toContain("retryLastTurnActionFromMessage(trimmed,");
+    expect(chat).toContain("assistantMessageId: assistantId");
+    expect(chat).toContain("retryLastTurnFailedAssistantIdFromAction(action)");
     expect(chat).toContain("retryLastTurnMessageFromAction(action)");
+    expect(chat).toContain("appendOrReplacePendingAssistantMessage(baseMessages");
+    expect(chat).toContain("replacementAssistantId: failedAssistantId ?? undefined");
+    expect(chat).toContain("const persistedErrorMessageId = event.data.message_id?.trim()");
+    expect(chat).toContain("id: persistedErrorMessageId || m.id");
     expect(chat).toContain("isFailedActionRetry(action)");
     expect(retry).toContain("latest_failed_action_reference");
     expect(retry).toContain("launch_payload");
+    expect(retry).toContain("failed_assistant_id");
     expect(retry).toContain('type: "retry_failed_action"');
     expect(retry).toContain('type: "retry_last_turn"');
     expect(retry).toContain("export function isRetryAction");
+    expect(sendState).toContain("export function appendOrReplacePendingAssistantMessage");
+    expect(sendState).toContain("message.id !== assistantId");
     expect(retry).not.toContain("content.includes");
     expect(retry).not.toContain(".match(");
     expect(message).toContain("action.labelKey ? t(action.labelKey, action.label) : action.label");
@@ -139,8 +152,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("const shouldShowTextFooter =");
     expect(message).toContain("message.kind === \"text\" && (isLatest || Boolean(retryAction))");
     expect(message).toContain("{shouldShowTextFooter &&");
+    expect(message).toContain("Boolean(retryAction) || rating || showOptions");
     expect(message).toContain("<RotateCcw");
-    expect(message).toContain("onMouseLeave={() => setShowOptions(false)}");
+    expect(message.indexOf("<ThumbsDown")).toBeLessThan(message.indexOf("<RotateCcw"));
+    expect(message.indexOf("<RotateCcw")).toBeLessThan(message.indexOf("<MoreHorizontal"));
+    expect(message).not.toContain("const optionsCloseTimeoutRef = useRef");
+    expect(message).not.toContain("const scheduleOptionsClose = () =>");
+    expect(message).not.toContain("onMouseLeave={scheduleOptionsClose}");
+    expect(message).toContain("aria-expanded={showOptions}");
     expect(message).toContain('rating || showOptions ? "opacity-100"');
     expect(message).toContain("onBlur={(event) =>");
     expect(message).toContain("setShowOptions(false)");
@@ -349,10 +368,21 @@ describe("Argus Alpha frontend contract", () => {
   test("chat stream parser consumes canonical data-only SSE frames", () => {
     const stage = parseChatStreamFrame('data: {"type":"stage_start","stage":"execute"}');
     const token = parseChatStreamFrame('data: {"type":"token","content":"Running"}');
+    const error = parseChatStreamFrame(
+      'data: {"type":"error","code":"agent_runtime_failure","message":"Something went wrong.","message_id":"assistant-persisted-1"}',
+    );
     const done = parseChatStreamFrame("data: [DONE]");
 
     expect(stage).toEqual({ event: "stage_start", data: { stage: "execute" } });
     expect(token).toEqual({ event: "token", data: { text: "Running" } });
+    expect(error).toEqual({
+      event: "error",
+      data: {
+        code: "agent_runtime_failure",
+        detail: "Something went wrong.",
+        message_id: "assistant-persisted-1",
+      },
+    });
     expect(done).toEqual({ event: "done", data: { message_id: null } });
   });
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
+from argus.domain.backtesting.date_window import validate_backtest_date_window
 from argus.domain.backtesting.rules import validate_rule_spec
 from argus.domain.indicators import normalize_indicator_parameters
 from argus.domain.market_data import resolve_asset
@@ -184,10 +185,7 @@ def validate_backtest_config(config: dict[str, Any]) -> None:
 
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
-    if start >= end:
-        raise ValueError("invalid_date_range")
-    if end > date.today():
-        raise ValueError("invalid_date_range")
+    validate_backtest_date_window(start=start, end=end)
     validate_market_data_window(
         asset_class=config["asset_class"],
         timeframe=config["timeframe"],

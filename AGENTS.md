@@ -191,9 +191,107 @@ Usage:
 
 ## 🚀 Quick Start (Local Development)
 
-1. **Initialize workspace**: Run `.github/setup.sh` (Poetry + Bun + mock data ready)
-2. **Start dev environment**: Terminal 1: `poetry run fastapi dev src/argus/api/main.py`, Terminal 2: `cd web && bun run dev`
-3. **Build + test**: `poetry run pytest` (backend), `bun test` (frontend)
+Argus supports two primary development scenarios. Choose your mode and start:
+
+### Fast Iteration (Dev Mode)
+**Use this for:** Building features, debugging, UI work, isolated testing — no persistence needed.
+
+1. **Initialize workspace** (one time):
+   ```bash
+   .github/setup.sh
+   ```
+
+2. **Activate Dev Mode** (Terminal 1: Backend):
+   ```bash
+   .github/dev.sh
+   ```
+   This sources your `.env` credentials and sets all Dev Mode variables automatically.
+
+3. **Start frontend** (Terminal 2):
+   ```bash
+   cd web && bun run dev
+   ```
+
+4. **Access**: Open `http://localhost:3000` → Auto-logs in as "Mock Developer"
+
+5. **Build + test**:
+   ```bash
+   poetry run pytest tests/
+   cd web && bun test
+   ```
+
+### Production Parity (QA Mode)
+**Use this for:** End-to-end testing, launch validation, browser QA matrix, release verification.
+
+1. **Initialize workspace** (one time):
+   ```bash
+   .github/setup.sh
+   ```
+   Your `.env` should already contain real Supabase credentials and API keys.
+
+2. **Activate QA Mode** (Terminal 1: Backend):
+   ```bash
+   .github/qa.sh
+   ```
+   This sources your `.env` credentials and sets all QA Mode variables automatically.
+
+3. **Start frontend** (Terminal 2):
+   ```bash
+   cd web && bun run dev
+   ```
+
+4. **Run full QA suite**:
+   ```bash
+   # Backend contract & runtime tests
+   poetry run pytest tests/agent_runtime/ -q
+   
+   # Frontend integration
+   cd web && bun test __tests__/
+   
+   # Browser QA (if Playwright is set up)
+   bun run test:e2e
+   ```
+
+### What Each Mode Script Does
+
+**`.github/dev.sh`** sets:
+- `ARGUS_PERSISTENCE_MODE=memory` — Ephemeral, no database writes
+- `ARGUS_DEV_MEMORY_FALLBACK=true` — Tolerant (failures don't block the chat)
+- `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` — Hardcoded test assets (no API calls)
+- `ARGUS_CHECKPOINTER_MODE=memory` — No checkpoint persistence
+
+**`.github/qa.sh`** sets:
+- `ARGUS_PERSISTENCE_MODE=supabase` — Durable, all writes go to Supabase
+- `ARGUS_DEV_MEMORY_FALLBACK=false` — Strict (errors propagate for debugging)
+- `ARGUS_MARKET_DATA_PROVIDER_MODE=recorded_provider_fixture` — Realistic recorded data (production-like)
+- `ARGUS_CHECKPOINTER_MODE=memory` — Runtime state recovery
+
+**Your `.env` stays constant** — Both scripts source the same `.env`, so your credentials are never scattered or duplicated.
+
+### Feature Flags (All Private-Alpha)
+Keep these disabled unless explicitly testing:
+```bash
+NEXT_PUBLIC_STRATEGIES_ENABLED=false
+NEXT_PUBLIC_COLLECTIONS_ENABLED=false
+NEXT_PUBLIC_OMNISEARCH_ENABLED=false
+NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
+```
+
+### Frontend Environment (web/.env.local)
+Create `web/.env.local` with frontend-specific settings:
+```bash
+cp web/.env.local.example web/.env.local
+```
+
+For both Dev and QA modes, typically:
+```bash
+NEXT_PUBLIC_MOCK_AUTH=true
+NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+NEXT_PUBLIC_STRATEGIES_ENABLED=false
+NEXT_PUBLIC_COLLECTIONS_ENABLED=false
+NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+```
 
 ---
 
@@ -218,6 +316,95 @@ To bypass the Supabase OAuth wall in development environments (e.g., remote VMs)
 - **Access Control**: Grants access to `/builder`, `/strategies`, etc., without OAuth.
 
 
+---
+
+## ⚙️ Architectural Patterns
+
+### 1. Fail-Open Deterministic Fallback
+Used for: LLM-backed features that must never block the chat
+
+Pattern:
+- Try LLM with bounded timeout (ThreadPoolExecutor)
+- On timeout/failure → deterministic fallback
+- Log failure but don't expose to user
+- Route receipt captures outcome for ops
+
+Example: `result_breakdown_message()` in src/argus/api/chat/breakdown.py
+
+### 2. Task-Scoped Execution Budget
+Used for: All OpenRouter calls
+
+Pattern:
+- Each task (interpretation, breakdown, naming) has own profile
+- Profile controls: temperature, max_tokens, timeout_seconds, max_retries
+- Same code path; different budgets based on task importance
+- Route receipt captures latency, model, tier, token usage
+
+Example: OPENROUTER_PROFILES in src/argus/llm/openrouter.py
+
+### 3. Stage Result Contract
+Used for: Runtime decision-making stages
+
+Pattern:
+- Stage returns StageResult(outcome: str, stage_patch: dict)
+- Outcome drives routing (ready_to_confirm, needs_clarification, etc.)
+- Patch contains only state mutations
+- Stage is pure function of (state, contract)
+
+Example: confirm_stage() in src/argus/agent_runtime/stages/confirm.py
+
+### 4. Response Voice Contract
+Used for: All assistant-facing prose
+
+Pattern:
+- Explicit tone contract defined in response_style.py
+- Anti-patterns: dense PDF tone, metric dumps, generic lists, jargon
+- Deterministic facts ground LLM language
+- No raw enums or internal field names in user-facing text
+
+Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
+
+### 5. Provider Mode Abstraction
+Used for: Making asset/market data deterministic without HTTP mocking
+
+Pattern:
+- ARGUS_MARKET_DATA_PROVIDER_MODE env controls data source
+- Modes: live_provider | recorded_provider_fixture | synthetic_unit_fixture
+- Code path unchanged; only data source changes
+- Enables deterministic testing with real code paths
+
+Example: _asset_provider_mode() in src/argus/domain/market_data/assets.py
+
+### 6. Capability Contract Pattern
+Used for: Validating what's executable vs draft-only
+
+Pattern:
+- CapabilityContract class centralizes "can I execute this?"
+- Returns ranked candidates, not binary yes/no
+- Used by interpret → confirm → execute → capability Q&A
+- Single source of truth across all surfaces
+
+### 7. Semantic Integrity Rules
+Used for: Preserving user intent across edits and defaults
+
+Pattern:
+- User-explicit constraints (dates, assets, cadence) are immutable
+- Defaults only fill gaps, never overwrite user intent
+- If constraint cannot be preserved → clarify, don't override
+- For DCA: recurring_contribution is sacred once set
+
+Example: conserve_semantic_constraints() in src/argus/agent_runtime/semantic_integrity.py
+
+### 8. Anti-Pattern Checklist
+Never do this:
+- ❌ Regex/phrase gates before LLM interpretation
+- ❌ Strategy name routing (use intent + capability contract)
+- ❌ Parallel chat orchestrators (LangGraph is the only brain)
+- ❌ Frontend prose inventing strategy state
+- ❌ Raw enum/field names in assistant voice
+- ❌ Unsupported causality from context packets
+- ❌ Silent defaults overwriting user constraints
+- ❌ Duplicate action surfaces (one button per action, owned by one component)
 ---
 
 ## 🛑 Never-Violate Standards

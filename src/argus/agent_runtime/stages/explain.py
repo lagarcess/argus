@@ -7,7 +7,6 @@ from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     with_response_heading,
 )
-from argus.agent_runtime.result_followups import as_float as followup_as_float
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     ConfirmationPayload,
@@ -16,6 +15,9 @@ from argus.agent_runtime.state.models import (
     RunState,
 )
 from argus.agent_runtime.strategy_contract import display_strategy_type
+from argus.domain.benchmark_comparison import (
+    benchmark_comparison_from_delta,
+)
 from argus.domain.engine_launch.result_facts import (
     execution_note as result_execution_note,
 )
@@ -47,7 +49,7 @@ class QuickTakeDraft(BaseModel):
     relative_performance_claim: QuickTakeRelativeClaim = Field(
         description=(
             "Structured claim about the strategy versus the benchmark. Use only "
-            "the supplied benchmark_delta truth."
+            "the supplied benchmark comparison truth."
         )
     )
     takeaway: str = Field(
@@ -240,13 +242,17 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
+    relative_performance_truth = _quick_take_relative_truth(
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
     required_fact_ids = _required_quick_take_fact_ids(fact_bank)
     prompt_context = {
         "allowed_next_experiments": allowed_next_experiments,
         "benchmark_contract": benchmark_contract,
         "fact_bank": fact_bank,
         "language": "use the user's current language preference if available",
-        "relative_performance_truth": _quick_take_relative_truth(fact_bank),
+        "relative_performance_truth": relative_performance_truth,
         "required_fact_ids": sorted(required_fact_ids),
         "strategy": _canonical_strategy_context(strategy),
     }
@@ -263,6 +269,10 @@ async def _llm_explanation(
                 "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
                 "Return structured fields so the runtime can validate fact usage; "
                 "do not invent facts or supported next experiment kinds."
+                " For user-facing beat/lagged wording, use benchmark_comparison "
+                "or benchmark_delta_magnitude; do not phrase a lag as a negative "
+                "percentage return. When using benchmark_comparison, include that "
+                "fact phrase exactly."
             ),
         },
         {
@@ -290,6 +300,7 @@ async def _llm_explanation(
             fact_bank=fact_bank,
             required_fact_ids=required_fact_ids,
             allowed_next_experiments=allowed_next_experiments,
+            relative_performance_truth=relative_performance_truth,
         )
     except Exception as exc:
         # The OpenRouter helper records per-model route receipts. This local fallback
@@ -357,9 +368,9 @@ def _quick_take_fact_bank(
     if benchmark_return is not None:
         fact_bank["benchmark_return"] = _format_percent_points(benchmark_return)
     if total_return is not None and benchmark_return is not None:
-        fact_bank["benchmark_delta"] = _format_percent_points(
-            total_return - benchmark_return
-        )
+        comparison = benchmark_comparison_from_delta(total_return - benchmark_return)
+        fact_bank["benchmark_delta_magnitude"] = comparison.magnitude_points
+        fact_bank["benchmark_comparison"] = comparison.user_phrase
     fact_bank["caveat"] = fact_bank.get(
         "caveat",
         "Historical simulation evidence, not a prediction or trading recommendation",
@@ -373,21 +384,28 @@ def _required_quick_take_fact_ids(fact_bank: dict[str, str]) -> set[str]:
         "tested_summary",
         "total_return",
         "benchmark_return",
-        "benchmark_delta",
         "benchmark_symbol",
     ):
         if fact_id in fact_bank:
             required.add(fact_id)
+    if "benchmark_comparison" in fact_bank:
+        required.add("benchmark_comparison")
     return required
 
 
-def _quick_take_relative_truth(fact_bank: dict[str, str]) -> QuickTakeRelativeClaim:
-    delta = followup_as_float(fact_bank.get("benchmark_delta"))
-    if delta is None:
+def _quick_take_relative_truth(
+    *,
+    result_payload: dict[str, Any],
+    explanation_context: dict[str, Any],
+) -> QuickTakeRelativeClaim:
+    total_return, benchmark_return, _ = _resolved_return_metrics(
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    if total_return is None or benchmark_return is None:
         return "unknown"
-    if abs(delta) < 0.05:
-        return "matched_benchmark"
-    return "beat_benchmark" if delta > 0 else "lagged_benchmark"
+    delta = total_return - benchmark_return
+    return benchmark_comparison_from_delta(delta).claim
 
 
 def _format_percent_points(value: float) -> str:
@@ -402,11 +420,12 @@ def _render_quick_take_draft(
     fact_bank: dict[str, str],
     required_fact_ids: set[str],
     allowed_next_experiments: Any,
+    relative_performance_truth: QuickTakeRelativeClaim,
 ) -> str | None:
     response = _coerce_quick_take_draft(draft)
     if response is None:
         return None
-    truth = _quick_take_relative_truth(fact_bank)
+    truth = relative_performance_truth
     if truth != "unknown" and response.relative_performance_claim != truth:
         return None
     used_fact_ids: set[str] = set()
@@ -471,6 +490,9 @@ def _quick_take_mentions_required_visible_facts(
     )
     benchmark_symbol = fact_bank.get("benchmark_symbol")
     if benchmark_symbol and benchmark_symbol not in text:
+        return False
+    benchmark_comparison = fact_bank.get("benchmark_comparison")
+    if benchmark_comparison and benchmark_comparison not in text:
         return False
     return True
 

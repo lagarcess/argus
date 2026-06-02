@@ -278,7 +278,7 @@ export default function ChatMessage({
               {/* Feedback Icon Row (Right-aligned) - Progressive Disclosure: Hide while streaming */}
               {!isStreaming && (
                 <div
-                  className={`relative flex items-center gap-1.5 transition-opacity shrink-0 ${rating || showOptions ? "opacity-100" : "opacity-50 hover:opacity-100"}`}
+                  className={`relative flex items-center gap-1.5 transition-opacity shrink-0 ${Boolean(retryAction) || rating || showOptions ? "opacity-100" : "opacity-50 hover:opacity-100"}`}
                   ref={optionsRef}
                   onBlur={(event) => {
                     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -314,6 +314,8 @@ export default function ChatMessage({
                   onClick={toggleOptions}
                   className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
                   title={t('chat.more_actions')}
+                  aria-haspopup="menu"
+                  aria-expanded={showOptions}
                 >
                   <MoreHorizontal className="w-3.5 h-3.5" />
                 </button>
@@ -322,10 +324,11 @@ export default function ChatMessage({
                 {showOptions && (
                   <div
                     className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}
-                    onMouseLeave={() => setShowOptions(false)}
+                    role="menu"
                   >
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                      role="menuitem"
                       onClick={() => { void handleCopy(); setShowOptions(false); }}
                     >
                       <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
@@ -333,6 +336,7 @@ export default function ChatMessage({
                     </button>
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                      role="menuitem"
                       onClick={() => { void handleCopy(message.id); setShowOptions(false); }}
                     >
                       <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
@@ -340,6 +344,7 @@ export default function ChatMessage({
                     </button>
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
+                      role="menuitem"
                       onClick={() => { setShowOptions(false); onFeedback?.("bug", { message_id: message.id }); }}
                     >
                       <MessageSquareWarning className="w-4 h-4 text-black/60 dark:text-white/60" />

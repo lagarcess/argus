@@ -29,7 +29,7 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
         return schema(
             relative_performance_claim="beat_benchmark",
             answer=(
-                "AAPL beat SPY by +14.5% in this run: the strategy returned "
+                "AAPL beat SPY by 14.5 percentage points in this run: the strategy returned "
                 "+40.8% while SPY returned +26.4%, so the useful read is the "
                 "spread, not a generic underperformance story."
             ),
@@ -39,7 +39,7 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
                 "total_return",
                 "benchmark_symbol",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "caveat",
             ],
         )
@@ -64,16 +64,16 @@ async def test_result_followup_composes_with_llm_fact_references() -> None:
     )
 
     assert response is not None
-    assert "AAPL beat SPY by +14.5%" in response
+    assert "AAPL beat SPY by 14.5 percentage points" in response
     assert "For this run" not in response
     assert "Strategy return:" not in response
     assert "Asset:" not in response
     assert "AAPL" in response
-    assert "beat SPY by +14.5%" in response
+    assert "beat SPY by 14.5 percentage points" in response
     assert "+40.8%" in response
     assert "SPY" in response
     assert "+26.4%" in response
-    assert "+14.5%" in response
+    assert "14.5 percentage points" in response
     assert "stored run facts" not in response
     assert "causal proof" not in response
     assert calls[0]["task"] == "result_summary"
@@ -162,7 +162,7 @@ async def test_result_followup_prefers_structured_answer_blocks() -> None:
                 "This dense compatibility answer should not be the rendered response."
             ),
             answer_blocks=[
-                "AAPL beat SPY by +12.4% in this run.",
+                "AAPL beat SPY by 12.4 percentage points in this run.",
                 (
                     "That is useful historical evidence, but it does not prove the "
                     "same edge would persist."
@@ -174,7 +174,7 @@ async def test_result_followup_prefers_structured_answer_blocks() -> None:
                 "total_return",
                 "benchmark_symbol",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "caveat",
             ],
         )
@@ -201,7 +201,7 @@ async def test_result_followup_prefers_structured_answer_blocks() -> None:
 
     assert response is not None
     assert "compatibility answer" not in response
-    assert "AAPL beat SPY by +12.4% in this run.\n\nThat is useful" in response
+    assert "AAPL beat SPY by 12.4 percentage points in this run.\n\nThat is useful" in response
 
 
 def test_result_followup_rejects_dense_unstructured_answer() -> None:
@@ -277,6 +277,50 @@ def test_result_followup_prompt_keeps_runtime_words_out_of_market_facts() -> Non
     assert "routing fix" not in json.dumps(payload["fact_bank"])
 
 
+def test_result_followup_fact_bank_uses_user_safe_benchmark_comparison() -> None:
+    fact_bank = result_followup_fact_bank(
+        {
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "QQQ",
+            "metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 15.1,
+                        "benchmark_return_pct": 20.4,
+                        "delta_vs_benchmark_pct": -5.3,
+                    }
+                }
+            },
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "date_range": {"start": "2026-01-01", "end": "2026-05-31"},
+            },
+        }
+    )
+
+    assert fact_bank["benchmark_symbol"] == "QQQ"
+    assert fact_bank["benchmark_comparison"] == "Lagged by 5.3 percentage points"
+    assert fact_bank["benchmark_delta_magnitude"] == "5.3 percentage points"
+    assert fact_bank["relative_performance"] == (
+        "AAPL lagged QQQ by 5.3 percentage points in this run"
+    )
+    assert "benchmark_delta" not in fact_bank
+
+    messages = result_followup_llm_messages(
+        fact_bank=fact_bank,
+        focus="why_underperformed",
+        user_message="why did this lag?",
+        required_fact_ids={"symbols", "relative_performance", "caveat"},
+    )
+    payload = json.loads(messages[1]["content"])
+    assert payload["relative_performance_truth"] == "lagged_benchmark"
+    assert payload["fact_bank"]["benchmark_comparison"] == (
+        "Lagged by 5.3 percentage points"
+    )
+    assert "benchmark_comparison_claim" not in payload["fact_bank"]
+    assert "benchmark_delta" not in payload["fact_bank"]
+
+
 def test_result_followup_rejects_user_visible_internal_fact_names() -> None:
     rendered = render_result_followup_draft(
         draft=ResultFollowupDraft(
@@ -290,7 +334,7 @@ def test_result_followup_rejects_user_visible_internal_fact_names() -> None:
                 "total_return",
                 "benchmark_symbol",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "caveat",
             ],
         ),
@@ -324,7 +368,7 @@ async def test_result_followup_falls_back_when_structured_claim_contradicts_posi
                 "total_return",
                 "benchmark_symbol",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "caveat",
             ],
         )
@@ -355,7 +399,7 @@ async def test_result_followup_falls_back_when_structured_claim_contradicts_posi
     assert response is not None
     assert response.startswith("AAPL beat SPY")
     assert "underperformed" not in response.lower()
-    assert "+14.5%" in response
+    assert "14.5 percentage points" in response
 
 
 @pytest.mark.asyncio
@@ -412,7 +456,7 @@ async def test_result_followup_accepts_semantic_language_with_required_fact_cont
             relative_performance_claim="beat_benchmark",
             answer=(
                 "The key read is the relationship between the run and "
-                "its benchmark: AAPL beat SPY by +12.4% in this run, with "
+                "its benchmark: AAPL beat SPY by 12.4 percentage points in this run, with "
                 "a +39.7% strategy return versus +27.3% for SPY. The wording "
                 "can stay conversational because exact values are grounded by "
                 "fact ids."
@@ -423,7 +467,7 @@ async def test_result_followup_accepts_semantic_language_with_required_fact_cont
                 "total_return",
                 "benchmark_symbol",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "caveat",
             ],
         )
@@ -453,7 +497,7 @@ async def test_result_followup_accepts_semantic_language_with_required_fact_cont
 
     assert response is not None
     assert "exact values are grounded by fact ids" in response
-    assert "AAPL beat SPY by +12.4% in this run" in response
+    assert "AAPL beat SPY by 12.4 percentage points in this run" in response
     assert "+39.7%" in response
 
 
@@ -585,7 +629,7 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
             relative_performance_claim="beat_benchmark",
             answer=(
                 "TSLA was stronger than SPY in this run: the strategy returned "
-                "+130.0% while SPY returned +24.8%, a +105.2% gap. The attached "
+                "+130.0% while SPY returned +24.8%, a 105.2 percentage point gap. The attached "
                 "fed funds rate observation is only backdrop."
             ),
             fact_ids=[
@@ -593,7 +637,7 @@ async def test_general_followup_uses_context_packet_facts_when_attached() -> Non
                 "total_return",
                 "benchmark_symbol",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "context_packet_facts",
             ],
         )
@@ -710,7 +754,7 @@ async def test_context_backed_why_followup_appends_missing_required_run_facts() 
     assert "Fed funds rate latest observation was 5.33" in response
     assert "TSLA" in response
     assert "AAPL" not in response
-    assert "TSLA beat SPY by +105.2% in this run" in response
+    assert "TSLA beat SPY by 105.2 percentage points in this run" in response
     assert "simulated trades" in response
     assert "caus" in response.lower()
     assert calls[0]["context_packet_ids"] == ["packet-1"]
@@ -954,7 +998,7 @@ def test_what_tested_fallback_includes_performance_context_when_focus_drifts() -
     assert "I tested NVDA" in response
     assert "The strategy returned +23.6%" in response
     assert "SPY returned +11.4%" in response
-    assert "The gap versus the benchmark was +12.2%" in response
+    assert "Benchmark comparison: Beat by 12.2 percentage points" in response
 
 
 def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncertain() -> (
@@ -991,7 +1035,7 @@ def test_general_result_followup_fallback_is_fact_complete_when_focus_is_uncerta
     assert "2025-11-15 to 2026-05-15" in response
     assert "+21.9%" in response
     assert "SPY returned +11.4%" in response
-    assert "gap versus the benchmark was +10.4%" in response
+    assert "Benchmark comparison: Beat by 10.4 percentage points" in response
     assert "max drawdown was -15.7%" in response.lower()
     assert "next step" in response.lower()
 

@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  conversationLoadRetryActionFromConversationId,
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
+  retryLastTurnActionFromMetadata,
   retryLastTurnActionFromMessage,
+  retryLoadConversationIdFromAction,
   retryLastTurnMessageFromAction,
+  isRetryAction,
 } from "../lib/chat-retry-actions";
 
 describe("failed-action retry UI contract", () => {
@@ -135,7 +139,63 @@ describe("failed-action retry UI contract", () => {
     );
   });
 
+  test("hydrates a retry-last-turn action from persisted failure metadata", () => {
+    const action = retryLastTurnActionFromMetadata(
+      {
+        retry_last_turn: {
+          message: "what if I bought $125 of BTC every two weeks in 2022?",
+        },
+      },
+      { assistantMessageId: "assistant-failed-persisted" },
+    );
+
+    expect(action).toEqual({
+      id: "retry-last-turn",
+      label: "Retry",
+      labelKey: "common.retry",
+      value: "Retry",
+      type: "retry_last_turn",
+      payload: {
+        message: "what if I bought $125 of BTC every two weeks in 2022?",
+        failed_assistant_id: "assistant-failed-persisted",
+      },
+    });
+  });
+
+  test("does not hydrate retry-last-turn from malformed persisted metadata", () => {
+    expect(retryLastTurnActionFromMetadata({ retry_last_turn: {} })).toBeNull();
+    expect(
+      retryLastTurnActionFromMetadata({
+        retry_last_turn: { message: "   " },
+      }),
+    ).toBeNull();
+  });
+
   test("does not hydrate a retry-last-turn action from empty input", () => {
     expect(retryLastTurnActionFromMessage("   ")).toBeNull();
+  });
+
+  test("hydrates a structured retry action for conversation load failures", () => {
+    const action = conversationLoadRetryActionFromConversationId(
+      " conversation-load-1 ",
+    );
+
+    expect(action).toEqual({
+      id: "retry-load-conversation",
+      label: "Retry",
+      labelKey: "common.retry",
+      value: "Retry",
+      type: "retry_load_conversation",
+      payload: {
+        conversation_id: "conversation-load-1",
+      },
+    });
+    expect(retryLoadConversationIdFromAction(action)).toBe("conversation-load-1");
+    expect(isRetryAction(action)).toBe(true);
+  });
+
+  test("does not hydrate a conversation-load retry without a conversation id", () => {
+    expect(conversationLoadRetryActionFromConversationId("  ")).toBeNull();
+    expect(retryLoadConversationIdFromAction(undefined)).toBeNull();
   });
 });

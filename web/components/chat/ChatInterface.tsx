@@ -48,11 +48,14 @@ import {
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
 import {
+  conversationLoadRetryActionFromConversationId,
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
   isRetryAction,
   retryLastTurnActionFromMessage,
+  retryLastTurnFailedAssistantIdFromAction,
   retryLastTurnMessageFromAction,
+  retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
 import {
   activeConversationRouteStateFromUrl,
@@ -60,6 +63,8 @@ import {
   type ActiveConversationRouteState,
 } from "@/lib/chat-conversation-routing";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
+import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
@@ -85,6 +90,7 @@ import {
 type View = "chat" | "strategies" | "settings";
 type SendOptions = {
   renderUserMessage?: boolean;
+  replacementAssistantId?: string;
 };
 type OnboardingChoice = {
   goal: PrimaryGoal;
@@ -576,22 +582,12 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         actions: confirmation.actions ?? [],
       };
     }
-    return {
-      id: m.id,
-      role: m.role === "user" ? "user" : "ai",
-      kind: "text",
-      content: m.content,
-      actions:
-        m.role !== "user"
-          ? [failedActionRetryActionFromMetadata(metadata)].filter(
-              (action): action is ChatActionOption => Boolean(action),
-            )
-          : undefined,
+    return hydrateTextMessageFromApi(m, {
       contentPresentation:
         m.role !== "user" && isBreakdownActionMetadata(metadata)
           ? "result_breakdown"
           : undefined,
-    };
+    });
   });
 
   const normalized = applyConsumedResultActions(
@@ -962,6 +958,9 @@ export default function ChatInterface() {
           role: "ai",
           kind: "text",
           content: t('chat.error_load'),
+          actions: [
+            conversationLoadRetryActionFromConversationId(convId),
+          ].filter((action): action is ChatActionOption => Boolean(action)),
         },
       ]);
     } finally {
@@ -1076,9 +1075,7 @@ export default function ChatInterface() {
     if (isStreamingResponse) return;
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
-    const retryLastTurnAction = action?.type
-      ? null
-      : retryLastTurnActionFromMessage(trimmed);
+    const replacementAssistantId = options?.replacementAssistantId?.trim() || undefined;
     const routeState = readActiveConversationRouteState();
     let targetConversationId = routeState.conversationId ?? conversationId;
     const shouldCreateNewRouteConversation = shouldStartConversationForVisibleEmptyChat({
@@ -1122,10 +1119,15 @@ export default function ChatInterface() {
       mentions,
       selectedAction: action,
     };
-    const assistantId = crypto.randomUUID();
+    const assistantId = replacementAssistantId ?? crypto.randomUUID();
+    const retryLastTurnAction = action?.type
+      ? null
+      : retryLastTurnActionFromMessage(trimmed, {
+          assistantMessageId: assistantId,
+        });
 
-    setMessages((prev) => [
-      ...consumeConfirmationActionOnMessages(
+    setMessages((prev) => {
+      const baseMessages = consumeConfirmationActionOnMessages(
         consumeResultActionOnMessages(
           markComposerActionsInactive(
             shouldResetMessagesForNewConversation ? [] : prev,
@@ -1133,17 +1135,21 @@ export default function ChatInterface() {
           action,
         ),
         action,
-      ),
-      ...(renderUserMessage ? [userMsg] : []),
-      {
-        id: assistantId,
-        role: "ai",
-        kind: "text",
-        content: "",
-        contentPresentation:
-          action?.type === "show_breakdown" ? "result_breakdown" : undefined,
-      },
-    ]);
+      );
+      return appendOrReplacePendingAssistantMessage(baseMessages, {
+        assistantId,
+        pendingAssistant: {
+          id: assistantId,
+          role: "ai",
+          kind: "text",
+          content: "",
+          contentPresentation:
+            action?.type === "show_breakdown" ? "result_breakdown" : undefined,
+        },
+        userMessage: userMsg,
+        renderUserMessage,
+      });
+    });
     setInputActions([]);
     setStreamStatus(null);
     setIsStreamingResponse(true);
@@ -1172,6 +1178,13 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "error") {
+        const persistedErrorMessageId = event.data.message_id?.trim();
+        const visibleRetryAction =
+          retryLastTurnAction && persistedErrorMessageId
+            ? retryLastTurnActionFromMessage(trimmed, {
+                assistantMessageId: persistedErrorMessageId,
+              })
+            : retryLastTurnAction;
         setInputActions([]);
         setStreamStatus(null);
         setIsStreamingResponse(false);
@@ -1180,11 +1193,12 @@ export default function ChatInterface() {
             m.id === assistantId
               ? {
                   ...m,
+                  id: persistedErrorMessageId || m.id,
                   content: chatStreamErrorText(
                     event.data.detail,
                     t('chat.error_backtest'),
                   ),
-                  actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
+                  actions: visibleRetryAction ? [visibleRetryAction] : m.actions,
                 }
               : m,
           ),
@@ -1552,8 +1566,19 @@ export default function ChatInterface() {
     }
     if (action.type === "retry_last_turn") {
       const retryText = retryLastTurnMessageFromAction(action);
+      const failedAssistantId = retryLastTurnFailedAssistantIdFromAction(action);
       if (retryText) {
-        void handleSend(retryText, [], undefined, { renderUserMessage: false });
+        void handleSend(retryText, [], undefined, {
+          renderUserMessage: false,
+          replacementAssistantId: failedAssistantId ?? undefined,
+        });
+      }
+      return;
+    }
+    if (action.type === "retry_load_conversation") {
+      const retryConversationId = retryLoadConversationIdFromAction(action);
+      if (retryConversationId) {
+        void loadConversation(retryConversationId);
       }
       return;
     }

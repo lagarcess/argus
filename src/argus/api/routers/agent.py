@@ -59,6 +59,7 @@ from argus.api.chat.result_actions import (
     missing_refine_strategy_action_turn,
     refine_strategy_action_turn,
 )
+from argus.api.chat.retry import retry_last_turn_metadata
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.chat.strategies import save_strategy_from_run
 from argus.api.chat.streaming import (
@@ -949,14 +950,38 @@ async def chat_stream(
                 "Agent runtime chat streaming failed",
                 conversation_id=conversation.id,
             )
+            assistant_text = (
+                "Something went wrong. Your conversation is saved. "
+                "Please try again."
+            )
+            failure_metadata: dict[str, Any] = {
+                "conversation_mode": "recovery",
+                "agent_runtime_stage_outcome": "agent_runtime_failure",
+            }
+            retry_metadata = retry_last_turn_metadata(
+                payload=payload,
+                request_message=request_message,
+            )
+            if retry_metadata is not None:
+                failure_metadata.update(retry_metadata)
+            assistant_message = create_message(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                role="assistant",
+                content=assistant_text,
+                metadata=failure_metadata,
+            )
+            receipt_message_id = assistant_message.id
+            receipt_metadata = {
+                "stage_outcome": "agent_runtime_failure",
+                "conversation_mode": "recovery",
+            }
             yield sse_data(
                 {
                     "type": "error",
                     "code": "agent_runtime_failure",
-                    "message": (
-                        "Something went wrong. Your conversation is saved. "
-                        "Please try again."
-                    ),
+                    "message": assistant_text,
+                    "message_id": assistant_message.id,
                 }
             )
             yield sse_done()

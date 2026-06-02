@@ -83,6 +83,9 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
     StructuredInterpreter,
 )
+from argus.agent_runtime.stages.recovery_composer import (
+    compose_active_confirmation_interpreter_recovery,
+)
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     IntentName,
@@ -2717,11 +2720,86 @@ async def _interpreter_unavailable_result(
     )
     if result_followup is not None:
         return result_followup
+    active_confirmation_followup = (
+        await _active_confirmation_followup_when_interpreter_unavailable(
+            user=user,
+            snapshot=snapshot,
+            current_user_message=current_user_message,
+            selected_thread_metadata=selected_thread_metadata or {},
+        )
+    )
+    if active_confirmation_followup is not None:
+        return active_confirmation_followup
     return _offline_interpreter_unavailable_result(
         user=user,
         snapshot=snapshot,
         current_user_message=current_user_message,
         selected_thread_metadata=selected_thread_metadata or {},
+    )
+
+
+async def _active_confirmation_followup_when_interpreter_unavailable(
+    *,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    if (
+        snapshot is None
+        or snapshot.pending_strategy_summary is None
+        or snapshot.active_confirmation_reference is None
+        or not current_user_message.strip()
+    ):
+        return None
+    if _pending_assumption_edit_was_not_applied(
+        current_user_message=current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+    ):
+        return None
+    strategy = snapshot.pending_strategy_summary
+    setup_phrase = _current_setup_phrase(strategy)
+    assumptions_response = _draft_assumptions_response(snapshot)
+    action_guidance = (
+        "The visible confirmation is still ready. Use the card to start the "
+        "simulation, or use the card controls to change it."
+    )
+    response = await compose_active_confirmation_interpreter_recovery(
+        current_user_message=current_user_message,
+        setup_phrase=setup_phrase,
+        assumptions_response=assumptions_response,
+        action_guidance=action_guidance,
+    )
+    if response is None:
+        return None
+    effective_profile = resolve_effective_response_profile(
+        user=user,
+        explicit_overrides=None,
+    )
+    decision = InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary=(
+            "Structured interpretation was unavailable; answered while preserving "
+            "the active confirmation artifact."
+        ),
+        candidate_strategy_draft=StrategySummary(),
+        missing_required_fields=[],
+        optional_parameter_opportunity=[],
+        confidence=0.0,
+        arbitration_mode="deterministic",
+        reason_codes=[
+            "llm_interpreter_unavailable",
+            "active_confirmation_composed_recovery",
+        ],
+        effective_response_profile=effective_profile,
+        semantic_turn_act="educational_question",
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={"assistant_response": response},
     )
 
 

@@ -147,6 +147,52 @@ def test_clarify_dca_missing_execution_fields_win_over_total_budget_constraint()
     assert clarifier.requests[0].unsupported_constraints == []
 
 
+def test_clarify_dca_missing_period_wins_over_total_budget_constraint() -> None:
+    state = RunState.new(
+        current_user_message="I want to DCA $100 into ETH with a $5,000 cap.",
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.missing_required_fields = ["date_range"]
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        capital_amount=100,
+        cadence="weekly",
+        extra_parameters={"total_capital": 5000},
+    )
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_dca_starting_principal",
+                "raw_value": "$5,000 contribution cap",
+                "explanation": (
+                    "The current DCA backtest can only execute the recurring "
+                    "contribution."
+                ),
+                "simplification_options": [
+                    {"label": "Run recurring buys only"},
+                    {"label": "Adjust recurring contribution"},
+                ],
+            }
+        ]
+    }
+    clarifier = RecordingClarifier("Which date window should I use?")
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["semantic_needs"] == ["period"]
+    assert result.patch["requested_field"] == "date_range"
+    assert clarifier.requests[0].unsupported_constraints == []
+
+
 def test_dca_amount_and_cadence_contract_can_override_under_specific_llm_copy() -> None:
     state = RunState.new(
         current_user_message=(
@@ -283,6 +329,58 @@ def test_clarify_uses_generator_for_unsupported_recovery() -> None:
     assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
         "unsupported_asset_mix"
     )
+
+
+def test_clarify_composes_dca_cap_recovery_after_execution_fields_are_known() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "what if I bought $125 of BTC every two weeks from 2022 through "
+            "2023 with a $3000 cap?"
+        ),
+        recent_thread_history=[],
+    )
+    state.intent = "strategy_drafting"
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        asset_universe=["BTC"],
+        asset_class="crypto",
+        date_range={"start": "2022-01-01", "end": "2023-12-31"},
+        capital_amount=125,
+        cadence="biweekly",
+        extra_parameters={"total_budget": 3000},
+    )
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_dca_starting_principal",
+                "raw_value": "$3,000 contribution cap",
+                "explanation": (
+                    "I understand $3,000 as a contribution cap, but the current "
+                    "DCA backtest can only execute the recurring contribution."
+                ),
+                "simplification_options": [
+                    {"label": "Run recurring buys only"},
+                    {"label": "Adjust recurring contribution"},
+                    {"label": "Use buy and hold with starting capital"},
+                ],
+            }
+        ]
+    }
+    clarifier = RecordingClarifier("This LLM clarification should not be used.")
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["response_intent"]["kind"] == "unsupported_recovery"
+    assert clarifier.requests == []
+    prompt = result.patch["assistant_prompt"]
+    assert "contribution cap" in prompt
+    assert "recurring contribution" in prompt
+    assert "run the recurring-buy simulation only" in prompt
 
 
 def test_clarify_routes_interpreter_prefill_through_target_aware_generator() -> None:
@@ -1296,6 +1394,62 @@ def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> Non
     assert "Benchmark: SPY" not in assumptions
     assert result.patch["confirmation_payload"]["launch_payload"]["benchmark_symbol"] == (
         "QQQ"
+    )
+
+
+def test_confirm_stage_blocks_carried_dca_cap_before_ready_card() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "what if I bought $125 of BTC every two weeks from 2022 through "
+            "2023 with a $3000 cap?"
+        ),
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Recurring buys for BTC with a budget cap.",
+        asset_universe=["BTC"],
+        asset_class="crypto",
+        date_range={"start": "2022-01-01", "end": "2023-12-31"},
+        capital_amount=125,
+        cadence="biweekly",
+        extra_parameters={
+            "recurring_contribution": 125,
+            "total_budget": 3000,
+            "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "total_capital": "cap",
+                "cadence": "explicit_user",
+            },
+        },
+    )
+    state.optional_parameter_status = {
+        "unsupported_constraints": [
+            {
+                "category": "unsupported_dca_starting_principal",
+                "raw_value": "$3,000 cap",
+                "explanation": (
+                    "The recurring-buy launch can use the per-buy amount and "
+                    "cadence, but it cannot enforce a total cap yet."
+                ),
+                "simplification_options": [
+                    {"label": "Run recurring buys only"},
+                    {"label": "Adjust the recurring contribution"},
+                ],
+            }
+        ]
+    }
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "needs_clarification"
+    assert "confirmation_payload" not in result.patch
+    assert result.patch["requested_field"] == "unsupported_constraints"
+    constraint = result.patch["optional_parameter_status"]["unsupported_constraints"][0]
+    assert constraint["category"] == "unsupported_dca_starting_principal"
+    assert any(
+        option["label"] == "Run recurring buys only"
+        for option in constraint["simplification_options"]
     )
 
 

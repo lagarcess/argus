@@ -38,7 +38,11 @@ def compose_response_intent(state: RunState) -> str | None:
 
 def should_prefer_composed_intent(state: RunState) -> bool:
     intent = state.response_intent
-    if intent is None or intent.kind != "clarification":
+    if intent is None:
+        return False
+    if intent.kind == "unsupported_recovery":
+        return _should_compose_unsupported_recovery(intent)
+    if intent.kind != "clarification":
         return False
     strategy = _strategy_from_intent(intent)
     if strategy.strategy_type != "dca_accumulation":
@@ -49,6 +53,31 @@ def should_prefer_composed_intent(state: RunState) -> bool:
         {"sizing_amount", "schedule"}.issubset(needs)
         and {"capital_amount", "cadence"}.issubset(missing_fields)
         and not {"asset_universe", "date_range"}.intersection(missing_fields)
+    )
+
+
+def _should_compose_unsupported_recovery(intent: ResponseIntent) -> bool:
+    strategy = _strategy_from_intent(intent)
+    if strategy.strategy_type != "dca_accumulation":
+        return False
+    if not _has_dca_runnable_execution_fields(strategy):
+        return False
+    constraints = intent.facts.get("unsupported_constraints", [])
+    if not isinstance(constraints, list):
+        return False
+    return any(
+        isinstance(constraint, dict)
+        and constraint.get("category") == "unsupported_dca_starting_principal"
+        for constraint in constraints
+    )
+
+
+def _has_dca_runnable_execution_fields(strategy: StrategySummary) -> bool:
+    return bool(
+        strategy.asset_universe
+        and strategy.date_range not in (None, "", [], {})
+        and strategy.capital_amount is not None
+        and _has_dca_cadence(strategy)
     )
 
 

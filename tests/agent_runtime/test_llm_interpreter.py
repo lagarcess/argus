@@ -4,9 +4,11 @@ from datetime import date
 import pytest
 from argus.agent_runtime.asset_text_grounding import (
     _candidate_text_supports_resolved_asset,
+    provider_ticker_mentions_from_text,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_interpreter import (
+    AssetGroundingAudit,
     LLMInterpretationResponse,
     LLMRiskRule,
     LLMStrategyDraft,
@@ -18,6 +20,7 @@ from argus.agent_runtime.llm_interpreter import (
     _response_from_signal_rule_plan,
     _signal_rule_checked_response,
 )
+from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.signal_rule_repair import (
     SignalRuleGroundingAudit,
     SignalRulePlan,
@@ -27,6 +30,7 @@ from argus.agent_runtime.stages.interpret import InterpretationRequest, interpre
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     ConversationMessage,
+    ResolutionProvenance,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -97,6 +101,42 @@ def test_candidate_text_keeps_lowercase_action_words_from_becoming_assets() -> N
     )
 
 
+def test_provider_ticker_mentions_support_lowercase_benchmark_evidence_only() -> None:
+    def resolve_candidate(query: str) -> AssetResolution | None:
+        normalized = query.strip().upper()
+        if normalized == "APPLE":
+            asset = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        elif normalized == "QQQ":
+            asset = ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        else:
+            return None
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field="asset_universe",
+                raw_text=query,
+                source="user_mention",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        )
+
+    mentions = provider_ticker_mentions_from_text(
+        "how did apple do against qqq in 2024",
+        resolve_candidate=resolve_candidate,
+    )
+
+    assert [mention.raw_text for mention in mentions] == ["qqq"]
+    assert [mention.asset.canonical_symbol for mention in mentions] == ["QQQ"]
+
+
 @pytest.mark.asyncio
 async def test_ready_run_with_missing_stated_benchmark_uses_fidelity_audit(
     monkeypatch,
@@ -137,6 +177,11 @@ async def test_ready_run_with_missing_stated_benchmark_uses_fidelity_audit(
         if schema_name == "ExecutableStrategyGroundingAudit":
             return ExecutableStrategyGroundingAudit(
                 outcome="grounded",
+                confidence=0.95,
+            )
+        if schema_name == "AssetGroundingAudit":
+            return AssetGroundingAudit(
+                grounded_symbols=["AAPL"],
                 confidence=0.95,
             )
         if schema_name == "StatedRunFieldFidelityAudit":
@@ -1862,6 +1907,149 @@ async def test_retry_word_inside_new_prompt_uses_focused_strategy_repair(
 
 
 @pytest.mark.asyncio
+async def test_current_year_so_far_repairs_llm_year_end_date_range(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def repair_stub(*, failed_response, request, **kwargs):
+        del kwargs
+        return interpreter_module._response_from_focused_strategy_extraction(
+            extraction=interpreter_module.FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                requires_clarification=False,
+                user_goal_summary="User wants an Apple buy-and-hold comparison.",
+                strategy_type="buy_and_hold",
+                strategy_thesis="Buy and hold Apple against QQQ in 2026 so far.",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                date_range={"start": "2026-01-01", "end": "2026-12-31"},
+                comparison_baseline="QQQ",
+            ),
+            request=request,
+            base_response=failed_response,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_repair_incomplete_strategy_extraction",
+        repair_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_date_range_from_current_message",
+        lambda message: {"start": "2026-01-01", "end": "2026-06-01"}
+        if "so far" in message
+        else None,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks a fresh comparison.",
+        candidate_strategy_draft=LLMStrategyDraft(),
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "how did apple perform against QQQ in 2026 so far, simple buy and hold"
+        ),
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert ready_response.semantic_turn_act == "new_idea"
+    assert ready_response.candidate_strategy_draft.asset_universe == ["AAPL"]
+    assert ready_response.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert ready_response.candidate_strategy_draft.date_range == {
+        "start": "2026-01-01",
+        "end": "2026-06-01",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "current_message",
+    [
+        "explain what dollar cost averaging means",
+        "what does average entry price mean for beginners?",
+    ],
+)
+async def test_candidate_failure_repair_skips_active_confirmation_side_question_without_execution_evidence(
+    monkeypatch,
+    current_message,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    repair_calls: list[str] = []
+
+    async def failed_interpreter_stub(**kwargs):
+        assert kwargs["schema_name"] == "LLMInterpretationResponse"
+        raise TimeoutError("structured interpreter unavailable")
+
+    async def repair_stub(*, request, **kwargs):
+        del kwargs
+        repair_calls.append(request.current_user_message)
+        raise AssertionError("side questions should not enter focused strategy repair")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        failed_interpreter_stub,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "_repair_incomplete_strategy_extraction",
+        repair_stub,
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = await interpreter.ainvoke(
+        InterpretationRequest(
+            current_user_message=current_message,
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="dca_accumulation",
+                    strategy_thesis="Recurring buys for BTC.",
+                    asset_universe=["BTC"],
+                    asset_class="crypto",
+                    date_range={"start": "2022-01-01", "end": "2023-12-31"},
+                    capital_amount=125,
+                    cadence="biweekly",
+                ),
+                active_confirmation_reference=ArtifactReference(
+                    artifact_kind="confirmation",
+                    artifact_id="confirmation-1",
+                    metadata={
+                        "strategy": "Recurring Buys",
+                        "assets": ["BTC"],
+                    },
+                ),
+            ),
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is None
+    assert repair_calls == []
+
+
+@pytest.mark.asyncio
 async def test_llm_interpreter_does_not_repair_vague_strategy_start(
     monkeypatch,
 ) -> None:
@@ -2206,6 +2394,48 @@ async def test_llm_interpreter_audits_pending_asset_answer_despite_educational_c
     assert "requested_asset_answer_candidate_audit" in ready_response.reason_codes
 
 
+def test_requested_asset_answer_audit_prompt_does_not_copy_rejection_prose() -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the asset edit with a company name.",
+        assistant_response=(
+            'I ran "Google" through our supported assets and it did not match.'
+        ),
+        semantic_turn_act="educational_question",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="google",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Test TSLA with buy and hold.",
+                asset_universe=["TSLA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            )
+        ),
+        selected_thread_metadata={"requested_field": "asset_universe"},
+        user=UserState(user_id="u1"),
+    )
+
+    messages = interpreter_module._requested_asset_answer_candidate_audit_messages(
+        response=response,
+        request=request,
+    )
+
+    joined = "\n".join(message["content"] for message in messages)
+    assert "Current asset answer: google" in joined
+    assert "did not match" not in joined
+    assert "assistant_response" not in joined
+    assert "TSLA" in joined
+
+
 @pytest.mark.asyncio
 async def test_pending_asset_answer_audit_tries_fallback_model_before_rejecting(
     monkeypatch,
@@ -2283,6 +2513,66 @@ async def test_pending_asset_answer_audit_tries_fallback_model_before_rejecting(
     )
 
     assert calls == ["structured-primary", "structured-fallback"]
+    assert ready_response.semantic_turn_act == "answer_pending_need"
+    assert ready_response.candidate_strategy_draft.asset_universe == ["GBEX"]
+    assert ready_response.candidate_strategy_draft.asset_class == "equity"
+    assert ready_response.assistant_response is None
+    assert "requested_asset_answer_candidate_audit" in ready_response.reason_codes
+
+
+def test_requested_asset_answer_audit_validates_ranked_candidates_before_clarifying(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == "GBEX":
+            return ResolvedAssetStub(
+                "GBEX",
+                "equity",
+                name="Globex Corporation Common Stock",
+            )
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    response = LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the asset edit with a company name.",
+        assistant_response="Which listed share should I use?",
+        semantic_turn_act="educational_question",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="globex",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="buy_and_hold",
+                strategy_thesis="Test ACME with buy and hold.",
+                asset_universe=["ACME"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            )
+        ),
+        selected_thread_metadata={"requested_field": "asset_universe"},
+        user=UserState(user_id="u1"),
+    )
+    audit = interpreter_module.AssetAnswerCandidateAudit(
+        candidate_symbols=["GBEX", "GBEY"],
+        needs_clarification=True,
+        confidence=0.88,
+    )
+
+    ready_response = interpreter_module._response_from_requested_asset_answer_candidate_audit(
+        response=response,
+        request=request,
+        audit=audit,
+    )
+
+    assert ready_response is not None
     assert ready_response.semantic_turn_act == "answer_pending_need"
     assert ready_response.candidate_strategy_draft.asset_universe == ["GBEX"]
     assert ready_response.candidate_strategy_draft.asset_class == "equity"
@@ -2579,6 +2869,213 @@ async def test_llm_interpreter_clears_ungrounded_lowercase_asset_extraction(
     assert ready_response.candidate_strategy_draft.asset_universe == []
     assert ready_response.assistant_response is None
     assert "asset_grounding_audit_removed_unsubstantiated_symbols" in (
+        ready_response.reason_codes
+    )
+
+
+@pytest.mark.asyncio
+async def test_llm_interpreter_repairs_side_question_after_ungrounded_asset_extraction(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        calls.append(kwargs["schema_name"])
+        if kwargs["schema_name"] == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=[],
+                confidence=0.92,
+            )
+        if kwargs["schema_name"] == "CapabilitySideQuestionAudit":
+            return interpreter_module.CapabilitySideQuestionAudit(
+                is_capability_question=True,
+                focus="supported_strategies",
+                assistant_response=None,
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected schema: {kwargs['schema_name']}")
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == "DG":
+            return ResolvedAssetStub("DG", "equity", name="Dollar General Corporation")
+        if normalized == "BTC":
+            return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User asks what recurring buys mean.",
+        assistant_response=(
+            "I can test recurring buys for DG. How much should each recurring "
+            "purchase be?"
+        ),
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="explain what recurring buys mean",
+            strategy_type="dca_accumulation",
+            strategy_thesis="Test recurring buys for DG.",
+            asset_universe=["DG"],
+        ),
+        missing_required_fields=["capital_amount", "cadence", "date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="explain what recurring buys mean",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="dca_accumulation",
+                strategy_thesis="Recurring buys for BTC.",
+                asset_universe=["BTC"],
+                asset_class="crypto",
+                date_range={"start": "2022-01-01", "end": "2023-12-31"},
+                capital_amount=125,
+                cadence="biweekly",
+            )
+        ),
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls == ["AssetGroundingAudit", "CapabilitySideQuestionAudit"]
+    assert ready_response.intent == "conversation_followup"
+    assert ready_response.semantic_turn_act == "educational_question"
+    assert ready_response.capability_question_focus == "supported_strategies"
+    assert ready_response.candidate_strategy_draft.asset_universe == []
+    assert ready_response.missing_required_fields == []
+    assert ready_response.assistant_response is None
+    assert "asset_grounding_audit_removed_unsubstantiated_symbols" in (
+        ready_response.reason_codes
+    )
+    assert "capability_side_question_audit" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("current_message", "extracted_symbol", "asset_name", "strategy_thesis"),
+    [
+        (
+            "explain what recurring buys mean",
+            "DG",
+            "Dollar General Corporation",
+            "Test recurring buys for DG.",
+        ),
+        (
+            "what does average entry price mean for beginners?",
+            "AEP",
+            "American Electric Power Company",
+            "Test average entry price for AEP.",
+        ),
+    ],
+)
+async def test_llm_interpreter_keeps_side_question_conversational_when_audit_unavailable_after_ungrounded_asset(
+    monkeypatch,
+    current_message,
+    extracted_symbol,
+    asset_name,
+    strategy_thesis,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def audit_stub(**kwargs):
+        calls.append(kwargs["schema_name"])
+        if kwargs["schema_name"] == "AssetGroundingAudit":
+            return interpreter_module.AssetGroundingAudit(
+                grounded_symbols=[],
+                confidence=0.92,
+            )
+        if kwargs["schema_name"] == "CapabilitySideQuestionAudit":
+            raise TimeoutError("audit unavailable")
+        raise AssertionError(f"Unexpected schema: {kwargs['schema_name']}")
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == extracted_symbol:
+            return ResolvedAssetStub(
+                extracted_symbol,
+                "equity",
+                name=asset_name,
+            )
+        if normalized == "BTC":
+            return ResolvedAssetStub("BTC", "crypto", name="Bitcoin")
+        raise ValueError("invalid_symbol")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+
+    response = LLMInterpretationResponse(
+        intent="strategy_drafting",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User asks an investing concept side question.",
+        assistant_response="I can set up a test if you tell me the missing facts.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=current_message,
+            strategy_type="dca_accumulation",
+            strategy_thesis=strategy_thesis,
+            asset_universe=[extracted_symbol],
+        ),
+        missing_required_fields=["capital_amount", "cadence", "date_range"],
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=current_message,
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="dca_accumulation",
+                strategy_thesis="Recurring buys for BTC.",
+                asset_universe=["BTC"],
+                asset_class="crypto",
+                date_range={"start": "2022-01-01", "end": "2023-12-31"},
+                capital_amount=125,
+                cadence="biweekly",
+            )
+        ),
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls == ["AssetGroundingAudit", "CapabilitySideQuestionAudit"]
+    assert ready_response.intent == "conversation_followup"
+    assert ready_response.semantic_turn_act == "educational_question"
+    assert ready_response.artifact_target == "none"
+    assert ready_response.candidate_strategy_draft.asset_universe == []
+    assert ready_response.missing_required_fields == []
+    assert ready_response.assistant_response is None
+    assert "asset_grounding_audit_removed_unsubstantiated_symbols" in (
+        ready_response.reason_codes
+    )
+    assert "capability_side_question_audit_unavailable_after_asset_grounding" in (
         ready_response.reason_codes
     )
 
@@ -4327,6 +4824,92 @@ async def test_dca_contribution_role_audit_demotes_total_budget(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
+async def test_dca_contribution_role_audit_preserves_recurring_amount_with_cap(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_model, model_name
+        assert schema_name == "DcaContributionRoleAudit"
+        return interpreter_module.DcaContributionRoleAudit(
+            recurring_contribution_explicit=True,
+            total_budget_not_recurring=True,
+            confidence=0.9,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="User supplied recurring buys with a contribution cap.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "what if I bought $125 of BTC every two weeks from 2022 "
+                "through 2023 with a $3000 cap?"
+            ),
+            strategy_type="dca_accumulation",
+            strategy_thesis="Recurring buys for BTC.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2022-01-01", "end": "2023-12-31"},
+            capital_amount=125,
+            recurring_contribution=125,
+            cadence="biweekly",
+            total_capital=3000,
+            sizing_mode="capital_amount",
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "recurring_contribution": "recurring_contribution",
+                "total_capital": "cap",
+                "cadence": "explicit_user",
+            },
+            extra_parameters={
+                "recurring_contribution": 125,
+                "recurring_cadence": "biweekly",
+                "total_budget": 3000,
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    audited = await interpreter_module._dca_contribution_role_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "what if I bought $125 of BTC every two weeks from 2022 "
+                "through 2023 with a $3000 cap?"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = audited.candidate_strategy_draft
+    assert audited.requires_clarification is False
+    assert audited.intent == "backtest_execution"
+    assert draft.capital_amount == 125
+    assert draft.recurring_contribution == 125
+    assert draft.cadence == "biweekly"
+    assert draft.total_capital == 3000
+    assert draft.sizing_mode == "capital_amount"
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert draft.field_provenance["total_capital"] == "cap"
+    assert "capital_amount" not in audited.missing_required_fields
+    assert "dca_recurring_contribution_grounded_in_current_message" in (
+        audited.reason_codes
+    )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("message", "symbol", "amount", "cadence", "budget"),
     [
@@ -4849,6 +5432,96 @@ async def test_dca_contract_audit_recovers_recurring_buy_shape_before_capability
     assert draft.field_provenance["total_capital"] == budget_source
     assert "capital_amount" not in repaired.missing_required_fields
     assert "cadence" not in repaired.missing_required_fields
+    assert "dca_contract_audit" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_dca_contract_audit_preserves_optional_cap_on_ready_dca_shape(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, model_name
+        calls.append(schema_name)
+        if schema_name == "DcaContractAudit":
+            return schema_model(
+                is_recurring_buy_request=True,
+                recurring_contribution_amount=125,
+                cadence="biweekly",
+                total_budget_amount=3000,
+                total_budget_source="cap",
+                confidence=0.92,
+            )
+        if schema_name == "DcaContributionRoleAudit":
+            return interpreter_module.DcaContributionRoleAudit(
+                recurring_contribution_explicit=True,
+                total_budget_not_recurring=True,
+                confidence=0.9,
+            )
+        raise AssertionError(f"unexpected schema: {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants recurring buys with a contribution cap.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "what if I bought $125 of BTC every two weeks from 2022 "
+                "through 2023 with a $3000 cap?"
+            ),
+            strategy_type="dca_accumulation",
+            strategy_thesis="Recurring buys for BTC.",
+            asset_universe=["BTC"],
+            asset_class="crypto",
+            date_range={"start": "2022-01-01", "end": "2023-12-31"},
+            capital_amount=125,
+            cadence="biweekly",
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "what if I bought $125 of BTC every two weeks from 2022 "
+            "through 2023 with a $3000 cap?"
+        ),
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    repaired = await interpreter_module._response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    draft = repaired.candidate_strategy_draft
+    assert "DcaContractAudit" in calls
+    assert repaired.requires_clarification is False
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.capital_amount == 125
+    assert draft.recurring_contribution == 125
+    assert draft.cadence == "biweekly"
+    assert draft.total_capital == 3000
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert draft.field_provenance["total_capital"] == "cap"
+    assert draft.extra_parameters["total_budget"] == 3000
     assert "dca_contract_audit" in repaired.reason_codes
 
 

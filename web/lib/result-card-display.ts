@@ -178,6 +178,9 @@ export function displayResultMetricLabel(
     metric.key === "benchmark_delta_pct" ||
     metric.label === "Vs benchmark"
   ) {
+    if (benchmarkSymbol) {
+      return benchmarkLabel(benchmarkSymbol, copy);
+    }
     if (metric.label.startsWith("Compared with ")) {
       return metric.label;
     }
@@ -337,8 +340,8 @@ function executionFacts(
     stringValue(resolvedParameters?.timeframe) ??
     assumptionValue(assumptions, "Timeframe");
   const benchmark =
-    stringValue(config?.benchmark_symbol) ??
     stringValue(resolvedParameters?.benchmark_symbol) ??
+    stringValue(config?.benchmark_symbol) ??
     assumptionValue(assumptions, "Benchmark") ??
     benchmarkFromMetric(result);
   const contribution = contributionFromStructuredFacts(

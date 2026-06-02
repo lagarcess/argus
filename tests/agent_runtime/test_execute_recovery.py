@@ -419,6 +419,35 @@ def test_execute_stage_keeps_raw_failure_code_out_of_ui_error_metadata() -> None
     assert "current setup" in result.patch["final_response_payload"]["error"]
 
 
+def test_execute_future_end_date_returns_non_retryable_date_prompt() -> None:
+    state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL"],
+            "date_range": {"start": "2026-01-01", "end": "2099-12-31"},
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
+            "benchmark_symbol": {"value": "QQQ", "source": "user"},
+        },
+    }
+
+    result = execute_stage(state=state, tool=RealBacktestTool(), max_retries=1)
+
+    assert result.outcome == "execution_failed_terminally"
+    assert result.patch["failure_classification"] == "parameter_validation_error"
+    prompt = result.patch["assistant_prompt"]
+    assert "later than the latest date" in prompt
+    failed_reference = result.patch["latest_failed_action_reference"]
+    metadata = failed_reference["metadata"]
+    assert metadata["retryable"] is False
+    assert metadata["failure_classification"] == "parameter_validation_error"
+    assert metadata["launch_payload"]["benchmark_symbol"] == "QQQ"
+    assert metadata["recovery_mode"] == "reopen_confirmation"
+
+
 def test_execute_ambiguous_user_intent_returns_to_conversation() -> None:
     tool = StubBacktestTool(
         responses=[
@@ -694,6 +723,45 @@ def test_execute_stage_uses_currency_pair_as_default_benchmark(
     execute_stage(state=state, tool=tool, max_retries=1)
 
     assert tool.calls[0]["benchmark_symbol"] == "EURUSD"
+
+
+def test_execute_stage_prioritizes_explicit_strategy_benchmark_over_default_optional() -> None:
+    tool = StubBacktestTool(
+        responses=[
+            {
+                "success": True,
+                "payload": {"result_card": {"title": "AAPL Buy and Hold"}},
+                "error_type": None,
+                "error_message": None,
+                "retryable": False,
+                "capability_context": {},
+            }
+        ]
+    )
+    state = RunState.new(
+        current_user_message="Run backtest",
+        recent_thread_history=[],
+    )
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_thesis": "Buy and hold AAPL against QQQ in 2024",
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL"],
+            "asset_class": "equity",
+            "comparison_baseline": "QQQ",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "capital_amount": 1000.0,
+        },
+        "optional_parameters": {
+            "timeframe": {"value": "1D", "source": "default"},
+            "initial_capital": {"value": 1000.0, "source": "default"},
+            "benchmark_symbol": {"value": "SPY", "source": "default"},
+        },
+    }
+
+    execute_stage(state=state, tool=tool, max_retries=1)
+
+    assert tool.calls[0]["benchmark_symbol"] == "QQQ"
 
 
 def test_execute_stage_preserves_multi_symbol_launch_payload(
@@ -1410,7 +1478,7 @@ async def test_explain_stage_async_limits_llm_next_checks_to_supported_contract(
         captured.update(kwargs)
         return {
             "relative_performance_claim": "lagged_benchmark",
-            "takeaway": "The test lagged the benchmark, so the signal needs a tighter follow-up.",
+            "takeaway": "The TSLA test Lagged by 87.8 percentage points against SPY, so the signal needs a tighter follow-up.",
             "tested_bullet": "Tested TSLA with the confirmed crossover over the supplied window.",
             "meaning_bullet": "The comparison is useful evidence, not a verdict.",
             "next_check_bullet": "Next check: adjust the signal periods.",
@@ -1419,11 +1487,12 @@ async def test_explain_stage_async_limits_llm_next_checks_to_supported_contract(
             "next_experiment_option_kinds": ["adjust_signal_periods"],
             "fact_ids": [
                 "tested_summary",
-                "total_return",
-                "benchmark_return",
-                "benchmark_delta",
-                "caveat",
-            ],
+                    "total_return",
+                    "benchmark_return",
+                    "benchmark_symbol",
+                    "benchmark_comparison",
+                    "caveat",
+                ],
         }
 
     monkeypatch.setattr(
@@ -1442,7 +1511,11 @@ async def test_explain_stage_async_limits_llm_next_checks_to_supported_contract(
         "optional_parameters": {},
     }
     state.final_response_payload = {
-        "result": {"total_return": -0.326, "benchmark_return": 0.552}
+        "result": {
+            "total_return": -0.326,
+            "benchmark_return": 0.552,
+            "benchmark_symbol": "SPY",
+        }
     }
 
     result = await explain_stage_async(state=state)
@@ -1486,7 +1559,7 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
                 "tested_summary",
                 "total_return",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "benchmark_symbol",
                 "caveat",
             ],
@@ -1530,6 +1603,12 @@ async def test_explain_stage_async_sends_benchmark_contract_for_grounded_compari
         "tested_symbols": ["TSLA"],
         "benchmark_is_tested_asset": False,
     }
+    assert context["fact_bank"]["benchmark_comparison"] == (
+        "Lagged by 87.8 percentage points"
+    )
+    assert context["fact_bank"]["benchmark_delta_magnitude"] == (
+        "87.8 percentage points"
+    )
     assert captured["context_packet_ids"] == ["packet-1"]
 
 
@@ -1553,7 +1632,7 @@ async def test_explain_stage_async_renders_quick_take_from_canonical_facts(
                 "tested_summary",
                 "total_return",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "benchmark_symbol",
                 "caveat",
             ],
@@ -1601,6 +1680,62 @@ async def test_explain_stage_async_renders_quick_take_from_canonical_facts(
 
 
 @pytest.mark.asyncio
+async def test_explain_stage_async_rejects_signed_benchmark_delta_copy(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "lagged_benchmark",
+            "takeaway": (
+                "AAPL returned 15.1%, while QQQ returned 20.4% over the same "
+                "period, about -5.3 percentage points versus the benchmark."
+            ),
+            "tested_bullet": "Tested AAPL buy and hold over the confirmed window.",
+            "meaning_bullet": None,
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Historical simulation only.",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "AAPL buy and hold against QQQ.",
+            "asset_universe": ["AAPL"],
+            "date_range": {"start": "2026-01-01", "end": "2026-05-31"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.151, "benchmark_return": 0.204},
+        "explanation_context": {"benchmark_symbol": "QQQ"},
+    }
+
+    result = await explain_stage_async(state=state)
+    response = result.stage_patch["assistant_response"]
+
+    assert "-5.3" not in response
+    assert "lagged by 5.3 percentage points" in response
+
+
+@pytest.mark.asyncio
 async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
     monkeypatch,
 ) -> None:
@@ -1623,7 +1758,7 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
                 "tested_summary",
                 "total_return",
                 "benchmark_return",
-                "benchmark_delta",
+                "benchmark_comparison",
                 "benchmark_symbol",
                 "caveat",
             ],
@@ -1672,6 +1807,7 @@ async def test_explain_stage_async_sends_only_curated_facts_to_quick_take_llm(
         "strategy",
     }
     prompt_payload = messages[1]["content"].lower()
+    assert "beat by 8.1 percentage points" in prompt_payload
     assert "sharpe" not in prompt_payload
     assert "result_card" not in prompt_payload
 

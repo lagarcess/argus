@@ -45,6 +45,15 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
             },
         )
 
+    carried_unsupported_constraints = _carried_unsupported_constraints_patch(
+        state.optional_parameter_status
+    )
+    if carried_unsupported_constraints is not None:
+        return StageResult(
+            outcome="needs_clarification",
+            stage_patch=carried_unsupported_constraints,
+        )
+
     optional_parameters = _resolve_optional_parameters(
         contract=contract,
         optional_parameter_status=state.optional_parameter_status,
@@ -446,6 +455,27 @@ def _unsupported_execution_assumption(
             },
         )
     return None
+
+
+def _carried_unsupported_constraints_patch(
+    optional_parameter_status: dict[str, Any],
+) -> dict[str, Any] | None:
+    unsupported_constraints = [
+        value
+        for value in optional_parameter_status.get("unsupported_constraints", [])
+        if isinstance(value, dict) and isinstance(value.get("category"), str)
+    ]
+    if not unsupported_constraints:
+        return None
+    return {
+        "assistant_prompt": None,
+        "requested_field": "unsupported_constraints",
+        "missing_required_fields": [],
+        "optional_parameter_status": {
+            **optional_parameter_status,
+            "unsupported_constraints": unsupported_constraints,
+        },
+    }
 
 
 def _recoverable_constraint_patch(

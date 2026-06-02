@@ -4614,7 +4614,11 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
         LLMInterpretationResponse,
         LLMStrategyDraft,
     )
+    from argus.agent_runtime.run_field_contract import current_message_date_range
 
+    current_message = "how did apple perform against QQQ in 2026 so far?"
+    expected_range = current_message_date_range(current_message)
+    assert expected_range is not None
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
@@ -4624,7 +4628,7 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
             strategy_type="buy_and_hold",
             asset_universe=["AAPL"],
             asset_class="equity",
-            date_range={"start": "2026-01-01", "end": "2026-06-01"},
+            date_range=expected_range,
             comparison_baseline="QQQ",
         ),
         semantic_turn_act="new_idea",
@@ -4636,10 +4640,58 @@ def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
     repaired = _response_from_stated_run_field_fidelity_audit(
         response=response,
         audit=audit,
-        current_message="how did apple perform against QQQ in 2026 so far?",
+        current_message=current_message,
     )
 
     assert repaired is None
+
+
+def test_current_message_contract_repairs_full_future_year_to_so_far(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter import (
+        _response_from_current_message_run_field_contract,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    expected_range = {"start": "2026-01-01", "end": "2026-06-01"}
+    monkeypatch.setattr(
+        llm_module,
+        "_date_range_from_current_message",
+        lambda message: expected_range,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants Apple against QQQ year to date.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-12-31"},
+            comparison_baseline="QQQ",
+        ),
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message="how did apple perform against QQQ in 2026 so far?",
+        user=UserState(user_id="user-1"),
+    )
+
+    repaired = _response_from_current_message_run_field_contract(
+        response=response,
+        request=request,
+    )
+
+    assert repaired is not None
+    assert repaired.candidate_strategy_draft.date_range == expected_range
+    assert "current_message_run_field_contract_repair" in repaired.reason_codes
 
 
 def test_interpret_stage_repairs_dca_calendar_period_before_clarifying_timeframe(

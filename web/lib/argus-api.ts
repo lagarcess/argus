@@ -212,7 +212,7 @@ export type ChatStreamEvent =
   | { event: "final"; data: ChatFinalPayload }
   | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
-  | { event: "error"; data: { code?: string; detail: string } }
+  | { event: "error"; data: { code?: string; detail: string; message_id?: string } }
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
@@ -824,6 +824,8 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
       data: {
         code: typeof payload.code === "string" ? payload.code : undefined,
         detail: String(payload.message ?? payload.detail ?? "Chat stream failed"),
+        message_id:
+          typeof payload.message_id === "string" ? payload.message_id : undefined,
       },
     };
   }

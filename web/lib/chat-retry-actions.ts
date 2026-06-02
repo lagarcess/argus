@@ -84,13 +84,19 @@ export function failedActionRetryActionFromMetadata(
   };
 }
 
+type RetryLastTurnOptions = {
+  assistantMessageId?: string;
+};
+
 export function retryLastTurnActionFromMessage(
   message: string,
+  options?: RetryLastTurnOptions,
 ): ChatActionOption | null {
   const trimmed = message.trim();
   if (!trimmed) {
     return null;
   }
+  const failedAssistantId = options?.assistantMessageId?.trim();
   return {
     id: "retry-last-turn",
     label: "Retry",
@@ -99,8 +105,21 @@ export function retryLastTurnActionFromMessage(
     type: "retry_last_turn",
     payload: {
       message: trimmed,
+      ...(failedAssistantId ? { failed_assistant_id: failedAssistantId } : {}),
     },
   };
+}
+
+export function retryLastTurnActionFromMetadata(
+  metadata: Record<string, unknown>,
+  options?: RetryLastTurnOptions,
+): ChatActionOption | null {
+  const retryLastTurn = recordOrNull(metadata.retry_last_turn);
+  const message = stringOrNull(retryLastTurn?.message);
+  if (!message) {
+    return null;
+  }
+  return retryLastTurnActionFromMessage(message, options);
 }
 
 export function retryLastTurnMessageFromAction(
@@ -113,6 +132,43 @@ export function retryLastTurnMessageFromAction(
   return message?.trim() || null;
 }
 
+export function retryLastTurnFailedAssistantIdFromAction(
+  action: ChatActionOption | null | undefined,
+): string | null {
+  if (action?.type !== "retry_last_turn") {
+    return null;
+  }
+  return stringOrNull(action.payload?.failed_assistant_id)?.trim() || null;
+}
+
+export function conversationLoadRetryActionFromConversationId(
+  conversationId: string | null | undefined,
+): ChatActionOption | null {
+  const trimmed = conversationId?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return {
+    id: "retry-load-conversation",
+    label: "Retry",
+    labelKey: "common.retry",
+    value: "Retry",
+    type: "retry_load_conversation",
+    payload: {
+      conversation_id: trimmed,
+    },
+  };
+}
+
+export function retryLoadConversationIdFromAction(
+  action: ChatActionOption | null | undefined,
+): string | null {
+  if (action?.type !== "retry_load_conversation") {
+    return null;
+  }
+  return stringOrNull(action.payload?.conversation_id)?.trim() || null;
+}
+
 export function isRetryAction(action: ChatActionOption | null | undefined): boolean {
   if (!action) {
     return false;
@@ -120,6 +176,7 @@ export function isRetryAction(action: ChatActionOption | null | undefined): bool
   return (
     action.type === "retry_failed_action" ||
     action.type === "retry_last_turn" ||
+    action.type === "retry_load_conversation" ||
     action.artifactType === "failed_action"
   );
 }

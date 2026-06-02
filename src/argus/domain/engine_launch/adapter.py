@@ -620,6 +620,8 @@ def _normalize_value_error(error_code: str) -> tuple[str, str]:
         "capital_amount_not_applicable",
         "position_size_not_applicable",
         "invalid_date_range",
+        "invalid_chronological_date_range",
+        "future_end_date",
         "invalid_starting_capital",
         "invalid_symbol_count",
         "position_price_required",

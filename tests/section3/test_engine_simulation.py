@@ -211,6 +211,38 @@ def test_validate_backtest_config_rejects_custom_parameters() -> None:
         engine.validate_backtest_config(config)
 
 
+def test_validate_backtest_config_distinguishes_chronology_and_future_dates() -> None:
+    base_config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+    }
+
+    with pytest.raises(ValueError, match="invalid_chronological_date_range"):
+        engine.validate_backtest_config(
+            {
+                **base_config,
+                "start_date": "2024-12-31",
+                "end_date": "2024-01-01",
+            }
+        )
+
+    with pytest.raises(ValueError, match="future_end_date"):
+        engine.validate_backtest_config(
+            {
+                **base_config,
+                "start_date": "2026-01-01",
+                "end_date": "2099-12-31",
+            }
+        )
+
+
 def test_validate_backtest_config_accepts_custom_rsi_thresholds() -> None:
     config = engine.normalize_backtest_config(
         {

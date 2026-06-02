@@ -11,6 +11,9 @@ from argus.agent_runtime.strategy_contract import (
     resolve_date_range,
     strategy_can_be_approved,
 )
+from argus.agent_runtime.turn_execution_evidence import (
+    current_turn_has_material_execution_evidence,
+)
 
 
 def test_resolve_date_range_accepts_month_name_ranges() -> None:
@@ -89,6 +92,21 @@ def test_current_message_dca_cadence_uses_capability_aliases() -> None:
     )
     assert current_message_dca_cadence("comprar 100 de BTC cada mes en 2024") == (
         "monthly"
+    )
+
+
+def test_active_context_asset_mentions_need_requested_field_context() -> None:
+    assert current_turn_has_material_execution_evidence(
+        "QQQ",
+        has_provider_asset_mention=True,
+        active_strategy_context=True,
+        requested_field="comparison_baseline",
+    )
+    assert not current_turn_has_material_execution_evidence(
+        "what is QQQ?",
+        has_provider_asset_mention=True,
+        active_strategy_context=True,
+        requested_field=None,
     )
 
 
