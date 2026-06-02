@@ -191,7 +191,8 @@ Usage:
 
 ## 🚀 Quick Start (Local Development)
 
-Argus supports two primary development scenarios. Choose your mode and start:
+Argus supports two primary local scenarios. Choose the script first; do not
+manually juggle backend mode flags for normal work.
 
 ### Fast Iteration (Dev Mode)
 **Use this for:** Building features, debugging, UI work, isolated testing — no persistence needed.
@@ -205,16 +206,23 @@ Argus supports two primary development scenarios. Choose your mode and start:
    ```bash
    .github/dev.sh
    ```
-   This sources your `.env` credentials and sets all Dev Mode variables automatically.
+   This sources `.env` if present, then overrides backend runtime flags for fast
+   synthetic-data development.
 
 3. **Start frontend** (Terminal 2):
    ```bash
    cd web && bun run dev
    ```
 
-4. **Access**: Open `http://localhost:3000` → Auto-logs in as "Mock Developer"
+4. **Frontend env**: for fast mock-auth dev, set in `web/.env.local`:
+   ```bash
+   NEXT_PUBLIC_MOCK_AUTH=true
+   NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+   ```
 
-5. **Build + test**:
+5. **Access**: Open `http://localhost:3000` → Auto-logs in as "Mock Developer"
+
+6. **Build + test**:
    ```bash
    poetry run pytest tests/
    cd web && bun test
@@ -233,11 +241,18 @@ Argus supports two primary development scenarios. Choose your mode and start:
    ```bash
    .github/qa.sh
    ```
-   This sources your `.env` credentials and sets all QA Mode variables automatically.
+   This requires real Supabase, OpenRouter, Alpaca, and `DATABASE_URL` values in
+   `.env`, then overrides backend runtime flags for strict production-parity QA.
 
 3. **Start frontend** (Terminal 2):
    ```bash
    cd web && bun run dev
+   ```
+
+   For real auth QA, set in `web/.env.local`:
+   ```bash
+   NEXT_PUBLIC_MOCK_AUTH=false
+   NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
    ```
 
 4. **Run full QA suite**:
@@ -259,14 +274,24 @@ Argus supports two primary development scenarios. Choose your mode and start:
 - `ARGUS_DEV_MEMORY_FALLBACK=true` — Tolerant (failures don't block the chat)
 - `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` — Hardcoded test assets (no API calls)
 - `ARGUS_CHECKPOINTER_MODE=memory` — No checkpoint persistence
+- `ARGUS_MOCK_AUTH=true` — Backend mock auth for local development
 
 **`.github/qa.sh`** sets:
 - `ARGUS_PERSISTENCE_MODE=supabase` — Durable, all writes go to Supabase
 - `ARGUS_DEV_MEMORY_FALLBACK=false` — Strict (errors propagate for debugging)
-- `ARGUS_MARKET_DATA_PROVIDER_MODE=recorded_provider_fixture` — Realistic recorded data (production-like)
-- `ARGUS_CHECKPOINTER_MODE=memory` — Runtime state recovery
+- `ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider` — Real provider-backed asset resolution
+- `ARGUS_CHECKPOINTER_MODE=postgres` — Runtime recovery/reload through Supabase Postgres
+- `ARGUS_MOCK_AUTH=false` — Real backend auth validation
 
-**Your `.env` stays constant** — Both scripts source the same `.env`, so your credentials are never scattered or duplicated.
+**Your `.env` stays mostly constant** — It stores credentials and safe defaults.
+The scripts are authoritative for backend mode flags, so you should not need to
+remember the right `ARGUS_*` combination for dev vs QA.
+
+**Recorded provider fixtures** are not the default manual QA path. They are for
+deterministic provider tests or CI when `ARGUS_ASSET_FIXTURE_PATH` points to a
+provider-shaped asset catalog snapshot. Until such a snapshot is generated and
+versioned, manual QA should use `live_provider` so symbol recognition exercises
+the same provider-backed resolution path production will use.
 
 ### Feature Flags (All Private-Alpha)
 Keep these disabled unless explicitly testing:
@@ -284,9 +309,18 @@ Create `web/.env.local` with frontend-specific settings:
 cp web/.env.local.example web/.env.local
 ```
 
-For both Dev and QA modes, typically:
+For fast Dev Mode:
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=true
+NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+NEXT_PUBLIC_STRATEGIES_ENABLED=false
+NEXT_PUBLIC_COLLECTIONS_ENABLED=false
+NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+```
+
+For QA Mode with real Supabase auth:
+```bash
+NEXT_PUBLIC_MOCK_AUTH=false
 NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
 NEXT_PUBLIC_STRATEGIES_ENABLED=false
 NEXT_PUBLIC_COLLECTIONS_ENABLED=false
@@ -306,9 +340,13 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 - **Scheduled Framework**: [`.agent/.jules/README.md`](./.agent/.jules/README.md)
 
 ### 🛡️ Developer Identity: Mock Auth Mode
-To bypass the Supabase OAuth wall in development environments (e.g., remote VMs), set the following environment variable:
+To bypass the Supabase auth wall in fast Dev Mode, set the following frontend
+environment variable:
 
 `NEXT_PUBLIC_MOCK_AUTH=true`
+
+Keep `NEXT_PUBLIC_MOCK_AUTH=false` for QA Mode when validating signup, login,
+logout, persistence, reload, and private-alpha allowlist behavior.
 
 **Benefits for Agents:**
 - **Auth Bypass**: Instantly logs in as "Mock Developer" (mock user).
@@ -368,10 +406,13 @@ Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style
 Used for: Making asset/market data deterministic without HTTP mocking
 
 Pattern:
-- ARGUS_MARKET_DATA_PROVIDER_MODE env controls data source
-- Modes: live_provider | recorded_provider_fixture | synthetic_unit_fixture
-- Code path unchanged; only data source changes
-- Enables deterministic testing with real code paths
+- `ARGUS_MARKET_DATA_PROVIDER_MODE` controls data source.
+- Modes:
+  - `live_provider`: real provider catalog/data; default for manual QA and production-like validation.
+  - `recorded_provider_fixture`: provider-shaped catalog snapshot; deterministic tests/CI only and requires `ARGUS_ASSET_FIXTURE_PATH`.
+  - `synthetic_unit_fixture`: small hardcoded unit fixture; fast Dev Mode only.
+- Code path unchanged; only data source changes.
+- Enables deterministic testing with real code paths without making synthetic fixtures look like production truth.
 
 Example: _asset_provider_mode() in src/argus/domain/market_data/assets.py
 
@@ -457,3 +498,29 @@ Priority order of authority:
 6. Existing code
 
 *Argus should feel modern, intelligent, simple, trustworthy, and fast — never intimidating.*
+
+---
+
+## Commit / Checkpoint Discipline
+
+For multi-step or high-risk work, do not accumulate large uncommitted diffs.
+
+Before starting:
+- Check `git status`.
+- Identify any user-owned changes and do not overwrite them.
+- Use a branch/worktree for substantial work.
+
+During implementation:
+- Prefer atomic, single-purpose changes.
+- After each coherent slice, run focused verification.
+- If the slice is working, create a conventional commit checkpoint before moving to the next slice.
+- Do not let runtime/UI work grow into 50-file uncommitted diffs unless explicitly approved.
+
+For long plans:
+- Each worker/slice should end with: tests run, browser smoke note if applicable, known caveats, and either a commit or a clear reason it remains uncommitted.
+
+Never:
+- Commit unrelated user changes.
+- Hide broken work in a broad checkpoint.
+- Use vague commit messages.
+- Leave large exploratory diffs without explaining rollback risk.
