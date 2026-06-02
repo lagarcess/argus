@@ -314,7 +314,7 @@ def _render_clarification_response(
     *,
     request: ClarificationRequest,
 ) -> str:
-    question = response.question.strip()
+    question = _collapse_adjacent_duplicate_sentences(response.question.strip())
     contract_question = _contract_direct_question(request)
     direct_question = contract_question or response.direct_question.strip()
     if direct_question:
@@ -327,6 +327,28 @@ def _render_clarification_response(
             return f"{context} {direct_question}".strip()
         return direct_question
     return question
+
+
+def _collapse_adjacent_duplicate_sentences(text: str) -> str:
+    sentences = _sentences(text)
+    if len(sentences) < 2:
+        return text
+
+    collapsed: list[str] = []
+    previous_identity = ""
+    for sentence in sentences:
+        identity = _sentence_identity(sentence)
+        if identity and identity == previous_identity:
+            continue
+        collapsed.append(sentence)
+        previous_identity = identity
+    return " ".join(collapsed).strip()
+
+
+def _sentence_identity(sentence: str) -> str:
+    return " ".join(
+        "".join(char.casefold() if char.isalnum() else " " for char in sentence).split()
+    )
 
 
 def _contract_direct_question(request: ClarificationRequest) -> str:

@@ -215,10 +215,10 @@ def _confirmation_benchmark_assumption(
     launch_payload: dict[str, Any],
 ) -> str | None:
     for value in (
-        launch_payload.get("benchmark_symbol"),
-        _optional_parameter_value(optional_parameters, "benchmark_symbol"),
         strategy.get("comparison_baseline"),
         strategy.get("benchmark_symbol"),
+        _optional_parameter_value(optional_parameters, "benchmark_symbol"),
+        launch_payload.get("benchmark_symbol"),
     ):
         if isinstance(value, str) and value.strip():
             return f"Benchmark: {value.strip().upper()}"

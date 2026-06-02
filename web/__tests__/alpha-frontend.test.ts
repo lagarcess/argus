@@ -117,6 +117,39 @@ describe("Argus Alpha frontend contract", () => {
     );
   });
 
+  test("failed-action retry stays a structured footer action and message menus close on focus loss", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const retry = readFileSync(join(root, "lib/chat-retry-actions.ts"), "utf-8");
+
+    expect(chat).toContain("failedActionRetryActionFromMetadata(metadata)");
+    expect(chat).toContain("retryLastTurnActionFromMessage(trimmed)");
+    expect(chat).toContain("retryLastTurnMessageFromAction(action)");
+    expect(chat).toContain("isFailedActionRetry(action)");
+    expect(retry).toContain("latest_failed_action_reference");
+    expect(retry).toContain("launch_payload");
+    expect(retry).toContain('type: "retry_failed_action"');
+    expect(retry).toContain('type: "retry_last_turn"');
+    expect(retry).toContain("export function isRetryAction");
+    expect(retry).not.toContain("content.includes");
+    expect(retry).not.toContain(".match(");
+    expect(message).toContain("action.labelKey ? t(action.labelKey, action.label) : action.label");
+    expect(message).toContain("const retryAction = message.actions?.find");
+    expect(message).toContain("message.actions?.find(isRetryAction)");
+    expect(message).toContain("const shouldShowTextFooter =");
+    expect(message).toContain("message.kind === \"text\" && (isLatest || Boolean(retryAction))");
+    expect(message).toContain("{shouldShowTextFooter &&");
+    expect(message).toContain("<RotateCcw");
+    expect(message).toContain("onMouseLeave={() => setShowOptions(false)}");
+    expect(message).toContain('rating || showOptions ? "opacity-100"');
+    expect(message).toContain("onBlur={(event) =>");
+    expect(message).toContain("setShowOptions(false)");
+    expect(chat).toContain("const finalRetryActions = [");
+    expect(chat).toContain("failedActionRetryActionFromMetadata(finalPayload)");
+    expect(chat).toContain("mergeFinalTextMessage(m, {");
+    expect(chat).toContain("finalActions: finalRetryActions");
+  });
+
   test("result cards render a separate trust strip and compact assumption details", () => {
     const card = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
     const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
@@ -270,8 +303,15 @@ describe("Argus Alpha frontend contract", () => {
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const artifactHistory = readFileSync(
+      join(root, "components/chat/artifact-history.ts"),
+      "utf-8",
+    );
 
-    expect(chat).toContain("supersedeOpenConfirmations");
+    expect(chat).toContain("settleOpenConfirmationsAfterTextFinal");
+    expect(artifactHistory).toContain("supersedeOpenConfirmations");
+    expect(artifactHistory).toContain("Could not run");
+    expect(artifactHistory).toContain('artifactType === "failed_action"');
     expect(chat).toContain("finalStageOutcome");
     expect(chat).toContain('finalStageOutcome === "await_user_reply"');
     expect(chat).toContain('finalStageOutcome === "needs_clarification"');
@@ -503,8 +543,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("readActiveConversationId");
     expect(chat).toContain("persistActiveConversationId");
     expect(chat).toContain("getConversationMessages(activeConversationId");
-    expect(chat).toContain("const routeConversationId = readActiveConversationIdFromUrl();");
-    expect(chat).toContain("const targetConversationId = routeConversationId ?? conversationId;");
+    expect(chat).toContain("const routeState = readActiveConversationRouteState();");
+    expect(chat).toContain("shouldStartConversationForVisibleEmptyChat({");
+    expect(chat).toContain("visibleMessageCount: messages.length");
+    expect(chat).toContain("hasStructuredAction: Boolean(action?.type)");
     expect(chat).toContain("await streamToConversation(targetConversationId);");
   });
 

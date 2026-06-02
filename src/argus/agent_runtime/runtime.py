@@ -311,6 +311,7 @@ def _pending_strategy_payload(
     stage_outcome = result.get("stage_outcome")
     stage_outcome_value = str(getattr(stage_outcome, "value", stage_outcome or ""))
     if stage_outcome_value not in {
+        "needs_clarification",
         "await_user_reply",
         "ready_for_confirmation",
         "await_approval",
@@ -345,6 +346,9 @@ def _pending_strategy_payload(
         pending_resolution = selected_thread_metadata.get("pending_resolution")
         if isinstance(pending_resolution, dict):
             payload["pending_resolution"] = dict(pending_resolution)
+        response_intent = selected_thread_metadata.get("response_intent")
+        if isinstance(response_intent, dict):
+            payload["response_intent"] = dict(response_intent)
     return payload
 
 

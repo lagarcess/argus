@@ -13,6 +13,7 @@ from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     plan_artifact_assumption_edit,
 )
+from argus.agent_runtime.asset_text_grounding import grounded_asset_mentions_from_text
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
@@ -27,6 +28,18 @@ from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.result_followups import result_followup_fact_bank
+from argus.agent_runtime.run_field_contract import (
+    current_message_dca_cadence as _dca_cadence_from_current_message,
+)
+from argus.agent_runtime.run_field_contract import (
+    current_message_date_range as _date_range_from_current_message,
+)
+from argus.agent_runtime.run_field_contract import (
+    field_fidelity_tokens as _field_fidelity_tokens,
+)
+from argus.agent_runtime.run_field_contract import (
+    message_states_bar_timeframe as _message_states_bar_timeframe,
+)
 from argus.agent_runtime.rule_specs import (
     executable_rule_spec_from_strategy,
     moving_average_crossover_text,
@@ -41,6 +54,9 @@ from argus.agent_runtime.signal_rule_repair import (
     SignalRulePlan,
     audit_signal_rule_grounding,
     repair_signal_rule_plan,
+)
+from argus.agent_runtime.stages.artifact_context import (
+    launch_payload_from_failed_action,
 )
 from argus.agent_runtime.stages.interpret_types import (
     CapabilityQuestionFocus,
@@ -75,6 +91,7 @@ from argus.domain.indicators import (
     normalize_indicator_parameters,
 )
 from argus.domain.market_data import resolve_asset
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.llm.openrouter import (
     build_openrouter_model,
     invoke_openrouter_json_schema,
@@ -85,6 +102,25 @@ from argus.llm.openrouter import (
 )
 
 _DEFAULT_RESOLVE_ASSET = resolve_asset
+
+
+def _selected_thread_metadata_context(metadata: dict[str, Any]) -> str:
+    if not metadata:
+        return "none"
+    context_keys = (
+        "last_stage_outcome",
+        "requested_field",
+        "requested_fields",
+        "artifact_target",
+        "chat_action",
+        "source_result_run_id",
+        "failed_action",
+        "response_intent",
+    )
+    context = {key: metadata[key] for key in context_keys if key in metadata}
+    if not context:
+        return "none"
+    return json.dumps(context, sort_keys=True, default=str)
 
 
 class CapabilitySideQuestionAudit(BaseModel):
@@ -140,6 +176,27 @@ class AssetGroundingAudit(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class AssetAnswerCandidateAudit(BaseModel):
+    candidate_symbols: list[str] = Field(
+        default_factory=list,
+        description=(
+            "One to three likely public market symbols for the current asset answer, "
+            "normalized as tickers or crypto symbols. A common public-company or "
+            "public-asset name is a valid answer even when the user did not type the "
+            "ticker. Leave empty when the answer is ambiguous, unsupported, or not "
+            "an asset answer."
+        ),
+    )
+    needs_clarification: bool = Field(
+        default=False,
+        description=(
+            "True when multiple plausible assets remain and the user should choose "
+            "instead of the runtime guessing."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
 class StrategyFamilyContinuityAudit(BaseModel):
     should_rebind_strategy_family: bool = Field(
         description=(
@@ -181,13 +238,89 @@ class DcaContributionRoleAudit(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class DcaContractAudit(BaseModel):
+    is_recurring_buy_request: bool = Field(
+        description=(
+            "True only when the current user message is asking for a DCA or "
+            "recurring fixed-dollar buy backtest."
+        )
+    )
+    recurring_contribution_amount: float | None = Field(
+        default=None,
+        description=(
+            "The per-purchase contribution explicitly stated by the user. Leave "
+            "null when the message only states total budget, starting principal, "
+            "or cap."
+        ),
+    )
+    cadence: str | None = Field(
+        default=None,
+        description=(
+            "User-stated recurring cadence normalized to one allowed DCA cadence "
+            "such as daily, weekly, biweekly, monthly, or quarterly. Leave null "
+            "when absent."
+        ),
+    )
+    total_budget_amount: float | None = Field(
+        default=None,
+        description=(
+            "Optional total budget, starting principal, or contribution cap stated "
+            "for the whole DCA plan. Do not use this as the recurring contribution."
+        ),
+    )
+    total_budget_source: str | None = Field(
+        default=None,
+        description=(
+            "Semantic role for total_budget_amount, for example cap, max_budget, "
+            "total_budget, starting_capital, or initial_capital."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class PendingResponseOptionSelectionAudit(BaseModel):
+    is_selection: bool = Field(
+        description=(
+            "True when the current user message semantically selects one of the "
+            "pending response-intent options."
+        )
+    )
+    selected_option_index: int | None = Field(
+        default=None,
+        description=(
+            "Zero-based index of the selected option from the provided option list. "
+            "Leave null when no option is selected."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
 class StatedRunFieldFidelityAudit(BaseModel):
     capital_amount: float | None = Field(
         default=None,
         description=(
             "Starting capital explicitly stated by the current user message, "
             "normalized as a number. Examples: 10k -> 10000, $500 -> 500. "
-            "Leave null when the user did not state starting capital."
+            "Leave null when the user did not state starting capital. For DCA "
+            "or recurring buys, do not put the per-purchase contribution here; "
+            "use recurring_contribution_amount."
+        ),
+    )
+    recurring_contribution_amount: float | None = Field(
+        default=None,
+        description=(
+            "For DCA or recurring-buy requests only: the amount explicitly stated "
+            "as each recurring purchase contribution, normalized as a number. "
+            "Leave null when the current user message gives only a total budget, "
+            "starting principal, cap, or no per-purchase contribution."
+        ),
+    )
+    cadence: str | None = Field(
+        default=None,
+        description=(
+            "For DCA or recurring-buy requests only: user-stated cadence normalized "
+            "to daily, weekly, biweekly, monthly, or quarterly. Leave null when "
+            "the current user message did not state cadence."
         ),
     )
     timeframe: str | None = Field(
@@ -328,6 +461,11 @@ class OpenRouterStructuredInterpreter:
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
+                repaired_response = await _stated_run_field_audited_response(
+                    response=repaired_response,
+                    preferred_model=candidate_models[0] if candidate_models else "",
+                    request=request,
+                )
                 return self._to_runtime_interpretation(
                     repaired_response,
                     request=request,
@@ -506,7 +644,9 @@ class OpenRouterStructuredInterpreter:
                     f"Latest result fact bank JSON, if any: "
                     f"{latest_result if latest_result else 'none'}\n"
                     f"Latest failed action JSON, if any: "
-                    f"{latest_failed_action if latest_failed_action else 'none'}"
+                    f"{latest_failed_action if latest_failed_action else 'none'}\n"
+                    f"Selected thread metadata JSON, if any: "
+                    f"{_selected_thread_metadata_context(request.selected_thread_metadata)}"
                 )
             ),
             *history,
@@ -541,7 +681,9 @@ class OpenRouterStructuredInterpreter:
             "'compared with BTC', or 'beat the market' describe comparison_baseline "
             "or the benchmark, not additional assets to buy. Do not add benchmark "
             "symbols to asset_universe unless the user explicitly says to buy, hold, "
-            "or test both as assets. When the user gives exact start/end dates, "
+            "or test both as assets. Set field_provenance.comparison_baseline="
+            "'explicit_user' only when the current user message explicitly names "
+            "the comparison or benchmark. When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
             "never replace them with past year, last year, or another default period. "
             f"The current runtime date is {date.today().isoformat()}; if the user "
@@ -680,9 +822,9 @@ class OpenRouterStructuredInterpreter:
             "underperformance premises from the facts. Use next_experiment when "
             "the user asks what to try next, what else to test, next steps, what "
             "to change, or how to refine the latest result. Assumption questions "
-            "about a visible confirmation or draft should set semantic_turn_act="
+            "about a visible confirmation should set semantic_turn_act="
             "result_followup and result_followup_focus=assumptions even when no "
-            "completed run exists; use the active draft/card context instead of "
+            "completed run exists; use the active confirmation/card context instead of "
             "regenerating a new card. If the user asks to save, keep, bookmark, "
             "or promote the latest completed result, set semantic_turn_act="
             "result_followup, result_followup_focus=general, artifact_target="
@@ -690,7 +832,7 @@ class OpenRouterStructuredInterpreter:
             "Set artifact_target to latest_result only when the current user message "
             "is actually about the latest completed run. Set artifact_target to "
             "pending_refinement when the user is answering a Refine strategy prompt. "
-            "Set artifact_target to active_confirmation for visible draft/card "
+            "Set artifact_target to active_confirmation for visible confirmation/card "
             "questions. Set artifact_target to none for new ideas, standalone market "
             "questions, product help, or education. Do not let a completed result "
             "capture unrelated turns merely because it exists. "
@@ -711,7 +853,7 @@ class OpenRouterStructuredInterpreter:
             "macro backdrop; corporate_events for splits, dividends, corporate actions, "
             "or earnings/event context; and market_movers for broad movers, most-active, "
             "or unusual-move curiosity. Keep artifact_target=none unless the user "
-            "clearly targets a visible result or current draft. "
+            "clearly targets a visible result or current confirmation. "
             "Retry turns should preserve the failed action payload; do "
             "not reinterpret the original investing idea from scratch. "
             "Social turns are conversation_followup with assistant_response and no "
@@ -719,6 +861,16 @@ class OpenRouterStructuredInterpreter:
             "When the user explicitly asks for response style, verbosity, or expertise "
             "for this turn, set response_profile_overrides; do not rely on backend "
             "regex for those preferences.\n\n"
+            "Selected thread metadata may include the pending requested_field from "
+            "the visible artifact. Use it as context for short answers, not as "
+            "user-facing copy. If requested_field is asset_universe and the current "
+            "message is a company, ticker, crypto asset, or currency-pair answer, "
+            "fill only the replacement asset field in candidate_strategy_draft and "
+            "keep unrelated prior strategy fields unchanged. Use normal market-symbol "
+            "knowledge for the candidate strategy when the company or asset is common; "
+            "deterministic provider validation will accept, clarify, or reject it "
+            "after you return. If the user gives a fresh complete idea instead of a "
+            "field answer, classify that as a new idea and extract the full draft.\n\n"
             "assistant_response must be natural user-facing prose. Never expose "
             "internal field names such as asset_universe, capital_amount, "
             "requested_field, or missing_required_fields. Never output raw JSON, "
@@ -884,6 +1036,216 @@ def _response_without_ungrounded_symbols(
             ),
         }
     )
+
+
+async def _requested_asset_answer_candidate_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    if not _response_needs_requested_asset_answer_candidate_audit(
+        response=response,
+        request=request,
+    ):
+        return response
+    messages = _requested_asset_answer_candidate_audit_messages(
+        response=response,
+        request=request,
+    )
+    for model_name in _unique_repair_models(preferred_model):
+        try:
+            audit = await invoke_openrouter_json_schema(
+                task="interpretation",
+                messages=messages,
+                schema_model=AssetAnswerCandidateAudit,
+                schema_name="AssetAnswerCandidateAudit",
+                model_name=model_name,
+            )
+        except Exception as exc:
+            log_openrouter_failure(
+                task="interpretation",
+                model_name=model_name,
+                exc=exc,
+                message=(
+                    "Requested asset-answer candidate audit failed; trying next "
+                    "candidate model"
+                ),
+            )
+            continue
+        repaired = _response_from_requested_asset_answer_candidate_audit(
+            response=response,
+            request=request,
+            audit=audit,
+        )
+        if repaired is not None:
+            return repaired
+    return response
+
+
+def _response_from_requested_asset_answer_candidate_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    audit: Any,
+) -> LLMInterpretationResponse | None:
+    if (
+        not isinstance(audit, AssetAnswerCandidateAudit)
+        or audit.needs_clarification
+        or audit.confidence < 0.6
+    ):
+        return None
+    prior_symbols = _prior_strategy_symbols(request)
+    for index, symbol in enumerate(audit.candidate_symbols[:3]):
+        candidate = str(symbol or "").strip()
+        if not candidate:
+            continue
+        resolution = _resolve_asset_candidate(
+            candidate,
+            field=f"asset_universe[{index}]",
+            source="llm_extraction",
+        )
+        if resolution.status != "resolved" or resolution.asset is None:
+            continue
+        if resolution.asset.canonical_symbol in prior_symbols:
+            continue
+        draft = response.candidate_strategy_draft.model_copy(deep=True)
+        draft.asset_universe = [resolution.asset.canonical_symbol]
+        draft.asset_class = resolution.asset.asset_class
+        draft.raw_user_phrasing = draft.raw_user_phrasing or request.current_user_message
+        missing = [
+            field
+            for field in response.missing_required_fields
+            if str(field).split("[", 1)[0] != "asset_universe"
+        ]
+        return response.model_copy(
+            update={
+                "intent": "backtest_execution",
+                "task_relation": "continue",
+                "requires_clarification": bool(missing),
+                "candidate_strategy_draft": draft,
+                "missing_required_fields": missing,
+                "assistant_response": None,
+                "semantic_turn_act": "answer_pending_need",
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *response.reason_codes,
+                            "requested_asset_answer_candidate_audit",
+                        ]
+                    )
+                ),
+            }
+        )
+    return None
+
+
+def _response_needs_requested_asset_answer_candidate_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if _selected_requested_field_base(request) != "asset_universe":
+        return False
+    if not request.current_user_message.strip():
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    if _draft_has_valid_requested_asset_update(response.candidate_strategy_draft, request):
+        return False
+    return bool(_prior_strategy_symbols(request))
+
+
+def _draft_has_valid_requested_asset_update(
+    draft: LLMStrategyDraft,
+    request: InterpretationRequest,
+) -> bool:
+    prior_symbols = _prior_strategy_symbols(request)
+    for index, symbol in enumerate(draft.asset_universe):
+        candidate = str(symbol or "").strip()
+        if not candidate:
+            continue
+        resolution = _resolve_asset_candidate(
+            candidate,
+            field=f"asset_universe[{index}]",
+            source="llm_extraction",
+        )
+        if resolution.status != "resolved" or resolution.asset is None:
+            continue
+        if resolution.asset.canonical_symbol not in prior_symbols:
+            return True
+    return False
+
+
+def _selected_requested_field_base(request: InterpretationRequest) -> str:
+    return (
+        str(request.selected_thread_metadata.get("requested_field") or "")
+        .split("[", 1)[0]
+        .strip()
+    )
+
+
+def _prior_strategy_symbols(request: InterpretationRequest) -> set[str]:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return set()
+    prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    if prior is None:
+        return set()
+    return {
+        str(symbol).strip().upper()
+        for symbol in prior.asset_universe
+        if str(symbol).strip()
+    }
+
+
+def _requested_asset_answer_candidate_audit_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    prior = None
+    snapshot = request.latest_task_snapshot
+    if snapshot is not None:
+        prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's asset-answer candidate audit. The user is answering "
+                "a visible request to change the asset in an existing strategy draft. "
+                "Use semantic meaning and common public-market knowledge to propose "
+                "likely listed symbols for the current answer only. The current answer "
+                "does not need to be a ticker; a well-known public company, fund, crypto "
+                "asset, or currency-pair name can be mapped to likely symbols. Provider "
+                "validation will verify your candidates afterward. The primary "
+                "interpretation may have rejected the answer without the pending-field "
+                "context; do not copy that classification. Do not preserve the prior "
+                "asset unless the current answer explicitly asks for it. Do not invent "
+                "support for private companies, themes, sectors, or vague references. "
+                "Return an empty list when the answer is ambiguous or not an asset."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Prior strategy JSON, if any: "
+                f"{prior.model_dump(mode='json') if prior else 'none'}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Current structured interpretation: "
+                f"{response.model_dump(mode='json', exclude_none=True)}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
 
 
 _ASSET_TOKEN_MAP = str.maketrans(
@@ -1350,6 +1712,225 @@ def _response_needs_strategy_family_continuity_audit(
     )
 
 
+async def _dca_contract_audited_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    if not _response_needs_dca_contract_audit(response=response, request=request):
+        return response
+    messages = _dca_contract_audit_messages(response=response, request=request)
+    for model_name in _unique_repair_models(preferred_model):
+        try:
+            audit = await invoke_openrouter_json_schema(
+                task="interpretation",
+                messages=messages,
+                schema_model=DcaContractAudit,
+                schema_name="DcaContractAudit",
+                model_name=model_name,
+            )
+        except Exception as exc:
+            log_openrouter_failure(
+                task="interpretation",
+                model_name=model_name,
+                exc=exc,
+                message="DCA contract audit failed; trying next candidate model",
+            )
+            continue
+        repaired = _response_from_dca_contract_audit(response=response, audit=audit)
+        if repaired is not None:
+            return repaired
+    return response
+
+
+def _response_needs_dca_contract_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.artifact_target == "latest_result":
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "refine_current_idea",
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    if response.intent not in {
+        "strategy_drafting",
+        "backtest_execution",
+        "unsupported_or_out_of_scope",
+    }:
+        return False
+    if not request.current_user_message.strip():
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        return _dca_response_needs_semantic_field_audit(response)
+    if response.capability_question_focus is not None:
+        return _llm_strategy_draft_has_extractable_fields(draft) or bool(
+            draft.raw_user_phrasing or draft.strategy_thesis
+        )
+    if response.semantic_turn_act == "unsupported_request":
+        return _llm_strategy_draft_has_extractable_fields(draft) or bool(
+            draft.raw_user_phrasing or draft.strategy_thesis
+        )
+    return (
+        response.requires_clarification
+        and not canonical_strategy_type(draft.strategy_type)
+        and _llm_strategy_draft_has_extractable_fields(draft)
+    )
+
+
+def _response_from_dca_contract_audit(
+    *,
+    response: LLMInterpretationResponse,
+    audit: Any,
+) -> LLMInterpretationResponse | None:
+    if (
+        not isinstance(audit, DcaContractAudit)
+        or not audit.is_recurring_buy_request
+        or audit.confidence < 0.7
+    ):
+        return None
+    cadence = _supported_dca_cadence_value(audit.cadence)
+    recurring_amount = audit.recurring_contribution_amount
+    if cadence is None or recurring_amount is None or recurring_amount <= 0:
+        return None
+
+    draft = response.candidate_strategy_draft.model_copy(deep=True)
+    draft.strategy_type = "dca_accumulation"
+    draft.capital_amount = float(recurring_amount)
+    draft.recurring_contribution = float(recurring_amount)
+    draft.cadence = cadence
+    draft.sizing_mode = "capital_amount"
+
+    field_provenance = dict(draft.field_provenance or {})
+    field_provenance["capital_amount"] = "recurring_contribution"
+    field_provenance["recurring_contribution"] = "recurring_contribution"
+
+    extra_parameters = dict(draft.extra_parameters or {})
+    extra_parameters["recurring_contribution"] = float(recurring_amount)
+    extra_parameters["recurring_cadence"] = cadence
+
+    if audit.total_budget_amount is not None and audit.total_budget_amount > 0:
+        budget_source = _dca_total_budget_source(audit.total_budget_source)
+        draft.total_capital = float(audit.total_budget_amount)
+        field_provenance["total_capital"] = budget_source
+        extra_parameters["total_budget"] = float(audit.total_budget_amount)
+
+    draft.field_provenance = field_provenance
+    draft.extra_parameters = extra_parameters
+
+    missing_required_fields = _dca_contract_missing_fields(
+        response.missing_required_fields,
+        draft=draft,
+    )
+    return response.model_copy(
+        update={
+            "intent": "strategy_drafting"
+            if missing_required_fields
+            else "backtest_execution",
+            "task_relation": "new_task",
+            "requires_clarification": bool(missing_required_fields),
+            "candidate_strategy_draft": draft,
+            "missing_required_fields": missing_required_fields,
+            "assistant_response": None,
+            "semantic_turn_act": "new_idea",
+            "capability_question_focus": None,
+            "artifact_target": "none",
+            "unsupported_constraints": [],
+            "reason_codes": list(
+                dict.fromkeys([*response.reason_codes, "dca_contract_audit"])
+            ),
+        }
+    )
+
+
+def _dca_contract_missing_fields(
+    current_missing: list[str],
+    *,
+    draft: LLMStrategyDraft,
+) -> list[str]:
+    stale_rule_fields = {"entry_logic", "exit_logic", "strategy_type"}
+    missing = [
+        field
+        for field in current_missing
+        if str(field).split("[", 1)[0] not in stale_rule_fields
+    ]
+    present_fields: set[str] = set()
+    if draft.asset_universe:
+        present_fields.add("asset_universe")
+    if draft.date_range not in (None, "", [], {}):
+        present_fields.add("date_range")
+    if draft.capital_amount is not None:
+        present_fields.add("capital_amount")
+    if draft.cadence not in (None, "", [], {}):
+        present_fields.add("cadence")
+    return [
+        field
+        for field in missing
+        if str(field).split("[", 1)[0] not in present_fields
+    ]
+
+
+def _supported_dca_cadence_value(value: Any) -> str | None:
+    normalized = str(value or "").strip().casefold()
+    if not normalized:
+        return None
+    capability = STRATEGY_CAPABILITIES.get("dca_accumulation")
+    cadence_spec = capability.parameters.get("dca_cadence") if capability else None
+    if cadence_spec is None:
+        return None
+    for allowed in cadence_spec.allowed_values:
+        candidate = str(allowed).strip().casefold()
+        if normalized == candidate:
+            return candidate
+    return None
+
+
+def _dca_total_budget_source(value: Any) -> str:
+    source = str(value or "").strip().casefold()
+    if source in _TOTAL_CAPITAL_SOURCES:
+        return source
+    return "total_budget"
+
+
+def _dca_contract_audit_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's DCA contract audit. The primary interpreter may "
+                "have misclassified a supported recurring-buy request as unsupported "
+                "or may have mixed up recurring contribution and total budget/cap. "
+                "Use semantic meaning, not keywords. Return true only when the "
+                "current user message asks for a fixed contribution on a recurring "
+                "cadence. The per-purchase amount belongs in "
+                "recurring_contribution_amount. A total budget, starting principal, "
+                "or cap belongs in total_budget_amount and must not replace the "
+                "recurring contribution. Do not infer missing contribution or "
+                "cadence. Provider and capability validation will run after this "
+                "audit; return only JSON matching the schema."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Current structured interpretation: "
+                f"{response.model_dump(mode='json', exclude_none=True)}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
 async def _dca_contribution_role_audited_response(
     *,
     response: LLMInterpretationResponse,
@@ -1358,12 +1939,6 @@ async def _dca_contribution_role_audited_response(
 ) -> LLMInterpretationResponse:
     if not _response_needs_dca_contribution_role_audit(response):
         return response
-    grounded_recurring_response = _response_with_current_message_dca_recurring_evidence(
-        response=response,
-        request=request,
-    )
-    if grounded_recurring_response is not None:
-        return grounded_recurring_response
     try:
         audit = await invoke_openrouter_json_schema(
             task="interpretation",
@@ -1383,12 +1958,44 @@ async def _dca_contribution_role_audited_response(
             message="DCA contribution role audit failed; preserving primary interpretation",
         )
         return response
-    if (
-        not isinstance(audit, DcaContributionRoleAudit)
-        or audit.confidence < 0.65
-        or audit.recurring_contribution_explicit
-        or not audit.total_budget_not_recurring
-    ):
+    if not isinstance(audit, DcaContributionRoleAudit) or audit.confidence < 0.65:
+        return response
+    if audit.recurring_contribution_explicit and not audit.total_budget_not_recurring:
+        draft = response.candidate_strategy_draft.model_copy(deep=True)
+        if draft.field_provenance.get("capital_amount") != "recurring_contribution":
+            draft.field_provenance["capital_amount"] = "recurring_contribution"
+        cadence = _dca_cadence_from_current_message(request.current_user_message)
+        missing_required_fields = list(response.missing_required_fields)
+        if cadence is not None:
+            draft.cadence = cadence
+            draft.field_provenance["cadence"] = "explicit_user"
+            missing_required_fields = [
+                field
+                for field in missing_required_fields
+                if str(field).split("[", 1)[0] != "cadence"
+            ]
+        missing_required_fields = [
+            field
+            for field in missing_required_fields
+            if str(field).split("[", 1)[0] != "capital_amount"
+        ]
+        return response.model_copy(
+            update={
+                "candidate_strategy_draft": draft,
+                "missing_required_fields": missing_required_fields,
+                "requires_clarification": bool(missing_required_fields),
+                "assistant_response": None,
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [
+                            *response.reason_codes,
+                            "dca_recurring_contribution_grounded_in_current_message",
+                        ]
+                    )
+                ),
+            }
+        )
+    if not audit.total_budget_not_recurring:
         return response
     draft = response.candidate_strategy_draft.model_copy(deep=True)
     _move_dca_total_budget_out_of_recurring_amount(draft)
@@ -1417,6 +2024,8 @@ async def _dca_contribution_role_audited_response(
 def _response_needs_dca_contribution_role_audit(
     response: LLMInterpretationResponse,
 ) -> bool:
+    if "pending_response_option_selected" in response.reason_codes:
+        return False
     draft = response.candidate_strategy_draft
     return (
         canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
@@ -1425,53 +2034,6 @@ def _response_needs_dca_contribution_role_audit(
             "approval",
             "result_followup",
             "retry_failed_action",
-        }
-    )
-
-
-def _response_with_current_message_dca_recurring_evidence(
-    *,
-    response: LLMInterpretationResponse,
-    request: InterpretationRequest,
-) -> LLMInterpretationResponse | None:
-    draft = response.candidate_strategy_draft
-    if canonical_strategy_type(draft.strategy_type) != "dca_accumulation":
-        return None
-    cadence = draft.cadence or _dca_cadence_from_current_message(
-        request.current_user_message
-    )
-    if not _message_contains_recurring_amount_evidence(
-        amount=draft.capital_amount,
-        cadence=cadence,
-        message=request.current_user_message,
-    ):
-        return None
-    updated = draft.model_copy(deep=True)
-    updated.cadence = cadence
-    field_provenance = dict(updated.field_provenance or {})
-    field_provenance["capital_amount"] = "recurring_contribution"
-    if cadence:
-        field_provenance["cadence"] = "explicit_user"
-    updated.field_provenance = field_provenance
-    missing_required_fields = [
-        field
-        for field in response.missing_required_fields
-        if field not in {"capital_amount", "cadence"}
-    ]
-    return response.model_copy(
-        update={
-            "candidate_strategy_draft": updated,
-            "missing_required_fields": missing_required_fields,
-            "requires_clarification": bool(missing_required_fields),
-            "assistant_response": None,
-            "reason_codes": list(
-                dict.fromkeys(
-                    [
-                        *response.reason_codes,
-                        "dca_recurring_contribution_grounded_in_current_message",
-                    ]
-                )
-            ),
         }
     )
 
@@ -1570,6 +2132,379 @@ def _move_dca_total_budget_out_of_recurring_amount(
     draft.extra_parameters = extra_parameters
 
 
+async def _pending_response_option_selected_response(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    if not _response_needs_pending_response_option_selection_audit(
+        response=response,
+        request=request,
+    ):
+        return response
+    options = _pending_response_intent_options(request)
+    messages = _pending_response_option_selection_audit_messages(
+        response=response,
+        request=request,
+        options=options,
+    )
+    for model_name in _unique_repair_models(preferred_model):
+        try:
+            audit = await invoke_openrouter_json_schema(
+                task="interpretation",
+                messages=messages,
+                schema_model=PendingResponseOptionSelectionAudit,
+                schema_name="PendingResponseOptionSelectionAudit",
+                model_name=model_name,
+            )
+        except Exception as exc:
+            log_openrouter_failure(
+                task="interpretation",
+                model_name=model_name,
+                exc=exc,
+                message=(
+                    "Pending response option selection audit failed; trying next "
+                    "candidate model"
+                ),
+            )
+            continue
+        repaired = _response_from_pending_response_option_selection_audit(
+            response=response,
+            request=request,
+            audit=audit,
+            options=options,
+        )
+        if repaired is not None:
+            return repaired
+    return response
+
+
+def _response_needs_pending_response_option_selection_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if not request.current_user_message.strip():
+        return False
+    response_intent = request.selected_thread_metadata.get("response_intent")
+    if not isinstance(response_intent, dict):
+        return False
+    if response_intent.get("kind") != "unsupported_recovery":
+        return False
+    semantic_needs = response_intent.get("semantic_needs")
+    if not isinstance(semantic_needs, list) or "simplification_choice" not in {
+        str(need) for need in semantic_needs
+    }:
+        return False
+    if not _pending_response_intent_options(request):
+        return False
+    if response.artifact_target == "latest_result":
+        return False
+    if response.semantic_turn_act in {
+        "result_followup",
+        "retry_failed_action",
+    }:
+        return False
+    snapshot = request.latest_task_snapshot
+    return bool(snapshot and snapshot.pending_strategy_summary is not None)
+
+
+def _pending_response_intent_options(
+    request: InterpretationRequest,
+) -> list[dict[str, Any]]:
+    response_intent = request.selected_thread_metadata.get("response_intent")
+    if not isinstance(response_intent, dict):
+        return []
+    raw_options = response_intent.get("options")
+    if not isinstance(raw_options, list):
+        return []
+    options: list[dict[str, Any]] = []
+    for raw_option in raw_options:
+        if not isinstance(raw_option, dict):
+            continue
+        replacement_values = raw_option.get("replacement_values")
+        if not isinstance(replacement_values, dict):
+            continue
+        options.append(
+            {
+                "label": str(raw_option.get("label") or "").strip(),
+                "replacement_values": dict(replacement_values),
+            }
+        )
+    return options
+
+
+def _pending_response_option_selection_audit_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    options: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    pending_strategy = None
+    if (
+        request.latest_task_snapshot
+        and request.latest_task_snapshot.pending_strategy_summary
+    ):
+        pending_strategy = (
+            request.latest_task_snapshot.pending_strategy_summary.model_dump(
+                mode="json"
+            )
+        )
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's pending response option selection audit. The "
+                "previous assistant turn asked the user to choose among structured "
+                "recovery options. Decide whether the current user message "
+                "semantically selects one of those options. Use meaning, not "
+                "keywords. Return only the zero-based option index when the user "
+                "selects an option. Return no selection when the user provides a "
+                "fresh investing idea, changes fields outside the offered options, "
+                "or asks an unrelated question. Do not invent a new option."
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"Pending strategy JSON: {pending_strategy or 'none'}",
+        },
+        {
+            "role": "system",
+            "content": (
+                "Pending options JSON: "
+                f"{json.dumps(options, sort_keys=True, default=str)}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Primary structured interpretation: "
+                f"{response.model_dump(mode='json', exclude_none=True)}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _response_from_pending_response_option_selection_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    audit: Any,
+    options: list[dict[str, Any]],
+) -> LLMInterpretationResponse | None:
+    if (
+        not isinstance(audit, PendingResponseOptionSelectionAudit)
+        or not audit.is_selection
+        or audit.confidence < 0.7
+        or audit.selected_option_index is None
+    ):
+        return None
+    option_index = audit.selected_option_index
+    if option_index < 0 or option_index >= len(options):
+        return None
+    draft = _pending_strategy_draft_from_request_or_response(
+        response=response,
+        request=request,
+    )
+    if draft is None:
+        return None
+    replacement_values = options[option_index].get("replacement_values")
+    if not isinstance(replacement_values, dict):
+        return None
+    replacement_result = _apply_pending_response_option_replacement(
+        draft=draft,
+        replacement_values=replacement_values,
+        current_missing=response.missing_required_fields,
+    )
+    missing_fields = replacement_result["missing_fields"]
+    return response.model_copy(
+        update={
+            "intent": "strategy_drafting"
+            if missing_fields
+            else "backtest_execution",
+            "task_relation": "continue",
+            "requires_clarification": bool(missing_fields),
+            "candidate_strategy_draft": replacement_result["draft"],
+            "missing_required_fields": missing_fields,
+            "assistant_response": None,
+            "semantic_turn_act": "answer_pending_need",
+            "capability_question_focus": None,
+            "context_question_focus": None,
+            "artifact_target": "none",
+            "unsupported_constraints": [],
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "pending_response_option_selected",
+                    ]
+                )
+            ),
+        }
+    )
+
+
+def _pending_strategy_draft_from_request_or_response(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMStrategyDraft | None:
+    snapshot = request.latest_task_snapshot
+    if snapshot and snapshot.pending_strategy_summary is not None:
+        return _llm_draft_from_strategy_summary(snapshot.pending_strategy_summary)
+    draft = response.candidate_strategy_draft
+    if _llm_strategy_draft_has_extractable_fields(draft):
+        return draft.model_copy(deep=True)
+    return None
+
+
+def _llm_draft_from_strategy_summary(strategy: StrategySummary) -> LLMStrategyDraft:
+    extra_parameters = dict(strategy.extra_parameters or {})
+    field_provenance = extra_parameters.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
+    indicator_parameters = extra_parameters.get("indicator_parameters")
+    if not isinstance(indicator_parameters, dict):
+        indicator_parameters = {}
+    return LLMStrategyDraft(
+        raw_user_phrasing=strategy.raw_user_phrasing,
+        strategy_type=strategy.strategy_type,
+        strategy_thesis=strategy.strategy_thesis,
+        asset_universe=list(strategy.asset_universe),
+        asset_class=strategy.asset_class,
+        timeframe=strategy.timeframe,
+        cadence=strategy.cadence,
+        entry_logic=strategy.entry_logic,
+        exit_logic=strategy.exit_logic,
+        entry_rule=strategy.entry_rule,
+        exit_rule=strategy.exit_rule,
+        rule_spec=strategy.rule_spec,
+        indicator=indicator_parameters.get("indicator"),
+        indicator_period=indicator_parameters.get("indicator_period"),
+        entry_threshold=indicator_parameters.get("entry_threshold"),
+        exit_threshold=indicator_parameters.get("exit_threshold"),
+        date_range=strategy.date_range,
+        sizing_mode=strategy.sizing_mode,
+        capital_amount=strategy.capital_amount,
+        recurring_contribution=extra_parameters.get("recurring_contribution"),
+        initial_capital=extra_parameters.get("initial_capital"),
+        total_capital=extra_parameters.get("total_capital")
+        or extra_parameters.get("total_budget"),
+        position_size=strategy.position_size,
+        risk_rules=[LLMRiskRule.model_validate(rule) for rule in strategy.risk_rules],
+        assumptions=list(strategy.assumptions),
+        comparison_baseline=strategy.comparison_baseline,
+        refinement_of=strategy.refinement_of,
+        field_provenance={
+            str(key): str(value) for key, value in field_provenance.items()
+        },
+        extra_parameters=extra_parameters,
+    )
+
+
+def _apply_pending_response_option_replacement(
+    *,
+    draft: LLMStrategyDraft,
+    replacement_values: dict[str, Any],
+    current_missing: list[str],
+) -> dict[str, Any]:
+    repaired = draft.model_copy(deep=True)
+    requested_field = replacement_values.get("requested_field")
+    if replacement_values.get("ignore_initial_capital") is True:
+        _clear_dca_total_budget_fields(repaired)
+    if "strategy_type" in replacement_values:
+        repaired.strategy_type = str(replacement_values["strategy_type"])
+    if "initial_capital" in replacement_values:
+        value = replacement_values.get("initial_capital")
+        if value is not None:
+            repaired.initial_capital = float(value)
+            repaired.capital_amount = float(value)
+            field_provenance = dict(repaired.field_provenance or {})
+            field_provenance["capital_amount"] = "starting_capital"
+            field_provenance["initial_capital"] = "starting_capital"
+            repaired.field_provenance = field_provenance
+    if "capital_amount" in replacement_values:
+        value = replacement_values.get("capital_amount")
+        if value is not None:
+            repaired.capital_amount = float(value)
+    if "date_range" in replacement_values:
+        repaired.date_range = replacement_values["date_range"]
+    if "cadence" in replacement_values:
+        repaired.cadence = _supported_dca_cadence_value(
+            replacement_values.get("cadence")
+        )
+    if "timeframe" in replacement_values:
+        repaired.timeframe = str(replacement_values["timeframe"])
+    if "comparison_baseline" in replacement_values:
+        repaired.comparison_baseline = str(
+            replacement_values["comparison_baseline"]
+        ).strip()
+    if canonical_strategy_type(repaired.strategy_type) != "dca_accumulation":
+        _clear_dca_recurring_fields(repaired)
+
+    missing_fields = _missing_fields_after_pending_option(
+        repaired,
+        requested_field=requested_field,
+        current_missing=current_missing,
+    )
+    return {"draft": repaired, "missing_fields": missing_fields}
+
+
+def _clear_dca_total_budget_fields(draft: LLMStrategyDraft) -> None:
+    draft.initial_capital = None
+    draft.total_capital = None
+    field_provenance = dict(draft.field_provenance or {})
+    for key in ("initial_capital", "total_capital"):
+        field_provenance.pop(key, None)
+    draft.field_provenance = field_provenance
+    extra_parameters = dict(draft.extra_parameters or {})
+    for key in (
+        "initial_capital",
+        "total_capital",
+        "total_budget",
+        "max_budget",
+        "investment_budget",
+        "cap",
+    ):
+        extra_parameters.pop(key, None)
+    if field_provenance:
+        extra_parameters["field_provenance"] = field_provenance
+    else:
+        extra_parameters.pop("field_provenance", None)
+    draft.extra_parameters = extra_parameters
+
+
+def _clear_dca_recurring_fields(draft: LLMStrategyDraft) -> None:
+    draft.cadence = None
+    draft.recurring_contribution = None
+    field_provenance = dict(draft.field_provenance or {})
+    for key in ("cadence", "recurring_contribution"):
+        field_provenance.pop(key, None)
+    draft.field_provenance = field_provenance
+    extra_parameters = dict(draft.extra_parameters or {})
+    for key in ("recurring_contribution", "recurring_cadence"):
+        extra_parameters.pop(key, None)
+    if field_provenance:
+        extra_parameters["field_provenance"] = field_provenance
+    else:
+        extra_parameters.pop("field_provenance", None)
+    draft.extra_parameters = extra_parameters
+
+
+def _missing_fields_after_pending_option(
+    draft: LLMStrategyDraft,
+    *,
+    requested_field: Any,
+    current_missing: list[str],
+) -> list[str]:
+    missing = list(current_missing)
+    if isinstance(requested_field, str) and requested_field.strip():
+        missing = list(dict.fromkeys([*missing, requested_field.strip()]))
+    return _dca_contract_missing_fields(missing, draft=draft)
+
+
 async def _response_ready_for_runtime(
     *,
     response: LLMInterpretationResponse,
@@ -1577,6 +2512,16 @@ async def _response_ready_for_runtime(
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse:
     response = _normalize_response_for_runtime_context(response, request=request)
+    response = await _pending_response_option_selected_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    response = await _requested_asset_answer_candidate_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
     response = await _asset_grounding_audited_response(
         response=response,
         preferred_model=preferred_model,
@@ -1595,6 +2540,11 @@ async def _response_ready_for_runtime(
     if _response_targets_latest_result_followup(response=response, request=request):
         return response
     response = await _context_question_audited_response(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    response = await _dca_contract_audited_response(
         response=response,
         preferred_model=preferred_model,
         request=request,
@@ -1741,6 +2691,20 @@ async def _response_ready_for_runtime(
         )
         if context_response is not None:
             return context_response
+    if _response_replays_prior_strategy_without_current_turn_update(
+        response=response,
+        request=request,
+    ):
+        planned_response = await _plan_artifact_edit_response(
+            preferred_model=preferred_model,
+            request=request,
+        )
+        if planned_response is not None:
+            return planned_response
+        raise ValueError(
+            "OpenRouter interpretation replayed the active artifact without a "
+            "material current-turn update"
+        )
     audited_response = await _audit_stated_run_field_fidelity(
         response=response,
         preferred_model=preferred_model,
@@ -1758,6 +2722,31 @@ async def _response_ready_for_runtime(
     if _structured_interpretation_has_required_shape(response, request=request):
         return response
 
+    planned_response = await _plan_artifact_edit_response(
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if planned_response is not None:
+        return planned_response
+    repaired_response = await _repair_incomplete_strategy_extraction(
+        failed_response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if repaired_response is not None:
+        return await _stated_run_field_audited_response(
+            response=repaired_response,
+            preferred_model=preferred_model,
+            request=request,
+        )
+    raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+
+
+async def _plan_artifact_edit_response(
+    *,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
     planned_response = await _plan_pending_artifact_assumption_edit(
         request=request,
         preferred_model=preferred_model,
@@ -1768,18 +2757,12 @@ async def _response_ready_for_runtime(
             request=request,
         )
     if planned_response is None:
-        planned_response = await _repair_incomplete_strategy_extraction(
-            failed_response=response,
-            preferred_model=preferred_model,
-            request=request,
-        )
-    if planned_response is not None:
-        return await _stated_run_field_audited_response(
-            response=planned_response,
-            preferred_model=preferred_model,
-            request=request,
-        )
-    raise ValueError("OpenRouter interpretation returned an incomplete strategy draft")
+        return None
+    return await _stated_run_field_audited_response(
+        response=planned_response,
+        preferred_model=preferred_model,
+        request=request,
+    )
 
 
 async def _stated_run_field_audited_response(
@@ -1875,7 +2858,7 @@ async def _repair_incomplete_strategy_extraction(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
-    if not _strategy_extraction_repair_is_allowed(failed_response):
+    if not _strategy_extraction_repair_is_allowed(failed_response, request=request):
         return None
     messages = _focused_strategy_extraction_messages(request)
     for model_name in _unique_repair_models(preferred_model):
@@ -1988,7 +2971,7 @@ def _response_from_artifact_assumption_edit_plan(
             task_relation="continue",
             requires_clarification=False,
             user_goal_summary=(
-                plan.user_goal_summary or "User changed a visible draft assumption."
+                plan.user_goal_summary or "User changed a visible confirmation assumption."
             ),
             candidate_strategy_draft=draft,
             confidence=plan.confidence,
@@ -2257,207 +3240,24 @@ def _llm_strategy_draft_has_non_asset_strategy_anchor(
 
 
 def _resolved_asset_mentions_from_message(message: str) -> list[Any]:
-    resolved_assets: list[Any] = []
-    seen: set[str] = set()
-    for phrase in _asset_candidate_phrases(message):
+    def _resolve_candidate(query: str) -> AssetResolution | None:
         try:
-            resolution = _resolve_asset_candidate(
-                phrase,
-                field=f"asset_universe[{len(resolved_assets)}]",
-                source="llm_extraction",
+            return _resolve_asset_candidate(
+                query,
+                field="asset_universe[0]",
+                source="user_mention",
             )
         except ValueError:
-            continue
-        if resolution.status != "resolved" or resolution.asset is None:
-            continue
-        if not _candidate_text_supports_resolved_asset(phrase, resolution.asset):
-            continue
-        symbol = resolution.asset.canonical_symbol
-        if symbol in seen:
-            continue
-        seen.add(symbol)
-        resolved_assets.append(resolution.asset)
-        if len(resolved_assets) >= 5:
-            break
-    return resolved_assets
+            return None
 
-
-def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
-    candidate = str(phrase or "").strip()
-    if not candidate:
-        return False
-    tokens = _asset_candidate_tokens(candidate)
-    if not tokens:
-        return False
-    lowered_tokens = [token.lower() for token in tokens]
-    symbol_texts = _asset_symbol_texts(asset)
-    compact_candidate = _compact_asset_candidate(candidate)
-
-    if len(tokens) != 1:
-        name_words = set(_asset_name_tokens(getattr(asset, "name", "")))
-        meaningful_tokens = [
-            token
-            for token in lowered_tokens
-            if token not in _ASSET_CONTEXT_WORDS and len(token) >= 2
-        ]
-        if compact_candidate in symbol_texts and len(compact_candidate) >= 2:
-            return True
-        return bool(meaningful_tokens) and all(
-            token in name_words for token in meaningful_tokens
+    return [
+        mention.asset
+        for mention in grounded_asset_mentions_from_text(
+            message,
+            resolve_candidate=_resolve_candidate,
+            limit=5,
         )
-
-    token = tokens[0]
-    lowered = token.lower()
-    has_uppercase_signal = _token_has_uppercase_letter(token)
-    if lowered in _ASSET_MENTION_NOISE_TOKENS and not has_uppercase_signal:
-        return False
-    compact_token = _compact_asset_candidate(token)
-    if len(compact_token) < 2:
-        return False
-
-    name_words = {
-        word
-        for word in _asset_name_tokens(getattr(asset, "name", ""))
-        if len(word) >= 3
-    }
-    if lowered in name_words:
-        return True
-
-    if has_uppercase_signal:
-        return compact_token in symbol_texts and len(compact_token) >= 2
-    if compact_token in symbol_texts and len(compact_token) >= 3:
-        return True
-    return False
-
-
-_ASSET_CONTEXT_WORDS = {
-    "asset",
-    "coin",
-    "company",
-    "crypto",
-    "equity",
-    "etf",
-    "pair",
-    "share",
-    "shares",
-    "stock",
-    "ticker",
-    "token",
-}
-
-_ASSET_MENTION_NOISE_TOKENS = {
-    "above",
-    "bb",
-    "below",
-    "bollinger",
-    "buy",
-    "buying",
-    "cross",
-    "crossed",
-    "crosses",
-    "crossing",
-    "day",
-    "days",
-    "ema",
-    "for",
-    "from",
-    "hold",
-    "holding",
-    "last",
-    "macd",
-    "ma",
-    "month",
-    "months",
-    "over",
-    "past",
-    "rsi",
-    "sell",
-    "selling",
-    "sma",
-    "the",
-    "to",
-    "today",
-    "test",
-    "under",
-    "want",
-    "week",
-    "weeks",
-    "when",
-    "with",
-    "year",
-    "years",
-}
-
-
-def _asset_symbol_texts(asset: Any) -> set[str]:
-    values = {
-        str(getattr(asset, "canonical_symbol", "") or ""),
-        str(getattr(asset, "raw_symbol", "") or ""),
-    }
-    return {
-        compact
-        for value in values
-        if (compact := _compact_asset_candidate(value))
-    }
-
-
-def _compact_asset_candidate(value: str) -> str:
-    compact: list[str] = []
-    for char in str(value or "").lower():
-        if char.isalnum():
-            compact.append(char)
-    return "".join(compact)
-
-
-def _token_has_uppercase_letter(value: str) -> bool:
-    return any(char.isalpha() and char.isupper() for char in str(value or ""))
-
-
-def _asset_name_tokens(name: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in str(name or "").lower():
-        if char.isalnum():
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def _asset_candidate_phrases(message: str) -> list[str]:
-    tokens = _asset_candidate_tokens(message)
-    phrases: list[str] = []
-    seen: set[str] = set()
-    max_window = min(3, len(tokens))
-    for window_size in range(max_window, 0, -1):
-        for start in range(0, len(tokens) - window_size + 1):
-            phrase = " ".join(tokens[start : start + window_size]).strip()
-            if not phrase or phrase in seen:
-                continue
-            if not any(char.isalpha() for char in phrase):
-                continue
-            seen.add(phrase)
-            phrases.append(phrase)
-    return phrases
-
-
-def _asset_candidate_tokens(message: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in str(message or ""):
-        if char.isalnum() or char in {"/", "-"}:
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
+    ]
 
 
 async def _repair_pending_signal_rule_answer_if_needed(
@@ -2866,6 +3666,10 @@ def _response_needs_testable_idea_repair(
     ):
         return True
     if response.intent in {"beginner_guidance", "conversation_followup"} and (
+        response.semantic_turn_act == "unsupported_request"
+    ):
+        return True
+    if response.intent in {"beginner_guidance", "conversation_followup"} and (
         response.semantic_turn_act in {None, "educational_question", "new_idea"}
     ):
         return True
@@ -3221,6 +4025,7 @@ async def _audit_stated_run_field_fidelity(
         repaired = _response_from_stated_run_field_fidelity_audit(
             response=response,
             audit=audit,
+            current_message=request.current_user_message,
         )
         if repaired is not None:
             if not _stated_run_field_audit_omitted_expected_fields(
@@ -3249,12 +4054,23 @@ def _response_from_current_message_run_field_contract(
     date_range = _date_range_from_current_message(current_message)
     if (
         date_range is not None
-        and _draft_date_range_needs_stated_run_field_audit(
-            draft,
-            current_message=current_message,
+        and (
+            _draft_date_range_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            )
+            or _response_needs_current_message_date_repair(
+                response=repaired,
+                current_message=current_message,
+            )
         )
     ):
         draft.date_range = date_range
+        if (
+            _draft_has_non_executable_timeframe_label(draft)
+            and not _message_states_bar_timeframe(current_message)
+        ):
+            draft.timeframe = None
         if has_partial_explicit_date_range(date_range):
             repaired.requires_clarification = True
             repaired.assistant_response = None
@@ -3273,33 +4089,6 @@ def _response_from_current_message_run_field_contract(
                 if field.field_name.split("[", 1)[0] != "date_range"
             ]
         changed = True
-
-    comparison_baseline = _comparison_baseline_from_current_message(
-        draft,
-        current_message=current_message,
-    )
-    if comparison_baseline and draft.comparison_baseline != comparison_baseline:
-        draft.comparison_baseline = comparison_baseline
-        changed = True
-
-    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
-        dca_changed = _preserve_dca_current_message_execution_fields(
-            draft=draft,
-            current_message=current_message,
-        )
-        if dca_changed:
-            repaired.missing_required_fields = [
-                field
-                for field in repaired.missing_required_fields
-                if str(field).split("[", 1)[0] not in {"capital_amount", "cadence"}
-            ]
-            repaired.ambiguous_fields = [
-                field
-                for field in repaired.ambiguous_fields
-                if field.field_name.split("[", 1)[0]
-                not in {"capital_amount", "cadence"}
-            ]
-            changed = True
 
     if (
         changed
@@ -3348,6 +4137,11 @@ def _response_needs_stated_run_field_fidelity_audit(
         return False
     if "stated_run_field_fidelity_audit" in response.reason_codes:
         return False
+    if request is not None and _response_replays_prior_strategy_without_current_turn_update(
+        response=response,
+        request=request,
+    ):
+        return False
     draft = response.candidate_strategy_draft
     current_message = request.current_user_message if request is not None else ""
     requested_field = ""
@@ -3355,6 +4149,20 @@ def _response_needs_stated_run_field_fidelity_audit(
         requested_field = str(
             request.selected_thread_metadata.get("requested_field") or ""
         ).split("[", 1)[0]
+    if (
+        canonical_strategy_type(draft.strategy_type) == "dca_accumulation"
+        and _dca_response_needs_semantic_field_audit(response)
+    ):
+        return True
+    if _response_needs_current_message_date_repair(
+        response=response,
+        current_message=current_message,
+    ):
+        return True
+    if _response_needs_missing_benchmark_fidelity_audit(response):
+        return True
+    if _draft_has_unprovenanced_benchmark(draft):
+        return True
     if response.semantic_turn_act == "answer_pending_need":
         if requested_field != "date_range":
             return False
@@ -3375,12 +4183,7 @@ def _response_needs_stated_run_field_fidelity_audit(
             current_message=current_message,
         )
     if "focused_repair_from_unsupported_context" in response.reason_codes:
-        return draft.capital_amount is None or (
-            _draft_comparison_baseline_conflicts_with_current_message(
-                draft,
-                current_message=current_message,
-            )
-        )
+        return draft.capital_amount is None
     if "signal_rule_plan_repair" in response.reason_codes:
         return any(
             [
@@ -3392,14 +4195,14 @@ def _response_needs_stated_run_field_fidelity_audit(
                     draft,
                     current_message=current_message,
                 ),
-                _draft_comparison_baseline_conflicts_with_current_message(
-                    draft,
-                    current_message=current_message,
-                ),
             ]
         )
     return any(
         [
+            _focused_repair_benchmark_needs_fidelity_audit(
+                draft,
+                current_message=current_message,
+            ),
             draft.capital_amount is None
             and _draft_contains_structured_capital_context(draft),
             _llm_value_is_empty(draft.timeframe)
@@ -3408,12 +4211,24 @@ def _response_needs_stated_run_field_fidelity_audit(
                 draft,
                 current_message=current_message,
             ),
-            _draft_comparison_baseline_conflicts_with_current_message(
-                draft,
-                current_message=current_message,
-            ),
         ]
     )
+
+
+def _focused_repair_benchmark_needs_fidelity_audit(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str,
+) -> bool:
+    benchmark = str(draft.comparison_baseline or "").strip().lstrip("$").upper()
+    if not benchmark:
+        return False
+    tokens = {
+        token.strip().lstrip("$").casefold()
+        for token in _field_fidelity_tokens(str(current_message or "").casefold())
+        if token.strip()
+    }
+    return benchmark.casefold() not in tokens
 
 
 def _ready_response_has_unreconciled_stated_run_fields(
@@ -3423,6 +4238,7 @@ def _ready_response_has_unreconciled_stated_run_fields(
 ) -> bool:
     return any(
         [
+            _draft_missing_comparison_baseline_needs_stated_run_field_audit(draft),
             draft.capital_amount is None
             and _draft_contains_structured_capital_context(draft),
             _llm_value_is_empty(draft.timeframe)
@@ -3431,12 +4247,97 @@ def _ready_response_has_unreconciled_stated_run_fields(
                 draft,
                 current_message=current_message,
             ),
-            _draft_comparison_baseline_conflicts_with_current_message(
-                draft,
-                current_message=current_message,
-            ),
         ]
     )
+
+
+def _draft_missing_comparison_baseline_needs_stated_run_field_audit(
+    draft: LLMStrategyDraft,
+) -> bool:
+    return (
+        _llm_value_is_empty(draft.comparison_baseline)
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
+    )
+
+
+def _response_needs_current_message_date_repair(
+    *,
+    response: LLMInterpretationResponse,
+    current_message: str,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    if not _llm_value_is_empty(draft.date_range):
+        return False
+    if _date_range_from_current_message(current_message) is None:
+        return False
+    if _response_has_pending_base_field(response, "date_range"):
+        return True
+    return response.requires_clarification and _llm_strategy_draft_has_concrete_execution_target(
+        draft
+    )
+
+
+def _response_needs_missing_benchmark_fidelity_audit(
+    response: LLMInterpretationResponse,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    return (
+        response.requires_clarification
+        and not response.missing_required_fields
+        and not response.ambiguous_fields
+        and _llm_value_is_empty(draft.comparison_baseline)
+        and _llm_strategy_draft_has_concrete_execution_target(draft)
+    )
+
+
+def _dca_response_needs_semantic_field_audit(
+    response: LLMInterpretationResponse,
+) -> bool:
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) != "dca_accumulation":
+        return False
+    field_provenance = dict(draft.field_provenance or {})
+    amount_source = str(field_provenance.get("capital_amount") or "").strip()
+    cadence_source = str(field_provenance.get("cadence") or "").strip()
+    if draft.capital_amount is None or amount_source not in {
+        "explicit_user",
+        "prior",
+        "recurring_contribution",
+        "contribution_amount",
+        "periodic_contribution",
+        "dca_contribution",
+    }:
+        return True
+    if draft.cadence in (None, "", [], {}) or cadence_source not in {
+        "explicit_user",
+        "prior",
+        "visible_draft",
+    }:
+        return True
+    return False
+
+
+def _response_has_pending_base_field(
+    response: LLMInterpretationResponse,
+    field_name: str,
+) -> bool:
+    return any(
+        str(field).split("[", 1)[0] == field_name
+        for field in response.missing_required_fields
+    ) or any(
+        field.field_name.split("[", 1)[0] == field_name
+        for field in response.ambiguous_fields
+    )
+
+
+def _draft_has_unprovenanced_benchmark(draft: LLMStrategyDraft) -> bool:
+    if _llm_value_is_empty(draft.comparison_baseline):
+        return False
+    provenance = draft.field_provenance or {}
+    return provenance.get("comparison_baseline") not in {
+        "explicit_user",
+        "stated_run_field_fidelity_audit",
+    }
 
 
 def _draft_date_range_needs_stated_run_field_audit(
@@ -3449,7 +4350,7 @@ def _draft_date_range_needs_stated_run_field_audit(
         current_message=current_message,
     )
     if _llm_value_is_empty(draft.date_range):
-        return date_context
+        return False
     if _draft_date_range_has_unstated_current_endpoint(
         draft.date_range,
         current_message=current_message,
@@ -3512,73 +4413,6 @@ def _date_endpoint_is_runtime_current(value: Any) -> bool:
     }
 
 
-def _draft_comparison_baseline_conflicts_with_current_message(
-    draft: LLMStrategyDraft,
-    *,
-    current_message: str = "",
-) -> bool:
-    if not _message_uses_comparison_language(current_message):
-        return False
-    mentioned_assets = _resolved_asset_mentions_from_message(current_message)
-    if not mentioned_assets:
-        return _llm_value_is_empty(draft.comparison_baseline)
-    universe_symbols = {
-        str(symbol or "").strip().upper()
-        for symbol in (draft.asset_universe or [])
-        if str(symbol or "").strip()
-    }
-    stated_comparison_symbols = [
-        str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
-        for asset in mentioned_assets
-        if str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
-        not in universe_symbols
-    ]
-    if not stated_comparison_symbols:
-        return _llm_value_is_empty(draft.comparison_baseline)
-    baseline = str(draft.comparison_baseline or "").strip().upper()
-    return not baseline or any(
-        symbol != baseline for symbol in stated_comparison_symbols
-    )
-
-
-def _comparison_baseline_from_current_message(
-    draft: LLMStrategyDraft,
-    *,
-    current_message: str = "",
-) -> str | None:
-    if not _message_uses_comparison_language(current_message):
-        return None
-    mentioned_assets = _resolved_asset_mentions_from_message(current_message)
-    if not mentioned_assets:
-        return None
-    universe_symbols = {
-        str(symbol or "").strip().upper()
-        for symbol in (draft.asset_universe or [])
-        if str(symbol or "").strip()
-    }
-    for asset in mentioned_assets:
-        symbol = str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
-        if symbol and symbol not in universe_symbols:
-            return symbol
-    return None
-
-
-def _message_uses_comparison_language(message: str) -> bool:
-    folded = str(message or "").casefold()
-    return any(
-        token in folded
-        for token in (
-            "compare",
-            "compared",
-            "comparison",
-            "versus",
-            " vs ",
-            "benchmark",
-            "against",
-        )
-    )
-
-
 def _draft_contains_structured_capital_context(draft: LLMStrategyDraft) -> bool:
     text = _structured_draft_context_text(draft)
     folded = text.casefold()
@@ -3625,120 +4459,6 @@ def _draft_contains_structured_date_context(
             if 1900 <= year <= 2100:
                 return True
     return False
-
-
-def _date_range_from_current_message(message: str) -> dict[str, str] | None:
-    tokens = _field_fidelity_tokens(str(message or "").casefold())
-    start_endpoint = _date_endpoint_from_marker_tokens(
-        tokens,
-        markers={"start", "starting", "beginning"},
-        endpoint="start",
-    )
-    end_endpoint = _date_endpoint_from_marker_tokens(
-        tokens,
-        markers={"end", "ending"},
-        endpoint="end",
-    )
-    if start_endpoint is not None and end_endpoint is not None:
-        return {"start": start_endpoint, "end": end_endpoint}
-    if start_endpoint is not None and not _tokens_after_year_include_date_endpoint(
-        tokens,
-        endpoint=start_endpoint,
-    ):
-        return {"start": start_endpoint}
-    if end_endpoint is not None:
-        return {"end": end_endpoint}
-    calendar_year = _calendar_year_date_range_from_tokens(tokens)
-    if calendar_year is not None:
-        return calendar_year
-    return None
-
-
-def _calendar_year_date_range_from_tokens(tokens: list[str]) -> dict[str, str] | None:
-    for index, token in enumerate(tokens):
-        if not (len(token) == 4 and token.isdigit()):
-            continue
-        year = int(token)
-        if year < 1900 or year > date.today().year:
-            continue
-        previous = tokens[index - 1] if index > 0 else ""
-        if len(tokens) == 1 or previous in {
-            "in",
-            "during",
-            "throughout",
-            "for",
-            "over",
-        }:
-            return {"start": f"{year}-01-01", "end": f"{year}-12-31"}
-    return None
-
-
-def _date_endpoint_from_marker_tokens(
-    tokens: list[str],
-    *,
-    markers: set[str],
-    endpoint: str,
-) -> str | None:
-    for index, token in enumerate(tokens):
-        if token not in markers:
-            continue
-        year_index = _first_year_token_index(tokens, start=index + 1, limit=index + 5)
-        if year_index is None:
-            continue
-        year = int(tokens[year_index])
-        if endpoint == "end":
-            return date(year, 12, 31).isoformat()
-        return date(year, 1, 1).isoformat()
-    return None
-
-
-def _first_year_token_index(
-    tokens: list[str],
-    *,
-    start: int,
-    limit: int,
-) -> int | None:
-    for index in range(max(start, 0), min(limit, len(tokens))):
-        token = tokens[index]
-        if len(token) != 4 or not token.isdigit():
-            continue
-        year = int(token)
-        if 1900 <= year <= 2100:
-            return index
-    return None
-
-
-def _tokens_after_year_include_date_endpoint(
-    tokens: list[str],
-    *,
-    endpoint: str,
-) -> bool:
-    year = endpoint.split("-", 1)[0]
-    try:
-        index = tokens.index(year)
-    except ValueError:
-        return False
-    endpoint_tokens = {
-        "to",
-        "through",
-        "until",
-        "till",
-        "end",
-        "ending",
-        "today",
-        "now",
-        "present",
-        "current",
-    }
-    return any(token in endpoint_tokens for token in tokens[index + 1 :])
-
-
-def _field_fidelity_tokens(text: str) -> list[str]:
-    separators = ",.;:!?()[]{}"
-    cleaned = text
-    for separator in separators:
-        cleaned = cleaned.replace(separator, " ")
-    return [token for token in cleaned.split() if token]
 
 
 def _structured_draft_context_text(
@@ -3996,7 +4716,12 @@ def _stated_run_field_fidelity_messages(
                 "reshaped. Do not infer defaults, fees, slippage, symbols, or rules. "
                 "If a field is absent from the current user message, return null "
                 "for that field. Normalize starting capital such as 10k or $10,000 "
-                "to 10000. Normalize one-hour/hourly bars to 1h, four-hour bars to "
+                "to 10000. For DCA or recurring buys, return the per-purchase "
+                "recurring contribution as recurring_contribution_amount, not "
+                "capital_amount; return cadence only when the current message states "
+                "one. If a money amount is total budget, starting principal, or cap, "
+                "leave recurring_contribution_amount null. Normalize one-hour/hourly "
+                "bars to 1h, four-hour bars to "
                 "4h, and daily bars to 1D. Preserve today/current as today or the "
                 f"runtime date {date.today().isoformat()} only when the user stated "
                 "today/current. If the user stated only a start or only an end date, "
@@ -4030,6 +4755,7 @@ def _response_from_stated_run_field_fidelity_audit(
     *,
     response: LLMInterpretationResponse,
     audit: StatedRunFieldFidelityAudit,
+    current_message: str = "",
 ) -> LLMInterpretationResponse | None:
     repaired = response.model_copy(deep=True)
     draft = repaired.candidate_strategy_draft
@@ -4038,22 +4764,56 @@ def _response_from_stated_run_field_fidelity_audit(
         draft.capital_amount = audit.capital_amount
         draft.field_provenance["capital_amount"] = "starting_capital"
         changed = True
+    if audit.recurring_contribution_amount is not None:
+        recurring_amount = float(audit.recurring_contribution_amount)
+        if draft.capital_amount != recurring_amount:
+            draft.capital_amount = recurring_amount
+            changed = True
+        if draft.field_provenance.get("capital_amount") != "recurring_contribution":
+            draft.field_provenance["capital_amount"] = "recurring_contribution"
+            changed = True
+    if audit.cadence:
+        cadence = str(audit.cadence).strip().casefold()
+        if draft.cadence != cadence:
+            draft.cadence = cadence
+            changed = True
+        if draft.field_provenance.get("cadence") != "explicit_user":
+            draft.field_provenance["cadence"] = "explicit_user"
+            changed = True
     if audit.timeframe and draft.timeframe != audit.timeframe:
         draft.timeframe = audit.timeframe
         changed = True
     if audit.date_range not in (None, "", [], {}):
+        audited_date_range: Any = audit.date_range
+        expected_date_range = _date_range_from_current_message(current_message)
+        if (
+            isinstance(expected_date_range, dict)
+            and not has_partial_explicit_date_range(expected_date_range)
+            and isinstance(audited_date_range, dict)
+            and _normalized_stated_field(audited_date_range)
+            != _normalized_stated_field(expected_date_range)
+        ):
+            audited_date_range = expected_date_range
         date_range, date_changed = _date_range_with_fidelity_audit(
             current=draft.date_range,
-            audited=audit.date_range,
+            audited=audited_date_range,
         )
         if date_changed:
             draft.date_range = date_range
             changed = True
     if audit.comparison_baseline:
         baseline = str(audit.comparison_baseline).strip().upper()
-        if baseline and draft.comparison_baseline != baseline:
-            draft.comparison_baseline = baseline
-            changed = True
+        if baseline:
+            if draft.comparison_baseline != baseline:
+                draft.comparison_baseline = baseline
+                changed = True
+            if draft.field_provenance.get("comparison_baseline") != (
+                "stated_run_field_fidelity_audit"
+            ):
+                draft.field_provenance["comparison_baseline"] = (
+                    "stated_run_field_fidelity_audit"
+                )
+                changed = True
     if not changed:
         return None
     repaired.reason_codes = list(
@@ -4179,19 +4939,27 @@ def _focused_strategy_extraction_has_material_fields(
 
 def _strategy_extraction_repair_is_allowed(
     response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
 ) -> bool:
     if response.task_relation == "refine":
         return False
+    if response.semantic_turn_act == "retry_failed_action":
+        return not _request_has_failed_action_launch_payload(request)
     if response.semantic_turn_act == "unsupported_request":
         return (
-            response.intent == "unsupported_or_out_of_scope"
+            response.intent
+            in {
+                "unsupported_or_out_of_scope",
+                "beginner_guidance",
+                "conversation_followup",
+            }
             and not response.unsupported_constraints
         )
     return response.semantic_turn_act not in {
         "refine_current_idea",
         "answer_pending_need",
         "approval",
-        "retry_failed_action",
         "result_followup",
     }
 
@@ -4322,6 +5090,9 @@ def _response_from_focused_strategy_extraction(
                 indicator_period=extraction.indicator_period,
                 entry_threshold=extraction.entry_threshold,
                 exit_threshold=extraction.exit_threshold,
+                field_provenance=_comparison_baseline_provenance(
+                    extraction.comparison_baseline
+                ),
                 extra_parameters={
                     "raw_strategy_type": extraction.strategy_type,
                 }
@@ -4378,6 +5149,9 @@ def _response_from_focused_strategy_extraction(
             indicator_period=extraction.indicator_period,
             entry_threshold=extraction.entry_threshold,
             exit_threshold=extraction.exit_threshold,
+            field_provenance=_comparison_baseline_provenance(
+                extraction.comparison_baseline
+            ),
         ),
         missing_required_fields=list(extraction.missing_required_fields),
         assistant_response=extraction.assistant_response,
@@ -4389,6 +5163,12 @@ def _response_from_focused_strategy_extraction(
         response=response,
         base_response=base_response,
     )
+
+
+def _comparison_baseline_provenance(
+    comparison_baseline: str | None,
+) -> dict[str, str]:
+    return {"comparison_baseline": "explicit_user"} if comparison_baseline else {}
 
 
 def _merge_focused_repair_with_base(
@@ -4567,6 +5347,8 @@ def _structured_interpretation_has_required_shape(
         request=request,
     ):
         return False
+    if response.semantic_turn_act == "retry_failed_action":
+        return _request_has_failed_action_launch_payload(request)
     if response.intent not in {"strategy_drafting", "backtest_execution"}:
         return True
     if response.semantic_turn_act == "approval":
@@ -4598,10 +5380,17 @@ def _structured_interpretation_has_required_shape(
         "answer_pending_need",
     }:
         return False
-    if response.semantic_turn_act == "retry_failed_action":
-        snapshot = request.latest_task_snapshot
-        return bool(snapshot and snapshot.latest_failed_action_reference is not None)
     return False
+
+
+def _request_has_failed_action_launch_payload(request: InterpretationRequest) -> bool:
+    snapshot = request.latest_task_snapshot
+    if snapshot is None:
+        return False
+    return (
+        launch_payload_from_failed_action(snapshot.latest_failed_action_reference)
+        is not None
+    )
 
 
 def _response_underfills_pending_result_refinement(
@@ -4729,7 +5518,7 @@ def _llm_strategy_draft_has_executable_shape(draft: LLMStrategyDraft) -> bool:
     strategy_type = canonical_strategy_type(draft.strategy_type)
     if strategy_type == "buy_and_hold":
         return bool(draft.asset_universe or draft.date_range)
-    if strategy_type == "dca":
+    if strategy_type == "dca_accumulation":
         return bool(draft.cadence)
     if strategy_type == "signal_strategy":
         return _llm_strategy_draft_has_structured_rule_or_indicator_fields(draft)
@@ -4788,6 +5577,8 @@ def _response_replays_prior_strategy_without_current_turn_update(
     response: LLMInterpretationResponse,
     request: InterpretationRequest,
 ) -> bool:
+    if "pending_response_option_selected" in response.reason_codes:
+        return False
     if response.semantic_turn_act in {
         "approval",
         "educational_question",
@@ -5468,13 +6259,6 @@ def _dca_amount_has_user_provenance(
             "dca_contribution",
         }:
             return True
-    if _message_contains_recurring_amount_evidence(
-        amount=strategy.capital_amount,
-        cadence=strategy.cadence
-        or _dca_cadence_from_current_message(request.current_user_message),
-        message=request.current_user_message,
-    ):
-        return True
     snapshot = request.latest_task_snapshot
     if snapshot is None:
         return False
@@ -5484,153 +6268,6 @@ def _dca_amount_has_user_provenance(
         and prior.capital_amount is not None
         and strategy.capital_amount == prior.capital_amount
     )
-
-
-def _preserve_dca_current_message_execution_fields(
-    *,
-    draft: LLMStrategyDraft,
-    current_message: str,
-) -> bool:
-    changed = False
-    cadence = draft.cadence or _dca_cadence_from_current_message(current_message)
-    if cadence and draft.cadence != cadence:
-        draft.cadence = cadence
-        changed = True
-    amount = draft.capital_amount or draft.total_capital or draft.initial_capital
-    if (
-        amount is not None
-        and _message_contains_recurring_amount_evidence(
-            amount=amount,
-            cadence=cadence,
-            message=current_message,
-        )
-    ):
-        if draft.capital_amount != amount:
-            draft.capital_amount = amount
-            changed = True
-        if draft.total_capital == amount:
-            draft.total_capital = None
-            changed = True
-        if draft.initial_capital == amount:
-            draft.initial_capital = None
-            changed = True
-        field_provenance = dict(draft.field_provenance or {})
-        if field_provenance.get("capital_amount") != "recurring_contribution":
-            field_provenance["capital_amount"] = "recurring_contribution"
-            changed = True
-        if cadence and field_provenance.get("cadence") != "explicit_user":
-            field_provenance["cadence"] = "explicit_user"
-            changed = True
-        draft.field_provenance = field_provenance
-    return changed
-
-
-def _message_contains_recurring_amount_evidence(
-    *,
-    amount: Any,
-    cadence: Any,
-    message: str,
-) -> bool:
-    amount_value = _money_token_value(amount)
-    if amount_value is None:
-        return False
-    cadence_words = _cadence_evidence_words(cadence)
-    if not cadence_words:
-        return False
-    tokens = _field_fidelity_tokens(message.casefold())
-    for index, token in enumerate(tokens):
-        token_value = _money_token_value(token)
-        if token_value is None or abs(token_value - amount_value) > 0.0001:
-            continue
-        if _money_token_has_total_budget_context(tokens, index):
-            continue
-        if _money_token_has_recurring_context(tokens, index, cadence_words):
-            return True
-    return False
-
-
-def _dca_cadence_from_current_message(message: str) -> str | None:
-    tokens = _field_fidelity_tokens(message.casefold())
-    words = set(tokens)
-    compact_message = "".join(char for char in message.casefold() if char.isalnum())
-    candidates = {
-        "biweekly": {"biweekly", "bi-weekly"},
-        "weekly": {"weekly", "week", "weeks"},
-        "monthly": {"monthly", "month", "months"},
-        "quarterly": {"quarterly", "quarter", "quarters"},
-        "daily": {"daily", "day", "days"},
-    }
-    for cadence, evidence in candidates.items():
-        if words.intersection(evidence) or cadence.replace("-", "") in compact_message:
-            return cadence
-    return None
-
-
-def _money_token_value(value: Any) -> float | None:
-    if isinstance(value, int | float):
-        return float(value)
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().lower().replace("$", "").replace(",", "")
-    if not normalized:
-        return None
-    multiplier = 1.0
-    if normalized.endswith("k"):
-        multiplier = 1000.0
-        normalized = normalized[:-1]
-    elif normalized.endswith("m"):
-        multiplier = 1_000_000.0
-        normalized = normalized[:-1]
-    try:
-        return float(normalized) * multiplier
-    except ValueError:
-        return None
-
-
-def _cadence_evidence_words(cadence: Any) -> set[str]:
-    normalized = str(cadence or "").strip().casefold()
-    return {
-        "daily": {"daily", "day", "days"},
-        "weekly": {"weekly", "week", "weeks"},
-        "biweekly": {"biweekly", "bi-weekly"},
-        "monthly": {"monthly", "month", "months"},
-        "quarterly": {"quarterly", "quarter", "quarters"},
-    }.get(normalized, set())
-
-
-def _money_token_has_total_budget_context(tokens: list[str], index: int) -> bool:
-    window = set(tokens[max(index - 4, 0) : index + 5])
-    return bool(
-        window.intersection(
-            {
-                "budget",
-                "total",
-                "available",
-                "cap",
-                "maximum",
-                "max",
-                "principal",
-                "starting",
-            }
-        )
-    )
-
-
-def _money_token_has_recurring_context(
-    tokens: list[str],
-    index: int,
-    cadence_words: set[str],
-) -> bool:
-    window = tokens[max(index - 4, 0) : index + 8]
-    window_words = set(window)
-    has_cadence = bool(window_words.intersection(cadence_words))
-    if not has_cadence:
-        return False
-    if window_words.intersection({"every", "each", "per"}):
-        return True
-    following = tokens[index + 1 : index + 4]
-    return bool(set(following).intersection(cadence_words))
-
 
 def _dca_cadence_has_user_provenance(
     *,
@@ -5645,10 +6282,7 @@ def _dca_cadence_has_user_provenance(
         cadence_source = field_provenance.get("cadence")
         if cadence_source in {"user", "explicit_user", "prior", "visible_draft"}:
             return True
-    if _message_contains_cadence_evidence(
-        cadence=cadence,
-        message=request.current_user_message,
-    ):
+    if _dca_cadence_from_current_message(request.current_user_message) == cadence:
         return True
     snapshot = request.latest_task_snapshot
     if snapshot is None:
@@ -5659,26 +6293,6 @@ def _dca_cadence_has_user_provenance(
         and prior.cadence not in (None, "", [], {})
         and str(prior.cadence).strip().casefold() == cadence
     )
-
-
-def _message_contains_cadence_evidence(*, cadence: str, message: str) -> bool:
-    words = set(_field_fidelity_tokens(message.casefold()))
-    compact_message = "".join(
-        char
-        for char in message.casefold()
-        if char.isalnum()
-    )
-    evidence_words = {
-        "daily": {"daily", "day", "days"},
-        "weekly": {"weekly", "week", "weeks"},
-        "biweekly": {"biweekly", "bi-weekly"},
-        "monthly": {"monthly", "month", "months"},
-        "quarterly": {"quarterly", "quarter", "quarters"},
-    }.get(cadence, {cadence})
-    if words.intersection(evidence_words):
-        return True
-    return cadence.replace("-", "") in compact_message
-
 
 def _strategy_has_indicator_parameters(strategy: StrategySummary) -> bool:
     return bool(_indicator_parameters_from_strategy(strategy))

@@ -117,16 +117,16 @@
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [
-      "What if I bought Tesla after big drops?",
-      "What if I bought Bitcoin every month?",
+      "How did Apple perform against SPY in 2024?",
+      "What if I bought Bitcoin at the start of 2024?",
       "Explain a market term in simple words.",
       "What happens if I hold Nvidia for a year?",
       "Compare Ethereum and Bitcoin over the last year.",
-      "Test buying SPY when it starts rising.",
+      "Test buying SPY at the start of 2024.",
       "How does buying strong stocks work?",
-      "What if I bought dividend stocks during a recession?",
-      "Try a simple Solana idea.",
-      "Why do people buy after a price drop?"
+      "What if I bought $250 of Nvidia every week in 2024?",
+      "Try a simple Solana buy-and-hold idea.",
+      "Why do people compare a stock to SPY?"
     ],
     "view_history": "View history",
     "chat_options": "Chat options",
@@ -134,16 +134,16 @@
     "hide_suggestions": "Hide suggestions",
     "starter_actions": {
       "tsla": {
-        "label": "Buy Tesla after drops",
-        "value": "What if I bought Tesla after big drops?"
+        "label": "Compare Apple to SPY",
+        "value": "How did Apple perform against SPY in 2024?"
       },
       "btc": {
-        "label": "Test Bitcoin strength",
-        "value": "What if I bought Bitcoin when it has been rising?"
+        "label": "Hold Bitcoin in 2024",
+        "value": "What if I bought Bitcoin at the start of 2024 and held through the end of 2024?"
       },
       "dca": {
-        "label": "Buy every month",
-        "value": "What if I bought a fixed amount every month?"
+        "label": "Buy Nvidia weekly",
+        "value": "What if I bought $250 of Nvidia every week in 2024?"
       }
     },
     "example_queries": {

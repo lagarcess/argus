@@ -512,7 +512,7 @@ def test_visible_confirmation_metadata_fallback_carries_text_turn_context(
             "type": "final",
             "payload": {
                 "stage_outcome": "ready_to_respond",
-                "assistant_response": "For the visible draft, I am using Benchmark: SPY.",
+                "assistant_response": "For the visible confirmation, I am using Benchmark: SPY.",
             },
         }
 
@@ -1530,6 +1530,118 @@ def test_pending_refinement_fallback_carries_source_result_reference() -> None:
     assert fallback.selected_thread_metadata is not None
     assert fallback.selected_thread_metadata["requested_field"] == "refinement"
     assert fallback.selected_thread_metadata["source_result_run_id"] == run.id
+
+
+def test_pending_edit_prompt_takes_precedence_over_older_confirmation_fallback() -> None:
+    from argus.api.chat.recovery import (
+        confirmation_metadata_fallback_context,
+        pending_strategy_metadata_fallback_context,
+    )
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to test buy-and-hold for AAPL.",
+        metadata=_confirmation_metadata(),
+    )
+    pending_metadata = _pending_strategy_metadata()
+    pending_metadata["pending_strategy"]["requested_field"] = "asset_universe"
+    pending_metadata["pending_strategy"]["missing_required_fields"] = [
+        "asset_universe"
+    ]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What asset should I use instead?",
+        metadata=pending_metadata,
+    )
+
+    confirmation_fallback = confirmation_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+    pending_fallback = pending_strategy_metadata_fallback_context(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+    )
+
+    assert confirmation_fallback is None
+    assert pending_fallback is not None
+    assert pending_fallback.selected_thread_metadata is not None
+    assert pending_fallback.selected_thread_metadata["requested_field"] == (
+        "asset_universe"
+    )
+
+
+def test_plain_text_after_pending_edit_prompt_passes_requested_field_to_runtime(
+    monkeypatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _checkpoint(**_: Any) -> dict[str, Any]:
+        return {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Captured fallback context.",
+            },
+        }
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="Ready to test buy-and-hold for AAPL.",
+        metadata=_confirmation_metadata(),
+    )
+    pending_metadata = _pending_strategy_metadata()
+    pending_metadata["pending_strategy"]["requested_field"] = "asset_universe"
+    pending_metadata["pending_strategy"]["missing_required_fields"] = [
+        "asset_universe"
+    ]
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="What asset should I use instead?",
+        metadata=pending_metadata,
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "microsoft",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["message"] == "microsoft"
+    assert captured["fallback_selected_thread_metadata"]["requested_field"] == (
+        "asset_universe"
+    )
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary is not None
+    assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
 
 
 def test_retry_after_reload_carries_latest_failed_action_reference(monkeypatch) -> None:

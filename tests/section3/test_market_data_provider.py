@@ -230,7 +230,7 @@ def test_recorded_provider_fixture_uses_provider_shaped_payloads(
     assert eurusd.asset_class == "currency_pair"
 
 
-def test_asset_search_prefers_provider_validated_close_symbol_match(
+def test_asset_search_does_not_promote_close_symbol_typos_as_provider_truth(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mapping: dict[str, ResolvedAsset] = {}
@@ -255,7 +255,79 @@ def test_asset_search_prefers_provider_validated_close_symbol_match(
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: mapping)
     monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
 
-    assert assets.search_assets("appl")[0].canonical_symbol == "AAPL"
+    assert assets.search_assets("aapq") == []
+
+
+def test_resolve_asset_accepts_unique_provider_name_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapping: dict[str, ResolvedAsset] = {}
+    record = ResolvedAsset(
+        canonical_symbol="AAPL",
+        asset_class="equity",
+        name="Apple Inc.",
+        raw_symbol="AAPL",
+    )
+    assets._add_aliases(mapping, record, canonical="AAPL")
+    mapping[record.name.lower()] = record
+
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: mapping)
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
+
+    assert assets.resolve_asset("apple").canonical_symbol == "AAPL"
+
+
+def test_resolve_asset_does_not_force_ambiguous_company_hints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapping: dict[str, ResolvedAsset] = {}
+    for symbol, name in (
+        ("GOOG", "Alphabet Inc. Class C Capital Stock"),
+        ("GOOGL", "Alphabet Inc. Class A Common Stock"),
+        ("GOOP", "Kurv Yield Premium Strategy Google ETF"),
+        ("MSFT", "Microsoft Corporation Common Stock"),
+        ("MSFX", "T-Rex 2X Long Microsoft Daily Target ETF"),
+    ):
+        record = ResolvedAsset(
+            canonical_symbol=symbol,
+            asset_class="equity",
+            name=name,
+            raw_symbol=symbol,
+        )
+        assets._add_aliases(mapping, record, canonical=symbol)
+        mapping[name.lower()] = record
+
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: mapping)
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
+
+    with pytest.raises(ValueError, match="invalid_symbol"):
+        assets.resolve_asset("google")
+
+
+def test_live_provider_does_not_use_static_company_hint_table(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapping: dict[str, ResolvedAsset] = {}
+    record = ResolvedAsset(
+        canonical_symbol="GOOGL",
+        asset_class="equity",
+        name="Alphabet Inc. Class A Common Stock",
+        raw_symbol="GOOGL",
+    )
+    assets._add_aliases(mapping, record, canonical="GOOGL")
+    mapping[record.name.lower()] = record
+
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+    monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: mapping)
+    monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
+
+    with pytest.raises(ValueError, match="invalid_symbol"):
+        assets.resolve_asset("google")
 
 
 def test_resolve_asset_does_not_fuzzy_replace_exact_ticker_like_query(

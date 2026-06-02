@@ -194,8 +194,8 @@ async def chat_stream(
     display_message = chat_display_message(payload)
     onboarding_goal = parse_onboarding_control_message(request_message)
 
-    conversation = api_state.store.conversations.get(payload.conversation_id)
-    if conversation is None and api_state.supabase_gateway is not None:
+    conversation = None
+    if api_state.supabase_gateway is not None:
         try:
             conversation = api_state.supabase_gateway.get_conversation(
                 user_id=user.id,
@@ -209,6 +209,9 @@ async def chat_stream(
                 error=str(exc),
                 conversation_id=payload.conversation_id,
             )
+            conversation = api_state.store.conversations.get(payload.conversation_id)
+    else:
+        conversation = api_state.store.conversations.get(payload.conversation_id)
     if not conversation:
         raise problem(
             request,
@@ -875,6 +878,10 @@ async def chat_stream(
                     receipt_run_id = run.id
                     result_card = run.conversation_result_card
                     metadata["result_card"] = result_card
+                    runtime_result["result_card"] = result_card
+                    final_response_payload = runtime_result.get("final_response_payload")
+                    if isinstance(final_response_payload, dict):
+                        final_response_payload["result_card"] = result_card
                     metadata["latest_run_id"] = run.id
                     metadata["result_run_id"] = run.id
                     metadata["result_strategy_id"] = run.strategy_id
@@ -886,7 +893,12 @@ async def chat_stream(
                     runtime_result["run"] = run.model_dump(mode="json")
 
                 streamed_text = "".join(streamed_text_parts).strip()
-                if streamed_text and confirmation_card is None and run is None:
+                if (
+                    streamed_text
+                    and confirmation_card is None
+                    and run is None
+                    and not assistant_text
+                ):
                     assistant_text = streamed_text
                     runtime_result["assistant_response"] = streamed_text
 

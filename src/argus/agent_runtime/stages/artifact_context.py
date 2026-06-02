@@ -50,14 +50,14 @@ def stale_confirmation_action_response(
     if clicked_id and active_id and clicked_id != active_id:
         return (
             "That confirmation was updated. Use the latest visible card and I will "
-            "keep the current draft intact."
+            "keep the current confirmation intact."
         )
     clicked_hash = str(payload.get("launch_payload_hash") or "").strip()
     active_hash = str(reference.metadata.get("launch_payload_hash") or "").strip()
     if clicked_hash and active_hash and clicked_hash != active_hash:
         return (
             "That confirmation payload is stale. Use the latest visible card and I "
-            "will keep the current draft intact."
+            "will keep the current confirmation intact."
         )
     return None
 
@@ -82,12 +82,12 @@ def draft_assumptions_response(snapshot: TaskSnapshot | None) -> str | None:
         assumptions = inferred_strategy_assumptions(snapshot.pending_strategy_summary)
     if not assumptions:
         return None
-    draft_label = (
-        "visible draft"
+    artifact_label = (
+        "visible confirmation"
         if snapshot.active_confirmation_reference is not None
-        else "current draft"
+        else "current idea"
     )
-    return f"For the {draft_label}, I am using: " + "; ".join(assumptions) + "."
+    return f"For the {artifact_label}, I am using: " + "; ".join(assumptions) + "."
 
 
 def active_confirmation_assumptions(snapshot: TaskSnapshot) -> list[str]:
@@ -169,7 +169,7 @@ def _strategy_with_launch_defaults(
         if value not in (None, "", [], {}):
             setattr(updated, field_name, value)
     benchmark_symbol = launch_payload.get("benchmark_symbol")
-    if benchmark_symbol:
+    if benchmark_symbol and not updated.comparison_baseline:
         updated.comparison_baseline = str(benchmark_symbol).strip().upper()
     return updated
 
@@ -255,6 +255,7 @@ def confirmation_payload_matches_visible_strategy(
         "rule_spec",
         "cadence",
         "capital_amount",
+        "comparison_baseline",
     }
     for field in fields_that_bind_launch_truth:
         if normalized_launch_binding_value(payload_strategy.get(field)) != (
@@ -385,6 +386,8 @@ def strategy_from_failed_launch_payload(payload: dict[str, Any]) -> StrategySumm
         "date_range": payload.get("date_range"),
         "capital_amount": payload.get("capital_amount"),
     }
+    if benchmark_symbol:
+        strategy_payload["comparison_baseline"] = benchmark_symbol
     if payload.get("entry_rule") not in (None, "", [], {}):
         strategy_payload["entry_logic"] = payload.get("entry_rule")
     if payload.get("exit_rule") not in (None, "", [], {}):
@@ -415,8 +418,8 @@ def _retry_strategy_thesis(payload: dict[str, Any], symbols: list[str]) -> str:
 def failed_action_is_retryable(reference: ArtifactReference | None) -> bool:
     if reference is None or reference.artifact_kind != "failed_action":
         return False
-    retryable = dict(reference.metadata).get("retryable")
-    return retryable is not False
+    metadata = dict(reference.metadata)
+    return metadata.get("retryable") is True
 
 
 def non_retryable_failed_action_response(reference: ArtifactReference | None) -> str:

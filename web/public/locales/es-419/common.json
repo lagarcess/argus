@@ -117,16 +117,16 @@
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
     "placeholder_prompts": [
-      "¿Y si comprara Tesla en caídas importantes?",
-      "¿Cómo funcionaría una estrategia DCA en Bitcoin?",
-      "Muéstrame cómo funciona un cruce de RSI en Apple.",
-      "¿Qué pasa si mantengo Nvidia durante alta volatilidad?",
+      "¿Cómo le fue a Apple contra SPY en 2024?",
+      "¿Y si comprara Bitcoin al inicio de 2024?",
+      "Explícame un término del mercado en palabras simples.",
+      "¿Qué pasa si mantengo Nvidia durante un año?",
       "Compara mantener ETH frente a BTC el último año.",
-      "Prueba una estrategia de ruptura de media móvil en SPY.",
+      "Prueba comprar SPY al inicio de 2024.",
       "¿Cómo funciona el trading de momentum para tecnológicas?",
-      "¿Y si invirtiera en acciones de dividendos en una recesión?",
-      "Simula una estrategia de seguimiento de tendencia en Solana.",
-      "¿Puedes explicar cómo funciona la reversión a la media?"
+      "¿Y si comprara $250 de Nvidia cada semana en 2024?",
+      "Prueba una idea simple de comprar y mantener Solana.",
+      "¿Por qué la gente compara una acción con SPY?"
     ],
     "view_history": "Ver historial",
     "chat_options": "Opciones de chat",
@@ -134,16 +134,16 @@
     "hide_suggestions": "Ocultar sugerencias",
     "starter_actions": {
       "tsla": {
-        "label": "Prueba caídas de Tesla",
-        "value": "¿Y si comprara Tesla en caídas importantes?"
+        "label": "Compara Apple con SPY",
+        "value": "¿Cómo le fue a Apple contra SPY en 2024?"
       },
       "btc": {
-        "label": "Prueba momentum de Bitcoin",
-        "value": "Prueba una idea de ruptura de impulso en Bitcoin"
+        "label": "Mantener Bitcoin en 2024",
+        "value": "¿Y si comprara Bitcoin al inicio de 2024 y lo mantuviera hasta el final de 2024?"
       },
       "dca": {
-        "label": "Explora DCA",
-        "value": "Muéstrame una estrategia de acumulación DCA para Apple"
+        "label": "Comprar Nvidia semanalmente",
+        "value": "¿Y si comprara $250 de Nvidia cada semana en 2024?"
       }
     },
     "example_queries": {

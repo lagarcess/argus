@@ -18,20 +18,6 @@ from argus.domain.market_data import ResolvedAsset, is_ticker_like_query
 from argus.domain.market_data import resolve_asset as resolve_market_asset
 from argus.domain.market_data import search_assets as search_market_assets
 
-VAGUE_ASSET_REFERENCES = {
-    "dollar",
-    "the dollar",
-    "usd",
-    "cash",
-    "the market",
-    "market",
-    "crypto",
-    "stocks",
-    "stock market",
-    "forex",
-}
-
-
 @dataclass(frozen=True)
 class AssetResolution:
     status: ResolutionStatus
@@ -68,17 +54,6 @@ def resolve_asset_candidate(
             candidates=(),
             confidence="low",
         )
-    if normalized in VAGUE_ASSET_REFERENCES:
-        candidates = _search_assets_safely(raw_text, limit=5)
-        return _asset_resolution(
-            status="ambiguous",
-            raw_text=raw_text,
-            field=field,
-            source=source,
-            asset=None,
-            candidates=candidates,
-            confidence="low",
-        )
     try:
         asset = resolve_market_asset(raw_text)
         return _asset_resolution(
@@ -91,7 +66,8 @@ def resolve_asset_candidate(
             confidence="high",
         )
     except Exception:
-        if is_ticker_like_query(raw_text):
+        candidates = _search_assets_safely(raw_text, limit=5)
+        if is_ticker_like_query(raw_text) and source != "user_mention":
             return _asset_resolution(
                 status="unsupported",
                 raw_text=raw_text,
@@ -101,11 +77,23 @@ def resolve_asset_candidate(
                 candidates=(),
                 confidence="high",
             )
-        candidates = _search_assets_safely(raw_text, limit=5)
 
     unique = _unique_assets(candidates)
     if len(unique) == 1:
         asset = unique[0]
+        if source == "user_mention" and not _provider_name_prefix_match(
+            raw_text,
+            asset,
+        ):
+            return _asset_resolution(
+                status="unsupported",
+                raw_text=raw_text,
+                field=field,
+                source=source,
+                asset=None,
+                candidates=(asset,),
+                confidence="low",
+            )
         return _asset_resolution(
             status="resolved",
             raw_text=raw_text,
@@ -116,6 +104,17 @@ def resolve_asset_candidate(
             confidence="medium",
         )
     if len(unique) > 1:
+        ranked_answer = _provider_ranked_user_mention_asset(raw_text, unique, source)
+        if ranked_answer is not None:
+            return _asset_resolution(
+                status="resolved",
+                raw_text=raw_text,
+                field=field,
+                source=source,
+                asset=ranked_answer,
+                candidates=(ranked_answer,),
+                confidence="medium",
+            )
         return _asset_resolution(
             status="ambiguous",
             raw_text=raw_text,
@@ -138,6 +137,25 @@ def resolve_asset_candidate(
 
 def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
     return search_market_assets(query, limit=limit)
+
+
+def _provider_ranked_user_mention_asset(
+    raw_text: str,
+    candidates: list[ResolvedAsset],
+    source: ResolutionSource,
+) -> ResolvedAsset | None:
+    if source != "user_mention" or not candidates:
+        return None
+    top = candidates[0]
+    if _provider_name_prefix_match(raw_text, top):
+        return top
+    return None
+
+
+def _provider_name_prefix_match(raw_text: str, asset: ResolvedAsset) -> bool:
+    lowered = " ".join(str(raw_text or "").casefold().split())
+    top_name = " ".join(str(asset.name or "").casefold().split())
+    return bool(lowered and top_name.startswith(lowered))
 
 
 def resolve_indicator_candidate(

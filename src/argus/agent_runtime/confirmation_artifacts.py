@@ -132,6 +132,10 @@ def _strategy_contract_failure(
     ):
         return "launch_payload_date_range_mismatch"
 
+    expected_benchmark = _expected_benchmark(confirmation_payload, strategy)
+    if expected_benchmark is not None and request.benchmark_symbol != expected_benchmark:
+        return "launch_payload_benchmark_mismatch"
+
     if expected_strategy_type == "signal_strategy":
         expected_rule_spec = executable_rule_spec_from_strategy(strategy)
         if expected_rule_spec is None or request.rule_spec != expected_rule_spec:
@@ -173,3 +177,30 @@ def _strategy_date_range(strategy: dict[str, Any]) -> dict[str, str] | None:
         return resolve_date_range(value).payload
     except Exception:
         return None
+
+
+def _strategy_benchmark(strategy: dict[str, Any]) -> str | None:
+    for key in ("comparison_baseline", "benchmark_symbol"):
+        value = strategy.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip().upper()
+    return None
+
+
+def _expected_benchmark(
+    confirmation_payload: dict[str, Any],
+    strategy: dict[str, Any],
+) -> str | None:
+    return _strategy_benchmark(strategy) or _optional_benchmark(confirmation_payload)
+
+
+def _optional_benchmark(confirmation_payload: dict[str, Any]) -> str | None:
+    optional_parameters = confirmation_payload.get("optional_parameters")
+    if not isinstance(optional_parameters, dict):
+        return None
+    value = optional_parameters.get("benchmark_symbol")
+    if isinstance(value, dict):
+        value = value.get("value")
+    if isinstance(value, str) and value.strip():
+        return value.strip().upper()
+    return None

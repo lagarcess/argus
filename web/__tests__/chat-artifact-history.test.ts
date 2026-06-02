@@ -4,6 +4,7 @@ import {
   applyConfirmationActionEffects,
   confirmationActionEffectsFromApi,
   normalizeConfirmationHistory,
+  settleOpenConfirmationsAfterTextFinal,
 } from "../components/chat/artifact-history";
 import type { ChatActionOption, Message } from "../components/chat/types";
 import type { ApiMessage } from "../lib/argus-api";
@@ -290,6 +291,64 @@ describe("chat artifact history", () => {
     expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
     expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
     expect(normalizedConfirmation.actions).toEqual([]);
+  });
+
+  test("failed run finalization does not leave confirmation status running", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const [settled] = settleOpenConfirmationsAfterTextFinal([running], {
+      action: {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-aapl" },
+      },
+      finalActions: [
+        {
+          type: "retry_failed_action",
+          artifactType: "failed_action",
+          artifactStatus: "failed",
+          label: "Retry",
+        },
+      ],
+    });
+
+    expect(settled.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled.confirmation?.statusLabel).toBe("Could not run");
+    expect(settled.confirmation?.actions).toEqual([]);
+    expect(settled.actions).toEqual([]);
+  });
+
+  test("non-retryable failed run finalization still settles confirmation as failed", () => {
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const [settled] = settleOpenConfirmationsAfterTextFinal([running], {
+      action: {
+        type: "run_backtest",
+        label: "Run backtest",
+        presentation: "confirmation",
+        payload: { confirmation_id: "confirm-aapl" },
+      },
+      hasFailedAction: true,
+      finalActions: [],
+    });
+
+    expect(settled.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled.confirmation?.statusLabel).toBe("Could not run");
+    expect(settled.confirmation?.actions).toEqual([]);
+    expect(settled.actions).toEqual([]);
   });
 
   test("hydration closes active confirmation as complete when a result follows it", () => {

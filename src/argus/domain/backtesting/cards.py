@@ -7,9 +7,8 @@ from argus.domain.backtesting.execution import _execution_realism_settings
 
 
 def _format_money(value: float) -> str:
-    if abs(value) >= 1000:
-        return f"${value / 1000:.1f}k"
-    return f"${value:,.0f}"
+    prefix = "-$" if value < 0 else "$"
+    return f"{prefix}{abs(value):,.0f}"
 
 
 def build_result_card(

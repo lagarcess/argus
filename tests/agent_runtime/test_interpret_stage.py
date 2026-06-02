@@ -47,6 +47,14 @@ class RecordingInterpreter:
         return self.response
 
 
+class RaisingInterpreter:
+    last_status = "unused"
+
+    def __call__(self, request):
+        del request
+        raise RuntimeError("unexpected interpreter failure")
+
+
 def run_interpret_with_llm(
     *,
     message: str,
@@ -72,6 +80,19 @@ def run_interpret_with_llm(
         structured_interpreter=interpreter,
     )
     return result, interpreter
+
+
+def test_interpret_stage_does_not_hide_unexpected_interpreter_exceptions() -> None:
+    with pytest.raises(RuntimeError, match="unexpected interpreter failure"):
+        interpret_stage(
+            state=RunState.new(
+                current_user_message="test apple against qqq in 2024",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="u1"),
+            latest_task_snapshot=None,
+            structured_interpreter=RaisingInterpreter(),
+        )
 
 
 def validated_confirmation_payload(strategy: StrategySummary) -> dict[str, Any]:
@@ -1505,7 +1526,7 @@ def test_interpret_answers_pending_draft_assumption_followup_without_approval() 
     )
 
     assert result.outcome == "ready_to_respond"
-    assert "For the current draft" in result.patch["assistant_response"]
+    assert "For the current idea" in result.patch["assistant_response"]
     assert "Long-only" in result.patch["assistant_response"]
     assert result.decision.semantic_turn_act == "result_followup"
 
@@ -2523,7 +2544,9 @@ def test_llm_extracted_company_name_resolves_through_provider_catalog(monkeypatc
             "apple": ResolvedAssetStub("AAPL", "equity", name="Apple Inc."),
             "AAPL": ResolvedAssetStub("AAPL", "equity", name="Apple Inc."),
         }
-        return lookup[symbol]
+        if symbol in lookup:
+            return lookup[symbol]
+        raise ValueError("invalid_symbol")
 
     monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
     response = StructuredInterpretation(
@@ -4027,11 +4050,11 @@ def test_active_artifact_rule_answer_repairs_and_preserves_prior_asset(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert calls == [
-        "LLMInterpretationResponse",
-        "FocusedStrategyExtraction",
-        "LLMInterpretationResponse",
-    ]
+    assert calls[:2] == ["LLMInterpretationResponse", "FocusedStrategyExtraction"]
+    assert calls.count("LLMInterpretationResponse") >= 2
+    assert set(calls[2:]).issubset(
+        {"LLMInterpretationResponse", "StatedRunFieldFidelityAudit"}
+    )
     assert result.outcome == "ready_for_confirmation"
     assert strategy.asset_universe == ["TSLA"]
     assert strategy.date_range == "last 3 months"
@@ -4099,7 +4122,10 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
                 strategy_thesis="Buy AAPL with recurring $500 contributions.",
                 cadence="biweekly",
                 capital_amount=500,
-                field_provenance={"capital_amount": "recurring_contribution"},
+                field_provenance={
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                },
             ),
             semantic_turn_act="refine_current_idea",
         )
@@ -4138,7 +4164,8 @@ def test_result_refinement_reply_forks_latest_result_into_new_draft(
     )
 
     strategy = result.decision.candidate_strategy_draft
-    assert calls == ["LLMInterpretationResponse", "LLMInterpretationResponse"]
+    assert calls[:2] == ["LLMInterpretationResponse", "LLMInterpretationResponse"]
+    assert set(calls[2:]).issubset({"StatedRunFieldFidelityAudit"})
     assert result.outcome == "ready_for_confirmation"
     assert result.stage_patch.get("assistant_response") is None
     assert strategy.strategy_type == "dca_accumulation"
@@ -4185,7 +4212,7 @@ def test_indicator_simplification_does_not_regex_parse_when_interpreter_unavaila
         "assistant_response"
     ].lower()
     assert "interpreter" not in result.patch["assistant_response"].lower()
-    assert "nvda signal strategy draft" in result.patch["assistant_response"].lower()
+    assert "draft" not in result.patch["assistant_response"].lower()
 
 
 def test_interpreter_unavailable_reads_visible_confirmation_assumptions() -> None:
@@ -4278,7 +4305,7 @@ def test_interpreter_unavailable_during_assumption_edit_does_not_answer_stale_as
     answer = result.patch["assistant_response"]
     assert "could not safely apply that assumption change" in answer
     assert "$1,000 starting capital" not in answer
-    assert "left the current draft unchanged" in answer
+    assert "left the current idea unchanged" in answer
     assert "interpreter" not in answer.lower()
 
 
@@ -4303,6 +4330,7 @@ def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> 
                 "launch_payload": launch_payload,
                 "failure_classification": "upstream_dependency_error",
                 "error": "market_data_unavailable",
+                "retryable": True,
             },
         )
     )

@@ -401,7 +401,60 @@ def test_chat_stream_finalizes_ai_title_after_meaningful_turn(
     assert updated.title_source == "ai_generated"
 
 
-def test_chat_stream_persists_visible_streamed_text_for_non_card_reply(
+def test_chat_stream_final_text_wins_over_provisional_streamed_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {"type": "stage_outcome", "outcome": "needs_clarification"}
+        yield {"type": "token", "content": "I can show you a confirmation if you want."}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_response": "Which end date should I use?",
+                "pending_strategy": {
+                    "strategy": {
+                        "strategy_type": None,
+                        "asset_universe": [],
+                        "date_range": None,
+                    },
+                    "missing_required_fields": ["asset_universe"],
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "hello from browser smoke",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = _final_payload(response.text)
+    assert payload["assistant_response"] == "Which end date should I use?"
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert messages[-1]["id"] == payload["message_id"]
+    assert messages[-1]["content"] == "Which end date should I use?"
+
+
+def test_chat_stream_persists_streamed_text_when_final_text_is_absent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.routers import agent as agent_router
@@ -414,7 +467,6 @@ def test_chat_stream_persists_visible_streamed_text_for_non_card_reply(
             "type": "final",
             "payload": {
                 "stage_outcome": "await_user_reply",
-                "assistant_response": "Different final clarification.",
                 "pending_strategy": {
                     "strategy": {
                         "strategy_type": None,

@@ -208,7 +208,23 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = [
       strategyName: "AAPL Monthly DCA",
       strategyLabel: "Monthly contribution",
       symbols: ["AAPL"],
+      template: "dca_accumulation",
       assetClass: "equity",
+      configSnapshot: {
+        template: "dca_accumulation",
+        timeframe: "1D",
+        benchmark_symbol: "SPY",
+        resolved_parameters: {
+          strategy_type: "dca_accumulation",
+          timeframe: "1D",
+          benchmark_symbol: "SPY",
+          cadence: "monthly",
+          capital_amount: 250,
+        },
+        parameters: {
+          dca_cadence: "monthly",
+        },
+      },
       period: "January 3, 2022 to December 29, 2023",
       statusLabel: "Simulation Complete",
       metrics: [

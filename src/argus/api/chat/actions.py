@@ -42,6 +42,7 @@ def chat_request_message(payload: ChatStreamRequest) -> str:
         "show_breakdown": "show a detailed breakdown of this result",
         "refine_strategy": "refine this strategy",
         "save_strategy": "save this strategy",
+        "retry_failed_action": "retry failed action",
     }
     return action_messages[action_type]
 

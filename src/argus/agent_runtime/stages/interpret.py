@@ -15,6 +15,10 @@ from argus.agent_runtime.capabilities.answers import (
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.extraction import detect_unsupported_constraints
+from argus.agent_runtime.asset_text_grounding import (
+    grounded_asset_mention_has_name_support,
+    grounded_asset_mentions_from_text,
+)
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -31,6 +35,11 @@ from argus.agent_runtime.result_followups import (
     compose_result_followup_response,
     fallback_private_alpha_save_response,
     fallback_result_followup_response,
+)
+from argus.agent_runtime.run_field_contract import (
+    current_message_date_range,
+    current_message_execution_context_tokens,
+    message_states_bar_timeframe,
 )
 from argus.agent_runtime.rule_specs import (
     indicator_parameters_from_strategy as canonical_indicator_parameters_from_strategy,
@@ -89,7 +98,10 @@ from argus.agent_runtime.state.models import (
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
     canonical_strategy_type,
+    display_strategy_type,
     executable_strategy_type,
+    has_partial_explicit_date_range,
+    resolve_date_range,
 )
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
@@ -182,6 +194,15 @@ async def interpret_stage_async(
         )
         if pending_date_result is not None:
             return pending_date_result
+        pending_asset_result = await _pending_asset_answer_result_when_interpreter_unavailable(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
+        if pending_asset_result is not None:
+            return pending_asset_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -209,6 +230,15 @@ async def interpret_stage_async(
         )
         if pending_date_result is not None:
             return pending_date_result
+        pending_asset_result = await _pending_asset_answer_result_when_interpreter_unavailable(
+            state=state,
+            user=user,
+            snapshot=snapshot,
+            capability_contract=capability_contract,
+            selected_thread_metadata=selected_metadata,
+        )
+        if pending_asset_result is not None:
+            return pending_asset_result
         return await _interpreter_unavailable_result(
             user=user,
             snapshot=snapshot,
@@ -248,6 +278,59 @@ async def _pending_date_answer_result_when_interpreter_unavailable(
         interpretation=interpretation,
         capability_contract=capability_contract,
         selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+async def _pending_asset_answer_result_when_interpreter_unavailable(
+    *,
+    state: RunState,
+    user: UserState,
+    snapshot: TaskSnapshot | None,
+    capability_contract: Any,
+    selected_thread_metadata: dict[str, Any],
+) -> StageResult | None:
+    interpretation = _pending_asset_answer_interpretation_when_unavailable(
+        current_user_message=state.current_user_message,
+        snapshot=snapshot,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    if interpretation is None:
+        return None
+    return await _stage_result_from_interpretation(
+        state=state,
+        user=user,
+        snapshot=snapshot,
+        interpretation=interpretation,
+        capability_contract=capability_contract,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+
+
+def _pending_asset_answer_interpretation_when_unavailable(
+    *,
+    current_user_message: str,
+    snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+) -> StructuredInterpretation | None:
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "asset_universe":
+        return None
+    if snapshot is None or snapshot.pending_strategy_summary is None:
+        return None
+    asset_answer = current_user_message.strip()
+    if not asset_answer:
+        return None
+    return StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied the requested replacement asset.",
+        candidate_strategy_draft=StrategySummary(asset_universe=[asset_answer]),
+        missing_required_fields=[],
+        semantic_turn_act="answer_pending_need",
+        reason_codes=["deterministic_pending_asset_answer_fallback"],
     )
 
 
@@ -425,6 +508,7 @@ async def _stage_result_from_interpretation(
     capability_contract: Any,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
+    original_semantic_turn_act = interpretation.semantic_turn_act
     interpretation = _repair_retry_route_when_pending_need_is_active(
         interpretation=interpretation,
         snapshot=snapshot,
@@ -448,6 +532,7 @@ async def _stage_result_from_interpretation(
         selected_thread_metadata=selected_thread_metadata,
         semantic_turn_act=interpretation.semantic_turn_act,
         task_relation=interpretation.task_relation,
+        reason_codes=interpretation.reason_codes,
     )
     artifact_target, artifact_target_reason_codes = _validated_artifact_target(
         interpretation=interpretation,
@@ -476,6 +561,9 @@ async def _stage_result_from_interpretation(
         _strategy_with_supported_indicator_simplification(
             strategy=incoming_strategy,
             snapshot=snapshot,
+            selected_thread_metadata=selected_thread_metadata,
+            semantic_turn_act=interpretation.semantic_turn_act,
+            task_relation=interpretation.task_relation,
         )
     )
     if supported_indicator_simplification_applied:
@@ -514,6 +602,22 @@ async def _stage_result_from_interpretation(
             pending_resolution_applied=pending_resolution_applied,
         )
     )
+    if requested_asset_answer_applied:
+        expects_strategy_route = True
+        interpretation = interpretation.model_copy(
+            update={
+                "intent": "backtest_execution",
+                "task_relation": "continue",
+                "requires_clarification": False,
+                "assistant_response": None,
+                "semantic_turn_act": "answer_pending_need",
+                "missing_required_fields": [],
+                "reason_codes": [
+                    *interpretation.reason_codes,
+                    "requested_asset_answer_route_repaired",
+                ],
+            }
+        )
     if (
         expects_strategy_route
         and interpretation.semantic_turn_act != "retry_failed_action"
@@ -543,18 +647,46 @@ async def _stage_result_from_interpretation(
         if expects_strategy_route
         else incoming_strategy
     )
+    current_message_asset_grounding_reason_codes: list[str] = []
+    if expects_strategy_route and _should_apply_current_message_asset_grounding(
+        semantic_turn_act=original_semantic_turn_act,
+        selected_thread_metadata=selected_thread_metadata,
+        snapshot=snapshot,
+    ):
+        strategy, current_message_asset_grounding_reason_codes = (
+            _strategy_with_current_message_asset_grounding(
+                strategy=strategy,
+                current_user_message=state.current_user_message,
+            )
+        )
+    if expects_strategy_route:
+        strategy, interpretation = _strategy_with_current_message_run_field_contract(
+            strategy=strategy,
+            interpretation=interpretation,
+            current_user_message=state.current_user_message,
+            supported_timeframes=_supported_timeframes(capability_contract),
+        )
     benchmark_reason_codes: list[str] = []
     if expects_strategy_route:
-        strategy, benchmark_reason_codes = _strategy_with_user_stated_benchmark(
-            strategy=strategy,
-            current_user_message=state.current_user_message,
+        prior_strategy = _active_strategy_from_snapshot(snapshot)
+        strategy, unstated_benchmark_reason_codes = (
+            _strategy_with_unstated_benchmark_guard(
+                strategy=strategy,
+                prior_strategy=prior_strategy,
+            )
         )
         strategy, separate_benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
             strategy
         )
+        strategy, validated_benchmark_reason_codes = (
+            _strategy_with_validated_benchmark_symbol(strategy)
+        )
         benchmark_reason_codes = [
             *benchmark_reason_codes,
+            *current_message_asset_grounding_reason_codes,
+            *unstated_benchmark_reason_codes,
             *separate_benchmark_reason_codes,
+            *validated_benchmark_reason_codes,
         ]
     strategy, optional_parameter_values = _route_contextual_money_answer(
         strategy=strategy,
@@ -592,7 +724,9 @@ async def _stage_result_from_interpretation(
             )
         )
     ambiguous_fields = list(interpretation.ambiguous_fields)
-    if pending_resolution_applied:
+    if requested_asset_answer_applied:
+        ambiguous_fields = []
+    elif pending_resolution_applied:
         ambiguous_fields = [
             field
             for field in ambiguous_fields
@@ -912,6 +1046,161 @@ async def _stage_result_from_interpretation(
     )
 
 
+def _strategy_with_current_message_run_field_contract(
+    *,
+    strategy: StrategySummary,
+    interpretation: StructuredInterpretation,
+    current_user_message: str,
+    supported_timeframes: tuple[str, ...],
+) -> tuple[StrategySummary, StructuredInterpretation]:
+    date_range = _explicit_date_range_from_current_message_for_repair(
+        current_user_message,
+        strategy=strategy,
+    )
+    if date_range is None:
+        return strategy, interpretation
+
+    updated = strategy.model_copy(deep=True)
+    changed = False
+    if (
+        not has_partial_explicit_date_range(date_range)
+        and _strategy_date_range_needs_current_message_repair(
+            strategy=updated,
+            interpretation=interpretation,
+            current_date_range=date_range,
+        )
+    ):
+        updated.date_range = date_range
+        changed = True
+    if (
+        _strategy_has_non_executable_timeframe_label(
+            updated,
+            supported_timeframes=supported_timeframes,
+        )
+        and not message_states_bar_timeframe(current_user_message)
+    ):
+        updated.timeframe = None
+        changed = True
+    if not changed:
+        return strategy, interpretation
+
+    missing_required_fields = [
+        field
+        for field in interpretation.missing_required_fields
+        if str(field).split("[", 1)[0] != "date_range"
+    ]
+    ambiguous_fields = [
+        field
+        for field in interpretation.ambiguous_fields
+        if field.field_name.split("[", 1)[0] != "date_range"
+    ]
+    requires_clarification = interpretation.requires_clarification
+    assistant_response = interpretation.assistant_response
+    if (
+        not missing_required_fields
+        and not ambiguous_fields
+        and not interpretation.unsupported_constraints
+    ):
+        requires_clarification = False
+        assistant_response = None
+    repaired = interpretation.model_copy(
+        update={
+            "requires_clarification": requires_clarification,
+            "assistant_response": assistant_response,
+            "missing_required_fields": missing_required_fields,
+            "ambiguous_fields": ambiguous_fields,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *interpretation.reason_codes,
+                        "current_message_run_field_contract_repair",
+                    ]
+                )
+            ),
+        }
+    )
+    return updated, repaired
+
+
+def _explicit_date_range_from_current_message_for_repair(
+    current_user_message: str,
+    *,
+    strategy: StrategySummary,
+) -> dict[str, str] | None:
+    date_range = current_message_date_range(current_user_message)
+    if date_range is not None:
+        return date_range
+    if strategy.date_range not in (None, "", [], {}):
+        return None
+    try:
+        resolved = resolve_date_range(current_user_message)
+    except Exception:
+        return None
+    if resolved.used_default or not isinstance(resolved.payload, dict):
+        return None
+    payload = {
+        key: str(value)
+        for key in ("start", "end")
+        if (value := resolved.payload.get(key)) not in (None, "")
+    }
+    if set(payload) != {"start", "end"}:
+        return None
+    return payload
+
+
+def _strategy_date_range_needs_current_message_repair(
+    *,
+    strategy: StrategySummary,
+    interpretation: StructuredInterpretation,
+    current_date_range: dict[str, str],
+) -> bool:
+    if interpretation.semantic_turn_act == "answer_pending_need":
+        return False
+    if strategy.date_range in (None, "", [], {}):
+        return True
+    if has_partial_explicit_date_range(strategy.date_range):
+        return True
+    if isinstance(strategy.date_range, str):
+        return True
+    if _date_range_endpoints(strategy.date_range) != _date_range_endpoints(
+        current_date_range
+    ):
+        return True
+    return any(
+        str(field).split("[", 1)[0] == "date_range"
+        for field in interpretation.missing_required_fields
+    ) or any(
+        field.field_name.split("[", 1)[0] == "date_range"
+        for field in interpretation.ambiguous_fields
+    )
+
+
+def _date_range_endpoints(value: Any) -> tuple[str | None, str | None] | None:
+    if not isinstance(value, dict):
+        return None
+    start = value.get("start") or value.get("from")
+    end = value.get("end") or value.get("to")
+    return (
+        str(start).strip() if start not in (None, "", [], {}) else None,
+        str(end).strip() if end not in (None, "", [], {}) else None,
+    )
+
+
+def _strategy_has_non_executable_timeframe_label(
+    strategy: StrategySummary,
+    *,
+    supported_timeframes: tuple[str, ...],
+) -> bool:
+    if strategy.timeframe in (None, "", [], {}):
+        return False
+    normalized = str(strategy.timeframe).strip().casefold().replace(" ", "")
+    supported = {
+        str(value).strip().casefold().replace(" ", "")
+        for value in supported_timeframes
+    }
+    return bool(normalized and normalized not in supported)
+
+
 def _repair_retry_route_when_pending_need_is_active(
     *,
     interpretation: StructuredInterpretation,
@@ -980,6 +1269,7 @@ def _repair_fresh_restatement_route_when_pending_need_is_active(
         selected_thread_metadata=selected_thread_metadata,
         semantic_turn_act="new_idea",
         task_relation="new_task",
+        reason_codes=interpretation.reason_codes,
     )
     if not _strategy_has_execution_anchor(candidate):
         return interpretation
@@ -1415,7 +1705,7 @@ async def _compose_natural_context_curiosity_answer(
         )
     provenance_rule = (
         "If you use visible artifact context, say so naturally with phrases like "
-        "'from this result' or 'from the current draft'."
+        "'from this result' or 'from this confirmation'."
         if artifact_target in {"latest_result", "active_confirmation", "pending_refinement"}
         else "Do not imply you used a prior result or hidden memory."
     )
@@ -2008,24 +2298,55 @@ def _strategy_with_requested_asset_answer_resolution(
 ) -> tuple[StrategySummary, bool]:
     if pending_resolution_applied:
         return strategy, False
-    if semantic_turn_act != "answer_pending_need":
-        return strategy, False
     requested_field = _field_base(
         str(selected_thread_metadata.get("requested_field") or "")
     )
     if requested_field != "asset_universe":
         return strategy, False
-    asset_answer = _requested_asset_answer_candidate(
+    del semantic_turn_act
+    asset_candidates = _requested_asset_answer_candidates(
         explicit_strategy=explicit_strategy,
         current_user_message=current_user_message,
     )
-    if not asset_answer:
+    if not asset_candidates:
         return strategy, False
-    resolution = _resolve_asset_candidate(
-        asset_answer,
-        field="asset_universe[0]",
-        source="llm_extraction",
-    )
+    prior_symbols = _strategy_canonical_asset_symbols(prior_strategy)
+    fallback_resolution: AssetResolution | None = None
+    resolution: AssetResolution | None = None
+    for asset_candidate in asset_candidates:
+        if (
+            not asset_candidate.from_user_answer
+            and _normalized_symbol(asset_candidate.text) in prior_symbols
+        ):
+            continue
+        candidate_resolution = _resolve_asset_candidate_safely(
+            asset_candidate.text,
+            field="asset_universe[0]",
+            source=asset_candidate.source,
+        )
+        if candidate_resolution is None:
+            if fallback_resolution is None and asset_candidate.from_user_answer:
+                fallback_resolution = _unresolved_requested_asset_resolution(
+                    asset_candidate.text,
+                    field="asset_universe[0]",
+                    source=asset_candidate.source,
+                )
+            continue
+        if (
+            not asset_candidate.from_user_answer
+            and candidate_resolution.asset is not None
+            and candidate_resolution.asset.canonical_symbol in prior_symbols
+        ):
+            continue
+        if candidate_resolution.status == "resolved" and candidate_resolution.asset is not None:
+            resolution = candidate_resolution
+            break
+        if fallback_resolution is None:
+            fallback_resolution = candidate_resolution
+    if resolution is None:
+        resolution = fallback_resolution
+    if resolution is None:
+        return strategy, False
     updated = (prior_strategy or strategy).model_copy(deep=True)
     existing_provenance: list[ResolutionProvenance | dict[str, Any]] = []
     for item in updated.resolution_provenance:
@@ -2043,6 +2364,51 @@ def _strategy_with_requested_asset_answer_resolution(
     return updated, True
 
 
+def _resolve_asset_candidate_safely(
+    query: str,
+    *,
+    field: str,
+    source: ResolutionSource,
+) -> AssetResolution | None:
+    try:
+        return _resolve_asset_candidate(query, field=field, source=source)
+    except ValueError:
+        return None
+
+
+def _unresolved_requested_asset_resolution(
+    query: str,
+    *,
+    field: str,
+    source: ResolutionSource,
+) -> AssetResolution:
+    return AssetResolution(
+        status="unsupported",
+        raw_text=query,
+        asset=None,
+        candidates=(),
+        provenance=ResolutionProvenance(
+            field=field,
+            raw_text=query,
+            source=source,
+            candidate_kind="asset",
+            resolution_status="unsupported",
+            validated_by="provider_catalog",
+            confidence="low",
+        ),
+    )
+
+
+def _strategy_canonical_asset_symbols(strategy: StrategySummary | None) -> set[str]:
+    if strategy is None:
+        return set()
+    return {
+        symbol.strip().upper()
+        for symbol in strategy.asset_universe
+        if isinstance(symbol, str) and symbol.strip()
+    }
+
+
 def _provenance_field(item: ResolutionProvenance | dict[str, Any]) -> str:
     if isinstance(item, ResolutionProvenance):
         return item.field
@@ -2050,23 +2416,55 @@ def _provenance_field(item: ResolutionProvenance | dict[str, Any]) -> str:
     return field if isinstance(field, str) else ""
 
 
-def _requested_asset_answer_candidate(
+@dataclass(frozen=True)
+class _RequestedAssetCandidate:
+    text: str
+    source: ResolutionSource
+    from_user_answer: bool = False
+
+
+def _requested_asset_answer_candidates(
     *,
     explicit_strategy: StrategySummary,
     current_user_message: str,
-) -> str:
+) -> list[_RequestedAssetCandidate]:
+    candidates: list[_RequestedAssetCandidate] = []
+    answer = current_user_message.strip()
+    if answer:
+        candidates.append(
+            _RequestedAssetCandidate(
+                text=answer,
+                source="user_mention",
+                from_user_answer=True,
+            )
+        )
     for symbol in explicit_strategy.asset_universe:
         candidate = str(symbol or "").strip()
         if candidate:
-            return candidate
-    return current_user_message.strip()
+            candidates.append(
+                _RequestedAssetCandidate(text=candidate, source="llm_extraction")
+            )
+    deduped: list[_RequestedAssetCandidate] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = candidate.text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
 
 
 def _strategy_with_supported_indicator_simplification(
     *,
     strategy: StrategySummary,
     snapshot: TaskSnapshot | None,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: str | None,
+    task_relation: str,
 ) -> tuple[StrategySummary, bool]:
+    if semantic_turn_act == "approval":
+        return strategy, False
     indicator_key = _indicator_key_from_strategy(strategy)
     if indicator_key is None:
         return strategy, False
@@ -2083,21 +2481,37 @@ def _strategy_with_supported_indicator_simplification(
     if spec is None or not _indicator_supports_default_threshold_rule(spec):
         return strategy, False
 
+    preserve_prior_asset_context = (
+        prior is not None
+        and _should_preserve_prior_asset_context(
+            prior=prior,
+            selected_thread_metadata=selected_thread_metadata,
+            semantic_turn_act=semantic_turn_act,
+            task_relation=task_relation,
+        )
+    )
+    merge_fields = [
+        "asset_universe",
+        "asset_class",
+        "date_range",
+        "timeframe",
+        "capital_amount",
+        "position_size",
+        "comparison_baseline",
+        "entry_logic",
+        "exit_logic",
+        "extra_parameters",
+    ]
+    if preserve_prior_asset_context:
+        merge_fields = [
+            field
+            for field in merge_fields
+            if field not in {"asset_universe", "asset_class"}
+        ]
     updated = _merge_non_empty_strategy_fields(
         base=base,
         incoming=strategy,
-        field_names=(
-            "asset_universe",
-            "asset_class",
-            "date_range",
-            "timeframe",
-            "capital_amount",
-            "position_size",
-            "comparison_baseline",
-            "entry_logic",
-            "exit_logic",
-            "extra_parameters",
-        ),
+        field_names=tuple(merge_fields),
     )
     prior_strategy_type = executable_strategy_type(base)
     incoming_indicator_parameters = _indicator_parameters_from_strategy(strategy)
@@ -2212,7 +2626,7 @@ def _indicator_simplification_thesis(
     assets = ", ".join(strategy.asset_universe)
     if assets:
         return f"Test {assets} with a supported {spec.label} threshold rule."
-    return f"Test the current draft with a supported {spec.label} threshold rule."
+    return f"Test the current idea with a supported {spec.label} threshold rule."
 
 
 def _is_ambiguous_asset_resolution(item: ResolutionProvenance | dict[str, Any]) -> bool:
@@ -2506,21 +2920,20 @@ def _offline_recovery_message(
 ) -> str:
     if snapshot is not None and snapshot.pending_strategy_summary is not None:
         strategy = snapshot.pending_strategy_summary
-        assets = ", ".join(strategy.asset_universe) or "the current asset"
-        strategy_label = (strategy.strategy_type or "strategy").replace("_", " ")
+        setup_phrase = _current_setup_phrase(strategy)
         if _pending_assumption_edit_was_not_applied(
             current_user_message=current_user_message,
             selected_thread_metadata=selected_thread_metadata or {},
         ):
             return (
-                f"I still have the {assets} {strategy_label} draft in this chat, "
-                "but I could not safely apply that assumption change, so I left "
-                "the current draft unchanged. Please retry the change in a moment."
+                "I saved your reply, but I could not safely apply that assumption "
+                "change, so I left the current idea unchanged. Please retry the "
+                "change in a moment."
             )
         if snapshot.active_confirmation_reference is None:
             return (
-                f"I still have the {assets} {strategy_label} draft in this chat, "
-                "but I could not safely apply that change. Please retry in a moment."
+                f"I still have the {setup_phrase} in this chat, but I could not "
+                "safely apply that change. Please retry in a moment."
             )
         assumptions_response = _draft_assumptions_response(snapshot)
         action_guidance = (
@@ -2530,7 +2943,7 @@ def _offline_recovery_message(
         if assumptions_response is not None:
             return f"{assumptions_response} {action_guidance}"
         return (
-            f"I still have the {assets} {strategy_label} draft in this chat, "
+            f"I still have the {setup_phrase} confirmation in this chat, "
             f"but I could not safely apply that change. {action_guidance}"
         )
     if snapshot is not None and snapshot.latest_backtest_result_reference is not None:
@@ -2539,9 +2952,22 @@ def _offline_recovery_message(
             "answer that follow-up. Please retry in a moment."
         )
     return (
-        "I saved your message, but I could not turn it into a reliable draft. "
+        "I saved your message, but I could not turn it into a reliable test setup. "
         "Please retry in a moment."
     )
+
+
+def _current_setup_phrase(strategy: StrategySummary) -> str:
+    assets = [symbol for symbol in strategy.asset_universe if symbol]
+    asset_label = ", ".join(assets)
+    strategy_label = display_strategy_type(strategy).strip().lower()
+    if asset_label and strategy_label:
+        return f"{asset_label} {strategy_label} setup"
+    if asset_label:
+        return f"{asset_label} setup"
+    if strategy_label:
+        return f"current {strategy_label} setup"
+    return "current setup"
 
 
 def _pending_assumption_edit_was_not_applied(
@@ -2560,11 +2986,14 @@ def _strategy_with_contextual_merge(
     selected_thread_metadata: dict[str, Any],
     semantic_turn_act: str | None,
     task_relation: str,
+    reason_codes: list[str] | None = None,
 ) -> StrategySummary:
     if snapshot is None:
         return strategy
     prior = snapshot.pending_strategy_summary or snapshot.confirmed_strategy_summary
     if prior is None:
+        return strategy
+    if "pending_response_option_selected" in set(reason_codes or []):
         return strategy
     should_merge = (
         semantic_turn_act in CONTEXTUAL_EDIT_TURN_ACTS
@@ -2599,6 +3028,12 @@ def _strategy_with_contextual_merge(
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
     )
+    preserve_prior_asset_context = _should_preserve_prior_asset_context(
+        prior=prior,
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=semantic_turn_act,
+        task_relation=task_relation,
+    )
     if preserve_prior_family:
         strategy_family_changed = False
         incoming_strategy_family = prior_strategy_family
@@ -2617,6 +3052,12 @@ def _strategy_with_contextual_merge(
         if key == "strategy_thesis" and not strategy_family_changed:
             continue
         if key == "strategy_type" and preserve_prior_family:
+            continue
+        if preserve_prior_asset_context and key in {
+            "asset_universe",
+            "asset_class",
+            "resolution_provenance",
+        }:
             continue
         if value in (None, "", [], {}):
             continue
@@ -2646,6 +3087,25 @@ def _strategy_with_contextual_merge(
     if declared_family in SUPPORTED_STRATEGY_TYPES:
         _clear_incompatible_strategy_rule_state(merged, declared_family)
     return merged
+
+
+def _should_apply_current_message_asset_grounding(
+    *,
+    semantic_turn_act: str | None,
+    selected_thread_metadata: dict[str, Any],
+    snapshot: TaskSnapshot | None,
+) -> bool:
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field == "asset_universe":
+        return True
+    if semantic_turn_act != "answer_pending_need":
+        return True
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return True
+    prior = _active_strategy_from_snapshot(snapshot)
+    return not bool(prior and prior.asset_universe)
 
 
 def _merged_contextual_date_range(
@@ -2714,6 +3174,27 @@ def _should_preserve_pending_strategy_family(
     if _strategy_supplies_executable_rule_edit(strategy):
         return False
     return True
+
+
+def _should_preserve_prior_asset_context(
+    *,
+    prior: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: str | None,
+    task_relation: str,
+) -> bool:
+    if not prior.asset_universe:
+        return False
+    if semantic_turn_act != "answer_pending_need":
+        return False
+    if task_relation not in {"continue", "refine"}:
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field == "asset_universe":
+        return False
+    return selected_thread_metadata.get("last_stage_outcome") == "await_user_reply"
 
 
 def _strategy_fills_pending_execution_context(
@@ -2921,7 +3402,11 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
         resolution = _resolve_asset_candidate(
             symbol,
             field=f"asset_universe[{index}]",
-            source="llm_extraction",
+            source=_asset_resolution_source_for_canonicalization(
+                updated,
+                index=index,
+                symbol=symbol,
+            ),
         )
         provenance.append(resolution.provenance)
         if resolution.status != "resolved" or resolution.asset is None:
@@ -2946,6 +3431,409 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
         [*updated.resolution_provenance, *provenance]
     )
     return updated
+
+
+def _strategy_with_current_message_asset_grounding(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str,
+) -> tuple[StrategySummary, list[str]]:
+    if not current_user_message.strip():
+        return strategy, []
+    if not strategy.asset_universe:
+        return _strategy_with_missing_asset_grounded_from_current_message(
+            strategy=strategy,
+            current_user_message=current_user_message,
+        )
+    if _message_explicitly_mentions_symbol(
+        current_user_message,
+        symbols=strategy.asset_universe,
+    ):
+        return strategy, []
+
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        return _resolve_asset_candidate_safely(
+            query,
+            field="asset_universe[0]",
+            source="user_mention",
+        )
+
+    current_symbols = [
+        symbol
+        for symbol in (_normalized_symbol(value) for value in strategy.asset_universe)
+        if symbol is not None
+    ]
+    current_symbol_set = set(current_symbols)
+    benchmark_symbol = _normalized_symbol(strategy.comparison_baseline)
+    mentions = grounded_asset_mentions_from_text(
+        current_user_message,
+        resolve_candidate=_resolve_candidate,
+        excluded_tokens=current_message_execution_context_tokens(
+            current_user_message,
+            strategy_type=strategy.strategy_type,
+        ),
+        limit=5,
+    )
+    if not mentions:
+        repaired_symbols = _without_weak_implicit_current_symbols(
+            current_symbols=current_symbols,
+            benchmark_symbol=benchmark_symbol,
+            current_user_message=current_user_message,
+        )
+        if repaired_symbols != current_symbols:
+            updated = strategy.model_copy(deep=True)
+            updated.asset_universe = repaired_symbols
+            return updated, ["current_message_asset_grounding_repaired"]
+        return strategy, []
+
+    grounded_assets = [
+        mention.asset
+        for mention in mentions
+        if _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
+        != benchmark_symbol
+    ]
+    grounded_symbols = [
+        str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        for asset in grounded_assets
+        if str(getattr(asset, "canonical_symbol", "") or "").strip()
+    ]
+    grounded_symbols = list(dict.fromkeys(grounded_symbols))
+    if not grounded_symbols:
+        repaired_symbols = _without_weak_implicit_current_symbols(
+            current_symbols=current_symbols,
+            benchmark_symbol=benchmark_symbol,
+            current_user_message=current_user_message,
+        )
+        if repaired_symbols != current_symbols:
+            updated = strategy.model_copy(deep=True)
+            updated.asset_universe = repaired_symbols
+            return updated, ["current_message_asset_grounding_repaired"]
+        return strategy, []
+
+    grounded_symbols = _without_weak_implicit_short_symbol_mentions(
+        grounded_symbols=grounded_symbols,
+        grounded_mentions=mentions,
+        current_symbols=current_symbols,
+        benchmark_symbol=benchmark_symbol,
+        current_user_message=current_user_message,
+    )
+    grounded_symbols = _symbols_corroborated_by_strategy_text(
+        symbols=grounded_symbols,
+        strategy=strategy,
+        benchmark_symbol=benchmark_symbol,
+    )
+    grounded_symbol_set = set(grounded_symbols)
+    if not grounded_symbol_set:
+        return strategy, []
+    retained_symbols = [
+        symbol for symbol in current_symbols if symbol in grounded_symbol_set
+    ]
+    weak_current_symbols = _weak_implicit_current_symbol_set(
+        current_symbols=current_symbols,
+        benchmark_symbol=benchmark_symbol,
+        current_user_message=current_user_message,
+    )
+    if retained_symbols:
+        repaired_symbols = retained_symbols
+    elif current_symbol_set and current_symbol_set.issubset(grounded_symbol_set):
+        return strategy, []
+    else:
+        alternate_grounded_symbols = [
+            symbol for symbol in grounded_symbols if symbol not in current_symbol_set
+        ]
+        if current_symbol_set and not current_symbol_set.issubset(weak_current_symbols):
+            if not _grounded_symbols_have_name_support(
+                symbols=alternate_grounded_symbols,
+                mentions=mentions,
+            ):
+                return strategy, []
+        if current_symbol_set and len(alternate_grounded_symbols) != 1:
+            return strategy, []
+        repaired_symbols = alternate_grounded_symbols or grounded_symbols
+    if repaired_symbols == current_symbols:
+        return strategy, []
+
+    asset_class_by_symbol = {
+        str(getattr(asset, "canonical_symbol", "") or "").strip().upper(): getattr(
+            asset,
+            "asset_class",
+            None,
+        )
+        for asset in grounded_assets
+    }
+    asset_classes = {
+        str(asset_class)
+        for symbol in repaired_symbols
+        if (asset_class := asset_class_by_symbol.get(symbol))
+    }
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = repaired_symbols
+    if len(asset_classes) == 1:
+        updated.asset_class = next(iter(asset_classes))
+    elif len(asset_classes) > 1:
+        updated.asset_class = "mixed"
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [
+            item
+            for item in updated.resolution_provenance
+            if _field_base(_provenance_field(item)) != "asset_universe"
+        ]
+        + [
+            mention.resolution.provenance
+            for mention in mentions
+            if str(
+                getattr(mention.resolution.asset, "canonical_symbol", "") or ""
+            ).strip().upper()
+            in repaired_symbols
+        ]
+    )
+    return updated, ["current_message_asset_grounding_repaired"]
+
+
+def _grounded_symbols_have_name_support(
+    *,
+    symbols: list[str],
+    mentions: list[Any],
+) -> bool:
+    symbol_set = set(symbols)
+    if not symbol_set:
+        return False
+    return any(
+        symbol in symbol_set and grounded_asset_mention_has_name_support(mention)
+        for mention in mentions
+        if (
+            symbol := _normalized_symbol(
+                getattr(mention.asset, "canonical_symbol", None)
+            )
+        )
+    )
+
+
+def _symbols_corroborated_by_strategy_text(
+    *,
+    symbols: list[str],
+    strategy: StrategySummary,
+    benchmark_symbol: str | None,
+) -> list[str]:
+    if len(symbols) <= 1:
+        return symbols
+    strategy_text = str(strategy.strategy_thesis or "").strip()
+    if not strategy_text:
+        return symbols
+
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        return _resolve_asset_candidate_safely(
+            query,
+            field="asset_universe[0]",
+            source="user_mention",
+        )
+
+    semantic_mentions = grounded_asset_mentions_from_text(
+        strategy_text,
+        resolve_candidate=_resolve_candidate,
+        excluded_tokens=current_message_execution_context_tokens(
+            strategy_text,
+            strategy_type=strategy.strategy_type,
+        ),
+        limit=5,
+    )
+    if not semantic_mentions:
+        return symbols
+
+    semantic_symbols = {
+        symbol
+        for mention in semantic_mentions
+        if (
+            symbol := _normalized_symbol(
+                getattr(mention.asset, "canonical_symbol", None)
+            )
+        )
+        and symbol != benchmark_symbol
+    }
+    if not semantic_symbols:
+        return symbols
+    filtered = [symbol for symbol in symbols if symbol in semantic_symbols]
+    return filtered or symbols
+
+
+def _strategy_with_missing_asset_grounded_from_current_message(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str,
+) -> tuple[StrategySummary, list[str]]:
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        return _resolve_asset_candidate_safely(
+            query,
+            field="asset_universe[0]",
+            source="user_mention",
+        )
+
+    benchmark_symbol = _normalized_symbol(strategy.comparison_baseline)
+    mentions = grounded_asset_mentions_from_text(
+        current_user_message,
+        resolve_candidate=_resolve_candidate,
+        excluded_tokens=current_message_execution_context_tokens(
+            current_user_message,
+            strategy_type=strategy.strategy_type,
+        ),
+        limit=5,
+    )
+    if not mentions:
+        return strategy, []
+    grounded_assets = [
+        mention.asset
+        for mention in mentions
+        if _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
+        != benchmark_symbol
+    ]
+    grounded_symbols = [
+        str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        for asset in grounded_assets
+        if str(getattr(asset, "canonical_symbol", "") or "").strip()
+    ]
+    grounded_symbols = list(dict.fromkeys(grounded_symbols))
+    if len(grounded_symbols) != 1:
+        return strategy, []
+
+    asset_class = str(getattr(grounded_assets[0], "asset_class", "") or "").strip()
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = grounded_symbols
+    if asset_class:
+        updated.asset_class = asset_class
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [
+            item
+            for item in updated.resolution_provenance
+            if _field_base(_provenance_field(item)) != "asset_universe"
+        ]
+        + [
+            mention.resolution.provenance
+            for mention in mentions
+            if str(
+                getattr(mention.resolution.asset, "canonical_symbol", "") or ""
+            ).strip().upper()
+            in grounded_symbols
+        ]
+    )
+    return updated, ["current_message_asset_grounding_repaired"]
+
+
+def _without_weak_implicit_current_symbols(
+    *,
+    current_symbols: list[str],
+    benchmark_symbol: str | None,
+    current_user_message: str,
+) -> list[str]:
+    if benchmark_symbol is None or not current_symbols:
+        return current_symbols
+    weak_symbols = _weak_implicit_current_symbol_set(
+        current_symbols=current_symbols,
+        benchmark_symbol=benchmark_symbol,
+        current_user_message=current_user_message,
+    )
+    if not weak_symbols:
+        return current_symbols
+    stronger_symbols = [symbol for symbol in current_symbols if symbol not in weak_symbols]
+    return stronger_symbols or current_symbols
+
+
+def _weak_implicit_current_symbol_set(
+    *,
+    current_symbols: list[str],
+    benchmark_symbol: str | None,
+    current_user_message: str,
+) -> set[str]:
+    if benchmark_symbol is None:
+        return set()
+    return {
+        symbol
+        for symbol in current_symbols
+        if len(symbol) <= 2
+        and not _message_explicitly_mentions_symbol(
+            current_user_message,
+            symbols=[symbol],
+        )
+    }
+
+
+def _without_weak_implicit_short_symbol_mentions(
+    *,
+    grounded_symbols: list[str],
+    grounded_mentions: list[Any],
+    current_symbols: list[str],
+    benchmark_symbol: str | None,
+    current_user_message: str,
+) -> list[str]:
+    if benchmark_symbol is None or not current_symbols:
+        return grounded_symbols
+
+    current_symbol_set = set(current_symbols)
+    weak_symbols: set[str] = set()
+    for mention in grounded_mentions:
+        symbol = _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
+        if symbol is None or symbol not in current_symbol_set:
+            continue
+        if _message_explicitly_mentions_symbol(current_user_message, symbols=[symbol]):
+            continue
+        if len(symbol) > 2:
+            continue
+        raw_text = str(getattr(mention, "raw_text", "") or "").strip()
+        if not raw_text or raw_text != raw_text.lower() or len(raw_text.split()) != 1:
+            continue
+        weak_symbols.add(symbol)
+
+    if not weak_symbols:
+        pruned_current_symbols = _without_weak_implicit_current_symbols(
+            current_symbols=current_symbols,
+            benchmark_symbol=benchmark_symbol,
+            current_user_message=current_user_message,
+        )
+        weak_symbols = set(current_symbols) - set(pruned_current_symbols)
+        if not weak_symbols:
+            return grounded_symbols
+
+    filtered = [symbol for symbol in grounded_symbols if symbol not in weak_symbols]
+    if not filtered:
+        filtered = [symbol for symbol in current_symbols if symbol not in weak_symbols]
+    if not filtered:
+        return grounded_symbols
+    return filtered
+
+
+def _asset_resolution_source_for_canonicalization(
+    strategy: StrategySummary,
+    *,
+    index: int,
+    symbol: str,
+) -> ResolutionSource:
+    field = f"asset_universe[{index}]"
+    normalized_symbol = str(symbol or "").strip().upper()
+    for item in strategy.resolution_provenance:
+        if _field_base(_provenance_field(item)) != "asset_universe":
+            continue
+        if _provenance_field(item) != field and len(strategy.asset_universe) > 1:
+            continue
+        raw_text = (
+            item.raw_text
+            if isinstance(item, ResolutionProvenance)
+            else item.get("raw_text")
+        )
+        canonical = (
+            item.canonical_symbol
+            if isinstance(item, ResolutionProvenance)
+            else item.get("canonical_symbol")
+        )
+        if str(canonical or "").strip().upper() == normalized_symbol or (
+            str(raw_text or "").strip().upper() == normalized_symbol
+        ):
+            source = (
+                item.source
+                if isinstance(item, ResolutionProvenance)
+                else item.get("source")
+            )
+            if source in {"llm_extraction", "user_mention"}:
+                return source
+    return "llm_extraction"
 
 
 def _strategy_with_execution_defaults(strategy: StrategySummary) -> StrategySummary:
@@ -2992,81 +3880,64 @@ def _strategy_with_separate_benchmark_symbol(
     return updated, ["benchmark_symbol_removed_from_asset_universe"]
 
 
-def _strategy_with_user_stated_benchmark(
+def _strategy_with_unstated_benchmark_guard(
     *,
     strategy: StrategySummary,
-    current_user_message: str,
+    prior_strategy: StrategySummary | None,
 ) -> tuple[StrategySummary, list[str]]:
-    current = _normalized_symbol(strategy.comparison_baseline)
-    benchmark = _user_stated_benchmark_symbol(
-        current_user_message=current_user_message,
-        traded_symbols=set(strategy.asset_universe or []),
-        existing_benchmark=current,
-    )
+    benchmark = _normalized_symbol(strategy.comparison_baseline)
     if benchmark is None:
         return strategy, []
-    if current == benchmark:
+    provenance = strategy.extra_parameters.get("field_provenance")
+    if isinstance(provenance, dict) and provenance.get("comparison_baseline") in {
+        "explicit_user",
+        "stated_run_field_fidelity_audit",
+    }:
+        return strategy, []
+    prior_benchmark = (
+        _normalized_symbol(prior_strategy.comparison_baseline)
+        if prior_strategy is not None
+        else None
+    )
+    if prior_benchmark == benchmark:
         return strategy, []
     updated = strategy.model_copy(deep=True)
-    updated.comparison_baseline = benchmark
-    return updated, ["user_stated_benchmark_preserved"]
+    if prior_benchmark is not None:
+        updated.comparison_baseline = prior_benchmark
+        return updated, ["unstated_benchmark_symbol_reverted"]
+    updated.comparison_baseline = None
+    return updated, ["unstated_benchmark_symbol_cleared"]
 
 
-def _user_stated_benchmark_symbol(
-    *,
-    current_user_message: str,
-    traded_symbols: set[str],
-    existing_benchmark: str | None = None,
-) -> str | None:
-    tokens = _asset_candidate_tokens(current_user_message)
-    traded = {
-        symbol.strip().upper()
-        for symbol in traded_symbols
-        if isinstance(symbol, str) and symbol.strip()
-    }
-    connectors = {"against", "benchmark", "versus", "vs", "with"}
-    for index, token in enumerate(tokens):
-        if token.lower() not in connectors:
-            continue
-        for window_size in range(1, min(3, len(tokens) - index - 1) + 1):
-            phrase = " ".join(tokens[index + 1 : index + 1 + window_size])
-            symbol = _resolved_symbol_from_benchmark_phrase(phrase)
-            if symbol is None:
-                continue
-            if existing_benchmark is not None and symbol == existing_benchmark:
-                return symbol
-            if symbol not in traded:
-                return symbol
-    return None
-
-
-def _resolved_symbol_from_benchmark_phrase(phrase: str) -> str | None:
+def _strategy_with_validated_benchmark_symbol(
+    strategy: StrategySummary,
+) -> tuple[StrategySummary, list[str]]:
+    benchmark = _normalized_symbol(strategy.comparison_baseline)
+    if benchmark is None:
+        return strategy, []
     try:
         resolution = _resolve_asset_candidate(
-            phrase,
+            benchmark,
             field="comparison_baseline",
             source="llm_extraction",
         )
     except ValueError:
-        return None
-    if resolution.status != "resolved" or resolution.asset is None:
-        return None
-    return resolution.asset.canonical_symbol.strip().upper()
-
-
-def _asset_candidate_tokens(message: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in str(message or ""):
-        if char.isalnum() or char in {"/", "-"}:
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
+        resolution = None
+    if resolution is not None and resolution.status == "resolved" and resolution.asset is not None:
+        benchmark_asset_class = resolution.asset.asset_class
+        if strategy.asset_class and benchmark_asset_class != strategy.asset_class:
+            updated = strategy.model_copy(deep=True)
+            updated.comparison_baseline = None
+            return updated, ["invalid_benchmark_symbol_cleared"]
+        canonical = resolution.asset.canonical_symbol.strip().upper()
+        if canonical == benchmark:
+            return strategy, []
+        updated = strategy.model_copy(deep=True)
+        updated.comparison_baseline = canonical
+        return updated, ["benchmark_symbol_provider_validated"]
+    updated = strategy.model_copy(deep=True)
+    updated.comparison_baseline = None
+    return updated, ["invalid_benchmark_symbol_cleared"]
 
 
 def _normalized_symbol(value: Any) -> str | None:

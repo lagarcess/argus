@@ -45,7 +45,12 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import RunState, StrategySummary, TaskSnapshot
+from argus.agent_runtime.state.models import (
+    ResponseProfile,
+    RunState,
+    StrategySummary,
+    TaskSnapshot,
+)
 from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.agent_runtime.strategy_requirements import missing_required_fields_for_strategy
 
@@ -99,6 +104,11 @@ def structured_action_stage_result_if_applicable(
     action = state.structured_action
     if action is None:
         return None
+    if action.type == "retry_failed_action":
+        return _retry_failed_action_stage_result(
+            decision=_retry_failed_action_decision(state=state),
+            snapshot=snapshot,
+        )
     if action.presentation == "result":
         return result_action_stage_result_if_applicable(
             state=state,
@@ -456,6 +466,35 @@ def retry_failed_action_stage_result_if_applicable(
 ) -> StageResult | None:
     if decision.semantic_turn_act != "retry_failed_action":
         return None
+    return _retry_failed_action_stage_result(decision=decision, snapshot=snapshot)
+
+
+def _retry_failed_action_decision(*, state: RunState) -> InterpretDecision:
+    return InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="Retry failed action",
+        candidate_strategy_draft=StrategySummary(),
+        missing_required_fields=[],
+        confidence=1.0,
+        arbitration_mode="deterministic",
+        reason_codes=["structured_retry_failed_action"],
+        effective_response_profile=state.effective_response_profile
+        or ResponseProfile(
+            effective_tone="friendly",
+            effective_verbosity="medium",
+            effective_expertise_mode="beginner",
+        ),
+        semantic_turn_act="retry_failed_action",
+    )
+
+
+def _retry_failed_action_stage_result(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+) -> StageResult:
     reference = (
         snapshot.latest_failed_action_reference if snapshot is not None else None
     )

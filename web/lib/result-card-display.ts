@@ -33,6 +33,7 @@ export type ResultCardDisplayCopy = {
   laggedBy: (value: string) => string;
   trustStrip: string;
   startingCapitalLabel: string;
+  totalContributedLabel: string;
   dateRangeLabel: string;
   timeframeLabel: string;
   sideLabel: string;
@@ -75,6 +76,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   laggedBy: (value) => `Lagged by ${value}`,
   trustStrip: "Historical simulation · No fees/slippage · Not advice",
   startingCapitalLabel: "Starting capital",
+  totalContributedLabel: "Total contributed",
   dateRangeLabel: "Date range",
   timeframeLabel: "Timeframe",
   sideLabel: "Side",
@@ -339,9 +341,11 @@ function executionFacts(
     stringValue(resolvedParameters?.benchmark_symbol) ??
     assumptionValue(assumptions, "Benchmark") ??
     benchmarkFromMetric(result);
-  const contribution =
-    contributionFromStructuredFacts(resolvedParameters, parameters, locale) ??
-    contributionFromAssumptions(assumptions);
+  const contribution = contributionFromStructuredFacts(
+    resolvedParameters,
+    parameters,
+    locale,
+  );
   const entryRule = assumptionValue(assumptions, "Entry");
   const exitRule = assumptionValue(assumptions, "Exit");
   const side = assumptions.find((assumption) => assumption.toLowerCase() === "long-only");
@@ -350,10 +354,16 @@ function executionFacts(
   );
   const startingCapital =
     parsedStartingCapital ?? result.chart?.base_value ?? undefined;
+  const capitalBasisLabel = isRecurringContributionResult(
+    result,
+    resolvedParameters,
+  )
+    ? copy.totalContributedLabel
+    : copy.startingCapitalLabel;
   const details: EvidenceMetric[] = [
     startingCapital == null
       ? undefined
-      : { label: copy.startingCapitalLabel, value: formatCurrency(startingCapital, locale) },
+      : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
     { label: copy.dateRangeLabel, value: result.period },
     timeframe ? { label: copy.timeframeLabel, value: timeframe } : undefined,
     side ? { label: copy.sideLabel, value: side } : undefined,
@@ -370,6 +380,17 @@ function executionFacts(
     benchmark,
     details,
   };
+}
+
+function isRecurringContributionResult(
+  result: StrategyResultPayload,
+  resolvedParameters: Record<string, unknown> | undefined,
+) {
+  const template =
+    stringValue(result.template) ??
+    stringValue(result.configSnapshot?.template) ??
+    stringValue(resolvedParameters?.strategy_type);
+  return template === "dca_accumulation";
 }
 
 function recordValue(value: unknown) {
@@ -397,20 +418,6 @@ function assumptionValue(assumptions: string[], label: string) {
     assumption.toLowerCase().startsWith(prefix.toLowerCase()),
   );
   return value?.slice(prefix.length).trim();
-}
-
-function contributionFromAssumptions(assumptions: string[]) {
-  const contribution = assumptions.find((assumption) =>
-    /\bcontribution\b/i.test(assumption),
-  );
-  if (!contribution) return undefined;
-
-  const [rawCadence, rawAmount] = contribution.split(":");
-  const cadence = rawCadence?.replace(/\s+contribution$/i, "").trim();
-  return {
-    cadence: cadence || undefined,
-    amount: rawAmount?.trim() || undefined,
-  };
 }
 
 function contributionFromStructuredFacts(

@@ -1,5 +1,9 @@
 from datetime import date
 
+from argus.agent_runtime.run_field_contract import (
+    current_message_date_range,
+    current_message_dca_cadence,
+)
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type_from_extracted_fields,
@@ -17,6 +21,16 @@ def test_resolve_date_range_accepts_month_name_ranges() -> None:
 
     assert resolved.payload == {"start": "2010-01-01", "end": "2020-12-31"}
     assert resolved.display == "January 1, 2010 - December 31, 2020"
+
+
+def test_current_message_contract_does_not_broaden_explicit_month_ranges() -> None:
+    assert (
+        current_message_date_range(
+            "from March 1 2020 to August 1 2021",
+            today=date(2026, 5, 3),
+        )
+        is None
+    )
 
 
 def test_resolve_date_range_accepts_month_year_to_today() -> None:
@@ -37,6 +51,45 @@ def test_resolve_date_range_accepts_calendar_year() -> None:
     assert resolved.payload == {"start": "2024-01-01", "end": "2024-12-31"}
     assert resolved.display == "2024 (January 1, 2024 - December 31, 2024)"
     assert resolved.used_default is False
+
+
+def test_calendar_year_contract_preserves_multi_year_language() -> None:
+    resolved = resolve_date_range("over 2024 and 2025", today=date(2026, 5, 3))
+
+    assert resolved.payload == {"start": "2024-01-01", "end": "2025-12-31"}
+    assert resolved.used_default is False
+    assert current_message_date_range(
+        "how did apple perform over 2024 and 2025?",
+        today=date(2026, 5, 3),
+    ) == (
+        {"start": "2024-01-01", "end": "2025-12-31"}
+    )
+
+
+def test_resolve_date_range_accepts_current_year_so_far() -> None:
+    resolved = resolve_date_range("in 2026 so far", today=date(2026, 6, 1))
+
+    assert resolved.label == "2026 so far"
+    assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-01"}
+    assert resolved.used_default is False
+
+
+def test_current_message_date_range_accepts_current_year_so_far() -> None:
+    resolved = current_message_date_range(
+        "how did apple perform against QQQ in 2026 so far?",
+        today=date(2026, 6, 1),
+    )
+
+    assert resolved == {"start": "2026-01-01", "end": "2026-06-01"}
+
+
+def test_current_message_dca_cadence_uses_capability_aliases() -> None:
+    assert current_message_dca_cadence("buy $250 of NVDA every week in 2024") == (
+        "weekly"
+    )
+    assert current_message_dca_cadence("comprar 100 de BTC cada mes en 2024") == (
+        "monthly"
+    )
 
 
 def test_normalize_date_range_preserves_structured_month_name_ranges() -> None:

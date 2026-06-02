@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning } from "lucide-react";
+import { ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
+import { isRetryAction } from "@/lib/chat-retry-actions";
 
 type ChatMessageProps = {
   message: Message;
@@ -67,13 +68,21 @@ export default function ChatMessage({
       setShowOptions(false);
     }
 
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowOptions(false);
+      }
+    }
+
     if (showOptions) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
       // Use capture phase to ensure we catch the scroll event from the inner container natively
       window.addEventListener("scroll", handleScroll, true);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("scroll", handleScroll, true);
     };
   }, [showOptions]);
@@ -173,11 +182,20 @@ export default function ChatMessage({
     return content;
   };
 
+  const actionLabel = (action: ChatActionOption) =>
+    action.labelKey ? t(action.labelKey, action.label) : action.label;
+  const retryAction = message.actions?.find(isRetryAction);
+  const visibleMessageActions = (message.actions ?? []).filter(
+    (action) => !isRetryAction(action),
+  );
+  const shouldShowTextFooter =
+    message.kind === "text" && (isLatest || Boolean(retryAction));
+
   if (isUser && message.kind === "action") {
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
-          {message.selectedAction?.label ?? getDisplayContent()}
+          {message.selectedAction ? actionLabel(message.selectedAction) : getDisplayContent()}
         </div>
       </div>
     );
@@ -238,18 +256,18 @@ export default function ChatMessage({
             </div>
           )}
 
-          {isLatest && message.kind === "text" && (
+          {shouldShowTextFooter && (
             <div className="flex items-start justify-between gap-4 mt-2">
-              {message.actions && message.actions.length > 0 ? (
+              {visibleMessageActions.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {message.actions.map((action) => (
+                  {visibleMessageActions.map((action) => (
                     <button
                       key={action.id ?? action.type ?? action.label}
                       type="button"
                       onClick={() => onAction?.(action)}
                       className="rounded-full border border-black/12 dark:border-white/12 px-3 py-1.5 text-[13px] font-medium tracking-tight text-black/80 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/6 transition-colors"
                     >
-                      {action.label}
+                      {actionLabel(action)}
                     </button>
                   ))}
                 </div>
@@ -259,7 +277,15 @@ export default function ChatMessage({
 
               {/* Feedback Icon Row (Right-aligned) - Progressive Disclosure: Hide while streaming */}
               {!isStreaming && (
-                <div className={`relative flex items-center gap-1.5 transition-opacity shrink-0 ${rating ? "opacity-100" : "opacity-50 hover:opacity-100"}`} ref={optionsRef}>
+                <div
+                  className={`relative flex items-center gap-1.5 transition-opacity shrink-0 ${rating || showOptions ? "opacity-100" : "opacity-50 hover:opacity-100"}`}
+                  ref={optionsRef}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setShowOptions(false);
+                    }
+                  }}
+                >
                   <button
                     className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? selectedFeedbackClass : idleFeedbackClass }`}
                     title={t('chat.good_response')}
@@ -274,6 +300,16 @@ export default function ChatMessage({
                   >
                     <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
                   </button>
+                  {retryAction && (
+                    <button
+                      className={`p-1.5 rounded-full transition-all duration-200 ${idleFeedbackClass}`}
+                      title={actionLabel(retryAction)}
+                      aria-label={actionLabel(retryAction)}
+                      onClick={() => onAction?.(retryAction)}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 <button
                   onClick={toggleOptions}
                   className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
@@ -284,7 +320,10 @@ export default function ChatMessage({
 
                 {/* Popover Menu */}
                 {showOptions && (
-                  <div className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}>
+                  <div
+                    className={`absolute ${menuPosition === "bottom" ? "top-full mt-2" : "bottom-full mb-2"} right-0 w-[220px] bg-white dark:bg-[#1f2225] rounded-[24px] border border-black/5 dark:border-white/5 py-2 z-50 animate-in fade-in zoom-in-95 duration-200`}
+                    onMouseLeave={() => setShowOptions(false)}
+                  >
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                       onClick={() => { void handleCopy(); setShowOptions(false); }}

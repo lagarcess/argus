@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
+import pytest
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
 from argus.agent_runtime.stages.interpret import StructuredInterpretation, interpret_stage
 from argus.agent_runtime.state.models import (
+    AmbiguousField,
     ArtifactReference,
     ConfirmationPayload,
+    ResolutionProvenance,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -31,6 +35,15 @@ class RecordingInterpreter:
     def __call__(self, request: Any) -> StructuredInterpretation | None:
         self.requests.append(request)
         return self.response
+
+
+class RaisingInterpreter:
+    def __init__(self) -> None:
+        self.requests: list[Any] = []
+
+    def __call__(self, request: Any) -> StructuredInterpretation | None:
+        self.requests.append(request)
+        raise RuntimeError("interpreter unavailable")
 
 
 def _interpret(
@@ -101,6 +114,124 @@ def _task_snapshot_with_confirmation(strategy: StrategySummary) -> TaskSnapshot:
         active_confirmation_reference=reference,
         artifact_references=[reference],
     )
+
+
+@pytest.mark.parametrize(
+    ("visible_benchmark", "stale_launch_benchmark"),
+    [("QQQ", "SPY"), ("BTC", "ETH")],
+)
+def test_confirmation_payload_validation_rejects_stale_benchmark_launch_payload(
+    visible_benchmark: str,
+    stale_launch_benchmark: str,
+) -> None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        validate_confirmation_execution_payload,
+    )
+
+    asset_symbol = "AAPL" if visible_benchmark == "QQQ" else "ETH"
+    asset_class = "equity" if visible_benchmark == "QQQ" else "crypto"
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis=f"Buy and hold {asset_symbol} against {visible_benchmark}.",
+        asset_universe=[asset_symbol],
+        asset_class=asset_class,
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        comparison_baseline=visible_benchmark,
+    )
+    payload = _validated_confirmation_payload(strategy)
+    payload["launch_payload"]["benchmark_symbol"] = stale_launch_benchmark
+
+    validation = validate_confirmation_execution_payload(payload)
+
+    assert validation.executable is False
+    assert validation.failure_code == "launch_payload_benchmark_mismatch"
+
+
+def test_confirmation_payload_validation_rejects_stale_optional_benchmark_payload() -> None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        validate_confirmation_execution_payload,
+    )
+
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Microsoft against IWM.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+    )
+    payload = _validated_confirmation_payload(
+        strategy,
+        optional_parameters={
+            "benchmark_symbol": {
+                "label": "Benchmark",
+                "source": "explicit_user",
+                "value": "IWM",
+            }
+        },
+    )
+    payload["launch_payload"]["benchmark_symbol"] = "SPY"
+
+    validation = validate_confirmation_execution_payload(payload)
+
+    assert validation.executable is False
+    assert validation.failure_code == "launch_payload_benchmark_mismatch"
+
+
+def test_confirmation_payload_visibility_match_includes_benchmark_contract() -> None:
+    from argus.agent_runtime.stages.artifact_context import (
+        confirmation_payload_matches_visible_strategy,
+    )
+
+    visible_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL against QQQ.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        comparison_baseline="QQQ",
+    )
+    payload = _validated_confirmation_payload(
+        visible_strategy.model_copy(update={"comparison_baseline": "SPY"})
+    )
+
+    assert not confirmation_payload_matches_visible_strategy(
+        payload,
+        visible_strategy,
+    )
+
+
+def test_active_confirmation_effective_strategy_does_not_overwrite_visible_benchmark() -> None:
+    from argus.agent_runtime.stages.artifact_context import (
+        active_confirmation_effective_strategy,
+    )
+
+    visible_strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL against QQQ.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        comparison_baseline="QQQ",
+    )
+    payload = _validated_confirmation_payload(visible_strategy)
+    payload["launch_payload"]["benchmark_symbol"] = "SPY"
+    reference = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id="confirmation-stale-benchmark",
+        artifact_status="active",
+        metadata={"confirmation_payload": payload},
+    )
+
+    strategy = active_confirmation_effective_strategy(
+        snapshot=TaskSnapshot(
+            pending_strategy_summary=visible_strategy,
+            active_confirmation_reference=reference,
+            artifact_references=[reference],
+        ),
+        fallback=StrategySummary(),
+    )
+
+    assert strategy.comparison_baseline == "QQQ"
 
 
 def test_answer_pending_need_preserves_prior_strategy_fields(monkeypatch) -> None:
@@ -477,48 +608,63 @@ def test_dca_recurring_amount_from_user_text_is_preserved(monkeypatch) -> None:
     assert strategy.cadence == "weekly"
 
 
-def test_dca_recurring_amount_grounded_by_current_message_without_provenance(
+def test_dca_recurring_amount_with_current_message_evidence_is_preserved(
     monkeypatch,
 ) -> None:
-    from argus.agent_runtime.stages import interpret as interpret_module
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter import _validate_capability_boundaries
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 
     monkeypatch.setattr(
-        interpret_module,
+        llm_module,
         "resolve_asset",
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
-    response = StructuredInterpretation(
+    response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",
         requires_clarification=True,
         user_goal_summary="User wants weekly NVDA recurring buys.",
-        candidate_strategy_draft=StrategySummary(
-            strategy_type="dca_accumulation",
-            strategy_thesis="Buy NVIDIA weekly in 2024.",
-            asset_universe=["NVDA"],
-            asset_class="equity",
-            date_range="2024",
-            cadence="weekly",
-            capital_amount=250,
-        ),
+        candidate_strategy_draft=LLMStrategyDraft(),
         semantic_turn_act="new_idea",
     )
-
-    result, _ = _interpret(
-        message="What if I bought $250 of NVDA every week in 2024?",
-        response=response,
-        snapshot=None,
+    strategy = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy NVIDIA weekly in 2024.",
+        asset_universe=["NVDA"],
+        asset_class="equity",
+        date_range="2024",
+        cadence="weekly",
+        capital_amount=250,
+        extra_parameters={
+            "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            }
+        },
+    )
+    request = InterpretationRequest(
+        current_user_message="What if I bought $250 of NVDA every week in 2024?",
+        user=UserState(user_id="user-1"),
     )
 
-    assert result.outcome == "ready_for_confirmation"
-    strategy = result.decision.candidate_strategy_draft
+    _validate_capability_boundaries(
+        strategy=strategy,
+        response=response,
+        request=request,
+    )
+
     assert strategy.asset_universe == ["NVDA"]
     assert strategy.cadence == "weekly"
     assert strategy.capital_amount == 250
-    assert result.decision.missing_required_fields == []
+    assert response.missing_required_fields == []
 
 
-def test_dca_recurring_amount_grounding_handles_different_cadence_and_asset(
+def test_dca_recurring_amount_semantic_provenance_handles_variation(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
@@ -541,6 +687,12 @@ def test_dca_recurring_amount_grounding_handles_different_cadence_and_asset(
             date_range="2025",
             cadence="monthly",
             capital_amount=75,
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                }
+            },
         ),
         semantic_turn_act="new_idea",
     )
@@ -557,6 +709,123 @@ def test_dca_recurring_amount_grounding_handles_different_cadence_and_asset(
     assert strategy.cadence == "monthly"
     assert strategy.capital_amount == 75
     assert result.decision.missing_required_fields == []
+
+
+@pytest.mark.parametrize(
+    ("message", "valid_symbol", "cadence_asset_symbol", "valid_name", "cadence_name"),
+    [
+        (
+            "What if I bought $250 of Nvidia every week in 2024?",
+            "NVDA",
+            "WEEK",
+            "NVIDIA Corporation",
+            "Weekly Income ETF",
+        ),
+        (
+            "What if I bought $75 of Microsoft each month in 2025?",
+            "MSFT",
+            "MONTH",
+            "Microsoft Corporation",
+            "Monthly Income ETF",
+        ),
+    ],
+)
+def test_dca_cadence_terms_are_not_promoted_to_assets(
+    monkeypatch,
+    message: str,
+    valid_symbol: str,
+    cadence_asset_symbol: str,
+    valid_name: str,
+    cadence_name: str,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset_for(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().lower()
+        if normalized in {valid_symbol.lower(), valid_name.split()[0].lower()}:
+            return ResolvedAssetStub(valid_symbol, "equity", name=valid_name)
+        if normalized in {cadence_asset_symbol.lower(), cadence_name.split()[0].lower()}:
+            return ResolvedAssetStub(
+                cadence_asset_symbol,
+                "equity",
+                name=cadence_name,
+            )
+        raise ValueError(query)
+
+    def _resolution(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        try:
+            asset = _asset_for(query)
+        except ValueError:
+            return AssetResolution(
+                status="unresolved",
+                raw_text=query,
+                asset=None,
+                candidates=(),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="unresolved",
+                    validated_by="provider_catalog",
+                    confidence="low",
+                ),
+            )
+        return AssetResolution(
+            status="resolved",
+            raw_text=query,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        )
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset_for)
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants recurring buys.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Recurring buys should only include the intended asset.",
+            asset_universe=[valid_symbol, cadence_asset_symbol],
+            asset_class="equity",
+            date_range="2024",
+            cadence="weekly",
+            capital_amount=250,
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                }
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(message=message, response=response, snapshot=None)
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == [valid_symbol]
+    assert cadence_asset_symbol not in strategy.asset_universe
 
 
 def test_dca_tsla_monthly_recurring_contribution_does_not_ask_total_budget(
@@ -1244,26 +1513,35 @@ def test_change_asset_answer_patches_requested_field_only(monkeypatch) -> None:
     assert strategy.capital_amount is None
 
 
-def test_requested_asset_answer_resolves_google_through_provider_path(
+@pytest.mark.parametrize(
+    ("answer", "mapped_symbol", "prior_symbol"),
+    [
+        ("google", "GOOGL", "AAPL"),
+        ("the chipmaker", "NVDA", "MSFT"),
+    ],
+)
+def test_requested_asset_answer_uses_llm_mapped_asset_after_raw_provider_miss(
     monkeypatch,
+    answer: str,
+    mapped_symbol: str,
+    prior_symbol: str,
 ) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
     provider_queries: list[str] = []
-    provider_assets = {
-        "google": ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc."),
-        "googl": ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc."),
-    }
 
     def _asset(symbol: str) -> ResolvedAssetStub:
         provider_queries.append(symbol)
-        return provider_assets[symbol.strip().lower()]
+        normalized = symbol.strip().upper()
+        if normalized in {mapped_symbol, prior_symbol}:
+            return ResolvedAssetStub(normalized, "equity", name=f"{normalized} Inc.")
+        raise ValueError("unsupported_symbol")
 
     monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
     pending = StrategySummary(
         strategy_type="buy_and_hold",
-        strategy_thesis="Buy and hold Apple.",
-        asset_universe=["AAPL"],
+        strategy_thesis="Buy and hold the current asset.",
+        asset_universe=[prior_symbol],
         asset_class="equity",
         date_range="past year",
         capital_amount=10000,
@@ -1273,8 +1551,74 @@ def test_requested_asset_answer_resolves_google_through_provider_path(
         task_relation="continue",
         requires_clarification=False,
         user_goal_summary="User supplied the replacement asset.",
-        candidate_strategy_draft=StrategySummary(),
+        candidate_strategy_draft=StrategySummary(asset_universe=[mapped_symbol]),
         semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message=answer,
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert provider_queries[0] == answer
+    normalized_queries = [query.strip().upper() for query in provider_queries]
+    assert mapped_symbol in normalized_queries
+    mapped_index = normalized_queries.index(mapped_symbol)
+    assert prior_symbol not in normalized_queries[: mapped_index + 1]
+    assert strategy.asset_universe == [mapped_symbol]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == "past year"
+    assert strategy.capital_amount == 10000
+
+
+@pytest.mark.parametrize(
+    "ambiguous_field_name",
+    ["raw_user_input", "user_input", "user_intent"],
+)
+def test_requested_asset_answer_clears_stale_input_ambiguity_after_provider_resolution(
+    monkeypatch,
+    ambiguous_field_name: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized in {"GOOGL", "TSLA"}:
+            return ResolvedAssetStub(normalized, "equity", name=f"{normalized} Inc.")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test TSLA with a supported RSI threshold rule.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2025-11-30", "end": "2026-05-31"},
+        capital_amount=1000,
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied a replacement asset.",
+        candidate_strategy_draft=StrategySummary(asset_universe=["GOOGL"]),
+        semantic_turn_act="answer_pending_need",
+        ambiguous_fields=[
+            AmbiguousField(
+                field_name=ambiguous_field_name,
+                raw_value="google",
+                reason_code="unparseable_or_out_of_domain",
+            )
+        ],
     )
 
     result, _ = _interpret(
@@ -1288,13 +1632,63 @@ def test_requested_asset_answer_resolves_google_through_provider_path(
     )
 
     assert result.outcome == "ready_for_confirmation"
+    assert not result.decision.requires_clarification
+    assert result.decision.ambiguous_fields == []
+    assert result.decision.candidate_strategy_draft.asset_universe == ["GOOGL"]
+
+
+def test_requested_asset_answer_does_not_reuse_prior_asset_after_raw_provider_miss(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[str] = []
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        provider_queries.append(symbol)
+        normalized = symbol.strip().upper()
+        if normalized == "TSLA":
+            return ResolvedAssetStub("TSLA", "equity", name="Tesla Inc.")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test TSLA with a supported RSI threshold rule.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2025-11-30", "end": "2026-05-31"},
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+        comparison_baseline="SPY",
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User supplied the replacement asset.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="indicator_threshold",
+            asset_universe=["TSLA"],
+            raw_user_phrasing="google",
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="google",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
     strategy = result.decision.candidate_strategy_draft
     assert provider_queries[0] == "google"
-    assert "AAPL" not in provider_queries
-    assert strategy.asset_universe == ["GOOGL"]
-    assert strategy.asset_class == "equity"
-    assert strategy.date_range == "past year"
-    assert strategy.capital_amount == 10000
+    assert strategy.asset_universe != ["TSLA"]
+    assert result.outcome == "needs_clarification"
 
 
 def test_requested_asset_answer_ignores_unrelated_llm_draft_fields(
@@ -1475,6 +1869,732 @@ def test_requested_asset_answer_resolves_ticker_through_provider_path(
     assert strategy.asset_class == "equity"
     assert strategy.date_range == "past year"
     assert strategy.capital_amount == 10000
+    assert strategy.resolution_provenance[-1].source == "user_mention"
+
+
+def test_requested_asset_answer_prefers_current_answer_source_over_duplicate_llm_candidate(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.resolution import AssetResolution
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[tuple[str, str]] = []
+
+    def _resolution(
+        query: str,
+        *,
+        field: str,
+        source: str,
+    ) -> AssetResolution:
+        provider_queries.append((query, source))
+        if source == "user_mention":
+            asset = ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc.")
+            return AssetResolution(
+                status="resolved",
+                raw_text=query,
+                asset=asset,
+                candidates=(asset,),
+                provenance=ResolutionProvenance(
+                    field=field,
+                    raw_text=query,
+                    source=source,
+                    candidate_kind="asset",
+                    resolution_status="resolved",
+                    canonical_symbol="GOOGL",
+                    asset_class="equity",
+                    validated_by="provider_catalog",
+                    confidence="medium",
+                ),
+            )
+        return AssetResolution(
+            status="ambiguous",
+            raw_text=query,
+            asset=None,
+            candidates=(),
+            provenance=ResolutionProvenance(
+                field=field,
+                raw_text=query,
+                source=source,
+                candidate_kind="asset",
+                resolution_status="ambiguous",
+                validated_by="provider_catalog",
+                confidence="medium",
+            ),
+        )
+
+    monkeypatch.setattr(interpret_module, "runtime_resolve_asset_candidate", _resolution)
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test TSLA with a supported RSI threshold rule.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2025-11-30", "end": "2026-05-31"},
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+        comparison_baseline="SPY",
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User supplied a replacement asset.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="indicator_threshold",
+            asset_universe=["google"],
+            asset_class="equity",
+            raw_user_phrasing="google",
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="google",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert provider_queries[0] == ("google", "user_mention")
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["GOOGL"]
+    assert strategy.date_range == {"start": "2025-11-30", "end": "2026-05-31"}
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 30 or below"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+
+
+def test_requested_asset_answer_overrides_noisy_interpreter_draft(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[str] = []
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        provider_queries.append(symbol)
+        normalized = symbol.strip().lower()
+        if normalized in {"google", "googl"}:
+            return ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc.")
+        if normalized == "tsla":
+            return ResolvedAssetStub("TSLA", "equity", name="Tesla Inc.")
+        if normalized == "spy":
+            return ResolvedAssetStub("SPY", "equity", name="SPDR S&P 500 ETF")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test TSLA with a supported RSI threshold rule.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2025-11-30", "end": "2026-05-31"},
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+        comparison_baseline="SPY",
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 30,
+                "exit_threshold": 55,
+            },
+        },
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="refine",
+        requires_clarification=False,
+        user_goal_summary="User refined the visible draft.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="indicator_threshold",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            raw_user_phrasing="google",
+            comparison_baseline="AN",
+        ),
+        semantic_turn_act="refine_current_idea",
+    )
+
+    result, _ = _interpret(
+        message="google",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert provider_queries[0] == "google"
+    assert "TSLA" not in provider_queries[:1]
+    assert strategy.asset_universe == ["GOOGL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == {"start": "2025-11-30", "end": "2026-05-31"}
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 30 or below"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+    assert strategy.comparison_baseline == "SPY"
+
+
+def test_unresolved_llm_benchmark_is_not_preserved_without_user_request(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == "AAPL":
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test AAPL.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="AN",
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="if i bought AAPL at the start of 2024 until the end of 2024",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.comparison_baseline is None
+    assert "unstated_benchmark_symbol_cleared" in result.decision.reason_codes
+
+
+@pytest.mark.parametrize(
+    ("message", "asset_symbol", "noisy_benchmark"),
+    [
+        (
+            "Test TSLA with an RSI threshold from November 30, 2025 to May 31, 2026.",
+            "TSLA",
+            "AN",
+        ),
+        (
+            "Run AAPL buy and hold on daily bars from January 1, 2024 to December 31, 2024.",
+            "AAPL",
+            "ON",
+        ),
+    ],
+)
+def test_provider_valid_llm_benchmark_is_not_preserved_without_user_request(
+    monkeypatch,
+    message: str,
+    asset_symbol: str,
+    noisy_benchmark: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == asset_symbol:
+            return ResolvedAssetStub(normalized, "equity", name=normalized)
+        if normalized == noisy_benchmark:
+            return ResolvedAssetStub(normalized, "equity", name=f"{normalized} Corp.")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test an equity strategy.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Test an equity strategy.",
+            asset_universe=[asset_symbol],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline=noisy_benchmark,
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message=message,
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.comparison_baseline is None
+    assert "unstated_benchmark_symbol_cleared" in result.decision.reason_codes
+
+
+def test_explicit_structured_benchmark_is_provider_validated_and_preserved(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized in {"AAPL", "QQQ"}:
+            return ResolvedAssetStub(normalized, "equity")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to compare AAPL with QQQ.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold AAPL.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message=(
+            "if i bought AAPL at the start of 2024 until the end of 2024, "
+            "how did it compare with QQQ?"
+        ),
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert "user_stated_benchmark_preserved" not in result.decision.reason_codes
+
+
+@pytest.mark.parametrize(
+    (
+        "message",
+        "provider_asset_name",
+        "expected_asset",
+        "interpreter_assets",
+        "interpreter_asset_name",
+        "benchmark_symbol",
+    ),
+    [
+        (
+            "apple versus qqq in 2026 so far buy and hold",
+            "Apple Inc.",
+            "AAPL",
+            ["VS"],
+            "Versus Systems Inc.",
+            "QQQ",
+        ),
+        (
+            "apple versus qqq in 2026 so far buy and hold",
+            "Apple Inc.",
+            "AAPL",
+            ["AAPL", "VS"],
+            "Versus Systems Inc.",
+            "QQQ",
+        ),
+        (
+            "microsoft compared with spy in 2024 buy and hold",
+            "Microsoft Corporation",
+            "MSFT",
+            ["CMPR"],
+            "CompoSecure, Inc.",
+            "SPY",
+        ),
+    ],
+)
+def test_provider_grounded_asset_mentions_override_ungrounded_short_symbol_candidates(
+    monkeypatch,
+    message: str,
+    provider_asset_name: str,
+    expected_asset: str,
+    interpreter_assets: list[str],
+    interpreter_asset_name: str,
+    benchmark_symbol: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        provider_name_tokens = {
+            token.upper().strip(".,")
+            for token in provider_asset_name.split()
+            if token.strip(".,")
+        }
+        if normalized == expected_asset or normalized in provider_name_tokens:
+            return ResolvedAssetStub(expected_asset, "equity", name=provider_asset_name)
+        if normalized == benchmark_symbol:
+            return ResolvedAssetStub(normalized, "equity", name=f"{normalized} ETF")
+        interpreter_name_tokens = {
+            token.upper().strip(".,")
+            for token in interpreter_asset_name.split()
+            if token.strip(".,")
+        }
+        if normalized in interpreter_assets or normalized in interpreter_name_tokens:
+            return ResolvedAssetStub(
+                interpreter_assets[-1],
+                "equity",
+                name=interpreter_asset_name,
+            )
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to compare an equity idea with a benchmark.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold the stated asset.",
+            asset_universe=interpreter_assets,
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline=benchmark_symbol,
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(message=message, response=response, snapshot=None)
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == [expected_asset]
+    assert strategy.comparison_baseline == benchmark_symbol
+    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+
+
+def test_asset_grounding_prunes_implicit_short_symbol_when_only_benchmark_is_grounded(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized in {"AAPL", "VS", "QQQ"}:
+            return ResolvedAssetStub(normalized, "equity", name=f"{normalized} asset")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to compare an equity idea with a benchmark.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold the stated asset.",
+            asset_universe=["AAPL", "VS"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="apple versus qqq in 2026 so far buy and hold",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.comparison_baseline == "QQQ"
+    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+
+
+def test_asset_grounding_prunes_lowercase_word_collisions_and_keeps_benchmark_role(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(
+            char for char in str(symbol).upper() if char.isalnum()
+        )
+        if normalized in {"AAPL", "APPLE"}:
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        if normalized == "QQQ":
+            return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        if normalized == "CHECK":
+            return ResolvedAssetStub("CHECK", "equity", name="Check-Cap Ltd.")
+        if normalized == "JUST":
+            return ResolvedAssetStub(
+                "JUST",
+                "equity",
+                name="Goldman Sachs JUST U.S. Large Cap Equity ETF",
+            )
+        if normalized == "XXI":
+            return ResolvedAssetStub("XXI", "equity", name="21Shares ETF")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants Apple against QQQ over 2024.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Apple against QQQ.",
+            asset_universe=["AAPL", "CHECK", "XXI", "JUST"],
+            asset_class="mixed",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message=(
+            "messy sanity check: if i bought apple at the start of twenty "
+            "twenty four and just held it until year end, compare that with qqq"
+        ),
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.asset_class == "equity"
+    assert strategy.comparison_baseline == "QQQ"
+    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+
+
+@pytest.mark.parametrize(
+    ("prior_symbol", "answer", "benchmark_symbol"),
+    [
+        ("TSLA", "yes daily bars and SPY benchmark", "SPY"),
+        ("MSFT", "yes daily bars and QQQ benchmark", "QQQ"),
+    ],
+)
+def test_support_field_answer_does_not_replace_prior_asset_with_provider_name_noise(
+    monkeypatch,
+    prior_symbol: str,
+    answer: str,
+    benchmark_symbol: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == "TSLA":
+            return ResolvedAssetStub("TSLA", "equity", name="Tesla Inc.")
+        if normalized == "MSFT":
+            return ResolvedAssetStub("MSFT", "equity", name="Microsoft Corporation")
+        if normalized == "SPY":
+            return ResolvedAssetStub("SPY", "equity", name="SPDR S&P 500 ETF")
+        if normalized == "QQQ":
+            return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        if normalized in {"DJCO", "DAILY"}:
+            return ResolvedAssetStub(
+                "DJCO",
+                "equity",
+                name="Daily Journal Corp. Common Stock",
+            )
+        if normalized in {"BHE", "BENCHMARK"}:
+            return ResolvedAssetStub(
+                "BHE",
+                "equity",
+                name="Benchmark Electronics Common Stock",
+            )
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis=f"Test {prior_symbol} with an RSI threshold.",
+        asset_universe=[prior_symbol],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+        comparison_baseline=None,
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 30,
+                "exit_threshold": 55,
+            },
+        },
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User answered the pending timeframe and benchmark question.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="indicator_threshold",
+            strategy_thesis="Test daily bars with a benchmark.",
+            asset_universe=["DJCO", "BHE"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            timeframe="1D",
+            comparison_baseline=benchmark_symbol,
+            entry_logic="Buy when RSI(14) drops to 30 or below",
+            exit_logic="Sell when RSI(14) rises to 55 or above",
+            extra_parameters={
+                "indicator": "rsi",
+                "indicator_parameters": {
+                    "indicator": "rsi",
+                    "indicator_period": 14,
+                    "entry_threshold": 30,
+                    "exit_threshold": 55,
+                },
+                "field_provenance": {"comparison_baseline": "explicit_user"},
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message=answer,
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={"last_stage_outcome": "await_user_reply"},
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == [prior_symbol]
+    assert strategy.timeframe == "1D"
+    assert strategy.comparison_baseline == benchmark_symbol
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 30 or below"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected_symbol", "expected_class"),
+    [
+        ("msft", "MSFT", "equity"),
+        ("ethereum", "ETH", "crypto"),
+    ],
+)
+def test_requested_asset_answer_uses_provider_path_when_interpreter_unavailable(
+    monkeypatch,
+    answer: str,
+    expected_symbol: str,
+    expected_class: str,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[str] = []
+    provider_assets = {
+        "msft": ResolvedAssetStub("MSFT", "equity", name="Microsoft Corporation"),
+        "ethereum": ResolvedAssetStub("ETH", "crypto", name="Ethereum"),
+        "eth": ResolvedAssetStub("ETH", "crypto", name="Ethereum"),
+    }
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        provider_queries.append(symbol)
+        return provider_assets[symbol.strip().lower()]
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=10000,
+    )
+
+    result, interpreter = _interpret(
+        message=answer,
+        response=None,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert provider_queries[0] == answer
+    assert "AAPL" not in provider_queries
+    assert expected_symbol in {query.strip().upper() for query in provider_queries}
+    assert strategy.asset_universe == [expected_symbol]
+    assert strategy.asset_class == expected_class
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert strategy.capital_amount == 10000
+    assert "assistant_response" not in result.patch
+
+
+def test_requested_asset_answer_does_not_hide_interpreter_exception(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    provider_queries: list[str] = []
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        provider_queries.append(symbol)
+        if symbol.strip().lower() == "googl":
+            return ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc.")
+        return ResolvedAssetStub(symbol.strip().upper(), "equity")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=10000,
+    )
+    interpreter = RaisingInterpreter()
+    state = RunState.new(
+        current_user_message="googl",
+        recent_thread_history=[],
+    )
+
+    with pytest.raises(RuntimeError, match="interpreter unavailable"):
+        interpret_stage(
+            state=state,
+            user=UserState(user_id="user-1"),
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "asset_universe",
+            },
+            structured_interpreter=interpreter,
+        )
+
+    assert len(interpreter.requests) == 1
+    assert provider_queries == []
 
 
 def test_affirmative_asset_clarification_uses_pending_resolution_candidate(
@@ -1808,7 +2928,7 @@ def test_change_asset_action_prompts_for_replacement_without_llm() -> None:
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
 
 
-def test_model_unavailable_recovery_mentions_active_pending_draft() -> None:
+def test_model_unavailable_recovery_mentions_active_pending_setup() -> None:
     pending = StrategySummary(
         strategy_type="buy_and_hold",
         strategy_thesis="Buy and hold Apple.",
@@ -1828,9 +2948,11 @@ def test_model_unavailable_recovery_mentions_active_pending_draft() -> None:
     assert len(interpreter.requests) == 1
     assert result.outcome == "ready_to_respond"
     assert "AAPL" in result.patch["assistant_response"]
-    assert "draft" in result.patch["assistant_response"].lower()
+    assert "setup" in result.patch["assistant_response"].lower()
+    assert "draft" not in result.patch["assistant_response"].lower()
     assert "retry" in result.patch["assistant_response"].lower()
     assert "interpretation model" not in result.patch["assistant_response"].lower()
+    assert "interpreter" not in result.patch["assistant_response"].lower()
 
 
 def test_refine_strategy_result_action_prompts_for_change_without_llm() -> None:
@@ -2443,7 +3565,10 @@ def test_fresh_complete_restatement_preserves_user_stated_benchmark(
             asset_universe=["AAPL"],
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
-            comparison_baseline="SPY",
+            comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
         ),
         semantic_turn_act="retry_failed_action",
     )
@@ -2465,7 +3590,95 @@ def test_fresh_complete_restatement_preserves_user_stated_benchmark(
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["AAPL"]
     assert strategy.comparison_baseline == "QQQ"
-    assert "user_stated_benchmark_preserved" in result.decision.reason_codes
+    assert "user_stated_benchmark_preserved" not in result.decision.reason_codes
+
+
+def test_structured_failed_action_retry_rebuilds_confirmation_without_llm() -> None:
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "SPY",
+        "language": "en",
+    }
+
+    result, interpreter = _interpret(
+        message="Retry",
+        response=None,
+        action_context={
+            "type": "retry_failed_action",
+            "label": "Retry",
+            "payload": {"failed_action_id": "failed-action-1"},
+        },
+        snapshot=TaskSnapshot(
+            latest_failed_action_reference=ArtifactReference(
+                artifact_kind="failed_action",
+                artifact_id="failed-action-1",
+                artifact_status="failed",
+                metadata={
+                    "action_type": "run_backtest",
+                    "launch_payload": launch_payload,
+                    "failure_classification": "upstream_dependency_error",
+                    "error": "market_data_unavailable",
+                    "retryable": True,
+                },
+            )
+        ),
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+
+
+def test_structured_failed_action_recovery_does_not_retry_nonrerunnable_payload() -> None:
+    launch_payload = {
+        "strategy_type": "buy_and_hold",
+        "symbol": "AAPL",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "date_range": {"start": "2026-01-01", "end": "2026-12-31"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 1000,
+        "benchmark_symbol": "QQQ",
+        "language": "en",
+    }
+
+    result, interpreter = _interpret(
+        message="Retry",
+        response=None,
+        action_context={
+            "type": "retry_failed_action",
+            "label": "Retry",
+            "payload": {"failed_action_id": "failed-action-invalid-date"},
+        },
+        snapshot=TaskSnapshot(
+            latest_failed_action_reference=ArtifactReference(
+                artifact_kind="failed_action",
+                artifact_id="failed-action-invalid-date",
+                artifact_status="failed",
+                metadata={
+                    "action_type": "run_backtest",
+                    "launch_payload": launch_payload,
+                    "failure_classification": "parameter_validation_error",
+                    "error": "Date range is outside provider availability.",
+                    "retryable": False,
+                    "recovery_mode": "reopen_confirmation",
+                },
+            )
+        ),
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "ready_to_respond"
+    assert "same blocker" in result.patch["assistant_response"]
+    assert "date" in result.patch["assistant_response"].lower()
 
 
 def test_fresh_complete_restatement_after_failed_date_followup_keeps_strategy_route(
@@ -2580,6 +3793,85 @@ def test_fresh_complete_restatement_route_repair_handles_different_benchmark(
     assert strategy.comparison_baseline == "IWM"
 
 
+@pytest.mark.parametrize(
+    ("asset", "baseline", "start", "end", "message"),
+    [
+        (
+            "AAPL",
+            "QQQ",
+            "2026-01-01",
+            "2026-12-31",
+            "how did apple perform against qqq from the start of 2026 through the end of 2026, simple buy and hold",
+        ),
+        (
+            "MSFT",
+            "IWM",
+            "2027-01-01",
+            "2027-12-31",
+            "compare microsoft with iwm from the start of 2027 through the end of 2027",
+        ),
+    ],
+)
+def test_future_end_date_blocks_confirmation_before_run(
+    monkeypatch,
+    asset: str,
+    baseline: str,
+    start: str,
+    end: str,
+    message: str,
+) -> None:
+    from argus.agent_runtime import strategy_contract as strategy_contract_module
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    class FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 6, 1)
+
+    monkeypatch.setattr(strategy_contract_module, "date", FrozenDate)
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User supplied a future-ended comparison window.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis=f"{asset} buy and hold against {baseline}.",
+            asset_universe=[asset],
+            asset_class="equity",
+            date_range={"start": start, "end": end},
+            comparison_baseline=baseline,
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message=message,
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == [asset]
+    assert strategy.comparison_baseline == baseline
+    assert strategy.date_range == {"start": start, "end": end}
+    assert result.decision.missing_required_fields == ["date_range"]
+    assert any(
+        constraint.category == "invalid_date_range"
+        for constraint in result.decision.unsupported_constraints
+    )
+    assert "invalid_date_range_requires_correction" in result.decision.reason_codes
+
+
 def test_partial_explicit_date_range_requires_endpoint_clarification(
     monkeypatch,
 ) -> None:
@@ -2602,6 +3894,9 @@ def test_partial_explicit_date_range_requires_endpoint_clarification(
             asset_class="equity",
             date_range={"start": "2024-01-01"},
             comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
         ),
         semantic_turn_act="new_idea",
     )
@@ -2644,6 +3939,9 @@ def test_partial_explicit_date_range_requires_endpoint_clarification_variation(
             asset_class="equity",
             date_range={"from": "2025-01-01"},
             comparison_baseline="IWM",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
         ),
         semantic_turn_act="new_idea",
     )
@@ -2744,6 +4042,9 @@ def test_stated_run_fidelity_removes_inferred_date_endpoint_and_restores_benchma
     draft = repaired.candidate_strategy_draft
     assert draft.date_range == {"start": "2024-01-01"}
     assert draft.comparison_baseline == "QQQ"
+    assert draft.field_provenance["comparison_baseline"] == (
+        "stated_run_field_fidelity_audit"
+    )
     assert "stated_run_field_fidelity_audit" in repaired.reason_codes
 
 
@@ -2808,6 +4109,7 @@ def test_stated_run_fidelity_audit_skips_complete_aligned_comparison() -> None:
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2025-12-31"},
             comparison_baseline="SPY",
+            field_provenance={"comparison_baseline": "explicit_user"},
         ),
         semantic_turn_act="new_idea",
     )
@@ -2906,7 +4208,48 @@ def test_stated_run_fidelity_audit_handles_retry_restatement_benchmark() -> None
     )
 
 
-def test_current_message_contract_repair_preserves_partial_date_and_benchmark(
+def test_focused_repair_benchmark_provenance_still_gets_fidelity_audit() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        _response_needs_stated_run_field_fidelity_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User restated a complete executable idea.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            strategy_thesis="AAPL buy and hold over 2026.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-12-31"},
+            comparison_baseline="SPY",
+            field_provenance={"comparison_baseline": "explicit_user"},
+        ),
+        semantic_turn_act="new_idea",
+        reason_codes=["focused_strategy_extraction_repair"],
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "one more messy retry check: how did apple perform against qqq "
+            "from the start of 2026 through the end of 2026, simple buy and hold"
+        ),
+        user=UserState(user_id="user-1"),
+    )
+
+    assert _response_needs_stated_run_field_fidelity_audit(
+        response=response,
+        request=request,
+    )
+
+
+def test_current_message_contract_repair_preserves_partial_date_without_benchmark_parser(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as llm_module
@@ -2957,7 +4300,7 @@ def test_current_message_contract_repair_preserves_partial_date_and_benchmark(
     assert repaired is not None
     draft = repaired.candidate_strategy_draft
     assert draft.asset_universe == ["AAPL"]
-    assert draft.comparison_baseline == "QQQ"
+    assert draft.comparison_baseline == "SPY"
     assert draft.date_range == {"start": "2024-01-01"}
     assert repaired.requires_clarification
     assert repaired.missing_required_fields == ["date_range"]
@@ -3029,7 +4372,7 @@ def test_current_message_contract_repair_preserves_full_natural_date_range(
     assert "current_message_run_field_contract_repair" in repaired.reason_codes
 
 
-def test_current_message_contract_repair_preserves_calendar_year_date_range(
+def test_current_message_contract_repair_preserves_only_calendar_year_date_range(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as llm_module
@@ -3086,16 +4429,528 @@ def test_current_message_contract_repair_preserves_calendar_year_date_range(
     assert repaired is not None
     draft = repaired.candidate_strategy_draft
     assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
-    assert draft.cadence == "weekly"
-    assert draft.capital_amount == 250
-    assert draft.total_capital is None
-    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
-    assert not repaired.requires_clarification
-    assert repaired.missing_required_fields == []
+    assert draft.cadence is None
+    assert draft.capital_amount is None
+    assert draft.total_capital == 250
+    assert repaired.requires_clarification
+    assert repaired.missing_required_fields == ["capital_amount", "cadence"]
     assert "current_message_run_field_contract_repair" in repaired.reason_codes
 
 
-def test_current_message_contract_repair_handles_other_symbols_and_year(
+@pytest.mark.asyncio
+async def test_dca_calendar_period_label_does_not_become_timeframe_clarification(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter import (
+        DcaContributionRoleAudit,
+        ExecutableStrategyGroundingAudit,
+        _response_ready_for_runtime,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    calls: list[str] = []
+
+    async def _audit_stub(*, schema_name: str, **kwargs):
+        calls.append(schema_name)
+        if schema_name == "DcaContributionRoleAudit":
+            return DcaContributionRoleAudit(
+                recurring_contribution_explicit=True,
+                total_budget_not_recurring=False,
+                confidence=0.95,
+            )
+        if schema_name == "ExecutableStrategyGroundingAudit":
+            return ExecutableStrategyGroundingAudit(
+                outcome="needs_clarification",
+                assistant_response=(
+                    "Please confirm the date range before I run this."
+                ),
+                missing_required_fields=["date_range"],
+                confidence=0.9,
+            )
+        raise AssertionError(f"Unexpected audit schema: {schema_name}")
+
+    monkeypatch.setattr(llm_module, "invoke_openrouter_json_schema", _audit_stub)
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants weekly NVDA recurring buys.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Weekly NVDA recurring buys.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"end": "2024"},
+            timeframe="calendar_year",
+            cadence="weekly",
+            capital_amount=250,
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        assistant_response=(
+            "Got the stock and weekly amount. Do you mean the full 2024 year?"
+        ),
+        missing_required_fields=["date_range"],
+    )
+    request = InterpretationRequest(
+        current_user_message="What if I bought $250 of NVDA every week in 2024?",
+        user=UserState(user_id="user-1"),
+    )
+
+    repaired = await _response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert not repaired.requires_clarification
+    assert repaired.missing_required_fields == []
+    draft = repaired.candidate_strategy_draft
+    assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert draft.timeframe is None
+    assert draft.cadence == "weekly"
+    assert draft.capital_amount == 250
+    assert "DcaContributionRoleAudit" in calls
+    assert "ExecutableStrategyGroundingAudit" not in calls
+
+
+@pytest.mark.asyncio
+async def test_current_year_so_far_refusal_enters_strategy_repair(monkeypatch) -> None:
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter import _response_ready_for_runtime
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    calls: list[str] = []
+
+    async def repair_stub(*, failed_response, request, **kwargs):
+        del failed_response, kwargs
+        calls.append(request.current_user_message)
+        return LLMInterpretationResponse(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User wants a current-year buy-and-hold comparison.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                strategy_type="buy_and_hold",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                date_range={"start": "2026-01-01", "end": "2026-06-01"},
+                comparison_baseline="QQQ",
+                raw_user_phrasing=request.current_user_message,
+            ),
+            semantic_turn_act="new_idea",
+            reason_codes=["focused_strategy_extraction_repair"],
+        )
+
+    monkeypatch.setattr(
+        llm_module,
+        "_repair_incomplete_strategy_extraction",
+        repair_stub,
+    )
+
+    async def audit_stub(*, response, **kwargs):
+        del kwargs
+        return response
+
+    monkeypatch.setattr(
+        llm_module,
+        "_audit_stated_run_field_fidelity",
+        audit_stub,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="beginner_guidance",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Model refused an executable current-year comparison.",
+        candidate_strategy_draft=LLMStrategyDraft(),
+        assistant_response=(
+            "I cannot provide actual performance numbers for that period."
+        ),
+        semantic_turn_act="unsupported_request",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "how did apple perform against QQQ in 2026 so far, "
+            "a simple buy and hold"
+        ),
+        user=UserState(user_id="user-1"),
+    )
+
+    repaired = await _response_ready_for_runtime(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls == [request.current_user_message]
+    assert repaired.intent == "backtest_execution"
+    assert repaired.candidate_strategy_draft.comparison_baseline == "QQQ"
+    assert repaired.candidate_strategy_draft.date_range == {
+        "start": "2026-01-01",
+        "end": "2026-06-01",
+    }
+
+
+def test_stated_run_fidelity_preserves_current_year_so_far_contract() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        StatedRunFieldFidelityAudit,
+        _response_from_stated_run_field_fidelity_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants Apple against QQQ year to date.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-06-01"},
+            comparison_baseline="QQQ",
+        ),
+        semantic_turn_act="new_idea",
+    )
+    audit = StatedRunFieldFidelityAudit(
+        date_range={"start": "2026-01-01", "end": "today"},
+    )
+
+    repaired = _response_from_stated_run_field_fidelity_audit(
+        response=response,
+        audit=audit,
+        current_message="how did apple perform against QQQ in 2026 so far?",
+    )
+
+    assert repaired is None
+
+
+def test_interpret_stage_repairs_dca_calendar_period_before_clarifying_timeframe(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants weekly NVDA recurring buys.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Weekly NVDA recurring buys.",
+            asset_universe=["NVDA"],
+            asset_class="equity",
+            date_range={"end": "2024"},
+            timeframe="calendar_year",
+            cadence="weekly",
+            capital_amount=250,
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                }
+            },
+        ),
+        semantic_turn_act="new_idea",
+        assistant_response=(
+            "Got it. Do you want to use the full year or a specific date range?"
+        ),
+        missing_required_fields=["date_range"],
+    )
+
+    result, _ = _interpret(
+        message="What if I bought $250 of NVDA every week in 2024?",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert strategy.timeframe is None
+    assert strategy.cadence == "weekly"
+    assert strategy.capital_amount == 250
+    assert result.decision.missing_required_fields == []
+    assert "current_message_run_field_contract_repair" in result.decision.reason_codes
+
+
+def test_interpret_stage_repairs_current_year_so_far_before_execution(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "current_message_date_range",
+        lambda message: {"start": "2026-01-01", "end": "2026-06-01"},
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants Apple against QQQ year to date.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="AAPL buy and hold against QQQ in 2026.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-12-31"},
+            comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(
+        message="how did apple perform against QQQ in 2026 so far?",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2026-01-01", "end": "2026-06-01"}
+    assert strategy.comparison_baseline == "QQQ"
+    assert result.decision.missing_required_fields == []
+    assert "current_message_run_field_contract_repair" in result.decision.reason_codes
+
+
+def test_interpret_stage_repairs_missing_asset_and_explicit_date_from_current_message(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized != "TSLA":
+            raise ValueError(query)
+        return ResolvedAssetStub(
+            normalized,
+            "equity",
+            name="Tesla Inc.",
+            raw_symbol=normalized,
+        )
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants an RSI threshold backtest.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="indicator_threshold",
+            strategy_thesis="RSI threshold strategy.",
+            asset_universe=[],
+            asset_class=None,
+            date_range=None,
+            entry_logic="Buy when RSI(14) drops to 30 or below",
+            exit_logic="Sell when RSI(14) rises to 55 or above",
+        ),
+        semantic_turn_act="new_idea",
+        missing_required_fields=["asset_universe", "date_range"],
+    )
+
+    result, _ = _interpret(
+        message=(
+            "test TSLA with RSI buy when RSI 14 drops to 30 or below and "
+            "sell when RSI 14 rises to 55 or above from Jan 1 2024 to "
+            "Dec 31 2024"
+        ),
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["TSLA"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert strategy.entry_logic == "Buy when RSI(14) drops to 30 or below"
+    assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+    assert result.decision.missing_required_fields == []
+    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+    assert "current_message_run_field_contract_repair" in (
+        result.decision.reason_codes
+    )
+
+
+def test_interpret_stage_repairs_missing_asset_when_benchmark_owner_is_known(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL", "QQQ"}:
+            raise ValueError(query)
+        return ResolvedAssetStub(
+            normalized,
+            "equity",
+            name=normalized,
+            raw_symbol=normalized,
+        )
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants a benchmark comparison.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold comparison.",
+            asset_universe=[],
+            asset_class=None,
+            date_range=None,
+            comparison_baseline="QQQ",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
+        ),
+        semantic_turn_act="new_idea",
+        missing_required_fields=["asset_universe", "date_range"],
+    )
+
+    result, _ = _interpret(
+        message="compare AAPL with QQQ from Jan 1 2024 to Dec 31 2024",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.comparison_baseline == "QQQ"
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+
+
+def test_interpret_stage_does_not_guess_missing_asset_from_ambiguous_mentions(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        if normalized not in {"AAPL", "QQQ"}:
+            raise ValueError(query)
+        return ResolvedAssetStub(
+            normalized,
+            "equity",
+            name=normalized,
+            raw_symbol=normalized,
+        )
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants a comparison but structure is incomplete.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold comparison.",
+            asset_universe=[],
+            asset_class=None,
+            date_range=None,
+            comparison_baseline=None,
+        ),
+        semantic_turn_act="new_idea",
+        missing_required_fields=["asset_universe", "date_range"],
+    )
+
+    result, _ = _interpret(
+        message="compare AAPL with QQQ from Jan 1 2024 to Dec 31 2024",
+        response=response,
+        snapshot=None,
+    )
+
+    assert result.outcome == "needs_clarification"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == []
+    assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert result.decision.missing_required_fields == ["asset_universe"]
+
+
+def test_stated_run_fidelity_audit_restores_dca_recurring_amount_and_cadence(
+) -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        StatedRunFieldFidelityAudit,
+        _response_from_stated_run_field_fidelity_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants monthly MSFT recurring buys.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Monthly MSFT recurring buys.",
+            asset_universe=["MSFT"],
+            asset_class="equity",
+            date_range={"start": "2023-01-01", "end": "2024-12-31"},
+            cadence=None,
+            capital_amount=None,
+        ),
+        semantic_turn_act="new_idea",
+        missing_required_fields=["capital_amount", "cadence"],
+    )
+    audit = StatedRunFieldFidelityAudit(
+        recurring_contribution_amount=100,
+        cadence="monthly",
+    )
+
+    repaired = _response_from_stated_run_field_fidelity_audit(
+        response=response,
+        audit=audit,
+    )
+
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.asset_universe == ["MSFT"]
+    assert draft.date_range == {"start": "2023-01-01", "end": "2024-12-31"}
+    assert draft.cadence == "monthly"
+    assert draft.capital_amount == 100
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert draft.field_provenance["cadence"] == "explicit_user"
+    assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
+
+def test_current_message_contract_repair_handles_other_symbol_dates_without_benchmark_parser(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as llm_module
@@ -3144,7 +4999,7 @@ def test_current_message_contract_repair_handles_other_symbols_and_year(
     assert repaired is not None
     draft = repaired.candidate_strategy_draft
     assert draft.asset_universe == ["MSFT"]
-    assert draft.comparison_baseline == "IWM"
+    assert draft.comparison_baseline == "SPY"
     assert draft.date_range == {"start": "2025-01-01"}
     assert "current_message_run_field_contract_repair" in repaired.reason_codes
 
@@ -3171,6 +5026,7 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair() -> None:
             asset_class="equity",
             date_range={"start": "2024-01-01", "end": "2025-12-31"},
             comparison_baseline="SPY",
+            field_provenance={"comparison_baseline": "explicit_user"},
         ),
         semantic_turn_act="new_idea",
         reason_codes=["focused_strategy_extraction_repair"],
@@ -3255,6 +5111,84 @@ def test_pending_non_date_answer_does_not_use_stated_run_fidelity_audit() -> Non
         response=response,
         request=request,
     )
+
+
+def test_pending_simplification_option_removes_unsupported_dca_cap_before_confirmation(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    pending = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Quarterly recurring buys for MSFT with an unsupported cap.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        date_range={"start": "2021-01-01", "end": "2023-12-31"},
+        capital_amount=750,
+        cadence="quarterly",
+        extra_parameters={
+            "recurring_contribution": 750,
+            "total_budget": 9000,
+            "total_capital": 9000,
+            "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "total_capital": "cap",
+            },
+        },
+    )
+    selected = pending.model_copy(deep=True)
+    selected.raw_user_phrasing = "yes, use the recurring buys only"
+    selected.strategy_thesis = "Quarterly recurring buys for MSFT."
+    selected.extra_parameters = {
+        "recurring_contribution": 750,
+        "field_provenance": {
+            "capital_amount": "recurring_contribution",
+        },
+    }
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User selected the supported recurring-buy simplification.",
+        candidate_strategy_draft=selected,
+        missing_required_fields=[],
+        semantic_turn_act="answer_pending_need",
+        unsupported_constraints=[],
+        reason_codes=["pending_response_option_selected"],
+    )
+
+    result, _ = _interpret(
+        message="yes, use the recurring buys only",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "response_intent": {
+                "kind": "unsupported_recovery",
+                "semantic_needs": ["simplification_choice"],
+                "options": [
+                    {
+                        "label": "Run recurring buys only",
+                        "replacement_values": {"ignore_initial_capital": True},
+                    }
+                ],
+            },
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["MSFT"]
+    assert strategy.capital_amount == 750
+    assert strategy.cadence == "quarterly"
+    assert "total_budget" not in strategy.extra_parameters
+    assert "total_capital" not in strategy.extra_parameters
+    assert result.decision.unsupported_constraints == []
 
 
 def test_runnable_clarification_candidate_still_uses_stated_run_fidelity_audit() -> None:
@@ -3357,6 +5291,9 @@ def test_benchmark_symbol_is_removed_from_asset_universe_and_kept_as_benchmark(
             asset_class="crypto",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
             comparison_baseline="BTC",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
         ),
         semantic_turn_act="new_idea",
     )
@@ -3405,6 +5342,9 @@ def test_benchmark_only_asset_universe_requires_traded_asset(
             asset_class="crypto",
             date_range={"start": "2024-01-01", "end": "2024-12-31"},
             comparison_baseline="BTC",
+            extra_parameters={
+                "field_provenance": {"comparison_baseline": "explicit_user"}
+            },
         ),
         semantic_turn_act="new_idea",
     )

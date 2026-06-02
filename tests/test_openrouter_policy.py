@@ -9,6 +9,7 @@ import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_interpreter import (
+    AssetAnswerCandidateAudit,
     AssetGroundingAudit,
     FocusedStrategyExtraction,
     LLMAmbiguousField,
@@ -446,6 +447,94 @@ def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
         == 20
     )
     assert seen["model_name"] == "primary/model"
+
+
+@pytest.mark.parametrize(
+    ("answer", "candidate_symbols", "expected_symbol", "primary_turn_act"),
+    [
+        ("google", ["GOOGL", "GOOG"], "GOOGL", "unsupported_request"),
+        ("microsoft", ["MSFT"], "MSFT", "answer_pending_need"),
+    ],
+)
+def test_requested_asset_answer_uses_semantic_candidate_audit_before_provider_validation(
+    monkeypatch,
+    answer: str,
+    candidate_symbols: list[str],
+    expected_symbol: str,
+    primary_turn_act: str,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    calls: list[str] = []
+
+    async def fake_direct_schema(**kwargs: Any):
+        schema_model = kwargs["schema_model"]
+        calls.append(schema_model.__name__)
+        if schema_model is LLMInterpretationResponse:
+            return LLMInterpretationResponse(
+                intent=(
+                    "unsupported_or_out_of_scope"
+                    if primary_turn_act == "unsupported_request"
+                    else "backtest_execution"
+                ),
+                task_relation="continue",
+                user_goal_summary="User supplied a replacement asset.",
+                semantic_turn_act=primary_turn_act,
+                candidate_strategy_draft=LLMStrategyDraft(
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                ),
+            )
+        if schema_model is AssetAnswerCandidateAudit:
+            return AssetAnswerCandidateAudit(
+                candidate_symbols=candidate_symbols,
+                confidence=0.86,
+            )
+        raise AssertionError(f"unexpected schema model {schema_model}")
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="RSI threshold on TSLA.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2025-11-30", "end": "2026-05-31"},
+        capital_amount=1000,
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+    )
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message=answer,
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(pending_strategy_summary=pending),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "asset_universe",
+            },
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    assert "AssetAnswerCandidateAudit" in calls
+    assert result.candidate_strategy_draft.asset_universe == [expected_symbol]
+    assert result.candidate_strategy_draft.asset_class == "equity"
+    assert "requested_asset_answer_candidate_audit" in result.reason_codes
 
 
 def test_default_interpreter_retries_configured_structured_model_when_first_is_incomplete(
@@ -1040,11 +1129,11 @@ def test_default_interpreter_uses_focused_repair_after_structured_candidate_fail
     assert seen_schema_names == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
-        "StatedRunFieldFidelityAudit",
     ]
     draft = result.candidate_strategy_draft
     assert draft.strategy_type == "signal_strategy"
     assert draft.asset_universe == ["TSLA"]
+    assert "stated_run_field_fidelity_audit" not in result.reason_codes
     assert draft.entry_rule == {
         "type": "moving_average_crossover",
         "fast_indicator": "sma",
@@ -1580,7 +1669,10 @@ def test_explicit_model_interpreter_plans_result_refinement_before_accepting_pro
                 strategy_type="dca_accumulation",
                 cadence="biweekly",
                 capital_amount=500,
-                field_provenance={"capital_amount": "recurring_contribution"},
+                field_provenance={
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                },
             ),
         )
 
@@ -1694,6 +1786,74 @@ def test_interpreter_uses_artifact_snapshot_instead_of_raw_history_for_refinemen
     assert "Prior strategy JSON" in wire_text
     assert "I read this as AAPL" not in wire_text
     assert "Test buying and holding Apple over the past year." not in wire_text
+
+
+def test_interpreter_sends_pending_field_metadata_with_artifact_context(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter
+
+    seen_messages: list[dict[str, str]] = []
+
+    async def fake_direct_schema(**kwargs: Any) -> LLMInterpretationResponse:
+        seen_messages.extend(kwargs["messages"])
+        return LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="continue",
+            user_goal_summary="User answered the pending asset field.",
+            candidate_strategy_draft=LLMStrategyDraft(
+                raw_user_phrasing="google",
+                asset_universe=["GOOGL"],
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+
+    monkeypatch.setattr(
+        llm_interpreter,
+        "invoke_openrouter_json_schema",
+        fake_direct_schema,
+    )
+    monkeypatch.setattr(
+        llm_interpreter,
+        "openrouter_structured_model_candidates",
+        lambda: ["primary/model"],
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    result = interpreter(
+        InterpretationRequest(
+            current_user_message="google",
+            recent_thread_history=[
+                ConversationMessage(
+                    role="assistant",
+                    content="What asset should I use instead?",
+                ),
+            ],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="indicator_threshold",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2025-11-30", "end": "2026-05-31"},
+                    entry_logic="Buy when RSI(14) drops to 30 or below",
+                    exit_logic="Sell when RSI(14) rises to 55 or above",
+                )
+            ),
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "requested_field": "asset_universe",
+            },
+            user=UserState(user_id="u1"),
+        )
+    )
+
+    assert result is not None
+    wire_text = "\n".join(message["content"] for message in seen_messages)
+    assert "Selected thread metadata JSON" in wire_text
+    assert '"requested_field": "asset_universe"' in wire_text
+    assert "What asset should I use instead?" not in wire_text
 
 
 def test_default_interpreter_rejects_result_explanation_without_latest_result(

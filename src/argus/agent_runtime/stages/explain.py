@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from argus.agent_runtime.result_followups import as_float as followup_as_float
 from argus.agent_runtime.response_style import (
     ARGUS_RESPONSE_STYLE_CONTRACT,
     with_response_heading,
 )
+from argus.agent_runtime.strategy_contract import display_strategy_type
 from argus.agent_runtime.stages.interpret import StageResult
 from argus.agent_runtime.state.models import (
     ConfirmationPayload,
@@ -21,7 +25,77 @@ from argus.domain.engine_launch.result_facts import (
     resolved_rule_summary as result_rule_summary,
 )
 from argus.domain.engine_launch.result_facts import structured_next_experiments
-from argus.llm.openrouter import invoke_openrouter_chat_completion
+from argus.llm.openrouter import invoke_openrouter_json_schema
+
+
+QuickTakeRelativeClaim = Literal[
+    "beat_benchmark",
+    "lagged_benchmark",
+    "matched_benchmark",
+    "unknown",
+]
+QuickTakeEmphasis = Literal[
+    "comparison",
+    "risk",
+    "rule",
+    "no_trade",
+    "neutral",
+]
+
+
+class QuickTakeDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    relative_performance_claim: QuickTakeRelativeClaim = Field(
+        description=(
+            "Structured claim about the strategy versus the benchmark. Use only "
+            "the supplied benchmark_delta truth."
+        )
+    )
+    takeaway: str = Field(
+        description=(
+            "One concise user-visible sentence interpreting the important result "
+            "from supplied fact_bank facts only."
+        )
+    )
+    tested_bullet: str = Field(
+        description="Compact user-visible tested/setup bullet grounded in fact_bank."
+    )
+    meaning_bullet: str | None = Field(
+        default=None,
+        description=(
+            "Optional user-visible interpretation bullet. Use facts only; do not "
+            "invent causes or recommendations."
+        ),
+    )
+    next_check_bullet: str | None = Field(
+        default=None,
+        description=(
+            "Optional user-visible next-check bullet. It must correspond to an "
+            "allowed_next_experiments kind when one is supplied."
+        ),
+    )
+    assumption_bullet: str | None = Field(
+        default=None,
+        description="Optional compact assumption bullet grounded in fact_bank.",
+    )
+    caveat_bullet: str | None = Field(
+        default=None,
+        description="Optional compact caveat bullet grounded in fact_bank.",
+    )
+    next_experiment_option_kinds: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional supported next experiment kinds copied exactly from "
+            "allowed_next_experiments. Do not invent kinds."
+        ),
+    )
+    fact_ids: list[str] = Field(
+        description=(
+            "Fact IDs from fact_bank that ground this draft. Include every "
+            "required_fact_id and do not invent IDs."
+        )
+    )
 
 
 def explain_stage(*, state: RunState) -> StageResult:
@@ -70,9 +144,15 @@ def explain_stage(*, state: RunState) -> StageResult:
                 )
             },
         )
+    benchmark_symbol = _benchmark_contract(
+        strategy=strategy,
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    ).get("benchmark_symbol")
     response = _build_response(
         total_return=total_return,
         benchmark_return=benchmark_return,
+        benchmark_symbol=str(benchmark_symbol or ""),
         same_period=same_period,
         profile=profile,
         tested_summary=tested_summary,
@@ -130,70 +210,88 @@ async def _llm_explanation(
         result_payload=result_payload,
         explanation_context=explanation_context,
     )
-    context = {
-        "tested_summary": _tested_summary(
-            strategy=strategy,
-            result_payload=result_payload,
-            explanation_context=explanation_context,
-        ),
-        "execution_note": result_execution_note(result_facts),
-        "rule_summary": result_rule_summary(result_facts),
-        "allowed_next_experiments": structured_next_experiments(result_facts),
-        "benchmark_contract": _benchmark_contract(
-            strategy=strategy,
-            result_payload=result_payload,
-            explanation_context=explanation_context,
-        ),
-        "strategy": _canonical_strategy_context(strategy),
-        "result": result_payload,
-        "explanation_context": explanation_context,
-        "fallback_text": fallback_text,
+    optional_parameters = _optional_parameters(state)
+    tested_summary = _tested_summary(
+        strategy=strategy,
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    execution_note = result_execution_note(result_facts)
+    rule_summary = result_rule_summary(result_facts)
+    assumption_summary = _assumption_summary(
+        optional_parameters=optional_parameters,
+        explanation_context=explanation_context,
+    )
+    caveat = _caveat_summary(explanation_context)
+    allowed_next_experiments = structured_next_experiments(result_facts)
+    benchmark_contract = _benchmark_contract(
+        strategy=strategy,
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    fact_context = {
+        "tested_summary": tested_summary,
+        "execution_note": execution_note,
+        "rule_summary": rule_summary,
+        "assumption_summary": assumption_summary,
+        "caveat": caveat,
+        "benchmark_contract": benchmark_contract,
+    }
+    fact_bank = _quick_take_fact_bank(
+        context=fact_context,
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    required_fact_ids = _required_quick_take_fact_ids(fact_bank)
+    prompt_context = {
+        "allowed_next_experiments": allowed_next_experiments,
+        "benchmark_contract": benchmark_contract,
+        "fact_bank": fact_bank,
         "language": "use the user's current language preference if available",
+        "relative_performance_truth": _quick_take_relative_truth(fact_bank),
+        "required_fact_ids": sorted(required_fact_ids),
+        "strategy": _canonical_strategy_context(strategy),
     }
     messages = [
         {
             "role": "system",
             "content": (
                 f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
-                "You are Argus explaining a completed historical backtest. "
-                "Use only the supplied metrics and assumptions. Keep the response "
-                "concise, natural, and beginner-friendly. Do not invent metrics, "
-                "predictions, fees, slippage, or unsupported trading capabilities. "
-                "Describe the tested strategy from tested_summary, not from raw "
-                "user wording or strategy_thesis. "
-                "If rule_summary is present, include it in the Test bullet. "
-                "If execution_note is present, include it because it explains a "
-                "flat or no-trade result. "
+                "You are writing a concise Quick Take for a completed historical "
+                "backtest. Compose natural user-facing wording, but use only "
+                "supplied fact_bank facts for metrics, symbols, dates, assumptions, "
+                "and next-test labels. The result card answers what happened; your "
+                "job is to explain what matters without duplicating every metric. "
                 "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
-                "If that symbol differs from the tested asset, never describe the "
-                "benchmark return as buy-and-hold or holding the tested asset; say "
-                "the benchmark symbol returned it instead. "
-                "Format the answer like a short chat response, not a report: one "
-                "plain-English takeaway sentence, then 2 to 4 compact bullets for "
-                "what was tested, the main assumption, and a useful next check. "
-                "The next check must come from allowed_next_experiments when that "
-                "list is non-empty. Do not suggest unsupported filters, stops, "
-                "position sizing, external sentiment, or other mechanics not present "
-                "in allowed_next_experiments. "
-                "Do not add your own heading; the runtime adds a short presentation "
-                "label. Keep it under 120 words. "
-                "For no-trade results, say the strategy stayed in cash instead of "
-                "using dramatic market timing language. "
-                "Do not restate every result-card metric; interpret what matters."
+                "Return structured fields so the runtime can validate fact usage; "
+                "do not invent facts or supported next experiment kinds."
             ),
         },
         {
             "role": "user",
-            "content": json.dumps(context, default=str, sort_keys=True),
+            "content": json.dumps(
+                prompt_context,
+                default=str,
+                sort_keys=True,
+            ),
         },
     ]
     try:
-        return await invoke_openrouter_chat_completion(
+        draft = await invoke_openrouter_json_schema(
             task="result_summary",
             messages=messages,
+            schema_model=QuickTakeDraft,
+            schema_name="QuickTakeDraft",
             context_packet_ids=_context_packet_ids_from_explanation_context(
                 explanation_context
             ),
+        )
+        return _render_quick_take_draft(
+            draft=draft,
+            fallback_text=fallback_text,
+            fact_bank=fact_bank,
+            required_fact_ids=required_fact_ids,
+            allowed_next_experiments=allowed_next_experiments,
         )
     except Exception as exc:
         # The OpenRouter helper records per-model route receipts. This local fallback
@@ -217,6 +315,189 @@ def _context_packet_ids_from_explanation_context(
             if packet_id and packet_id not in packet_ids:
                 packet_ids.append(packet_id)
     return packet_ids
+
+
+def _quick_take_fact_bank(
+    *,
+    context: dict[str, Any],
+    result_payload: dict[str, Any],
+    explanation_context: dict[str, Any],
+) -> dict[str, str]:
+    fact_bank: dict[str, str] = {}
+    for key in (
+        "tested_summary",
+        "execution_note",
+        "rule_summary",
+        "assumption_summary",
+        "caveat",
+    ):
+        value = context.get(key)
+        if isinstance(value, str) and value.strip():
+            fact_bank[key] = value.strip()
+
+    benchmark_contract = context.get("benchmark_contract")
+    benchmark_symbol = (
+        benchmark_contract.get("benchmark_symbol")
+        if isinstance(benchmark_contract, dict)
+        else None
+    )
+    if not benchmark_symbol:
+        benchmark_symbol = _benchmark_contract(
+            strategy={},
+            result_payload=result_payload,
+            explanation_context=explanation_context,
+        ).get("benchmark_symbol")
+    if benchmark_symbol:
+        fact_bank["benchmark_symbol"] = str(benchmark_symbol)
+
+    total_return, benchmark_return, _ = _resolved_return_metrics(
+        result_payload=result_payload,
+        explanation_context=explanation_context,
+    )
+    if total_return is not None:
+        fact_bank["total_return"] = _format_percent_points(total_return)
+    if benchmark_return is not None:
+        fact_bank["benchmark_return"] = _format_percent_points(benchmark_return)
+    if total_return is not None and benchmark_return is not None:
+        fact_bank["benchmark_delta"] = _format_percent_points(
+            total_return - benchmark_return
+        )
+    fact_bank["caveat"] = fact_bank.get(
+        "caveat",
+        "Historical simulation evidence, not a prediction or trading recommendation",
+    )
+    return fact_bank
+
+
+def _required_quick_take_fact_ids(fact_bank: dict[str, str]) -> set[str]:
+    required = {"caveat"}
+    for fact_id in (
+        "tested_summary",
+        "total_return",
+        "benchmark_return",
+        "benchmark_delta",
+        "benchmark_symbol",
+    ):
+        if fact_id in fact_bank:
+            required.add(fact_id)
+    return required
+
+
+def _quick_take_relative_truth(fact_bank: dict[str, str]) -> QuickTakeRelativeClaim:
+    delta = followup_as_float(fact_bank.get("benchmark_delta"))
+    if delta is None:
+        return "unknown"
+    if abs(delta) < 0.05:
+        return "matched_benchmark"
+    return "beat_benchmark" if delta > 0 else "lagged_benchmark"
+
+
+def _format_percent_points(value: float) -> str:
+    prefix = "+" if value > 0 else ""
+    return f"{prefix}{value:.1f}%"
+
+
+def _render_quick_take_draft(
+    *,
+    draft: QuickTakeDraft | dict[str, Any] | None,
+    fallback_text: str,
+    fact_bank: dict[str, str],
+    required_fact_ids: set[str],
+    allowed_next_experiments: Any,
+) -> str | None:
+    response = _coerce_quick_take_draft(draft)
+    if response is None:
+        return None
+    truth = _quick_take_relative_truth(fact_bank)
+    if truth != "unknown" and response.relative_performance_claim != truth:
+        return None
+    used_fact_ids: set[str] = set()
+    for fact_id_value in response.fact_ids:
+        fact_id = str(fact_id_value or "").strip()
+        if fact_id not in fact_bank:
+            return None
+        used_fact_ids.add(fact_id)
+    if not required_fact_ids.issubset(used_fact_ids):
+        return None
+    if not _quick_take_mentions_required_visible_facts(
+        draft=response,
+        fact_bank=fact_bank,
+    ):
+        return None
+    if not _next_check_kinds_are_supported(
+        draft=response,
+        allowed_next_experiments=allowed_next_experiments,
+    ):
+        return None
+
+    lines = [_clean_quick_take_line(response.takeaway), ""]
+    for bullet in (
+        response.tested_bullet,
+        response.meaning_bullet,
+        response.next_check_bullet,
+        response.assumption_bullet,
+        response.caveat_bullet,
+    ):
+        line = _clean_quick_take_line(bullet)
+        if line:
+            lines.append(f"- {line}")
+    body = "\n".join(line for line in lines if line is not None).strip()
+    return body or fallback_text
+
+
+def _coerce_quick_take_draft(value: Any) -> QuickTakeDraft | None:
+    if isinstance(value, QuickTakeDraft):
+        return value
+    try:
+        return QuickTakeDraft.model_validate(value)
+    except (TypeError, ValidationError):
+        return None
+
+
+def _quick_take_mentions_required_visible_facts(
+    *,
+    draft: QuickTakeDraft,
+    fact_bank: dict[str, str],
+) -> bool:
+    text = " ".join(
+        line
+        for line in (
+            draft.takeaway,
+            draft.tested_bullet,
+            draft.meaning_bullet or "",
+            draft.next_check_bullet or "",
+            draft.assumption_bullet or "",
+            draft.caveat_bullet or "",
+        )
+        if line
+    )
+    benchmark_symbol = fact_bank.get("benchmark_symbol")
+    if benchmark_symbol and benchmark_symbol not in text:
+        return False
+    return True
+
+
+def _next_check_kinds_are_supported(
+    *,
+    draft: QuickTakeDraft,
+    allowed_next_experiments: Any,
+) -> bool:
+    if not isinstance(allowed_next_experiments, list):
+        return not draft.next_experiment_option_kinds
+    by_kind = {
+        str(option.get("kind") or "")
+        for option in allowed_next_experiments
+        if isinstance(option, dict)
+    }
+    return all(
+        str(kind_value or "").strip() in by_kind
+        for kind_value in draft.next_experiment_option_kinds
+    )
+
+
+def _clean_quick_take_line(value: str | None) -> str:
+    text = " ".join(str(value or "").split()).strip()
+    return text.strip("- ").rstrip(".")
 
 
 def _benchmark_contract(
@@ -416,13 +697,7 @@ def _asset_summary(strategy: dict[str, Any]) -> str | None:
 def _strategy_label(value: Any) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
-    normalized = value.strip()
-    labels = {
-        "buy_and_hold": "buy and hold",
-        "dca_accumulation": "DCA accumulation",
-        "indicator_threshold": "indicator threshold",
-    }
-    return labels.get(normalized, normalized.replace("_", " "))
+    return display_strategy_type({"strategy_type": value.strip()}).lower()
 
 
 def _period_summary(value: Any) -> str | None:
@@ -485,6 +760,7 @@ def _build_response(
     *,
     total_return: float,
     benchmark_return: float,
+    benchmark_symbol: str,
     same_period: bool,
     profile: ResponseProfile | None,
     tested_summary: str | None,
@@ -492,6 +768,7 @@ def _build_response(
     caveat: str,
     execution_note: str | None,
     rule_summary: str | None,
+    next_check_override: str | None = None,
 ) -> str:
     tone = profile.effective_tone if profile is not None else "friendly"
     verbosity = profile.effective_verbosity if profile is not None else "medium"
@@ -505,6 +782,7 @@ def _build_response(
         return _result_readout_markdown(
             total_return=total_return,
             benchmark_return=benchmark_return,
+            benchmark_symbol=benchmark_symbol,
             same_period=same_period,
             tested_summary=tested_summary,
             interpretation=expertise_sentence,
@@ -512,12 +790,14 @@ def _build_response(
             caveat=caveat,
             execution_note=execution_note,
             rule_summary=rule_summary,
+            next_check_override=next_check_override,
             compact=True,
         )
 
     return _result_readout_markdown(
         total_return=total_return,
         benchmark_return=benchmark_return,
+        benchmark_symbol=benchmark_symbol,
         same_period=same_period,
         tested_summary=tested_summary,
         interpretation=expertise_sentence,
@@ -525,6 +805,7 @@ def _build_response(
         caveat=caveat,
         execution_note=execution_note,
         rule_summary=rule_summary,
+        next_check_override=next_check_override,
         compact=tone == "concise" and verbosity != "high",
     )
 
@@ -533,6 +814,7 @@ def _result_readout_markdown(
     *,
     total_return: float,
     benchmark_return: float,
+    benchmark_symbol: str,
     same_period: bool,
     tested_summary: str | None,
     interpretation: str,
@@ -540,12 +822,14 @@ def _result_readout_markdown(
     caveat: str,
     execution_note: str | None,
     rule_summary: str | None,
+    next_check_override: str | None,
     compact: bool,
 ) -> str:
     delta = total_return - benchmark_return
     takeaway = _readout_takeaway(
         total_return=total_return,
         benchmark_return=benchmark_return,
+        benchmark_symbol=benchmark_symbol,
         same_period=same_period,
         delta=delta,
         execution_note=execution_note,
@@ -560,7 +844,7 @@ def _result_readout_markdown(
         lines.append(f"- Signal: {_compact_execution_note(execution_note)}")
     else:
         lines.append(f"- What that means: {interpretation}")
-    next_check = _next_check_line(execution_note=execution_note)
+    next_check = next_check_override or _next_check_line(execution_note=execution_note)
     if next_check:
         lines.append(f"- Next check: {next_check}")
     if assumption_summary:
@@ -573,21 +857,23 @@ def _readout_takeaway(
     *,
     total_return: float,
     benchmark_return: float,
+    benchmark_symbol: str,
     same_period: bool,
     delta: float,
     execution_note: str | None,
 ) -> str:
     benchmark_context = _benchmark_context_phrase(same_period)
+    benchmark_label = benchmark_symbol or "the benchmark"
     relative = _relative_performance_sentence(delta)
     if execution_note and abs(total_return) < 0.05:
         return (
             "No trade opened. The strategy stayed in cash because its entry "
             f"condition never fired; it returned {total_return:.1f}% while the "
-            f"benchmark returned {benchmark_return:.1f}% {benchmark_context}; "
+            f"{benchmark_label} returned {benchmark_return:.1f}% {benchmark_context}; "
             f"it {relative}"
         )
     return (
-        f"The strategy returned {total_return:.1f}% while the benchmark returned "
+        f"The strategy returned {total_return:.1f}% while {benchmark_label} returned "
         f"{benchmark_return:.1f}% {benchmark_context}, so it {relative}"
     )
 

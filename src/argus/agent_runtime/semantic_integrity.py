@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 
 from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
@@ -433,14 +434,41 @@ def _dca_total_capital_role_label(source: str | None) -> str:
 def _invalid_date_range_constraint(value: Any) -> UnsupportedConstraint | None:
     if value in (None, "", [], {}):
         return None
+    current_date = date.today()
     try:
-        resolution = resolve_date_range(value)
+        resolution = resolve_date_range(value, today=current_date)
     except Exception:
         return None
-    if resolution.used_default or resolution.start <= resolution.end:
+    if resolution.used_default:
         return None
     start = format_display_date(resolution.start)
     end = format_display_date(resolution.end)
+    today = format_display_date(current_date)
+    if resolution.start <= resolution.end <= current_date:
+        return None
+    if resolution.end > current_date:
+        return UnsupportedConstraint(
+            category="invalid_date_range",
+            raw_value=_format_date_range_value(value),
+            explanation=(
+                f"I read the date window as {start} to {end}, but historical "
+                f"backtests need an end date on or before {today}."
+            ),
+            simplification_options=[
+                SimplificationOption(
+                    label="Choose an end date on or before today",
+                    replacement_values={"requested_field": "date_range"},
+                ),
+                SimplificationOption(
+                    label="Use year to date",
+                    replacement_values={"requested_field": "date_range"},
+                ),
+                SimplificationOption(
+                    label="Use a different date window",
+                    replacement_values={"requested_field": "date_range"},
+                ),
+            ],
+        )
     return UnsupportedConstraint(
         category="invalid_date_range",
         raw_value=_format_date_range_value(value),

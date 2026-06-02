@@ -5,7 +5,6 @@ import os
 import threading
 import time
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlencode
@@ -31,27 +30,6 @@ class ResolvedAsset:
     name: str
     raw_symbol: str
 
-
-PROVIDER_VALIDATED_NAME_HINTS = {
-    "alphabet": ("GOOG", "GOOGL"),
-    "amazon": ("AMZN",),
-    "apple": ("AAPL",),
-    "bitcoin": ("BTC", "BTCUSD"),
-    "btc": ("BTC", "BTCUSD"),
-    "ethereum": ("ETH", "ETHUSD"),
-    "ether": ("ETH", "ETHUSD"),
-    "euro dollar": ("EURUSD",),
-    "eur usd": ("EURUSD",),
-    "eurusd": ("EURUSD",),
-    "facebook": ("META",),
-    "forex": ("EURUSD",),
-    "google": ("GOOG", "GOOGL"),
-    "meta": ("META",),
-    "microsoft": ("MSFT",),
-    "netflix": ("NFLX",),
-    "nvidia": ("NVDA",),
-    "tesla": ("TSLA",),
-}
 
 SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
     "AAPL": ("equity", "Apple Inc.", "AAPL"),
@@ -264,7 +242,6 @@ def _load_kraken_asset_pairs(pairs: dict[str, object]) -> dict[str, ResolvedAsse
 
 def _load_synthetic_unit_assets() -> dict[str, ResolvedAsset]:
     aliases: dict[str, ResolvedAsset] = {}
-    records: dict[str, ResolvedAsset] = {}
     for symbol, (asset_class, name, raw_symbol) in SYNTHETIC_UNIT_ASSETS.items():
         resolved = ResolvedAsset(
             canonical_symbol=symbol,
@@ -272,17 +249,9 @@ def _load_synthetic_unit_assets() -> dict[str, ResolvedAsset]:
             name=name,
             raw_symbol=raw_symbol,
         )
-        records[symbol] = resolved
         _add_aliases(aliases, resolved, canonical=symbol)
         aliases[name.lower().strip()] = resolved
 
-    for alias, symbols in PROVIDER_VALIDATED_NAME_HINTS.items():
-        for symbol in symbols:
-            normalized_symbol = _canonicalize_crypto_symbol(symbol)
-            record = records.get(normalized_symbol) or records.get(symbol)
-            if record is not None:
-                aliases.setdefault(alias, record)
-                break
     return aliases
 
 
@@ -407,6 +376,10 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
         if alt:
             return alt
 
+    confident_name_matches = _high_confidence_name_matches(symbol)
+    if len(confident_name_matches) == 1:
+        return confident_name_matches[0]
+
     if _is_unresolved_ticker_like_query(symbol):
         raise ValueError("invalid_symbol")
 
@@ -414,8 +387,6 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
     # loaded catalog, so a common name can only resolve when a provider record
     # exists in the active mode.
     matches = search_assets(symbol, limit=2)
-    if len(matches) == 1:
-        return matches[0]
     if matches and _name_match_score(lower_candidate, matches[0]) <= 1:
         return matches[0]
 
@@ -426,8 +397,6 @@ def _is_unresolved_ticker_like_query(query: str) -> bool:
     raw = str(query or "").strip()
     compact = _compact_symbol(raw)
     if not compact.isalpha() or not 2 <= len(compact) <= 5:
-        return False
-    if raw.lower().strip() in PROVIDER_VALIDATED_NAME_HINTS:
         return False
     return "/" not in raw and " " not in raw
 
@@ -446,13 +415,6 @@ def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
         return []
 
     scored: dict[str, tuple[int, ResolvedAsset]] = {}
-    for alias in PROVIDER_VALIDATED_NAME_HINTS.get(lowered_query, ()):
-        record = _ASSET_ALIAS_MAP.get(_normalize_symbol(alias)) or _ASSET_ALIAS_MAP.get(
-            alias.lower()
-        )
-        if record is not None:
-            scored[record.canonical_symbol] = (0, record)
-
     for alias, record in _ASSET_ALIAS_MAP.items():
         alias_upper = _normalize_symbol(alias)
         name_lower = record.name.lower().strip()
@@ -467,8 +429,6 @@ def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
             score = 4
         elif lowered_query and lowered_query in name_lower:
             score = 5
-        elif _close_symbol_match(normalized_query, record.canonical_symbol):
-            score = 2
         if score is None:
             continue
         existing = scored.get(record.canonical_symbol)
@@ -482,16 +442,22 @@ def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
     return [record for _, record in ranked[: max(1, min(limit, 25))]]
 
 
-def _close_symbol_match(query: str, symbol: str) -> bool:
-    if len(query) < 3:
-        return False
-    compact_query = query.replace("/", "")
-    compact_symbol = symbol.replace("/", "")
-    if compact_query == compact_symbol:
-        return True
-    if abs(len(compact_query) - len(compact_symbol)) > 1:
-        return False
-    return SequenceMatcher(None, compact_query, compact_symbol).ratio() >= 0.72
+def _high_confidence_name_matches(query: str) -> list[ResolvedAsset]:
+    lowered_query = query.lower().strip()
+    if not lowered_query:
+        return []
+    assert _ASSET_ALIAS_MAP is not None
+    seen: set[str] = set()
+    matches: list[tuple[int, ResolvedAsset]] = []
+    for record in _ASSET_ALIAS_MAP.values():
+        if record.canonical_symbol in seen:
+            continue
+        seen.add(record.canonical_symbol)
+        score = _name_match_score(lowered_query, record)
+        if score <= 1:
+            matches.append((score, record))
+    matches.sort(key=lambda item: (item[0], item[1].asset_class, item[1].canonical_symbol))
+    return [record for _, record in matches]
 
 
 def _name_match_score(query: str, record: ResolvedAsset) -> int:

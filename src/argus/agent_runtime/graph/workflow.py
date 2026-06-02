@@ -544,8 +544,14 @@ def _build_thread_metadata(
         "last_stage_outcome": stage_outcome_value,
     }
     requested_field = workflow_state.get("requested_field")
+    if requested_field in (None, ""):
+        requested_field = run_state.requested_field
     if isinstance(requested_field, str) and requested_field:
         metadata["requested_field"] = requested_field
+    if run_state.response_intent is not None:
+        metadata["response_intent"] = run_state.response_intent.model_dump(
+            mode="python"
+        )
     pending_resolution = _pending_resolution_candidate(workflow_state=workflow_state)
     if pending_resolution is not None:
         metadata["pending_resolution"] = pending_resolution

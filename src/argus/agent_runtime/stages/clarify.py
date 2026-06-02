@@ -123,7 +123,11 @@ async def clarify_stage_async(
                     language=language,
                 ),
                 "response_intent": response_intent,
-                "requested_field": None,
+                "requested_field": _requested_field_for_ambiguous_fields(
+                    state=state,
+                    requested_fields=requested_fields,
+                    ambiguous_fields=ambiguous_fields,
+                ),
                 "ambiguous_fields": ambiguous_fields,
             },
         )
@@ -335,6 +339,35 @@ def _requested_fields(
         for field in state.missing_required_fields
         if field in contract.required_fields or field in {"capital_amount", "cadence"}
     ]
+
+
+def _requested_field_for_ambiguous_fields(
+    *,
+    state: RunState,
+    requested_fields: list[str],
+    ambiguous_fields: list[dict[str, object]],
+) -> str | None:
+    if state.requested_field:
+        return _field_base(state.requested_field)
+    base_fields = [
+        _field_base(field)
+        for field in requested_fields
+        if isinstance(field, str) and _field_base(field)
+    ]
+    if len(set(base_fields)) == 1:
+        return base_fields[0]
+    ambiguous_base_fields = [
+        _field_base(str(field.get("field_name") or ""))
+        for field in ambiguous_fields
+        if isinstance(field.get("field_name"), str)
+    ]
+    if len(set(ambiguous_base_fields)) == 1:
+        return ambiguous_base_fields[0]
+    return None
+
+
+def _field_base(field: str) -> str:
+    return field.split("[", 1)[0]
 
 
 def _semantic_needs_from_required_fields(fields: list[str]) -> list[PendingNeedName]:

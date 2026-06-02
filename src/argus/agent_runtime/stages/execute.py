@@ -358,6 +358,7 @@ def _failed_action_reference_patch(
             "error": error,
             "user_safe_message": error,
             "retryable": retryable,
+            "recovery_mode": "reopen_confirmation",
         },
     )
     return {
@@ -449,7 +450,7 @@ def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> st
     if error_type == "missing_required_input":
         return (
             "I need one more executable detail before I can run this. Tell me the "
-            "missing rule, asset, or date range and I will keep the draft intact."
+            "missing rule, asset, or date range and I will keep the current setup intact."
         )
     if error_type == "unsupported_capability":
         return (
@@ -465,17 +466,17 @@ def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> st
     if error_type == "parameter_validation_error":
         return (
             "I could not run this because one detail is not valid for the current "
-            "backtest. I still have the draft; adjust the asset, rules, or dates "
-            "and I can try again."
+            "backtest. Adjust the asset, rules, or dates and I can try again from "
+            "the current setup."
         )
     if error_type == "upstream_dependency_error":
         return (
-            "The run hit a temporary data or service issue. I still have the "
-            "draft; ask me to try again or adjust the setup."
+            "The run hit a temporary data or service issue. Try again from the "
+            "current setup or adjust it first."
         )
     return (
-        "The backtest could not complete. I still have the draft; ask me to try "
-        "again or adjust the setup."
+        "The backtest could not complete. Try again from the current setup or "
+        "adjust it first."
     )
 
 
@@ -496,9 +497,9 @@ def _recoverable_execution_prompt(
 
     draft_label = _draft_label_from_payload(payload)
     return (
-        f"I still have the {draft_label}, but I could not get market data for that "
-        "run right now. Try again, change the dates, or choose a different supported "
-        "asset and I will keep the draft intact."
+        f"The {draft_label} setup is still here, but I could not get market data "
+        "for that run right now. Try again, change the dates, or choose a different "
+        "supported asset."
     )
 
 

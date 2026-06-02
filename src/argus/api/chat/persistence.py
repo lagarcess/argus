@@ -71,6 +71,21 @@ def enrich_result_card_actions(
     return enriched
 
 
+def _explicit_benchmark_symbol(
+    *,
+    resolved_parameters: dict[str, Any],
+    benchmark_metrics: dict[str, Any] | None,
+) -> str | None:
+    for candidate in (
+        resolved_parameters.get("benchmark_symbol"),
+        benchmark_metrics.get("symbol") if benchmark_metrics else None,
+        benchmark_metrics.get("benchmark_symbol") if benchmark_metrics else None,
+    ):
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip().upper()
+    return None
+
+
 def build_runtime_backtest_run(
     *,
     user_id: str,
@@ -93,27 +108,21 @@ def build_runtime_backtest_run(
         return None
     symbol = symbols[0]
     run_id = api_state.store.new_id()
-    result_card = enrich_result_card_actions(
-        result_card=result_card,
-        run_id=run_id,
-        strategy_id=None,
-        conversation_id=conversation_id,
-    )
 
     try:
         asset_class = classify_symbol_func(symbol).asset_class
     except ValueError:
         asset_class = "equity"
 
-    benchmark_symbol = default_benchmark_func(asset_class, symbols)
-    if isinstance(benchmark_metrics, dict):
-        candidate_benchmark = benchmark_metrics.get("benchmark_symbol")
-        if isinstance(candidate_benchmark, str) and candidate_benchmark:
-            benchmark_symbol = candidate_benchmark.strip().upper()
-
     resolved_parameters_dict = (
         dict(resolved_parameters) if isinstance(resolved_parameters, dict) else {}
     )
+    benchmark_metrics_dict = benchmark_metrics if isinstance(benchmark_metrics, dict) else None
+    benchmark_symbol = _explicit_benchmark_symbol(
+        resolved_parameters=resolved_parameters_dict,
+        benchmark_metrics=benchmark_metrics_dict,
+    ) or default_benchmark_func(asset_class, symbols)
+    resolved_parameters_dict.setdefault("benchmark_symbol", benchmark_symbol)
     provider_metadata = envelope.get("provider_metadata")
     config_snapshot = {
         "template": resolved_strategy.get("strategy_type", "strategy"),
@@ -126,6 +135,12 @@ def build_runtime_backtest_run(
     }
     if isinstance(provider_metadata, dict):
         config_snapshot["provider_metadata"] = dict(provider_metadata)
+    result_card = enrich_result_card_actions(
+        result_card=result_card,
+        run_id=run_id,
+        strategy_id=None,
+        conversation_id=conversation_id,
+    )
 
     chart = (
         result_card.get("chart") if isinstance(result_card.get("chart"), dict) else None

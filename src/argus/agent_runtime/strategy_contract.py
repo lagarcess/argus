@@ -250,6 +250,12 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
                 start=date(1900, 1, 1),
                 end=current_date,
             )
+        natural_explicit = _explicit_natural_range(normalized, today=current_date)
+        if natural_explicit is not None:
+            return natural_explicit
+        multi_year = _multi_year_period(normalized, today=current_date)
+        if multi_year is not None:
+            return multi_year
         ytd = _year_to_date(normalized, today=current_date)
         if ytd is not None:
             return ytd
@@ -265,10 +271,6 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         relative = _relative_period(normalized, today=current_date)
         if relative is not None:
             return relative
-        natural_explicit = _explicit_natural_range(normalized, today=current_date)
-        if natural_explicit is not None:
-            return natural_explicit
-
     start = _add_months(current_date, -12)
     return DateRangeResolution(
         label="past year",
@@ -691,12 +693,71 @@ def _int_or_none(value: Any) -> int | None:
 
 
 def _year_to_date(value: str, *, today: date) -> DateRangeResolution | None:
-    if value not in {"ytd", "year_to_date", "year to date"}:
+    tokens = _tokens(value)
+    if value in {"ytd", "year_to_date", "year to date"}:
+        return DateRangeResolution(
+            label="year to date",
+            start=date(today.year, 1, 1),
+            end=today,
+        )
+    if {"so", "far"} <= set(tokens):
+        if {"this", "year"} <= set(tokens):
+            return DateRangeResolution(
+                label="this year so far",
+                start=date(today.year, 1, 1),
+                end=today,
+            )
+        for token in tokens:
+            if _is_four_digit_year(token) and int(token) == today.year:
+                year = int(token)
+                return DateRangeResolution(
+                    label=f"{year} so far",
+                    start=date(year, 1, 1),
+                    end=today,
+                )
+    return None
+
+
+def _multi_year_period(value: str, *, today: date) -> DateRangeResolution | None:
+    tokens = _tokens(value)
+    years: list[int] = []
+    for token in tokens:
+        if _is_four_digit_year(token):
+            year = int(token)
+            if year <= today.year and year not in years:
+                years.append(year)
+    if len(years) != 2:
         return None
+    if not (
+        set(tokens)
+        & {
+            "and",
+            "to",
+            "through",
+            "thru",
+            "until",
+            "till",
+            "from",
+            "between",
+            "over",
+            "during",
+        }
+    ):
+        return None
+    start_year, end_year = years
+    if end_year < start_year:
+        return None
+    if end_year == today.year and (
+        {"so", "far"} <= set(tokens)
+        or set(tokens) & {"today", "now", "present", "current"}
+    ):
+        end = today
+    else:
+        end = date(end_year, 12, 31)
     return DateRangeResolution(
-        label="year to date",
-        start=date(today.year, 1, 1),
-        end=today,
+        label=f"{start_year} to {end_year}",
+        start=date(start_year, 1, 1),
+        end=end,
     )
 
 
@@ -714,6 +775,9 @@ def _since_year(value: str, *, today: date) -> DateRangeResolution | None:
 
 def _calendar_year(value: str) -> DateRangeResolution | None:
     tokens = _tokens(value)
+    year_tokens = [token for token in tokens if _is_four_digit_year(token)]
+    if len(set(year_tokens)) != 1:
+        return None
     for index, token in enumerate(tokens):
         if not _is_four_digit_year(token):
             continue

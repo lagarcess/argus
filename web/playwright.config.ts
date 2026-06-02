@@ -1,6 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const runId = `${Date.now()}-${process.pid}`;
+const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
+const reuseExistingServer =
+  process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === "true";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -13,13 +16,13 @@ export default defineConfig({
   workers: 2,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: `http://localhost:${port}`,
     trace: "on-first-retry",
   },
   webServer: {
-    command: "node ./node_modules/next/dist/bin/next dev --port 3000",
-    port: 3000,
-    reuseExistingServer: true,
+    command: `node ./node_modules/next/dist/bin/next dev --port ${port}`,
+    port,
+    reuseExistingServer,
     timeout: 120_000,
     env: {
       NEXT_PUBLIC_MOCK_AUTH: "true",

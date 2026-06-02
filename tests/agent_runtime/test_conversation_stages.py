@@ -5,7 +5,9 @@ from pathlib import Path
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.llm_clarifier import (
     ClarificationResponse,
+    ClarificationRequest,
     OpenRouterClarificationGenerator,
+    _render_clarification_response,
 )
 from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.compose import (
@@ -176,6 +178,40 @@ def test_dca_amount_and_cadence_contract_can_override_under_specific_llm_copy() 
     assert "How much should each recurring purchase be" in copy
     assert "how often should those purchases happen" in copy
     assert "total budget" in copy.lower()
+
+
+def test_ambiguous_asset_clarification_preserves_requested_field_context() -> None:
+    state = RunState.new(current_user_message="google", recent_thread_history=[])
+    state.intent = "strategy_drafting"
+    state.requested_field = "asset_universe"
+    state.missing_required_fields = []
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+    )
+    state.optional_parameter_status = {
+        "ambiguous_fields": [
+            {
+                "field_name": "asset_universe[0]",
+                "raw_value": "google",
+                "reason_code": "ambiguous_asset",
+            }
+        ]
+    }
+    clarifier = RecordingClarifier("Do you mean GOOGL or GOOG?")
+
+    result = clarify_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+        clarification_generator=clarifier,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "asset_universe"
+    assert result.patch["ambiguous_fields"][0]["field_name"] == "asset_universe[0]"
 
 
 def test_dca_full_setup_fallback_uses_single_plain_question() -> None:
@@ -414,6 +450,30 @@ def test_clarify_unsupported_recovery_uses_generator_over_prefilled_copy() -> No
     assert clarifier.requests[0].unsupported_constraints[0]["category"] == (
         "unsupported_strategy_logic"
     )
+
+
+def test_clarification_renderer_collapses_adjacent_duplicate_sentences() -> None:
+    request = ClarificationRequest(
+        current_user_message="Use the supported version.",
+        candidate_strategy_draft=StrategySummary(strategy_type="dca_accumulation"),
+        response_intent={
+            "kind": "unsupported_recovery",
+            "semantic_needs": ["simplification_choice"],
+        },
+    )
+    response = ClarificationResponse(
+        question=(
+            "I can keep the runnable version. I can keep the runnable version. "
+            "Which direction should I use?"
+        ),
+        question_targets=["simplification_choice"],
+        directly_asks_user=True,
+        detail_targets=["simplification_choice"],
+    )
+
+    rendered = _render_clarification_response(response, request=request)
+
+    assert rendered == "I can keep the runnable version. Which direction should I use?"
 
 
 def test_clarifier_system_prompt_enforces_user_language() -> None:

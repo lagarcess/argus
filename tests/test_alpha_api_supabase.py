@@ -498,6 +498,45 @@ def test_chat_stream_supabase_persists_backtest_run(mock_gateway):
     )
 
 
+def test_chat_stream_supabase_rejects_memory_only_conversation(mock_gateway):
+    from argus.api import state as api_state
+
+    now = utcnow()
+    memory_only_conversation = Conversation(
+        id="memory-only-conversation",
+        title="Memory only",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview=None,
+        deleted_at=None,
+        created_at=now,
+        updated_at=now,
+    )
+    api_state.store.conversations[memory_only_conversation.id] = (
+        memory_only_conversation
+    )
+    api_state.store.messages[memory_only_conversation.id] = []
+    mock_gateway.get_conversation.return_value = None
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": memory_only_conversation.id,
+            "message": "Test TSLA dip idea",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 404
+    mock_gateway.get_conversation.assert_called_with(
+        user_id="00000000-0000-0000-0000-000000000001",
+        conversation_id=memory_only_conversation.id,
+    )
+    mock_gateway.create_message.assert_not_called()
+
+
 def test_chat_stream_supabase_prompts_onboarding_before_running_backtest(mock_gateway):
     now = utcnow()
     conversation = Conversation(

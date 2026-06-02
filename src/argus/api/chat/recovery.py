@@ -209,7 +209,18 @@ def _metadata_invalidates_confirmation(metadata: dict[str, Any]) -> bool:
     if metadata.get("result_card") or metadata.get("result_run_id"):
         return True
     action = metadata.get("chat_action")
-    return isinstance(action, dict) and action.get("type") == "cancel_confirmation"
+    if isinstance(action, dict) and action.get("type") == "cancel_confirmation":
+        return True
+    pending_strategy = metadata.get("pending_strategy")
+    if not isinstance(pending_strategy, dict):
+        return False
+    requested_field = pending_strategy.get("requested_field")
+    stage_outcome = str(metadata.get("agent_runtime_stage_outcome") or "")
+    return (
+        isinstance(requested_field, str)
+        and bool(requested_field.strip())
+        and stage_outcome in {"await_user_reply", "needs_clarification"}
+    )
 
 
 def pending_strategy_metadata_fallback_context(
@@ -254,6 +265,9 @@ def pending_strategy_metadata_fallback_context(
         pending_resolution = pending_payload.get("pending_resolution")
         if isinstance(pending_resolution, dict):
             selected_thread_metadata["pending_resolution"] = dict(pending_resolution)
+        response_intent = pending_payload.get("response_intent")
+        if isinstance(response_intent, dict):
+            selected_thread_metadata["response_intent"] = dict(response_intent)
         source_reference: ArtifactReference | None = None
         source_result = pending_payload.get("source_result")
         raw_source_run_id = (

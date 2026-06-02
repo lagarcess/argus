@@ -37,6 +37,7 @@ export type ArtifactType =
 export type ChatActionOption = {
   id?: string;
   label: string;
+  labelKey?: string;
   value?: string;
   type?:
     | "run_backtest"
@@ -46,7 +47,9 @@ export type ChatActionOption = {
     | "cancel_confirmation"
     | "show_breakdown"
     | "refine_strategy"
-    | "save_strategy";
+    | "save_strategy"
+    | "retry_failed_action"
+    | "retry_last_turn";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;

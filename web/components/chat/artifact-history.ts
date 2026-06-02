@@ -334,6 +334,36 @@ export function supersedeOpenConfirmations(
   );
 }
 
+export function settleOpenConfirmationsAfterTextFinal(
+  messages: Message[],
+  {
+    action,
+    finalActions = [],
+    hasFailedAction = false,
+    stageOutcome,
+  }: {
+    action?: ChatActionOption;
+    finalActions?: ChatActionOption[];
+    hasFailedAction?: boolean;
+    stageOutcome?: unknown;
+  },
+): Message[] {
+  const hasConfirmationAction = Boolean(confirmationActionEffectFromAction(action));
+  const hasFailedActionFinal =
+    hasFailedAction || finalActions.some(isFailedActionRetry);
+  const hasClarifyingOutcome =
+    stageOutcome === "await_user_reply" || stageOutcome === "needs_clarification";
+
+  if (!hasConfirmationAction && !hasFailedActionFinal && !hasClarifyingOutcome) {
+    return messages;
+  }
+
+  return supersedeOpenConfirmations(
+    messages,
+    confirmationTextFinalStatusLabel(action, hasFailedActionFinal),
+  );
+}
+
 function closeConfirmationForAction(
   message: Message,
   effect: ConfirmationActionEffect,
@@ -401,6 +431,20 @@ function chatActionFromMetadata(
     return undefined;
   }
   return chatAction as ChatActionOption;
+}
+
+function confirmationTextFinalStatusLabel(
+  action: ChatActionOption | undefined,
+  hasFailedAction: boolean,
+) {
+  if (hasFailedAction) {
+    return "Could not run";
+  }
+  return confirmationActionStatusLabel(action);
+}
+
+function isFailedActionRetry(action: ChatActionOption | undefined) {
+  return action?.type === "retry_failed_action" || action?.artifactType === "failed_action";
 }
 
 function resultActionWasConsumed(

@@ -181,6 +181,7 @@ StructuredActionType = Literal[
     "show_breakdown",
     "refine_strategy",
     "save_strategy",
+    "retry_failed_action",
 ]
 
 

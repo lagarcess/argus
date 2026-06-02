@@ -10,7 +10,7 @@ from argus.domain.engine_launch.models import (
 USER_SAFE_FAILURE_MESSAGES = {
     "missing_rule_group": (
         "The visible strategy is missing a complete executable entry and exit rule. "
-        "Keep the draft and choose the rule details before running it."
+        "Choose the rule details before running it."
     ),
     "indicator_data_insufficient": (
         "That indicator needs more historical bars than this date window provides. "
@@ -18,16 +18,16 @@ USER_SAFE_FAILURE_MESSAGES = {
     ),
     "unsupported_indicator": (
         "That indicator is not executable in the current backtest engine yet. "
-        "I can keep it as a draft or help convert the idea to a supported RSI or "
+        "I can help convert the idea to a supported RSI or "
         "SMA/EMA rule."
     ),
     "unsupported_indicator_threshold": (
         "That threshold rule is not executable with the current indicator registry. "
-        "Use a supported indicator threshold or keep the idea as a draft."
+        "Use a supported indicator threshold or simplify the rule."
     ),
     "unsupported_rule_operator": (
         "That rule operator is not executable yet. Choose one of the supported "
-        "comparison or crossover rules and I can keep the rest of the draft intact."
+        "comparison or crossover rules and I can keep the rest of the setup intact."
     ),
     "invalid_indicator_parameter": (
         "One indicator parameter is outside the supported schema. Adjust the "
@@ -42,8 +42,8 @@ USER_SAFE_FAILURE_MESSAGES = {
         "inside the indicator scale and I can run the same idea."
     ),
     "market_data_unavailable": (
-        "Market data was unavailable for that run. I still have the draft; try "
-        "again, change the dates, or choose a different supported asset."
+        "Market data was unavailable for that run. Try again, change the dates, "
+        "or choose a different supported asset."
     ),
     "invalid_date_range": (
         "That date range is not valid for a backtest. Choose a start and end date "
@@ -129,7 +129,7 @@ def user_safe_failure_message(
     if failure_category == "missing_required_input":
         return (
             "I need one more executable detail before I can run this. Tell me the "
-            "missing rule, asset, or date range and I will keep the draft intact."
+            "missing rule, asset, or date range and I will keep the current setup intact."
         )
     if failure_category == "unsupported_capability":
         return (
@@ -139,16 +139,16 @@ def user_safe_failure_message(
     if failure_category == "parameter_validation_error":
         return (
             "One detail in the launch payload is not valid for the current engine. "
-            "Adjust the strategy, dates, or sizing and I can run the same draft."
+            "Adjust the strategy, dates, or sizing and I can run the same setup."
         )
     if failure_category == "upstream_dependency_error":
         return (
-            "The run hit a temporary data or service issue. I still have the draft; "
-            "ask me to try again or adjust the setup."
+            "The run hit a temporary data or service issue. Try again from the "
+            "current setup or adjust it first."
         )
     return (
-        "The backtest could not complete. I still have the draft; ask me to try "
-        "again or adjust the setup."
+        "The backtest could not complete. Try again from the current setup or "
+        "adjust it first."
     )
 
 
@@ -187,12 +187,14 @@ def build_benchmark_metrics(
     *,
     request: LaunchBacktestRequest,
     metrics: dict[str, Any],
+    benchmark_symbol: str | None = None,
 ) -> dict[str, Any]:
     aggregate_performance = metrics.get("aggregate", {}).get("performance", {})
     by_symbol = metrics.get("by_symbol", {})
+    resolved_benchmark = str(benchmark_symbol or request.benchmark_symbol).strip().upper()
 
     return {
-        "symbol": request.benchmark_symbol,
+        "symbol": resolved_benchmark,
         "aggregate": {
             "total_return_pct": aggregate_performance.get("benchmark_return_pct"),
         },
@@ -213,10 +215,15 @@ def build_explanation_context(
     envelope: LaunchExecutionEnvelope,
     result_card: dict[str, Any],
 ) -> dict[str, Any]:
+    resolved_parameters = dict(envelope.resolved_parameters or {})
+    benchmark_symbol = str(
+        resolved_parameters.get("benchmark_symbol") or request.benchmark_symbol
+    ).strip().upper()
     return {
         "strategy_type": request.strategy_type,
         "symbol": request.symbol,
         "symbols": request.symbols,
+        "benchmark_symbol": benchmark_symbol,
         "timeframe": request.timeframe,
         "date_range": request.date_range.model_dump(mode="python"),
         "metrics": envelope.metrics,

@@ -47,6 +47,19 @@ import {
   privateAlphaOnboardingEnabled,
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
+import {
+  failedActionRetryActionFromMetadata,
+  hasFailedActionMetadata,
+  isRetryAction,
+  retryLastTurnActionFromMessage,
+  retryLastTurnMessageFromAction,
+} from "@/lib/chat-retry-actions";
+import {
+  activeConversationRouteStateFromUrl,
+  shouldStartConversationForVisibleEmptyChat,
+  type ActiveConversationRouteState,
+} from "@/lib/chat-conversation-routing";
+import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
@@ -58,19 +71,21 @@ import {
   applyConfirmationActionEffects,
   confirmationActionEffectFromAction,
   confirmationActionEffectsFromApi,
-  confirmationActionStatusLabel,
   consumeResultActionOnMessages,
   consumedResultActionsFromApi,
   hiddenSaveActionMessageIdsFromApi,
   isBreakdownActionMetadata,
   normalizeConfirmationHistory,
   resultActionRunId,
-  supersedeOpenConfirmations,
+  settleOpenConfirmationsAfterTextFinal,
 } from "./artifact-history";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 type View = "chat" | "strategies" | "settings";
+type SendOptions = {
+  renderUserMessage?: boolean;
+};
 type OnboardingChoice = {
   goal: PrimaryGoal;
   title: string;
@@ -96,15 +111,30 @@ function readActiveConversationId() {
   }
 }
 
-function readActiveConversationIdFromUrl() {
-  if (typeof window === "undefined") return null;
-  try {
-    const url = new URL(window.location.href);
-    const conversationId = url.searchParams.get(ACTIVE_CONVERSATION_QUERY_KEY);
-    return conversationId?.trim() || null;
-  } catch {
-    return null;
+function readActiveConversationRouteState(): ActiveConversationRouteState {
+  if (typeof window === "undefined") {
+    return {
+      conversationId: null,
+      isChatRoute: false,
+      isNewChatRoute: false,
+    };
   }
+  try {
+    return activeConversationRouteStateFromUrl(
+      window.location.href,
+      ACTIVE_CONVERSATION_QUERY_KEY,
+    );
+  } catch {
+    return {
+      conversationId: null,
+      isChatRoute: false,
+      isNewChatRoute: false,
+    };
+  }
+}
+
+function readActiveConversationIdFromUrl() {
+  return readActiveConversationRouteState().conversationId;
 }
 
 function persistActiveConversationId(conversationId: string) {
@@ -179,7 +209,11 @@ function latestInputActions(messages: Message[]) {
   ) {
     return [];
   }
-  return (latestAi?.actions ?? []).filter((action) => action.type !== "save_strategy");
+  return (latestAi?.actions ?? []).filter(
+    (action) =>
+      action.type !== "save_strategy" &&
+      action.artifactType !== "failed_action",
+  );
 }
 
 const CARD_SCOPED_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>([
@@ -219,6 +253,11 @@ function visibleInputActions(actions: ChatActionOption[]) {
 
 function visibleComposerActions(actions: ChatActionOption[]) {
   return visibleInputActions(actions).filter((action) => !isCardScopedAction(action));
+}
+
+function isFailedActionRetry(action: ChatActionOption | undefined) {
+  if (!action) return false;
+  return action.type === "retry_failed_action" || action.artifactType === "failed_action";
 }
 
 function hasActiveArtifactActionSet(messages: Message[]) {
@@ -542,6 +581,12 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
       role: m.role === "user" ? "user" : "ai",
       kind: "text",
       content: m.content,
+      actions:
+        m.role !== "user"
+          ? [failedActionRetryActionFromMetadata(metadata)].filter(
+              (action): action is ChatActionOption => Boolean(action),
+            )
+          : undefined,
       contentPresentation:
         m.role !== "user" && isBreakdownActionMetadata(metadata)
           ? "result_breakdown"
@@ -1024,15 +1069,41 @@ export default function ChatInterface() {
     text: string,
     mentionsOrAction?: ChatMention[] | ChatActionOption,
     actionArg?: ChatActionOption,
+    options?: SendOptions,
   ) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    const routeConversationId = readActiveConversationIdFromUrl();
-    const targetConversationId = routeConversationId ?? conversationId;
-    if (!targetConversationId) return;
     if (isStreamingResponse) return;
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
+    const retryLastTurnAction = action?.type
+      ? null
+      : retryLastTurnActionFromMessage(trimmed);
+    const routeState = readActiveConversationRouteState();
+    let targetConversationId = routeState.conversationId ?? conversationId;
+    const shouldCreateNewRouteConversation = shouldStartConversationForVisibleEmptyChat({
+      routeState,
+      visibleMessageCount: messages.length,
+      hasStructuredAction: Boolean(action?.type),
+    });
+    let shouldResetMessagesForNewConversation = false;
+
+    if (shouldCreateNewRouteConversation) {
+      try {
+        const { conversation } = await createConversation(i18n.language);
+        targetConversationId = conversation.id;
+        shouldResetMessagesForNewConversation = true;
+        rememberActiveConversationId(conversation.id);
+        setConversationId(conversation.id);
+        void refreshHistory();
+      } catch (err) {
+        console.error("Failed to start conversation before sending:", err);
+        showToast(t('chat.error_generic'));
+        return;
+      }
+    }
+
+    if (!targetConversationId) return;
 
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
@@ -1041,6 +1112,7 @@ export default function ChatInterface() {
 
     setIsSidebarOpen(false);
     shouldAutoScrollRef.current = true;
+    const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -1054,10 +1126,15 @@ export default function ChatInterface() {
 
     setMessages((prev) => [
       ...consumeConfirmationActionOnMessages(
-        consumeResultActionOnMessages(markComposerActionsInactive(prev), action),
+        consumeResultActionOnMessages(
+          markComposerActionsInactive(
+            shouldResetMessagesForNewConversation ? [] : prev,
+          ),
+          action,
+        ),
         action,
       ),
-      userMsg,
+      ...(renderUserMessage ? [userMsg] : []),
       {
         id: assistantId,
         role: "ai",
@@ -1107,6 +1184,7 @@ export default function ChatInterface() {
                     event.data.detail,
                     t('chat.error_backtest'),
                   ),
+                  actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
                 }
               : m,
           ),
@@ -1118,6 +1196,10 @@ export default function ChatInterface() {
         const finalPayload = event.data as typeof event.data & Record<string, unknown>;
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
+        const finalRetryActions = [
+          failedActionRetryActionFromMetadata(finalPayload),
+        ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
+        const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
         if (action?.type === "save_strategy" && savedStrategyId) {
           setMessages((prev) =>
@@ -1175,26 +1257,27 @@ export default function ChatInterface() {
         } else if (finalText) {
           setMessages((prev) => {
             const nextMessages = prev.map((m) =>
-              m.id === assistantId && !m.content
-                ? {
-                    ...m,
-                    content: finalText,
-                    contentPresentation:
-                      action?.type === "show_breakdown"
-                        ? "result_breakdown"
-                        : m.contentPresentation,
-                  }
-                : m,
+              mergeFinalTextMessage(m, {
+                assistantId,
+                finalText,
+                finalActions: finalRetryActions,
+                contentPresentation:
+                  action?.type === "show_breakdown"
+                    ? "result_breakdown"
+                    : undefined,
+              }),
             );
             if (
               isConfirmationAction(action) ||
               finalStageOutcome === "await_user_reply" ||
               finalStageOutcome === "needs_clarification"
             ) {
-              return supersedeOpenConfirmations(
-                nextMessages,
-                confirmationActionStatusLabel(action),
-              );
+              return settleOpenConfirmationsAfterTextFinal(nextMessages, {
+                action,
+                finalActions: finalRetryActions,
+                hasFailedAction: finalHasFailedAction,
+                stageOutcome: finalStageOutcome,
+              });
             }
             return nextMessages;
           });
@@ -1257,6 +1340,7 @@ export default function ChatInterface() {
                 content: isRateLimit
                   ? t('chat.rate_limit_error')
                   : fallbackMessage,
+                actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
               }
             : m,
         ),
@@ -1464,6 +1548,17 @@ export default function ChatInterface() {
     }
     if (value === "/action:new-chat") {
       void startNewChat();
+      return;
+    }
+    if (action.type === "retry_last_turn") {
+      const retryText = retryLastTurnMessageFromAction(action);
+      if (retryText) {
+        void handleSend(retryText, [], undefined, { renderUserMessage: false });
+      }
+      return;
+    }
+    if (isFailedActionRetry(action)) {
+      void handleSend(action.label || value, action);
       return;
     }
     setInputActions(consumeInputAction(action, inputActions));
@@ -1738,25 +1833,25 @@ export default function ChatInterface() {
                 {/* Starter Actions / Chips */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'What if I bought Tesla after big drops?'))}
+                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'How did Apple perform against SPY in 2024?'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.tsla.label', 'Buy Tesla after drops')}
+                    {t('chat.starter_actions.tsla.label', 'Compare Apple to SPY')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'What if I bought Bitcoin when it has been rising?'))}
+                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'What if I bought Bitcoin at the start of 2024 and held through the end of 2024?'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.btc.label', 'Test Bitcoin strength')}
+                    {t('chat.starter_actions.btc.label', 'Hold Bitcoin in 2024')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'What if I bought a fixed amount every month?'))}
+                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'What if I bought $250 of Nvidia every week in 2024?'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.dca.label', 'Buy every month')}
+                    {t('chat.starter_actions.dca.label', 'Buy Nvidia weekly')}
                   </button>
                 </div>
 

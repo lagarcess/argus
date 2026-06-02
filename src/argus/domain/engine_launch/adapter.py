@@ -114,7 +114,11 @@ def _run_indicator_threshold(
 
     metrics = compute_alpha_metrics(config)
     result_card = _build_launch_result_card(config, metrics, language=language)
-    benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
+    benchmark_metrics = build_benchmark_metrics(
+        request=request,
+        metrics=metrics,
+        benchmark_symbol=config["benchmark_symbol"],
+    )
     envelope = build_success_envelope(
         resolved_strategy={
             "strategy_type": request.strategy_type,
@@ -198,7 +202,11 @@ def _run_signal_strategy(
 
     metrics = compute_alpha_metrics(config)
     result_card = _build_launch_result_card(config, metrics, language=language)
-    benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
+    benchmark_metrics = build_benchmark_metrics(
+        request=request,
+        metrics=metrics,
+        benchmark_symbol=config["benchmark_symbol"],
+    )
     envelope = build_success_envelope(
         resolved_strategy={
             "strategy_type": request.strategy_type,
@@ -276,7 +284,11 @@ def _run_dca_accumulation(
 
     metrics = compute_alpha_metrics(config)
     result_card = _build_launch_result_card(config, metrics, language=language)
-    benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
+    benchmark_metrics = build_benchmark_metrics(
+        request=request,
+        metrics=metrics,
+        benchmark_symbol=config["benchmark_symbol"],
+    )
     envelope = build_success_envelope(
         resolved_strategy={
             "strategy_type": request.strategy_type,
@@ -344,7 +356,11 @@ def _run_buy_and_hold(
 
     metrics = compute_alpha_metrics(config)
     result_card = _build_launch_result_card(config, metrics, language=language)
-    benchmark_metrics = build_benchmark_metrics(request=request, metrics=metrics)
+    benchmark_metrics = build_benchmark_metrics(
+        request=request,
+        metrics=metrics,
+        benchmark_symbol=config["benchmark_symbol"],
+    )
     envelope = build_success_envelope(
         resolved_strategy={
             "strategy_type": request.strategy_type,

@@ -208,6 +208,178 @@ def _result_runtime_result() -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("benchmark_symbol", ["QQQ", "IWM"])
+def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
+    benchmark_symbol: str,
+) -> None:
+    from argus.api.chat.persistence import build_runtime_backtest_run
+
+    run = build_runtime_backtest_run(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        result_card={
+            "title": "AAPL buy and hold",
+            "rows": [],
+            "metrics": [],
+            "assumptions": [f"Benchmark: {benchmark_symbol}"],
+            "actions": [],
+        },
+        envelope={
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "asset_universe": ["AAPL"],
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "benchmark_symbol": benchmark_symbol,
+            },
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
+            "benchmark_metrics": {
+                "symbol": benchmark_symbol,
+                "aggregate": {"total_return_pct": 8.1},
+            },
+        },
+        classify_symbol_func=lambda symbol: SymbolAsset(
+            symbol=symbol.strip().upper(), asset_class="equity"
+        ),
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+    )
+
+    assert run is not None
+    assert run.benchmark_symbol == benchmark_symbol
+    assert run.config_snapshot["benchmark_symbol"] == benchmark_symbol
+    assert run.config_snapshot["resolved_parameters"]["benchmark_symbol"] == (
+        benchmark_symbol
+    )
+
+
+def test_chat_stream_final_payload_uses_engine_result_card_benchmark_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    result_card = {
+        "title": "AAPL buy and hold",
+        "rows": [
+            {"key": "ending_value", "label": "Ending value", "value": "$1,400"},
+            {
+                "key": "benchmark_delta",
+                "label": "Compared with QQQ",
+                "value": "Beat QQQ by 8.1 percentage points",
+            },
+        ],
+        "metrics": [
+            {"key": "ending_value", "label": "Ending value", "value": "$1,400"},
+            {
+                "key": "benchmark_delta",
+                "label": "Compared with QQQ",
+                "value": "Beat QQQ by 8.1 percentage points",
+            },
+        ],
+        "assumptions": ["Long-only", "Equal weight", "Benchmark: QQQ"],
+        "benchmark_note": "Compared with QQQ.",
+        "actions": [],
+    }
+
+    def _runtime(**_: Any) -> dict[str, Any]:
+        return {
+            "stage_outcome": "end_run",
+            "assistant_response": "Grounded result summary.",
+            "final_response_payload": {
+                "result_card": result_card,
+                "result": {
+                    "resolved_strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "symbol": "AAPL",
+                        "asset_universe": ["AAPL"],
+                    },
+                    "resolved_parameters": {
+                        "timeframe": "1D",
+                        "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                        "benchmark_symbol": "QQQ",
+                    },
+                    "metrics": {
+                        "aggregate": {
+                            "performance": {
+                                "total_return_pct": 35.0,
+                                "delta_vs_benchmark_pct": 8.1,
+                            }
+                        }
+                    },
+                    "benchmark_metrics": {
+                        "symbol": "QQQ",
+                        "aggregate": {"total_return_pct": 27.0},
+                    },
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "run the confirmed AAPL idea",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    card = final["final_response_payload"]["result_card"]
+    assert card["rows"][1]["label"] == "Compared with QQQ"
+    assert card["rows"][1]["value"] == "Beat QQQ by 8.1 percentage points"
+    assert final["result_card"]["metrics"][1]["label"] == "Compared with QQQ"
+    assert final["run"]["conversation_result_card"]["assumptions"][-1] == "Benchmark: QQQ"
+
+
+def test_runtime_backtest_run_prefers_resolved_explicit_benchmark_over_default() -> None:
+    from argus.api.chat.persistence import build_runtime_backtest_run
+
+    run = build_runtime_backtest_run(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        result_card={
+            "title": "BTC buy and hold",
+            "rows": [],
+            "metrics": [],
+            "assumptions": ["Benchmark: ETH"],
+            "actions": [],
+        },
+        envelope={
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "BTC",
+                "asset_universe": ["BTC"],
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "benchmark_symbol": "ETH",
+            },
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
+            "benchmark_metrics": {"aggregate": {"total_return_pct": 8.1}},
+        },
+        classify_symbol_func=lambda symbol: SymbolAsset(
+            symbol=symbol.strip().upper(), asset_class="crypto"
+        ),
+        default_benchmark_func=lambda _asset_class, _symbols: "BTC",
+    )
+
+    assert run is not None
+    assert run.benchmark_symbol == "ETH"
+    assert run.config_snapshot["benchmark_symbol"] == "ETH"
+
+
 def _stream_events_from_runtime(runtime):
     async def _events(**kwargs: Any):
         yield {"type": "final", "payload": runtime(**kwargs)}
@@ -1034,7 +1206,8 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
     second_text = _stream_payloads(second.text, "token")[0]["text"]
     assert "help you choose a sensible next step" in first_text
     assert "What should trigger the buy?" not in second_text
-    assert "reliable draft" in second_text
+    assert "reliable test setup" in second_text
+    assert "draft" not in second_text.lower()
     assert "interpreter" not in second_text.lower()
 
 

@@ -10,6 +10,7 @@ from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     LaunchExecutionEnvelope,
 )
+from argus.domain.engine_launch.results import user_safe_failure_message
 
 
 def test_launch_request_supports_three_strategy_types() -> None:
@@ -66,6 +67,27 @@ def test_launch_request_supports_three_strategy_types() -> None:
     assert dca_request.strategy_type == "dca_accumulation"
     assert dca_request.cadence == "monthly"
     assert threshold_request.strategy_type == "indicator_threshold"
+
+
+@pytest.mark.parametrize(
+    "failure_category",
+    [
+        "missing_required_input",
+        "parameter_validation_error",
+        "upstream_dependency_error",
+        "unexpected_failure",
+    ],
+)
+def test_user_safe_failure_messages_do_not_expose_draft_language(
+    failure_category: str,
+) -> None:
+    message = user_safe_failure_message(
+        failure_reason=None,
+        failure_category=failure_category,
+    )
+
+    assert "draft" not in message.lower()
+    assert "setup" in message.lower() or "detail" in message.lower()
 
 
 def test_launch_request_supports_signal_strategy_with_rule_spec() -> None:
@@ -301,6 +323,169 @@ def test_buy_and_hold_adapter_returns_envelope_card_and_context(
     assert result.result_card["title"] == "TSLA Buy and Hold"
     assert result.explanation_context is not None
     assert result.explanation_context["strategy_type"] == "buy_and_hold"
+
+
+def test_buy_and_hold_adapter_propagates_explicit_benchmark_to_card_and_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="AAPL",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=1000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="QQQ",
+    )
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        lambda config: {
+            "aggregate": {
+                "performance": {
+                    "profit": 350.0,
+                    "total_return_pct": 35.0,
+                    "benchmark_return_pct": 26.9,
+                    "delta_vs_benchmark_pct": 8.1,
+                },
+                "risk": {"max_drawdown_pct": -15.5},
+                "efficiency": {"total_trades": 1, "win_rate": 1.0},
+            },
+            "by_symbol": {
+                "AAPL": {
+                    "performance": {
+                        "total_return_pct": 35.0,
+                        "benchmark_return_pct": 26.9,
+                    }
+                }
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_chart",
+        lambda config: None,
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert result.envelope.resolved_parameters["benchmark_symbol"] == "QQQ"
+    assert result.envelope.benchmark_metrics["symbol"] == "QQQ"
+    assert result.result_card is not None
+    assert result.result_card["rows"][0]["value"] == "$1,000 -> $1,350"
+    assert result.result_card["rows"][2]["label"] == "Compared with QQQ"
+    assert "Benchmark: QQQ" in result.result_card["assumptions"]
+    assert result.explanation_context is not None
+    assert result.explanation_context["benchmark_symbol"] == "QQQ"
+
+
+def test_buy_and_hold_adapter_uses_canonical_benchmark_for_all_result_facts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="BTC",
+        timeframe="1D",
+        date_range={"start": "2025-01-01", "end": "2025-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=1000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="ETHUSD",
+    )
+
+    def classify_stub(symbol: str):
+        normalized = "ETH" if symbol == "ETHUSD" else symbol
+        return type(
+            "ResolvedAsset",
+            (),
+            {
+                "canonical_symbol": normalized,
+                "asset_class": "crypto",
+                "symbol": normalized,
+            },
+        )()
+
+    seen_configs: list[dict[str, object]] = []
+
+    def fake_result_card(config, metrics, language="en", chart=None):
+        del metrics, language, chart
+        seen_configs.append(config)
+        benchmark = str(config["benchmark_symbol"])
+        return {
+            "title": "BTC Buy and Hold",
+            "assumptions": [f"Benchmark: {benchmark}"],
+            "rows": [
+                {"label": "Ending value", "value": "$1,000 -> $1,100"},
+                {"label": "Total return", "value": "+10.0%"},
+                {"label": f"Compared with {benchmark}", "value": "Beat by 1.0 point"},
+                {"label": "Worst drop", "value": "-5.0%"},
+            ],
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        classify_stub,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        lambda config: {
+            "aggregate": {
+                "performance": {
+                    "profit": 100.0,
+                    "total_return_pct": 10.0,
+                    "benchmark_return_pct": 9.0,
+                    "delta_vs_benchmark_pct": 1.0,
+                },
+                "risk": {"max_drawdown_pct": -5.0},
+            },
+            "by_symbol": {
+                "BTC": {
+                    "performance": {
+                        "total_return_pct": 10.0,
+                        "benchmark_return_pct": 9.0,
+                    }
+                }
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_card",
+        fake_result_card,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_chart",
+        lambda config: None,
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert seen_configs[0]["benchmark_symbol"] == "ETH"
+    assert result.envelope.resolved_parameters["benchmark_symbol"] == "ETH"
+    assert result.envelope.benchmark_metrics["symbol"] == "ETH"
+    assert result.result_card is not None
+    assert result.result_card["rows"][2]["label"] == "Compared with ETH"
+    assert result.explanation_context is not None
+    assert result.explanation_context["benchmark_symbol"] == "ETH"
 
 
 def test_buy_and_hold_adapter_preserves_multi_symbol_universe(

@@ -127,6 +127,8 @@ describe("result card playground", () => {
     expect(dca.hero.tone).toBe("neutral");
     expect(dca.benchmark.value).toBe("In line with SPY");
     expect(dca.timeframeDisplay).toBe("Daily data");
+    expect(dca.details).toContainEqual({ label: "Total contributed", value: "$1,000" });
+    expect(dca.details).not.toContainEqual({ label: "Starting capital", value: "$1,000" });
     expect(dca.details).toContainEqual({ label: "Cadence", value: "Monthly" });
     expect(dca.details).toContainEqual({ label: "Contribution", value: "$250" });
 
@@ -145,6 +147,39 @@ describe("result card playground", () => {
     );
     expect(compactProductionShape.benchmark.value).toBe(
       "Beat by 8.4 percentage points",
+    );
+  });
+
+  test("does not infer recurring contribution mode from display prose", () => {
+    const proseOnlyRecurring = heroDeltaEvidenceView({
+      ...resultCardPlaygroundFixtures[0].result,
+      strategyName: "Recurring buys display text",
+      assumptions: [
+        "Long-only",
+        "Equal weight",
+        "Monthly contribution: $250",
+        "Benchmark: SPY",
+      ],
+      configSnapshot: {
+        template: "buy_and_hold",
+        benchmark_symbol: "SPY",
+        resolved_parameters: {
+          timeframe: "1D",
+          benchmark_symbol: "SPY",
+        },
+      },
+    });
+
+    expect(proseOnlyRecurring.details).toContainEqual({
+      label: "Starting capital",
+      value: "$1,000",
+    });
+    expect(proseOnlyRecurring.details).not.toContainEqual({
+      label: "Total contributed",
+      value: "$1,000",
+    });
+    expect(proseOnlyRecurring.details.some((detail) => detail.label === "Contribution")).toBe(
+      false,
     );
   });
 
@@ -167,6 +202,32 @@ describe("result card playground", () => {
     expect(formatTimeframeForDisplay("2h")).toBe("2-hour data");
     expect(formatTimeframeForDisplay("12h")).toBe("12-hour data");
     expect(formatTimeframeForDisplay("15m")).toBe("15-minute data");
+  });
+
+  test("uses structured benchmark facts before stale assumption text", () => {
+    const structured = heroDeltaEvidenceView({
+      ...resultCardPlaygroundFixtures[0].result,
+      metrics: [
+        { label: "Ending value", value: "$1,000 -> $1,350" },
+        { label: "Total return", value: "+35.0%" },
+        { label: "Compared with QQQ", value: "+8.1 percentage points vs QQQ" },
+        { label: "Worst drop", value: "-15.5%" },
+      ],
+      assumptions: ["Long-only", "Equal weight", "No fees/slippage", "Benchmark: SPY"],
+      configSnapshot: {
+        timeframe: "1D",
+        benchmark_symbol: "QQQ",
+        resolved_parameters: {
+          timeframe: "1D",
+          benchmark_symbol: "QQQ",
+        },
+      },
+    });
+
+    expect(structured.benchmark.label).toBe("Compared with QQQ");
+    expect(structured.benchmark.value).toBe("Beat by 8.1 percentage points");
+    expect(structured.details).toContainEqual({ label: "Benchmark", value: "QQQ" });
+    expect(structured.details).not.toContainEqual({ label: "Benchmark", value: "SPY" });
   });
 
   test("keeps result card display copy configurable while Spanish is disabled", () => {
