@@ -83,6 +83,47 @@ def test_resolve_date_range_accepts_relative_endpoint_tokens() -> None:
     assert resolved.used_default is False
 
 
+def test_resolve_date_range_accepts_structured_iso_month_endpoints() -> None:
+    resolved = resolve_date_range(
+        {"start": "2021-01", "end": "2024-01"},
+        today=date(2026, 6, 3),
+    )
+
+    assert resolved.payload == {"start": "2021-01-01", "end": "2024-01-31"}
+    assert resolved.display == "January 1, 2021 - January 31, 2024"
+    assert resolved.used_default is False
+
+    string_resolved = resolve_date_range(
+        "2021-01 to 2024-01",
+        today=date(2026, 6, 3),
+    )
+    assert string_resolved.payload == resolved.payload
+    assert string_resolved.used_default is False
+
+
+def test_resolve_date_range_accepts_compact_month_year_spans() -> None:
+    resolved = resolve_date_range(
+        "Jan 2021-Jan 2024",
+        today=date(2026, 6, 3),
+    )
+
+    assert resolved.payload == {"start": "2021-01-01", "end": "2024-01-31"}
+    assert resolved.display == "January 1, 2021 - January 31, 2024"
+    assert resolved.used_default is False
+
+
+def test_current_message_date_range_accepts_compact_month_year_spans() -> None:
+    resolved = current_message_date_range(
+        (
+            "Can you set a strategy where I buy AAPL GOOG at $200 every month "
+            "for Jan 2021-Jan 2024?"
+        ),
+        today=date(2026, 6, 3),
+    )
+
+    assert resolved == {"start": "2021-01-01", "end": "2024-01-31"}
+
+
 def test_resolve_date_range_accepts_calendar_year() -> None:
     resolved = resolve_date_range("in 2024", today=date(2026, 5, 3))
 

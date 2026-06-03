@@ -240,9 +240,15 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
     current_date = today or date.today()
     if isinstance(value, dict):
         start = _parse_date_token(
-            value.get("start") or value.get("from"), today=current_date
+            value.get("start") or value.get("from"),
+            today=current_date,
+            endpoint="start",
         )
-        end = _parse_date_token(value.get("end") or value.get("to"), today=current_date)
+        end = _parse_date_token(
+            value.get("end") or value.get("to"),
+            today=current_date,
+            endpoint="end",
+        )
         if start is not None and end is not None:
             return DateRangeResolution(
                 label=f"{format_display_date(start)} to {format_display_date(end)}",
@@ -540,10 +546,36 @@ def _parse_iso_date(value: Any) -> date | None:
         return None
 
 
-def _parse_date_token(value: Any, *, today: date) -> date | None:
+def _parse_iso_month(value: Any, *, endpoint: str) -> date | None:
+    if not isinstance(value, str):
+        return None
+    parts = value.strip().split("-")
+    if len(parts) != 2:
+        return None
+    year = _int_or_none(parts[0])
+    month = _int_or_none(parts[1])
+    if year is None or month is None or not 1 <= month <= 12:
+        return None
+    day = 1 if endpoint == "start" else _last_day_of_month(year, month)
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _parse_date_token(
+    value: Any,
+    *,
+    today: date,
+    endpoint: str | None = None,
+) -> date | None:
     parsed = _parse_iso_date(value)
     if parsed is not None:
         return parsed
+    if endpoint is not None:
+        parsed_month = _parse_iso_month(value, endpoint=endpoint)
+        if parsed_month is not None:
+            return parsed_month
     if not isinstance(value, str):
         return None
     normalized = _normalize_token(value)
@@ -574,8 +606,14 @@ def _explicit_iso_range(value: str) -> DateRangeResolution | None:
         if connector not in collapsed:
             continue
         start_text, end_text = collapsed.split(connector, 1)
-        start = _parse_iso_date(start_text.strip())
-        end = _parse_iso_date(end_text.strip())
+        start = _parse_iso_date(start_text.strip()) or _parse_iso_month(
+            start_text.strip(),
+            endpoint="start",
+        )
+        end = _parse_iso_date(end_text.strip()) or _parse_iso_month(
+            end_text.strip(),
+            endpoint="end",
+        )
         if start is not None and end is not None:
             break
     if start is None or end is None:
@@ -596,6 +634,9 @@ def _explicit_natural_range(
     shared_year_span = _month_span_with_shared_year(tokens)
     if shared_year_span is not None:
         return shared_year_span
+    month_year_span = _month_year_span(tokens)
+    if month_year_span is not None:
+        return month_year_span
     start: date | None = None
     end: date | None = None
     connectors = {"to", "through", "until", "till"}
@@ -630,6 +671,37 @@ def _explicit_natural_range(
         start=start,
         end=end,
     )
+
+
+def _month_year_span(tokens: list[str]) -> DateRangeResolution | None:
+    connectors = {"to", "through", "until", "till"}
+    for index in range(0, len(tokens)):
+        start_candidate = _build_month_year_date(
+            tokens[index],
+            tokens[index + 1] if index + 1 < len(tokens) else None,
+            endpoint="start",
+        )
+        if start_candidate is None:
+            continue
+        end_index = index + 2
+        if end_index < len(tokens) and tokens[end_index] in connectors:
+            end_index += 1
+        end_candidate = _build_month_year_date(
+            tokens[end_index] if end_index < len(tokens) else None,
+            tokens[end_index + 1] if end_index + 1 < len(tokens) else None,
+            endpoint="end",
+        )
+        if end_candidate is None or end_candidate < start_candidate:
+            continue
+        return DateRangeResolution(
+            label=(
+                f"{format_display_date(start_candidate)} to "
+                f"{format_display_date(end_candidate)}"
+            ),
+            start=start_candidate,
+            end=end_candidate,
+        )
+    return None
 
 
 def _month_span_with_shared_year(tokens: list[str]) -> DateRangeResolution | None:

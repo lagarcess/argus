@@ -1399,6 +1399,36 @@ def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> Non
     )
 
 
+def test_confirm_stage_resolves_structured_month_range_into_launch_payload() -> None:
+    state = RunState.new(
+        current_user_message=(
+            "Can you set a strategy where I buy AAPL GOOG at $200 every month "
+            "for Jan 2021-Jan 2024?"
+        ),
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        raw_user_phrasing=state.current_user_message,
+        strategy_type="dca_accumulation",
+        strategy_thesis="Accumulate AAPL and GOOG monthly over the specified period.",
+        asset_universe=["AAPL", "GOOG"],
+        asset_class="equity",
+        capital_amount=200,
+        cadence="monthly",
+        date_range={"start": "2021-01", "end": "2024-01"},
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    confirmation_payload = result.patch["confirmation_payload"]
+    assert confirmation_payload["launch_payload"]["date_range"] == {
+        "start": "2021-01-01",
+        "end": "2024-01-31",
+    }
+    assert confirmation_payload["validation"]["status"] == "ready_to_run"
+
+
 def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

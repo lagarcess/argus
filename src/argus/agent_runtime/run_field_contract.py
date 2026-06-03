@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 from datetime import date
 
 from argus.agent_runtime.strategy_contract import (
@@ -82,8 +83,14 @@ def current_message_date_range(
     *,
     today: date | None = None,
 ) -> dict[str, str] | None:
-    tokens = field_fidelity_tokens(str(message or "").casefold())
+    folded_message = str(message or "").casefold()
+    tokens = field_fidelity_tokens(folded_message)
     current_date = today or date.today()
+    month_year = _month_year_date_range_from_tokens(
+        _date_range_fidelity_tokens(folded_message)
+    )
+    if month_year is not None:
+        return month_year
     multi_year = _multi_year_date_range_from_tokens(tokens, today=current_date)
     if multi_year is not None:
         return multi_year
@@ -129,6 +136,21 @@ def field_fidelity_tokens(text: str) -> list[str]:
     return [token for token in cleaned.split() if token]
 
 
+def _date_range_fidelity_tokens(text: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    for char in text:
+        if char.isalnum():
+            current.append(char)
+            continue
+        if current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return tokens
+
+
 def message_states_bar_timeframe(message: str) -> bool:
     tokens = set(field_fidelity_tokens(str(message or "").casefold()))
     return bool(
@@ -167,6 +189,41 @@ def _year_so_far_date_range_from_tokens(
         if year == today.year:
             return {"start": f"{year}-01-01", "end": today.isoformat()}
     return None
+
+
+def _month_year_date_range_from_tokens(tokens: list[str]) -> dict[str, str] | None:
+    connectors = {"to", "through", "thru", "until", "till"}
+    for index in range(0, len(tokens)):
+        start = _month_year_endpoint(tokens, index=index, endpoint="start")
+        if start is None:
+            continue
+        end_index = index + 2
+        if end_index < len(tokens) and tokens[end_index] in connectors:
+            end_index += 1
+        end = _month_year_endpoint(tokens, index=end_index, endpoint="end")
+        if end is None or end < start:
+            continue
+        return {"start": start.isoformat(), "end": end.isoformat()}
+    return None
+
+
+def _month_year_endpoint(
+    tokens: list[str],
+    *,
+    index: int,
+    endpoint: str,
+) -> date | None:
+    if index < 0 or index + 1 >= len(tokens):
+        return None
+    month = MONTH_ALIASES.get(tokens[index])
+    year_text = tokens[index + 1]
+    if month is None or not (len(year_text) == 4 and year_text.isdigit()):
+        return None
+    year = int(year_text)
+    if not 1900 <= year <= 2100:
+        return None
+    day = 1 if endpoint == "start" else calendar.monthrange(year, month)[1]
+    return date(year, month, day)
 
 
 def _multi_year_date_range_from_tokens(
