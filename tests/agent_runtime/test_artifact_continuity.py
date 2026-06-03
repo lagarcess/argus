@@ -128,6 +128,40 @@ def test_confirmation_draft_prefers_visible_strategy_and_fills_launch_defaults()
     assert draft.comparison_baseline == "QQQ"
 
 
+def test_confirmation_draft_ignores_launch_fields_outside_strategy_contract() -> None:
+    draft = draft_from_confirmation_payload(
+        {
+            "strategy": {
+                "strategy_type": "rsi_threshold",
+                "strategy_thesis": "Test TSLA with RSI.",
+                "asset_universe": ["TSLA"],
+                "asset_class": "equity",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "entry_logic": "Buy when RSI drops below 30",
+                "exit_logic": "Sell when RSI rises above 55",
+            },
+            "launch_payload": {
+                "strategy_type": "rsi_threshold",
+                "symbols": ["TSLA"],
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "entry_rule": "rsi_below",
+                "exit_rule": "rsi_above",
+                "benchmark_symbol": "SPY",
+            },
+        }
+    )
+
+    assert draft.strategy_type == "rsi_threshold"
+    assert draft.asset_universe == ["TSLA"]
+    assert draft.entry_logic == "Buy when RSI drops below 30"
+    assert draft.exit_logic == "Sell when RSI rises above 55"
+    assert draft.entry_rule is None
+    assert draft.exit_rule is None
+    assert draft.timeframe == "1D"
+    assert draft.comparison_baseline == "SPY"
+
+
 def test_failed_action_draft_preserves_launch_payload_fields() -> None:
     draft = draft_from_failed_launch_payload(
         {

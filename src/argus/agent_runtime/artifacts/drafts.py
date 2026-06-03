@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import ValidationError
+
 from argus.agent_runtime.state.models import StrategySummary
 
 
@@ -108,14 +110,28 @@ def _strategy_from_values(values: dict[str, Any]) -> StrategySummary:
     payload = {
         key: value
         for key, value in values.items()
-        if key in allowed and not _blank(value)
+        if key in allowed
+        and not _blank(value)
+        and _strategy_field_accepts(key, value)
     }
     return StrategySummary.model_validate(payload)
 
 
 def _fill_if_blank(values: dict[str, Any], key: str, value: Any) -> None:
     if _blank(values.get(key)) and not _blank(value):
-        values[key] = _normalize_value(key, value)
+        normalized = _normalize_value(key, value)
+        if _strategy_field_accepts(key, normalized):
+            values[key] = normalized
+
+
+def _strategy_field_accepts(key: str, value: Any) -> bool:
+    if key not in StrategySummary.model_fields or _blank(value):
+        return False
+    try:
+        StrategySummary.model_validate({key: value})
+    except ValidationError:
+        return False
+    return True
 
 
 def _normalize_value(key: str, value: Any) -> Any:
