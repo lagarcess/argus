@@ -30,6 +30,22 @@ def test_agent_runtime_checkpointer_serializes_runtime_state() -> None:
     assert restored.recent_thread_history[0].content.startswith("try dca")
 
 
+def test_agent_runtime_postgres_checkpointer_uses_runtime_serde() -> None:
+    serde = api_state.build_agent_runtime_checkpoint_serde()
+    run_state = RunState.new(
+        current_user_message="Run backtest",
+        recent_thread_history=[
+            ConversationMessage(role="user", content="buy AAPL weekly"),
+        ],
+    )
+
+    serialized = serde.dumps_typed(run_state)
+    restored = serde.loads_typed(serialized)
+
+    assert restored.current_user_message == "Run backtest"
+    assert restored.recent_thread_history[0].content == "buy AAPL weekly"
+
+
 def test_agent_runtime_checkpointer_serializes_artifact_spine() -> None:
     checkpointer = api_state.build_agent_runtime_checkpointer()
     snapshot = TaskSnapshot(

@@ -221,7 +221,7 @@ def list_messages(
         if api_state.supabase_gateway
         else api_state.store.conversations.get(conversation_id)
     )
-    if not conversation:
+    if not conversation or conversation.deleted_at is not None:
         raise problem(
             request,
             status_code=404,
@@ -255,6 +255,14 @@ def list_messages(
 
     if items is None:
         conversation = api_state.store.conversations.get(conversation_id)
+        if conversation is not None and conversation.deleted_at is not None:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Conversation not found.",
+            )
         if not conversation:
             return PaginatedMessages(items=[])
         items = api_state.store.messages.get(conversation_id, [])

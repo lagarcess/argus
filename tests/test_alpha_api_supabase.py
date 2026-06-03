@@ -411,6 +411,31 @@ def test_create_conversation_uses_dev_memory_fallback_when_supabase_fails(
     assert conversation["title_source"] == "system_default"
 
 
+def test_deleted_conversation_messages_supabase_return_not_found(mock_gateway):
+    now = utcnow()
+    mock_gateway.get_conversation.return_value = Conversation(
+        id="deleted-conversation",
+        title="Deleted idea",
+        title_source="system_default",
+        language="en",
+        pinned=False,
+        archived=False,
+        last_message_preview="Old turn",
+        deleted_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+
+    response = client.get(
+        "/api/v1/conversations/deleted-conversation/messages",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    mock_gateway.list_messages.assert_not_called()
+
+
 def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock_gateway):
     mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
 

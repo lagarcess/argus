@@ -34,7 +34,10 @@ async def lifespan(app: FastAPI):
     if api_state.CHECKPOINTER_MODE == "postgres":
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-        checkpointer_cm = AsyncPostgresSaver.from_conn_string(api_state.DATABASE_URL)
+        checkpointer_cm = AsyncPostgresSaver.from_conn_string(
+            api_state.DATABASE_URL,
+            serde=api_state.build_agent_runtime_checkpoint_serde(),
+        )
         checkpointer = await checkpointer_cm.__aenter__()
         await checkpointer.setup()
     else:

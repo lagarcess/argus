@@ -329,6 +329,34 @@ def test_unknown_conversation_messages_return_not_found() -> None:
     assert response.json()["code"] == "not_found"
 
 
+def test_deleted_conversation_messages_return_not_found() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    stream = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest Tesla when it dips",
+            "language": "en",
+        },
+    )
+    assert stream.status_code == 200
+
+    hydrated = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    assert hydrated.status_code == 200
+    assert len(hydrated.json()["items"]) > 0
+
+    deleted = client.delete(f"/api/v1/conversations/{conversation['id']}")
+    assert deleted.status_code == 200
+
+    response = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
 def test_backtest_rejects_mixed_asset_symbols_with_problem_details() -> None:
     client = _client()
 
