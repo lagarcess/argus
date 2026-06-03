@@ -44,15 +44,11 @@ from argus.api.chat.onboarding import (
 from argus.api.chat.persistence import persist_runtime_backtest_run
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
-    checkpoint_has_latest_result,
     checkpoint_has_pending_confirmation,
-    checkpoint_has_pending_strategy,
-    checkpoint_latest_result_has_context_packets,
     confirmation_metadata_fallback_context,
     failed_action_metadata_fallback_context,
     latest_result_fallback_context,
     pending_strategy_metadata_fallback_context,
-    result_reference_has_context_packets,
     runtime_checkpoint_values,
 )
 from argus.api.chat.result_actions import (
@@ -113,15 +109,6 @@ def _confirmation_id_for_runtime_card(runtime_result: dict[str, Any]) -> str:
     if isinstance(payload, dict):
         return confirmation_id_from_payload(payload, fallback=fallback)
     return fallback or api_state.store.new_id()
-
-
-def _fallback_latest_result_has_context_packets(
-    fallback: RuntimeFallbackContext,
-) -> bool:
-    snapshot = fallback.latest_task_snapshot
-    if snapshot is None:
-        return False
-    return result_reference_has_context_packets(snapshot.latest_backtest_result_reference)
 
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
@@ -288,24 +275,12 @@ async def chat_stream(
                 )
                 if pending_fallback is not None:
                     runtime_fallback = pending_fallback
-                elif not checkpoint_has_pending_strategy(
-                    checkpoint_values
-                ) and not checkpoint_has_latest_result(checkpoint_values):
+                else:
                     result_fallback = latest_result_fallback_context(
                         user_id=user.id,
                         conversation_id=conversation.id,
                     )
                     if result_fallback is not None:
-                        runtime_fallback = result_fallback
-                elif not checkpoint_latest_result_has_context_packets(checkpoint_values):
-                    result_fallback = latest_result_fallback_context(
-                        user_id=user.id,
-                        conversation_id=conversation.id,
-                    )
-                    if (
-                        result_fallback is not None
-                        and _fallback_latest_result_has_context_packets(result_fallback)
-                    ):
                         runtime_fallback = result_fallback
     mention_provenance = [
         mention_to_provenance(mention.model_dump(mode="python"), index=index)

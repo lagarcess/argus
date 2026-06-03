@@ -1016,6 +1016,141 @@ def test_result_followup_after_reload_carries_latest_run_reference(
     assert reference.metadata["conversation_id"] == conversation["id"]
 
 
+def test_result_followup_prefers_visible_result_over_stale_checkpoint(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "I can use the latest visible result.",
+            },
+        }
+
+    async def _stale_checkpoint_values(**kwargs: Any) -> dict[str, Any]:
+        del kwargs
+        return {
+            "latest_task_snapshot": TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Older confirmation state.",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range="past year",
+                )
+            )
+        }
+
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "runtime_checkpoint_values",
+        _stale_checkpoint_values,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL", "GOOG"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 20.6,
+                    "benchmark_return_pct": 15.2,
+                    "delta_vs_benchmark_pct": 5.4,
+                }
+            },
+            "by_symbol": {},
+        },
+        config_snapshot={
+            "template": "dca_accumulation",
+            "symbols": ["AAPL", "GOOG"],
+            "resolved_strategy": {
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "Buy AAPL and GOOG every month.",
+                "asset_universe": ["AAPL", "GOOG"],
+                "asset_class": "equity",
+                "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                "capital_amount": 200,
+                "cadence": "monthly",
+                "comparison_baseline": "SPY",
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "capital_amount": 200,
+                "recurring_contribution": 200,
+                "cadence": "monthly",
+                "benchmark_symbol": "SPY",
+            },
+        },
+        conversation_result_card={
+            "title": "AAPL, GOOG DCA Accumulation",
+            "status_label": "Simulation Complete",
+            "rows": [
+                {"key": "total_return_pct", "label": "Total return", "value": "+20.6%"}
+            ],
+            "assumptions": [
+                "$200 recurring contribution",
+                "Monthly cadence",
+                "Daily data",
+                "Benchmark: SPY",
+            ],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I tested that idea.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_card": run.conversation_result_card,
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "do the date range October 2019 to October 2025",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary is None
+    reference = snapshot.latest_backtest_result_reference
+    assert reference is not None
+    assert reference.artifact_id == run_id
+    assert reference.metadata["symbols"] == ["AAPL", "GOOG"]
+
+
 def test_refine_strategy_action_uses_latest_result_context_after_reload() -> None:
     from argus.api import state as api_state
 
