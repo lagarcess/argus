@@ -67,6 +67,7 @@ import {
   targetConversationIdForSend,
   type ActiveConversationRouteState,
 } from "@/lib/chat-conversation-routing";
+import { conversationLoadFailureMessage } from "@/lib/chat-conversation-load-state";
 import { writeClipboardText } from "@/lib/clipboard";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
@@ -921,12 +922,20 @@ export default function ChatInterface() {
               setHistoryItems((prev) =>
                 prev.filter((item) => !historyItemBelongsToConversation(item, activeConversationId)),
               );
+              resetToEmptyChatSurface();
+              setShowOnboardingGoalCards(
+                privateAlphaOnboardingEnabled &&
+                (stage === "language_selection" || stage === "primary_goal_selection"),
+              );
+              return;
             }
-            resetToEmptyChatSurface();
-            setShowOnboardingGoalCards(
-              privateAlphaOnboardingEnabled &&
-              (stage === "language_selection" || stage === "primary_goal_selection"),
-            );
+            rememberActiveConversationId(activeConversationId);
+            setConversationId(activeConversationId);
+            setMessages([
+              conversationLoadFailureMessage(activeConversationId, t('chat.error_load')),
+            ]);
+            setInputActions([]);
+            setShowOnboardingGoalCards(false);
             return;
           }
         }
@@ -1006,8 +1015,12 @@ export default function ChatInterface() {
         setHistoryItems((prev) =>
           prev.filter((item) => !historyItemBelongsToConversation(item, convId)),
         );
+        resetToEmptyChatSurface();
+        showToast(t('chat.error_load'));
+        return;
       }
-      resetToEmptyChatSurface();
+      setMessages([conversationLoadFailureMessage(convId, t('chat.error_load'))]);
+      setInputActions([]);
       showToast(t('chat.error_load'));
     } finally {
       setStreamStatus(null);

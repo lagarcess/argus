@@ -10,11 +10,12 @@ describe("chat archive/delete lifecycle source contract", () => {
     const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
     const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
     const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
+    const beforeCatch = loadConversation.slice(0, loadConversation.indexOf("} catch (error)"));
 
     expect(loadConversationStart).toBeGreaterThan(-1);
     expect(loadConversation).toContain("setStreamStatus(t('common.loading'))");
-    expect(loadConversation).not.toContain("setMessages([])");
-    expect(loadConversation).not.toContain("setInputActions([])");
+    expect(beforeCatch).not.toContain("setMessages([])");
+    expect(beforeCatch).not.toContain("setInputActions([])");
   });
 
   test("active archive and delete navigate away from the removed chat", () => {
