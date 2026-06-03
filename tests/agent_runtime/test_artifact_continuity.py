@@ -1,15 +1,27 @@
 from __future__ import annotations
 
+from argus.agent_runtime.artifacts.continuity import (
+    apply_patch_to_anchor,
+    resolve_artifact_anchor,
+)
 from argus.agent_runtime.artifacts.drafts import (
     draft_from_confirmation_payload,
     draft_from_failed_launch_payload,
     draft_from_result_metadata,
 )
+from argus.agent_runtime.artifacts.lifecycle import (
+    RetryLifecycleDecision,
+    retry_lifecycle_after_artifact_event,
+)
 from argus.agent_runtime.artifacts.patches import (
     ArtifactPatch,
     apply_artifact_patch,
 )
-from argus.agent_runtime.state.models import StrategySummary
+from argus.agent_runtime.state.models import (
+    ArtifactReference,
+    StrategySummary,
+    TaskSnapshot,
+)
 
 
 def test_result_draft_preserves_dca_money_cadence_timeframe_and_benchmark() -> None:
@@ -219,3 +231,165 @@ def test_patch_clears_fields_only_when_explicitly_requested() -> None:
     assert cleared.comparison_baseline is None
     assert cleared.asset_universe == ["AAPL"]
     assert cleared.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+
+
+def test_anchor_resolution_prefers_targeted_active_confirmation() -> None:
+    confirmation = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id="confirmation-1",
+        artifact_status="active",
+        metadata={
+            "confirmation_id": "confirmation-1",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "comparison_baseline": "SPY",
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "capital_amount": 500,
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        },
+    )
+    result = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-1",
+        artifact_status="completed",
+        metadata={
+            "asset_class": "equity",
+            "symbols": ["NVDA"],
+            "benchmark_symbol": "QQQ",
+            "config_snapshot": {"template": "buy_and_hold"},
+        },
+    )
+    snapshot = TaskSnapshot(
+        active_confirmation_reference=confirmation,
+        latest_backtest_result_reference=result,
+    )
+
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload={"confirmation_id": "confirmation-1"},
+    )
+
+    assert anchor.kind == "confirmation"
+    assert anchor.artifact_id == "confirmation-1"
+    assert anchor.draft is not None
+    assert anchor.draft.asset_universe == ["AAPL"]
+    assert anchor.draft.capital_amount == 500
+    assert anchor.draft.comparison_baseline == "SPY"
+
+
+def test_anchor_resolution_uses_result_when_action_targets_run() -> None:
+    result = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-1",
+        artifact_status="completed",
+        metadata={
+            "asset_class": "equity",
+            "symbols": ["AAPL", "GOOG"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "dca_accumulation",
+                "symbols": ["AAPL", "GOOG"],
+                "resolved_strategy": {
+                    "strategy_type": "dca_accumulation",
+                    "asset_universe": ["AAPL", "GOOG"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                    "capital_amount": 200,
+                    "cadence": "monthly",
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        },
+    )
+    snapshot = TaskSnapshot(latest_backtest_result_reference=result)
+
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload={"run_id": "run-1"},
+    )
+
+    assert anchor.kind == "result"
+    assert anchor.artifact_id == "run-1"
+    assert anchor.draft is not None
+    assert anchor.draft.asset_universe == ["AAPL", "GOOG"]
+    assert anchor.draft.capital_amount == 200
+    assert anchor.draft.cadence == "monthly"
+
+
+def test_anchor_patch_applies_to_failed_action_payload() -> None:
+    failed = ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id="failed-run-1",
+        artifact_status="failed",
+        metadata={
+            "action_type": "run_backtest",
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbols": ["NU"],
+                "asset_class": "equity",
+                "date_range": {"start": "2026-01-01", "end": "2026-06-03"},
+                "timeframe": "1D",
+                "capital_amount": 500,
+                "benchmark_symbol": "SPY",
+            },
+        },
+    )
+    snapshot = TaskSnapshot(latest_failed_action_reference=failed)
+    anchor = resolve_artifact_anchor(snapshot=snapshot, retrying_failed_action=True)
+
+    patched = apply_patch_to_anchor(
+        anchor,
+        ArtifactPatch(
+            source="retry",
+            date_range={"start": "2026-01-01", "end": "2026-06-02"},
+        ),
+    )
+
+    assert anchor.kind == "failed_action"
+    assert patched is not None
+    assert patched.asset_universe == ["NU"]
+    assert patched.capital_amount == 500
+    assert patched.date_range == {"start": "2026-01-01", "end": "2026-06-02"}
+
+
+def test_retry_lifecycle_supersedes_after_new_confirmation() -> None:
+    decision = retry_lifecycle_after_artifact_event(
+        retry_artifact_id="failed-run-1",
+        latest_failed_artifact_id="failed-run-1",
+        new_artifact_kind="confirmation",
+    )
+
+    assert decision == RetryLifecycleDecision.SUPERSEDED
+
+
+def test_retry_lifecycle_expires_when_retry_no_longer_matches_latest_failure() -> None:
+    decision = retry_lifecycle_after_artifact_event(
+        retry_artifact_id="failed-run-1",
+        latest_failed_artifact_id="failed-run-2",
+        new_artifact_kind=None,
+    )
+
+    assert decision == RetryLifecycleDecision.EXPIRED
+
+
+def test_retry_lifecycle_remains_active_for_current_failure() -> None:
+    decision = retry_lifecycle_after_artifact_event(
+        retry_artifact_id="failed-run-1",
+        latest_failed_artifact_id="failed-run-1",
+        new_artifact_kind=None,
+    )
+
+    assert decision == RetryLifecycleDecision.ACTIVE
