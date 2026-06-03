@@ -432,8 +432,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("isWorkingMessage");
     expect(chat).toContain('(msg.content ?? "") === ""');
     expect(chat).toContain("isStreaming={isWorkingMessage}");
-    expect(message).toContain("{!isUser && !isStreaming && !copyFeedback && (");
-    expect(message).toContain("{copyFeedback && (");
+    expect(message).toContain("{!isUser && !isStreaming && (");
+    expect(message).not.toContain("{copyFeedback && (");
   });
 
   test("stream status hides once assistant tokens are visible", () => {
@@ -576,12 +576,17 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(message).toContain('import { writeClipboardText } from "@/lib/clipboard";');
     expect(message).toContain("await writeClipboardText(text)");
-    expect(message).toContain("copyFeedback");
+    expect(message).toContain("onToast?: (message: string) => void");
+    expect(message).toContain('onToast?.(t(copied ? "chat.copy_success" : "chat.copy_failed"))');
+    expect(message).not.toContain("absolute -left-12");
     expect(message).toContain("chat.copy_success");
     expect(message).toContain("chat.copy_failed");
     expect(message).toContain('message.kind === "strategy_confirmation"');
+    expect(chat).toContain("onToast={showToast}");
     expect(chat).toContain("pb-[190px]");
     expect(chat).toContain('className="h-28"');
+    expect(chat).toContain("absolute inset-x-0 bottom-24");
+    expect(chat).toContain("flex justify-center");
     expect(chat).toContain('role="status"');
     expect(chat).toContain("dark:bg-[#1f2225]");
     expect(chat).not.toContain("rounded-full bg-black dark:bg-white");

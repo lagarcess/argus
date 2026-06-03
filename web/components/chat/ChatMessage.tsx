@@ -18,6 +18,7 @@ type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
+  onToast?: (message: string) => void;
   isLatest?: boolean;
   isStreaming?: boolean;
   conversationId?: string | null;
@@ -27,6 +28,7 @@ export default function ChatMessage({
   message,
   onAction,
   onFeedback,
+  onToast,
   isLatest,
   isStreaming,
   conversationId,
@@ -36,9 +38,7 @@ export default function ChatMessage({
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [menuPosition, setMenuPosition] = useState<"top" | "bottom">("bottom");
-  const [copyFeedback, setCopyFeedback] = useState<"success" | "failed" | null>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
-  const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedFeedbackClass =
     "hover:bg-black/5 dark:hover:bg-white/10 text-[#191c1f] dark:text-white";
   const idleFeedbackClass =
@@ -89,14 +89,6 @@ export default function ChatMessage({
       window.removeEventListener("scroll", handleScroll, true);
     };
   }, [showOptions]);
-
-  useEffect(() => {
-    return () => {
-      if (copyFeedbackTimeoutRef.current) {
-        clearTimeout(copyFeedbackTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const normalizeCopyText = (text: string) =>
     isUser ? text : normalizeAssistantDisplayText(text);
@@ -162,14 +154,7 @@ export default function ChatMessage({
 
   const handleCopy = async (text = getCopyText()) => {
     const copied = await writeClipboardText(text);
-    setCopyFeedback(copied ? "success" : "failed");
-    if (copyFeedbackTimeoutRef.current) {
-      clearTimeout(copyFeedbackTimeoutRef.current);
-    }
-    copyFeedbackTimeoutRef.current = setTimeout(() => {
-      setCopyFeedback(null);
-      copyFeedbackTimeoutRef.current = null;
-    }, 2000);
+    onToast?.(t(copied ? "chat.copy_success" : "chat.copy_failed"));
   };
 
   const getDisplayContent = () => {
@@ -216,7 +201,7 @@ export default function ChatMessage({
 
   return (
     <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300 group relative">
-      {!isUser && !isStreaming && !copyFeedback && (
+      {!isUser && !isStreaming && (
         <Tooltip content={t('chat.copy_plaintext')} side="left" delay={150}>
           <button
             onClick={() => {
@@ -228,15 +213,6 @@ export default function ChatMessage({
             <Copy className="w-4 h-4" />
           </button>
         </Tooltip>
-      )}
-      {copyFeedback && (
-        <span
-          role="status"
-          aria-live="polite"
-          className="absolute -left-12 top-10 rounded-full border border-black/10 bg-white px-2.5 py-1 text-[11px] font-medium text-black/70 dark:border-white/10 dark:bg-[#1f2225] dark:text-white/70"
-        >
-          {t(copyFeedback === "success" ? "chat.copy_success" : "chat.copy_failed")}
-        </span>
       )}
       <div className="flex flex-col max-w-[85%]">
         <div className="flex flex-col mt-1.5">
