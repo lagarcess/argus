@@ -15,6 +15,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     resolve_date_range,
 )
+from argus.domain.engine_launch.display import format_timeframe_data_label
 
 
 def runtime_confirmation_card(
@@ -23,6 +24,7 @@ def runtime_confirmation_card(
     confirmation_id: str | None = None,
     conversation_id: str | None = None,
     format_confirmation_period_func: Any | None = None,
+    language: str = "en",
 ) -> dict[str, Any] | None:
     if runtime_result.get("stage_outcome") != "await_approval":
         return None
@@ -92,6 +94,7 @@ def runtime_confirmation_card(
         strategy=strategy,
         optional_parameters=optional_parameters,
         launch_payload=launch_payload,
+        language=language,
     )
     summary_period = _confirmation_period_without_parentheses(date_range)
     summary = _confirmation_summary(
@@ -174,6 +177,7 @@ def _confirmation_assumptions(
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
     launch_payload: dict[str, Any] | None = None,
+    language: str = "en",
 ) -> list[str]:
     assumptions: list[str] = []
     strategy_type = executable_strategy_type(strategy)
@@ -195,7 +199,7 @@ def _confirmation_assumptions(
             assumptions.append(f"${float(initial_capital):,.0f} starting capital")
     timeframe = _optional_parameter_value(optional_parameters, "timeframe")
     if timeframe:
-        assumptions.append(f"{timeframe} bars")
+        assumptions.append(format_timeframe_data_label(timeframe, language=language))
     fees = _optional_parameter_value(optional_parameters, "fees")
     if fees in (0, 0.0, "0", "0.0"):
         assumptions.append("No fees")

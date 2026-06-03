@@ -44,7 +44,6 @@ def resolve_asset_candidate(
     source: ResolutionSource,
 ) -> AssetResolution:
     raw_text = str(query or "").strip()
-    normalized = " ".join(raw_text.lower().replace("-", " ").split())
     if not raw_text:
         return _asset_resolution(
             status="unsupported",

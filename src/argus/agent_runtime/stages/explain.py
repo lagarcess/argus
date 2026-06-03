@@ -18,6 +18,7 @@ from argus.agent_runtime.strategy_contract import display_strategy_type
 from argus.domain.benchmark_comparison import (
     benchmark_comparison_from_delta,
 )
+from argus.domain.engine_launch.display import normalize_legacy_data_caveat
 from argus.domain.engine_launch.result_facts import (
     execution_note as result_execution_note,
 )
@@ -98,7 +99,7 @@ class QuickTakeDraft(BaseModel):
     )
 
 
-def explain_stage(*, state: RunState) -> StageResult:
+def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
     result_payload = _result_payload(state)
     explanation_context = _explanation_context(state)
     profile = _response_profile(state)
@@ -113,7 +114,7 @@ def explain_stage(*, state: RunState) -> StageResult:
         optional_parameters=optional_parameters,
         explanation_context=explanation_context,
     )
-    caveat = _caveat_summary(explanation_context)
+    caveat = _caveat_summary(explanation_context, language=language)
     result_facts = _result_facts_for_explanation(
         strategy=strategy,
         result_payload=result_payload,
@@ -173,8 +174,8 @@ def explain_stage(*, state: RunState) -> StageResult:
     )
 
 
-async def explain_stage_async(*, state: RunState) -> StageResult:
-    fallback = explain_stage(state=state)
+async def explain_stage_async(*, state: RunState, language: str = "en") -> StageResult:
+    fallback = explain_stage(state=state, language=language)
     fallback_text = fallback.stage_patch.get("assistant_response")
     if not isinstance(fallback_text, str) or not fallback_text:
         return fallback
@@ -182,6 +183,7 @@ async def explain_stage_async(*, state: RunState) -> StageResult:
     llm_text = await _llm_explanation(
         state=state,
         fallback_text=fallback_text,
+        language=language,
     )
     if llm_text is None:
         return fallback
@@ -201,6 +203,7 @@ async def _llm_explanation(
     *,
     state: RunState,
     fallback_text: str,
+    language: str,
 ) -> str | None:
     strategy = _strategy_payload(state)
     result_payload = _result_payload(state)
@@ -222,7 +225,7 @@ async def _llm_explanation(
         optional_parameters=optional_parameters,
         explanation_context=explanation_context,
     )
-    caveat = _caveat_summary(explanation_context)
+    caveat = _caveat_summary(explanation_context, language=language)
     allowed_next_experiments = structured_next_experiments(result_facts)
     benchmark_contract = _benchmark_contract(
         strategy=strategy,
@@ -251,7 +254,7 @@ async def _llm_explanation(
         "allowed_next_experiments": allowed_next_experiments,
         "benchmark_contract": benchmark_contract,
         "fact_bank": fact_bank,
-        "language": "use the user's current language preference if available",
+        "language": language,
         "relative_performance_truth": relative_performance_truth,
         "required_fact_ids": sorted(required_fact_ids),
         "strategy": _canonical_strategy_context(strategy),
@@ -766,11 +769,14 @@ def _assumption_summary(
     return " ".join(parts)
 
 
-def _caveat_summary(explanation_context: dict[str, Any]) -> str:
+def _caveat_summary(explanation_context: dict[str, Any], *, language: str) -> str:
     caveats = explanation_context.get("caveats", [])
     if not isinstance(caveats, list) or not caveats:
         return "This is a return comparison, not causal attribution."
-    caveat_text = _compact_sentence_list(caveats, limit=2)
+    caveat_text = _compact_sentence_list(
+        [normalize_legacy_data_caveat(value, language=language) for value in caveats],
+        limit=2,
+    )
     if not caveat_text:
         return "This is a return comparison, not causal attribution."
     return f"This is a return comparison, not causal attribution. {caveat_text}"

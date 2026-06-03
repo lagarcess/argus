@@ -267,6 +267,7 @@ def _question_for_need(need: str) -> str:
         "rule_definition": "What specific rule should I test?",
         "assumption": "Which assumption do you want to change?",
         "simplification_choice": "Which simplification should I use?",
+        "refinement": "What should I change, compare, or stress-test next?",
     }
     return questions.get(need, "")
 

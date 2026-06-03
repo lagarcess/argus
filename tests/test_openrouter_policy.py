@@ -2275,6 +2275,74 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
     assert "BABA Buy and Hold BABA last month" not in text
 
 
+def test_result_breakdown_rejects_malformed_generated_connective_text(
+    monkeypatch,
+) -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
+            "sections": [
+                {
+                    "heading": "Quick Take",
+                    "parts": [
+                        {
+                            "kind": "text",
+                            "text": (
+                                "The benchmark return for the same window was "
+                            ),
+                        },
+                        {"kind": "fact", "fact_id": "benchmark_return"},
+                        {"kind": "text", "text": " — a spread of "},
+                        {"kind": "fact", "fact_id": "benchmark_comparison"},
+                        {"kind": "text", "text": "."},
+                        {"kind": "fact", "fact_id": "title"},
+                        {"kind": "fact", "fact_id": "symbols"},
+                        {"kind": "fact", "fact_id": "date_range"},
+                        {"kind": "fact", "fact_id": "total_return"},
+                        {"kind": "fact", "fact_id": "benchmark_symbol"},
+                        {"kind": "fact", "fact_id": "max_drawdown"},
+                        {"kind": "fact", "fact_id": "assumptions"},
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                }
+            ]
+        }
+    )
+
+    text = chat_service.llm_result_breakdown_message(
+        {
+            "title": "AAPL DCA Accumulation",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "date_range": "March 1, 2024 to October 31, 2024",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 12.5,
+                        "benchmark_return_pct": 5.5,
+                        "delta_vs_benchmark_pct": 7.0,
+                        "max_drawdown_pct": -4.5,
+                    }
+                }
+            },
+            "assumptions": [
+                "Recurring allocation: $200.",
+                "Cadence: weekly.",
+                "Benchmark: SPY.",
+            ],
+        },
+        invoke_json_schema_func=fake_schema,
+    )
+
+    assert text is not None
+    assert "was — a spread of" not in text
+    assert "**Test:** AAPL DCA Accumulation, March 1, 2024 to October 31, 2024." in text
+    assert "SPY benchmark return +5.5%" in text
+    assert "Beat by 7.0 percentage points" in text
+
+
 def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> None:
     from argus.api.chat import breakdown as chat_service
 

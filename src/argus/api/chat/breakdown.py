@@ -184,8 +184,10 @@ def _result_breakdown_llm_messages(
                 "context_packet_facts are present, treat them as possible backdrop only "
                 "and include context_packet_limitations; do not claim causality unless "
                 "the supplied fact directly supports it. Cover "
-                "what was tested, what happened, benchmark comparison, risk or drawdown, "
-                "assumptions, caveats, and one useful next test."
+                "what was tested, what drove the observed result, benchmark comparison, "
+                "risk or drawdown, assumptions, caveats, and one useful next test. "
+                "Keep the breakdown clearly deeper than the Quick Take: setup, drivers, "
+                "risk/assumptions, and next experiment should each have their own job."
             ),
         },
         {
@@ -417,6 +419,7 @@ def _render_result_breakdown_parts(
     body = ""
     fact_ids: list[str] = []
     used_fact_ids: set[str] = set()
+    inline_fact_scaffold = _result_breakdown_parts_use_inline_fact_scaffold(parts)
     for part in parts:
         if part.kind == "text":
             body = _append_result_breakdown_piece(body, part.text)
@@ -429,7 +432,11 @@ def _render_result_breakdown_parts(
             used_fact_ids.add(fact_id)
     body = _normalize_result_breakdown_body(body)
     fact_block = _render_result_breakdown_fact_block(fact_ids, fact_bank=fact_bank)
-    if _result_breakdown_body_is_fragmentary(body, fact_ids):
+    if _result_breakdown_body_is_fragmentary(
+        body,
+        fact_ids,
+        inline_fact_scaffold=inline_fact_scaffold,
+    ):
         body = ""
     if body and fact_block:
         return f"{body}\n\n{fact_block}", used_fact_ids
@@ -556,11 +563,65 @@ def _normalize_result_breakdown_body(value: str) -> str:
     return " ".join(str(value or "").split()).strip()
 
 
-def _result_breakdown_body_is_fragmentary(body: str, fact_ids: list[str]) -> bool:
+def _result_breakdown_body_is_fragmentary(
+    body: str,
+    fact_ids: list[str],
+    *,
+    inline_fact_scaffold: bool,
+) -> bool:
     if not body or not fact_ids:
         return False
+    if inline_fact_scaffold:
+        return True
     word_count = len([word for word in body.split(" ") if word.strip()])
     return word_count < 12
+
+
+def _result_breakdown_parts_use_inline_fact_scaffold(
+    parts: list[ResultBreakdownPart],
+) -> bool:
+    for index, part in enumerate(parts):
+        if part.kind != "fact":
+            continue
+        previous_text = _nearest_result_breakdown_text_part(parts, index, step=-1)
+        next_text = _nearest_result_breakdown_text_part(parts, index, step=1)
+        if previous_text and not _text_part_ends_standalone_sentence(previous_text):
+            return True
+        if next_text and _text_part_starts_inline_continuation(next_text):
+            return True
+    return False
+
+
+def _nearest_result_breakdown_text_part(
+    parts: list[ResultBreakdownPart],
+    start_index: int,
+    *,
+    step: int,
+) -> str:
+    index = start_index + step
+    while 0 <= index < len(parts):
+        part = parts[index]
+        if part.kind == "text":
+            text = str(part.text or "").strip()
+            if text:
+                return text
+        if part.kind == "fact":
+            return ""
+        index += step
+    return ""
+
+
+def _text_part_ends_standalone_sentence(value: str) -> bool:
+    text = str(value or "").strip()
+    return bool(text and text[-1] in {".", "!", "?"})
+
+
+def _text_part_starts_inline_continuation(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    first = text[0]
+    return first in {".", ",", ";", ":", ")", "%", "-", "–", "—"} or first.islower()
 
 
 def _sentence_fragment(value: str) -> str:
@@ -704,12 +765,12 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
 
     return (
         "Here's the deeper read on the completed run.\n\n"
-        f"**Setup.** {' '.join(setup_lines)}\n\n"
-        f"**How to read it.** {' '.join(performance_lines)}\n\n"
-        f"**Risk and assumptions.** Max drawdown was {drawdown_text}, the largest "
+        f"**What was tested.** {' '.join(setup_lines)}\n\n"
+        f"**What moved the result.** {' '.join(performance_lines)}\n\n"
+        f"**Risks and assumptions.** Max drawdown was {drawdown_text}, the largest "
         "peak-to-trough decline captured by the simulation. The run used "
         f"{assumption_text or 'the stored run settings'}.\n\n"
-        f"**Useful next check.** {_ensure_sentence(fact_bank['runnable_next_tests'])}\n\n"
+        f"**Try next.** {_ensure_sentence(fact_bank['runnable_next_tests'])}\n\n"
         "Use this as historical simulation evidence, not a prediction or trading "
         "recommendation."
     )

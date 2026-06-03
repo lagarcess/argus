@@ -26,6 +26,17 @@ def test_resolve_date_range_accepts_month_name_ranges() -> None:
     assert resolved.display == "January 1, 2010 - December 31, 2020"
 
 
+def test_resolve_date_range_accepts_month_span_with_shared_year() -> None:
+    resolved = resolve_date_range(
+        "march through october 2024",
+        today=date(2026, 5, 3),
+    )
+
+    assert resolved.payload == {"start": "2024-03-01", "end": "2024-10-31"}
+    assert resolved.display == "March 1, 2024 - October 31, 2024"
+    assert resolved.used_default is False
+
+
 def test_current_message_contract_does_not_broaden_explicit_month_ranges() -> None:
     assert (
         current_message_date_range(

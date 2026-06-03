@@ -28,6 +28,7 @@ PendingNeedName = Literal[
     "rule_definition",
     "assumption",
     "simplification_choice",
+    "refinement",
 ]
 
 ResponseIntentKind = Literal[

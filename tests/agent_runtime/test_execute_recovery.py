@@ -1314,7 +1314,8 @@ def test_explain_stage_uses_execution_envelope_context() -> None:
     assert "12.5%" in result.patch["assistant_response"]
     assert "9.2%" in result.patch["assistant_response"]
     assert "Starting capital: $10,000." in result.patch["assistant_response"]
-    assert "1D bars only." in result.patch["assistant_response"]
+    assert "Daily data only." in result.patch["assistant_response"]
+    assert "1D bars only." not in result.patch["assistant_response"]
 
 
 def test_explain_stage_describes_canonical_run_not_stale_original_thesis() -> None:
@@ -1870,6 +1871,9 @@ def test_explain_stage_deterministic_fallback_avoids_report_tone() -> None:
     response = result.patch["assistant_response"]
 
     assert response.startswith("**Quick take**")
+    assert "Result card:" not in response
+    assert "Breakdown:" not in response
+    assert "1D bars" not in response
     assert "**Interpretation:**" not in response
     assert "**Caveat:**" not in response
     assert "Keep in mind:" in response

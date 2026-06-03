@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.confirmation_artifacts import confirmation_artifact_reference
+from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.stages.interpret import (
     StructuredInterpretation,
     interpret_stage,
@@ -15,6 +16,7 @@ from argus.agent_runtime.stages.interpret import (
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     ArtifactReference,
+    ResponseIntent,
     ResponseProfileOverrides,
     RunState,
     StrategySummary,
@@ -1499,6 +1501,109 @@ def test_structured_confirmation_action_without_validated_payload_refreshes_card
     assert result.outcome == "ready_for_confirmation"
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["TSLA"]
     assert "confirmation_payload" not in result.patch
+
+
+def test_confirmation_edit_action_publishes_intent_without_backend_prompt() -> None:
+    pending = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy Apple weekly.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-03-01", "end": "2024-10-31"},
+        cadence="weekly",
+        capital_amount=250,
+        extra_parameters={
+            "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
+            "recurring_contribution": 250,
+            "recurring_cadence": "weekly",
+        },
+    )
+    snapshot = TaskSnapshot(pending_strategy_summary=pending)
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.structured_action = StructuredActionContext(
+        type="adjust_assumptions",
+        label="Adjust assumptions",
+        presentation="confirmation",
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "await_user_reply"
+    assert result.patch["assistant_prompt"] is None
+    assert result.patch["requested_field"] == "assumption"
+    assert result.patch["missing_required_fields"] == ["assumption"]
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["semantic_needs"] == ["assumption"]
+    assert result.patch["response_intent"]["requested_fields"] == ["assumption"]
+    assert result.patch["response_intent"]["facts"]["strategy"]["asset_universe"] == [
+        "AAPL"
+    ]
+
+
+def test_dca_assumption_clarification_composes_without_starting_capital_leak() -> None:
+    strategy = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy Apple weekly.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-03-01", "end": "2024-10-31"},
+        cadence="weekly",
+        capital_amount=250,
+        extra_parameters={
+            "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
+            "recurring_contribution": 250,
+            "recurring_cadence": "weekly",
+        },
+    )
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["assumption"],
+        requested_fields=["assumption"],
+        facts={"strategy": strategy.model_dump(mode="python")},
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "recurring buys" in prompt
+    assert "assumption" in prompt
+    assert "starting capital" not in prompt.lower()
+
+
+def test_refinement_clarification_composes_from_response_intent() -> None:
+    strategy = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["refinement"],
+        requested_fields=["refinement"],
+        facts={"strategy": strategy.model_dump(mode="python")},
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "AAPL" in prompt
+    assert "change" in prompt.lower()
 
 
 def test_interpret_answers_pending_draft_assumption_followup_without_approval() -> None:
@@ -3036,6 +3141,284 @@ def test_pending_date_answer_accepts_sentence_and_preserves_signal_rule(
     assert strategy.entry_rule == entry_rule
     assert strategy.exit_rule == exit_rule
     assert result.decision.missing_required_fields == []
+
+
+def test_pending_date_edit_uses_full_current_message_month_span(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple every week.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            capital_amount=250,
+            cadence="weekly",
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User changed the pending date range.",
+            candidate_strategy_draft=StrategySummary(
+                date_range={"end": "2024-10-31"},
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="march through october 2024",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert len(interpreter.requests) == 1
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2024-03-01", "end": "2024-10-31"}
+    assert strategy.asset_universe == ["AAPL"]
+    assert strategy.capital_amount == 250
+    assert strategy.cadence == "weekly"
+
+
+def test_pending_date_edit_preserves_dca_recurring_contribution_role(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple every week.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            capital_amount=250,
+            cadence="weekly",
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                },
+                "recurring_contribution": 250,
+                "recurring_cadence": "weekly",
+            },
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User changed the pending date range.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                strategy_thesis="Buy Apple every week.",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                date_range={"start": "2024-03-01", "end": "2024-10-31"},
+                capital_amount=250,
+                cadence="weekly",
+                extra_parameters={
+                    "field_provenance": {
+                        "capital_amount": "total_budget",
+                        "cadence": "explicit_user",
+                    },
+                    "total_budget": 250,
+                    "recurring_cadence": "weekly",
+                },
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="march through october 2024",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "date_range",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.date_range == {"start": "2024-03-01", "end": "2024-10-31"}
+    assert strategy.capital_amount == 250
+    assert strategy.extra_parameters["recurring_contribution"] == 250
+    assert "total_budget" not in strategy.extra_parameters
+    assert (
+        strategy.extra_parameters["field_provenance"]["capital_amount"]
+        == "recurring_contribution"
+    )
+    assert result.decision.unsupported_constraints == []
+
+
+def test_current_message_dca_evidence_recovers_missing_strategy_family(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User wants weekly Nvidia recurring buys.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type=None,
+                strategy_thesis=(
+                    "DCA accumulation of Nvidia with $250 weekly investments "
+                    "from January 1, 2024 to December 31, 2024."
+                ),
+                asset_universe=["NVDA"],
+                asset_class="equity",
+                date_range={"start": "2024-01-01", "end": "2024-12-31"},
+                capital_amount=250,
+            ),
+            missing_required_fields=[],
+            semantic_turn_act="new_idea",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "Test buying $250 of Nvidia every week, starting January 1, "
+                "2024 and ending December 31, 2024."
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=None,
+        structured_interpreter=interpreter,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.cadence == "weekly"
+    assert strategy.asset_universe == ["NVDA"]
+    assert strategy.capital_amount == 250
+    assert result.decision.missing_required_fields == []
+    assert result.decision.unsupported_constraints == []
+    assert "current_message_dca_contract_repair" in result.decision.reason_codes
+
+
+def test_pending_dca_assumption_edit_preserves_interpreter_recurring_contribution(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple weekly.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-03-01", "end": "2024-10-31"},
+            capital_amount=250,
+            cadence="weekly",
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                },
+                "recurring_contribution": 250,
+                "recurring_cadence": "weekly",
+            },
+        )
+    )
+    interpreter = RecordingInterpreter(
+        StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User wants to adjust the DCA contribution.",
+            candidate_strategy_draft=StrategySummary(
+                strategy_type="dca_accumulation",
+                strategy_thesis="Buy Apple weekly.",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                date_range={"start": "2024-03-01", "end": "2024-10-31"},
+                capital_amount=200,
+                cadence="weekly",
+                extra_parameters={
+                    "field_provenance": {
+                        "capital_amount": "recurring_contribution",
+                    },
+                    "recurring_contribution": 200,
+                    "recurring_cadence": "weekly",
+                },
+            ),
+            semantic_turn_act="answer_pending_need",
+        )
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message="change contribution to 200 dollars every week",
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={
+            "requested_field": "assumption",
+            "last_stage_outcome": "await_user_reply",
+        },
+        structured_interpreter=interpreter,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.capital_amount == 200
+    assert strategy.cadence == "weekly"
+    assert strategy.extra_parameters["recurring_contribution"] == 200
+    assert (
+        strategy.extra_parameters["field_provenance"]["capital_amount"]
+        == "recurring_contribution"
+    )
+    assert result.decision.unsupported_constraints == []
 
 
 def test_pending_asset_date_answer_preserves_signal_family_when_llm_defaults_buy_hold(

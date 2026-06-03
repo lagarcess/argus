@@ -14,6 +14,10 @@ from argus.domain.engine import (
     validate_backtest_config,
 )
 from argus.domain.engine_launch.cadence import resolve_dca_cadence
+from argus.domain.engine_launch.display import (
+    format_recurring_entry_caveat,
+    format_timeframe_data_caveat,
+)
 from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     LaunchExecutionEnvelope,
@@ -149,7 +153,7 @@ def _run_indicator_threshold(
         benchmark_metrics=benchmark_metrics,
         assumptions=list(result_card.get("assumptions", [])),
         caveats=[
-            f"{config['timeframe']} bars only.",
+            format_timeframe_data_caveat(config["timeframe"], language=language),
             (
                 f"Only the confirmed {indicator_parameters['indicator'].upper()} "
                 "threshold rule was simulated; no extra filters were added."
@@ -234,7 +238,7 @@ def _run_signal_strategy(
         benchmark_metrics=benchmark_metrics,
         assumptions=list(result_card.get("assumptions", [])),
         caveats=[
-            f"{config['timeframe']} bars only.",
+            format_timeframe_data_caveat(config["timeframe"], language=language),
             "Only the confirmed signal rules were simulated; no extra filters were added.",
         ],
         provider_metadata=_provider_metadata(
@@ -277,7 +281,7 @@ def _run_dca_accumulation(
         request=request,
         asset_class=asset_class,
         symbols=symbols,
-        starting_capital=recurring_allocation,
+        recurring_contribution=recurring_allocation,
         cadence=cadence,
     )
     _validate_launch_config(config)
@@ -306,6 +310,8 @@ def _run_dca_accumulation(
             "benchmark_symbol": config["benchmark_symbol"],
             "sizing_mode": request.sizing_mode,
             "capital_amount": recurring_allocation,
+            "recurring_contribution": recurring_allocation,
+            "starting_principal": 0.0,
             "position_size": request.position_size,
             "cadence": cadence,
         },
@@ -316,8 +322,8 @@ def _run_dca_accumulation(
             f"Cadence: {cadence}.",
         ],
         caveats=[
-            f"{config['timeframe']} bars only.",
-            "Recurring entries use the first available bar in each cadence window.",
+            format_timeframe_data_caveat(config["timeframe"], language=language),
+            format_recurring_entry_caveat(config["timeframe"], language=language),
         ],
         provider_metadata=_provider_metadata(
             asset_class=asset_class,
@@ -384,7 +390,7 @@ def _run_buy_and_hold(
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
         assumptions=list(result_card.get("assumptions", [])),
-        caveats=[f"{config['timeframe']} bars only."],
+        caveats=[format_timeframe_data_caveat(config["timeframe"], language=language)],
         provider_metadata=_provider_metadata(
             asset_class=asset_class,
             timeframe=config["timeframe"],
@@ -429,7 +435,7 @@ def _build_periodic_config(
     request: LaunchBacktestRequest,
     asset_class: str,
     symbols: list[str],
-    starting_capital: float,
+    recurring_contribution: float,
     cadence: str,
 ) -> dict[str, Any]:
     benchmark_asset = classify_symbol(request.benchmark_symbol)
@@ -444,10 +450,14 @@ def _build_periodic_config(
         "start_date": request.date_range.start,
         "end_date": request.date_range.end,
         "side": "long",
-        "starting_capital": starting_capital,
+        # The shared engine still reads this field as the periodic contribution
+        # for DCA. Keep product-facing names in parameters/envelopes.
+        "starting_capital": recurring_contribution,
         "allocation_method": "equal_weight",
         "benchmark_symbol": benchmark_asset.symbol,
         "parameters": {"dca_cadence": cadence},
+        "recurring_contribution": recurring_contribution,
+        "starting_principal": 0.0,
     }
 
 

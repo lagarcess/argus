@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argus.api.chat.confirmation import runtime_confirmation_card
+from argus.domain.engine_launch.display import format_timeframe_data_label
 
 
 def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None:
@@ -43,7 +44,38 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
     assert {"label": "Cadence", "value": "Monthly"} in card["rows"]
     assert {"label": "Contribution", "value": "$500"} in card["rows"]
     assert "$500 recurring contribution" in card["assumptions"]
+    assert "Daily data" in card["assumptions"]
+    assert "1D bars" not in card["assumptions"]
     assert "$10,000 starting capital" not in card["assumptions"]
+
+
+def test_runtime_confirmation_card_uses_shared_timeframe_display() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold Apple.",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "capital_amount": 1000.0,
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                },
+                "optional_parameters": {
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "user",
+                        "value": "2h",
+                    },
+                },
+            },
+        }
+    )
+
+    assert card is not None
+    assert format_timeframe_data_label("2h") in card["assumptions"]
+    assert all("bars" not in assumption.lower() for assumption in card["assumptions"])
 
 
 def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> None:

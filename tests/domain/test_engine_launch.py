@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -1170,6 +1171,79 @@ def test_dca_adapter_returns_envelope_card_and_context(
     assert result.explanation_context["strategy_type"] == "dca_accumulation"
 
 
+def test_dca_adapter_separates_recurring_contribution_from_starting_principal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="dca_accumulation",
+        symbol="TSLA",
+        timeframe="1D",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=500.0,
+        position_size=None,
+        cadence="monthly",
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+    observed_config: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        lambda symbol: type(
+            "ResolvedAsset",
+            (),
+            {"canonical_symbol": symbol, "asset_class": "equity", "symbol": symbol},
+        )(),
+    )
+
+    def fake_metrics(config: dict[str, Any]) -> dict[str, Any]:
+        observed_config.update(config)
+        return {
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 8.5,
+                    "benchmark_return_pct": 6.0,
+                }
+            },
+            "by_symbol": {
+                "TSLA": {
+                    "performance": {
+                        "total_return_pct": 8.5,
+                        "benchmark_return_pct": 6.0,
+                    }
+                }
+            },
+        }
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.compute_alpha_metrics",
+        fake_metrics,
+    )
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.build_result_card",
+        lambda config, metrics, language="en": {
+            "title": "TSLA DCA Accumulation",
+            "assumptions": ["Recurring allocation: $500."],
+            "rows": [],
+        },
+    )
+
+    result = run_launch_backtest(request)
+
+    assert result.envelope.execution_status == "succeeded"
+    assert observed_config["starting_capital"] == 500.0
+    assert observed_config["recurring_contribution"] == 500.0
+    assert observed_config["starting_principal"] == 0.0
+    assert observed_config["parameters"] == {"dca_cadence": "monthly"}
+    assert result.envelope.resolved_parameters["capital_amount"] == 500.0
+    assert result.envelope.resolved_parameters["recurring_contribution"] == 500.0
+    assert result.envelope.resolved_parameters["starting_principal"] == 0.0
+
+
 def test_dca_adapter_supports_quarterly_cadence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1229,8 +1303,9 @@ def test_dca_adapter_supports_quarterly_cadence(
 
     assert result.envelope.execution_status == "succeeded"
     assert result.envelope.resolved_parameters["cadence"] == "quarterly"
+    assert result.envelope.caveats[0] == "Daily data only."
     assert result.envelope.caveats[-1].startswith(
-        "Recurring entries use the first available bar"
+        "Recurring entries use the first available daily price"
     )
 
 

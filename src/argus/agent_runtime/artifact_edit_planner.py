@@ -14,6 +14,8 @@ class ArtifactAssumptionEditPlan(BaseModel):
     outcome: Literal["ready_to_confirm", "needs_clarification", "unsupported"]
     user_goal_summary: str | None = None
     initial_capital: float | None = None
+    recurring_contribution_amount: float | None = None
+    cadence: str | None = None
     timeframe: str | None = None
     fee_rate: float | None = None
     slippage: float | None = None
@@ -78,6 +80,11 @@ def _artifact_assumption_edit_messages(
                 "assumption.\n\n"
                 "Supported assumption edits for this planner:\n"
                 "- starting capital / initial capital -> initial_capital as a number\n"
+                "- DCA or recurring-buy per-purchase contribution -> "
+                "recurring_contribution_amount as a number; do not put it in "
+                "initial_capital\n"
+                "- DCA or recurring-buy cadence -> cadence as daily, weekly, "
+                "biweekly, monthly, or quarterly\n"
                 "- timeframe / bars -> timeframe as a compact value such as 1D or 1h\n"
                 "- fees -> fee_rate as a decimal fraction when explicitly supplied\n"
                 "- slippage -> slippage as a decimal fraction when explicitly supplied\n\n"
@@ -106,6 +113,8 @@ def _has_supported_edit(plan: ArtifactAssumptionEditPlan) -> bool:
         value is not None
         for value in (
             plan.initial_capital,
+            plan.recurring_contribution_amount,
+            plan.cadence,
             plan.timeframe,
             plan.fee_rate,
             plan.slippage,

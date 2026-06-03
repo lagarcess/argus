@@ -2852,6 +2852,17 @@ async def _response_ready_for_runtime(
         response=response,
         request=request,
     ):
+        if _pending_dca_assumption_reply_needs_stated_run_field_audit(
+            response=response,
+            request=request,
+        ):
+            audited_response = await _audit_stated_run_field_fidelity(
+                response=response,
+                preferred_model=preferred_model,
+                request=request,
+            )
+            if audited_response is not None:
+                return audited_response
         planned_response = await _plan_artifact_edit_response(
             preferred_model=preferred_model,
             request=request,
@@ -3107,12 +3118,25 @@ def _response_from_artifact_assumption_edit_plan(
 ) -> LLMInterpretationResponse:
     draft = LLMStrategyDraft(raw_user_phrasing=request.current_user_message)
     field_provenance: dict[str, str] = {}
+    extra_parameters: dict[str, Any] = {}
     if plan.initial_capital is not None:
         draft.capital_amount = plan.initial_capital
         field_provenance["capital_amount"] = "starting_capital"
+    if plan.recurring_contribution_amount is not None:
+        recurring_amount = float(plan.recurring_contribution_amount)
+        draft.capital_amount = recurring_amount
+        draft.recurring_contribution = recurring_amount
+        field_provenance["capital_amount"] = "recurring_contribution"
+        field_provenance["recurring_contribution"] = "recurring_contribution"
+        extra_parameters["recurring_contribution"] = recurring_amount
+    if plan.cadence is not None:
+        cadence = _supported_dca_cadence_value(plan.cadence)
+        if cadence is not None:
+            draft.cadence = cadence
+            field_provenance["cadence"] = "explicit_user"
+            extra_parameters["recurring_cadence"] = cadence
     if plan.timeframe is not None:
         draft.timeframe = plan.timeframe
-    extra_parameters: dict[str, Any] = {}
     if plan.fee_rate is not None:
         extra_parameters["fee_rate"] = plan.fee_rate
     if plan.slippage is not None:
@@ -4294,6 +4318,11 @@ def _response_needs_stated_run_field_fidelity_audit(
         return False
     if "stated_run_field_fidelity_audit" in response.reason_codes:
         return False
+    if _pending_dca_assumption_reply_needs_stated_run_field_audit(
+        response=response,
+        request=request,
+    ):
+        return True
     if request is not None and _response_replays_prior_strategy_without_current_turn_update(
         response=response,
         request=request,
@@ -4370,6 +4399,23 @@ def _response_needs_stated_run_field_fidelity_audit(
             ),
         ]
     )
+
+
+def _pending_dca_assumption_reply_needs_stated_run_field_audit(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest | None,
+) -> bool:
+    if request is None or response.semantic_turn_act != "answer_pending_need":
+        return False
+    requested_field = str(
+        request.selected_thread_metadata.get("requested_field") or ""
+    ).split("[", 1)[0]
+    if requested_field != "assumption":
+        return False
+    return canonical_strategy_type(
+        response.candidate_strategy_draft.strategy_type
+    ) == "dca_accumulation"
 
 
 def _focused_repair_benchmark_needs_fidelity_audit(
@@ -5659,6 +5705,11 @@ def _llm_strategy_draft_has_supported_artifact_assumption_edit(
             and field_provenance.get("capital_amount") in _TOTAL_CAPITAL_SOURCES,
             draft.initial_capital is not None
             and field_provenance.get("initial_capital") in _TOTAL_CAPITAL_SOURCES,
+            draft.capital_amount is not None
+            and field_provenance.get("capital_amount") == "recurring_contribution",
+            draft.recurring_contribution is not None
+            and field_provenance.get("recurring_contribution")
+            == "recurring_contribution",
             bool(draft.timeframe),
             "fee_rate" in extra_parameters,
             "slippage" in extra_parameters,

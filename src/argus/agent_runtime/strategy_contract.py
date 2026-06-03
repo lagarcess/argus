@@ -571,6 +571,9 @@ def _explicit_natural_range(
     today: date,
 ) -> DateRangeResolution | None:
     tokens = _tokens(value)
+    shared_year_span = _month_span_with_shared_year(tokens)
+    if shared_year_span is not None:
+        return shared_year_span
     start: date | None = None
     end: date | None = None
     connectors = {"to", "through", "until", "till"}
@@ -605,6 +608,37 @@ def _explicit_natural_range(
         start=start,
         end=end,
     )
+
+
+def _month_span_with_shared_year(tokens: list[str]) -> DateRangeResolution | None:
+    connectors = {"to", "through", "until", "till"}
+    for index, token in enumerate(tokens):
+        start_month = MONTH_ALIASES.get(token)
+        if start_month is None:
+            continue
+        connector_index = index + 1
+        end_month_index = index + 2
+        year_index = index + 3
+        if year_index >= len(tokens):
+            continue
+        if tokens[connector_index] not in connectors:
+            continue
+        end_month = MONTH_ALIASES.get(tokens[end_month_index])
+        if end_month is None:
+            continue
+        year = _int_or_none(tokens[year_index])
+        if year is None:
+            continue
+        if end_month < start_month:
+            continue
+        start = date(year, start_month, 1)
+        end = date(year, end_month, _last_day_of_month(year, end_month))
+        return DateRangeResolution(
+            label=f"{format_display_date(start)} to {format_display_date(end)}",
+            start=start,
+            end=end,
+        )
+    return None
 
 
 def _natural_endpoint_candidate(

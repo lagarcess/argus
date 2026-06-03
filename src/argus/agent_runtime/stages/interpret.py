@@ -46,6 +46,7 @@ from argus.agent_runtime.rule_specs import (
 )
 from argus.agent_runtime.run_field_contract import (
     current_message_date_range,
+    current_message_dca_cadence,
     current_message_execution_context_tokens,
     message_states_bar_timeframe,
 )
@@ -573,6 +574,7 @@ async def _stage_result_from_interpretation(
         selected_thread_metadata=selected_thread_metadata,
         semantic_turn_act=interpretation.semantic_turn_act,
         task_relation=interpretation.task_relation,
+        current_user_message=state.current_user_message,
         reason_codes=interpretation.reason_codes,
     )
     artifact_target, artifact_target_reason_codes = _validated_artifact_target(
@@ -1121,13 +1123,13 @@ def _strategy_with_current_message_run_field_contract(
         current_user_message,
         strategy=strategy,
     )
-    if date_range is None:
-        return strategy, interpretation
-
     updated = strategy.model_copy(deep=True)
     changed = False
+    repaired_field_bases: set[str] = set()
+    repair_reason_codes = ["current_message_run_field_contract_repair"]
     if (
-        not has_partial_explicit_date_range(date_range)
+        date_range is not None
+        and not has_partial_explicit_date_range(date_range)
         and _strategy_date_range_needs_current_message_repair(
             strategy=updated,
             interpretation=interpretation,
@@ -1136,6 +1138,20 @@ def _strategy_with_current_message_run_field_contract(
     ):
         updated.date_range = date_range
         changed = True
+        repaired_field_bases.add("date_range")
+    dca_cadence = current_message_dca_cadence(current_user_message)
+    if _strategy_needs_current_message_dca_contract_repair(
+        strategy=updated,
+        cadence=dca_cadence,
+    ):
+        if executable_strategy_type(updated) != "dca_accumulation":
+            updated.strategy_type = "dca_accumulation"
+            repaired_field_bases.update({"entry_logic", "exit_logic", "strategy_type"})
+        if updated.cadence in (None, "", [], {}):
+            updated.cadence = dca_cadence
+            repaired_field_bases.add("cadence")
+        changed = True
+        repair_reason_codes.append("current_message_dca_contract_repair")
     if (
         _strategy_has_non_executable_timeframe_label(
             updated,
@@ -1151,19 +1167,27 @@ def _strategy_with_current_message_run_field_contract(
     missing_required_fields = [
         field
         for field in interpretation.missing_required_fields
-        if str(field).split("[", 1)[0] != "date_range"
+        if str(field).split("[", 1)[0] not in repaired_field_bases
     ]
     ambiguous_fields = [
         field
         for field in interpretation.ambiguous_fields
-        if field.field_name.split("[", 1)[0] != "date_range"
+        if field.field_name.split("[", 1)[0] not in repaired_field_bases
+    ]
+    unsupported_constraints = [
+        constraint
+        for constraint in interpretation.unsupported_constraints
+        if not (
+            "current_message_dca_contract_repair" in repair_reason_codes
+            and constraint.category == "unsupported_strategy_logic"
+        )
     ]
     requires_clarification = interpretation.requires_clarification
     assistant_response = interpretation.assistant_response
     if (
         not missing_required_fields
         and not ambiguous_fields
-        and not interpretation.unsupported_constraints
+        and not unsupported_constraints
     ):
         requires_clarification = False
         assistant_response = None
@@ -1173,17 +1197,34 @@ def _strategy_with_current_message_run_field_contract(
             "assistant_response": assistant_response,
             "missing_required_fields": missing_required_fields,
             "ambiguous_fields": ambiguous_fields,
+            "unsupported_constraints": unsupported_constraints,
             "reason_codes": list(
                 dict.fromkeys(
                     [
                         *interpretation.reason_codes,
-                        "current_message_run_field_contract_repair",
+                        *repair_reason_codes,
                     ]
                 )
             ),
         }
     )
     return updated, repaired
+
+
+def _strategy_needs_current_message_dca_contract_repair(
+    *,
+    strategy: StrategySummary,
+    cadence: str | None,
+) -> bool:
+    if cadence is None:
+        return False
+    strategy_family = _declared_strategy_family(strategy)
+    if strategy_family not in {None, "dca_accumulation"}:
+        return False
+    return bool(
+        strategy.asset_universe
+        and strategy.capital_amount is not None
+    )
 
 
 def _explicit_date_range_from_current_message_for_repair(
@@ -3206,6 +3247,7 @@ def _strategy_with_contextual_merge(
     selected_thread_metadata: dict[str, Any],
     semantic_turn_act: str | None,
     task_relation: str,
+    current_user_message: str | None = None,
     reason_codes: list[str] | None = None,
 ) -> StrategySummary:
     if snapshot is None:
@@ -3254,6 +3296,10 @@ def _strategy_with_contextual_merge(
         semantic_turn_act=semantic_turn_act,
         task_relation=task_relation,
     )
+    preserve_prior_money_context = _should_preserve_prior_money_context(
+        selected_thread_metadata=selected_thread_metadata,
+        semantic_turn_act=semantic_turn_act,
+    )
     if preserve_prior_family:
         strategy_family_changed = False
         incoming_strategy_family = prior_strategy_family
@@ -3279,12 +3325,25 @@ def _strategy_with_contextual_merge(
             "resolution_provenance",
         }:
             continue
+        if preserve_prior_money_context and key in {
+            "capital_amount",
+            "initial_capital",
+            "total_capital",
+            "position_size",
+        }:
+            continue
         if value in (None, "", [], {}):
             continue
         if key == "date_range" and isinstance(value, dict):
-            value = _merged_contextual_date_range(
-                base=merged.date_range,
-                incoming=value,
+            value = (
+                _current_message_date_range_for_contextual_edit(
+                    current_user_message=current_user_message,
+                    selected_thread_metadata=selected_thread_metadata,
+                )
+                or _merged_contextual_date_range(
+                    base=merged.date_range,
+                    incoming=value,
+                )
             )
         if key == "extra_parameters":
             if preserve_prior_family and isinstance(value, dict):
@@ -3293,6 +3352,8 @@ def _strategy_with_contextual_merge(
                     for nested_key, nested_value in value.items()
                     if nested_key not in {"raw_strategy_type", "template"}
                 }
+            if preserve_prior_money_context and isinstance(value, dict):
+                value = _extra_parameters_without_unrequested_money_context(value)
             merged.extra_parameters = _merge_contextual_extra_parameters(
                 base=merged.extra_parameters,
                 incoming=value if isinstance(value, dict) else {},
@@ -3307,6 +3368,68 @@ def _strategy_with_contextual_merge(
     if declared_family in SUPPORTED_STRATEGY_TYPES:
         _clear_incompatible_strategy_rule_state(merged, declared_family)
     return merged
+
+
+def _should_preserve_prior_money_context(
+    *,
+    selected_thread_metadata: dict[str, Any],
+    semantic_turn_act: str | None,
+) -> bool:
+    if semantic_turn_act != "answer_pending_need":
+        return False
+    if selected_thread_metadata.get("last_stage_outcome") != "await_user_reply":
+        return False
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    return requested_field in {"asset_universe", "date_range", "timeframe"}
+
+
+def _extra_parameters_without_unrequested_money_context(
+    extra_parameters: dict[str, Any],
+) -> dict[str, Any]:
+    money_context_keys = {
+        "initial_capital",
+        "starting_capital",
+        "starting_principal",
+        "initial_lump_sum",
+        "initial_lump",
+        "lump_sum",
+        "total_capital",
+        "total_budget",
+        "max_budget",
+        "investment_budget",
+        "cap",
+        "contribution_cap",
+        "capital_cap",
+        "investment_cap",
+        "recurring_contribution",
+        "contribution_amount",
+        "periodic_contribution",
+        "dca_contribution",
+    }
+    money_provenance_keys = {
+        "capital_amount",
+        "initial_capital",
+        "total_capital",
+        "position_size",
+        "recurring_contribution",
+    }
+    cleaned: dict[str, Any] = {}
+    for key, value in extra_parameters.items():
+        if key in money_context_keys:
+            continue
+        if key == "field_provenance" and isinstance(value, dict):
+            provenance = {
+                provenance_key: provenance_value
+                for provenance_key, provenance_value in value.items()
+                if provenance_key not in money_provenance_keys
+            }
+            if provenance:
+                cleaned[key] = provenance
+            continue
+        cleaned[key] = value
+    return cleaned
 
 
 def _should_apply_current_message_asset_grounding(
@@ -3326,6 +3449,30 @@ def _should_apply_current_message_asset_grounding(
         return True
     prior = _active_strategy_from_snapshot(snapshot)
     return not bool(prior and prior.asset_universe)
+
+
+def _current_message_date_range_for_contextual_edit(
+    *,
+    current_user_message: str | None,
+    selected_thread_metadata: dict[str, Any],
+) -> dict[str, str] | None:
+    if _field_base(str(selected_thread_metadata.get("requested_field") or "")) != (
+        "date_range"
+    ):
+        return None
+    message = str(current_user_message or "").strip()
+    if not message:
+        return None
+    try:
+        resolved = resolve_date_range(message)
+    except Exception:
+        return None
+    if resolved.used_default:
+        return None
+    payload = resolved.payload
+    if set(payload) != {"start", "end"}:
+        return None
+    return payload
 
 
 def _merged_contextual_date_range(
@@ -3470,6 +3617,18 @@ def _merge_contextual_extra_parameters(
             continue
         if (
             key == "indicator_parameters"
+            and isinstance(value, dict)
+            and isinstance(merged.get(key), dict)
+        ):
+            nested = dict(merged[key])
+            for nested_key, nested_value in value.items():
+                if nested_value in (None, "", [], {}):
+                    continue
+                nested[nested_key] = nested_value
+            merged[key] = nested
+            continue
+        if (
+            key == "field_provenance"
             and isinstance(value, dict)
             and isinstance(merged.get(key), dict)
         ):

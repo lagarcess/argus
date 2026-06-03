@@ -55,12 +55,9 @@ from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.agent_runtime.strategy_requirements import missing_required_fields_for_strategy
 
 CONFIRMATION_EDIT_ACTION_FIELDS = {
-    "change_asset": ("asset_universe", "What asset should I use instead?"),
-    "change_dates": ("date_range", "What date range should I use instead?"),
-    "adjust_assumptions": (
-        "assumption",
-        "Which assumption do you want to adjust: starting capital, timeframe, fees, or slippage?",
-    ),
+    "change_asset": "asset_universe",
+    "change_dates": "date_range",
+    "adjust_assumptions": "assumption",
 }
 
 TEXT_APPROVAL_REQUIRES_CARD_ACTION_RESPONSE = (
@@ -152,12 +149,12 @@ def structured_action_stage_result_if_applicable(
         )
 
     if action_type in CONFIRMATION_EDIT_ACTION_FIELDS:
-        requested_field, prompt = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
+        requested_field = CONFIRMATION_EDIT_ACTION_FIELDS[action_type]
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
                 "candidate_strategy_draft": pending.model_dump(mode="python"),
-                "assistant_prompt": prompt,
+                "assistant_prompt": None,
                 "requested_field": requested_field,
                 "missing_required_fields": [requested_field],
                 "response_intent": {
@@ -254,12 +251,12 @@ def result_action_stage_result_if_applicable(
         outcome="await_user_reply",
         stage_patch={
             "candidate_strategy_draft": strategy.model_dump(mode="python"),
-            "assistant_prompt": "What would you like to change about this strategy?",
+            "assistant_prompt": None,
             "requested_field": "refinement",
             "missing_required_fields": ["refinement"],
             "response_intent": {
                 "kind": "clarification",
-                "semantic_needs": [],
+                "semantic_needs": ["refinement"],
                 "requested_fields": ["refinement"],
                 "facts": {
                     "strategy": strategy.model_dump(mode="python"),

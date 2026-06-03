@@ -277,7 +277,10 @@ async def _execute_node_async(
 async def _explain_node_async(state: WorkflowState) -> WorkflowState:
     return _apply_stage_result(
         state,
-        await explain_stage_async(state=_run_state(state)),
+        await explain_stage_async(
+            state=_run_state(state),
+            language=_user(state).language_preference,
+        ),
     )
 
 

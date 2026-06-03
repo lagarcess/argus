@@ -152,12 +152,14 @@ def runtime_confirmation_card(
     *,
     confirmation_id: str | None = None,
     conversation_id: str | None = None,
+    language: str = "en",
 ) -> dict[str, Any] | None:
     return _confirmation.runtime_confirmation_card(
         runtime_result,
         confirmation_id=confirmation_id,
         conversation_id=conversation_id,
         format_confirmation_period_func=_format_confirmation_period,
+        language=language,
     )
 
 
@@ -165,10 +167,12 @@ def _confirmation_assumptions(
     *,
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
+    language: str = "en",
 ) -> list[str]:
     return _confirmation._confirmation_assumptions(
         strategy=strategy,
         optional_parameters=optional_parameters,
+        language=language,
     )
 
 

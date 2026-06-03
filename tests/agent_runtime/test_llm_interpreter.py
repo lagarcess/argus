@@ -219,6 +219,168 @@ async def test_ready_run_with_missing_stated_benchmark_uses_fidelity_audit(
     assert result.candidate_strategy_draft.comparison_baseline == "QQQ"
 
 
+@pytest.mark.asyncio
+async def test_stated_run_field_fidelity_audit_repairs_pending_dca_contribution_role(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, model_name
+        calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return schema_model(
+                recurring_contribution_amount=200,
+                cadence="weekly",
+                confidence=0.95,
+            )
+        raise AssertionError(f"unexpected schema: {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User wants to adjust the DCA contribution.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple weekly.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-03-01", "end": "2024-10-31"},
+            capital_amount=250,
+            cadence="weekly",
+            field_provenance={
+                "capital_amount": "starting_capital",
+                "cadence": "explicit_user",
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="change contribution to 200 dollars every week",
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        selected_thread_metadata={
+            "requested_field": "assumption",
+            "last_stage_outcome": "await_user_reply",
+        },
+        user=UserState(user_id="u1"),
+    )
+
+    repaired = await interpreter_module._audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert "StatedRunFieldFidelityAudit" in calls
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.capital_amount == 200
+    assert draft.cadence == "weekly"
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_stated_run_field_fidelity_audit_checks_dca_assumption_replies_with_prior_contribution(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[str] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, model_name
+        calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return schema_model(
+                recurring_contribution_amount=200,
+                cadence="weekly",
+                confidence=0.95,
+            )
+        raise AssertionError(f"unexpected schema: {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User wants to adjust the DCA contribution.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy Apple weekly.",
+            asset_universe=["AAPL"],
+            asset_class="equity",
+            date_range={"start": "2024-03-01", "end": "2024-10-31"},
+            capital_amount=250,
+            cadence="weekly",
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
+        ),
+        semantic_turn_act="answer_pending_need",
+        artifact_target="active_confirmation",
+    )
+    request = InterpretationRequest(
+        current_user_message="make the contribution 200 dollars every week",
+        recent_thread_history=[],
+        latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=StrategySummary(
+                strategy_type="dca_accumulation",
+                strategy_thesis="Buy Apple weekly.",
+                asset_universe=["AAPL"],
+                asset_class="equity",
+                date_range={"start": "2024-03-01", "end": "2024-10-31"},
+                capital_amount=250,
+                cadence="weekly",
+                extra_parameters={
+                    "field_provenance": {
+                        "capital_amount": "recurring_contribution",
+                        "cadence": "explicit_user",
+                    }
+                },
+            )
+        ),
+        selected_thread_metadata={
+            "requested_field": "assumption",
+            "last_stage_outcome": "await_user_reply",
+        },
+        user=UserState(user_id="u1"),
+    )
+
+    repaired = await interpreter_module._audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert "StatedRunFieldFidelityAudit" in calls
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.capital_amount == 200
+    assert draft.cadence == "weekly"
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
+
 def test_dca_executable_shape_uses_canonical_dca_contract() -> None:
     assert _llm_strategy_draft_has_executable_shape(
         LLMStrategyDraft(strategy_type="dca_accumulation", cadence="weekly")
@@ -598,6 +760,99 @@ async def test_llm_interpreter_plans_underfilled_active_artifact_assumption_edit
         "capital_amount": "starting_capital"
     }
     assert "artifact_assumption_edit_planned" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_artifact_assumption_edit_planner_supports_dca_recurring_contribution(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import artifact_edit_planner
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["test-model"],
+    )
+
+    async def invoke_stub(*, schema_model, **kwargs):
+        del kwargs
+        return schema_model(
+            outcome="ready_to_confirm",
+            user_goal_summary="User changed the visible recurring contribution.",
+            recurring_contribution_amount=200,
+            cadence="weekly",
+            confidence=0.91,
+        )
+
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "invoke_openrouter_json_schema",
+        invoke_stub,
+    )
+
+    plan = await artifact_edit_planner.plan_artifact_assumption_edit(
+        current_user_message="make the contribution 200 dollars every week",
+        prior_strategy={
+            "strategy_type": "dca_accumulation",
+            "asset_universe": ["AAPL"],
+            "date_range": {"start": "2024-03-01", "end": "2024-10-31"},
+            "capital_amount": 250,
+            "cadence": "weekly",
+        },
+        active_confirmation=None,
+        preferred_model="test-model",
+    )
+
+    assert plan is not None
+    assert plan.recurring_contribution_amount == 200
+    assert plan.cadence == "weekly"
+
+
+def test_artifact_assumption_edit_plan_maps_dca_recurring_contribution() -> None:
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    plan = artifact_edit_planner.ArtifactAssumptionEditPlan(
+        outcome="ready_to_confirm",
+        user_goal_summary="User changed the visible recurring contribution.",
+        recurring_contribution_amount=200,
+        cadence="weekly",
+        confidence=0.91,
+    )
+
+    response = interpreter_module._response_from_artifact_assumption_edit_plan(
+        plan=plan,
+        request=InterpretationRequest(
+            current_user_message="make the contribution 200 dollars every week",
+            recent_thread_history=[],
+            latest_task_snapshot=TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="dca_accumulation",
+                    strategy_thesis="Buy Apple weekly.",
+                    asset_universe=["AAPL"],
+                    asset_class="equity",
+                    date_range={"start": "2024-03-01", "end": "2024-10-31"},
+                    capital_amount=250,
+                    cadence="weekly",
+                )
+            ),
+            selected_thread_metadata={
+                "requested_field": "assumption",
+                "last_stage_outcome": "await_user_reply",
+            },
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    draft = response.candidate_strategy_draft
+    assert draft.capital_amount == 200
+    assert draft.recurring_contribution == 200
+    assert draft.cadence == "weekly"
+    assert draft.field_provenance["capital_amount"] == "recurring_contribution"
+    assert draft.field_provenance["recurring_contribution"] == "recurring_contribution"
+    assert draft.field_provenance["cadence"] == "explicit_user"
+    assert draft.extra_parameters["recurring_contribution"] == 200
+    assert draft.extra_parameters["recurring_cadence"] == "weekly"
 
 
 def test_signal_rule_plan_promotes_macd_crossover_to_ready_rule_spec() -> None:

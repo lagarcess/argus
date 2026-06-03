@@ -2974,7 +2974,7 @@ def test_run_backtest_action_from_missing_field_state_returns_confirmation() -> 
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
 
 
-def test_change_asset_action_prompts_for_replacement_without_llm() -> None:
+def test_change_asset_action_publishes_clarification_intent_without_llm() -> None:
     pending = StrategySummary(
         strategy_type="buy_and_hold",
         strategy_thesis="Buy and hold Apple.",
@@ -3001,7 +3001,10 @@ def test_change_asset_action_prompts_for_replacement_without_llm() -> None:
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "asset_universe"
     assert result.patch["missing_required_fields"] == ["asset_universe"]
-    assert "asset" in result.patch["assistant_prompt"].lower()
+    assert result.patch["assistant_prompt"] is None
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["semantic_needs"] == ["asset_target"]
+    assert result.patch["response_intent"]["requested_fields"] == ["asset_universe"]
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
 
 
@@ -3032,7 +3035,7 @@ def test_model_unavailable_recovery_mentions_active_pending_setup() -> None:
     assert "interpreter" not in result.patch["assistant_response"].lower()
 
 
-def test_refine_strategy_result_action_prompts_for_change_without_llm() -> None:
+def test_refine_strategy_result_action_publishes_clarification_intent_without_llm() -> None:
     confirmed = StrategySummary(
         strategy_type="buy_and_hold",
         strategy_thesis="Buy and hold Microsoft.",
@@ -3080,7 +3083,10 @@ def test_refine_strategy_result_action_prompts_for_change_without_llm() -> None:
     assert interpreter.requests == []
     assert result.outcome == "await_user_reply"
     assert result.patch["requested_field"] == "refinement"
-    assert "change" in result.patch["assistant_prompt"].lower()
+    assert result.patch["assistant_prompt"] is None
+    assert result.patch["response_intent"]["kind"] == "clarification"
+    assert result.patch["response_intent"]["semantic_needs"] == ["refinement"]
+    assert result.patch["response_intent"]["requested_fields"] == ["refinement"]
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
     assert result.patch["response_intent"]["facts"]["latest_run_id"] == "run-1"
 

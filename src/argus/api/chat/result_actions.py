@@ -7,10 +7,11 @@ from argus.agent_runtime.stages.artifact_context import (
     latest_run_id_for_action,
     strategy_from_result_reference,
 )
+from argus.agent_runtime.stages.compose import compose_response_intent
+from argus.agent_runtime.state.models import ResponseIntent, RunState
 from argus.api.chat.artifacts import result_reference_from_run
 from argus.api.schemas import BacktestRun, ChatActionPayload
 
-REFINE_STRATEGY_PROMPT = "What would you like to change about this strategy?"
 MISSING_REFINEMENT_RESULT_MESSAGE = (
     "I could not find the completed backtest to refine. Use Refine strategy from "
     "the latest result card, or run the strategy again."
@@ -46,25 +47,35 @@ def refine_strategy_action_turn(
         action_payload=action.payload,
         reference=reference,
     )
+    response_intent = _refinement_response_intent(
+        action=action,
+        latest_run_id=latest_run_id,
+        pending_strategy=pending_strategy,
+        reference=reference,
+    )
+    assistant_text = _compose_refinement_prompt(response_intent)
+    pending_strategy["response_intent"] = response_intent
     metadata = {
         "conversation_mode": "setup",
         "agent_runtime_stage_outcome": "await_user_reply",
         "chat_action": action.model_dump(mode="python"),
         "pending_strategy": pending_strategy,
+        "response_intent": response_intent,
         "source_result_run_id": run.id,
         "source_result_strategy_id": run.strategy_id,
         "source_result_conversation_id": run.conversation_id,
     }
     final_payload = {
         "stage_outcome": "await_user_reply",
-        "assistant_response": REFINE_STRATEGY_PROMPT,
+        "assistant_response": assistant_text,
         "pending_strategy": pending_strategy,
+        "response_intent": response_intent,
         "latest_run_id": latest_run_id,
         "source_result_run_id": run.id,
     }
     return ResultActionTurn(
         stage="interpret",
-        assistant_text=REFINE_STRATEGY_PROMPT,
+        assistant_text=assistant_text,
         metadata=metadata,
         final_payload=final_payload,
     )
@@ -89,3 +100,33 @@ def missing_refine_strategy_action_turn(
         metadata=metadata,
         final_payload=final_payload,
     )
+
+
+def _refinement_response_intent(
+    *,
+    action: ChatActionPayload,
+    latest_run_id: str | None,
+    pending_strategy: dict[str, Any],
+    reference: Any,
+) -> dict[str, Any]:
+    return {
+        "kind": "clarification",
+        "semantic_needs": ["refinement"],
+        "requested_fields": ["refinement"],
+        "facts": {
+            "strategy": pending_strategy["strategy"],
+            "structured_action": action.model_dump(mode="python"),
+            "latest_run_id": latest_run_id,
+            "latest_result_reference": reference.model_dump(mode="python"),
+        },
+        "options": [],
+    }
+
+
+def _compose_refinement_prompt(response_intent: dict[str, Any]) -> str:
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent.model_validate(response_intent)
+    prompt = compose_response_intent(state)
+    if prompt is None:
+        raise RuntimeError("Refinement response intent did not compose.")
+    return prompt
