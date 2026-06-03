@@ -1,0 +1,221 @@
+from __future__ import annotations
+
+from argus.agent_runtime.artifacts.drafts import (
+    draft_from_confirmation_payload,
+    draft_from_failed_launch_payload,
+    draft_from_result_metadata,
+)
+from argus.agent_runtime.artifacts.patches import (
+    ArtifactPatch,
+    apply_artifact_patch,
+)
+from argus.agent_runtime.state.models import StrategySummary
+
+
+def test_result_draft_preserves_dca_money_cadence_timeframe_and_benchmark() -> None:
+    draft = draft_from_result_metadata(
+        {
+            "asset_class": "equity",
+            "symbols": ["AAPL", "GOOG"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "dca_accumulation",
+                "symbols": ["AAPL", "GOOG"],
+                "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                "resolved_strategy": {
+                    "strategy_type": "dca_accumulation",
+                    "strategy_thesis": "Buy AAPL and GOOG every month.",
+                    "asset_universe": ["AAPL", "GOOG"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                    "capital_amount": 200,
+                    "cadence": "monthly",
+                    "comparison_baseline": "SPY",
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "capital_amount": 200,
+                    "recurring_contribution": 200,
+                    "cadence": "monthly",
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        }
+    )
+
+    assert draft.strategy_type == "dca_accumulation"
+    assert draft.asset_universe == ["AAPL", "GOOG"]
+    assert draft.asset_class == "equity"
+    assert draft.date_range == {"start": "2021-01-01", "end": "2024-01-31"}
+    assert draft.capital_amount == 200
+    assert draft.cadence == "monthly"
+    assert draft.timeframe == "1D"
+    assert draft.comparison_baseline == "SPY"
+
+
+def test_result_draft_preserves_buy_hold_defaults_from_config_snapshot() -> None:
+    draft = draft_from_result_metadata(
+        {
+            "asset_class": "crypto",
+            "symbols": ["btc"],
+            "benchmark_symbol": "BTC",
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "symbols": ["btc"],
+                "date_range": {"start": "2023-01-01", "end": "2023-12-31"},
+                "resolved_strategy": {},
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "capital_amount": 500,
+                    "benchmark_symbol": "BTC",
+                },
+            },
+        }
+    )
+
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["BTC"]
+    assert draft.asset_class == "crypto"
+    assert draft.date_range == {"start": "2023-01-01", "end": "2023-12-31"}
+    assert draft.capital_amount == 500
+    assert draft.timeframe == "1D"
+    assert draft.comparison_baseline == "BTC"
+
+
+def test_confirmation_draft_prefers_visible_strategy_and_fills_launch_defaults() -> None:
+    draft = draft_from_confirmation_payload(
+        {
+            "strategy": {
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold NVDA.",
+                "asset_universe": ["NVDA"],
+                "asset_class": "equity",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "comparison_baseline": "QQQ",
+            },
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "NVDA",
+                "symbols": ["NVDA"],
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "sizing_mode": "capital_amount",
+                "capital_amount": 500,
+                "benchmark_symbol": "QQQ",
+            },
+            "validation": {"executable": True},
+        }
+    )
+
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["NVDA"]
+    assert draft.asset_class == "equity"
+    assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert draft.capital_amount == 500
+    assert draft.timeframe == "1D"
+    assert draft.comparison_baseline == "QQQ"
+
+
+def test_failed_action_draft_preserves_launch_payload_fields() -> None:
+    draft = draft_from_failed_launch_payload(
+        {
+            "strategy_type": "buy_and_hold",
+            "symbols": ["msft"],
+            "asset_class": "equity",
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            "timeframe": "1D",
+            "capital_amount": 750,
+            "benchmark_symbol": "SPY",
+        }
+    )
+
+    assert draft.strategy_type == "buy_and_hold"
+    assert draft.asset_universe == ["MSFT"]
+    assert draft.asset_class == "equity"
+    assert draft.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert draft.timeframe == "1D"
+    assert draft.capital_amount == 750
+    assert draft.comparison_baseline == "SPY"
+
+
+def test_date_patch_preserves_canonical_dca_fields() -> None:
+    base = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy AAPL and GOOG monthly.",
+        asset_universe=["AAPL", "GOOG"],
+        asset_class="equity",
+        date_range={"start": "2021-01-01", "end": "2024-01-31"},
+        capital_amount=200,
+        cadence="monthly",
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+
+    merged = apply_artifact_patch(
+        base,
+        ArtifactPatch(
+            source="user_patch",
+            date_range={"start": "2019-10-01", "end": "2025-10-31"},
+        ),
+    )
+
+    assert merged.date_range == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert merged.asset_universe == ["AAPL", "GOOG"]
+    assert merged.asset_class == "equity"
+    assert merged.capital_amount == 200
+    assert merged.cadence == "monthly"
+    assert merged.timeframe == "1D"
+    assert merged.comparison_baseline == "SPY"
+
+
+def test_asset_patch_preserves_period_money_timeframe_and_benchmark() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=500,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+
+    merged = apply_artifact_patch(
+        base,
+        ArtifactPatch(
+            source="user_patch",
+            asset_universe=["nvda"],
+            asset_class="equity",
+        ),
+    )
+
+    assert merged.asset_universe == ["NVDA"]
+    assert merged.asset_class == "equity"
+    assert merged.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
+    assert merged.capital_amount == 500
+    assert merged.timeframe == "1D"
+    assert merged.comparison_baseline == "SPY"
+
+
+def test_patch_clears_fields_only_when_explicitly_requested() -> None:
+    base = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold AAPL.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        capital_amount=500,
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+
+    omitted = apply_artifact_patch(base, ArtifactPatch(source="user_patch"))
+    cleared = apply_artifact_patch(
+        base,
+        ArtifactPatch(source="user_patch", clear_fields=["comparison_baseline"]),
+    )
+
+    assert omitted.comparison_baseline == "SPY"
+    assert cleared.comparison_baseline is None
+    assert cleared.asset_universe == ["AAPL"]
+    assert cleared.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
