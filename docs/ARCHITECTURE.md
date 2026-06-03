@@ -433,6 +433,43 @@ No regex gate intercepts a user message before the LLM sees it. No hardcoded nat
 
 Derived state (missing fields, pending needs, field provenance) is computed fresh each turn from `pending_strategy_summary`. It is never persisted.
 
+### Conversation Artifact Continuity
+
+Conversation text is input, not state truth. Once a confirmation card, result
+card, saved strategy, or failed-action artifact exists, every subsequent turn
+must first resolve the active artifact anchor before interpreting the user
+message as a new task.
+
+Artifact anchors are resolved in this order:
+
+1. The structured action payload attached to the user turn.
+2. The latest active confirmation card in the same conversation.
+3. The latest completed backtest result referenced by the turn or conversation.
+4. The latest retryable failed-action artifact, if the user is retrying that
+   failure.
+5. No artifact anchor, which means the turn starts a new idea.
+
+After an anchor is resolved, the runtime builds the working draft from the
+artifact's canonical configuration (`confirmation_payload`, completed
+`backtest_run.config_snapshot`, saved strategy state, or failed-action launch
+payload). The LLM may interpret the user's messy text as a patch over that
+draft, but omitted artifact fields must carry forward. A date-only edit cannot
+erase assets, contribution amount, cadence, timeframe, benchmark, or strategy
+type that were already canonical in the anchored artifact.
+
+The deterministic guardrail layer applies the patch and validates the resulting
+draft. If the patched draft is executable, Argus emits a new confirmation card.
+If required information is genuinely missing, Argus asks a targeted
+clarification. Generic guidance such as "try next" must never replace an
+artifact-patch response when the user is attempting to modify or rerun a known
+setup.
+
+Failure and retry artifacts follow the same rule. A retry button represents one
+specific failed action and payload. Later turns that create a new active draft,
+new confirmation, completed result, or explicit cancellation must supersede or
+expire stale retry affordances so the user never has to guess what "Retry" will
+do after reload.
+
 # 12. Strategy Architecture (Alpha)
 
 ## Controlled Template System

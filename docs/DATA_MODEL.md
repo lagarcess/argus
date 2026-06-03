@@ -206,6 +206,22 @@ Represents individual messages within a conversation.
 ### Notes
 - Messages are immutable in Alpha.
 - `metadata` stores token usage, model identifiers, latency, and tool execution traces.
+- Message metadata may contain reloadable chat artifacts such as
+  `pending_strategy`, `confirmation_card`, `confirmation_payload`,
+  `result_card`, result identifiers, `chat_action`, `failed_action`, and
+  `retry_last_turn`. These fields hydrate the transcript and action affordances;
+  they do not make free-form transcript text the source of truth for strategy
+  state.
+- When a turn follows an artifact-backed setup, the runtime must reconstruct the
+  working draft from canonical artifact state before applying the new user
+  message as a patch. Canonical artifact state comes from, in order of
+  specificity, the structured action payload, active confirmation payload,
+  completed `backtest_runs.config_snapshot`, saved strategy state, or failed
+  action launch payload.
+- Persisted recovery or retry metadata is scoped to the failed turn/action it
+  references. Later turns that create a new draft, active confirmation,
+  completed result, or explicit cancellation should supersede stale retry
+  affordances during hydration.
 ---
 
 # 9. strategies
@@ -313,6 +329,12 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - `chart` stores the aggregate portfolio equity curve and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
 - `trades` may mirror chart event markers for lightweight UI hydration. Detailed execution ledgers can preserve signals, order intents, fills, ignored signals, and position snapshots, but list endpoints must expose only lightweight result metadata.
 - Saved strategies must be created from completed run state or an equivalent canonical result snapshot, not reconstructed from frontend display text.
+- Follow-up refinements from a result card must be seeded from
+  `config_snapshot` or equivalent canonical run metadata. A user's partial
+  change request may update the relevant field, but omitted run fields such as
+  symbols, contribution amount, cadence, timeframe, benchmark, and strategy
+  template must carry forward unless explicitly changed or invalidated by
+  deterministic guardrails.
 ---
 
 # 13. Backtest Metrics Shape

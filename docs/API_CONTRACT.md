@@ -1037,6 +1037,49 @@ Soft delete conversation.
   hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose.
 
+### Conversation Artifact Continuity Contract
+
+Chat turns that occur after a visible artifact must be interpreted against that
+artifact before they are treated as a standalone idea. This applies to button
+actions and to ordinary user text.
+
+**Artifact anchor resolution order:**
+1. `action.payload` artifact identifiers (`confirmation_id`, `run_id`,
+   `strategy_id`, `failed_action_id`, or `conversation_id`).
+2. Latest active confirmation metadata for the conversation.
+3. Latest completed result/run metadata for the conversation.
+4. Latest retryable failed-action metadata only when the user is retrying that
+   failed action.
+5. No anchor, which starts a new idea.
+
+**Patch semantics:**
+- The backend must build the next working draft from the anchor's canonical
+  payload: `confirmation_payload`, `backtest_runs.config_snapshot`,
+  saved-strategy state, or failed-action launch payload.
+- The user's message supplies a patch over that draft. Explicit new values win;
+  omitted values carry forward.
+- A partial edit such as "change the date range", "use NVDA instead", "make it
+  weekly", or "use $500" must not erase other canonical fields from the anchor.
+- Date, asset, cadence, money-role, timeframe, benchmark, and strategy-type
+  fields must preserve their prior canonical values unless the user explicitly
+  changes them or deterministic validation requires clarification.
+- If the patched draft is executable, the stream must return a new confirmation
+  payload. If it is not executable, the stream must return a targeted
+  clarification tied to the missing or invalid field.
+- Generic guidance responses such as "try next" are valid only for open-ended
+  result questions. They must not replace a patch response when the user is
+  modifying, rerunning, or retrying a known setup.
+
+**Retry semantics:**
+- `retry_last_turn` replays a specific failed user message and may include
+  `failed_assistant_id`.
+- `retry_failed_action` retries a specific failed action artifact and launch
+  payload.
+- A later user turn, new confirmation, completed result, or cancellation
+  supersedes stale retry affordances. Hydrated clients must hide or disable
+  stale retry actions when their referenced artifact is no longer the active
+  failed-action anchor.
+
 **Request:**
 ```json
 {
