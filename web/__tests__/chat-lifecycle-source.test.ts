@@ -37,6 +37,28 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(palette).toContain("onConversationRemoved?.(pendingDeleteItem.conversationId)");
   });
 
+  test("stale or deleted active chats reset to a lazy empty chat instead of creating a new stored conversation", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const initStart = chat.indexOf("// ── Init conversation");
+    const initEnd = chat.indexOf("const updateScrollPositionState", initStart);
+    const initBlock = chat.slice(initStart, initEnd);
+    const removedStart = chat.indexOf("const handleConversationRemoved");
+    const removedEnd = chat.indexOf("const handleTriggerPrompt", removedStart);
+    const removedBlock = chat.slice(removedStart, removedEnd);
+
+    expect(chat).toContain("resetToEmptyChatSurface");
+    expect(initBlock).not.toContain("await createConversation(resolvedLanguage)");
+    expect(initBlock).not.toContain("readActiveConversationIdFromUrl() ?? readActiveConversationId()");
+    expect(initBlock).toContain("resetToEmptyChatSurface");
+    expect(initBlock).toContain("hydrated.messages.length === 0");
+    expect(initBlock).toContain("clear empty persisted conversations from the active route");
+    expect(chat).toContain('import { useRouter } from "next/navigation";');
+    expect(chat).toContain("const router = useRouter();");
+    expect(chat).toContain("router.replace(clearedRoute, { scroll: false });");
+    expect(removedBlock).toContain("resetToEmptyChatSurface");
+    expect(removedBlock).not.toContain("startNewChat()");
+  });
+
   test("header delete requires a selected chat and confirmation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 

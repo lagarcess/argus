@@ -114,6 +114,7 @@
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
     "input_placeholder": "Describe an investing idea...",
+    "followup_placeholder": "Ask a follow-up...",
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [
@@ -134,16 +135,16 @@
     "hide_suggestions": "Hide suggestions",
     "starter_actions": {
       "tsla": {
-        "label": "Compare Apple to SPY",
-        "value": "How did Apple perform against SPY in 2024?"
+        "label": "Test Apple vs SPY",
+        "value": "Test Apple against SPY from January 1, 2024 through December 31, 2024 and show me the result."
       },
       "btc": {
-        "label": "Hold Bitcoin in 2024",
-        "value": "What if I bought Bitcoin at the start of 2024 and held through the end of 2024?"
+        "label": "Test Bitcoin (BTC) hold",
+        "value": "Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024."
       },
       "dca": {
-        "label": "Buy Nvidia weekly",
-        "value": "What if I bought $250 of Nvidia every week in 2024?"
+        "label": "Test weekly Nvidia buys",
+        "value": "Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024."
       }
     },
     "example_queries": {
@@ -155,6 +156,7 @@
     "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
     "error_load": "Could not load that conversation. Try again.",
     "error_backtest": "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
+    "error_generic": "Something went wrong. Try again.",
     "result_trust_strip": "Historical simulation · No fees/slippage · Not advice",
     "result_trust_strip_label": "Result trust context",
     "view_details": "View details",
@@ -171,6 +173,10 @@
     },
     "no_recent_activity": "No recent activity yet. Your strategies and chats will appear here.",
     "new_chat": "New chat",
+    "copy_conversation_link": "Copy conversation link",
+    "rename_chat": "Rename chat",
+    "pin_chat": "Pin chat",
+    "unpin_chat": "Unpin chat",
     "delete_chat": "Delete chat",
     "past_sessions": "Past sessions",
     "archive_chat": "Archive chat",
@@ -179,7 +185,7 @@
     "good_response": "Good response",
     "poor_response": "Poor response",
     "more_actions": "More Actions",
-    "copy_plaintext": "Copy Plaintext",
+    "copy_plaintext": "Copy Plain Text",
     "copy_id": "Copy ID",
     "copy_success": "Copied",
     "copy_failed": "Copy failed",
@@ -225,6 +231,17 @@
         "hourly": "Hourly data",
         "interval": "{{amount}}-{{unit}} data",
         "generic": "{{value}} data"
+      }
+    },
+    "discovery": {
+      "prompt": "Mention an asset or indicator",
+      "searching": "Search results",
+      "empty": "Type after @ to search supported assets and indicators.",
+      "sections": {
+        "assets": "Popular assets",
+        "indicators": "Runnable indicators",
+        "draft": "Draft-only indicators",
+        "results": "Search results"
       }
     },
       "status": {

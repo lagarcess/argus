@@ -80,7 +80,11 @@ describe("Argus Alpha frontend contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
     expect(chat).toContain('aria-label="Chat options"');
-    expect(chat).toContain("chat.view_history");
+    expect(chat).toContain("MoreVertical");
+    expect(chat).toContain("chat.copy_conversation_link");
+    expect(chat).toContain("chat.rename_chat");
+    expect(chat).toContain("chat.pin_chat");
+    expect(chat).toContain("chat.unpin_chat");
     expect(chat).not.toContain("chat.add_to_collection");
     expect(chat).not.toContain('aria-label="Archived chats"');
   });
@@ -90,6 +94,8 @@ describe("Argus Alpha frontend contract", () => {
     const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
     const flags = readFileSync(join(root, "lib/private-alpha-flags.ts"), "utf-8");
     const envExample = readFileSync(join(root, ".env.local.example"), "utf-8");
+    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
 
     expect(flags).toContain("NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED");
     expect(flags).toContain("chatExploratorySuggestionsEnabled");
@@ -102,6 +108,26 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("showExploratorySuggestions &&");
     expect(input).toContain("chatExploratorySuggestionsEnabled");
     expect(input).toContain("const prompts = chatExploratorySuggestionsEnabled");
+    expect(input).toContain("placeholder");
+    expect(chat).toContain("chat.followup_placeholder");
+    expect(en).toContain("from January 1, 2024 through December 31, 2024");
+    expect(en).toContain("Strategy: recurring buys");
+    expect(en).toContain("Asset: NVDA");
+    expect(en).toContain("Recurring contribution: $250 per week");
+    expect(en).toContain("Period: January 1, 2024 through December 31, 2024");
+    expect(es).toContain("del 1 de enero de 2024 al 31 de diciembre de 2024");
+  });
+
+  test("assistant turn controls use shared tooltips and robust clipboard copy", () => {
+    const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+
+    expect(message).toContain('import { Tooltip } from "@/components/ui/Tooltip";');
+    expect(message).toContain('import { writeClipboardText } from "@/lib/clipboard";');
+    expect(message).toContain("writeClipboardText(text)");
+    expect(message).toContain("Tooltip content={t('chat.good_response')}");
+    expect(message).toContain("Tooltip content={t('chat.poor_response')}");
+    expect(message).toContain("Tooltip content={t('chat.more_actions')}");
+    expect(message).not.toContain("navigator.clipboard.writeText");
   });
 
   test("chat result messages preserve assistant explanation next to card", () => {
@@ -110,10 +136,11 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("content: m.content");
     expect(message).toContain('message.kind === "strategy_result"');
-    expect(message).toContain("message.content &&");
+    expect(message).toContain("const displayContent = getDisplayContent()");
+    expect(message).toContain("displayContent &&");
     expect(message).toContain("<StrategyResultCard result={message.result} onAction={onAction} />");
     expect(message.indexOf("<StrategyResultCard result={message.result} onAction={onAction} />")).toBeLessThan(
-      message.indexOf("message.content &&"),
+      message.indexOf("displayContent &&"),
     );
   });
 
@@ -202,7 +229,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain('aria-label="Result breakdown"');
     expect(message).toContain("argus-result-section-label");
     expect(message).toContain("Breakdown");
-    expect(message).toContain('message.contentPresentation === "result_breakdown" && message.content?.trim()');
+    expect(message).toContain('message.contentPresentation === "result_breakdown" && displayContent.trim()');
     expect(chat).toContain('action?.type === "show_breakdown"');
     expect(chat).toContain('contentPresentation:');
     expect(css).toContain(".argus-result-breakdown::before");
@@ -422,7 +449,10 @@ describe("Argus Alpha frontend contract", () => {
     const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
 
     expect(chat).toContain("if (isStreamingResponse) return;");
-    expect(chat).toContain("<ChatInput onSend={handleSend} disabled={isStreamingResponse} />");
+    expect(chat).toContain("<ChatInput");
+    expect(chat).toContain("onSend={handleSend}");
+    expect(chat).toContain("disabled={isStreamingResponse}");
+    expect(chat).toContain("placeholder={chatInputPlaceholder}");
     expect(chat).toContain('if (event.event === "final")');
     expect(chat).toContain("setIsStreamingResponse(false);");
     expect(input).toContain("disabled?: boolean");
@@ -540,14 +570,21 @@ describe("Argus Alpha frontend contract", () => {
 
   test("assistant copy is artifact aware and visibly confirmed", () => {
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
     const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
 
-    expect(message).toContain("await navigator.clipboard.writeText");
+    expect(message).toContain('import { writeClipboardText } from "@/lib/clipboard";');
+    expect(message).toContain("await writeClipboardText(text)");
     expect(message).toContain("copyFeedback");
     expect(message).toContain("chat.copy_success");
     expect(message).toContain("chat.copy_failed");
     expect(message).toContain('message.kind === "strategy_confirmation"');
+    expect(chat).toContain("pb-[190px]");
+    expect(chat).toContain('className="h-28"');
+    expect(chat).toContain('role="status"');
+    expect(chat).toContain("dark:bg-[#1f2225]");
+    expect(chat).not.toContain("rounded-full bg-black dark:bg-white");
     expect(en).toContain('"copy_success": "Copied"');
     expect(es).toContain('"copy_failed": "No se pudo copiar"');
   });
@@ -566,12 +603,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("setInputActions([])");
   });
 
-  test("chat resumes active conversation instead of creating a fresh one on reload", () => {
+  test("chat resumes explicit conversation routes instead of creating a fresh one on reload", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
-    expect(chat).toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
-    expect(chat).toContain("readActiveConversationId");
-    expect(chat).toContain("persistActiveConversationId");
+    expect(chat).toContain("ACTIVE_CONVERSATION_QUERY_KEY");
+    expect(chat).toContain("readActiveConversationIdFromUrl");
+    expect(chat).not.toContain("ACTIVE_CONVERSATION_STORAGE_KEY");
+    expect(chat).not.toContain("readActiveConversationId()");
     expect(chat).toContain("getConversationMessages(activeConversationId");
     expect(chat).toContain("const routeState = readActiveConversationRouteState();");
     expect(chat).toContain("shouldStartConversationForVisibleEmptyChat({");
@@ -890,7 +928,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(api).toContain("response.status");
     expect(chat).toContain("err instanceof ChatStreamError");
     expect(chat).toContain("err.status === 404");
-    expect(chat).toContain("clearActiveConversationId()");
+    expect(chat).toContain("clearActiveConversationPointer()");
     expect(chat).toContain("await streamToConversation(conversation.id)");
   });
 });

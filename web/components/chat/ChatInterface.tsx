@@ -3,14 +3,17 @@
 import { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
-  ChevronRight,
-  History,
+  Copy,
+  Edit2,
+  MoreVertical,
+  Pin,
   Plus,
   Trash2,
   TrendingUp,
   Bitcoin,
   LineChart,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
@@ -26,6 +29,7 @@ import {
   listConversations,
   listHistory,
   logoutFromApi,
+  patchConversation,
   patchMe,
   resultCardFromConversationCard,
   resultCardFromRun,
@@ -49,7 +53,6 @@ import {
   strategiesEnabled,
 } from "@/lib/private-alpha-flags";
 import {
-  conversationLoadRetryActionFromConversationId,
   failedActionRetryActionFromMetadata,
   hasFailedActionMetadata,
   isRetryAction,
@@ -64,6 +67,7 @@ import {
   targetConversationIdForSend,
   type ActiveConversationRouteState,
 } from "@/lib/chat-conversation-routing";
+import { writeClipboardText } from "@/lib/clipboard";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
@@ -101,7 +105,6 @@ type OnboardingChoice = {
 };
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
-const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
 
@@ -109,15 +112,6 @@ type HydratedMessages = {
   messages: Message[];
   inputActions: ChatActionOption[];
 };
-
-function readActiveConversationId() {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
 
 function readActiveConversationRouteState(): ActiveConversationRouteState {
   if (typeof window === "undefined") {
@@ -145,15 +139,6 @@ function readActiveConversationIdFromUrl() {
   return readActiveConversationRouteState().conversationId;
 }
 
-function persistActiveConversationId(conversationId: string) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
-  } catch {
-    // Storage can be unavailable in restricted browser contexts.
-  }
-}
-
 function persistActiveConversationRoute(conversationId: string) {
   if (typeof window === "undefined") return;
   try {
@@ -170,40 +155,32 @@ function persistActiveConversationRoute(conversationId: string) {
 }
 
 function rememberActiveConversationId(conversationId: string) {
-  persistActiveConversationId(conversationId);
   persistActiveConversationRoute(conversationId);
 }
 
-function clearActiveConversationId() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
-  } catch {
-    // Storage can be unavailable in restricted browser contexts.
-  }
-}
-
-function clearActiveConversationRoute() {
-  if (typeof window === "undefined") return;
+function clearActiveConversationRoute(): string | null {
+  if (typeof window === "undefined") return null;
   try {
     const url = new URL(window.location.href);
-    if (url.pathname !== "/chat") return;
-    if (!url.searchParams.has(ACTIVE_CONVERSATION_QUERY_KEY)) return;
+    if (url.pathname !== "/chat") return null;
+    if (!url.searchParams.has(ACTIVE_CONVERSATION_QUERY_KEY)) return null;
     url.searchParams.delete(ACTIVE_CONVERSATION_QUERY_KEY);
     const query = url.searchParams.toString();
+    const nextRoute = query ? `${url.pathname}?${query}` : url.pathname;
     window.history.replaceState(
       window.history.state,
       "",
-      query ? `${url.pathname}?${query}` : url.pathname,
+      nextRoute,
     );
+    return nextRoute;
   } catch {
     // URL state is optional recovery metadata.
+    return null;
   }
 }
 
 function clearActiveConversationPointer() {
-  clearActiveConversationId();
-  clearActiveConversationRoute();
+  return clearActiveConversationRoute();
 }
 
 function latestInputActions(messages: Message[]) {
@@ -610,6 +587,7 @@ function chatStreamErrorText(detail: string | undefined, fallback: string) {
 
 export default function ChatInterface() {
   const { t, i18n } = useTranslation();
+  const router = useRouter();
 
   const onboardingChoices = useMemo<OnboardingChoice[]>(
     () => [
@@ -658,9 +636,10 @@ export default function ChatInterface() {
   const [showChatOptions, setShowChatOptions] = useState(false);
   const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);
   const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);
-  const [activeChatOptionsPanel, setActiveChatOptionsPanel] = useState<
-    "none" | "history"
-  >("none");
+  const [headerRenameValue, setHeaderRenameValue] = useState("");
+  const [isRenamingHeaderChat, setIsRenamingHeaderChat] = useState(false);
+  const [isSavingHeaderRename, setIsSavingHeaderRename] = useState(false);
+  const [isPinningHeaderChat, setIsPinningHeaderChat] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
@@ -694,6 +673,23 @@ export default function ChatInterface() {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const resetToEmptyChatSurface = useCallback(() => {
+    const clearedRoute = clearActiveConversationPointer();
+    if (clearedRoute) {
+      router.replace(clearedRoute, { scroll: false });
+    }
+    setConversationId(null);
+    setMessages([]);
+    setInputActions([]);
+    setStreamStatus(null);
+    setIsHydratingConversation(false);
+    setIsStreamingResponse(false);
+    setShowChatOptions(false);
+    setIsRenamingHeaderChat(false);
+    setHeaderRenameValue("");
+    setCurrentView("chat");
+  }, [router]);
 
   const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
     const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
@@ -865,12 +861,21 @@ export default function ChatInterface() {
           await i18n.changeLanguage(resolvedLanguage);
         }
         const stage = meResponse?.user?.onboarding?.stage;
-        const activeConversationId = readActiveConversationIdFromUrl() ?? readActiveConversationId();
+        const activeConversationId = readActiveConversationIdFromUrl();
         if (activeConversationId) {
           try {
             const { items } = await getConversationMessages(activeConversationId, 50);
             if (cancelled) return;
             const hydrated = hydrateMessagesFromApi(items);
+            if (hydrated.messages.length === 0) {
+              // clear empty persisted conversations from the active route.
+              resetToEmptyChatSurface();
+              setShowOnboardingGoalCards(
+                privateAlphaOnboardingEnabled &&
+                (stage === "language_selection" || stage === "primary_goal_selection"),
+              );
+              return;
+            }
             rememberActiveConversationId(activeConversationId);
             setConversationId(activeConversationId);
             setMessages(hydrated.messages);
@@ -883,15 +888,18 @@ export default function ChatInterface() {
 
             return;
           } catch {
-            clearActiveConversationPointer();
+            if (cancelled) return;
+            resetToEmptyChatSurface();
+            setShowOnboardingGoalCards(
+              privateAlphaOnboardingEnabled &&
+              (stage === "language_selection" || stage === "primary_goal_selection"),
+            );
+            return;
           }
         }
 
-        const { conversation } = await createConversation(resolvedLanguage);
         if (cancelled) return;
-        rememberActiveConversationId(conversation.id);
-        setConversationId(conversation.id);
-        setMessages([]);
+        resetToEmptyChatSurface();
         setShowOnboardingGoalCards(
           privateAlphaOnboardingEnabled &&
           (stage === "language_selection" || stage === "primary_goal_selection"),
@@ -953,20 +961,16 @@ export default function ChatInterface() {
     try {
       const { items } = await getConversationMessages(convId, 50);
       const hydrated = hydrateMessagesFromApi(items);
+      if (hydrated.messages.length === 0) {
+        // Keep empty persisted conversations from the active route.
+        resetToEmptyChatSurface();
+        return;
+      }
       setMessages(hydrated.messages);
       setInputActions(hydrated.inputActions);
     } catch {
-      setMessages([
-        {
-          id: "resume-error",
-          role: "ai",
-          kind: "text",
-          content: t('chat.error_load'),
-          actions: [
-            conversationLoadRetryActionFromConversationId(convId),
-          ].filter((action): action is ChatActionOption => Boolean(action)),
-        },
-      ]);
+      resetToEmptyChatSurface();
+      showToast(t('chat.error_load'));
     } finally {
       setStreamStatus(null);
       setIsHydratingConversation(false);
@@ -1012,31 +1016,21 @@ export default function ChatInterface() {
   // ── Start new chat ─────────────────────────────────────────────────────────
 
   const startNewChat = useCallback(async () => {
+    resetToEmptyChatSurface();
+    setIsSidebarOpen(false);
     try {
-      const { conversation } = await createConversation(i18n.language);
-      rememberActiveConversationId(conversation.id);
-      setConversationId(conversation.id);
-      setIsSidebarOpen(false);
-      setCurrentView("chat");
-      setMessages([]);
-      setInputActions([]);
-      try {
-        const me = await getMe();
-        const stage = me.user.onboarding.stage;
-        setShowOnboardingGoalCards(
-          privateAlphaOnboardingEnabled &&
-          (stage === "language_selection" || stage === "primary_goal_selection"),
-        );
-      } catch {
-        setShowOnboardingGoalCards(false);
-      }
-      void refreshHistory();
-      return conversation.id;
-    } catch (err) {
-      console.error("Failed to start new chat:", err);
-      return null;
+      const me = await getMe();
+      const stage = me.user.onboarding.stage;
+      setShowOnboardingGoalCards(
+        privateAlphaOnboardingEnabled &&
+        (stage === "language_selection" || stage === "primary_goal_selection"),
+      );
+    } catch {
+      setShowOnboardingGoalCards(false);
     }
-  }, [i18n.language, refreshHistory]);
+    void refreshHistory();
+    return null;
+  }, [refreshHistory, resetToEmptyChatSurface]);
 
   const handleConversationRemoved = useCallback((removedConversationId: string) => {
     setHistoryItems((prev) =>
@@ -1044,8 +1038,8 @@ export default function ChatInterface() {
     );
     refreshHistory();
     if (removedConversationId !== conversationId) return;
-    void startNewChat();
-  }, [conversationId, refreshHistory, startNewChat]);
+    resetToEmptyChatSurface();
+  }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
 
   const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
@@ -1053,8 +1047,7 @@ export default function ChatInterface() {
     setIsSidebarOpen(false);
 
     // 2. Start new chat
-    const newConvId = await startNewChat();
-    if (!newConvId) return;
+    await startNewChat();
 
     // 3. Define the localized prompt or use custom
     const prompt = customPrompt ?? t(
@@ -1098,6 +1091,21 @@ export default function ChatInterface() {
         const { conversation } = await createConversation(i18n.language);
         targetConversationId = conversation.id;
         shouldResetMessagesForNewConversation = true;
+        rememberActiveConversationId(conversation.id);
+        setConversationId(conversation.id);
+        void refreshHistory();
+      } catch (err) {
+        console.error("Failed to start conversation before sending:", err);
+        showToast(t('chat.error_generic'));
+        return;
+      }
+    }
+
+    if (!targetConversationId && !action?.type) {
+      try {
+        const { conversation } = await createConversation(i18n.language);
+        targetConversationId = conversation.id;
+        shouldResetMessagesForNewConversation = messages.length === 0;
         rememberActiveConversationId(conversation.id);
         setConversationId(conversation.id);
         void refreshHistory();
@@ -1371,7 +1379,18 @@ export default function ChatInterface() {
   };
 
   const handleOnboardingGoalChoice = async (goal: PrimaryGoal) => {
-    if (!conversationId) return;
+    let targetConversationId = conversationId;
+    if (!targetConversationId) {
+      try {
+        const { conversation } = await createConversation(i18n.language);
+        targetConversationId = conversation.id;
+        rememberActiveConversationId(conversation.id);
+        setConversationId(conversation.id);
+      } catch {
+        showToast(t('chat.error_generic'));
+        return;
+      }
+    }
     const isSkip = goal === "surprise_me";
     const hiddenMessage = isSkip ? "__ONBOARDING_SKIP__" : `__ONBOARDING_GOAL__:${goal}`;
     const userCopy = isSkip
@@ -1398,7 +1417,7 @@ export default function ChatInterface() {
     setIsSidebarOpen(false);
 
     try {
-      await streamChatMessage(conversationId, hiddenMessage, i18n.language, (event) => {
+      await streamChatMessage(targetConversationId, hiddenMessage, i18n.language, (event) => {
         if (event.event === "token") {
           setMessages((prev) =>
             prev.map((m) =>
@@ -1426,7 +1445,7 @@ export default function ChatInterface() {
           setStreamStatus(null);
           setIsStreamingResponse(false);
           setShowOnboardingGoalCards(false);
-          schedulePostTurnHistoryRefresh(conversationId);
+          schedulePostTurnHistoryRefresh(targetConversationId);
         }
       });
       await patchMe({
@@ -1622,8 +1641,76 @@ export default function ChatInterface() {
 
   const closeChatOptions = useCallback(() => {
     setShowChatOptions(false);
-    setActiveChatOptionsPanel("none");
+    setIsRenamingHeaderChat(false);
   }, []);
+
+  const activeHistoryChat = useMemo(
+    () =>
+      conversationId
+        ? historyItems.find(
+            (item) =>
+              item.type === "chat" &&
+              historyItemBelongsToConversation(item, conversationId),
+          ) ?? null
+        : null,
+    [conversationId, historyItems],
+  );
+
+  const handleCopyConversationLink = async () => {
+    if (!conversationId) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const copied = await writeClipboardText(
+      `${origin}/chat?conversation=${conversationId}`,
+    );
+    showToast(t(copied ? 'chat.copy_success' : 'chat.copy_failed'));
+    closeChatOptions();
+  };
+
+  const handleStartHeaderRename = () => {
+    if (!conversationId) return;
+    setHeaderRenameValue(
+      activeHistoryChat?.title && activeHistoryChat.title !== t('chat.new_chat')
+        ? activeHistoryChat.title
+        : "",
+    );
+    setIsRenamingHeaderChat(true);
+  };
+
+  const handleSaveHeaderRename = async () => {
+    if (!conversationId || isSavingHeaderRename) return;
+    const nextTitle = headerRenameValue.trim();
+    if (!nextTitle) {
+      setIsRenamingHeaderChat(false);
+      return;
+    }
+    setIsSavingHeaderRename(true);
+    try {
+      await patchConversation(conversationId, { title: nextTitle });
+      refreshHistory();
+      showToast(t('common.save'));
+      closeChatOptions();
+    } catch {
+      showToast(t('chat.rename_failed'));
+    } finally {
+      setIsSavingHeaderRename(false);
+    }
+  };
+
+  const handleToggleHeaderPin = async () => {
+    if (!conversationId || isPinningHeaderChat) return;
+    setIsPinningHeaderChat(true);
+    try {
+      await patchConversation(conversationId, {
+        pinned: !Boolean(activeHistoryChat?.pinned),
+      });
+      refreshHistory();
+      closeChatOptions();
+    } catch {
+      showToast(t('common.error_occurred'));
+    } finally {
+      setIsPinningHeaderChat(false);
+    }
+  };
 
   const handleRequestHeaderDelete = () => {
     if (!conversationId) return;
@@ -1668,6 +1755,10 @@ export default function ChatInterface() {
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
   const showExploratorySuggestions =
     chatExploratorySuggestionsEnabled && showSuggestions;
+  const chatInputPlaceholder =
+    messages.length === 0
+      ? t("chat.input_placeholder")
+      : t("chat.followup_placeholder", "Ask a follow-up...");
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1760,7 +1851,7 @@ export default function ChatInterface() {
 
           {/* Title (Always Centered relative to Content) */}
           <h1 className="font-display pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
-            {currentView === "chat" && (messages.length > 0 ? t('common.conversation', 'Conversation') : t('chat.new_chat'))}
+            {currentView === "chat" && messages.length > 0 && t('common.conversation', 'Conversation')}
             {currentView === "strategies" && t('common.strategies')}
           </h1>
 
@@ -1774,31 +1865,41 @@ export default function ChatInterface() {
                   className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                   aria-label="Chat options"
                 >
-                  <History className="h-5 w-5" />
+                  <MoreVertical className="h-5 w-5" />
                 </button>
                 {showChatOptions && (
                   <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-2 md:w-[260px] md:rounded-[20px] md:border md:pb-2">
                     <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
-                    {activeChatOptionsPanel === "none" && (
+                    {!isRenamingHeaderChat ? (
                       <div className="py-1">
                         <button
                           type="button"
-                          onClick={() => { closeChatOptions(); void startNewChat(); }}
+                          disabled={!conversationId}
+                          onClick={() => { void handleCopyConversationLink(); }}
                           className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                         >
-                          <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                          {t('chat.new_chat')}
+                          <Copy className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('chat.copy_conversation_link', 'Copy conversation link')}
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
-                          className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                          disabled={!conversationId}
+                          onClick={handleStartHeaderRename}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                         >
-                          <span className="flex items-center gap-4">
-                            <History className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            {t('chat.view_history')}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-black/30 dark:text-white/30 transition-transform group-hover:translate-x-0.5" />
+                          <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('chat.rename_chat', 'Rename chat')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!conversationId || isPinningHeaderChat}
+                          onClick={() => { void handleToggleHeaderPin(); }}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Pin className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {activeHistoryChat?.pinned
+                            ? t('chat.unpin_chat', 'Unpin chat')
+                            : t('chat.pin_chat', 'Pin chat')}
                         </button>
                         <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
                         <button
@@ -1811,34 +1912,42 @@ export default function ChatInterface() {
                           {t('chat.delete_chat')}
                         </button>
                       </div>
-                    )}
-                    {activeChatOptionsPanel === "history" && (
-                      <div className="py-1">
-                        <button
-                          type="button"
-                          onClick={() => setActiveChatOptionsPanel("none")}
-                          className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
-                        >
-                          {t('chat.past_sessions')}
-                          <ChevronRight className="h-4 w-4 -rotate-90" />
-                        </button>
-                        <div className="max-h-[300px] overflow-y-auto pb-1">
-                          {historyItems.filter(i => i.type === "chat").map((item: HistoryItem) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                void loadConversation(item.id);
-                                closeChatOptions();
-                              }}
-                              className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
-                            >
-                              <span className="truncate text-[15px] font-medium">{item.title}</span>
-                              <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">{item.subtitle}</span>
-                            </button>
-                          ))}
+                    ) : (
+                      <form
+                        className="space-y-2 px-5 py-3"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void handleSaveHeaderRename();
+                        }}
+                      >
+                        <label className="block text-[12px] font-medium text-black/45 dark:text-white/45">
+                          {t('chat.rename_chat', 'Rename chat')}
+                        </label>
+                        <input
+                          autoFocus
+                          value={headerRenameValue}
+                          onChange={(event) => setHeaderRenameValue(event.target.value.slice(0, 80))}
+                          className="w-full rounded-[12px] border border-black/10 bg-black/[0.02] px-3 py-2 text-[14px] font-medium text-black outline-none focus:border-black/25 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus:border-white/25"
+                          maxLength={80}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={isSavingHeaderRename}
+                            className="min-h-9 flex-1 rounded-full bg-black px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 disabled:opacity-50 dark:bg-white dark:text-black"
+                          >
+                            {t('common.save')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingHeaderRename}
+                            onClick={() => setIsRenamingHeaderChat(false)}
+                            className="min-h-9 flex-1 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-black/70 transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
+                          >
+                            {t('common.cancel')}
+                          </button>
                         </div>
-                      </div>
+                      </form>
                     )}
                   </div>
                 )}
@@ -1867,7 +1976,11 @@ export default function ChatInterface() {
                 </h1>
 
                 <div className="w-full max-w-2xl">
-                  <ChatInput onSend={handleSend} disabled={isStreamingResponse} />
+                  <ChatInput
+                    onSend={handleSend}
+                    disabled={isStreamingResponse}
+                    placeholder={chatInputPlaceholder}
+                  />
                 </div>
 
                 {showOnboardingGoalCards && (
@@ -1915,25 +2028,25 @@ export default function ChatInterface() {
                 {/* Starter Actions / Chips */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'How did Apple perform against SPY in 2024?'))}
+                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Test Apple against SPY for 2024 and show me the result.'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.tsla.label', 'Compare Apple to SPY')}
+                    {t('chat.starter_actions.tsla.label', 'Test Apple vs SPY')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'What if I bought Bitcoin at the start of 2024 and held through the end of 2024?'))}
+                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024.'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.btc.label', 'Hold Bitcoin in 2024')}
+                    {t('chat.starter_actions.btc.label', 'Test Bitcoin (BTC) hold')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'What if I bought $250 of Nvidia every week in 2024?'))}
+                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024.'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
-                    {t('chat.starter_actions.dca.label', 'Buy Nvidia weekly')}
+                    {t('chat.starter_actions.dca.label', 'Test weekly Nvidia buys')}
                   </button>
                 </div>
 
@@ -1970,7 +2083,7 @@ export default function ChatInterface() {
                 <div
                   ref={scrollContainerRef}
                   onScroll={updateScrollPositionState}
-                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]"
+                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[190px] pt-[86px]"
                 >
                   <div className="space-y-8">
                     {messages.map((msg, index) => {
@@ -2007,7 +2120,7 @@ export default function ChatInterface() {
                         </span>
                       </div>
                     )}
-                    <div ref={bottomRef} />
+                    <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
                 </div>
 
@@ -2041,7 +2154,11 @@ export default function ChatInterface() {
                         ))}
                       </div>
                     )}
-                    <ChatInput onSend={handleSend} disabled={isStreamingResponse || isHydratingConversation} />
+                    <ChatInput
+                      onSend={handleSend}
+                      disabled={isStreamingResponse || isHydratingConversation}
+                      placeholder={chatInputPlaceholder}
+                    />
                   </div>
                 </div>
               </>
@@ -2096,7 +2213,11 @@ export default function ChatInterface() {
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-full bg-black dark:bg-white px-5 py-2.5 text-[14px] font-medium text-white dark:text-black">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 rounded-full border border-black/10 bg-white px-5 py-2.5 text-[14px] font-medium text-black/80 shadow-[0_18px_60px_rgba(15,23,42,0.18)] duration-300 dark:border-white/10 dark:bg-[#1f2225] dark:text-white/80 dark:shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+        >
           {toast}
         </div>
       )}

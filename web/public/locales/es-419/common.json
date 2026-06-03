@@ -114,6 +114,7 @@
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
     "input_placeholder": "Describe una idea de inversión...",
+    "followup_placeholder": "Haz una pregunta de seguimiento...",
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
     "placeholder_prompts": [
@@ -134,16 +135,16 @@
     "hide_suggestions": "Ocultar sugerencias",
     "starter_actions": {
       "tsla": {
-        "label": "Compara Apple con SPY",
-        "value": "¿Cómo le fue a Apple contra SPY en 2024?"
+        "label": "Prueba Apple vs SPY",
+        "value": "Prueba Apple contra SPY del 1 de enero de 2024 al 31 de diciembre de 2024 y muéstrame el resultado."
       },
       "btc": {
-        "label": "Mantener Bitcoin en 2024",
-        "value": "¿Y si comprara Bitcoin al inicio de 2024 y lo mantuviera hasta el final de 2024?"
+        "label": "Prueba mantener Bitcoin (BTC)",
+        "value": "Prueba comprar BTC (Bitcoin) el 1 de enero de 2024 y mantenerlo hasta el 31 de diciembre de 2024."
       },
       "dca": {
-        "label": "Comprar Nvidia semanalmente",
-        "value": "¿Y si comprara $250 de Nvidia cada semana en 2024?"
+        "label": "Prueba compras semanales de Nvidia",
+        "value": "Prueba esta idea de inversión. Estrategia: compras recurrentes. Activo: NVDA (Nvidia). Aporte recurrente: $250 por semana. Periodo: del 1 de enero de 2024 al 31 de diciembre de 2024."
       }
     },
     "example_queries": {
@@ -155,6 +156,7 @@
     "error_offline": "Argus aún no ha podido conectarse a la API. Inicia el servicio FastAPI y envía tu idea de nuevo.",
     "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
+    "error_generic": "Algo salió mal. Inténtalo de nuevo.",
     "result_trust_strip": "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
     "result_trust_strip_label": "Contexto de confianza del resultado",
     "view_details": "Ver detalles",
@@ -171,6 +173,10 @@
     },
     "no_recent_activity": "Sin actividad reciente aún. Tus estrategias y chats aparecerán aquí.",
     "new_chat": "Nuevo chat",
+    "copy_conversation_link": "Copiar enlace de conversación",
+    "rename_chat": "Renombrar chat",
+    "pin_chat": "Anclar chat",
+    "unpin_chat": "Desanclar chat",
     "delete_chat": "Eliminar chat",
     "past_sessions": "Sesiones pasadas",
     "archive_chat": "Archivar chat",
@@ -225,6 +231,17 @@
         "hourly": "Datos por hora",
         "interval": "Datos de {{amount}} {{unit}}",
         "generic": "Datos {{value}}"
+      }
+    },
+    "discovery": {
+      "prompt": "Menciona un activo o indicador",
+      "searching": "Resultados de búsqueda",
+      "empty": "Escribe después de @ para buscar activos e indicadores compatibles.",
+      "sections": {
+        "assets": "Activos populares",
+        "indicators": "Indicadores ejecutables",
+        "draft": "Indicadores solo borrador",
+        "results": "Resultados de búsqueda"
       }
     },
       "status": {

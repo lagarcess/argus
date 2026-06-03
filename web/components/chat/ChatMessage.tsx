@@ -9,7 +9,10 @@ import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
+import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
+import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 type ChatMessageProps = {
   message: Message;
@@ -95,6 +98,9 @@ export default function ChatMessage({
     };
   }, []);
 
+  const normalizeCopyText = (text: string) =>
+    isUser ? text : normalizeAssistantDisplayText(text);
+
   const handleRating = (newRating: "positive" | "negative") => {
     if (rating === newRating) {
       setRating(null);
@@ -113,11 +119,11 @@ export default function ChatMessage({
 
   const getCopyText = () => {
     if (message.copyText) {
-      return message.copyText;
+      return normalizeCopyText(message.copyText);
     }
     if (message.kind === "strategy_result" && message.result) {
       if (message.result.copyText) {
-        return message.result.copyText;
+        return normalizeCopyText(message.result.copyText);
       }
       const rows = message.result.metrics.map((metric) => `${metric.label}: ${metric.value}`);
       const symbols = message.result.symbols?.length
@@ -126,41 +132,37 @@ export default function ChatMessage({
       const assumptions = message.result.assumptions?.length
         ? `Assumptions: ${message.result.assumptions.join(" • ")}`
         : null;
-      return [
+      return normalizeCopyText([
         message.result.strategyName,
         symbols,
         `Period: ${message.result.period}`,
         rows.join("\n"),
         message.result.benchmarkNote,
         assumptions,
-        message.content ? `Assistant explanation:\n${message.content}` : null,
-      ].filter(Boolean).join("\n");
+        message.content ? `Assistant explanation:\n${normalizeAssistantDisplayText(message.content)}` : null,
+      ].filter(Boolean).join("\n"));
     }
     if (message.kind === "strategy_confirmation" && message.confirmation) {
       if (message.confirmation.copyText) {
-        return message.confirmation.copyText;
+        return normalizeCopyText(message.confirmation.copyText);
       }
       const rows = message.confirmation.rows.map((row) => `${row.label}: ${row.value}`);
       const assumptions = message.confirmation.assumptions?.length
         ? `Assumptions: ${message.confirmation.assumptions.join(" • ")}`
         : null;
-      return [
+      return normalizeCopyText([
         message.confirmation.title,
         message.confirmation.summary,
         rows.join("\n"),
         assumptions,
-      ].filter(Boolean).join("\n");
+      ].filter(Boolean).join("\n"));
     }
-    return message.content ?? "";
+    return normalizeCopyText(message.content ?? "");
   };
 
   const handleCopy = async (text = getCopyText()) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopyFeedback("success");
-    } catch {
-      setCopyFeedback("failed");
-    }
+    const copied = await writeClipboardText(text);
+    setCopyFeedback(copied ? "success" : "failed");
     if (copyFeedbackTimeoutRef.current) {
       clearTimeout(copyFeedbackTimeoutRef.current);
     }
@@ -179,7 +181,7 @@ export default function ChatMessage({
       const goal = content.split(":")[1];
       return t(`onboarding.goals.${goal}.title`, goal);
     }
-    return content;
+    return isUser ? content : normalizeAssistantDisplayText(content);
   };
 
   const actionLabel = (action: ChatActionOption) =>
@@ -190,12 +192,13 @@ export default function ChatMessage({
   );
   const shouldShowTextFooter =
     message.kind === "text" && (isLatest || Boolean(retryAction));
+  const displayContent = getDisplayContent();
 
   if (isUser && message.kind === "action") {
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] rounded-full border border-black/10 bg-black/[0.03] px-4 py-2.5 text-[14px] font-medium leading-[1.45] text-black/75 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/75">
-          {message.selectedAction ? actionLabel(message.selectedAction) : getDisplayContent()}
+          {message.selectedAction ? actionLabel(message.selectedAction) : displayContent}
         </div>
       </div>
     );
@@ -205,7 +208,7 @@ export default function ChatMessage({
     return (
       <div className="flex w-full justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
         <div className="max-w-[85%] bg-black/5 dark:bg-white/10 text-black dark:text-white px-5 py-3.5 rounded-[24px] rounded-br-sm text-[16px] leading-[1.5] tracking-[0.24px] font-normal">
-          <UserMessageContent content={getDisplayContent()} mentions={message.mentions ?? []} />
+          <UserMessageContent content={displayContent} mentions={message.mentions ?? []} />
         </div>
       </div>
     );
@@ -214,15 +217,17 @@ export default function ChatMessage({
   return (
     <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300 group relative">
       {!isUser && !isStreaming && !copyFeedback && (
-        <button
-          onClick={() => {
-            void handleCopy();
-          }}
-          className="absolute -left-10 top-1 opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black dark:text-white"
-          title={t('chat.copy_plaintext')}
-        >
-          <Copy className="w-4 h-4" />
-        </button>
+        <Tooltip content={t('chat.copy_plaintext')} side="left" delay={150}>
+          <button
+            onClick={() => {
+              void handleCopy();
+            }}
+            className="absolute -left-10 top-1 opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black dark:text-white"
+            aria-label={t('chat.copy_plaintext')}
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        </Tooltip>
       )}
       {copyFeedback && (
         <span
@@ -238,20 +243,20 @@ export default function ChatMessage({
           {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard result={message.result} onAction={onAction} />
-              {message.content && (
-                <ResultReadout content={message.content} />
+              {displayContent && (
+                <ResultReadout content={displayContent} />
               )}
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
             <div className="w-full max-w-[min(100%,660px)]">
               <StrategyConfirmationCard confirmation={message.confirmation} onAction={onAction} />
             </div>
-          ) : message.contentPresentation === "result_breakdown" && message.content?.trim() ? (
-            <ResultBreakdown content={message.content ?? ""} />
+          ) : message.contentPresentation === "result_breakdown" && displayContent.trim() ? (
+            <ResultBreakdown content={displayContent} />
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content ?? ""}
+                {displayContent}
               </ReactMarkdown>
             </div>
           )}
@@ -286,39 +291,46 @@ export default function ChatMessage({
                     }
                   }}
                 >
-                  <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? selectedFeedbackClass : idleFeedbackClass }`}
-                    title={t('chat.good_response')}
-                    onClick={() => handleRating("positive")}
-                  >
-                    <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? selectedFeedbackIconClass : ""}`} />
-                  </button>
-                  <button
-                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? selectedFeedbackClass : idleFeedbackClass }`}
-                    title={t('chat.poor_response')}
-                    onClick={() => handleRating("negative")}
-                  >
-                    <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
-                  </button>
-                  {retryAction && (
+                  <Tooltip content={t('chat.good_response')} side="top" delay={150}>
                     <button
-                      className={`p-1.5 rounded-full transition-all duration-200 ${idleFeedbackClass}`}
-                      title={actionLabel(retryAction)}
-                      aria-label={actionLabel(retryAction)}
-                      onClick={() => onAction?.(retryAction)}
+                      className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? selectedFeedbackClass : idleFeedbackClass }`}
+                      aria-label={t('chat.good_response')}
+                      onClick={() => handleRating("positive")}
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? selectedFeedbackIconClass : ""}`} />
                     </button>
+                  </Tooltip>
+                  <Tooltip content={t('chat.poor_response')} side="top" delay={150}>
+                    <button
+                      className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? selectedFeedbackClass : idleFeedbackClass }`}
+                      aria-label={t('chat.poor_response')}
+                      onClick={() => handleRating("negative")}
+                    >
+                      <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
+                    </button>
+                  </Tooltip>
+                  {retryAction && (
+                    <Tooltip content={actionLabel(retryAction)} side="top" delay={150}>
+                      <button
+                        className={`p-1.5 rounded-full transition-all duration-200 ${idleFeedbackClass}`}
+                        aria-label={actionLabel(retryAction)}
+                        onClick={() => onAction?.(retryAction)}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
                   )}
-                <button
-                  onClick={toggleOptions}
-                  className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
-                  title={t('chat.more_actions')}
-                  aria-haspopup="menu"
-                  aria-expanded={showOptions}
-                >
-                  <MoreHorizontal className="w-3.5 h-3.5" />
-                </button>
+                <Tooltip content={t('chat.more_actions')} side="top" delay={150}>
+                  <button
+                    onClick={toggleOptions}
+                    className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
+                    aria-label={t('chat.more_actions')}
+                    aria-haspopup="menu"
+                    aria-expanded={showOptions}
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
 
                 {/* Popover Menu */}
                 {showOptions && (
