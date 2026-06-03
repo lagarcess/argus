@@ -3334,6 +3334,64 @@ def test_active_dca_confirmation_side_question_does_not_route_stale_candidate() 
     assert "educational_strategy_route_suppressed" in result.decision.reason_codes
 
 
+def test_dca_explanation_text_suppresses_misclassified_strategy_route() -> None:
+    pending = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy ETH every two weeks.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        date_range={"start": "2022-01-01", "end": "2023-12-31"},
+        capital_amount=125,
+        cadence="biweekly",
+        comparison_baseline="BTC",
+        field_provenance={
+            "capital_amount": "recurring_contribution",
+            "cadence": "explicit_user",
+        },
+    )
+    stale_candidate = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Recurring buys for an unrelated parsed asset.",
+        asset_universe=["DG"],
+        asset_class="equity",
+        date_range={"start": "2022-01-01", "end": "2023-12-31"},
+        capital_amount=125,
+        cadence="biweekly",
+        field_provenance={
+            "capital_amount": "recurring_contribution",
+            "cadence": "explicit_user",
+        },
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what dollar cost averaging means.",
+        assistant_response=(
+            "Ready to test recurring buys for DG over January 1, 2022 - "
+            "December 31, 2023."
+        ),
+        candidate_strategy_draft=stale_candidate,
+        semantic_turn_act="new_idea",
+        artifact_target="active_confirmation",
+    )
+
+    result, _ = _interpret(
+        message="explain what dollar cost averaging means",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert result.decision.semantic_turn_act == "educational_question"
+    assert result.decision.candidate_strategy_draft.asset_universe == []
+    assert "Dollar cost averaging" in answer
+    assert "DG" not in answer
+    assert "Ready to test" not in answer
+    assert "educational_strategy_route_suppressed" in result.decision.reason_codes
+
+
 def test_dca_contract_audit_skips_educational_turn_with_stale_strategy_baggage() -> None:
     from argus.agent_runtime.llm_interpreter import (
         _response_needs_dca_contract_audit,

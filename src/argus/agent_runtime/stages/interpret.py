@@ -529,22 +529,43 @@ async def _stage_result_from_interpretation(
     ) or _candidate_strategy_has_backtest_shape(
         interpretation.candidate_strategy_draft
     )
-    if _educational_turn_has_strategy_baggage(
+    dca_education_answer = _dca_education_answer_for_message(
+        state.current_user_message
+    )
+    educational_turn_has_strategy_baggage = _educational_turn_has_strategy_baggage(
         interpretation=interpretation,
         expects_strategy_route=expects_strategy_route,
+    )
+    misclassified_dca_education_has_strategy_baggage = (
+        _misclassified_dca_education_has_strategy_baggage(
+            interpretation=interpretation,
+            expects_strategy_route=expects_strategy_route,
+            dca_education_answer=dca_education_answer,
+        )
+    )
+    if (
+        educational_turn_has_strategy_baggage
+        or misclassified_dca_education_has_strategy_baggage
     ):
         expects_strategy_route = False
         route_suppression_reason_codes.append("educational_strategy_route_suppressed")
+        update: dict[str, Any] = {
+            "intent": "conversation_followup",
+            "task_relation": "continue",
+            "requires_clarification": False,
+            "candidate_strategy_draft": StrategySummary(),
+            "missing_required_fields": [],
+            "ambiguous_fields": [],
+            "unsupported_constraints": [],
+            "semantic_turn_act": "educational_question",
+        }
+        if (
+            misclassified_dca_education_has_strategy_baggage
+            and dca_education_answer is not None
+        ):
+            update["assistant_response"] = dca_education_answer
         interpretation = interpretation.model_copy(
-            update={
-                "intent": "conversation_followup",
-                "task_relation": "continue",
-                "requires_clarification": False,
-                "candidate_strategy_draft": StrategySummary(),
-                "missing_required_fields": [],
-                "ambiguous_fields": [],
-                "unsupported_constraints": [],
-            }
+            update=update,
         )
     incoming_strategy = _strategy_with_contextual_merge(
         strategy=interpretation.candidate_strategy_draft,
@@ -4454,6 +4475,72 @@ def _educational_turn_has_strategy_baggage(
         or interpretation.ambiguous_fields
         or interpretation.unsupported_constraints
     )
+
+
+def _misclassified_dca_education_has_strategy_baggage(
+    *,
+    interpretation: StructuredInterpretation,
+    expects_strategy_route: bool,
+    dca_education_answer: str | None,
+) -> bool:
+    if (
+        interpretation.semantic_turn_act == "educational_question"
+        or dca_education_answer is None
+    ):
+        return False
+    return bool(
+        expects_strategy_route
+        or _strategy_has_content(interpretation.candidate_strategy_draft)
+        or interpretation.requires_clarification
+        or interpretation.missing_required_fields
+        or interpretation.ambiguous_fields
+        or interpretation.unsupported_constraints
+    )
+
+
+def _dca_education_answer_for_message(message: str) -> str | None:
+    tokens = _plain_word_tokens(message)
+    if not tokens:
+        return None
+    if not _message_asks_for_strategy_explanation(tokens):
+        return None
+    if not _message_mentions_dca_concept(tokens):
+        return None
+    return (
+        "Dollar cost averaging means investing a set amount on a recurring "
+        "schedule instead of all at once. In Argus, the closest runnable version "
+        "is recurring buys/DCA: choose one asset, a date range, a cadence, and a "
+        "contribution amount, and I can simulate the historical result."
+    )
+
+
+def _message_asks_for_strategy_explanation(tokens: list[str]) -> bool:
+    if any(token in {"explain", "define", "meaning"} for token in tokens):
+        return True
+    if any(token in {"mean", "means"} for token in tokens) and "what" in tokens:
+        return True
+    explanation_starts = (
+        ("what", "is"),
+        ("what", "are"),
+        ("what", "does"),
+        ("tell", "me", "about"),
+    )
+    if any(
+        _token_sequence_spans(tokens, list(sequence))
+        for sequence in explanation_starts
+    ):
+        return True
+    return "how" in tokens and any(token in {"work", "works"} for token in tokens)
+
+
+def _message_mentions_dca_concept(tokens: list[str]) -> bool:
+    dca_terms = (
+        ("dca",),
+        ("dollar", "cost", "averaging"),
+        ("recurring", "buy"),
+        ("recurring", "buys"),
+    )
+    return any(_token_sequence_spans(tokens, list(term)) for term in dca_terms)
 
 
 def _candidate_strategy_has_backtest_shape(strategy: StrategySummary) -> bool:

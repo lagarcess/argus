@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 import {
   createConversation,
@@ -655,6 +656,8 @@ export default function ChatInterface() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
+  const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);
+  const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);
   const [activeChatOptionsPanel, setActiveChatOptionsPanel] = useState<
     "none" | "history"
   >("none");
@@ -687,10 +690,10 @@ export default function ChatInterface() {
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
-  };
+  }, []);
 
   const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
     const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
@@ -1617,9 +1620,30 @@ export default function ChatInterface() {
 
   // ── Chat options helpers ───────────────────────────────────────────────────
 
-  const closeChatOptions = () => {
+  const closeChatOptions = useCallback(() => {
     setShowChatOptions(false);
     setActiveChatOptionsPanel("none");
+  }, []);
+
+  const handleRequestHeaderDelete = () => {
+    if (!conversationId) return;
+    setPendingHeaderDeleteId(conversationId);
+    closeChatOptions();
+  };
+
+  const handleConfirmHeaderDelete = async () => {
+    if (!pendingHeaderDeleteId || isDeletingHeaderChat) return;
+    setIsDeletingHeaderChat(true);
+    try {
+      await deleteConversation(pendingHeaderDeleteId);
+      showToast(t('common.delete'));
+      handleConversationRemoved(pendingHeaderDeleteId);
+    } catch {
+      showToast(t('common.error_occurred'));
+    } finally {
+      setIsDeletingHeaderChat(false);
+      setPendingHeaderDeleteId(null);
+    }
   };
 
   useEffect(() => {
@@ -1634,7 +1658,7 @@ export default function ChatInterface() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showChatOptions]);
+  }, [closeChatOptions, showChatOptions]);
 
   const composerActions = hasActiveArtifactActionSet(messages)
     ? []
@@ -1707,6 +1731,23 @@ export default function ChatInterface() {
         />
       )}
 
+      <ConfirmDialog
+        isOpen={Boolean(pendingHeaderDeleteId)}
+        title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
+        description={t(
+          "sidebar.delete_confirm.description",
+          "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+          { title: t("common.conversation", "Conversation") },
+        )}
+        confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
+        cancelLabel={t("common.cancel", "Cancel")}
+        isBusy={isDeletingHeaderChat}
+        onCancel={() => {
+          if (!isDeletingHeaderChat) setPendingHeaderDeleteId(null);
+        }}
+        onConfirm={() => void handleConfirmHeaderDelete()}
+      />
+
       {/* ── Main panel ── */}
       <section
         className="relative z-10 flex h-full flex-1 flex-col overflow-hidden bg-[#f9f9f9] dark:bg-[#141517]"
@@ -1762,18 +1803,9 @@ export default function ChatInterface() {
                         <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
                         <button
                           type="button"
-                          onClick={() => {
-                            if (!conversationId) return;
-                            deleteConversation(conversationId)
-                              .then(() => {
-                                showToast(t('common.delete'));
-                                refreshHistory();
-                                void startNewChat();
-                                closeChatOptions();
-                              })
-                              .catch(() => showToast(t('common.error_occurred')));
-                          }}
-                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
+                          disabled={!conversationId || isDeletingHeaderChat}
+                          onClick={handleRequestHeaderDelete}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
                         >
                           <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
                           {t('chat.delete_chat')}

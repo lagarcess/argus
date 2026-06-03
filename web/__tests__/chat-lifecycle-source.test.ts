@@ -36,4 +36,18 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(palette).toContain("onConversationRemoved?.(item.conversationId)");
     expect(palette).toContain("onConversationRemoved?.(pendingDeleteItem.conversationId)");
   });
+
+  test("header delete requires a selected chat and confirmation", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+
+    expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
+    expect(chat).toContain("const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);");
+    expect(chat).toContain("const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);");
+    expect(chat).toContain("if (!conversationId) return;");
+    expect(chat).toContain("setPendingHeaderDeleteId(conversationId);");
+    expect(chat).toContain("deleteConversation(pendingHeaderDeleteId)");
+    expect(chat).toContain("handleConversationRemoved(pendingHeaderDeleteId);");
+    expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
+    expect(chat).toContain("disabled={!conversationId || isDeletingHeaderChat}");
+  });
 });
