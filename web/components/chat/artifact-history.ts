@@ -340,7 +340,6 @@ export function settleOpenConfirmationsAfterTextFinal(
     action,
     finalActions = [],
     hasFailedAction = false,
-    stageOutcome,
   }: {
     action?: ChatActionOption;
     finalActions?: ChatActionOption[];
@@ -351,10 +350,8 @@ export function settleOpenConfirmationsAfterTextFinal(
   const hasConfirmationAction = Boolean(confirmationActionEffectFromAction(action));
   const hasFailedActionFinal =
     hasFailedAction || finalActions.some(isFailedActionRetry);
-  const hasClarifyingOutcome =
-    stageOutcome === "await_user_reply" || stageOutcome === "needs_clarification";
 
-  if (!hasConfirmationAction && !hasFailedActionFinal && !hasClarifyingOutcome) {
+  if (!hasConfirmationAction && !hasFailedActionFinal) {
     return messages;
   }
 

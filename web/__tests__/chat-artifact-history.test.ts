@@ -351,6 +351,20 @@ describe("chat artifact history", () => {
     expect(settled.actions).toEqual([]);
   });
 
+  test("clarification text finals keep active confirmation cards open", () => {
+    const [settled] = settleOpenConfirmationsAfterTextFinal(
+      [confirmationMessage()],
+      {
+        stageOutcome: "needs_clarification",
+      },
+    );
+
+    expect(settled.confirmation?.confirmation_state).toBe("active");
+    expect(settled.confirmation?.statusLabel).toBe("Ready to run");
+    expect(settled.confirmation?.actions?.length).toBeGreaterThan(0);
+    expect(settled.actions?.length).toBeGreaterThan(0);
+  });
+
   test("hydration closes active confirmation as complete when a result follows it", () => {
     const result: Message = {
       id: "assistant-result",
