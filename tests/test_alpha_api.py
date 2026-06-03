@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 import pytest
 from argus.api.main import app
+from argus.api.message_store import memory_message
 from argus.domain.market_data.assets import ResolvedAsset
 from fastapi.testclient import TestClient
 
@@ -470,6 +471,62 @@ def test_history_excludes_archived_and_deleted_chats_by_default() -> None:
         item["title"] for item in response.json()["items"] if item["type"] == "chat"
     ]
     assert chat_titles == ["Active idea"]
+
+
+def test_deleted_conversation_restore_moves_chat_back_to_recents() -> None:
+    client = _client()
+
+    conversation = client.post(
+        "/api/v1/conversations",
+        json={"title": "Restorable idea"},
+    ).json()["conversation"]
+    memory_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="Can you test a DOGE buy-and-hold idea?",
+    )
+
+    assert client.delete(f"/api/v1/conversations/{conversation['id']}").status_code == 200
+    default_deleted_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history").json()["items"]
+        if item["type"] == "chat"
+    }
+    recently_deleted_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history?deleted=true").json()["items"]
+        if item["type"] == "chat"
+    }
+    assert conversation["id"] not in default_deleted_ids
+    assert conversation["id"] in recently_deleted_ids
+    assert (
+        client.get(f"/api/v1/conversations/{conversation['id']}/messages").status_code
+        == 404
+    )
+
+    restore = client.patch(
+        f"/api/v1/conversations/{conversation['id']}",
+        json={"deleted_at": None},
+    )
+
+    assert restore.status_code == 200
+    assert restore.json()["conversation"]["deleted_at"] is None
+    restored_default_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history").json()["items"]
+        if item["type"] == "chat"
+    }
+    restored_deleted_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history?deleted=true").json()["items"]
+        if item["type"] == "chat"
+    }
+    assert conversation["id"] in restored_default_ids
+    assert conversation["id"] not in restored_deleted_ids
+    assert (
+        client.get(f"/api/v1/conversations/{conversation['id']}/messages").status_code
+        == 200
+    )
 
 
 def test_history_can_return_archived_chats_without_deleted_chats() -> None:

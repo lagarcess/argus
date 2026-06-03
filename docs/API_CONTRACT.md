@@ -967,17 +967,19 @@ Create new chat thread.
 
 ## `PATCH /conversations/{id}`
 
-Rename, pin, or archive.
+Rename, pin, archive, or restore a soft-deleted conversation.
 
 **Request:**
 ```json
 {
   "title": "New Name",
   "pinned": true,
-  "archived": false
+  "archived": false,
+  "deleted_at": null
 }
 ```
 *Note: User-provided title changes set `title_source = user_renamed`.*
+*Note: Recently deleted restore actions clear `deleted_at` by sending `null`.*
 
 ## `DELETE /conversations/{id}`
 
@@ -1230,19 +1232,21 @@ data: [DONE]
 
 ## `PATCH /strategies/{id}`
 
-Rename, pin, metric preferences, update params.
+Rename, pin, metric preferences, update params, or restore a soft-deleted strategy.
 
 **Request:**
 ```json
 {
   "name": "Updated Name",
   "pinned": true,
+  "deleted_at": null,
   "metrics_preferences": [
     "win_rate",
     "sharpe_ratio"
   ]
 }
 ```
+*Note: Recently deleted restore actions clear `deleted_at` by sending `null`.*
 
 ## `DELETE /strategies/{id}`
 

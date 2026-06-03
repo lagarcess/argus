@@ -96,6 +96,23 @@ def _filter_history_runs_by_conversation_state(
     return filtered
 
 
+def _filter_history_conversations_by_message_state(
+    conversations: list[dict[str, Any]],
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    conversation_ids_with_messages = {
+        str(row["conversation_id"])
+        for row in messages
+        if row.get("conversation_id") is not None
+    }
+    return [
+        row
+        for row in conversations
+        if row.get("id") is not None
+        and str(row["id"]) in conversation_ids_with_messages
+    ]
+
+
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -635,11 +652,19 @@ class SupabaseGateway:
             user_id=user_id,
             runs=runs,
         )
+        chat_message_states = self._fetch_history_conversation_message_states(
+            user_id=user_id,
+            conversations=chats,
+        )
         runs = _filter_history_runs_by_conversation_state(
             runs,
             run_parent_conversations,
             archived=archived,
             deleted=deleted,
+        )
+        chats = _filter_history_conversations_by_message_state(
+            chats,
+            chat_message_states,
         )
 
         return {
@@ -673,6 +698,29 @@ class SupabaseGateway:
             .data
             or []
         )
+
+    def _fetch_history_conversation_message_states(
+        self,
+        *,
+        user_id: str,
+        conversations: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        conversation_ids = sorted(
+            {
+                str(conversation["id"])
+                for conversation in conversations
+                if conversation.get("id") is not None
+            }
+        )
+        if not conversation_ids:
+            return []
+        query = (
+            self.client.table("messages")
+            .select("conversation_id")
+            .eq("user_id", user_id)
+            .in_("conversation_id", conversation_ids)
+        )
+        return self._fetch_all_rows(lambda start, end: query.range(start, end))
 
     def search_rows(
         self, *, user_id: str, query: str, limit: int | None

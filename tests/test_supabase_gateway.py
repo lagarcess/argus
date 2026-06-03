@@ -249,6 +249,28 @@ class _HistoryClient:
                     "updated_at": "2026-05-31T00:00:00+00:00",
                 },
             ],
+            "messages": [
+                {
+                    "id": "msg-active",
+                    "user_id": "user-1",
+                    "conversation_id": "conv-active",
+                },
+                {
+                    "id": "msg-archived",
+                    "user_id": "user-1",
+                    "conversation_id": "conv-archived",
+                },
+                {
+                    "id": "msg-deleted",
+                    "user_id": "user-1",
+                    "conversation_id": "conv-deleted",
+                },
+                {
+                    "id": "msg-other-user",
+                    "user_id": "user-2",
+                    "conversation_id": "conv-other",
+                },
+            ],
             "backtest_runs": [
                 {
                     "id": "run-active",
@@ -321,6 +343,10 @@ class _HistoryTable:
         self.rows = self.rows[:count]
         return self
 
+    def range(self, start: int, end: int):
+        self.rows = self.rows[start : end + 1]
+        return self
+
     def execute(self):
         return SimpleNamespace(data=list(self.rows))
 
@@ -362,3 +388,23 @@ def test_gateway_history_filters_runs_by_parent_conversation_state() -> None:
     } == {"run-active"}
     assert {row["id"] for row in archived_rows["runs"]} == {"run-archived"}
     assert {row["id"] for row in deleted_rows["runs"]} == {"run-deleted"}
+
+
+def test_gateway_history_filters_chats_without_visible_messages() -> None:
+    gateway = SupabaseGateway(client=_HistoryClient())
+
+    default_rows = gateway.list_history_rows(user_id="user-1", limit=100)
+    archived_rows = gateway.list_history_rows(
+        user_id="user-1",
+        limit=100,
+        archived=True,
+    )
+    deleted_rows = gateway.list_history_rows(
+        user_id="user-1",
+        limit=100,
+        deleted=True,
+    )
+
+    assert {row["id"] for row in default_rows["conversations"]} == {"conv-active"}
+    assert {row["id"] for row in archived_rows["conversations"]} == {"conv-archived"}
+    assert {row["id"] for row in deleted_rows["conversations"]} == {"conv-deleted"}

@@ -84,6 +84,7 @@ class ConversationPatch(BaseModel):
     title: str | None = None
     pinned: bool | None = None
     archived: bool | None = None
+    deleted_at: datetime | None = None
 
 
 class Conversation(BaseModel):
@@ -144,6 +145,7 @@ class StrategyPatch(BaseModel):
     pinned: bool | None = None
     metrics_preferences: list[str] | None = None
     parameters: dict[str, Any] | None = None
+    deleted_at: datetime | None = None
 
 
 class Strategy(BaseModel):
