@@ -60,13 +60,19 @@ def apply_artifact_patch(
     return updated
 
 
-def _patchable_fields() -> tuple[str, ...]:
+def patchable_strategy_fields(*, include_prose: bool = True) -> tuple[str, ...]:
     excluded = {"raw_user_phrasing", "resolution_provenance"}
+    if not include_prose:
+        excluded.add("strategy_thesis")
     return tuple(
         field_name
         for field_name in ArtifactPatch.model_fields
         if field_name in StrategySummary.model_fields and field_name not in excluded
     )
+
+
+def _patchable_fields() -> tuple[str, ...]:
+    return patchable_strategy_fields()
 
 
 def _validated_clear_fields(values: list[str]) -> list[str]:

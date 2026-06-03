@@ -1,6 +1,7 @@
 from argus.agent_runtime.artifacts.continuity import (
     ArtifactAnchor,
     apply_patch_to_anchor,
+    patched_draft_from_candidate,
     resolve_artifact_anchor,
 )
 from argus.agent_runtime.artifacts.drafts import (
@@ -15,6 +16,7 @@ from argus.agent_runtime.artifacts.lifecycle import (
 from argus.agent_runtime.artifacts.patches import (
     ArtifactPatch,
     apply_artifact_patch,
+    patchable_strategy_fields,
 )
 
 __all__ = [
@@ -26,6 +28,8 @@ __all__ = [
     "draft_from_confirmation_payload",
     "draft_from_failed_launch_payload",
     "draft_from_result_metadata",
+    "patchable_strategy_fields",
+    "patched_draft_from_candidate",
     "resolve_artifact_anchor",
     "retry_lifecycle_after_artifact_event",
 ]

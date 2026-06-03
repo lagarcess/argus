@@ -3328,6 +3328,88 @@ def test_refine_strategy_result_action_preserves_result_parameters_without_llm()
     assert draft["comparison_baseline"] == "SPY"
 
 
+def test_result_followup_date_patch_routes_to_confirmation_without_guidance(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret_actions as action_module
+
+    called: list[dict[str, Any]] = []
+
+    async def _unexpected_followup(**kwargs: object) -> str:
+        called.append(dict(kwargs))
+        return "Try next: change the date range."
+
+    monkeypatch.setattr(
+        action_module,
+        "_compose_result_followup_with_timeout",
+        _unexpected_followup,
+    )
+    reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-dca",
+        metadata={
+            "asset_class": "equity",
+            "symbols": ["AAPL", "GOOG"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "dca_accumulation",
+                "symbols": ["AAPL", "GOOG"],
+                "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                "resolved_strategy": {
+                    "strategy_type": "dca_accumulation",
+                    "strategy_thesis": "Buy AAPL and GOOG monthly.",
+                    "asset_universe": ["AAPL", "GOOG"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "capital_amount": 200,
+                    "recurring_contribution": 200,
+                    "cadence": "monthly",
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        },
+    )
+    response = StructuredInterpretation(
+        intent="results_explanation",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User is changing the completed result date range.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"start": "2019-10-01", "end": "2025-10-31"},
+        ),
+        semantic_turn_act="result_followup",
+        result_followup_focus="next_experiment",
+        artifact_target="latest_result",
+    )
+
+    result, _ = _interpret(
+        message="do the date range October 2019 to October 2025",
+        response=response,
+        snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=reference,
+        ),
+    )
+
+    assert called == []
+    assert result.outcome == "ready_for_confirmation"
+    assert "assistant_response" not in result.patch
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["AAPL", "GOOG"]
+    assert strategy.asset_class == "equity"
+    assert strategy.date_range == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert strategy.capital_amount == 200
+    assert strategy.cadence == "monthly"
+    assert strategy.timeframe == "1D"
+    assert strategy.comparison_baseline == "SPY"
+    assert "artifact_patch_from_latest_result" in result.decision.reason_codes
+
+
 def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
     from argus.agent_runtime.stages import interpret_actions as action_module

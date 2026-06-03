@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from argus.agent_runtime.artifacts.continuity import resolve_artifact_anchor
+from argus.agent_runtime.artifacts.continuity import (
+    patched_draft_from_candidate,
+    resolve_artifact_anchor,
+)
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.response_style import (
     result_followup_heading,
@@ -607,6 +610,12 @@ async def artifact_followup_stage_result_if_applicable(
 ) -> StageResult | None:
     if not decision_targets_result_artifact(decision=decision, snapshot=snapshot):
         return None
+    artifact_patch_result = _result_artifact_patch_stage_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+    )
+    if artifact_patch_result is not None:
+        return artifact_patch_result
     focus = decision.result_followup_focus or "general"
     if focus == "assumptions":
         draft_response = draft_assumptions_response(snapshot)
@@ -643,6 +652,69 @@ async def artifact_followup_stage_result_if_applicable(
                 body=response,
             )
         },
+    )
+
+
+def _result_artifact_patch_stage_result_if_applicable(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+) -> StageResult | None:
+    reference = (
+        snapshot.latest_backtest_result_reference if snapshot is not None else None
+    )
+    if reference is None:
+        return None
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload={"run_id": reference.artifact_id},
+    )
+    patched = patched_draft_from_candidate(
+        anchor=anchor,
+        candidate=decision.candidate_strategy_draft,
+    )
+    if patched is None:
+        return None
+    missing_fields = missing_required_fields_for_strategy(
+        patched,
+        contract=build_default_capability_contract(),
+    )
+    has_blocking_validation = bool(
+        missing_fields
+        or decision.ambiguous_fields
+        or decision.unsupported_constraints
+    )
+    refined_decision = decision.model_copy(
+        update={
+            "intent": "backtest_execution",
+            "task_relation": "refine",
+            "requires_clarification": has_blocking_validation,
+            "candidate_strategy_draft": patched,
+            "missing_required_fields": list(missing_fields),
+            "semantic_turn_act": "refine_current_idea",
+            "result_followup_focus": None,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *decision.reason_codes,
+                        "artifact_patch_from_latest_result",
+                    ]
+                )
+            ),
+        }
+    )
+    stage_patch: dict[str, Any] = {
+        "candidate_strategy_draft": patched.model_dump(mode="python"),
+        "missing_required_fields": list(missing_fields),
+    }
+    return StageResult(
+        outcome=(
+            "needs_clarification"
+            if has_blocking_validation
+            else "ready_for_confirmation"
+        ),
+        decision=refined_decision,
+        stage_patch=stage_patch,
     )
 
 

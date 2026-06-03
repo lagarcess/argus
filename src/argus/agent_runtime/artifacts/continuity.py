@@ -8,7 +8,12 @@ from argus.agent_runtime.artifacts.drafts import (
     draft_from_failed_launch_payload,
     draft_from_result_metadata,
 )
-from argus.agent_runtime.artifacts.patches import ArtifactPatch, apply_artifact_patch
+from argus.agent_runtime.artifacts.patches import (
+    ArtifactPatch,
+    PatchSource,
+    apply_artifact_patch,
+    patchable_strategy_fields,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     StrategySummary,
@@ -71,6 +76,94 @@ def apply_patch_to_anchor(
     if anchor.draft is None:
         return None
     return apply_artifact_patch(anchor.draft, patch)
+
+
+def patched_draft_from_candidate(
+    *,
+    anchor: ArtifactAnchor,
+    candidate: StrategySummary,
+    source: PatchSource = "llm_patch",
+) -> StrategySummary | None:
+    if anchor.draft is None:
+        return None
+    patch_values: dict[str, Any] = {}
+    for field_name in patchable_strategy_fields(include_prose=False):
+        candidate_value = getattr(candidate, field_name)
+        if _blank(candidate_value):
+            continue
+        anchored_value = getattr(anchor.draft, field_name)
+        if _equivalent_strategy_value(field_name, candidate_value, anchored_value):
+            continue
+        patch_values[field_name] = candidate_value
+    if not patch_values:
+        return None
+    patch = ArtifactPatch(source=source, **patch_values)
+    return apply_artifact_patch(anchor.draft, patch)
+
+
+def _equivalent_strategy_value(
+    field_name: str,
+    candidate_value: Any,
+    anchored_value: Any,
+) -> bool:
+    return _comparable_strategy_value(field_name, candidate_value) == (
+        _comparable_strategy_value(field_name, anchored_value)
+    )
+
+
+def _comparable_strategy_value(field_name: str, value: Any) -> Any:
+    if field_name == "asset_universe" and isinstance(value, list):
+        return tuple(_normalized_symbol(item) for item in value if _normalized_symbol(item))
+    if field_name == "comparison_baseline":
+        return _normalized_symbol(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    if isinstance(value, list):
+        return tuple(_comparable_collection_item(item) for item in value)
+    if isinstance(value, dict):
+        return tuple(
+            sorted(
+                (
+                    str(key),
+                    _comparable_collection_item(nested_value),
+                )
+                for key, nested_value in value.items()
+                if not _blank(nested_value)
+            )
+        )
+    return value
+
+
+def _comparable_collection_item(value: Any) -> Any:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    if isinstance(value, list):
+        return tuple(_comparable_collection_item(item) for item in value)
+    if isinstance(value, dict):
+        return tuple(
+            sorted(
+                (
+                    str(key),
+                    _comparable_collection_item(nested_value),
+                )
+                for key, nested_value in value.items()
+                if not _blank(nested_value)
+            )
+        )
+    return value
+
+
+def _normalized_symbol(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    symbol = value.strip().upper().replace("-", "/")
+    return symbol or None
+
+
+def _blank(value: Any) -> bool:
+    return value in (None, "", [], {})
 
 
 def _matching_confirmation_anchor(
