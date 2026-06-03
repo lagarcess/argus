@@ -6,6 +6,7 @@ from argus.agent_runtime.run_field_contract import (
 )
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
+    executable_strategy_type,
     executable_strategy_type_from_extracted_fields,
     normalize_date_range_candidate,
     resolve_date_range,
@@ -24,6 +25,20 @@ def test_resolve_date_range_accepts_month_name_ranges() -> None:
 
     assert resolved.payload == {"start": "2010-01-01", "end": "2020-12-31"}
     assert resolved.display == "January 1, 2010 - December 31, 2020"
+
+
+def test_lump_sum_strategy_alias_executes_as_buy_and_hold() -> None:
+    assert (
+        executable_strategy_type(StrategySummary(strategy_type="lump_sum_investment"))
+        == "buy_and_hold"
+    )
+
+
+def test_broad_investment_label_is_not_a_strategy_alias() -> None:
+    assert (
+        executable_strategy_type(StrategySummary(strategy_type="investment"))
+        != "buy_and_hold"
+    )
 
 
 def test_resolve_date_range_accepts_month_span_with_shared_year() -> None:

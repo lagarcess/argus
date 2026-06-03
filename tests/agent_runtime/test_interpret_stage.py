@@ -163,6 +163,54 @@ def test_interpret_passes_raw_message_to_llm_without_regex_normalization() -> No
     assert result.outcome == "ready_to_respond"
 
 
+def test_lump_sum_investment_shape_defaults_to_buy_and_hold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    message = (
+        "let's see what an investment of 500 in NU could've made this year so "
+        "far if invested at the begining of this year"
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test a lump-sum investment in NU.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_thesis="Test a simple lump-sum investment in NU.",
+            asset_universe=["NU"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+            capital_amount=500,
+        ),
+        missing_required_fields=[],
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message=message,
+        response=response,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["NU"]
+    assert strategy.capital_amount == 500
+    assert result.decision.unsupported_constraints == []
+    assert "complete_no_rule_shape_defaulted_to_buy_and_hold" in (
+        result.decision.reason_codes
+    )
+
+
 def test_result_followup_response_does_not_leave_underfilled_strategy_draft() -> None:
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(

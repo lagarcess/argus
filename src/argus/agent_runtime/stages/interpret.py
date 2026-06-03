@@ -720,6 +720,11 @@ async def _stage_result_from_interpretation(
             current_user_message=state.current_user_message,
             supported_timeframes=_supported_timeframes(capability_contract),
         )
+    shape_default_reason_codes: list[str] = []
+    if expects_strategy_route:
+        strategy, shape_default_reason_codes = (
+            _strategy_with_default_template_for_complete_no_rule_shape(strategy)
+        )
     benchmark_reason_codes: list[str] = []
     if expects_strategy_route:
         prior_strategy = _active_strategy_from_snapshot(snapshot)
@@ -906,6 +911,7 @@ async def _stage_result_from_interpretation(
                 if requested_asset_answer_applied
                 else []
             ),
+            *shape_default_reason_codes,
             *integrity_report.reason_codes,
             *constraint_filter_reason_codes,
             *ambiguity_filter_reason_codes,
@@ -4236,6 +4242,36 @@ def _strategy_with_execution_defaults(strategy: StrategySummary) -> StrategySumm
             if not updated.exit_logic:
                 updated.exit_logic = moving_average_crossover_text(updated.exit_rule)
     return updated
+
+
+def _strategy_with_default_template_for_complete_no_rule_shape(
+    strategy: StrategySummary,
+) -> tuple[StrategySummary, list[str]]:
+    if executable_strategy_type(strategy) in SUPPORTED_STRATEGY_TYPES:
+        return strategy, []
+    if strategy.strategy_type not in (None, ""):
+        return strategy, []
+    if not _strategy_has_complete_no_rule_execution_shape(strategy):
+        return strategy, []
+    if _strategy_supplies_executable_rule_edit(strategy):
+        return strategy, []
+    updated = strategy.model_copy(deep=True)
+    updated.strategy_type = "buy_and_hold"
+    _clear_incompatible_strategy_rule_state(updated, "buy_and_hold")
+    return updated, ["complete_no_rule_shape_defaulted_to_buy_and_hold"]
+
+
+def _strategy_has_complete_no_rule_execution_shape(strategy: StrategySummary) -> bool:
+    return bool(
+        strategy.asset_universe
+        and strategy.date_range
+        and not strategy.cadence
+        and not strategy.entry_logic
+        and not strategy.exit_logic
+        and not strategy.entry_rule
+        and not strategy.exit_rule
+        and not strategy.rule_spec
+    )
 
 
 def _strategy_with_separate_benchmark_symbol(

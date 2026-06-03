@@ -12,6 +12,7 @@ from argus.domain.backtesting.rules import (
     validate_rule_spec,
 )
 from argus.domain.indicators import executable_indicator_spec
+from argus.domain.slot_normalizer import normalize_template_name
 
 SUPPORTED_STRATEGY_TYPES = {
     "buy_and_hold",
@@ -81,6 +82,16 @@ def canonical_strategy_type(
 ) -> str:
     del entry_logic, exit_logic
     normalized = _normalize_token(raw_type)
+    template = normalize_template_name(normalized)
+    template_strategy_types = {
+        "buy_and_hold": "buy_and_hold",
+        "dca_accumulation": "dca_accumulation",
+        "buy_the_dip": "indicator_threshold",
+        "rsi_mean_reversion": "indicator_threshold",
+        "moving_average_crossover": "signal_strategy",
+    }
+    if template in template_strategy_types:
+        return template_strategy_types[template]
     aliases = {
         "buy_hold": "buy_and_hold",
         "buy_and_hold": "buy_and_hold",
