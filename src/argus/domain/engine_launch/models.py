@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
+
+from argus.domain.backtesting.date_window import validate_backtest_date_window
 
 LaunchStrategyType = Literal[
     "buy_and_hold",
@@ -66,6 +69,13 @@ class LaunchBacktestRequest(BaseModel):
                 raise ValueError("cadence_required")
         elif self.cadence is not None:
             raise ValueError("cadence_not_applicable")
+
+        try:
+            start = date.fromisoformat(self.date_range.start)
+            end = date.fromisoformat(self.date_range.end)
+        except ValueError as exc:
+            raise ValueError("invalid_date_range") from exc
+        validate_backtest_date_window(start=start, end=end)
 
         return self
 

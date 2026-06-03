@@ -597,6 +597,13 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         },
     )
     assert create_confirmation.status_code == 200
+    confirmation = _stream_payloads(create_confirmation.text, "confirmation")[0][
+        "confirmation"
+    ]
+    for action in confirmation["actions"]:
+        assert action["presentation"] == "confirmation"
+        assert action["payload"]["confirmation_id"] == confirmation["confirmation_id"]
+        assert action["payload"]["conversation_id"] == conversation["id"]
 
     response = client.post(
         "/api/v1/chat/stream",

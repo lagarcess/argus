@@ -33,7 +33,7 @@ require_env "SUPABASE_PROJECT_URL"
 require_env "SUPABASE_ANON_PUBLIC_KEY"
 require_env "SUPABASE_SERVICE_ROLE_KEY"
 require_env "SUPABASE_JWT_SECRET"
-require_env "DATABASE_URL"
+require_env "SUPABASE_POSTGRES_SESSION_POOLER_URL"
 require_env "ALPACA_API_KEY"
 require_env "ALPACA_SECRET_KEY"
 require_env "OPENROUTER_API_KEY"
@@ -43,12 +43,17 @@ export ARGUS_DEV_MEMORY_FALLBACK=false
 export ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider
 export ARGUS_CHECKPOINTER_MODE=postgres
 export ARGUS_MOCK_AUTH=false
+# SUPABASE_POSTGRES_DIRECT_URL and SUPABASE_POSTGRES_TRANSACTION_POOLER_URL may
+# be present in .env for migrations or future serverless-style clients. QA uses
+# session pooling for the persistent local backend/checkpointer runtime.
+export DATABASE_URL="$SUPABASE_POSTGRES_SESSION_POOLER_URL"
 
 echo "🟢 QA Mode activated:"
 echo "   - Persistence: Supabase (durable)"
 echo "   - Market Data: Live provider catalog (production-like asset resolution)"
 echo "   - Fallback: Strict (errors exposed for debugging)"
 echo "   - Runtime checkpoints: Postgres"
+echo "   - Database URL: Session Pooler -> internal DATABASE_URL"
 echo ""
 echo "Frontend QA reminder:"
 echo "   web/.env.local should use NEXT_PUBLIC_MOCK_AUTH=false for real auth"

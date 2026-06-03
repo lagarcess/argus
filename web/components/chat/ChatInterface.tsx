@@ -60,6 +60,7 @@ import {
 import {
   activeConversationRouteStateFromUrl,
   shouldStartConversationForVisibleEmptyChat,
+  targetConversationIdForSend,
   type ActiveConversationRouteState,
 } from "@/lib/chat-conversation-routing";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
@@ -1077,7 +1078,11 @@ export default function ChatInterface() {
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
     const replacementAssistantId = options?.replacementAssistantId?.trim() || undefined;
     const routeState = readActiveConversationRouteState();
-    let targetConversationId = routeState.conversationId ?? conversationId;
+    let targetConversationId = targetConversationIdForSend({
+      routeConversationId: routeState.conversationId,
+      stateConversationId: conversationId,
+      action,
+    });
     const shouldCreateNewRouteConversation = shouldStartConversationForVisibleEmptyChat({
       routeState,
       visibleMessageCount: messages.length,
@@ -1446,7 +1451,17 @@ export default function ChatInterface() {
   // ── Action routing ─────────────────────────────────────────────────────────
 
   const handleSaveStrategyAction = async (action: ChatActionOption) => {
-    if (!conversationId) return;
+    const routeState = readActiveConversationRouteState();
+    const targetConversationId = targetConversationIdForSend({
+      routeConversationId: routeState.conversationId,
+      stateConversationId: conversationId,
+      action,
+    });
+    if (!targetConversationId) return;
+    if (targetConversationId !== conversationId) {
+      rememberActiveConversationId(targetConversationId);
+      setConversationId(targetConversationId);
+    }
     if (!strategiesEnabled) {
       showToast(t(
         "chat.private_alpha_result_kept",
@@ -1464,7 +1479,7 @@ export default function ChatInterface() {
 
     try {
       setMessages((prev) => markResultCardSaving(prev, runId, true));
-      await streamChatMessage(conversationId, streamInput, i18n.language, (event) => {
+      await streamChatMessage(targetConversationId, streamInput, i18n.language, (event) => {
         if (event.event === "final") {
           const finalPayload = event.data as typeof event.data & Record<string, unknown>;
           const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
@@ -1485,7 +1500,7 @@ export default function ChatInterface() {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
         }
         if (event.event === "done") {
-          schedulePostTurnHistoryRefresh(conversationId);
+          schedulePostTurnHistoryRefresh(targetConversationId);
         }
       }, []);
     } catch (err: unknown) {
@@ -1511,7 +1526,17 @@ export default function ChatInterface() {
   };
 
   const handleCancelConfirmationAction = async (action: ChatActionOption) => {
-    if (!conversationId || isStreamingResponse) return;
+    const routeState = readActiveConversationRouteState();
+    const targetConversationId = targetConversationIdForSend({
+      routeConversationId: routeState.conversationId,
+      stateConversationId: conversationId,
+      action,
+    });
+    if (!targetConversationId || isStreamingResponse) return;
+    if (targetConversationId !== conversationId) {
+      rememberActiveConversationId(targetConversationId);
+      setConversationId(targetConversationId);
+    }
     const effect = confirmationActionEffectFromAction(action);
     if (!effect) return;
     const streamInput: ChatActionRequest = {
@@ -1525,7 +1550,7 @@ export default function ChatInterface() {
     setStreamStatus(null);
     setIsStreamingResponse(true);
     try {
-      await streamChatMessage(conversationId, streamInput, i18n.language, (event) => {
+      await streamChatMessage(targetConversationId, streamInput, i18n.language, (event) => {
         if (event.event === "final") {
           setMessages((prev) =>
             applyConfirmationActionEffects(markComposerActionsInactive(prev), [effect]),
@@ -1535,7 +1560,7 @@ export default function ChatInterface() {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
         }
         if (event.event === "done") {
-          schedulePostTurnHistoryRefresh(conversationId);
+          schedulePostTurnHistoryRefresh(targetConversationId);
         }
       }, []);
     } catch (err: unknown) {

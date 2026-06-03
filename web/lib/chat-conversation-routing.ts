@@ -1,3 +1,5 @@
+import type { ChatActionOption } from "@/components/chat/types";
+
 export type ActiveConversationRouteState = {
   conversationId: string | null;
   isChatRoute: boolean;
@@ -39,5 +41,29 @@ export function shouldStartConversationForVisibleEmptyChat({
     routeState.isNewChatRoute &&
     visibleMessageCount === 0 &&
     !hasStructuredAction
+  );
+}
+
+export function actionConversationId(action: ChatActionOption | null | undefined) {
+  const rawConversationId =
+    action?.payload?.conversation_id ?? action?.payload?.conversationId;
+  if (typeof rawConversationId !== "string") return null;
+  return rawConversationId.trim() || null;
+}
+
+export function targetConversationIdForSend({
+  routeConversationId,
+  stateConversationId,
+  action,
+}: {
+  routeConversationId: string | null | undefined;
+  stateConversationId: string | null | undefined;
+  action: ChatActionOption | null | undefined;
+}) {
+  return (
+    actionConversationId(action) ??
+    routeConversationId?.trim() ??
+    stateConversationId?.trim() ??
+    null
   );
 }

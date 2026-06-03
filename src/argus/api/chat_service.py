@@ -151,10 +151,12 @@ def runtime_confirmation_card(
     runtime_result: dict[str, Any],
     *,
     confirmation_id: str | None = None,
+    conversation_id: str | None = None,
 ) -> dict[str, Any] | None:
     return _confirmation.runtime_confirmation_card(
         runtime_result,
         confirmation_id=confirmation_id,
+        conversation_id=conversation_id,
         format_confirmation_period_func=_format_confirmation_period,
     )
 

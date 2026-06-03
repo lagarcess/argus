@@ -25,12 +25,16 @@ export ARGUS_DEV_MEMORY_FALLBACK=true
 export ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture
 export ARGUS_CHECKPOINTER_MODE=memory
 export ARGUS_MOCK_AUTH=true
+# Dev mode is intentionally memory-only even if .env contains typed Supabase
+# Postgres URLs such as SUPABASE_POSTGRES_SESSION_POOLER_URL.
+unset DATABASE_URL
 
 echo "🔵 Dev Mode activated:"
 echo "   - Persistence: Memory (ephemeral)"
 echo "   - Market Data: Synthetic fixtures (no API calls)"
 echo "   - Fallback: Tolerant (keeps going on errors)"
 echo "   - Runtime checkpoints: Memory"
+echo "   - Database URLs: Ignored"
 echo ""
 echo "Starting FastAPI backend on http://127.0.0.1:8000"
 echo ""

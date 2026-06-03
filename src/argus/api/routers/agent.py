@@ -782,6 +782,7 @@ async def chat_stream(
                 confirmation_card = runtime_confirmation_card(
                     runtime_result,
                     confirmation_id=_confirmation_id_for_runtime_card(runtime_result),
+                    conversation_id=conversation.id,
                 )
                 confirmation_anchor_text: str | None = None
                 if confirmation_card is not None:

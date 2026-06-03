@@ -21,6 +21,7 @@ def runtime_confirmation_card(
     runtime_result: dict[str, Any],
     *,
     confirmation_id: str | None = None,
+    conversation_id: str | None = None,
     format_confirmation_period_func: Any | None = None,
 ) -> dict[str, Any] | None:
     if runtime_result.get("stage_outcome") != "await_approval":
@@ -105,6 +106,7 @@ def runtime_confirmation_card(
     )
     execution_validation = validate_confirmation_execution_payload(payload)
     is_ready_to_run = execution_validation.executable
+    owner_conversation_id = conversation_id.strip() if conversation_id else None
     action_payload = {
         "confirmation_id": active_confirmation_id,
         "artifact_id": active_confirmation_id,
@@ -112,6 +114,8 @@ def runtime_confirmation_card(
             execution_validation.launch_payload
         ),
     }
+    if owner_conversation_id:
+        action_payload["conversation_id"] = owner_conversation_id
     actions = [
         {
             "id": "change-dates",

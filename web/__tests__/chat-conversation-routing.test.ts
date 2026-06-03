@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   activeConversationRouteStateFromUrl,
   shouldStartConversationForVisibleEmptyChat,
+  targetConversationIdForSend,
 } from "../lib/chat-conversation-routing";
 
 describe("chat conversation route state", () => {
@@ -54,5 +55,41 @@ describe("chat conversation route state", () => {
         hasStructuredAction: true,
       }),
     ).toBe(false);
+  });
+
+  test("routes structured card actions through their owning conversation", () => {
+    expect(
+      targetConversationIdForSend({
+        routeConversationId: "stale-route",
+        stateConversationId: "stale-state",
+        action: {
+          label: "Change asset",
+          type: "change_asset",
+          presentation: "confirmation",
+          payload: { conversation_id: "card-conversation" },
+        },
+      }),
+    ).toBe("card-conversation");
+
+    expect(
+      targetConversationIdForSend({
+        routeConversationId: "stale-route",
+        stateConversationId: null,
+        action: {
+          label: "Run backtest",
+          type: "run_backtest",
+          presentation: "confirmation",
+          payload: { conversationId: "camel-card-conversation" },
+        },
+      }),
+    ).toBe("camel-card-conversation");
+
+    expect(
+      targetConversationIdForSend({
+        routeConversationId: "route-conversation",
+        stateConversationId: "state-conversation",
+        action: undefined,
+      }),
+    ).toBe("route-conversation");
   });
 });

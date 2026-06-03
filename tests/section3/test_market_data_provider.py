@@ -120,6 +120,7 @@ def test_resolve_asset_aliases_and_caches_universe(
         return mapping
 
     assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", fake_load_assets)
     monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
 
@@ -145,6 +146,7 @@ def test_resolve_asset_rejects_unknown_symbol(monkeypatch: pytest.MonkeyPatch) -
         return mapping
 
     assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", fake_load_assets)
     monkeypatch.setattr(assets, "_load_assets_from_kraken", lambda: {})
 
@@ -371,6 +373,7 @@ def test_kraken_currency_pairs_are_available_without_alpaca(
         }
 
     assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
     monkeypatch.setattr(assets, "_load_assets_from_alpaca", lambda: {})
     monkeypatch.setattr(assets, "_kraken_public_get", fake_kraken_get)
 

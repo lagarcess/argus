@@ -1876,6 +1876,7 @@ def _response_needs_dca_contract_audit(
         return False
     if response.semantic_turn_act in {
         "approval",
+        "educational_question",
         "refine_current_idea",
         "result_followup",
         "retry_failed_action",

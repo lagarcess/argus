@@ -15,6 +15,7 @@ from argus.agent_runtime.state.models import (
     RunState,
     StrategySummary,
     TaskSnapshot,
+    UnsupportedConstraint,
     UserState,
 )
 
@@ -1966,6 +1967,82 @@ def test_requested_asset_answer_prefers_current_answer_source_over_duplicate_llm
     assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
 
 
+def test_requested_asset_answer_repair_clears_stale_unsupported_rejection(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized == "GOOGL":
+            return ResolvedAssetStub("GOOGL", "equity", name="Alphabet Inc.")
+        if normalized == "AAPL":
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        if normalized == "QQQ":
+            return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Compare AAPL against QQQ over 2024.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        comparison_baseline="QQQ",
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User supplied a replacement asset.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            asset_universe=["GOOGL"],
+            asset_class="equity",
+            raw_user_phrasing="google",
+        ),
+        semantic_turn_act="answer_pending_need",
+        unsupported_constraints=[
+            UnsupportedConstraint(
+                category="navigation_or_tool",
+                raw_value="google",
+                explanation=(
+                    "The input does not describe an investing idea, backtest "
+                    "request, or supported capability question."
+                ),
+            ),
+            UnsupportedConstraint(
+                category="action",
+                raw_value="google",
+                explanation=(
+                    "The request does not map to a supported investing idea, "
+                    "backtest, or strategy refinement."
+                ),
+            ),
+        ],
+        assistant_response=(
+            "I can't run a backtest on 'google' as an investing idea."
+        ),
+        reason_codes=["requested_asset_answer_candidate_audit"],
+    )
+
+    result, _ = _interpret(
+        message="google",
+        response=response,
+        snapshot=TaskSnapshot(pending_strategy_summary=pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "asset_universe",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision.unsupported_constraints == []
+    assert result.decision.candidate_strategy_draft.asset_universe == ["GOOGL"]
+    assert result.decision.candidate_strategy_draft.comparison_baseline == "QQQ"
+
+
 def test_requested_asset_answer_overrides_noisy_interpreter_draft(
     monkeypatch,
 ) -> None:
@@ -3201,6 +3278,135 @@ def test_context_curiosity_does_not_silently_inherit_latest_result(monkeypatch) 
     assert result.decision.artifact_target == "none"
     assert result.decision.context_question_focus == "corporate_events"
     assert "Execution limits" not in result.patch["assistant_response"]
+
+
+def test_active_dca_confirmation_side_question_does_not_route_stale_candidate() -> None:
+    pending = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy ETH every two weeks.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        date_range={"start": "2022-01-01", "end": "2023-12-31"},
+        capital_amount=125,
+        cadence="biweekly",
+        comparison_baseline="BTC",
+        field_provenance={
+            "capital_amount": "recurring_contribution",
+            "cadence": "explicit_user",
+        },
+    )
+    stale_candidate = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Recurring buys for an unrelated parsed asset.",
+        asset_universe=["DG"],
+        asset_class="equity",
+        date_range={"start": "2022-01-01", "end": "2023-12-31"},
+        capital_amount=125,
+        cadence="biweekly",
+        field_provenance={
+            "capital_amount": "recurring_contribution",
+            "cadence": "explicit_user",
+        },
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what dollar cost averaging means.",
+        assistant_response=(
+            "Dollar cost averaging means spreading recurring purchases over time."
+        ),
+        candidate_strategy_draft=stale_candidate,
+        semantic_turn_act="educational_question",
+        artifact_target="active_confirmation",
+    )
+
+    result, _ = _interpret(
+        message="explain what dollar cost averaging means",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.patch["assistant_response"] == response.assistant_response
+    assert result.decision.semantic_turn_act == "educational_question"
+    assert result.decision.candidate_strategy_draft.asset_universe == []
+    assert "educational_strategy_route_suppressed" in result.decision.reason_codes
+
+
+def test_dca_contract_audit_skips_educational_turn_with_stale_strategy_baggage() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        _response_needs_dca_contract_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what dollar cost averaging means.",
+        assistant_response="Dollar cost averaging spreads recurring buys over time.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="dca_accumulation",
+            strategy_thesis="Stale recurring-buy context from the visible card.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2022-01-01", "end": "2023-12-31"},
+            capital_amount=125,
+            cadence="biweekly",
+            field_provenance={
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+            },
+        ),
+        semantic_turn_act="educational_question",
+    )
+
+    assert not _response_needs_dca_contract_audit(
+        response=response,
+        request=InterpretationRequest(
+            current_user_message="explain what dollar cost averaging means",
+            user=UserState(user_id="user-1"),
+        ),
+    )
+
+
+def test_dca_education_answer_cannot_claim_recurring_buys_unsupported(monkeypatch) -> None:
+    async def _bad_capability_composer(**_: object) -> str:
+        return (
+            "Since we can't run a pure DCA rule here, try buy and hold instead."
+        )
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret.invoke_openrouter_chat_completion",
+        _bad_capability_composer,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks what dollar cost averaging means.",
+        assistant_response=(
+            "Since we can't run a pure DCA rule here, try buy and hold instead."
+        ),
+        semantic_turn_act="educational_question",
+    )
+
+    result, _ = _interpret(
+        message="explain what dollar cost averaging means",
+        response=response,
+        snapshot=None,
+    )
+
+    answer = result.patch["assistant_response"]
+    assert result.outcome == "ready_to_respond"
+    assert "Recurring buys support" in answer
+    assert "can't run" not in answer
+    assert "not runnable" not in answer
 
 
 def test_new_vague_strategy_does_not_inherit_hidden_snapshot_assets(monkeypatch) -> None:

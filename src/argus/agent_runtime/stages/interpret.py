@@ -529,6 +529,23 @@ async def _stage_result_from_interpretation(
     ) or _candidate_strategy_has_backtest_shape(
         interpretation.candidate_strategy_draft
     )
+    if _educational_turn_has_strategy_baggage(
+        interpretation=interpretation,
+        expects_strategy_route=expects_strategy_route,
+    ):
+        expects_strategy_route = False
+        route_suppression_reason_codes.append("educational_strategy_route_suppressed")
+        interpretation = interpretation.model_copy(
+            update={
+                "intent": "conversation_followup",
+                "task_relation": "continue",
+                "requires_clarification": False,
+                "candidate_strategy_draft": StrategySummary(),
+                "missing_required_fields": [],
+                "ambiguous_fields": [],
+                "unsupported_constraints": [],
+            }
+        )
     incoming_strategy = _strategy_with_contextual_merge(
         strategy=interpretation.candidate_strategy_draft,
         snapshot=snapshot,
@@ -606,6 +623,10 @@ async def _stage_result_from_interpretation(
         )
     )
     if requested_asset_answer_applied:
+        unsupported_constraints = _without_stale_requested_asset_rejection_constraints(
+            interpretation.unsupported_constraints,
+            strategy=incoming_strategy,
+        )
         expects_strategy_route = True
         interpretation = interpretation.model_copy(
             update={
@@ -615,9 +636,16 @@ async def _stage_result_from_interpretation(
                 "assistant_response": None,
                 "semantic_turn_act": "answer_pending_need",
                 "missing_required_fields": [],
+                "unsupported_constraints": unsupported_constraints,
                 "reason_codes": [
                     *interpretation.reason_codes,
                     "requested_asset_answer_route_repaired",
+                    *(
+                        ["stale_requested_asset_rejection_removed"]
+                        if len(unsupported_constraints)
+                        < len(interpretation.unsupported_constraints)
+                        else []
+                    ),
                 ],
             }
         )
@@ -946,6 +974,18 @@ async def _stage_result_from_interpretation(
             outcome="ready_to_respond",
             decision=decision,
             stage_patch={"assistant_response": context_answer},
+        )
+    supported_strategy_answer = await _supported_strategy_education_repair_if_needed(
+        semantic_turn_act=interpretation.semantic_turn_act,
+        assistant_response=interpretation.assistant_response,
+        current_user_message=state.current_user_message,
+        capability_contract=capability_contract,
+    )
+    if supported_strategy_answer is not None:
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision,
+            stage_patch={"assistant_response": supported_strategy_answer},
         )
     capability_answer = await _capability_answer_if_applicable(
         focus=interpretation.capability_question_focus,
@@ -1594,9 +1634,48 @@ def _capability_answer_respects_contract(
 ) -> bool:
     if not answer:
         return False
+    if focus in {"supported_strategies", "general"} and (
+        _answer_contradicts_supported_strategy_families(answer)
+    ):
+        return False
     if focus != "supported_indicators":
         return True
     return not _answer_contradicts_supported_indicators(answer)
+
+
+async def _supported_strategy_education_repair_if_needed(
+    *,
+    semantic_turn_act: SemanticTurnAct | None,
+    assistant_response: str | None,
+    current_user_message: str,
+    capability_contract: Any,
+) -> str | None:
+    if (
+        semantic_turn_act != "educational_question"
+        or not assistant_response
+        or not _answer_contradicts_supported_strategy_families(assistant_response)
+    ):
+        return None
+    return await _compose_natural_capability_answer(
+        focus="supported_strategies",
+        current_user_message=current_user_message,
+        capability_contract=capability_contract,
+    )
+
+
+def _answer_contradicts_supported_strategy_families(answer: str) -> bool:
+    for sentence in _plain_sentences(answer):
+        tokens = _plain_word_tokens(sentence)
+        if not tokens:
+            continue
+        strategy_spans = _supported_strategy_family_token_spans(tokens)
+        if not strategy_spans:
+            continue
+        negative_positions = _negative_support_claim_positions(tokens)
+        for start, end in strategy_spans:
+            if any(start - 3 <= position <= end + 6 for position in negative_positions):
+                return True
+    return False
 
 
 def _answer_contradicts_supported_indicators(answer: str) -> bool:
@@ -1612,6 +1691,33 @@ def _answer_contradicts_supported_indicators(answer: str) -> bool:
             if any(start - 3 <= position <= end + 6 for position in negative_positions):
                 return True
     return False
+
+
+_SUPPORTED_STRATEGY_FAMILY_TERMS: tuple[str, ...] = (
+    "buy and hold",
+    "buy-and-hold",
+    "hold",
+    "recurring buys",
+    "recurring buy",
+    "dca",
+    "dollar cost averaging",
+    "indicator threshold",
+    "indicator rules",
+    "signal rules",
+    "moving average",
+    "macd",
+    "bollinger band",
+)
+
+
+def _supported_strategy_family_token_spans(tokens: list[str]) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for term in _SUPPORTED_STRATEGY_FAMILY_TERMS:
+        term_tokens = _plain_word_tokens(term)
+        if not term_tokens:
+            continue
+        spans.extend(_token_sequence_spans(tokens, term_tokens))
+    return spans
 
 
 def _plain_sentences(text: str) -> list[str]:
@@ -2365,6 +2471,21 @@ def _strategy_with_requested_asset_answer_resolution(
         updated.asset_universe = []
         updated.asset_class = None
     return updated, True
+
+
+def _without_stale_requested_asset_rejection_constraints(
+    constraints: list[UnsupportedConstraint],
+    *,
+    strategy: StrategySummary,
+) -> list[UnsupportedConstraint]:
+    if not strategy.asset_universe:
+        return list(constraints)
+    stale_rejection_categories = {"action", "navigation_or_tool"}
+    return [
+        constraint
+        for constraint in constraints
+        if constraint.category not in stale_rejection_categories
+    ]
 
 
 def _resolve_asset_candidate_safely(
@@ -4315,6 +4436,23 @@ def _strategy_route_expected(
 ) -> bool:
     return intent in {"strategy_drafting", "backtest_execution"} or (
         semantic_turn_act in STRATEGY_TURN_ACTS
+    )
+
+
+def _educational_turn_has_strategy_baggage(
+    *,
+    interpretation: StructuredInterpretation,
+    expects_strategy_route: bool,
+) -> bool:
+    if interpretation.semantic_turn_act != "educational_question":
+        return False
+    return bool(
+        expects_strategy_route
+        or _strategy_has_content(interpretation.candidate_strategy_draft)
+        or interpretation.requires_clarification
+        or interpretation.missing_required_fields
+        or interpretation.ambiguous_fields
+        or interpretation.unsupported_constraints
     )
 
 
