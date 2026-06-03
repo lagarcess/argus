@@ -70,6 +70,7 @@ import {
 import { writeClipboardText } from "@/lib/clipboard";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
+import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
 import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
@@ -594,12 +595,14 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     });
   });
 
-  const normalized = applyConsumedResultActions(
-    applyConfirmationActionEffects(
-      normalizeConfirmationHistory(messages),
-      confirmationActionEffects.effects,
+  const normalized = normalizeRetryActionHistory(
+    applyConsumedResultActions(
+      applyConfirmationActionEffects(
+        normalizeConfirmationHistory(messages),
+        confirmationActionEffects.effects,
+      ),
+      consumedResultActions,
     ),
-    consumedResultActions,
   );
   return { messages: normalized, inputActions: latestInputActions(normalized) };
 }
@@ -1279,17 +1282,19 @@ export default function ChatInterface() {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
           setInputActions([]);
           setMessages((prev) =>
-            normalizeConfirmationHistory(
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      kind: "strategy_confirmation",
-                      content: undefined,
-                      confirmation,
-                      actions: confirmation.actions ?? [],
-                    }
-                  : m,
+            normalizeRetryActionHistory(
+              normalizeConfirmationHistory(
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        kind: "strategy_confirmation",
+                        content: undefined,
+                        confirmation,
+                        actions: confirmation.actions ?? [],
+                      }
+                    : m,
+                ),
               ),
             ),
           );
@@ -1304,18 +1309,20 @@ export default function ChatInterface() {
           };
           setInputActions([]);
           setMessages((prev) =>
-            normalizeConfirmationHistory(
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                    ...m,
-                    kind: "strategy_result",
-                    content: m.content || finalText || undefined,
-                    result: card,
-                    actions: resultActions,
-                    savedStrategyId: card.savedStrategyId,
-                    }
-                  : m,
+            normalizeRetryActionHistory(
+              normalizeConfirmationHistory(
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        kind: "strategy_result",
+                        content: m.content || finalText || undefined,
+                        result: card,
+                        actions: resultActions,
+                        savedStrategyId: card.savedStrategyId,
+                      }
+                    : m,
+                ),
               ),
             ),
           );
@@ -1337,14 +1344,16 @@ export default function ChatInterface() {
               finalStageOutcome === "await_user_reply" ||
               finalStageOutcome === "needs_clarification"
             ) {
-              return settleOpenConfirmationsAfterTextFinal(nextMessages, {
-                action,
-                finalActions: finalRetryActions,
-                hasFailedAction: finalHasFailedAction,
-                stageOutcome: finalStageOutcome,
-              });
+              return normalizeRetryActionHistory(
+                settleOpenConfirmationsAfterTextFinal(nextMessages, {
+                  action,
+                  finalActions: finalRetryActions,
+                  hasFailedAction: finalHasFailedAction,
+                  stageOutcome: finalStageOutcome,
+                }),
+              );
             }
-            return nextMessages;
+            return normalizeRetryActionHistory(nextMessages);
           });
         }
       }
