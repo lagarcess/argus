@@ -302,6 +302,15 @@ function historyItemBelongsToConversation(
   return item.id === targetConversationId || item.conversation_id === targetConversationId;
 }
 
+function isMissingConversationLoadError(error: unknown) {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const status = "status" in error ? Number(error.status) : null;
+  const code = "code" in error && typeof error.code === "string" ? error.code : null;
+  return status === 403 || status === 404 || code === "not_found";
+}
+
 function hydrateResultActions(
   actions: ChatActionOption[],
   context: {
@@ -355,6 +364,23 @@ function stringArrayOrNull(value: unknown): string[] | null {
   }
   const values = value.map(String).filter(Boolean);
   return values.length > 0 ? values : null;
+}
+
+function isHydratableResultCard(value: unknown): value is ConversationResultCard {
+  const card = recordOrNull(value);
+  const dateRange = recordOrNull(card?.date_range);
+  return Boolean(
+    card &&
+      typeof card.title === "string" &&
+      typeof card.status_label === "string" &&
+      Array.isArray(card.rows) &&
+      Array.isArray(card.assumptions) &&
+      Array.isArray(card.actions) &&
+      dateRange &&
+      typeof dateRange.start === "string" &&
+      typeof dateRange.end === "string" &&
+      typeof dateRange.display === "string",
+  );
 }
 
 function assetClassOrUndefined(value: unknown): AssetClass | undefined {
@@ -493,7 +519,7 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     const metadata = m.metadata ?? {};
     const chatAction = metadata.chat_action as ChatActionOption | undefined;
     const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
-    const resultCard = metadata.result_card as ConversationResultCard | undefined;
+    const resultCard = metadata.result_card;
     if (m.role === "user" && chatAction && typeof chatAction === "object") {
       return {
         id: m.id,
@@ -506,8 +532,7 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     if (
       m.role !== "user" &&
       !isBreakdownActionMetadata(metadata) &&
-      resultCard &&
-      Array.isArray(resultCard.rows)
+      isHydratableResultCard(resultCard)
     ) {
       const runId = String(metadata.result_run_id ?? metadata.latest_run_id ?? "");
       const conversationId =
@@ -887,8 +912,13 @@ export default function ChatInterface() {
             );
 
             return;
-          } catch {
+          } catch (error) {
             if (cancelled) return;
+            if (isMissingConversationLoadError(error)) {
+              setHistoryItems((prev) =>
+                prev.filter((item) => !historyItemBelongsToConversation(item, activeConversationId)),
+              );
+            }
             resetToEmptyChatSurface();
             setShowOnboardingGoalCards(
               privateAlphaOnboardingEnabled &&
@@ -968,7 +998,12 @@ export default function ChatInterface() {
       }
       setMessages(hydrated.messages);
       setInputActions(hydrated.inputActions);
-    } catch {
+    } catch (error) {
+      if (isMissingConversationLoadError(error)) {
+        setHistoryItems((prev) =>
+          prev.filter((item) => !historyItemBelongsToConversation(item, convId)),
+        );
+      }
       resetToEmptyChatSurface();
       showToast(t('chat.error_load'));
     } finally {

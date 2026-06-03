@@ -59,6 +59,30 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(removedBlock).not.toContain("startNewChat()");
   });
 
+  test("missing recent conversations are pruned after a failed load", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const loadConversationStart = chat.indexOf("const loadConversation = async (convId: string) => {");
+    const loadConversationEnd = chat.indexOf("const loadConversationForRun", loadConversationStart);
+    const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
+
+    expect(chat).toContain("function isMissingConversationLoadError(error: unknown)");
+    expect(loadConversation).toContain("catch (error)");
+    expect(loadConversation).toContain("isMissingConversationLoadError(error)");
+    expect(loadConversation).toContain("setHistoryItems((prev) =>");
+    expect(loadConversation).toContain("!historyItemBelongsToConversation(item, convId)");
+  });
+
+  test("persisted result cards are validated before structured hydration", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const hydrateStart = chat.indexOf("function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages");
+    const hydrateEnd = chat.indexOf("function createPendingAssistantMessage", hydrateStart);
+    const hydrateBlock = chat.slice(hydrateStart, hydrateEnd);
+
+    expect(chat).toContain("function isHydratableResultCard(value: unknown)");
+    expect(hydrateBlock).toContain("isHydratableResultCard(resultCard)");
+    expect(hydrateBlock).not.toContain("resultCard &&\n      Array.isArray(resultCard.rows)");
+  });
+
   test("header delete requires a selected chat and confirmation", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
 
