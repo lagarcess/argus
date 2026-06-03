@@ -1229,6 +1229,207 @@ def test_refine_strategy_action_preserves_completed_dca_fields_after_reload() ->
     assert strategy["comparison_baseline"] == "SPY"
 
 
+def test_review_one_replay_preserves_result_artifact_through_date_patch(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+    from argus.agent_runtime.graph.workflow import build_workflow
+    from argus.agent_runtime.stages.interpret_types import (
+        InterpretationRequest,
+        StructuredInterpretation,
+    )
+    from argus.agent_runtime.state.models import StrategySummary
+    from argus.api import state as api_state
+    from argus.api.chat.recovery import failed_action_metadata_fallback_context
+    from langgraph.checkpoint.memory import MemorySaver
+
+    class _ResolvedAssetStub:
+        def __init__(self, canonical_symbol: str, asset_class: str) -> None:
+            self.canonical_symbol = canonical_symbol
+            self.asset_class = asset_class
+
+    class _DatePatchInterpreter:
+        async def ainvoke(
+            self,
+            request: InterpretationRequest,
+        ) -> StructuredInterpretation:
+            snapshot = request.latest_task_snapshot
+            assert snapshot is not None
+            assert snapshot.latest_failed_action_reference is None
+            reference = snapshot.latest_backtest_result_reference
+            assert reference is not None
+            assert reference.metadata["symbols"] == ["AAPL", "GOOG"]
+            return StructuredInterpretation(
+                intent="results_explanation",
+                task_relation="continue",
+                requires_clarification=False,
+                user_goal_summary="User changed the completed result date range.",
+                candidate_strategy_draft=StrategySummary(
+                    date_range={"start": "2019-10-01", "end": "2025-10-31"},
+                ),
+                confidence=0.9,
+                semantic_turn_act="result_followup",
+                result_followup_focus="next_experiment",
+                artifact_target="latest_result",
+            )
+
+    def _resolve_asset(query: str) -> _ResolvedAssetStub:
+        return _ResolvedAssetStub(query.strip().upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", _resolve_asset)
+    client = _client()
+    app.state.agent_runtime_workflow = build_workflow(
+        structured_interpreter=_DatePatchInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    failed_launch_payload = {
+        "strategy_type": "dca_accumulation",
+        "symbol": "AAPL",
+        "symbols": ["AAPL", "GOOG"],
+        "timeframe": "1D",
+        "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+        "sizing_mode": "capital_amount",
+        "capital_amount": 200,
+        "cadence": "monthly",
+        "benchmark_symbol": "SPY",
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="The previous run failed but can be retried.",
+        metadata={
+            "conversation_mode": "setup",
+            "agent_runtime_stage_outcome": "execution_failed_recoverably",
+            "failed_action": {
+                "artifact_id": "failed-review-one",
+                "action_type": "run_backtest",
+                "launch_payload": failed_launch_payload,
+                "failure_classification": "upstream_dependency_error",
+                "error": "market_data_unavailable",
+                "retryable": True,
+            },
+        },
+    )
+    assert (
+        failed_action_metadata_fallback_context(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        is not None
+    )
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL", "GOOG"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 20.6}}},
+        config_snapshot={
+            "template": "dca_accumulation",
+            "symbols": ["AAPL", "GOOG"],
+            "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+            "resolved_strategy": {
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "Buy AAPL and GOOG every month.",
+                "asset_universe": ["AAPL", "GOOG"],
+                "asset_class": "equity",
+                "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                "capital_amount": 200,
+                "cadence": "monthly",
+                "comparison_baseline": "SPY",
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "capital_amount": 200,
+                "recurring_contribution": 200,
+                "cadence": "monthly",
+                "benchmark_symbol": "SPY",
+            },
+        },
+        conversation_result_card={
+            "title": "AAPL, GOOG DCA Accumulation",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": [
+                "$200 recurring contribution",
+                "Monthly cadence",
+                "Daily data",
+                "Benchmark: SPY",
+            ],
+            "actions": [{"type": "refine_strategy", "label": "Refine strategy"}],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I tested that idea.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_card": run.conversation_result_card,
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+    assert (
+        failed_action_metadata_fallback_context(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        is None
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "do the date range October 2019 to October 2025",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    assert final["stage_outcome"] == "await_approval"
+    strategy = final["confirmation_payload"]["strategy"]
+    assert strategy["strategy_type"] == "dca_accumulation"
+    assert strategy["asset_universe"] == ["AAPL", "GOOG"]
+    assert strategy["asset_class"] == "equity"
+    assert strategy["date_range"] == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert strategy["capital_amount"] == 200
+    assert strategy["cadence"] == "monthly"
+    assert strategy["timeframe"] == "1D"
+    assert strategy["comparison_baseline"] == "SPY"
+    assert "assistant_response" not in final
+    assert "latest_failed_action_reference" not in final
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    latest_assistant = messages[-1]
+    assert latest_assistant["metadata"]["conversation_mode"] == "confirm"
+    assert "latest_failed_action_reference" not in latest_assistant["metadata"]
+    assert (
+        failed_action_metadata_fallback_context(
+            user_id=user_id,
+            conversation_id=conversation["id"],
+        )
+        is None
+    )
+
+
 def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_reload(
     monkeypatch,
 ) -> None:
