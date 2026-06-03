@@ -1402,12 +1402,28 @@ def test_confirm_stage_preserves_explicit_benchmark_in_card_assumptions() -> Non
 def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from datetime import datetime
+
     from argus.agent_runtime.stages import confirm as confirm_module
+    from argus.domain.market_data.capabilities import MarketClockSnapshot
 
     monkeypatch.setattr(
         confirm_module,
         "_today",
         lambda: date(2026, 6, 3),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        confirm_module,
+        "_market_clock_for_strategy",
+        lambda _: MarketClockSnapshot(
+            provider="alpaca",
+            timestamp=datetime(2026, 6, 3, 8, 0),
+            is_open=False,
+            next_open=datetime(2026, 6, 3, 9, 30),
+            next_close=datetime(2026, 6, 3, 16, 0),
+            is_market_day=True,
+        ),
         raising=False,
     )
     state = RunState.new(
