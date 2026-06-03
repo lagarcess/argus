@@ -167,10 +167,7 @@ def runtime_confirmation_card(
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
         "title": title,
-        "statusLabel": _confirmation_status_label(
-            is_ready_to_run=is_ready_to_run,
-            date_adjusted=_confirmation_date_adjusted(payload, strategy),
-        ),
+        "statusLabel": "Ready to run" if is_ready_to_run else "Needs change",
         "summary": summary,
         "rows": rows,
         "assumptions": assumptions,
@@ -225,26 +222,6 @@ def _confirmation_assumptions(
     return assumptions
 
 
-def _confirmation_status_label(
-    *,
-    is_ready_to_run: bool,
-    date_adjusted: bool,
-) -> str:
-    if not is_ready_to_run:
-        return "Needs change"
-    return "Adjusted" if date_adjusted else "Ready to run"
-
-
-def _confirmation_date_adjusted(
-    confirmation_payload: dict[str, Any],
-    strategy: dict[str, Any],
-) -> bool:
-    validation = confirmation_payload.get("validation")
-    if isinstance(validation, dict) and validation.get("date_adjusted") is True:
-        return True
-    return _data_availability_adjustment(strategy) is not None
-
-
 def _data_through_assumption(
     strategy: dict[str, Any],
     *,
@@ -268,9 +245,24 @@ def _data_availability_adjustment(strategy: dict[str, Any]) -> dict[str, Any] | 
         "latest_complete_market_data",
     }:
         return None
-    if not isinstance(adjustment.get("through"), str):
+    through = adjustment.get("through")
+    if not isinstance(through, str):
+        return None
+    if not _data_adjustment_matches_strategy_end(strategy, through=through):
         return None
     return adjustment
+
+
+def _data_adjustment_matches_strategy_end(
+    strategy: dict[str, Any],
+    *,
+    through: str,
+) -> bool:
+    date_range = strategy.get("date_range")
+    if not isinstance(date_range, dict):
+        return True
+    end = date_range.get("end") or date_range.get("to")
+    return end in (None, "") or str(end) == through
 
 
 def _confirmation_benchmark_assumption(

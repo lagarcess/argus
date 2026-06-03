@@ -13,9 +13,13 @@ from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     plan_artifact_assumption_edit,
 )
-from argus.agent_runtime.asset_text_grounding import grounded_asset_mentions_from_text
+from argus.agent_runtime.asset_text_grounding import (
+    grounded_asset_mention_has_name_support,
+    grounded_asset_mentions_from_text,
+)
 from argus.agent_runtime.benchmark_evidence import (
     current_message_has_extra_provider_asset_for_benchmark,
+    provider_ticker_assets_from_text,
 )
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_interpreter_types import (
@@ -45,6 +49,9 @@ from argus.agent_runtime.run_field_contract import (
 )
 from argus.agent_runtime.run_field_contract import (
     current_message_dca_cadence as _dca_cadence_from_current_message,
+)
+from argus.agent_runtime.run_field_contract import (
+    current_message_execution_context_tokens,
 )
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
@@ -959,7 +966,10 @@ async def _asset_grounding_audited_response(
         request=request,
     )
     if not suspicious_symbols:
-        return response
+        return _response_with_misplaced_benchmark_asset_recovered(
+            response=response,
+            request=request,
+        )
     try:
         audit = await invoke_openrouter_json_schema(
             task="interpretation",
@@ -990,10 +1000,17 @@ async def _asset_grounding_audited_response(
             grounded_symbols=[],
             reason_code="asset_grounding_audit_low_confidence_cleared_suspicious_symbols",
         )
-    return _response_without_ungrounded_symbols(
+    audited_response = _response_without_ungrounded_symbols(
         response=response,
         grounded_symbols=audit.grounded_symbols,
         reason_code="asset_grounding_audit_removed_unsubstantiated_symbols",
+    )
+    return _response_with_misplaced_benchmark_asset_recovered(
+        response=audited_response,
+        request=request,
+        ignored_name_supported_symbols=_normalized_extracted_symbols(
+            response.candidate_strategy_draft.asset_universe
+        ),
     )
 
 
@@ -1023,6 +1040,20 @@ def _suspicious_extracted_asset_symbols(
         for asset in _resolved_asset_mentions_from_message(request.current_user_message)
         if str(getattr(asset, "canonical_symbol", "")).strip()
     }
+    provider_ticker_symbol_map = _current_message_provider_ticker_asset_map(request)
+    misplaced_benchmark_candidate = _misplaced_benchmark_asset_candidate(
+        response=response,
+        request=request,
+        provider_ticker_symbol_map=provider_ticker_symbol_map,
+        ignored_name_supported_symbols=set(symbols),
+    )
+    misplaced_benchmark_symbol = (
+        str(getattr(misplaced_benchmark_candidate, "canonical_symbol", "") or "")
+        .strip()
+        .upper()
+        if misplaced_benchmark_candidate is not None
+        else None
+    )
     context_symbols = _context_inheritable_asset_symbols(
         response=response,
         request=request,
@@ -1034,12 +1065,196 @@ def _suspicious_extracted_asset_symbols(
         if symbol in raw_tokens or f"${symbol}" in raw_tokens or folded in cashtag_tokens:
             continue
         if symbol in grounded_symbols or symbol in context_symbols:
+            if (
+                misplaced_benchmark_symbol
+                and symbol != misplaced_benchmark_symbol
+                and symbol in grounded_symbols
+                and symbol not in provider_ticker_symbol_map
+            ):
+                suspicious.append(symbol)
+                continue
             continue
         if folded in lower_tokens:
             suspicious.append(symbol)
             continue
         suspicious.append(symbol)
     return suspicious
+
+
+def _current_message_provider_ticker_asset_map(
+    request: InterpretationRequest,
+) -> dict[str, Any]:
+    assets = provider_ticker_assets_from_text(
+        request.current_user_message,
+        resolve_candidate=_resolve_benchmark_candidate_from_message,
+        limit=10,
+    )
+    symbol_map: dict[str, Any] = {}
+    for asset in assets:
+        symbol = str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        if symbol and symbol not in symbol_map:
+            symbol_map[symbol] = asset
+    return symbol_map
+
+
+def _misplaced_benchmark_asset_candidate(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    provider_ticker_symbol_map: dict[str, Any] | None = None,
+    ignored_name_supported_symbols: set[str] | None = None,
+) -> Any | None:
+    draft = response.candidate_strategy_draft
+    benchmark_symbol = _normalized_extracted_symbol(draft.comparison_baseline)
+    if benchmark_symbol is None:
+        return None
+    if _current_message_has_other_name_supported_asset(
+        response=response,
+        request=request,
+        excluding_symbol=benchmark_symbol,
+        ignored_symbols=ignored_name_supported_symbols or set(),
+    ):
+        return None
+    symbol_map = provider_ticker_symbol_map
+    if symbol_map is None:
+        symbol_map = _current_message_provider_ticker_asset_map(request)
+    return symbol_map.get(benchmark_symbol)
+
+
+def _normalized_extracted_symbol(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().upper()
+    return normalized or None
+
+
+def _normalized_extracted_symbols(values: list[Any]) -> set[str]:
+    symbols: set[str] = set()
+    for value in values:
+        symbol = _normalized_extracted_symbol(value)
+        if symbol is not None:
+            symbols.add(symbol)
+    return symbols
+
+
+def _current_message_has_other_name_supported_asset(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    excluding_symbol: str,
+    ignored_symbols: set[str],
+) -> bool:
+    def _resolve_candidate(query: str) -> AssetResolution | None:
+        try:
+            return _resolve_asset_candidate(
+                query,
+                field="asset_universe[0]",
+                source="user_mention",
+            )
+        except ValueError:
+            return None
+
+    mentions = grounded_asset_mentions_from_text(
+        request.current_user_message,
+        resolve_candidate=_resolve_candidate,
+        excluded_tokens=current_message_execution_context_tokens(
+            request.current_user_message,
+            strategy_type=response.candidate_strategy_draft.strategy_type,
+        ),
+        limit=5,
+    )
+    for mention in mentions:
+        symbol = (
+            str(getattr(mention.asset, "canonical_symbol", "") or "")
+            .strip()
+            .upper()
+        )
+        if (
+            symbol != excluding_symbol
+            and symbol not in ignored_symbols
+            and grounded_asset_mention_has_name_support(mention)
+        ):
+            return True
+    return False
+
+
+def _comparison_baseline_has_provider_ticker_support(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str,
+) -> bool:
+    benchmark = _normalized_extracted_symbol(draft.comparison_baseline)
+    if benchmark is None:
+        return False
+    symbol_map = {
+        str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        for asset in provider_ticker_assets_from_text(
+            current_message,
+            resolve_candidate=_resolve_benchmark_candidate_from_message,
+            limit=10,
+        )
+    }
+    return benchmark in symbol_map
+
+
+def _comparison_baseline_has_trusted_provenance(draft: LLMStrategyDraft) -> bool:
+    provenance = draft.field_provenance or {}
+    return provenance.get("comparison_baseline") in {
+        "explicit_user",
+        "stated_run_field_fidelity_audit",
+    }
+
+
+def _response_with_misplaced_benchmark_asset_recovered(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+    ignored_name_supported_symbols: set[str] | None = None,
+) -> LLMInterpretationResponse:
+    draft = response.candidate_strategy_draft
+    if draft.asset_universe:
+        return response
+    candidate = _misplaced_benchmark_asset_candidate(
+        response=response,
+        request=request,
+        ignored_name_supported_symbols=ignored_name_supported_symbols,
+    )
+    if candidate is None:
+        return response
+    symbol = str(getattr(candidate, "canonical_symbol", "") or "").strip().upper()
+    if not symbol:
+        return response
+
+    repaired = response.model_copy(deep=True)
+    repaired_draft = repaired.candidate_strategy_draft
+    repaired_draft.asset_universe = [symbol]
+    asset_class = str(getattr(candidate, "asset_class", "") or "").strip()
+    if asset_class:
+        repaired_draft.asset_class = asset_class
+    repaired_draft.strategy_thesis = None
+    repaired_draft.comparison_baseline = None
+    field_provenance = dict(repaired_draft.field_provenance or {})
+    field_provenance.pop("comparison_baseline", None)
+    repaired_draft.field_provenance = field_provenance
+    extra_parameters = dict(repaired_draft.extra_parameters or {})
+    if field_provenance:
+        extra_parameters["field_provenance"] = field_provenance
+    else:
+        extra_parameters.pop("field_provenance", None)
+    repaired_draft.extra_parameters = extra_parameters
+    return repaired.model_copy(
+        update={
+            "candidate_strategy_draft": repaired_draft,
+            "reason_codes": list(
+                dict.fromkeys(
+                    [
+                        *repaired.reason_codes,
+                        "misplaced_benchmark_asset_recovered",
+                    ]
+                )
+            ),
+        }
+    )
 
 
 def _context_inheritable_asset_symbols(
@@ -1324,6 +1539,18 @@ def _asset_grounding_audit_messages(
     request: InterpretationRequest,
     suspicious_symbols: list[str],
 ) -> list[dict[str, str]]:
+    provider_ticker_symbol_map = _current_message_provider_ticker_asset_map(request)
+    misplaced_candidate = _misplaced_benchmark_asset_candidate(
+        response=response,
+        request=request,
+        provider_ticker_symbol_map=provider_ticker_symbol_map,
+        ignored_name_supported_symbols=set(suspicious_symbols),
+    )
+    misplaced_symbol = (
+        str(getattr(misplaced_candidate, "canonical_symbol", "") or "").strip().upper()
+        if misplaced_candidate is not None
+        else None
+    )
     return [
         {
             "role": "system",
@@ -1340,6 +1567,17 @@ def _asset_grounding_audit_messages(
         {
             "role": "system",
             "content": f"Extracted symbols to audit: {suspicious_symbols}",
+        },
+        {
+            "role": "system",
+            "content": (
+                "Provider-backed exact ticker candidates in the current message: "
+                f"{sorted(provider_ticker_symbol_map)}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"Possible misplaced benchmark asset: {misplaced_symbol}",
         },
         {
             "role": "system",
@@ -4423,15 +4661,21 @@ def _focused_repair_benchmark_needs_fidelity_audit(
     *,
     current_message: str,
 ) -> bool:
-    benchmark = str(draft.comparison_baseline or "").strip().lstrip("$").upper()
-    if not benchmark:
+    if _llm_value_is_empty(draft.comparison_baseline):
         return False
-    tokens = {
-        token.strip().lstrip("$").casefold()
-        for token in _field_fidelity_tokens(str(current_message or "").casefold())
-        if token.strip()
-    }
-    return benchmark.casefold() not in tokens
+    if _comparison_baseline_has_trusted_provenance(
+        draft
+    ) and _comparison_baseline_has_provider_ticker_support(
+        draft,
+        current_message=current_message,
+    ):
+        return False
+    return current_message_has_extra_provider_asset_for_benchmark(
+        draft,
+        current_message=current_message,
+        resolved_asset_mentions=_resolved_asset_mentions_from_message(current_message),
+        resolve_candidate=_resolve_benchmark_candidate_from_message,
+    )
 
 
 def _ready_response_has_unreconciled_stated_run_fields(
@@ -5323,7 +5567,8 @@ def _response_from_focused_strategy_extraction(
                 entry_threshold=extraction.entry_threshold,
                 exit_threshold=extraction.exit_threshold,
                 field_provenance=_comparison_baseline_provenance(
-                    extraction.comparison_baseline
+                    extraction.comparison_baseline,
+                    current_message=request.current_user_message,
                 ),
                 extra_parameters={
                     "raw_strategy_type": extraction.strategy_type,
@@ -5382,7 +5627,8 @@ def _response_from_focused_strategy_extraction(
             entry_threshold=extraction.entry_threshold,
             exit_threshold=extraction.exit_threshold,
             field_provenance=_comparison_baseline_provenance(
-                extraction.comparison_baseline
+                extraction.comparison_baseline,
+                current_message=request.current_user_message,
             ),
         ),
         missing_required_fields=list(extraction.missing_required_fields),
@@ -5399,8 +5645,11 @@ def _response_from_focused_strategy_extraction(
 
 def _comparison_baseline_provenance(
     comparison_baseline: str | None,
+    *,
+    current_message: str,
 ) -> dict[str, str]:
-    return {"comparison_baseline": "explicit_user"} if comparison_baseline else {}
+    del comparison_baseline, current_message
+    return {}
 
 
 def _merge_focused_repair_with_base(

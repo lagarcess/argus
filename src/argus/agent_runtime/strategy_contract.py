@@ -547,11 +547,22 @@ def _parse_date_token(value: Any, *, today: date) -> date | None:
     if not isinstance(value, str):
         return None
     normalized = _normalize_token(value)
-    if normalized in {"today", "now", "present", "to_date", "current_date"}:
-        return today
+    relative = parse_relative_date_token(normalized, today=today)
+    if relative is not None:
+        return relative
     natural = _parse_natural_date(normalized)
     if natural is not None:
         return natural
+    return None
+
+
+def parse_relative_date_token(value: Any, *, today: date | None = None) -> date | None:
+    current_date = today or date.today()
+    normalized = _normalize_token(value)
+    if normalized == "yesterday":
+        return current_date - timedelta(days=1)
+    if normalized in {"today", "now", "present", "current", "to_date", "current_date"}:
+        return current_date
     return None
 
 

@@ -73,6 +73,16 @@ def test_resolve_date_range_accepts_month_year_to_today() -> None:
     assert resolved.used_default is False
 
 
+def test_resolve_date_range_accepts_relative_endpoint_tokens() -> None:
+    resolved = resolve_date_range(
+        {"start": "2026-01-01", "end": "yesterday"},
+        today=date(2026, 6, 3),
+    )
+
+    assert resolved.payload == {"start": "2026-01-01", "end": "2026-06-02"}
+    assert resolved.used_default is False
+
+
 def test_resolve_date_range_accepts_calendar_year() -> None:
     resolved = resolve_date_range("in 2024", today=date(2026, 5, 3))
 
@@ -110,6 +120,15 @@ def test_current_message_date_range_accepts_current_year_so_far() -> None:
     )
 
     assert resolved == {"start": "2026-01-01", "end": "2026-06-01"}
+
+
+def test_current_message_date_range_accepts_relative_end_date_edit() -> None:
+    resolved = current_message_date_range(
+        "adjust the end date to yesterday",
+        today=date(2026, 6, 3),
+    )
+
+    assert resolved == {"end": "2026-06-02"}
 
 
 def test_current_message_dca_cadence_uses_capability_aliases() -> None:

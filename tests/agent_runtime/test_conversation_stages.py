@@ -1455,6 +1455,54 @@ def test_confirm_stage_marks_daily_today_endpoint_as_latest_complete_data(
     assert confirmation_payload["validation"]["date_adjusted"] is True
 
 
+def test_confirm_stage_clears_stale_latest_complete_data_adjustment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import confirm as confirm_module
+
+    monkeypatch.setattr(
+        confirm_module,
+        "_today",
+        lambda: date(2026, 6, 3),
+        raising=False,
+    )
+    state = RunState.new(
+        current_user_message="Adjust the end date to June 1, 2026.",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold NU this year so far.",
+        asset_universe=["NU"],
+        asset_class="equity",
+        capital_amount=500,
+        date_range={"start": "2026-01-01", "end": "2026-06-01"},
+        extra_parameters={
+            "data_availability_adjustment": {
+                "kind": "latest_complete_daily_data",
+                "original_end": "2026-06-03",
+                "provider": "alpaca",
+                "through": "2026-06-02",
+                "timeframe": "1D",
+            },
+        },
+    )
+
+    result = confirm_module.confirm_stage(
+        state=state,
+        contract=build_default_capability_contract(),
+    )
+
+    assert result.outcome == "await_approval"
+    confirmation_payload = result.patch["confirmation_payload"]
+    strategy = confirmation_payload["strategy"]
+
+    assert strategy["date_range"] == {"start": "2026-01-01", "end": "2026-06-01"}
+    assert "Through Jun 2" not in strategy["assumptions"]
+    assert "data_availability_adjustment" not in strategy.get("extra_parameters", {})
+    assert confirmation_payload["validation"]["date_adjusted"] is False
+
+
 def test_confirm_stage_blocks_far_future_date_instead_of_latest_data_clamp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

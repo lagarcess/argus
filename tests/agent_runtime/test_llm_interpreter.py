@@ -101,13 +101,30 @@ def test_candidate_text_keeps_lowercase_action_words_from_becoming_assets() -> N
     )
 
 
-def test_provider_ticker_mentions_support_lowercase_benchmark_evidence_only() -> None:
+def test_candidate_text_does_not_ground_single_word_from_long_fund_name() -> None:
+    assert not _candidate_text_supports_resolved_asset(
+        "investment",
+        ResolvedAssetStub(
+            "APPX",
+            "equity",
+            name="Investment Managers Series Trust II Tradr 2X Long APP Daily ETF",
+        ),
+    )
+    assert _candidate_text_supports_resolved_asset(
+        "apple",
+        ResolvedAssetStub("AAPL", "equity", name="Apple Inc."),
+    )
+
+
+def test_provider_ticker_mentions_support_lowercase_exact_ticker_evidence() -> None:
     def resolve_candidate(query: str) -> AssetResolution | None:
         normalized = query.strip().upper()
         if normalized == "APPLE":
             asset = ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
         elif normalized == "QQQ":
             asset = ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        elif normalized == "NU":
+            asset = ResolvedAssetStub("NU", "equity", name="Nu Holdings Ltd.")
         else:
             return None
         return AssetResolution(
@@ -129,12 +146,70 @@ def test_provider_ticker_mentions_support_lowercase_benchmark_evidence_only() ->
         )
 
     mentions = provider_ticker_mentions_from_text(
-        "how did apple do against qqq in 2024",
+        "how did apple do with qqq and nu in 2024",
         resolve_candidate=resolve_candidate,
     )
 
-    assert [mention.raw_text for mention in mentions] == ["qqq"]
-    assert [mention.asset.canonical_symbol for mention in mentions] == ["QQQ"]
+    assert [mention.raw_text for mention in mentions] == ["qqq", "nu"]
+    assert [mention.asset.canonical_symbol for mention in mentions] == ["QQQ", "NU"]
+
+
+def test_extra_provider_asset_benchmark_evidence_requires_grounded_primary_asset() -> None:
+    from argus.agent_runtime.benchmark_evidence import (
+        current_message_has_extra_provider_asset_for_benchmark,
+    )
+
+    def resolution(asset: ResolvedAssetStub, raw_text: str) -> AssetResolution:
+        return AssetResolution(
+            status="resolved",
+            raw_text=raw_text,
+            asset=asset,
+            candidates=(asset,),
+            provenance=ResolutionProvenance(
+                field="asset_universe",
+                raw_text=raw_text,
+                source="user_mention",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        )
+
+    def resolve_candidate(query: str) -> AssetResolution | None:
+        normalized = query.strip().upper()
+        if normalized == "QQQ":
+            asset = ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+            return resolution(asset, query)
+        if normalized == "NU":
+            asset = ResolvedAssetStub(
+                "NU",
+                "equity",
+                name="Nu Holdings Ltd.",
+                raw_symbol="NU",
+            )
+            return resolution(asset, query)
+        return None
+
+    assert current_message_has_extra_provider_asset_for_benchmark(
+        LLMStrategyDraft(asset_universe=["AAPL"], asset_class="equity"),
+        current_message="apple qqq from the start of 2024",
+        resolved_asset_mentions=[
+            ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        ],
+        resolve_candidate=resolve_candidate,
+    )
+    assert not current_message_has_extra_provider_asset_for_benchmark(
+        LLMStrategyDraft(asset_universe=["APPX"], asset_class="equity"),
+        current_message=(
+            "lets see what an investment of 500 in nu could have made this "
+            "year so far"
+        ),
+        resolved_asset_mentions=[],
+        resolve_candidate=resolve_candidate,
+    )
 
 
 @pytest.mark.asyncio
@@ -149,6 +224,8 @@ async def test_ready_run_with_missing_stated_benchmark_uses_fidelity_audit(
 
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         normalized = symbol.strip().upper()
+        if normalized == "APPLE":
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
         if normalized in {"AAPL", "QQQ"}:
             return ResolvedAssetStub(normalized, "equity")
         raise ValueError("unsupported_symbol")
@@ -3126,6 +3203,239 @@ async def test_llm_interpreter_clears_ungrounded_lowercase_asset_extraction(
     assert "asset_grounding_audit_removed_unsubstantiated_symbols" in (
         ready_response.reason_codes
     )
+
+
+@pytest.mark.asyncio
+async def test_asset_grounding_audit_recovers_lowercase_ticker_from_misplaced_benchmark(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(char for char in str(symbol).upper() if char.isalnum())
+        if normalized == "NU":
+            return ResolvedAssetStub(
+                "NU",
+                "equity",
+                name="Nu Holdings Ltd.",
+                raw_symbol="NU",
+            )
+        if normalized in {"APPX", "INVESTMENT"}:
+            return ResolvedAssetStub(
+                "APPX",
+                "equity",
+                name=(
+                    "Investment Managers Series Trust II Tradr 2X Long APP "
+                    "Daily ETF"
+                ),
+                raw_symbol="APPX",
+            )
+        raise ValueError("unsupported_symbol")
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "AssetGroundingAudit"
+        prompt = "\n".join(str(message["content"]) for message in kwargs["messages"])
+        assert "APPX" in prompt
+        assert "NU" in prompt
+        return interpreter_module.AssetGroundingAudit(
+            grounded_symbols=[],
+            confidence=0.92,
+        )
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test a lump-sum investment in NU.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "lets see what an investment of 500 in nu could have made this "
+                "year so far if invested at the begining of this year"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis="Test a simple lump-sum investment in NU.",
+            asset_universe=["APPX"],
+            asset_class="equity",
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+            capital_amount=500,
+            comparison_baseline="NU",
+            field_provenance={"comparison_baseline": "explicit_user"},
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "lets see what an investment of 500 in nu could have made this "
+            "year so far if invested at the begining of this year"
+        ),
+        recent_thread_history=[],
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._asset_grounding_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    draft = ready_response.candidate_strategy_draft
+    assert draft.asset_universe == ["NU"]
+    assert draft.asset_class == "equity"
+    assert draft.comparison_baseline is None
+    assert draft.strategy_thesis is None
+    assert "asset_grounding_audit_removed_unsubstantiated_symbols" in (
+        ready_response.reason_codes
+    )
+    assert "misplaced_benchmark_asset_recovered" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_asset_grounding_audit_recovers_exact_ticker_when_asset_is_empty(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(char for char in str(symbol).upper() if char.isalnum())
+        if normalized == "NU":
+            return ResolvedAssetStub(
+                "NU",
+                "equity",
+                name="Nu Holdings Ltd.",
+                raw_symbol="NU",
+            )
+        raise ValueError("unsupported_symbol")
+
+    async def audit_stub(**kwargs):
+        raise AssertionError("empty asset recovery should not require an LLM audit")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to test a lump-sum investment.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "lets see what an investment of 500 in nu could have made this "
+                "year so far if invested at the begining of this year"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis="Evaluate a $500 investment.",
+            asset_universe=[],
+            asset_class=None,
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+            capital_amount=500,
+            comparison_baseline="NU",
+            field_provenance={
+                "capital_amount": "starting_capital",
+                "comparison_baseline": "stated_run_field_fidelity_audit",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "lets see what an investment of 500 in nu could have made this "
+            "year so far if invested at the begining of this year"
+        ),
+        recent_thread_history=[],
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._asset_grounding_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    draft = ready_response.candidate_strategy_draft
+    assert draft.asset_universe == ["NU"]
+    assert draft.asset_class == "equity"
+    assert draft.comparison_baseline is None
+    assert draft.strategy_thesis is None
+    assert "misplaced_benchmark_asset_recovered" in ready_response.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_asset_grounding_audit_does_not_recover_benchmark_when_asset_name_is_grounded(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(char for char in str(symbol).upper() if char.isalnum())
+        if normalized in {"APPLE", "AAPL"}:
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        if normalized == "QQQ":
+            return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        if normalized == "APPX":
+            return ResolvedAssetStub(
+                "APPX",
+                "equity",
+                name="Investment Managers Series Trust II Tradr ETF",
+            )
+        raise ValueError("unsupported_symbol")
+
+    async def audit_stub(**kwargs):
+        assert kwargs["schema_name"] == "AssetGroundingAudit"
+        return interpreter_module.AssetGroundingAudit(
+            grounded_symbols=[],
+            confidence=0.92,
+        )
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        audit_stub,
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to compare Apple with QQQ.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="apple qqq from the start of 2024",
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Apple.",
+            asset_universe=["APPX"],
+            asset_class="equity",
+            date_range={"start": "2024-01-01", "end": "2024-12-31"},
+            comparison_baseline="QQQ",
+        ),
+        semantic_turn_act="new_idea",
+        artifact_target="none",
+    )
+    request = InterpretationRequest(
+        current_user_message="apple qqq from the start of 2024",
+        recent_thread_history=[],
+        user=UserState(user_id="u1"),
+    )
+
+    ready_response = await interpreter_module._asset_grounding_audited_response(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    draft = ready_response.candidate_strategy_draft
+    assert draft.asset_universe == []
+    assert draft.comparison_baseline == "QQQ"
+    assert "misplaced_benchmark_asset_recovered" not in ready_response.reason_codes
 
 
 @pytest.mark.asyncio

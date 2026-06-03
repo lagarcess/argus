@@ -279,6 +279,7 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
 def _strategy_with_latest_complete_data_adjustment(
     strategy: dict[str, Any],
 ) -> dict[str, Any]:
+    strategy = _strategy_without_data_availability_adjustment(strategy)
     asset_class = _strategy_asset_class(strategy)
     if asset_class is None:
         return strategy
@@ -308,6 +309,19 @@ def _strategy_with_latest_complete_data_adjustment(
             "data_availability_adjustment": adjustment.metadata,
         },
     }
+
+
+def _strategy_without_data_availability_adjustment(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return strategy
+    if "data_availability_adjustment" not in extra_parameters:
+        return strategy
+    cleaned_extra_parameters = dict(extra_parameters)
+    cleaned_extra_parameters.pop("data_availability_adjustment", None)
+    return {**strategy, "extra_parameters": cleaned_extra_parameters}
 
 
 def _today() -> date:
@@ -681,9 +695,24 @@ def _data_availability_adjustment(strategy: dict[str, Any]) -> dict[str, Any] | 
         "latest_complete_market_data",
     }:
         return None
-    if not isinstance(adjustment.get("through"), str):
+    through = adjustment.get("through")
+    if not isinstance(through, str):
+        return None
+    if not _data_adjustment_matches_strategy_end(strategy, through=through):
         return None
     return adjustment
+
+
+def _data_adjustment_matches_strategy_end(
+    strategy: dict[str, Any],
+    *,
+    through: str,
+) -> bool:
+    date_range = strategy.get("date_range")
+    if not isinstance(date_range, dict):
+        return True
+    end = date_range.get("end") or date_range.get("to")
+    return end in (None, "") or str(end) == through
 
 
 def _visible_card_benchmark_assumption(

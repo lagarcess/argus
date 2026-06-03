@@ -144,7 +144,11 @@ def grounded_asset_mention_has_name_support(mention: GroundedAssetMention) -> bo
             and all(token in name_words for token in lowered_tokens)
         )
     lowered = lowered_tokens[0]
-    return len(lowered) >= 4 and lowered in name_words
+    return (
+        len(lowered) >= 4
+        and lowered in name_words
+        and _single_name_token_supports_asset(lowered, mention.asset)
+    )
 
 
 def _asset_candidate_phrases(message: str) -> list[str]:
@@ -209,7 +213,7 @@ def _candidate_text_supports_resolved_asset(phrase: str, asset: Any) -> bool:
         return compact_token in symbol_texts
     lowered = token.lower()
     if len(lowered) >= 4 and lowered in name_words:
-        return True
+        return _single_name_token_supports_asset(lowered, asset)
     if ("/" in token or "-" in token) and compact_token in symbol_texts:
         return True
     return False
@@ -240,15 +244,38 @@ def _token_has_uppercase_letter(value: str) -> bool:
 
 
 def _asset_name_tokens(name: str) -> set[str]:
-    tokens: set[str] = set()
+    return set(_asset_name_token_sequence(name))
+
+
+def _asset_name_token_sequence(name: str) -> list[str]:
+    tokens: list[str] = []
+    seen: set[str] = set()
     current: list[str] = []
     for char in str(name or "").lower():
         if char.isalnum():
             current.append(char)
             continue
         if current:
-            tokens.add("".join(current))
+            token = "".join(current)
+            if token not in seen:
+                tokens.append(token)
+                seen.add(token)
             current = []
     if current:
-        tokens.add("".join(current))
+        token = "".join(current)
+        if token not in seen:
+            tokens.append(token)
     return tokens
+
+
+def _single_name_token_supports_asset(token: str, asset: Any) -> bool:
+    meaningful_name_tokens = [
+        name_token
+        for name_token in _asset_name_token_sequence(getattr(asset, "name", ""))
+        if len(name_token) >= 2 and any(char.isalpha() for char in name_token)
+    ]
+    return (
+        bool(meaningful_name_tokens)
+        and token == meaningful_name_tokens[0]
+        and len(meaningful_name_tokens) <= 4
+    )

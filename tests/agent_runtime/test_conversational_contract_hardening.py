@@ -279,6 +279,61 @@ def test_answer_pending_need_preserves_prior_strategy_fields(monkeypatch) -> Non
     assert strategy.capital_amount == 10000
 
 
+def test_active_confirmation_date_edit_refreshes_confirmation_card(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    monkeypatch.setattr(
+        interpret_module,
+        "current_message_date_range",
+        lambda message: {"end": "2026-06-02"},
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold NU this year so far.",
+        asset_universe=["NU"],
+        asset_class="equity",
+        date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        capital_amount=500,
+    )
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=True,
+        assistant_response=(
+            "I can't directly set a dynamic 'yesterday' date. Would you like "
+            "to use a supported RSI rule?"
+        ),
+        user_goal_summary="User wants to adjust the visible confirmation date.",
+        candidate_strategy_draft=StrategySummary(),
+        missing_required_fields=[],
+        semantic_turn_act="refine_current_idea",
+        artifact_target="active_confirmation",
+    )
+
+    result, _ = _interpret(
+        message="adjust the end date to be yesterday",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NU"]
+    assert strategy.date_range == {"start": "2026-01-01", "end": "2026-06-02"}
+    assert result.stage_patch.get("assistant_response") is None
+    assert (
+        "current_message_date_endpoint_patch_applied"
+        in result.decision.reason_codes
+    )
+
+
 def test_non_dca_capital_answer_updates_initial_capital_assumption(monkeypatch) -> None:
     from argus.agent_runtime.stages import interpret as interpret_module
 
@@ -2467,6 +2522,76 @@ def test_asset_grounding_prunes_lowercase_word_collisions_and_keeps_benchmark_ro
     assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
 
 
+def test_asset_grounding_recovers_exact_ticker_misplaced_as_benchmark(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = "".join(
+            char for char in str(symbol).upper() if char.isalnum()
+        )
+        if normalized == "NU":
+            return ResolvedAssetStub(
+                "NU",
+                "equity",
+                name="Nu Holdings Ltd.",
+                raw_symbol="NU",
+            )
+        if normalized == "QQQ":
+            return ResolvedAssetStub("QQQ", "equity", name="Invesco QQQ Trust")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _asset)
+    monkeypatch.setattr(
+        interpret_module,
+        "default_backtest_benchmark",
+        lambda asset_class, symbols=None: (
+            "QQQ" if asset_class == "equity" else str((symbols or [""])[0])
+        ),
+    )
+    message = (
+        "lets see what an investment of 500 in nu could have made this "
+        "year so far if invested at the begining of this year"
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=True,
+        assistant_response=(
+            "Just to confirm — by 'NU' do you mean Nu Holdings (NU) or "
+            "NVIDIA (NVDA)?"
+        ),
+        user_goal_summary="User wants a $500 buy-and-hold test.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Evaluate a $500 investment in NVIDIA.",
+            asset_universe=[],
+            asset_class=None,
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+            capital_amount=500,
+            comparison_baseline="NU",
+            extra_parameters={
+                "field_provenance": {
+                    "capital_amount": "starting_capital",
+                    "comparison_baseline": "stated_run_field_fidelity_audit",
+                }
+            },
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _ = _interpret(message=message, response=response, snapshot=None)
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["NU"]
+    assert strategy.asset_class == "equity"
+    assert strategy.comparison_baseline == "QQQ"
+    assert strategy.strategy_thesis is None
+    assert "current_message_asset_grounding_repaired" in result.decision.reason_codes
+
+
 @pytest.mark.parametrize(
     ("prior_symbol", "answer", "benchmark_symbol"),
     [
@@ -4478,7 +4603,10 @@ def test_stated_run_fidelity_audit_handles_retry_restatement_benchmark() -> None
     )
 
 
-def test_focused_repair_benchmark_provenance_still_gets_fidelity_audit() -> None:
+def test_focused_repair_benchmark_provenance_still_gets_fidelity_audit(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
     from argus.agent_runtime.llm_interpreter import (
         _response_needs_stated_run_field_fidelity_audit,
     )
@@ -4488,6 +4616,15 @@ def test_focused_repair_benchmark_provenance_still_gets_fidelity_audit() -> None
     )
     from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 
+    def _asset(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().upper()
+        if normalized in {"APPLE", "AAPL"}:
+            return ResolvedAssetStub("AAPL", "equity", name="Apple Inc.")
+        if normalized in {"QQQ", "SPY"}:
+            return ResolvedAssetStub(normalized, "equity", name=f"{normalized} ETF")
+        raise ValueError("unsupported_symbol")
+
+    monkeypatch.setattr(interpreter_module, "resolve_asset", _asset)
     response = LLMInterpretationResponse(
         intent="backtest_execution",
         task_relation="new_task",

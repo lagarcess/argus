@@ -6,11 +6,12 @@ import inspect
 import os
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, cast, get_args
 
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
+    provider_ticker_mentions_from_text,
 )
 from argus.agent_runtime.capabilities.answers import (
     EXECUTABLE_STRATEGY_FAMILIES,
@@ -118,6 +119,12 @@ from argus.context import (
     context_packet_freshness,
     fetch_alpaca_market_movers_packet,
 )
+from argus.domain.backtesting.config import (
+    AssetClass as BacktestAssetClass,
+)
+from argus.domain.backtesting.config import (
+    default_benchmark as default_backtest_benchmark,
+)
 from argus.domain.indicators import (
     EXECUTABLE_INDICATORS,
     IndicatorExecutionSpec,
@@ -130,6 +137,7 @@ from argus.llm.openrouter import invoke_openrouter_chat_completion
 _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
 _LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
+_BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
 
 
 @dataclass(frozen=True)
@@ -701,6 +709,16 @@ async def _stage_result_from_interpretation(
         if expects_strategy_route
         else incoming_strategy
     )
+    benchmark_reason_codes: list[str] = []
+    if expects_strategy_route:
+        prior_strategy = _active_strategy_from_snapshot(snapshot)
+        strategy, unstated_benchmark_reason_codes = (
+            _strategy_with_unstated_benchmark_guard(
+                strategy=strategy,
+                prior_strategy=prior_strategy,
+            )
+        )
+        benchmark_reason_codes.extend(unstated_benchmark_reason_codes)
     current_message_asset_grounding_reason_codes: list[str] = []
     if expects_strategy_route and _should_apply_current_message_asset_grounding(
         semantic_turn_act=original_semantic_turn_act,
@@ -725,15 +743,7 @@ async def _stage_result_from_interpretation(
         strategy, shape_default_reason_codes = (
             _strategy_with_default_template_for_complete_no_rule_shape(strategy)
         )
-    benchmark_reason_codes: list[str] = []
     if expects_strategy_route:
-        prior_strategy = _active_strategy_from_snapshot(snapshot)
-        strategy, unstated_benchmark_reason_codes = (
-            _strategy_with_unstated_benchmark_guard(
-                strategy=strategy,
-                prior_strategy=prior_strategy,
-            )
-        )
         strategy, separate_benchmark_reason_codes = _strategy_with_separate_benchmark_symbol(
             strategy
         )
@@ -743,7 +753,6 @@ async def _stage_result_from_interpretation(
         benchmark_reason_codes = [
             *benchmark_reason_codes,
             *current_message_asset_grounding_reason_codes,
-            *unstated_benchmark_reason_codes,
             *separate_benchmark_reason_codes,
             *validated_benchmark_reason_codes,
         ]
@@ -1125,14 +1134,22 @@ def _strategy_with_current_message_run_field_contract(
     current_user_message: str,
     supported_timeframes: tuple[str, ...],
 ) -> tuple[StrategySummary, StructuredInterpretation]:
-    date_range = _explicit_date_range_from_current_message_for_repair(
+    raw_date_range = _explicit_date_range_from_current_message_for_repair(
         current_user_message,
         strategy=strategy,
+    )
+    date_range, date_endpoint_patch_applied = (
+        _complete_current_message_date_endpoint_patch(
+            strategy=strategy,
+            date_range=raw_date_range,
+        )
     )
     updated = strategy.model_copy(deep=True)
     changed = False
     repaired_field_bases: set[str] = set()
     repair_reason_codes = ["current_message_run_field_contract_repair"]
+    if date_endpoint_patch_applied:
+        repair_reason_codes.append("current_message_date_endpoint_patch_applied")
     if (
         date_range is not None
         and not has_partial_explicit_date_range(date_range)
@@ -1215,6 +1232,23 @@ def _strategy_with_current_message_run_field_contract(
         }
     )
     return updated, repaired
+
+
+def _complete_current_message_date_endpoint_patch(
+    *,
+    strategy: StrategySummary,
+    date_range: dict[str, str] | None,
+) -> tuple[dict[str, str] | None, bool]:
+    if date_range is None or not has_partial_explicit_date_range(date_range):
+        return date_range, False
+    prior = strategy.date_range
+    if not isinstance(prior, dict):
+        return date_range, False
+    start = date_range.get("start") or prior.get("start") or prior.get("from")
+    end = date_range.get("end") or prior.get("end") or prior.get("to")
+    if not start or not end:
+        return date_range, False
+    return {"start": str(start), "end": str(end)}, True
 
 
 def _strategy_needs_current_message_dca_contract_repair(
@@ -4064,7 +4098,13 @@ def _strategy_with_missing_asset_grounded_from_current_message(
         limit=5,
     )
     if not mentions:
-        return strategy, []
+        return _strategy_with_missing_asset_from_misplaced_benchmark(
+            strategy=strategy,
+            current_user_message=current_user_message,
+            semantic_mentions=[],
+            benchmark_symbol=benchmark_symbol,
+            resolve_candidate=_resolve_candidate,
+        )
     grounded_assets = [
         mention.asset
         for mention in mentions
@@ -4078,6 +4118,14 @@ def _strategy_with_missing_asset_grounded_from_current_message(
     ]
     grounded_symbols = list(dict.fromkeys(grounded_symbols))
     if len(grounded_symbols) != 1:
+        if not grounded_symbols:
+            return _strategy_with_missing_asset_from_misplaced_benchmark(
+                strategy=strategy,
+                current_user_message=current_user_message,
+                semantic_mentions=mentions,
+                benchmark_symbol=benchmark_symbol,
+                resolve_candidate=_resolve_candidate,
+            )
         return strategy, []
 
     asset_class = str(getattr(grounded_assets[0], "asset_class", "") or "").strip()
@@ -4101,6 +4149,105 @@ def _strategy_with_missing_asset_grounded_from_current_message(
         ]
     )
     return updated, ["current_message_asset_grounding_repaired"]
+
+
+def _strategy_with_missing_asset_from_misplaced_benchmark(
+    *,
+    strategy: StrategySummary,
+    current_user_message: str,
+    semantic_mentions: list[Any],
+    benchmark_symbol: str | None,
+    resolve_candidate: Any,
+) -> tuple[StrategySummary, list[str]]:
+    if not benchmark_symbol:
+        return strategy, []
+    if any(
+        _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
+        != benchmark_symbol
+        and grounded_asset_mention_has_name_support(mention)
+        for mention in semantic_mentions
+    ):
+        return strategy, []
+
+    ticker_mentions = provider_ticker_mentions_from_text(
+        current_user_message,
+        resolve_candidate=resolve_candidate,
+        excluded_tokens=current_message_execution_context_tokens(
+            current_user_message,
+            strategy_type=strategy.strategy_type,
+        ),
+        limit=10,
+    )
+    matching_mentions = [
+        mention
+        for mention in ticker_mentions
+        if _normalized_symbol(getattr(mention.asset, "canonical_symbol", None))
+        == benchmark_symbol
+    ]
+    if len(matching_mentions) != 1:
+        return strategy, []
+
+    mention = matching_mentions[0]
+    asset = mention.asset
+    asset_class = str(getattr(asset, "asset_class", "") or "").strip()
+    updated = strategy.model_copy(deep=True)
+    updated.asset_universe = [benchmark_symbol]
+    if asset_class:
+        updated.asset_class = asset_class
+        updated.comparison_baseline = _default_benchmark_for_asset_class(
+            asset_class,
+            symbols=[benchmark_symbol],
+        )
+    else:
+        updated.comparison_baseline = None
+    updated.strategy_thesis = None
+    updated.extra_parameters = _without_field_provenance_keys(
+        updated.extra_parameters,
+        {"comparison_baseline"},
+    )
+    updated.resolution_provenance = _dedupe_resolution_provenance(
+        [
+            item
+            for item in updated.resolution_provenance
+            if _field_base(_provenance_field(item)) != "asset_universe"
+        ]
+        + [mention.resolution.provenance]
+    )
+    return updated, ["current_message_asset_grounding_repaired"]
+
+
+def _default_benchmark_for_asset_class(
+    asset_class: str,
+    *,
+    symbols: list[str],
+) -> str | None:
+    if asset_class not in _BACKTEST_ASSET_CLASSES:
+        return None
+    return default_backtest_benchmark(
+        cast(BacktestAssetClass, asset_class),
+        symbols,
+    )
+
+
+def _without_field_provenance_keys(
+    extra_parameters: dict[str, Any],
+    field_names: set[str],
+) -> dict[str, Any]:
+    if not extra_parameters:
+        return {}
+    updated = dict(extra_parameters)
+    field_provenance = updated.get("field_provenance")
+    if isinstance(field_provenance, dict):
+        remaining = {
+            key: value
+            for key, value in field_provenance.items()
+            if key not in field_names
+        }
+        if remaining:
+            updated["field_provenance"] = remaining
+        else:
+            updated.pop("field_provenance", None)
+    return updated
 
 
 def _without_weak_implicit_current_symbols(

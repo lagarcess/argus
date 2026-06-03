@@ -214,11 +214,69 @@ def test_runtime_confirmation_card_displays_latest_complete_data_assumption() ->
     )
 
     assert card is not None
-    assert card["statusLabel"] == "Adjusted"
+    assert card["statusLabel"] == "Ready to run"
     assert {"label": "Period", "value": "January 1, 2026 - June 2, 2026"} in card[
         "rows"
     ]
     assert "Through Jun 2" in card["assumptions"]
+
+
+def test_runtime_confirmation_card_ignores_stale_latest_complete_data_assumption() -> None:
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "strategy_thesis": "Buy and hold NU this year so far.",
+                    "asset_universe": ["NU"],
+                    "asset_class": "equity",
+                    "capital_amount": 500.0,
+                    "date_range": {"start": "2026-01-01", "end": "2026-06-01"},
+                    "extra_parameters": {
+                        "data_availability_adjustment": {
+                            "kind": "latest_complete_daily_data",
+                            "original_end": "2026-06-03",
+                            "through": "2026-06-02",
+                        },
+                    },
+                },
+                "optional_parameters": {
+                    "timeframe": {
+                        "label": "Timeframe",
+                        "source": "default",
+                        "value": "1D",
+                    },
+                    "fees": {"label": "Fees", "source": "default", "value": 0.0},
+                    "slippage": {
+                        "label": "Slippage",
+                        "source": "default",
+                        "value": 0.0,
+                    },
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbol": "NU",
+                    "symbols": ["NU"],
+                    "timeframe": "1D",
+                    "date_range": {"start": "2026-01-01", "end": "2026-06-01"},
+                    "sizing_mode": "capital_amount",
+                    "capital_amount": 500,
+                    "position_size": None,
+                    "parameters": {},
+                    "risk_rules": [],
+                    "benchmark_symbol": "SPY",
+                },
+                "validation": {"executable": True, "date_adjusted": True},
+            },
+        }
+    )
+
+    assert card is not None
+    assert {"label": "Period", "value": "January 1, 2026 - June 1, 2026"} in card[
+        "rows"
+    ]
+    assert "Through Jun 2" not in card["assumptions"]
 
 
 def test_runtime_confirmation_card_uses_visible_benchmark_when_payload_is_stale() -> None:

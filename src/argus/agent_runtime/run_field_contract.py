@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from argus.agent_runtime.strategy_contract import MONTH_ALIASES
+from argus.agent_runtime.strategy_contract import (
+    MONTH_ALIASES,
+    parse_relative_date_token,
+)
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 MONTH_TOKENS = frozenset(MONTH_ALIASES)
@@ -106,6 +109,12 @@ def current_message_date_range(
         return {"start": start_endpoint}
     if end_endpoint is not None:
         return {"end": end_endpoint}
+    relative_endpoint = _relative_date_endpoint_from_marker_tokens(
+        tokens,
+        today=current_date,
+    )
+    if relative_endpoint is not None:
+        return relative_endpoint
     calendar_year = _calendar_year_date_range_from_tokens(tokens, today=current_date)
     if calendar_year is not None:
         return calendar_year
@@ -253,6 +262,45 @@ def _date_endpoint_from_marker_tokens(
         if endpoint == "end":
             return date(year, 12, 31).isoformat()
         return date(year, 1, 1).isoformat()
+    return None
+
+
+def _relative_date_endpoint_from_marker_tokens(
+    tokens: list[str],
+    *,
+    today: date,
+) -> dict[str, str] | None:
+    endpoint_markers = (
+        ({"start", "starting", "beginning", "from"}, "start"),
+        ({"end", "ending", "through", "thru", "until", "till"}, "end"),
+    )
+    for markers, endpoint in endpoint_markers:
+        for index, token in enumerate(tokens):
+            if token not in markers:
+                continue
+            relative_date = _relative_date_token_after_marker(
+                tokens,
+                start=index + 1,
+                limit=index + 5,
+                today=today,
+            )
+            if relative_date is not None:
+                return {endpoint: relative_date.isoformat()}
+    return None
+
+
+def _relative_date_token_after_marker(
+    tokens: list[str],
+    *,
+    start: int,
+    limit: int,
+    today: date,
+) -> date | None:
+    for index in range(max(start, 0), min(limit, len(tokens))):
+        token = tokens[index]
+        parsed = parse_relative_date_token(token, today=today)
+        if parsed is not None:
+            return parsed
     return None
 
 

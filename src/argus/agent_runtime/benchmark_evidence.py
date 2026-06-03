@@ -30,14 +30,21 @@ def current_message_has_extra_provider_asset_for_benchmark(
             resolve_candidate=resolve_candidate,
         ),
     ]
+    draft_asset_grounded = any(
+        _asset_symbol(asset) in draft_symbols
+        and _asset_class_matches(asset, draft_asset_class)
+        for asset in current_assets
+    )
+    if not draft_asset_grounded:
+        return False
+
     seen_symbols: set[str] = set()
     for asset in current_assets:
-        symbol = str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+        symbol = _asset_symbol(asset)
         if not symbol or symbol in seen_symbols or symbol in draft_symbols:
             continue
         seen_symbols.add(symbol)
-        asset_class = str(getattr(asset, "asset_class", "") or "").strip()
-        if draft_asset_class and asset_class and asset_class != draft_asset_class:
+        if not _asset_class_matches(asset, draft_asset_class):
             continue
         return True
     return False
@@ -65,3 +72,14 @@ def _normalized_symbols(values: Iterable[Any]) -> set[str]:
         for value in values
         if str(value or "").strip()
     }
+
+
+def _asset_symbol(asset: Any) -> str:
+    return str(getattr(asset, "canonical_symbol", "") or "").strip().upper()
+
+
+def _asset_class_matches(asset: Any, draft_asset_class: str) -> bool:
+    if not draft_asset_class:
+        return True
+    asset_class = str(getattr(asset, "asset_class", "") or "").strip()
+    return not asset_class or asset_class == draft_asset_class
