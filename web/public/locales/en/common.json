@@ -115,6 +115,7 @@
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
     "input_placeholder": "Describe an investing idea",
     "followup_placeholder": "Add a follow-up",
+    "disclaimer": "Argus can make mistakes. For education only. Not financial advice.",
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [

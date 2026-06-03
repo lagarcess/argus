@@ -96,4 +96,27 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("isOpen={Boolean(pendingHeaderDeleteId)}");
     expect(chat).toContain("disabled={!conversationId || isDeletingHeaderChat}");
   });
+
+  test("chat disclaimer appears only after conversation activity and is localized", () => {
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const en = JSON.parse(readFileSync(join(root, "public/locales/en/common.json"), "utf-8"));
+    const es = JSON.parse(readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"));
+    const coldStartBranchStart = chat.indexOf("{messages.length === 0 ? (");
+    const coldStartBranchEnd = chat.indexOf(") : (", coldStartBranchStart);
+    const coldStartBranch = chat.slice(coldStartBranchStart, coldStartBranchEnd);
+    const conversationComposerStart = chat.indexOf("Input fade + bar");
+    const conversationComposerEnd = chat.indexOf("</div>\n                </div>\n              </>", conversationComposerStart);
+    const conversationComposer = chat.slice(conversationComposerStart, conversationComposerEnd);
+
+    expect(chat).toContain("const showConversationDisclaimer = messages.length > 0 || isStreamingResponse;");
+    expect(coldStartBranch).not.toContain("chat.disclaimer");
+    expect(conversationComposer).toContain("showConversationDisclaimer &&");
+    expect(conversationComposer).toContain('data-testid="chat-disclaimer"');
+    expect(conversationComposer).toContain('t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")');
+    expect(conversationComposer).toContain("text-[13px]");
+    expect(conversationComposer).toContain("font-normal");
+    expect(conversationComposer).toContain("text-black/40 dark:text-white/40");
+    expect(en.chat.disclaimer).toBe("Argus can make mistakes. For education only. Not financial advice.");
+    expect(es.chat.disclaimer).toBe("Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.");
+  });
 });

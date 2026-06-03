@@ -1790,6 +1790,7 @@ export default function ChatInterface() {
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
   const showExploratorySuggestions =
     chatExploratorySuggestionsEnabled && showSuggestions;
+  const showConversationDisclaimer = messages.length > 0 || isStreamingResponse;
   const chatInputPlaceholder =
     messages.length === 0
       ? t("chat.input_placeholder")
@@ -2194,6 +2195,14 @@ export default function ChatInterface() {
                       disabled={isStreamingResponse || isHydratingConversation}
                       placeholder={chatInputPlaceholder}
                     />
+                    {showConversationDisclaimer && (
+                      <p
+                        data-testid="chat-disclaimer"
+                        className="mt-3 text-center text-[13px] font-normal leading-[1.45] text-black/40 dark:text-white/40"
+                      >
+                        {t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")}
+                      </p>
+                    )}
                   </div>
                 </div>
               </>
