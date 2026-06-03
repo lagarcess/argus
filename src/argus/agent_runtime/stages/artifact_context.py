@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from argus.agent_runtime.artifacts.drafts import draft_from_confirmation_payload
 from argus.agent_runtime.confirmation_artifacts import (
     validate_confirmation_execution_payload,
 )
@@ -13,6 +14,15 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     StructuredActionContext,
     TaskSnapshot,
+)
+
+LEGACY_RESULT_EXPLANATION_TARGET_INFERRED = "legacy_result_explanation_target_inferred"
+LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED = "legacy_result_followup_target_inferred"
+LEGACY_RESULT_TARGET_INFERENCE_CODES = frozenset(
+    {
+        LEGACY_RESULT_EXPLANATION_TARGET_INFERRED,
+        LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
+    }
 )
 
 
@@ -28,6 +38,15 @@ def decision_targets_result_artifact(
     if decision.semantic_turn_act == "result_followup":
         return True
     return decision.intent == "results_explanation"
+
+
+def decision_allows_result_artifact_patch(
+    *,
+    decision: InterpretDecision,
+) -> bool:
+    if decision.artifact_target != "latest_result":
+        return False
+    return not bool(set(decision.reason_codes) & LEGACY_RESULT_TARGET_INFERENCE_CODES)
 
 
 def stale_confirmation_action_response(
@@ -243,6 +262,26 @@ def confirmation_payload_matches_visible_strategy(
     if not isinstance(payload_strategy, dict):
         return False
     visible_strategy = strategy.model_dump(mode="python")
+    if launch_binding_values_match(
+        left=payload_strategy,
+        right=visible_strategy,
+    ):
+        return True
+    try:
+        effective_payload_strategy = draft_from_confirmation_payload(payload)
+    except Exception:
+        return False
+    return launch_binding_values_match(
+        left=effective_payload_strategy.model_dump(mode="python"),
+        right=visible_strategy,
+    )
+
+
+def launch_binding_values_match(
+    *,
+    left: dict[str, Any],
+    right: dict[str, Any],
+) -> bool:
     fields_that_bind_launch_truth = {
         "strategy_type",
         "asset_universe",
@@ -258,8 +297,8 @@ def confirmation_payload_matches_visible_strategy(
         "comparison_baseline",
     }
     for field in fields_that_bind_launch_truth:
-        if normalized_launch_binding_value(payload_strategy.get(field)) != (
-            normalized_launch_binding_value(visible_strategy.get(field))
+        if normalized_launch_binding_value(left.get(field)) != (
+            normalized_launch_binding_value(right.get(field))
         ):
             return False
     return True

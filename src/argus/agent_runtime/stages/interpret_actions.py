@@ -4,9 +4,15 @@ import asyncio
 from typing import Any
 
 from argus.agent_runtime.artifacts.continuity import (
+    apply_patch_to_anchor,
     patched_draft_from_candidate,
     resolve_artifact_anchor,
 )
+from argus.agent_runtime.artifacts.patch_policy import (
+    executable_artifact_patch_missing_fields,
+    relevant_unsupported_constraints_for_artifact_patch,
+)
+from argus.agent_runtime.artifacts.patches import ArtifactPatch
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.response_style import (
     result_followup_heading,
@@ -20,6 +26,7 @@ from argus.agent_runtime.result_followups import (
     result_followup_fact_bank,
     result_followup_llm_task,
 )
+from argus.agent_runtime.run_field_contract import current_message_date_range
 from argus.agent_runtime.stages.approval_guard import (
     decision_is_pure_approval,
     decision_replays_visible_confirmation_without_material_change,
@@ -29,6 +36,7 @@ from argus.agent_runtime.stages.artifact_context import (
     active_confirmation_effective_strategy,
     confirmation_payload_dict,
     confirmation_payload_is_validated_executable,
+    decision_allows_result_artifact_patch,
     decision_targets_result_artifact,
     draft_assumptions_response,
     failed_action_is_retryable,
@@ -159,6 +167,7 @@ def structured_action_stage_result_if_applicable(
     if action_type == "run_backtest":
         return _run_backtest_action_result(
             state=state,
+            snapshot=snapshot,
             pending=pending,
             selected_thread_metadata=selected_thread_metadata,
         )
@@ -200,6 +209,7 @@ def structured_action_stage_result_if_applicable(
 def _run_backtest_action_result(
     *,
     state: RunState,
+    snapshot: TaskSnapshot | None,
     pending: StrategySummary,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult:
@@ -208,6 +218,11 @@ def _run_backtest_action_result(
         state=state,
         approved_strategy=approved,
     )
+    if confirmation_payload is None:
+        confirmation_payload = validated_approval_confirmation_payload_from_snapshot(
+            snapshot=snapshot,
+            approved_strategy=approved,
+        )
     if confirmation_payload is None:
         return StageResult(
             outcome="ready_for_confirmation",
@@ -608,6 +623,15 @@ async def artifact_followup_stage_result_if_applicable(
     snapshot: TaskSnapshot | None,
     current_user_message: str,
 ) -> StageResult | None:
+    deterministic_patch_result = (
+        _deterministic_result_artifact_patch_stage_result_if_applicable(
+            decision=decision,
+            snapshot=snapshot,
+            current_user_message=current_user_message,
+        )
+    )
+    if deterministic_patch_result is not None:
+        return deterministic_patch_result
     if not decision_targets_result_artifact(decision=decision, snapshot=snapshot):
         return None
     artifact_patch_result = _result_artifact_patch_stage_result_if_applicable(
@@ -660,6 +684,8 @@ def _result_artifact_patch_stage_result_if_applicable(
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
 ) -> StageResult | None:
+    if not decision_allows_result_artifact_patch(decision=decision):
+        return None
     reference = (
         snapshot.latest_backtest_result_reference if snapshot is not None else None
     )
@@ -675,14 +701,131 @@ def _result_artifact_patch_stage_result_if_applicable(
     )
     if patched is None:
         return None
+    return _stage_result_from_result_artifact_patch(
+        decision=decision,
+        patched=patched,
+        reason_code="artifact_patch_from_latest_result",
+    )
+
+
+def _deterministic_result_artifact_patch_stage_result_if_applicable(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+) -> StageResult | None:
+    reference = (
+        snapshot.latest_backtest_result_reference if snapshot is not None else None
+    )
+    if reference is None:
+        return None
+    date_range = current_message_date_range(current_user_message)
+    if not isinstance(date_range, dict) or not (
+        date_range.get("start") and date_range.get("end")
+    ):
+        return None
+    if not _decision_allows_deterministic_result_patch(
+        decision,
+        patch_fields=frozenset({"date_range"}),
+    ):
+        return None
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload={"run_id": reference.artifact_id},
+    )
+    patched = apply_patch_to_anchor(
+        anchor,
+        ArtifactPatch(
+            source="user_patch",
+            date_range=date_range,
+        ),
+    )
+    if patched is None:
+        return None
+    return _stage_result_from_result_artifact_patch(
+        decision=decision,
+        patched=patched,
+        reason_code="artifact_date_patch_from_current_message",
+    )
+
+
+def _decision_allows_deterministic_result_patch(
+    decision: InterpretDecision,
+    *,
+    patch_fields: frozenset[str],
+) -> bool:
+    if decision.artifact_target in {"active_confirmation", "pending_refinement"}:
+        return False
+    if decision.capability_question_focus is not None:
+        return False
+    if decision.context_question_focus is not None:
+        return False
+    if decision.intent == "unsupported_or_out_of_scope" or (
+        decision.semantic_turn_act == "unsupported_request"
+    ):
+        return not _strategy_has_structured_non_patch_evidence(
+            strategy=decision.candidate_strategy_draft,
+            patch_fields=patch_fields,
+        )
+    if decision.intent in {"beginner_guidance", "collection_management"}:
+        return False
+    if decision.semantic_turn_act in {
+        "approval",
+        "educational_question",
+        "retry_failed_action",
+    }:
+        return False
+    if decision.artifact_target == "latest_result":
+        return True
+    return (
+        decision.intent in {"backtest_execution", "strategy_drafting"}
+        or decision.task_relation == "refine"
+        or decision.semantic_turn_act
+        in {"answer_pending_need", "refine_current_idea", "result_followup"}
+    )
+
+
+def _strategy_has_structured_non_patch_evidence(
+    *,
+    strategy: StrategySummary,
+    patch_fields: frozenset[str],
+) -> bool:
+    ignored_fields = {
+        "raw_user_phrasing",
+        "strategy_thesis",
+        "resolution_provenance",
+        "extra_parameters",
+    }
+    for field_name in StrategySummary.model_fields:
+        if field_name in patch_fields or field_name in ignored_fields:
+            continue
+        if getattr(strategy, field_name) not in (None, "", [], {}):
+            return True
+    return False
+
+
+def _stage_result_from_result_artifact_patch(
+    *,
+    decision: InterpretDecision,
+    patched: StrategySummary,
+    reason_code: str,
+) -> StageResult:
     missing_fields = missing_required_fields_for_strategy(
         patched,
         contract=build_default_capability_contract(),
     )
+    missing_fields = executable_artifact_patch_missing_fields(
+        strategy=patched,
+        missing_fields=missing_fields,
+    )
+    unsupported_constraints = relevant_unsupported_constraints_for_artifact_patch(
+        strategy=patched,
+        constraints=decision.unsupported_constraints,
+    )
     has_blocking_validation = bool(
         missing_fields
         or decision.ambiguous_fields
-        or decision.unsupported_constraints
+        or unsupported_constraints
     )
     refined_decision = decision.model_copy(
         update={
@@ -691,13 +834,14 @@ def _result_artifact_patch_stage_result_if_applicable(
             "requires_clarification": has_blocking_validation,
             "candidate_strategy_draft": patched,
             "missing_required_fields": list(missing_fields),
+            "unsupported_constraints": list(unsupported_constraints),
             "semantic_turn_act": "refine_current_idea",
             "result_followup_focus": None,
             "reason_codes": list(
                 dict.fromkeys(
                     [
                         *decision.reason_codes,
-                        "artifact_patch_from_latest_result",
+                        reason_code,
                     ]
                 )
             ),

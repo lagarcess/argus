@@ -211,7 +211,84 @@ def test_lump_sum_investment_shape_defaults_to_buy_and_hold(
     )
 
 
-def test_result_followup_response_does_not_leave_underfilled_strategy_draft() -> None:
+def test_dca_starter_turn_suppresses_grounded_amount_ambiguity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
+    )
+    message = (
+        "Can you set a strategy where I buy AAPL GOOG at $200 every month for "
+        "Jan 2021-Jan 2024?"
+    )
+    response = StructuredInterpretation(
+        intent="strategy_drafting",
+        task_relation="new_task",
+        requires_clarification=True,
+        user_goal_summary="User wants monthly recurring buys in AAPL and GOOG.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="dca_accumulation",
+            strategy_thesis="Buy AAPL and GOOG every month.",
+            asset_universe=["AAPL", "GOOG"],
+            asset_class="equity",
+            date_range={"start": "2021-01-01", "end": "2024-01-31"},
+            cadence="monthly",
+            capital_amount=200,
+            sizing_mode="capital_amount",
+            extra_parameters={
+                "recurring_contribution": 200,
+                "recurring_cadence": "monthly",
+                "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "recurring_contribution": "recurring_contribution",
+                    "cadence": "explicit_user",
+                },
+            },
+        ),
+        ambiguous_fields=[
+            AmbiguousField(
+                field_name="capital_amount",
+                raw_value="$200",
+                candidate_normalized_value=200,
+                reason_code="missing_recurring_contribution_amount",
+            )
+        ],
+        assistant_response=(
+            "Is the $200 the total you want to invest each month across both "
+            "stocks, or is that the amount per stock per month?"
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message=message,
+        response=response,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    assert result.decision.ambiguous_fields == []
+    assert result.decision.candidate_strategy_draft.capital_amount == 200
+    assert result.decision.candidate_strategy_draft.asset_universe == ["AAPL", "GOOG"]
+    assert "resolved_strategy_ambiguity_suppressed" in result.decision.reason_codes
+
+
+def test_result_followup_response_does_not_leave_underfilled_strategy_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_compose_result_followup_response(**kwargs: Any) -> str:
+        del kwargs
+        return "TSLA underperformed SPY because the rule went to cash."
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.stages.interpret_actions.compose_result_followup_response",
+        fake_compose_result_followup_response,
+    )
     snapshot = TaskSnapshot(
         latest_backtest_result_reference=ArtifactReference(
             artifact_kind="backtest_result",
@@ -265,6 +342,267 @@ def test_result_followup_response_does_not_leave_underfilled_strategy_draft() ->
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.candidate_strategy_draft == StrategySummary()
     assert result.decision.missing_required_fields == []
+
+
+def test_result_artifact_date_patch_overrides_stale_unsupported_logic() -> None:
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "asset_class": "equity",
+                "symbols": ["AAPL", "GOOG"],
+                "benchmark_symbol": "SPY",
+                "config_snapshot": {
+                    "template": "dca_accumulation",
+                    "symbols": ["AAPL", "GOOG"],
+                    "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                    "benchmark_symbol": "SPY",
+                    "resolved_strategy": {
+                        "strategy_type": "dca_accumulation",
+                        "asset_universe": ["AAPL", "GOOG"],
+                        "entry_rule": {
+                            "type": "periodic_accumulation",
+                            "cadence": "monthly",
+                        },
+                        "exit_rule": {"type": "end_of_period"},
+                    },
+                    "resolved_parameters": {
+                        "timeframe": "1D",
+                        "date_range": {
+                            "start": "2021-01-01",
+                            "end": "2024-01-31",
+                        },
+                        "capital_amount": 200,
+                        "recurring_contribution": 200,
+                        "cadence": "monthly",
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            },
+        )
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User wants to change the latest result date range.",
+        candidate_strategy_draft=StrategySummary(
+            date_range={"start": "2019-10-01", "end": "2025-10-31"},
+        ),
+        unsupported_constraints=[
+            UnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="do the date range October 2019 to October 2025",
+                explanation=(
+                    "That idea needs a rule or data source the current backtest "
+                    "engine cannot execute directly yet."
+                ),
+            )
+        ],
+        semantic_turn_act="result_followup",
+        artifact_target="latest_result",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="do the date range October 2019 to October 2025",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "end_run"},
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["AAPL", "GOOG"]
+    assert strategy.date_range == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert strategy.capital_amount == 200
+    assert strategy.cadence == "monthly"
+    assert result.decision.unsupported_constraints == []
+    assert result.decision.missing_required_fields == []
+
+
+def test_executable_artifact_patch_does_not_require_strategy_thesis() -> None:
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User changed an executable artifact date range.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            strategy_thesis=None,
+            asset_universe=["AAPL", "GOOG"],
+            asset_class="equity",
+            timeframe="1D",
+            cadence="monthly",
+            date_range={"start": "2019-10-01", "end": "2025-10-31"},
+            capital_amount=200,
+            comparison_baseline="SPY",
+            entry_rule={"type": "periodic_accumulation", "cadence": "monthly"},
+            exit_rule={"type": "end_of_period"},
+            extra_parameters={
+                "artifact_patch": {
+                    "source": "llm_patch",
+                    "changed_fields": ["date_range"],
+                }
+            },
+        ),
+        missing_required_fields=["strategy_thesis"],
+        semantic_turn_act="refine_current_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="do the date range October 2019 to October 2025",
+        response=response,
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    assert result.decision.missing_required_fields == []
+    assert result.decision.candidate_strategy_draft.strategy_thesis is None
+
+
+def test_result_artifact_date_patch_survives_llm_losing_artifact_fields() -> None:
+    snapshot = _latest_dca_result_snapshot()
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User wants to change the latest result date range.",
+        candidate_strategy_draft=StrategySummary(strategy_type="signal_strategy"),
+        missing_required_fields=["entry_logic", "asset_universe", "exit_logic"],
+        semantic_turn_act="refine_current_idea",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="do the date range October 2019 to October 2025",
+        response=response,
+        snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "end_run"},
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["AAPL", "GOOG"]
+    assert strategy.date_range == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert strategy.capital_amount == 200
+    assert strategy.cadence == "monthly"
+    assert result.decision.missing_required_fields == []
+
+
+def test_result_artifact_date_patch_overrides_llm_asset_clarification() -> None:
+    response = StructuredInterpretation(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User wants to adjust the latest result date range.",
+        assistant_response=(
+            "Which assets would you like to buy each month for this window?"
+        ),
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="dca_accumulation",
+            date_range={"start": "2019-10-01", "end": "2025-10-31"},
+        ),
+        missing_required_fields=["asset_universe"],
+        semantic_turn_act="result_followup",
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="do the date range October 2019 to October 2025",
+        response=response,
+        snapshot=_latest_dca_result_snapshot(),
+        selected_thread_metadata={"last_stage_outcome": "end_run"},
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.strategy_type == "dca_accumulation"
+    assert strategy.asset_universe == ["AAPL", "GOOG"]
+    assert strategy.date_range == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert strategy.capital_amount == 200
+    assert result.decision.missing_required_fields == []
+
+
+def test_result_artifact_date_patch_overrides_date_only_unsupported_misroute() -> None:
+    response = StructuredInterpretation(
+        intent="unsupported_or_out_of_scope",
+        task_relation="continue",
+        requires_clarification=True,
+        user_goal_summary="User supplied a date window.",
+        assistant_response="I need a supported rule to run this.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing="do the date range October 2019 to October 2025",
+            strategy_thesis="Backtest over the date range October 2019 to October 2025.",
+            date_range={"start": "2019-10-01", "end": "2025-10-31"},
+        ),
+        missing_required_fields=["entry_logic", "asset_universe", "exit_logic"],
+        unsupported_constraints=[
+            UnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="Backtest over the date range October 2019 to October 2025.",
+                explanation="This idea depends on strategy logic that is not executable yet.",
+            )
+        ],
+    )
+
+    result, _interpreter = run_interpret_with_llm(
+        message="do the date range October 2019 to October 2025",
+        response=response,
+        snapshot=_latest_dca_result_snapshot(),
+        selected_thread_metadata={"last_stage_outcome": "end_run"},
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    assert result.decision is not None
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["AAPL", "GOOG"]
+    assert strategy.date_range == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert result.decision.missing_required_fields == []
+    assert result.decision.unsupported_constraints == []
+
+
+def _latest_dca_result_snapshot() -> TaskSnapshot:
+    return TaskSnapshot(
+        latest_backtest_result_reference=ArtifactReference(
+            artifact_kind="backtest_result",
+            artifact_id="run-1",
+            artifact_status="completed",
+            metadata={
+                "asset_class": "equity",
+                "symbols": ["AAPL", "GOOG"],
+                "benchmark_symbol": "SPY",
+                "config_snapshot": {
+                    "template": "dca_accumulation",
+                    "symbols": ["AAPL", "GOOG"],
+                    "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                    "benchmark_symbol": "SPY",
+                    "resolved_strategy": {
+                        "strategy_type": "dca_accumulation",
+                        "asset_universe": ["AAPL", "GOOG"],
+                        "entry_rule": {
+                            "type": "periodic_accumulation",
+                            "cadence": "monthly",
+                        },
+                        "exit_rule": {"type": "end_of_period"},
+                    },
+                    "resolved_parameters": {
+                        "timeframe": "1D",
+                        "date_range": {
+                            "start": "2021-01-01",
+                            "end": "2024-01-31",
+                        },
+                        "capital_amount": 200,
+                        "recurring_contribution": 200,
+                        "cadence": "monthly",
+                        "benchmark_symbol": "SPY",
+                    },
+                },
+            },
+        )
+    )
 
 
 def test_capability_question_answer_uses_indicator_registry_not_llm_copy(
@@ -1470,6 +1808,53 @@ def test_structured_confirmation_action_preserves_visible_artifact_without_re_re
     strategy = result.patch["confirmation_payload"]["strategy"]
     assert strategy["asset_universe"] == ["TSLA"]
     assert strategy["asset_class"] == "equity"
+    assert result.patch["confirmation_payload"]["launch_payload"]["symbol"] == "TSLA"
+
+
+def test_structured_confirmation_action_uses_snapshot_payload_when_turn_payload_missing(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub("SLAY", "crypto", raw_symbol=symbol),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Tesla.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    payload = validated_confirmation_payload(pending)
+    snapshot = TaskSnapshot(
+        pending_strategy_summary=pending,
+        active_confirmation_reference=confirmation_artifact_reference(
+            confirmation_id="confirm-visible",
+            confirmation_payload=payload,
+        ),
+    )
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.structured_action = StructuredActionContext(
+        type="run_backtest",
+        label="Run backtest",
+        presentation="confirmation",
+        payload={
+            "confirmation_id": "confirm-visible",
+        },
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=snapshot,
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        structured_interpreter=None,
+    )
+
+    assert result.outcome == "approved_for_execution"
     assert result.patch["confirmation_payload"]["launch_payload"]["symbol"] == "TSLA"
 
 

@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, cast, get_args
 
+from argus.agent_runtime.artifacts.patch_policy import (
+    executable_artifact_patch_missing_fields,
+    relevant_unsupported_constraints_for_artifact_patch,
+)
 from argus.agent_runtime.asset_text_grounding import (
     grounded_asset_mention_has_name_support,
     grounded_asset_mentions_from_text,
@@ -55,6 +59,10 @@ from argus.agent_runtime.semantic_integrity import (
     SemanticIntegrityReport,
     conserve_semantic_constraints,
     filter_unsubstantiated_timeframe_constraints,
+)
+from argus.agent_runtime.stages.artifact_context import (
+    LEGACY_RESULT_EXPLANATION_TARGET_INFERRED,
+    LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
 )
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
@@ -138,6 +146,23 @@ _DEFAULT_RESOLVE_ASSET = resolve_asset
 _STANDALONE_CONTEXT_PACKET_TIMEOUT_SECONDS = 2.5
 _LATEST_RESULT_SAVE_REQUESTED_REASON = "latest_result_save_requested"
 _BACKTEST_ASSET_CLASSES = frozenset(get_args(BacktestAssetClass))
+_USER_GROUNDED_CAPITAL_SOURCES = frozenset(
+    {
+        "explicit_user",
+        "prior",
+        "recurring_contribution",
+        "contribution_amount",
+        "periodic_contribution",
+        "dca_contribution",
+    }
+)
+_USER_GROUNDED_CADENCE_SOURCES = frozenset(
+    {
+        "explicit_user",
+        "prior",
+        "visible_draft",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -859,6 +884,14 @@ async def _stage_result_from_interpretation(
             [*missing_required_fields, *integrity_report.blocking_missing_fields]
         )
     )
+    missing_required_fields = executable_artifact_patch_missing_fields(
+        strategy=strategy,
+        missing_fields=missing_required_fields,
+    )
+    unsupported_constraints = relevant_unsupported_constraints_for_artifact_patch(
+        strategy=strategy,
+        constraints=unsupported_constraints,
+    )
     response_overrides = interpretation.response_profile_overrides
     effective_profile = resolve_effective_response_profile(
         user=user,
@@ -1478,14 +1511,14 @@ def _validated_artifact_target(
         and snapshot is not None
         and snapshot.latest_backtest_result_reference is not None
     ):
-        reason_codes.append("legacy_result_followup_target_inferred")
+        reason_codes.append(LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED)
         return "latest_result", reason_codes
     if (
         interpretation.intent == "results_explanation"
         and snapshot is not None
         and snapshot.latest_backtest_result_reference is not None
     ):
-        reason_codes.append("legacy_result_explanation_target_inferred")
+        reason_codes.append(LEGACY_RESULT_EXPLANATION_TARGET_INFERRED)
         return "latest_result", reason_codes
     return proposed, reason_codes
 
@@ -4664,7 +4697,34 @@ def _strategy_field_is_executable(
             or strategy_rule(strategy, "exit")
             or _valid_rule_spec_from_strategy(strategy)
         )
+    if field_name == "capital_amount":
+        return _strategy_has_user_grounded_capital_amount(strategy)
+    if field_name == "cadence":
+        return _strategy_has_user_grounded_cadence(strategy)
     return False
+
+
+def _strategy_has_user_grounded_capital_amount(strategy: StrategySummary) -> bool:
+    if strategy.capital_amount is None:
+        return False
+    return _strategy_field_provenance(strategy, "capital_amount") in (
+        _USER_GROUNDED_CAPITAL_SOURCES
+    )
+
+
+def _strategy_has_user_grounded_cadence(strategy: StrategySummary) -> bool:
+    if strategy.cadence in (None, "", [], {}):
+        return False
+    return _strategy_field_provenance(strategy, "cadence") in (
+        _USER_GROUNDED_CADENCE_SOURCES
+    )
+
+
+def _strategy_field_provenance(strategy: StrategySummary, field_name: str) -> str:
+    field_provenance = dict(strategy.extra_parameters or {}).get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        return ""
+    return str(field_provenance.get(field_name) or "").strip()
 
 
 def _unsupported_constraints_from_resolution(

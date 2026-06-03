@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from argus.agent_runtime.artifacts.patch_policy import (
+    executable_artifact_patch_missing_fields,
+)
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.confirmation_artifacts import (
     confirmation_artifact_reference,
@@ -342,9 +345,14 @@ def _missing_required_fields(
     strategy: dict[str, Any],
     contract: CapabilityContract,
 ) -> list[str]:
-    return missing_required_fields_for_strategy(
-        StrategySummary.model_validate(strategy),
+    strategy_summary = StrategySummary.model_validate(strategy)
+    missing_fields = missing_required_fields_for_strategy(
+        strategy_summary,
         contract=contract,
+    )
+    return executable_artifact_patch_missing_fields(
+        strategy=strategy_summary,
+        missing_fields=missing_fields,
     )
 
 

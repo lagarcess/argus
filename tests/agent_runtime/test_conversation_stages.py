@@ -1665,6 +1665,41 @@ def test_confirm_stage_does_not_require_thesis_for_buy_and_hold() -> None:
     assert strategy["asset_universe"] == ["AAPL"]
 
 
+def test_confirm_stage_does_not_require_thesis_for_executable_artifact_patch() -> None:
+    state = RunState.new(
+        current_user_message="do the date range October 2019 to October 2025",
+        recent_thread_history=[],
+    )
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis=None,
+        asset_universe=["AAPL", "GOOG"],
+        asset_class="equity",
+        timeframe="1D",
+        cadence="monthly",
+        date_range={"start": "2019-10-01", "end": "2025-10-31"},
+        capital_amount=200,
+        entry_rule={"type": "periodic_accumulation", "cadence": "monthly"},
+        exit_rule={"type": "end_of_period"},
+        comparison_baseline="SPY",
+        extra_parameters={
+            "artifact_patch": {
+                "source": "user_patch",
+                "changed_fields": ["date_range"],
+            }
+        },
+    )
+
+    result = confirm_stage(state=state, contract=build_default_capability_contract())
+
+    assert result.outcome == "await_approval"
+    assert result.patch["missing_required_fields"] == []
+    strategy = result.patch["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == ["AAPL", "GOOG"]
+    assert strategy["date_range"] == {"start": "2019-10-01", "end": "2025-10-31"}
+    assert strategy["capital_amount"] == 200
+
+
 def test_confirm_stage_uses_product_language_for_data_window_limits() -> None:
     state = RunState.new(
         current_user_message="Backtest Apple since 2015.",
