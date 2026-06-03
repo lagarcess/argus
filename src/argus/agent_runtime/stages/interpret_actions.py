@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from argus.agent_runtime.artifacts.continuity import resolve_artifact_anchor
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.response_style import (
     result_followup_heading,
@@ -126,7 +127,17 @@ def structured_action_stage_result_if_applicable(
                 "missing_required_fields": [],
             },
         )
-    if snapshot is None or snapshot.pending_strategy_summary is None:
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload=action.payload,
+    )
+    if (
+        snapshot is None
+        or (
+            snapshot.pending_strategy_summary is None
+            and anchor.draft is None
+        )
+    ):
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
@@ -139,7 +150,8 @@ def structured_action_stage_result_if_applicable(
             },
         )
 
-    pending = snapshot.pending_strategy_summary.model_copy(deep=True)
+    pending_source = anchor.draft or snapshot.pending_strategy_summary
+    pending = pending_source.model_copy(deep=True)
     action_type = action.type
     if action_type == "run_backtest":
         return _run_backtest_action_result(
@@ -242,7 +254,11 @@ def result_action_stage_result_if_applicable(
                 ),
             },
         )
-    strategy = strategy_from_result_action_snapshot(snapshot=snapshot)
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload=action.payload,
+    )
+    strategy = anchor.draft or strategy_from_result_action_snapshot(snapshot=snapshot)
     latest_run_id = latest_run_id_for_action(
         action_payload=action.payload,
         reference=reference,

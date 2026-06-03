@@ -3133,6 +3133,60 @@ def test_change_asset_action_publishes_clarification_intent_without_llm() -> Non
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
 
 
+def test_change_dates_action_anchors_to_visible_confirmation_payload() -> None:
+    stale_pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Stale Apple draft.",
+        asset_universe=["AAPL"],
+        asset_class="equity",
+        date_range="past year",
+    )
+    visible = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Buy AAPL and GOOG every month.",
+        asset_universe=["AAPL", "GOOG"],
+        asset_class="equity",
+        date_range={"start": "2021-01-01", "end": "2024-01-31"},
+        capital_amount=200,
+        cadence="monthly",
+        timeframe="1D",
+        comparison_baseline="SPY",
+    )
+    reference = confirmation_artifact_reference(
+        confirmation_id="confirmation-dca",
+        confirmation_payload=_validated_confirmation_payload(visible),
+    )
+
+    result, interpreter = _interpret(
+        message="change dates",
+        response=None,
+        snapshot=TaskSnapshot(
+            pending_strategy_summary=stale_pending,
+            active_confirmation_reference=reference,
+            artifact_references=[reference],
+        ),
+        selected_thread_metadata={"last_stage_outcome": "await_approval"},
+        action_context={
+            "type": "change_dates",
+            "label": "Change dates",
+            "presentation": "confirmation",
+            "payload": {"confirmation_id": "confirmation-dca"},
+        },
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "await_user_reply"
+    assert result.patch["requested_field"] == "date_range"
+    draft = result.patch["candidate_strategy_draft"]
+    assert draft["strategy_type"] == "dca_accumulation"
+    assert draft["asset_universe"] == ["AAPL", "GOOG"]
+    assert draft["asset_class"] == "equity"
+    assert draft["capital_amount"] == 200
+    assert draft["cadence"] == "monthly"
+    assert draft["timeframe"] == "1D"
+    assert draft["comparison_baseline"] == "SPY"
+
+
 def test_model_unavailable_recovery_mentions_active_pending_setup() -> None:
     pending = StrategySummary(
         strategy_type="buy_and_hold",
@@ -3214,6 +3268,64 @@ def test_refine_strategy_result_action_publishes_clarification_intent_without_ll
     assert result.patch["response_intent"]["requested_fields"] == ["refinement"]
     assert result.patch["candidate_strategy_draft"]["asset_universe"] == ["AAPL"]
     assert result.patch["response_intent"]["facts"]["latest_run_id"] == "run-1"
+
+
+def test_refine_strategy_result_action_preserves_result_parameters_without_llm() -> None:
+    reference = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-dca",
+        metadata={
+            "asset_class": "equity",
+            "symbols": ["AAPL", "GOOG"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "dca_accumulation",
+                "symbols": ["AAPL", "GOOG"],
+                "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                "resolved_strategy": {
+                    "strategy_type": "dca_accumulation",
+                    "strategy_thesis": "Buy AAPL and GOOG monthly.",
+                    "asset_universe": ["AAPL", "GOOG"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "capital_amount": 200,
+                    "recurring_contribution": 200,
+                    "cadence": "monthly",
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        },
+    )
+
+    result, interpreter = _interpret(
+        message="refine this strategy",
+        response=None,
+        snapshot=TaskSnapshot(
+            latest_task_type="results_explanation",
+            completed=True,
+            latest_backtest_result_reference=reference,
+        ),
+        action_context={
+            "type": "refine_strategy",
+            "label": "Refine strategy",
+            "presentation": "result",
+            "payload": {"run_id": "run-dca"},
+        },
+    )
+
+    assert interpreter.requests == []
+    assert result.outcome == "await_user_reply"
+    draft = result.patch["candidate_strategy_draft"]
+    assert draft["strategy_type"] == "dca_accumulation"
+    assert draft["asset_universe"] == ["AAPL", "GOOG"]
+    assert draft["asset_class"] == "equity"
+    assert draft["capital_amount"] == 200
+    assert draft["cadence"] == "monthly"
+    assert draft["timeframe"] == "1D"
+    assert draft["comparison_baseline"] == "SPY"
 
 
 def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -> None:
