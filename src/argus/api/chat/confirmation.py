@@ -15,7 +15,10 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     resolve_date_range,
 )
-from argus.domain.engine_launch.display import format_timeframe_data_label
+from argus.domain.engine_launch.display import (
+    format_data_through_label,
+    format_timeframe_data_label,
+)
 
 
 def runtime_confirmation_card(
@@ -164,7 +167,10 @@ def runtime_confirmation_card(
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
         "title": title,
-        "statusLabel": "Ready to run" if is_ready_to_run else "Needs change",
+        "statusLabel": _confirmation_status_label(
+            is_ready_to_run=is_ready_to_run,
+            date_adjusted=_confirmation_date_adjusted(payload, strategy),
+        ),
         "summary": summary,
         "rows": rows,
         "assumptions": assumptions,
@@ -200,6 +206,9 @@ def _confirmation_assumptions(
     timeframe = _optional_parameter_value(optional_parameters, "timeframe")
     if timeframe:
         assumptions.append(format_timeframe_data_label(timeframe, language=language))
+    data_through_assumption = _data_through_assumption(strategy, language=language)
+    if data_through_assumption:
+        assumptions.append(data_through_assumption)
     fees = _optional_parameter_value(optional_parameters, "fees")
     if fees in (0, 0.0, "0", "0.0"):
         assumptions.append("No fees")
@@ -214,6 +223,54 @@ def _confirmation_assumptions(
     if benchmark_assumption:
         assumptions.append(benchmark_assumption)
     return assumptions
+
+
+def _confirmation_status_label(
+    *,
+    is_ready_to_run: bool,
+    date_adjusted: bool,
+) -> str:
+    if not is_ready_to_run:
+        return "Needs change"
+    return "Adjusted" if date_adjusted else "Ready to run"
+
+
+def _confirmation_date_adjusted(
+    confirmation_payload: dict[str, Any],
+    strategy: dict[str, Any],
+) -> bool:
+    validation = confirmation_payload.get("validation")
+    if isinstance(validation, dict) and validation.get("date_adjusted") is True:
+        return True
+    return _data_availability_adjustment(strategy) is not None
+
+
+def _data_through_assumption(
+    strategy: dict[str, Any],
+    *,
+    language: str,
+) -> str | None:
+    adjustment = _data_availability_adjustment(strategy)
+    if adjustment is None:
+        return None
+    return format_data_through_label(adjustment.get("through"), language=language) or None
+
+
+def _data_availability_adjustment(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return None
+    adjustment = extra_parameters.get("data_availability_adjustment")
+    if not isinstance(adjustment, dict):
+        return None
+    if adjustment.get("kind") not in {
+        "latest_complete_daily_data",
+        "latest_complete_market_data",
+    }:
+        return None
+    if not isinstance(adjustment.get("through"), str):
+        return None
+    return adjustment
 
 
 def _confirmation_benchmark_assumption(

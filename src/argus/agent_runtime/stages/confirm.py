@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
@@ -16,13 +17,20 @@ from argus.agent_runtime.strategy_contract import (
 from argus.agent_runtime.strategy_requirements import (
     missing_required_fields_for_strategy,
 )
+from argus.domain.engine_launch.display import format_data_through_label
 from argus.domain.engine_launch.models import LaunchBacktestRequest
 from argus.domain.engine_launch.strategies import validate_launch_supported
-from argus.domain.market_data.capabilities import market_data_window_violation
+from argus.domain.market_data.capabilities import (
+    fetch_alpaca_market_clock,
+    latest_complete_data_adjustment,
+    market_data_window_violation,
+)
+from pydantic import ValidationError
 
 
 def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResult:
     strategy = _strategy_payload(state.candidate_strategy_draft)
+    strategy = _strategy_with_latest_complete_data_adjustment(strategy)
     date_limit_recovery = _date_limit_recovery_patch(
         strategy=strategy,
         optional_parameter_status=state.optional_parameter_status,
@@ -100,6 +108,7 @@ def confirm_stage(*, state: RunState, contract: CapabilityContract) -> StageResu
     confirmation_payload["validation"] = {
         "status": "ready_to_run",
         "executable": True,
+        "date_adjusted": _has_data_availability_adjustment(strategy_with_assumptions),
     }
     confirmation_reference = confirmation_artifact_reference(
         confirmation_id=confirmation_id,
@@ -133,6 +142,8 @@ def _validated_launch_payload(
         launch_payload = _launch_payload(launch_state)
         request = LaunchBacktestRequest.model_validate(launch_payload)
         validate_launch_supported(request)
+    except ValidationError as exc:
+        return _launch_validation_failure(_validation_error_code(exc))
     except ValueError as exc:
         return _launch_validation_failure(str(exc))
     except Exception:
@@ -146,7 +157,44 @@ def _validated_launch_payload(
     }
 
 
+def _validation_error_code(exc: ValidationError) -> str:
+    text = str(exc)
+    for code in (
+        "future_end_date",
+        "invalid_chronological_date_range",
+        "invalid_date_range",
+        "capital_amount_required",
+        "position_size_required",
+    ):
+        if code in text:
+            return code
+    return "missing_rule_group"
+
+
 def _launch_validation_failure(error_code: str) -> dict[str, Any]:
+    if error_code == "future_end_date":
+        return {
+            "outcome": "needs_clarification",
+            "missing_required_fields": ["date_range"],
+            "requested_field": "date_range",
+            "assistant_prompt": None,
+            "optional_parameter_status": _with_unsupported_constraint(
+                {},
+                {
+                    "category": "future_date_window",
+                    "raw_value": error_code,
+                    "explanation": (
+                        "The requested end date is after the latest available "
+                        "data Argus can test."
+                    ),
+                    "simplification_options": [
+                        {"label": "Use the latest available date"},
+                        {"label": "Choose an earlier end date"},
+                        {"label": "Change the date range"},
+                    ],
+                },
+            ),
+        }
     if error_code == "indicator_data_insufficient":
         return {
             "outcome": "needs_clarification",
@@ -226,6 +274,53 @@ def _strategy_payload(strategy: StrategySummary | dict[str, Any]) -> dict[str, A
     if isinstance(strategy, StrategySummary):
         return strategy.model_dump(mode="python")
     return dict(strategy)
+
+
+def _strategy_with_latest_complete_data_adjustment(
+    strategy: dict[str, Any],
+) -> dict[str, Any]:
+    asset_class = _strategy_asset_class(strategy)
+    if asset_class is None:
+        return strategy
+    today = _today()
+    try:
+        resolved = resolve_date_range(strategy.get("date_range"), today=today)
+    except (TypeError, ValueError):
+        return strategy
+    adjustment = latest_complete_data_adjustment(
+        asset_class=asset_class,
+        timeframe=_strategy_timeframe(strategy),
+        end_date=resolved.end,
+        today=today,
+        clock=_market_clock_for_strategy(asset_class),
+    )
+    if adjustment is None:
+        return strategy
+    extra_parameters = dict(strategy.get("extra_parameters") or {})
+    return {
+        **strategy,
+        "date_range": {
+            "start": resolved.start.isoformat(),
+            "end": adjustment.through.isoformat(),
+        },
+        "extra_parameters": {
+            **extra_parameters,
+            "data_availability_adjustment": adjustment.metadata,
+        },
+    }
+
+
+def _today() -> date:
+    return date.today()
+
+
+def _market_clock_for_strategy(asset_class: str) -> Any:
+    if asset_class != "equity":
+        return None
+    try:
+        return fetch_alpaca_market_clock()
+    except Exception:
+        return None
 
 
 def _missing_required_fields(
@@ -542,6 +637,10 @@ def _visible_card_assumptions(
     if timeframe:
         assumptions.append(f"{timeframe} bars")
 
+    data_through_assumption = _data_through_assumption(strategy)
+    if data_through_assumption:
+        assumptions.append(data_through_assumption)
+
     fees = _parameter_value(optional_parameters, "fees")
     if fees in (0, 0.0, "0", "0.0"):
         assumptions.append("No fees")
@@ -557,6 +656,34 @@ def _visible_card_assumptions(
     if benchmark_assumption:
         assumptions.append(benchmark_assumption)
     return assumptions
+
+
+def _data_through_assumption(strategy: dict[str, Any]) -> str | None:
+    adjustment = _data_availability_adjustment(strategy)
+    if adjustment is None:
+        return None
+    return format_data_through_label(adjustment.get("through")) or None
+
+
+def _has_data_availability_adjustment(strategy: dict[str, Any]) -> bool:
+    return _data_availability_adjustment(strategy) is not None
+
+
+def _data_availability_adjustment(strategy: dict[str, Any]) -> dict[str, Any] | None:
+    extra_parameters = strategy.get("extra_parameters")
+    if not isinstance(extra_parameters, dict):
+        return None
+    adjustment = extra_parameters.get("data_availability_adjustment")
+    if not isinstance(adjustment, dict):
+        return None
+    if adjustment.get("kind") not in {
+        "latest_complete_daily_data",
+        "latest_complete_market_data",
+    }:
+        return None
+    if not isinstance(adjustment.get("through"), str):
+        return None
+    return adjustment
 
 
 def _visible_card_benchmark_assumption(

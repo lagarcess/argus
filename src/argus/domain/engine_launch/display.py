@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Literal
 
 Language = Literal["en", "es-419"]
@@ -60,6 +61,15 @@ def format_timeframe_data_label(
     language: str = "en",
 ) -> str:
     return describe_timeframe(timeframe, language=language).data_label
+
+
+def format_data_through_label(value: object, *, language: str = "en") -> str:
+    parsed = _parse_date(value)
+    if parsed is None:
+        return ""
+    if _resolve_language(language) == "es-419":
+        return f"Hasta {_spanish_short_month_day(parsed)}"
+    return f"Through {_english_short_month_day(parsed)}"
 
 
 def format_timeframe_data_caveat(
@@ -242,6 +252,25 @@ def _spanish_unit(unit: TimeframeUnit, *, amount: int) -> str:
 
 def _resolve_language(language: str) -> Language:
     return "es-419" if (language or "en").lower().startswith("es") else "en"
+
+
+def _parse_date(value: object) -> date | None:
+    if isinstance(value, date):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _english_short_month_day(value: date) -> str:
+    return f"{value.strftime('%b')} {value.day}"
+
+
+def _spanish_short_month_day(value: date) -> str:
+    return f"{value.day} {value.strftime('%b').lower()}"
 
 
 def _lower_initial(value: str) -> str:
