@@ -1127,6 +1127,108 @@ def test_refine_strategy_action_uses_latest_result_context_after_reload() -> Non
     assert final["pending_strategy"]["strategy"]["asset_universe"] == ["AAPL"]
 
 
+def test_refine_strategy_action_preserves_completed_dca_fields_after_reload() -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    run_id = api_state.store.new_id()
+    run = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL", "GOOG"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 20.6}}},
+        config_snapshot={
+            "template": "dca_accumulation",
+            "symbols": ["AAPL", "GOOG"],
+            "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+            "resolved_strategy": {
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "Buy AAPL and GOOG every month.",
+                "asset_universe": ["AAPL", "GOOG"],
+                "asset_class": "equity",
+                "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                "capital_amount": 200,
+                "cadence": "monthly",
+                "comparison_baseline": "SPY",
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "capital_amount": 200,
+                "recurring_contribution": 200,
+                "cadence": "monthly",
+                "benchmark_symbol": "SPY",
+            },
+        },
+        conversation_result_card={
+            "title": "AAPL, GOOG DCA Accumulation",
+            "status_label": "Simulation Complete",
+            "rows": [],
+            "assumptions": [
+                "$200 recurring contribution",
+                "Monthly cadence",
+                "Daily data",
+                "Benchmark: SPY",
+            ],
+            "actions": [{"type": "refine_strategy", "label": "Refine strategy"}],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_runs[run_id] = run
+    api_state.store.backtest_run_owners[run_id] = user_id
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I tested that idea.",
+        metadata={
+            "conversation_mode": "result_review",
+            "result_card": run.conversation_result_card,
+            "result_run_id": run.id,
+            "latest_run_id": run.id,
+            "result_conversation_id": conversation["id"],
+        },
+    )
+    api_state.reset_agent_runtime_workflow(app)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "refine_strategy",
+                "label": "Refine strategy",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run.id,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]
+    strategy = final["pending_strategy"]["strategy"]
+    assert strategy["strategy_type"] == "dca_accumulation"
+    assert strategy["asset_universe"] == ["AAPL", "GOOG"]
+    assert strategy["asset_class"] == "equity"
+    assert strategy["date_range"] == {"start": "2021-01-01", "end": "2024-01-31"}
+    assert strategy["capital_amount"] == 200
+    assert strategy["cadence"] == "monthly"
+    assert strategy["timeframe"] == "1D"
+    assert strategy["comparison_baseline"] == "SPY"
+
+
 def test_refine_strategy_text_reply_uses_persisted_refinement_context_after_reload(
     monkeypatch,
 ) -> None:

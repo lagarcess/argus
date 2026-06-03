@@ -3,10 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from argus.agent_runtime.stages.artifact_context import (
-    latest_run_id_for_action,
-    strategy_from_result_reference,
-)
+from argus.agent_runtime.artifacts.drafts import draft_from_result_metadata
+from argus.agent_runtime.stages.artifact_context import latest_run_id_for_action
 from argus.agent_runtime.stages.compose import compose_response_intent
 from argus.agent_runtime.state.models import ResponseIntent, RunState
 from argus.api.chat.artifacts import result_reference_from_run
@@ -32,7 +30,7 @@ def refine_strategy_action_turn(
     action: ChatActionPayload,
 ) -> ResultActionTurn:
     reference = result_reference_from_run(run)
-    strategy = strategy_from_result_reference(reference)
+    strategy = draft_from_result_metadata(reference.metadata)
     pending_strategy = {
         "strategy": strategy.model_dump(mode="python"),
         "requested_field": "refinement",
