@@ -766,7 +766,7 @@ export async function streamChatMessage(
     const parsed = parseChatStreamFrame(part);
     if (!parsed) return;
     onEvent(parsed);
-    if (parsed.event === "done") {
+    if (parsed.event === "done" || parsed.event === "error") {
       receivedDone = true;
     }
   };

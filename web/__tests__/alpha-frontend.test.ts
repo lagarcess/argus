@@ -462,6 +462,59 @@ describe("Argus Alpha frontend contract", () => {
     expect((caught as ChatStreamError).code).toBe("stream_interrupted");
   });
 
+  test("chat stream treats backend error frames as terminal", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH;
+    const encoder = new TextEncoder();
+    const events: ChatStreamEvent[] = [];
+
+    process.env.NEXT_PUBLIC_MOCK_AUTH = "true";
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode(
+                  'data: {"type":"error","code":"agent_runtime_failure","message":"Backtest provider timed out."}\n\n',
+                ),
+              );
+              controller.close();
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "text/event-stream" } },
+        ),
+      )) as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await streamChatMessage("conversation-1", "test AAPL", "en", (event) => {
+        events.push(event);
+      });
+    } catch (err) {
+      caught = err;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalMockAuth === undefined) {
+        delete process.env.NEXT_PUBLIC_MOCK_AUTH;
+      } else {
+        process.env.NEXT_PUBLIC_MOCK_AUTH = originalMockAuth;
+      }
+    }
+
+    expect(caught).toBeUndefined();
+    expect(events).toEqual([
+      {
+        event: "error",
+        data: {
+          code: "agent_runtime_failure",
+          detail: "Backtest provider timed out.",
+          message_id: undefined,
+        },
+      },
+    ]);
+  });
+
   test("chat status is driven by backend stage_start events", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const locale = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
