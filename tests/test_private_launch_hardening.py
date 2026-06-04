@@ -22,14 +22,15 @@ def test_http_errors_do_not_echo_unconfigured_cors_origins(monkeypatch) -> None:
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     monkeypatch.delenv("ARGUS_CORS_ALLOW_ORIGINS", raising=False)
+    monkeypatch.delenv("ARGUS_DEV_ENDPOINTS_ENABLED", raising=False)
     client = TestClient(main.app)
 
-    response = client.get(
-        "/api/v1/auth/session",
+    response = client.post(
+        "/api/v1/dev/reset",
         headers={"Origin": "https://unknown.example"},
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 404
     assert "access-control-allow-origin" not in response.headers
 
 

@@ -39,9 +39,9 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
-        sync: false
+        value: https://lgdhvepyrzbnscqssgqq.supabase.co
       - key: SUPABASE_ANON_KEY
-        sync: false
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGh2ZXB5cnpibnNjcXNzZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzkwOTksImV4cCI6MjA4ODI1NTA5OX0.mc7KjmJYuAp01Mj96gceGsAW2UPI2_HQsv0_kyWaQmo
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: SUPABASE_JWT_SECRET
@@ -49,21 +49,21 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: ARGUS_UTILITY_MODEL
-        sync: false
+        value: qwen/qwen3.5-9b
       - key: ARGUS_UTILITY_FALLBACK_MODEL
-        sync: false
+        value: google/gemini-2.5-flash-lite
       - key: ARGUS_CHAT_MODEL
-        sync: false
+        value: deepseek/deepseek-v4-flash
       - key: ARGUS_CHAT_FALLBACK_MODEL
-        sync: false
+        value: qwen/qwen3.5-9b
       - key: ARGUS_STRUCTURED_MODEL
-        sync: false
+        value: mistralai/mistral-small-2603
       - key: ARGUS_STRUCTURED_FALLBACK_MODEL
-        sync: false
+        value: deepseek/deepseek-v4-flash
       - key: ARGUS_CONTEXT_MODEL
-        sync: false
+        value: openai/gpt-oss-120b
       - key: ARGUS_CONTEXT_FALLBACK_MODEL
-        sync: false
+        value: deepseek/deepseek-v4-flash
       - key: ALPACA_API_KEY
         sync: false
       - key: ALPACA_SECRET_KEY
@@ -86,8 +86,10 @@ services:
       - key: NEXT_PUBLIC_APP_ENV
         value: production
       - key: NEXT_PUBLIC_SUPABASE_URL
-        sync: false
+        value: https://lgdhvepyrzbnscqssgqq.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZGh2ZXB5cnpibnNjcXNzZ3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NzkwOTksImV4cCI6MjA4ODI1NTA5OX0.mc7KjmJYuAp01Mj96gceGsAW2UPI2_HQsv0_kyWaQmo
+      - key: NEXT_PUBLIC_POSTHOG_KEY
         sync: false
       - key: NEXT_PUBLIC_MOCK_AUTH
         value: "false"

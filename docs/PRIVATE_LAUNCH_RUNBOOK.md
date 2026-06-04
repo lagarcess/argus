@@ -24,6 +24,24 @@ This runbook is for the first trusted-user internet tests on Render.
 When the script prints `Argus is warm and ready for testers.`, send the app URL
 to testers.
 
+## Render Environment Ownership
+
+`render.yaml` is allowed to sync non-secret launch configuration: mode flags,
+public service URLs, public Supabase URL/anon key values, feature flags, paper
+trading mode, CORS origins, and model routing IDs.
+
+Keep true secrets manual in Render:
+
+- `DATABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_JWT_SECRET`
+- `OPENROUTER_API_KEY`
+- `ALPACA_API_KEY`
+- `ALPACA_SECRET_KEY`
+
+Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty until PostHog is intentionally
+enabled.
+
 ## Smoke Test
 
 Use an allowlisted account and verify:
