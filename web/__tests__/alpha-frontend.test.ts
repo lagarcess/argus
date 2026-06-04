@@ -2,7 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseChatStreamFrame, resultCardFromRun } from "../lib/argus-api";
+import {
+  ChatStreamError,
+  parseChatStreamFrame,
+  resultCardFromRun,
+  streamChatMessage,
+  type ChatStreamEvent,
+} from "../lib/argus-api";
 
 const root = join(import.meta.dir, "..");
 
@@ -411,6 +417,49 @@ describe("Argus Alpha frontend contract", () => {
       },
     });
     expect(done).toEqual({ event: "done", data: { message_id: null } });
+  });
+
+  test("chat stream rejects truncated responses before done", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH;
+    const encoder = new TextEncoder();
+    const events: ChatStreamEvent[] = [];
+
+    process.env.NEXT_PUBLIC_MOCK_AUTH = "true";
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode('data: {"type":"stage_start","stage":"interpret"}\n\n'),
+              );
+              controller.close();
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "text/event-stream" } },
+        ),
+      )) as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await streamChatMessage("conversation-1", "test AAPL", "en", (event) => {
+        events.push(event);
+      });
+    } catch (err) {
+      caught = err;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalMockAuth === undefined) {
+        delete process.env.NEXT_PUBLIC_MOCK_AUTH;
+      } else {
+        process.env.NEXT_PUBLIC_MOCK_AUTH = originalMockAuth;
+      }
+    }
+
+    expect(events).toEqual([{ event: "stage_start", data: { stage: "interpret" } }]);
+    expect(caught).toBeInstanceOf(ChatStreamError);
+    expect((caught as ChatStreamError).code).toBe("stream_interrupted");
   });
 
   test("chat status is driven by backend stage_start events", () => {
