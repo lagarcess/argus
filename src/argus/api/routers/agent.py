@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from datetime import datetime, timezone
 from typing import Any
 
@@ -66,6 +68,7 @@ from argus.api.chat.streaming import (
     runtime_stage_status,
     sse_data,
     sse_done,
+    sse_keepalive,
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.dependencies import current_user, dev_memory_fallback_enabled, problem
@@ -79,7 +82,39 @@ from argus.llm.openrouter import (
 )
 
 router = APIRouter(tags=["agent"])
-RUNTIME_EVENT_TIMEOUT_SECONDS = 45.0
+RUNTIME_EVENT_TIMEOUT_SECONDS = 120.0
+RUNTIME_EVENT_KEEPALIVE_SECONDS = 15.0
+
+
+def _runtime_event_timeout_seconds() -> float:
+    return _positive_float_env(
+        "ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS",
+        RUNTIME_EVENT_TIMEOUT_SECONDS,
+        min_value=1.0,
+    )
+
+
+def _runtime_event_keepalive_seconds() -> float:
+    timeout_seconds = _runtime_event_timeout_seconds()
+    return min(
+        timeout_seconds,
+        _positive_float_env(
+            "ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS",
+            RUNTIME_EVENT_KEEPALIVE_SECONDS,
+            min_value=0.1,
+        ),
+    )
+
+
+def _positive_float_env(name: str, default: float, *, min_value: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return max(value, min_value)
 
 
 def _strategies_enabled() -> bool:
@@ -737,12 +772,35 @@ async def chat_stream(
                 fallback_confirmation_payload=runtime_fallback.confirmation_payload,
             )
             final_seen = False
+            next_runtime_event: asyncio.Task[dict[str, Any]] | None = None
+            next_runtime_event_started = time.monotonic()
+            runtime_timeout_seconds = _runtime_event_timeout_seconds()
+            runtime_keepalive_seconds = _runtime_event_keepalive_seconds()
             while True:
+                if next_runtime_event is None:
+                    next_runtime_event = asyncio.create_task(anext(runtime_events))
+                    next_runtime_event_started = time.monotonic()
                 try:
+                    elapsed_seconds = time.monotonic() - next_runtime_event_started
+                    remaining_seconds = runtime_timeout_seconds - elapsed_seconds
+                    if remaining_seconds <= 0:
+                        raise asyncio.TimeoutError
                     runtime_event = await asyncio.wait_for(
-                        anext(runtime_events),
-                        timeout=RUNTIME_EVENT_TIMEOUT_SECONDS,
+                        asyncio.shield(next_runtime_event),
+                        timeout=min(runtime_keepalive_seconds, remaining_seconds),
                     )
+                    next_runtime_event = None
+                except asyncio.TimeoutError:
+                    if (
+                        time.monotonic() - next_runtime_event_started
+                        >= runtime_timeout_seconds
+                    ):
+                        next_runtime_event.cancel()
+                        with suppress(asyncio.CancelledError, StopAsyncIteration):
+                            await next_runtime_event
+                        raise asyncio.TimeoutError("agent_runtime_event_timeout") from None
+                    yield sse_keepalive()
+                    continue
                 except StopAsyncIteration:
                     break
                 event_type = runtime_event.get("type")
