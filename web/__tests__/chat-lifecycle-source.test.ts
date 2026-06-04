@@ -109,7 +109,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const conversationComposerEnd = chat.indexOf("</div>\n                </div>\n              </>", conversationComposerStart);
     const conversationComposer = chat.slice(conversationComposerStart, conversationComposerEnd);
 
-    expect(chat).toContain("const showConversationDisclaimer = messages.length > 0 || isStreamingResponse;");
+    expect(chat).toContain("const showConversationDisclaimer = shouldShowConversationDisclaimer(");
     expect(coldStartBranch).not.toContain("chat.disclaimer");
     expect(conversationComposer).toContain("showConversationDisclaimer &&");
     expect(conversationComposer).toContain('data-testid="chat-disclaimer"');

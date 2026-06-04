@@ -7,27 +7,19 @@
 
 set -eo pipefail
 
-if [ -f .env ]; then
-  set -a
-  set +u
-  # shellcheck disable=SC1091
-  source .env
-  set -u
-  set +a
-else
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/argus-env.sh"
+
+if ! argus_load_root_env; then
   echo "⚠️  Root .env missing. Dev mode can still start with synthetic assets,"
   echo "   but copy .env.example to .env when you need provider/LLM credentials."
   set -u
 fi
 
-export ARGUS_PERSISTENCE_MODE=memory
-export ARGUS_DEV_MEMORY_FALLBACK=true
-export ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture
-export ARGUS_CHECKPOINTER_MODE=memory
-export ARGUS_MOCK_AUTH=true
+argus_export_dev_mode
 # Dev mode is intentionally memory-only even if .env contains typed Supabase
 # Postgres URLs such as SUPABASE_POSTGRES_SESSION_POOLER_URL.
-unset DATABASE_URL
 
 echo "🔵 Dev Mode activated:"
 echo "   - Persistence: Memory (ephemeral)"

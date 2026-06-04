@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -26,6 +27,23 @@ from argus.api.routers import (
     search,
     strategies,
 )
+
+DEFAULT_CORS_ALLOW_ORIGINS = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+)
+
+
+def cors_allow_origins() -> list[str]:
+    configured = os.getenv("ARGUS_CORS_ALLOW_ORIGINS", "")
+    extra_origins = [
+        origin.strip()
+        for origin in configured.replace("\n", ",").split(",")
+        if origin.strip()
+    ]
+    return list(dict.fromkeys([*DEFAULT_CORS_ALLOW_ORIGINS, *extra_origins]))
 
 
 @asynccontextmanager
@@ -64,12 +82,7 @@ app = FastAPI(title="Argus Alpha API", version="1.0.0-alpha", lifespan=lifespan)
 app.middleware("http")(request_id_middleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,8 +105,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # type:
 
     origin = request.headers.get("origin")
     headers = dict(exc.headers or {})
-    headers["Access-Control-Allow-Origin"] = origin or "*"
-    if origin:
+    if origin in cors_allow_origins():
+        headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(body, status_code=exc.status_code, headers=headers)
 
