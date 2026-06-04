@@ -117,6 +117,55 @@ def _positive_float_env(name: str, default: float, *, min_value: float) -> float
     return max(value, min_value)
 
 
+async def _cancel_runtime_event_task(
+    runtime_event_task: asyncio.Task[dict[str, Any]],
+) -> None:
+    runtime_event_task.cancel()
+    with suppress(asyncio.CancelledError, StopAsyncIteration):
+        await runtime_event_task
+
+
+async def _runtime_events_with_keepalive(
+    runtime_events: AsyncIterator[dict[str, Any]],
+) -> AsyncIterator[dict[str, Any] | None]:
+    next_runtime_event: asyncio.Task[dict[str, Any]] | None = None
+    next_runtime_event_started = time.monotonic()
+    runtime_timeout_seconds = _runtime_event_timeout_seconds()
+    runtime_keepalive_seconds = _runtime_event_keepalive_seconds()
+
+    try:
+        while True:
+            if next_runtime_event is None:
+                next_runtime_event = asyncio.create_task(anext(runtime_events))
+                next_runtime_event_started = time.monotonic()
+            try:
+                elapsed_seconds = time.monotonic() - next_runtime_event_started
+                remaining_seconds = runtime_timeout_seconds - elapsed_seconds
+                if remaining_seconds <= 0:
+                    raise asyncio.TimeoutError
+                runtime_event = await asyncio.wait_for(
+                    asyncio.shield(next_runtime_event),
+                    timeout=min(runtime_keepalive_seconds, remaining_seconds),
+                )
+                next_runtime_event = None
+            except asyncio.TimeoutError:
+                if (
+                    time.monotonic() - next_runtime_event_started
+                    >= runtime_timeout_seconds
+                ):
+                    await _cancel_runtime_event_task(next_runtime_event)
+                    next_runtime_event = None
+                    raise asyncio.TimeoutError("agent_runtime_event_timeout") from None
+                yield None
+                continue
+            except StopAsyncIteration:
+                break
+            yield runtime_event
+    finally:
+        if next_runtime_event is not None and not next_runtime_event.done():
+            await _cancel_runtime_event_task(next_runtime_event)
+
+
 def _strategies_enabled() -> bool:
     raw = os.getenv("ARGUS_STRATEGIES_ENABLED", "false").strip().lower()
     return raw in {"1", "true", "yes", "on"}
@@ -772,37 +821,10 @@ async def chat_stream(
                 fallback_confirmation_payload=runtime_fallback.confirmation_payload,
             )
             final_seen = False
-            next_runtime_event: asyncio.Task[dict[str, Any]] | None = None
-            next_runtime_event_started = time.monotonic()
-            runtime_timeout_seconds = _runtime_event_timeout_seconds()
-            runtime_keepalive_seconds = _runtime_event_keepalive_seconds()
-            while True:
-                if next_runtime_event is None:
-                    next_runtime_event = asyncio.create_task(anext(runtime_events))
-                    next_runtime_event_started = time.monotonic()
-                try:
-                    elapsed_seconds = time.monotonic() - next_runtime_event_started
-                    remaining_seconds = runtime_timeout_seconds - elapsed_seconds
-                    if remaining_seconds <= 0:
-                        raise asyncio.TimeoutError
-                    runtime_event = await asyncio.wait_for(
-                        asyncio.shield(next_runtime_event),
-                        timeout=min(runtime_keepalive_seconds, remaining_seconds),
-                    )
-                    next_runtime_event = None
-                except asyncio.TimeoutError:
-                    if (
-                        time.monotonic() - next_runtime_event_started
-                        >= runtime_timeout_seconds
-                    ):
-                        next_runtime_event.cancel()
-                        with suppress(asyncio.CancelledError, StopAsyncIteration):
-                            await next_runtime_event
-                        raise asyncio.TimeoutError("agent_runtime_event_timeout") from None
+            async for runtime_event in _runtime_events_with_keepalive(runtime_events):
+                if runtime_event is None:
                     yield sse_keepalive()
                     continue
-                except StopAsyncIteration:
-                    break
                 event_type = runtime_event.get("type")
                 if event_type == "token":
                     content = str(runtime_event.get("content") or "")

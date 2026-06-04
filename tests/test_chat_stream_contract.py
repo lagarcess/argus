@@ -359,6 +359,36 @@ def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(
     assert response.text.count("data: [DONE]") == 1
 
 
+@pytest.mark.asyncio
+async def test_runtime_keepalive_wrapper_cleans_pending_task_on_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    cleanup_seen = asyncio.Event()
+
+    async def _runtime_events():
+        yield {"type": "stage_start", "stage": "interpret"}
+        try:
+            await asyncio.sleep(60)
+            yield {"type": "final", "payload": {"stage_outcome": "await_approval"}}
+        finally:
+            cleanup_seen.set()
+
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
+    wrapped_events = agent_router._runtime_events_with_keepalive(_runtime_events())
+
+    assert await anext(wrapped_events) == {
+        "type": "stage_start",
+        "stage": "interpret",
+    }
+    assert await anext(wrapped_events) is None
+    await wrapped_events.aclose()
+
+    await asyncio.wait_for(cleanup_seen.wait(), timeout=1)
+
+
 def test_chat_stream_missing_runtime_final_emits_recoverable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
