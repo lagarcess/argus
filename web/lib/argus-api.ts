@@ -252,6 +252,9 @@ export class ChatStreamError extends Error {
   }
 }
 
+const CHAT_STREAM_INTERRUPTED_MESSAGE =
+  "The connection ended before Argus finished responding. Please try again.";
+
 export type DiscoveryItem = {
   id: string;
   type: "asset" | "indicator";
@@ -757,17 +760,50 @@ export async function streamChatMessage(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let receivedDone = false;
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() ?? "";
-    for (const part of parts) {
-      const parsed = parseChatStreamFrame(part);
-      if (parsed) onEvent(parsed);
+  const dispatchParsedFrame = (part: string) => {
+    const parsed = parseChatStreamFrame(part);
+    if (!parsed) return;
+    onEvent(parsed);
+    if (parsed.event === "done" || parsed.event === "error") {
+      receivedDone = true;
     }
+  };
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+      for (const part of parts) {
+        dispatchParsedFrame(part);
+      }
+    }
+
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      dispatchParsedFrame(buffer);
+    }
+  } catch (err) {
+    if (err instanceof ChatStreamError) {
+      throw err;
+    }
+    throw new ChatStreamError(
+      CHAT_STREAM_INTERRUPTED_MESSAGE,
+      0,
+      "stream_interrupted",
+    );
+  }
+
+  if (!receivedDone) {
+    throw new ChatStreamError(
+      CHAT_STREAM_INTERRUPTED_MESSAGE,
+      0,
+      "stream_interrupted",
+    );
   }
 }
 
