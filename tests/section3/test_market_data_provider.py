@@ -170,6 +170,16 @@ def test_live_provider_mode_fails_closed_when_provider_catalog_unavailable(
         assets.resolve_asset("Apple")
 
 
+def test_warm_asset_universe_fails_closed_when_cache_refresh_leaves_no_alias_map(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assets.clear_asset_cache()
+    monkeypatch.setattr(assets, "_refresh_asset_cache_if_needed", lambda *, force=False: None)
+
+    with pytest.raises(ValueError, match="asset_universe_unavailable"):
+        assets.warm_asset_universe(force=True)
+
+
 def test_synthetic_unit_fixture_is_explicitly_opted_in(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
