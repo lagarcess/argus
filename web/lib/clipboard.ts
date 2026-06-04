@@ -30,13 +30,15 @@ function runtimeClipboardDocument(): DocumentLike | null {
 
   return {
     createElement: (tagName) => document.createElement(tagName),
-    body: document.body
-      ? {
-          appendChild: (node) => {
-            document.body.appendChild(node as HTMLTextAreaElement);
-          },
-        }
-      : undefined,
+    get body() {
+      return document.body
+        ? {
+            appendChild: (node: TextareaLike) => {
+              document.body.appendChild(node as HTMLTextAreaElement);
+            },
+          }
+        : undefined;
+    },
     execCommand: (command) => document.execCommand(command),
   };
 }

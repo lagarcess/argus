@@ -92,7 +92,20 @@ argus_load_root_env() {
 
 argus_require_env() {
   local name="$1"
-  local value="${!name:-}"
+  local value
+  local had_nounset=0
+
+  case "$-" in
+    *u*)
+      had_nounset=1
+      set +u
+      ;;
+  esac
+  value="${!name}"
+  if [ "$had_nounset" -eq 1 ]; then
+    set -u
+  fi
+
   if [ -z "$value" ] || [[ "$value" == YOUR_* ]] || [[ "$value" == your_* ]]; then
     echo "❌ $name is required."
     exit 1

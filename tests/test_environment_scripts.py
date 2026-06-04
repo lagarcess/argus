@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +48,28 @@ def test_dev_and_qa_scripts_source_shared_env_contract() -> None:
     assert ENV_CONTRACT.exists()
     assert 'source "$SCRIPT_DIR/argus-env.sh"' in _source(".github/dev.sh")
     assert 'source "$SCRIPT_DIR/argus-env.sh"' in _source(".github/qa.sh")
+
+
+def test_shared_env_contract_requires_unset_indirect_env_under_nounset() -> None:
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            "set -euo pipefail; "
+            "source .github/argus-env.sh; "
+            "unset OPENROUTER_API_KEY; "
+            "argus_require_env OPENROUTER_API_KEY",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "OPENROUTER_API_KEY is required" in result.stdout
+    assert "bad substitution" not in result.stderr
+    assert "unbound variable" not in result.stderr
 
 
 def test_render_blueprint_uses_current_env_contract_names_only() -> None:

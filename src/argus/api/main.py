@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import os
 from contextlib import asynccontextmanager
 
@@ -36,14 +37,19 @@ DEFAULT_CORS_ALLOW_ORIGINS = (
 )
 
 
-def cors_allow_origins() -> list[str]:
-    configured = os.getenv("ARGUS_CORS_ALLOW_ORIGINS", "")
+@functools.lru_cache(maxsize=16)
+def _cors_allow_origins_for(configured: str) -> tuple[str, ...]:
     extra_origins = [
         origin.strip()
         for origin in configured.replace("\n", ",").split(",")
         if origin.strip()
     ]
-    return list(dict.fromkeys([*DEFAULT_CORS_ALLOW_ORIGINS, *extra_origins]))
+    return tuple(dict.fromkeys([*DEFAULT_CORS_ALLOW_ORIGINS, *extra_origins]))
+
+
+def cors_allow_origins() -> list[str]:
+    configured = os.getenv("ARGUS_CORS_ALLOW_ORIGINS", "")
+    return list(_cors_allow_origins_for(configured))
 
 
 @asynccontextmanager
