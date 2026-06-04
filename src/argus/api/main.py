@@ -24,6 +24,7 @@ from argus.api.routers import (
     discovery,
     feedback,
     history,
+    ops,
     profile,
     search,
     strategies,
@@ -134,6 +135,7 @@ for api_router in (
     search.router,
     discovery.router,
     feedback.router,
+    ops.router,
     dev.router,
 ):
     app.include_router(api_router)

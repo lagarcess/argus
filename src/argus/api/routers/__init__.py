@@ -10,6 +10,7 @@ __all__ = [
     "discovery",
     "feedback",
     "history",
+    "ops",
     "profile",
     "search",
     "strategies",

@@ -15,14 +15,33 @@ This runbook is for the first trusted-user internet tests on Render.
    Stop if Render proposes duplicate services.
 4. Confirm both services still have manual deploys enabled.
 5. Manually deploy `argus-api`, then `argus-app`.
-6. Run the warmup script:
+6. Export local ops and canary secrets:
+
+```bash
+export ARGUS_OPS_TOKEN="..."
+export ARGUS_CANARY_EMAIL="..."
+export ARGUS_CANARY_PASSWORD="..."
+export ARGUS_CANARY_SUPABASE_URL="https://lgdhvepyrzbnscqssgqq.supabase.co"
+export ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="..."
+```
+
+7. Run the product warmup script:
 
 ```bash
 .github/warmup-render.sh
 ```
 
-When the script prints `Argus is warm and ready for testers.`, send the app URL
-to testers.
+8. Run the golden-path canary:
+
+```bash
+.github/canary-render.sh
+```
+
+Only send the app URL to testers after both scripts pass. If warmup fails, do
+not invite testers yet. Check Render service status and redeploy only if the
+service is stuck. If warmup passes but the canary fails, treat it as an Argus
+product-path regression and inspect API logs, Supabase messages, backtest runs,
+and route receipts for the canary conversation id.
 
 ## Render Environment Ownership
 
@@ -38,9 +57,13 @@ Keep true secrets manual in Render:
 - `OPENROUTER_API_KEY`
 - `ALPACA_API_KEY`
 - `ALPACA_SECRET_KEY`
+- `ARGUS_OPS_TOKEN`
 
 Keep `NEXT_PUBLIC_POSTHOG_KEY` present but empty until PostHog is intentionally
 enabled.
+
+Set `ARGUS_OPS_TOKEN` manually in Render for `argus-api`; it is intentionally
+`sync: false`. Keep `ARGUS_OPS_TOKEN` out of frontend environment variables.
 
 ## Smoke Test
 

@@ -23,6 +23,21 @@ def _render_env(service_name: str) -> dict[str, dict[str, str | bool]]:
     raise AssertionError(f"{service_name} service missing from render.yaml")
 
 
+def _contract_array(name: str) -> list[str]:
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source .github/argus-env.sh; printf "%s\\n" "${{{name}[@]}}"',
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.splitlines()
+
+
 def test_env_example_uses_typed_supabase_postgres_urls() -> None:
     env_example = (ROOT / ".env.example").read_text()
 
@@ -110,6 +125,11 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         assert legacy_key not in render_yaml
 
 
+def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
+    assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
+    assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
+
+
 def test_render_blueprint_syncs_public_supabase_coordinates() -> None:
     api_env = _render_env("argus-api")
     web_env = _render_env("argus-app")
@@ -154,6 +174,7 @@ def test_render_blueprint_keeps_true_secrets_manual() -> None:
         "OPENROUTER_API_KEY",
         "ALPACA_API_KEY",
         "ALPACA_SECRET_KEY",
+        "ARGUS_OPS_TOKEN",
     ):
         assert api_env[key] == {"key": key, "sync": False}
 
@@ -175,4 +196,12 @@ def test_warmup_script_defaults_to_private_launch_render_urls() -> None:
     assert "https://argus-app-suz5.onrender.com" in warmup
     assert "https://argus-ohr5.onrender.com" in warmup
     assert "/health" in warmup
-    assert "Argus is warm and ready for testers" in warmup
+    assert "Argus product path is ready for testers" in warmup
+
+
+def test_warmup_script_checks_product_readiness_endpoint() -> None:
+    warmup = _source(".github/warmup-render.sh")
+
+    assert "/internal/readiness" in warmup
+    assert "ARGUS_OPS_TOKEN" in warmup
+    assert "Authorization: Bearer ${OPS_TOKEN}" in warmup

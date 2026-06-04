@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -288,7 +289,14 @@ async def chat_stream(
     ]
     cancel_confirmation_action = is_cancel_confirmation_action(payload)
     if onboarding_goal is None and not cancel_confirmation_action:
-        user_metadata: dict[str, Any] = {}
+        user_metadata: dict[str, Any] = {
+            "agent_runtime_turn": {
+                "status": "started",
+                "conversation_id": conversation.id,
+                "request_id": request.state.request_id,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+        }
         if mention_provenance:
             user_metadata["mentions"] = [
                 mention.model_dump(mode="python") for mention in payload.mentions
@@ -303,7 +311,7 @@ async def chat_stream(
             conversation_id=conversation.id,
             role="user",
             content=display_message,
-            metadata=user_metadata or None,
+            metadata=user_metadata,
         )
 
     onboarding_required = current_user_profile.onboarding.stage in {

@@ -20,6 +20,8 @@ services:
         value: "false"
       - key: ARGUS_MARKET_DATA_PROVIDER_MODE
         value: live_provider
+      - key: MARKET_DATA_CACHE_TTL
+        value: "43200"
       - key: ARGUS_CHECKPOINTER_MODE
         value: postgres
       - key: ARGUS_MOCK_AUTH
@@ -36,6 +38,10 @@ services:
         value: "true"
       - key: ARGUS_TITLE_AUTOGEN_TIMEOUT_MS
         value: "250"
+      - key: ARGUS_READINESS_ASSET_TIMEOUT_SECONDS
+        value: "25"
+      - key: ARGUS_OPS_TOKEN
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
