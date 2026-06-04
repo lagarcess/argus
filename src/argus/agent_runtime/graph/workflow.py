@@ -4,6 +4,10 @@ from copy import deepcopy
 from enum import Enum
 from typing import Any, TypedDict, cast
 
+from argus.agent_runtime.artifacts.lifecycle import (
+    RetryLifecycleDecision,
+    retry_lifecycle_after_artifact_event,
+)
 from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
     build_default_capability_contract,
@@ -401,6 +405,11 @@ def _build_task_snapshot(
         artifact_references=artifact_references,
         artifact_kind="failed_action",
     )
+    latest_failed_action_reference = _current_failed_action_reference(
+        latest_failed_action_reference=latest_failed_action_reference,
+        prior_task_snapshot=prior_task_snapshot,
+        artifact_references=artifact_references,
+    )
     active_confirmation_reference = _active_confirmation_reference(
         run_state=run_state,
         artifact_references=artifact_references,
@@ -462,14 +471,7 @@ def _build_task_snapshot(
                 else None
             )
         ),
-        latest_failed_action_reference=(
-            latest_failed_action_reference
-            or (
-                prior_task_snapshot.latest_failed_action_reference
-                if prior_task_snapshot is not None
-                else None
-            )
-        ),
+        latest_failed_action_reference=latest_failed_action_reference,
         active_draft_reference=(
             prior_task_snapshot.active_draft_reference
             if prior_task_snapshot is not None
@@ -526,6 +528,62 @@ def _should_preserve_pending_strategy(
         return False
     action = run_state.structured_action
     return action is None or action.type != "cancel_confirmation"
+
+
+def _current_failed_action_reference(
+    *,
+    latest_failed_action_reference: ArtifactReference | None,
+    prior_task_snapshot: TaskSnapshot | None,
+    artifact_references: list[ArtifactReference],
+) -> ArtifactReference | None:
+    latest_failed_index = _latest_artifact_index(
+        artifact_references=artifact_references,
+        artifact_kind="failed_action",
+    )
+    prior_failed = (
+        prior_task_snapshot.latest_failed_action_reference
+        if prior_task_snapshot is not None
+        else None
+    )
+    current_failed = latest_failed_action_reference or prior_failed
+    if current_failed is None:
+        return None
+    decision = retry_lifecycle_after_artifact_event(
+        retry_artifact_id=current_failed.artifact_id,
+        latest_failed_artifact_id=current_failed.artifact_id,
+        new_artifact_kind=_latest_artifact_kind_after(
+            artifact_references=artifact_references,
+            index=latest_failed_index,
+        ),
+    )
+    if decision is not RetryLifecycleDecision.ACTIVE:
+        return None
+    return current_failed
+
+
+def _latest_artifact_index(
+    *,
+    artifact_references: list[ArtifactReference],
+    artifact_kind: str,
+) -> int | None:
+    for index in range(len(artifact_references) - 1, -1, -1):
+        if artifact_references[index].artifact_kind == artifact_kind:
+            return index
+    return None
+
+
+def _latest_artifact_kind_after(
+    *,
+    artifact_references: list[ArtifactReference],
+    index: int | None,
+) -> str | None:
+    if not artifact_references:
+        return None
+    if index is None:
+        return artifact_references[-1].artifact_kind
+    if index >= len(artifact_references) - 1:
+        return None
+    return artifact_references[-1].artifact_kind
 
 
 def _strategy_summary_has_content(strategy: StrategySummary) -> bool:

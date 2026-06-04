@@ -32,7 +32,9 @@ def draft_from_result_metadata(metadata: dict[str, Any]) -> StrategySummary:
         resolved_parameters.get("date_range") or config.get("date_range"),
     )
     _fill_if_blank(values, "timeframe", resolved_parameters.get("timeframe"))
+    _fill_if_blank(values, "sizing_mode", resolved_parameters.get("sizing_mode"))
     _fill_if_blank(values, "capital_amount", resolved_parameters.get("capital_amount"))
+    _fill_if_blank(values, "position_size", resolved_parameters.get("position_size"))
     _fill_if_blank(
         values,
         "capital_amount",

@@ -37,6 +37,16 @@ ResponseIntentKind = Literal[
     "unsupported_recovery",
     "ambiguity_check",
     "optional_settings",
+    "artifact_action_recovery",
+]
+
+ArtifactActionRecoveryAction = Literal["retry_failed_action"]
+ArtifactActionRecoveryStatus = Literal[
+    "stale",
+    "missing_artifact_id",
+    "missing_payload",
+    "non_retryable",
+    "rebuilt_confirmation",
 ]
 
 IntentName = Literal[
@@ -166,6 +176,14 @@ class ResponseIntent(BaseModel):
     options: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ArtifactActionRecoveryFacts(BaseModel):
+    action_type: ArtifactActionRecoveryAction
+    status: ArtifactActionRecoveryStatus
+    requested_failed_action_id: str | None = None
+    latest_failed_action_id: str | None = None
+    user_safe_message: str | None = None
+
+
 class ArtifactReference(BaseModel):
     artifact_kind: str
     artifact_id: str
@@ -191,6 +209,16 @@ class StructuredActionContext(BaseModel):
     label: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     presentation: Literal["confirmation", "result"] | None = None
+
+    @property
+    def failed_action_artifact_id(self) -> str | None:
+        if self.type != "retry_failed_action":
+            return None
+        raw_value = self.payload.get("failed_action_id")
+        if not isinstance(raw_value, str):
+            return None
+        artifact_id = raw_value.strip()
+        return artifact_id or None
 
 
 class TaskSnapshot(BaseModel):

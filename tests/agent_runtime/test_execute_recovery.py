@@ -1152,9 +1152,7 @@ async def test_workflow_rebuilds_failed_action_retry_as_confirmation() -> None:
     active_confirmation = snapshot.active_confirmation_reference
     assert active_confirmation is not None
     assert active_confirmation.artifact_kind == "confirmation"
-    reference = snapshot.latest_failed_action_reference
-    assert reference is not None
-    assert reference.metadata["launch_payload"]["symbol"] == "MSFT"
+    assert snapshot.latest_failed_action_reference is None
 
 
 def test_execute_stage_translates_provider_window_limit_to_human_recovery() -> None:

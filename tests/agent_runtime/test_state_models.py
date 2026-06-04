@@ -14,11 +14,13 @@ from argus.agent_runtime.profile.response_profile import (
 )
 from argus.agent_runtime.state.models import (
     AmbiguousField,
+    ArtifactActionRecoveryFacts,
     ConversationMessage,
     ExtractedFieldValue,
     ResponseProfileOverrides,
     RunState,
     SimplificationOption,
+    StructuredActionContext,
     TaskSnapshot,
     ThreadState,
     UnsupportedConstraint,
@@ -120,6 +122,32 @@ def test_effective_response_profile_prefers_turn_override() -> None:
 def test_response_profile_overrides_reject_unknown_values() -> None:
     with pytest.raises(ValidationError):
         ResponseProfileOverrides(verbosity="verbose")
+
+
+def test_artifact_action_recovery_facts_reject_unknown_status() -> None:
+    with pytest.raises(ValidationError):
+        ArtifactActionRecoveryFacts(
+            action_type="retry_failed_action",
+            status="retry_this_somehow",
+        )
+
+
+def test_structured_retry_action_exposes_canonical_failed_action_id() -> None:
+    action = StructuredActionContext(
+        type="retry_failed_action",
+        payload={"failed_action_id": " failed-1 "},
+    )
+
+    assert action.failed_action_artifact_id == "failed-1"
+
+
+def test_structured_action_does_not_infer_failed_action_id_for_other_actions() -> None:
+    action = StructuredActionContext(
+        type="run_backtest",
+        payload={"failed_action_id": "failed-1"},
+    )
+
+    assert action.failed_action_artifact_id is None
 
 
 def test_run_state_starts_fresh_but_thread_state_keeps_history() -> None:

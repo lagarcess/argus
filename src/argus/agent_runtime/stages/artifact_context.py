@@ -459,19 +459,3 @@ def failed_action_is_retryable(reference: ArtifactReference | None) -> bool:
         return False
     metadata = dict(reference.metadata)
     return metadata.get("retryable") is True
-
-
-def non_retryable_failed_action_response(reference: ArtifactReference | None) -> str:
-    metadata = dict(reference.metadata) if reference is not None else {}
-    message = metadata.get("user_safe_message") or metadata.get("error")
-    if isinstance(message, str) and message.strip():
-        return (
-            f"I still have the failed setup, but rerunning the same payload will "
-            f"hit the same blocker: {message.strip()} Adjust the rule, asset, or "
-            "date range and I will keep the idea intact."
-        )
-    return (
-        "I still have the failed setup, but rerunning the same payload will hit "
-        "the same blocker. Adjust the rule, asset, or date range and I will keep "
-        "the idea intact."
-    )

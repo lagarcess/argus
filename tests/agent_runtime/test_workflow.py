@@ -4,6 +4,7 @@ import pytest
 from argus.agent_runtime.graph.workflow import (
     WorkflowStageOutcome,
     _apply_stage_result,
+    _build_task_snapshot,
     build_workflow,
 )
 from argus.agent_runtime.runtime import (
@@ -19,6 +20,7 @@ from argus.agent_runtime.stages.interpret import (
 )
 from argus.agent_runtime.stages.next_step import next_step_stage
 from argus.agent_runtime.state.models import (
+    ArtifactReference,
     FinalResponsePayload,
     ResponseIntent,
     RunState,
@@ -35,6 +37,30 @@ class ResolvedAssetStub:
     def __init__(self, canonical_symbol: str, asset_class: str) -> None:
         self.canonical_symbol = canonical_symbol
         self.asset_class = asset_class
+
+
+def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
+    prior_failed = ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id="failed-run-1",
+        artifact_status="failed",
+        metadata={"retryable": True},
+    )
+    confirmation = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id="confirm-1",
+        artifact_status="active",
+        metadata={},
+    )
+
+    snapshot = _build_task_snapshot(
+        run_state=RunState(current_user_message="review this"),
+        stage_outcome=WorkflowStageOutcome.AWAIT_APPROVAL,
+        prior_task_snapshot=TaskSnapshot(latest_failed_action_reference=prior_failed),
+        artifact_references=[confirmation],
+    )
+
+    assert snapshot.latest_failed_action_reference is None
 
 
 class RsiConfirmationInterpreter:

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from argus.agent_runtime.state.models import ResponseIntent, RunState, StrategySummary
+from argus.agent_runtime.state.models import (
+    ArtifactActionRecoveryFacts,
+    ResponseIntent,
+    RunState,
+    StrategySummary,
+)
+from pydantic import ValidationError
 
 
 def compose_response_intent(state: RunState) -> str | None:
@@ -29,6 +35,8 @@ def compose_response_intent(state: RunState) -> str | None:
                 "Do you want to change one of those?"
             )
         return "I can use defaults for the remaining assumptions. Do you want to run it?"
+    if intent.kind == "artifact_action_recovery":
+        return _compose_artifact_action_recovery(intent)
     if intent.kind == "unsupported_recovery":
         return _compose_unsupported_recovery(intent)
     if intent.kind == "clarification":
@@ -40,6 +48,8 @@ def should_prefer_composed_intent(state: RunState) -> bool:
     intent = state.response_intent
     if intent is None:
         return False
+    if intent.kind == "artifact_action_recovery":
+        return True
     if intent.kind == "unsupported_recovery":
         return _should_compose_unsupported_recovery(intent)
     if intent.kind != "clarification":
@@ -175,6 +185,61 @@ def _compose_unsupported_recovery(intent: ResponseIntent) -> str:
             f"{explanation} I can {_human_list(labels)}. Which direction should I take?"
         )
     return f"{explanation} I can help simplify it into something runnable."
+
+
+def _compose_artifact_action_recovery(intent: ResponseIntent) -> str:
+    facts = _artifact_action_recovery_facts(intent)
+    if facts is None:
+        return (
+            "That action is no longer attached to the current conversation state. "
+            "Use the latest visible action or tell me what you want to do next."
+        )
+    if facts.status == "stale":
+        return (
+            "That retry belongs to an older failed run. Use the latest retry action "
+            "or confirm the setup you want to run."
+        )
+    if facts.status == "missing_artifact_id":
+        return (
+            "That retry is missing its failed-run reference. Use the latest retry "
+            "action or confirm the setup you want to run."
+        )
+    if facts.status == "missing_payload":
+        return (
+            "I do not have a failed run payload to retry. Use the visible Run "
+            "backtest action again, or confirm the strategy you want me to run."
+        )
+    if facts.status == "non_retryable":
+        message = facts.user_safe_message
+        if isinstance(message, str) and message.strip():
+            return (
+                "I still have the failed setup, but rerunning the same payload will "
+                f"hit the same blocker: {message.strip()} Adjust the rule, asset, "
+                "or date range and I will keep the idea intact."
+            )
+        return (
+            "I still have the failed setup, but rerunning the same payload will hit "
+            "the same blocker. Adjust the rule, asset, or date range and I will "
+            "keep the idea intact."
+        )
+    if facts.status == "rebuilt_confirmation":
+        return (
+            "I still have that failed setup. I rebuilt the draft so you can review "
+            "the card and retry when you are ready."
+        )
+    return (
+        "That retry is no longer attached to an active failed run. Use the latest "
+        "retry action or confirm the setup you want to run."
+    )
+
+
+def _artifact_action_recovery_facts(
+    intent: ResponseIntent,
+) -> ArtifactActionRecoveryFacts | None:
+    try:
+        return ArtifactActionRecoveryFacts.model_validate(intent.facts)
+    except ValidationError:
+        return None
 
 
 def _strategy_from_intent(intent: ResponseIntent) -> StrategySummary:

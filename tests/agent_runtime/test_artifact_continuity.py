@@ -17,8 +17,12 @@ from argus.agent_runtime.artifacts.patches import (
     ArtifactPatch,
     apply_artifact_patch,
 )
+from argus.agent_runtime.stages.interpret_actions import (
+    structured_action_stage_result_if_applicable,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
+    RunState,
     StrategySummary,
     TaskSnapshot,
 )
@@ -92,6 +96,35 @@ def test_result_draft_preserves_buy_hold_defaults_from_config_snapshot() -> None
     assert draft.capital_amount == 500
     assert draft.timeframe == "1D"
     assert draft.comparison_baseline == "BTC"
+
+
+def test_result_draft_preserves_position_sizing_from_config_snapshot() -> None:
+    draft = draft_from_result_metadata(
+        {
+            "asset_class": "equity",
+            "symbols": ["NVDA"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "buy_and_hold",
+                "symbols": ["NVDA"],
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "resolved_strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["NVDA"],
+                    "asset_class": "equity",
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "sizing_mode": "position_size",
+                    "position_size": 10,
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        }
+    )
+
+    assert draft.sizing_mode == "position_size"
+    assert draft.position_size == 10
 
 
 def test_confirmation_draft_prefers_visible_strategy_and_fills_launch_defaults() -> None:
@@ -427,3 +460,109 @@ def test_retry_lifecycle_remains_active_for_current_failure() -> None:
     )
 
     assert decision == RetryLifecycleDecision.ACTIVE
+
+
+def test_retry_failed_action_rejects_stale_action_id() -> None:
+    failed = ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id="failed-new",
+        artifact_status="failed",
+        metadata={
+            "action_type": "run_backtest",
+            "retryable": True,
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbols": ["MSFT"],
+                "asset_class": "equity",
+                "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+                "timeframe": "1D",
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000,
+                "benchmark_symbol": "SPY",
+            },
+        },
+    )
+    state = RunState.new(
+        current_user_message="Retry",
+        recent_thread_history=[],
+        action_context={
+            "type": "retry_failed_action",
+            "label": "Retry",
+            "payload": {"failed_action_id": "failed-old"},
+        },
+    )
+
+    result = structured_action_stage_result_if_applicable(
+        state=state,
+        snapshot=TaskSnapshot(latest_failed_action_reference=failed),
+        selected_thread_metadata={},
+    )
+
+    assert result is not None
+    assert result.outcome == "ready_to_respond"
+    assert result.decision is not None
+    assert "stale_failed_action_retry" in result.decision.reason_codes
+    assert "assistant_response" not in result.stage_patch
+    assert "candidate_strategy_draft" not in result.stage_patch
+    assert result.stage_patch["response_intent"] == {
+        "kind": "artifact_action_recovery",
+        "facts": {
+            "action_type": "retry_failed_action",
+            "status": "stale",
+            "requested_failed_action_id": "failed-old",
+            "latest_failed_action_id": "failed-new",
+        },
+    }
+
+
+def test_structured_retry_failed_action_requires_artifact_id() -> None:
+    failed = ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id="failed-new",
+        artifact_status="failed",
+        metadata={
+            "action_type": "run_backtest",
+            "retryable": True,
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbols": ["MSFT"],
+                "asset_class": "equity",
+                "date_range": {"start": "2025-01-01", "end": "2025-12-31"},
+                "timeframe": "1D",
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000,
+                "benchmark_symbol": "SPY",
+            },
+        },
+    )
+    state = RunState.new(
+        current_user_message="Retry",
+        recent_thread_history=[],
+        action_context={
+            "type": "retry_failed_action",
+            "label": "Retry",
+            "payload": {},
+        },
+    )
+
+    result = structured_action_stage_result_if_applicable(
+        state=state,
+        snapshot=TaskSnapshot(latest_failed_action_reference=failed),
+        selected_thread_metadata={},
+    )
+
+    assert result is not None
+    assert result.outcome == "ready_to_respond"
+    assert result.decision is not None
+    assert "stale_failed_action_retry" in result.decision.reason_codes
+    assert "assistant_response" not in result.stage_patch
+    assert "candidate_strategy_draft" not in result.stage_patch
+    assert result.stage_patch["response_intent"] == {
+        "kind": "artifact_action_recovery",
+        "facts": {
+            "action_type": "retry_failed_action",
+            "status": "missing_artifact_id",
+            "requested_failed_action_id": None,
+            "latest_failed_action_id": "failed-new",
+        },
+    }

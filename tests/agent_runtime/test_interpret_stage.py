@@ -2039,6 +2039,61 @@ def test_refinement_clarification_composes_from_response_intent() -> None:
     assert "change" in prompt.lower()
 
 
+def test_failed_action_retry_recovery_composes_from_response_intent() -> None:
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent(
+        kind="artifact_action_recovery",
+        facts={
+            "action_type": "retry_failed_action",
+            "status": "stale",
+            "requested_failed_action_id": "failed-old",
+            "latest_failed_action_id": "failed-new",
+        },
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "older failed run" in prompt
+    assert "latest retry action" in prompt
+
+
+def test_failed_action_retry_rebuilt_confirmation_composes_from_response_intent() -> None:
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent(
+        kind="artifact_action_recovery",
+        facts={
+            "action_type": "retry_failed_action",
+            "status": "rebuilt_confirmation",
+            "latest_failed_action_id": "failed-action-1",
+        },
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "rebuilt the draft" in prompt
+    assert "review the card" in prompt
+
+
+def test_failed_action_retry_recovery_degrades_invalid_facts() -> None:
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.response_intent = ResponseIntent(
+        kind="artifact_action_recovery",
+        facts={
+            "action_type": "retry_failed_action",
+            "status": "retry_this_somehow",
+            "latest_failed_action_id": "failed-action-1",
+        },
+    )
+
+    prompt = compose_response_intent(state)
+
+    assert prompt is not None
+    assert "current conversation state" in prompt
+    assert "latest visible action" in prompt
+
+
 def test_interpret_answers_pending_draft_assumption_followup_without_approval() -> None:
     pending = StrategySummary(
         strategy_type="buy_and_hold",
@@ -5249,8 +5304,17 @@ def test_retry_failed_action_rebuilds_confirmation_instead_of_auto_running() -> 
         "start": "2025-05-13",
         "end": "2026-05-13",
     }
-    assert "review the card" in result.patch["assistant_response"]
-    assert "retry" in result.patch["assistant_response"]
+    assert "assistant_response" not in result.patch
+    assert result.patch["response_intent"] == {
+        "kind": "artifact_action_recovery",
+        "facts": {
+            "action_type": "retry_failed_action",
+            "status": "rebuilt_confirmation",
+            "requested_failed_action_id": None,
+            "latest_failed_action_id": "failed-action-1",
+            "user_safe_message": "market_data_unavailable",
+        },
+    }
 
 
 def test_pending_date_answer_is_not_treated_as_failed_action_retry(monkeypatch) -> None:

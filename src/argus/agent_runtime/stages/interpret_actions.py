@@ -43,7 +43,6 @@ from argus.agent_runtime.stages.artifact_context import (
     has_pending_confirmation_context,
     latest_run_id_for_action,
     launch_payload_from_failed_action,
-    non_retryable_failed_action_response,
     prior_stage_was_await_approval,
     semantic_need_for_action,
     stale_confirmation_action_response,
@@ -58,6 +57,9 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
+    ArtifactActionRecoveryFacts,
+    ArtifactActionRecoveryStatus,
+    ArtifactReference,
     ResponseProfile,
     RunState,
     StrategySummary,
@@ -117,6 +119,8 @@ def structured_action_stage_result_if_applicable(
         return _retry_failed_action_stage_result(
             decision=_retry_failed_action_decision(state=state),
             snapshot=snapshot,
+            requested_failed_action_id=action.failed_action_artifact_id,
+            require_requested_failed_action_id=True,
         )
     if action.presentation == "result":
         return result_action_stage_result_if_applicable(
@@ -525,10 +529,44 @@ def _retry_failed_action_stage_result(
     *,
     decision: InterpretDecision,
     snapshot: TaskSnapshot | None,
+    requested_failed_action_id: str | None = None,
+    require_requested_failed_action_id: bool = False,
 ) -> StageResult:
     reference = (
         snapshot.latest_failed_action_reference if snapshot is not None else None
     )
+    if (
+        require_requested_failed_action_id and requested_failed_action_id is None
+    ) or not _failed_action_matches_requested_id(
+        reference=reference,
+        requested_failed_action_id=requested_failed_action_id,
+    ):
+        reason_codes = [*decision.reason_codes, "stale_failed_action_retry"]
+        retry_status = (
+            "missing_artifact_id"
+            if require_requested_failed_action_id
+            and requested_failed_action_id is None
+            else "stale"
+        )
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=decision.model_copy(
+                update={
+                    "intent": "conversation_followup",
+                    "task_relation": "continue",
+                    "requires_clarification": False,
+                    "missing_required_fields": [],
+                    "reason_codes": reason_codes,
+                }
+            ),
+            stage_patch={
+                "response_intent": _retry_failed_action_response_intent(
+                    status=retry_status,
+                    reference=reference,
+                    requested_failed_action_id=requested_failed_action_id,
+                )
+            },
+        )
     launch_payload = launch_payload_from_failed_action(reference)
     if launch_payload is None:
         return StageResult(
@@ -542,10 +580,10 @@ def _retry_failed_action_stage_result(
                 }
             ),
             stage_patch={
-                "assistant_response": (
-                    "I do not have a failed run payload to retry. Use the visible "
-                    "Run backtest action again, or confirm the strategy you want me "
-                    "to run."
+                "response_intent": _retry_failed_action_response_intent(
+                    status="missing_payload",
+                    reference=reference,
+                    requested_failed_action_id=requested_failed_action_id,
                 )
             },
         )
@@ -561,7 +599,11 @@ def _retry_failed_action_stage_result(
                 }
             ),
             stage_patch={
-                "assistant_response": non_retryable_failed_action_response(reference)
+                "response_intent": _retry_failed_action_response_intent(
+                    status="non_retryable",
+                    reference=reference,
+                    requested_failed_action_id=requested_failed_action_id,
+                )
             },
         )
     strategy = strategy_from_failed_launch_payload(launch_payload)
@@ -578,12 +620,54 @@ def _retry_failed_action_stage_result(
         ),
         stage_patch={
             "candidate_strategy_draft": strategy,
-            "assistant_response": (
-                "I still have that failed setup. I rebuilt the draft so you can "
-                "review the card and retry when you are ready."
+            "response_intent": _retry_failed_action_response_intent(
+                status="rebuilt_confirmation",
+                reference=reference,
+                requested_failed_action_id=requested_failed_action_id,
             ),
         },
     )
+
+
+def _retry_failed_action_response_intent(
+    *,
+    status: ArtifactActionRecoveryStatus,
+    reference: ArtifactReference | None,
+    requested_failed_action_id: str | None,
+) -> dict[str, Any]:
+    metadata = dict(reference.metadata) if reference is not None else {}
+    raw_user_safe_message = metadata.get("user_safe_message") or metadata.get("error")
+    user_safe_message = (
+        raw_user_safe_message.strip()
+        if isinstance(raw_user_safe_message, str) and raw_user_safe_message.strip()
+        else None
+    )
+    facts = ArtifactActionRecoveryFacts(
+        action_type="retry_failed_action",
+        status=status,
+        requested_failed_action_id=requested_failed_action_id,
+        latest_failed_action_id=reference.artifact_id if reference is not None else None,
+        user_safe_message=user_safe_message,
+    )
+    payload = facts.model_dump()
+    if facts.user_safe_message is None:
+        payload.pop("user_safe_message", None)
+    return {
+        "kind": "artifact_action_recovery",
+        "facts": payload,
+    }
+
+
+def _failed_action_matches_requested_id(
+    *,
+    reference: ArtifactReference | None,
+    requested_failed_action_id: str | None,
+) -> bool:
+    if not requested_failed_action_id:
+        return True
+    if reference is None:
+        return False
+    return reference.artifact_id == requested_failed_action_id
 
 
 def pending_artifact_followup_stage_result_if_applicable(
@@ -745,7 +829,8 @@ def _deterministic_result_artifact_patch_stage_result_if_applicable(
     return _stage_result_from_result_artifact_patch(
         decision=decision,
         patched=patched,
-        reason_code="artifact_date_patch_from_current_message",
+        reason_code="artifact_patch_from_latest_result",
+        additional_reason_codes=("artifact_date_patch_from_current_message",),
     )
 
 
@@ -809,6 +894,7 @@ def _stage_result_from_result_artifact_patch(
     decision: InterpretDecision,
     patched: StrategySummary,
     reason_code: str,
+    additional_reason_codes: tuple[str, ...] = (),
 ) -> StageResult:
     missing_fields = missing_required_fields_for_strategy(
         patched,
@@ -842,6 +928,7 @@ def _stage_result_from_result_artifact_patch(
                     [
                         *decision.reason_codes,
                         reason_code,
+                        *additional_reason_codes,
                     ]
                 )
             ),

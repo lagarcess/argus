@@ -4221,6 +4221,17 @@ def test_structured_failed_action_retry_rebuilds_confirmation_without_llm() -> N
 
     assert interpreter.requests == []
     assert result.outcome == "ready_for_confirmation"
+    assert "assistant_response" not in result.patch
+    assert result.patch["response_intent"] == {
+        "kind": "artifact_action_recovery",
+        "facts": {
+            "action_type": "retry_failed_action",
+            "status": "rebuilt_confirmation",
+            "requested_failed_action_id": "failed-action-1",
+            "latest_failed_action_id": "failed-action-1",
+            "user_safe_message": "market_data_unavailable",
+        },
+    }
     strategy = result.decision.candidate_strategy_draft
     assert strategy.asset_universe == ["AAPL"]
     assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
@@ -4266,8 +4277,17 @@ def test_structured_failed_action_recovery_does_not_retry_nonrerunnable_payload(
 
     assert interpreter.requests == []
     assert result.outcome == "ready_to_respond"
-    assert "same blocker" in result.patch["assistant_response"]
-    assert "date" in result.patch["assistant_response"].lower()
+    assert "assistant_response" not in result.patch
+    assert result.patch["response_intent"] == {
+        "kind": "artifact_action_recovery",
+        "facts": {
+            "action_type": "retry_failed_action",
+            "status": "non_retryable",
+            "requested_failed_action_id": "failed-action-invalid-date",
+            "latest_failed_action_id": "failed-action-invalid-date",
+            "user_safe_message": "Date range is outside provider availability.",
+        },
+    }
 
 
 def test_fresh_complete_restatement_after_failed_date_followup_keeps_strategy_route(

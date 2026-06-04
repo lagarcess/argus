@@ -3408,15 +3408,11 @@ def _strategy_with_contextual_merge(
         if value in (None, "", [], {}):
             continue
         if key == "date_range" and isinstance(value, dict):
-            value = (
-                _current_message_date_range_for_contextual_edit(
-                    current_user_message=current_user_message,
-                    selected_thread_metadata=selected_thread_metadata,
-                )
-                or _merged_contextual_date_range(
-                    base=merged.date_range,
-                    incoming=value,
-                )
+            value = _contextual_date_range_value(
+                base=merged.date_range,
+                incoming=value,
+                current_user_message=current_user_message,
+                selected_thread_metadata=selected_thread_metadata,
             )
         if key == "extra_parameters":
             if preserve_prior_family and isinstance(value, dict):
@@ -3546,6 +3542,32 @@ def _current_message_date_range_for_contextual_edit(
     if set(payload) != {"start", "end"}:
         return None
     return payload
+
+
+def _contextual_date_range_value(
+    *,
+    base: Any,
+    incoming: dict[str, Any],
+    current_user_message: str | None,
+    selected_thread_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    if _has_complete_date_range(incoming):
+        return incoming
+    return (
+        _current_message_date_range_for_contextual_edit(
+            current_user_message=current_user_message,
+            selected_thread_metadata=selected_thread_metadata,
+        )
+        or _merged_contextual_date_range(
+            base=base,
+            incoming=incoming,
+        )
+    )
+
+
+def _has_complete_date_range(value: Any) -> bool:
+    endpoints = _date_range_endpoints(value)
+    return endpoints is not None and all(endpoints)
 
 
 def _merged_contextual_date_range(
