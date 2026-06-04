@@ -67,7 +67,10 @@ import {
   targetConversationIdForSend,
   type ActiveConversationRouteState,
 } from "@/lib/chat-conversation-routing";
-import { conversationLoadFailureMessage } from "@/lib/chat-conversation-load-state";
+import {
+  conversationLoadFailureMessage,
+  shouldShowConversationDisclaimer,
+} from "@/lib/chat-conversation-load-state";
 import { writeClipboardText } from "@/lib/clipboard";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
@@ -1812,7 +1815,10 @@ export default function ChatInterface() {
   const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
   const showExploratorySuggestions =
     chatExploratorySuggestionsEnabled && showSuggestions;
-  const showConversationDisclaimer = messages.length > 0 || isStreamingResponse;
+  const showConversationDisclaimer = shouldShowConversationDisclaimer(
+    messages,
+    isStreamingResponse,
+  );
   const chatInputPlaceholder =
     messages.length === 0
       ? t("chat.input_placeholder")

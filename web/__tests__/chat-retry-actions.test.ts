@@ -111,6 +111,22 @@ describe("failed-action retry UI contract", () => {
     expect(action?.value).toBe("Retry");
   });
 
+  test("does not hydrate retryable failed-action metadata without an artifact id", () => {
+    const metadata = {
+      failed_action: {
+        artifact_status: "failed",
+        retryable: true,
+        launch_payload: {
+          strategy_type: "dca_accumulation",
+          symbols: ["NVDA"],
+        },
+      },
+    };
+
+    expect(failedActionRetryActionFromMetadata(metadata)).toBeNull();
+    expect(hasFailedActionMetadata(metadata)).toBe(true);
+  });
+
   test("does not treat unrelated metadata as a failed action", () => {
     expect(hasFailedActionMetadata({ stage_outcome: "needs_clarification" })).toBe(
       false,

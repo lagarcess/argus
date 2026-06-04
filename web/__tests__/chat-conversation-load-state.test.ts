@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { conversationLoadFailureMessage } from "../lib/chat-conversation-load-state";
+import {
+  conversationLoadFailureMessage,
+  shouldShowConversationDisclaimer,
+} from "../lib/chat-conversation-load-state";
 
 describe("chat conversation load state", () => {
   test("builds a retryable assistant message for transient conversation load failures", () => {
@@ -13,6 +16,7 @@ describe("chat conversation load state", () => {
       id: "conversation-load-failed",
       role: "ai",
       kind: "text",
+      contentPresentation: "conversation_load_failure",
       content: "Could not load that conversation. Try again.",
       actions: [
         {
@@ -36,5 +40,24 @@ describe("chat conversation load state", () => {
     );
 
     expect(message.actions).toBeUndefined();
+  });
+
+  test("does not treat a synthetic load failure as disclaimer-worthy activity", () => {
+    const message = conversationLoadFailureMessage(
+      "conversation-1",
+      "Could not load that conversation. Try again.",
+    );
+
+    expect(shouldShowConversationDisclaimer([message], false)).toBe(false);
+  });
+
+  test("shows the disclaimer after real chat activity or streaming starts", () => {
+    expect(
+      shouldShowConversationDisclaimer(
+        [{ id: "user-1", role: "user", kind: "text", content: "Test Apple" }],
+        false,
+      ),
+    ).toBe(true);
+    expect(shouldShowConversationDisclaimer([], true)).toBe(true);
   });
 });

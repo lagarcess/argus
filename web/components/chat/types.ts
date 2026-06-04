@@ -119,7 +119,7 @@ export type Message = {
   id: string;
   role: "user" | "ai";
   kind?: "text" | "strategy_result" | "strategy_confirmation" | "action";
-  contentPresentation?: "result_breakdown";
+  contentPresentation?: "result_breakdown" | "conversation_load_failure";
   content?: string;
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;

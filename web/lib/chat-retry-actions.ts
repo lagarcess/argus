@@ -69,13 +69,16 @@ export function failedActionRetryActionFromMetadata(
     return null;
   }
   const artifactId = failedAction.artifactId;
+  if (!artifactId) {
+    return null;
+  }
   return {
-    id: `retry-failed-action-${artifactId ?? "latest"}`,
+    id: `retry-failed-action-${artifactId}`,
     label: "Retry",
     labelKey: "common.retry",
     value: "Retry",
     type: "retry_failed_action",
-    artifactId: artifactId ?? undefined,
+    artifactId,
     artifactType: "failed_action",
     artifactStatus: failedAction.artifactStatus ?? "failed",
     payload: {
