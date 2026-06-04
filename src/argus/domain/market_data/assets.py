@@ -411,7 +411,8 @@ def warm_asset_universe(
 ) -> AssetUniverseWarmupResult:
     started = time.perf_counter()
     _refresh_asset_cache_if_needed(force=force)
-    assert _ASSET_ALIAS_MAP is not None
+    if _ASSET_ALIAS_MAP is None:
+        raise ValueError("asset_universe_unavailable")
 
     resolved: list[str] = []
     missing: list[str] = []
