@@ -107,6 +107,8 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         "ARGUS_PERSISTENCE_MODE",
         "ARGUS_DEV_MEMORY_FALLBACK",
         "ARGUS_MARKET_DATA_PROVIDER_MODE",
+        "ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS",
+        "ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS",
         "ARGUS_CHECKPOINTER_MODE",
         "ARGUS_MOCK_AUTH",
         "ARGUS_CORS_ALLOW_ORIGINS",

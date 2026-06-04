@@ -314,6 +314,81 @@ def test_chat_stream_runtime_stall_emits_recoverable_error(
     assert response.text.count("data: [DONE]") == 1
 
 
+def test_chat_stream_runtime_keepalive_preserves_slow_progressing_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _slow_progressing_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        await asyncio.sleep(0.03)
+        yield {"type": "stage_outcome", "outcome": "ready_for_confirmation"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_approval",
+                "assistant_response": "Ready to test AAPL and MSFT.",
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _slow_progressing_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Test an equal-weight AAPL and MSFT strategy",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert ": keepalive" in response.text
+    events = _data_events(response.text)
+    assert events[0] == {"type": "stage_start", "stage": "interpret"}
+    assert any(event.get("type") == "final" for event in events)
+    assert not any(event.get("type") == "error" for event in events)
+    assert response.text.count("data: [DONE]") == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_keepalive_wrapper_cleans_pending_task_on_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    cleanup_seen = asyncio.Event()
+
+    async def _runtime_events():
+        yield {"type": "stage_start", "stage": "interpret"}
+        try:
+            await asyncio.sleep(60)
+            yield {"type": "final", "payload": {"stage_outcome": "await_approval"}}
+        finally:
+            cleanup_seen.set()
+
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_KEEPALIVE_SECONDS", 0.01)
+    wrapped_events = agent_router._runtime_events_with_keepalive(_runtime_events())
+
+    assert await anext(wrapped_events) == {
+        "type": "stage_start",
+        "stage": "interpret",
+    }
+    assert await anext(wrapped_events) is None
+    await wrapped_events.aclose()
+
+    await asyncio.wait_for(cleanup_seen.wait(), timeout=1)
+
+
 def test_chat_stream_missing_runtime_final_emits_recoverable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -16,6 +16,10 @@ def sse_done() -> str:
     return "data: [DONE]\n\n"
 
 
+def sse_keepalive() -> str:
+    return ": keepalive\n\n"
+
+
 def fetch_run_metrics(user_id: str, run_id: str) -> dict[str, Any] | None:
     run = None
     if api_state.supabase_gateway is not None:
