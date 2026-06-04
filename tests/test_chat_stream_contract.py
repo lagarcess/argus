@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -62,6 +63,17 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(api_state, "supabase_gateway", None)
 
 
+def test_internal_agent_runtime_turn_is_not_exposed_by_launch_api() -> None:
+    paths = {
+        getattr(route, "path", "")
+        for route in app.routes
+        if getattr(route, "path", "")
+    }
+
+    assert "/api/v1/chat/stream" in paths
+    assert "/internal/agent-runtime/turn" not in paths
+
+
 def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -74,18 +86,35 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
             "type": "final",
             "payload": {
                 "stage_outcome": "await_approval",
-                "assistant_response": "I read this as AAPL buy and hold.",
+                "assistant_response": "Ready to test AAPL with buy and hold.",
                 "confirmation_payload": {
-                    "strategy": {
-                        "strategy_type": "buy_and_hold",
-                        "asset_universe": ["AAPL"],
-                        "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
-                        "capital_amount": 10000,
+                        "strategy": {
+                            "strategy_type": "buy_and_hold",
+                            "asset_universe": ["AAPL"],
+                            "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
+                            "capital_amount": 10000,
+                        },
+                        "optional_parameters": {},
+                        "launch_payload": {
+                            "strategy_type": "buy_and_hold",
+                            "symbol": "AAPL",
+                            "symbols": ["AAPL"],
+                            "timeframe": "1D",
+                            "date_range": {
+                                "start": "2025-05-03",
+                                "end": "2026-05-03",
+                            },
+                            "sizing_mode": "capital_amount",
+                            "capital_amount": 10000,
+                            "benchmark_symbol": "SPY",
+                        },
+                        "validation": {
+                            "status": "ready_to_run",
+                            "executable": True,
+                        },
                     },
-                    "optional_parameters": {},
                 },
-            },
-        }
+            }
 
     monkeypatch.setattr(
         agent_router,
@@ -109,6 +138,7 @@ def test_chat_stream_confirmation_uses_final_payload_without_named_events(
     assert response.text.count("data: [DONE]") == 1
     payload = _final_payload(response.text)
     assert payload["confirmation"]["actions"][0]["type"] == "run_backtest"
+    assert payload.get("assistant_response") is None
     assert payload["message_id"]
     assert "run" not in payload
 
@@ -194,3 +224,322 @@ def test_chat_stream_result_uses_final_payload_run_without_named_events(
     ]
     assert messages[-1]["id"] == payload["message_id"]
     assert messages[-1]["content"] == "Short grounded summary."
+
+
+def test_chat_stream_artifact_naming_scheduler_failure_does_not_block_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    scheduled: list[dict[str, Any]] = []
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Short grounded summary.",
+            },
+        }
+
+    def _failing_scheduler(**kwargs: Any) -> None:
+        scheduled.append(kwargs)
+        raise RuntimeError("title service unavailable")
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "schedule_artifact_naming_after_stream",
+        _failing_scheduler,
+        raising=False,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Explain dollar cost averaging.",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text.count("data: [DONE]") == 1
+    assert _final_payload(response.text)["assistant_response"] == (
+        "Short grounded summary."
+    )
+    assert len(scheduled) == 1
+
+
+def test_chat_stream_runtime_stall_emits_recoverable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _stalling_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stalling_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(agent_router, "RUNTIME_EVENT_TIMEOUT_SECONDS", 0.01)
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "what are the top market movers?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert events[0] == {"type": "stage_start", "stage": "interpret"}
+    assert events[-1]["type"] == "error"
+    assert events[-1]["code"] == "agent_runtime_failure"
+    assert "conversation is saved" in events[-1]["message"]
+    assert response.text.count("data: [DONE]") == 1
+
+
+def test_chat_stream_missing_runtime_final_emits_recoverable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _incomplete_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _incomplete_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "what are the top market movers?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    events = _data_events(response.text)
+    assert events[0] == {"type": "stage_start", "stage": "interpret"}
+    assert events[-1]["type"] == "error"
+    assert events[-1]["code"] == "agent_runtime_failure"
+    assert "conversation is saved" in events[-1]["message"]
+    assert response.text.count("data: [DONE]") == 1
+
+
+def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _incomplete_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _incomplete_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "what if I bought $125 of BTC every two weeks in 2022?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant_message = messages[-1]
+    assert assistant_message["role"] == "assistant"
+    assert assistant_message["metadata"]["retry_last_turn"] == {
+        "message": "what if I bought $125 of BTC every two weeks in 2022?"
+    }
+    assert assistant_message["metadata"]["agent_runtime_stage_outcome"] == (
+        "agent_runtime_failure"
+    )
+
+
+def test_chat_stream_finalizes_ai_title_after_meaningful_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": (
+                    "Dollar cost averaging means investing a fixed amount "
+                    "on a schedule."
+                ),
+            },
+        }
+
+    def _suggest_entity_name(**kwargs: Any) -> str:
+        assert kwargs["entity_type"] == "conversation"
+        assert "dollar cost averaging" in kwargs["context"].lower()
+        return "DCA Basics"
+
+    monkeypatch.setenv("ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS", "1")
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        "argus.api.artifact_naming.suggest_entity_name",
+        _suggest_entity_name,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Can you explain dollar cost averaging?",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text.count("data: [DONE]") == 1
+    updated = api_state.store.conversations[conversation["id"]]
+    assert updated.title == "DCA Basics"
+    assert updated.title_source == "ai_generated"
+
+
+def test_chat_stream_final_text_wins_over_provisional_streamed_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {"type": "stage_outcome", "outcome": "needs_clarification"}
+        yield {"type": "token", "content": "I can show you a confirmation if you want."}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "assistant_response": "Which end date should I use?",
+                "pending_strategy": {
+                    "strategy": {
+                        "strategy_type": None,
+                        "asset_universe": [],
+                        "date_range": None,
+                    },
+                    "missing_required_fields": ["asset_universe"],
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "hello from browser smoke",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = _final_payload(response.text)
+    assert payload["assistant_response"] == "Which end date should I use?"
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert messages[-1]["id"] == payload["message_id"]
+    assert messages[-1]["content"] == "Which end date should I use?"
+
+
+def test_chat_stream_persists_streamed_text_when_final_text_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _fake_stream_agent_turn_events(**_: Any):
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {"type": "stage_outcome", "outcome": "needs_clarification"}
+        yield {"type": "token", "content": "Visible clarification."}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "await_user_reply",
+                "pending_strategy": {
+                    "strategy": {
+                        "strategy_type": None,
+                        "asset_universe": [],
+                        "date_range": None,
+                    },
+                    "missing_required_fields": ["asset_universe"],
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "hello from browser smoke",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = _final_payload(response.text)
+    assert payload["assistant_response"] == "Visible clarification."
+
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assert messages[-1]["id"] == payload["message_id"]
+    assert messages[-1]["content"] == "Visible clarification."

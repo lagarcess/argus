@@ -1,0 +1,204 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from tests.evals.chat_runtime_eval_harness import (
+    build_semantic_judge_messages,
+    capability_context_payload,
+    iter_eval_cases,
+    parse_sse_events,
+)
+
+MANIFEST_PATH = Path(__file__).with_name("chat_runtime_scenarios.json")
+EXPECTED_QA_IDS = {f"QA {index}" for index in range(1, 16)}
+EXPECTED_WORKSTREAMS = {f"workstream_{index}" for index in range(1, 9)}
+VALID_PRIORITIES = {"must_pass", "should_pass", "watch"}
+EXPECTED_EVAL_CATEGORIES = {
+    "messy_beginner_investing_prompts",
+    "partial_strategy_ideas",
+    "unsupported_requests",
+    "contradictory_requests",
+    "recovery_scenarios",
+    "reload_refinement_continuity",
+    "result_followup_groundedness",
+    "why_did_this_happen_contextual_synthesis",
+    "next_experiment_usefulness",
+    "hallucination_prevention",
+    "no_unsupported_investment_advice",
+}
+
+
+def _load_manifest() -> dict[str, Any]:
+    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+
+def test_chat_runtime_eval_manifest_covers_release_matrix() -> None:
+    manifest = _load_manifest()
+    scenarios = manifest["scenarios"]
+
+    qa_ids = {scenario["qa_id"] for scenario in scenarios}
+    assert qa_ids == EXPECTED_QA_IDS
+
+    covered_workstreams = {
+        bucket
+        for scenario in scenarios
+        for bucket in scenario["buckets"]
+        if bucket.startswith("workstream_")
+    }
+    assert covered_workstreams == EXPECTED_WORKSTREAMS
+
+
+def test_chat_runtime_eval_manifest_has_judge_and_hard_checks() -> None:
+    manifest = _load_manifest()
+    scenario_ids: set[str] = set()
+
+    for scenario in manifest["scenarios"]:
+        assert scenario["id"] not in scenario_ids
+        scenario_ids.add(scenario["id"])
+        assert scenario["priority"] in VALID_PRIORITIES
+        assert scenario["purpose"]
+        assert len(scenario["natural_prompt_variants"]) >= 3
+        assert scenario["conversation_steps"]
+        assert scenario["artifact_checks"]
+        assert scenario["action_checks"]
+        assert scenario["reload_checks"]
+        assert scenario["forbidden_outcomes"]
+        assert scenario["judge_rubric"]
+
+        for step in scenario["conversation_steps"]:
+            assert step["semantic_target"]
+            assert step["hard_checks"]
+
+
+def test_chat_runtime_eval_manifest_separates_hard_checks_from_llm_judgment() -> None:
+    manifest = _load_manifest()
+    assert manifest["scoring"]["must_pass"].startswith("Hard runtime")
+
+    must_pass = [
+        scenario
+        for scenario in manifest["scenarios"]
+        if scenario["priority"] == "must_pass"
+    ]
+    assert len(must_pass) >= 10
+
+    for scenario in must_pass:
+        hard_check_text = " ".join(
+            check
+            for step in scenario["conversation_steps"]
+            for check in step["hard_checks"]
+        )
+        assert "judge" not in hard_check_text.lower()
+        assert "rubric" not in hard_check_text.lower()
+
+
+def test_chat_runtime_eval_layer_tracks_semantic_groundedness_and_receipts() -> None:
+    manifest = _load_manifest()
+    layer = manifest["production_readiness_eval_layer"]
+
+    assert layer["assertion_style"] == "semantic_contracts_not_exact_wording"
+    assert set(layer["exact_strings_reserved_for"]) == {
+        "protocol",
+        "static_ui",
+        "safety_fallback",
+    }
+    assert set(layer["categories"]) == EXPECTED_EVAL_CATEGORIES
+    assert set(layer["capability_context_source"]) == {
+        "build_default_capability_contract",
+        "EXECUTABLE_INDICATORS",
+        "strategy_contract validators",
+    }
+    assert set(layer["receipt_fields"]) >= {
+        "task",
+        "tier",
+        "model",
+        "fallback_model",
+        "latency_ms",
+        "outcome",
+        "failure_mode",
+        "token_usage",
+        "context_packet_ids",
+    }
+
+
+def test_chat_runtime_eval_manifest_covers_conditional_buy_sell_regression() -> None:
+    manifest = _load_manifest()
+    prompts = {
+        prompt
+        for scenario in manifest["scenarios"]
+        for prompt in scenario["natural_prompt_variants"]
+    }
+    hard_checks = {
+        check
+        for scenario in manifest["scenarios"]
+        for step in scenario["conversation_steps"]
+        for check in step["hard_checks"]
+    }
+
+    assert "buy and sell when it goes up" in prompts
+    assert (
+        "does not collapse conditional buy/sell language into buy-and-hold" in hard_checks
+    )
+
+
+def test_eval_harness_builds_judge_payload_from_runtime_capabilities() -> None:
+    context = capability_context_payload()
+
+    assert context["contract_version"] == "1.0"
+    assert "strategy_drafting" in context["supported_intents"]
+    assert {"rsi", "sma", "ema", "macd", "bbands"}.issubset(
+        {item["key"] for item in context["executable_indicators"]}
+    )
+    assert (
+        "asset resolution and provider availability"
+        in context["deterministic_boundaries"]
+    )
+
+    cases = iter_eval_cases(priority="must_pass")
+    case = next(item for item in cases if item.prompt == "buy and sell when it goes up")
+    messages = build_semantic_judge_messages(
+        case=case,
+        assistant_response="I need a specific executable rule before I can run that.",
+        final_payload={"stage_outcome": "await_user_reply"},
+        route_receipts=[
+            {
+                "task": "interpretation",
+                "tier": "structured",
+                "model": "test/model",
+                "fallback_model": "test/fallback",
+                "latency_ms": 123,
+                "outcome": "succeeded",
+                "failure_mode": None,
+                "token_usage": None,
+                "context_packet_ids": [],
+            }
+        ],
+        capability_context=context,
+    )
+
+    assert messages[0]["role"] == "system"
+    assert "Do not require exact wording" in messages[0]["content"]
+    payload = json.loads(messages[1]["content"])
+    assert payload["case"]["prompt"] == "buy and sell when it goes up"
+    assert payload["capability_context"]["executable_indicators"]
+    assert payload["runtime_output"]["route_receipts"][0]["task"] == "interpretation"
+
+
+def test_eval_harness_parses_canonical_sse_frames() -> None:
+    events = parse_sse_events(
+        "\n".join(
+            [
+                'data: {"type":"stage_start","stage":"interpret"}',
+                'data: {"type":"token","content":"hello"}',
+                'data: {"type":"final","payload":{"stage_outcome":"ready_to_respond"}}',
+                "data: [DONE]",
+            ]
+        )
+    )
+
+    assert [event["type"] for event in events] == [
+        "stage_start",
+        "token",
+        "final",
+    ]

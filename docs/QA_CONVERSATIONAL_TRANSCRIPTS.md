@@ -80,18 +80,17 @@ Run these as separate focused checks after the main transcript set.
 3. Click `Run backtest`.
 4. Confirm no fake user text such as `yes` or `Run backtest` is submitted.
 5. Confirm the result card shows before the result summary.
-6. Confirm result actions are `Show a breakdown`, `Refine strategy`, and the in-card `Save strategy` control.
-7. Click `Show a breakdown` and verify the answer explains metrics, assumptions, benchmark, chart caveats, and data limits without inventing fields.
-8. Click `Refine strategy` and verify Argus keeps the latest run context.
+6. Confirm result actions are `Explain result` and `Refine idea`, with no Save control when `NEXT_PUBLIC_STRATEGIES_ENABLED=false`.
+7. Click `Explain result` and verify the answer explains metrics, assumptions, benchmark, chart caveats, and data limits without inventing fields.
+8. Click `Refine idea` and verify Argus keeps the latest run context.
 
 ### Save Strategy And Strategies Surface
 
-1. Run a supported backtest.
-2. Click the in-card `Save strategy` control.
-3. Navigate to the Strategies sidebar item.
-4. Confirm the saved strategy appears with the same symbols, strategy type, period, and latest run summary.
-5. Refresh the browser and confirm the saved strategy still appears.
-6. Confirm collections UI remains hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
+1. With private-alpha defaults, run a supported backtest.
+2. Confirm the in-card Save control and Strategies sidebar item are hidden.
+3. Confirm completed results remain available after refresh through conversation/history/Recents.
+4. If Strategies are explicitly enabled in a separate test configuration, verify Save creates a visible, reopenable Strategies artifact.
+5. Confirm Collections UI remains fully hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`.
 
 ### Persistence And Reload
 
@@ -184,3 +183,11 @@ Run these before PR submission whenever conversational runtime code changes:
 5. Start a DCA flow, provide the amount, then provide the period.
    - Pass: Argus preserves the user-provided recurring amount through later turns.
    - Reject: re-asking the amount after it was supplied.
+
+## QA Transcript Decision Filter
+
+When adding or updating conversational QA transcripts, ask:
+
+> *Does this test semantic success, groundedness, and recovery rather than brittle exact wording?*
+
+If no, the transcript likely overfits language the LLM should own.

@@ -28,6 +28,7 @@ PendingNeedName = Literal[
     "rule_definition",
     "assumption",
     "simplification_choice",
+    "refinement",
 ]
 
 ResponseIntentKind = Literal[
@@ -36,6 +37,16 @@ ResponseIntentKind = Literal[
     "unsupported_recovery",
     "ambiguity_check",
     "optional_settings",
+    "artifact_action_recovery",
+]
+
+ArtifactActionRecoveryAction = Literal["retry_failed_action"]
+ArtifactActionRecoveryStatus = Literal[
+    "stale",
+    "missing_artifact_id",
+    "missing_payload",
+    "non_retryable",
+    "rebuilt_confirmation",
 ]
 
 IntentName = Literal[
@@ -93,6 +104,9 @@ class StrategySummary(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
     comparison_baseline: str | None = None
     refinement_of: str | None = None
+    entry_rule: dict[str, Any] | None = None
+    exit_rule: dict[str, Any] | None = None
+    rule_spec: dict[str, Any] | None = None
     resolution_provenance: list["ResolutionProvenance"] = Field(default_factory=list)
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
@@ -162,9 +176,18 @@ class ResponseIntent(BaseModel):
     options: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ArtifactActionRecoveryFacts(BaseModel):
+    action_type: ArtifactActionRecoveryAction
+    status: ArtifactActionRecoveryStatus
+    requested_failed_action_id: str | None = None
+    latest_failed_action_id: str | None = None
+    user_safe_message: str | None = None
+
+
 class ArtifactReference(BaseModel):
     artifact_kind: str
     artifact_id: str
+    artifact_status: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -177,6 +200,7 @@ StructuredActionType = Literal[
     "show_breakdown",
     "refine_strategy",
     "save_strategy",
+    "retry_failed_action",
 ]
 
 
@@ -185,6 +209,16 @@ class StructuredActionContext(BaseModel):
     label: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     presentation: Literal["confirmation", "result"] | None = None
+
+    @property
+    def failed_action_artifact_id(self) -> str | None:
+        if self.type != "retry_failed_action":
+            return None
+        raw_value = self.payload.get("failed_action_id")
+        if not isinstance(raw_value, str):
+            return None
+        artifact_id = raw_value.strip()
+        return artifact_id or None
 
 
 class TaskSnapshot(BaseModel):
@@ -195,14 +229,21 @@ class TaskSnapshot(BaseModel):
     pending_needs: list[PendingNeedName] = Field(default_factory=list)
     field_provenance: dict[str, str] = Field(default_factory=dict)
     resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
+    active_draft_reference: ArtifactReference | None = None
+    active_confirmation_reference: ArtifactReference | None = None
     latest_backtest_result_reference: ArtifactReference | None = None
     latest_collection_action_reference: ArtifactReference | None = None
+    latest_failed_action_reference: ArtifactReference | None = None
+    saved_strategy_reference: ArtifactReference | None = None
+    artifact_references: list[ArtifactReference] = Field(default_factory=list)
     last_unresolved_follow_up: str | None = None
 
 
 class ConfirmationPayload(BaseModel):
     strategy: StrategySummary
     optional_parameters: dict[str, Any] = Field(default_factory=dict)
+    launch_payload: dict[str, Any] | None = None
+    validation: dict[str, Any] = Field(default_factory=dict)
 
 
 class ToolCallRecord(BaseModel):
@@ -258,6 +299,7 @@ class RunState(BaseModel):
     user_goal_summary: str | None = None
     candidate_strategy_draft: StrategySummary = Field(default_factory=StrategySummary)
     missing_required_fields: list[str] = Field(default_factory=list)
+    requested_field: str | None = None
     optional_parameter_status: dict[str, Any] = Field(default_factory=dict)
     effective_response_profile: ResponseProfile | None = None
     confirmation_payload: ConfirmationPayload | None = None

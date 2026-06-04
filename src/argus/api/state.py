@@ -19,6 +19,12 @@ from argus.domain.supabase_gateway import SupabaseGateway
 load_dotenv()
 
 PERSISTENCE_MODE = os.getenv("ARGUS_PERSISTENCE_MODE", "memory").strip().lower()
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+CHECKPOINTER_MODE = os.getenv("ARGUS_CHECKPOINTER_MODE", "").strip().lower()
+if not CHECKPOINTER_MODE:
+    CHECKPOINTER_MODE = (
+        "postgres" if PERSISTENCE_MODE == "supabase" and DATABASE_URL else "memory"
+    )
 agent_runtime_capability_contract = build_default_capability_contract()
 store = AlphaStore()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
@@ -36,19 +42,35 @@ def build_agent_runtime_workflow(*, checkpointer: Any):
     )
 
 
-def build_agent_runtime_checkpointer() -> MemorySaver:
+def build_agent_runtime_checkpoint_serde() -> JsonPlusSerializer:
     # Runtime checkpoints are process-local and may include Pydantic state
     # objects that LangGraph's default msgpack serializer cannot encode.
+    return JsonPlusSerializer(
+        pickle_fallback=True,
+        allowed_msgpack_modules=[
+            ("argus.agent_runtime.state.models", "ArtifactReference"),
+            ("argus.agent_runtime.state.models", "ConfirmationPayload"),
+            ("argus.agent_runtime.state.models", "ConversationMessage"),
+            ("argus.agent_runtime.state.models", "FinalResponsePayload"),
+            ("argus.agent_runtime.state.models", "ResolutionProvenance"),
+            ("argus.agent_runtime.state.models", "ResponseIntent"),
+            ("argus.agent_runtime.state.models", "ResponseProfile"),
+            ("argus.agent_runtime.state.models", "ResponseProfileOverrides"),
+            ("argus.agent_runtime.graph.workflow", "WorkflowStageOutcome"),
+            ("argus.agent_runtime.state.models", "RunState"),
+            ("argus.agent_runtime.state.models", "StrategySummary"),
+            ("argus.agent_runtime.state.models", "StructuredActionContext"),
+            ("argus.agent_runtime.state.models", "TaskSnapshot"),
+            ("argus.agent_runtime.state.models", "ToolCallRecord"),
+            ("argus.agent_runtime.state.models", "UserState"),
+            ("argus.agent_runtime.state.models", "UnsupportedConstraint"),
+        ],
+    )
+
+
+def build_agent_runtime_checkpointer() -> MemorySaver:
     return MemorySaver(
-        serde=JsonPlusSerializer(
-            pickle_fallback=True,
-            allowed_msgpack_modules=[
-                ("argus.agent_runtime.graph.workflow", "WorkflowStageOutcome"),
-                ("argus.agent_runtime.state.models", "RunState"),
-                ("argus.agent_runtime.state.models", "TaskSnapshot"),
-                ("argus.agent_runtime.state.models", "UserState"),
-            ],
-        )
+        serde=build_agent_runtime_checkpoint_serde()
     )
 
 

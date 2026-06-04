@@ -4,9 +4,18 @@ from copy import deepcopy
 from enum import Enum
 from typing import Any, TypedDict, cast
 
+from argus.agent_runtime.artifacts.lifecycle import (
+    RetryLifecycleDecision,
+    retry_lifecycle_after_artifact_event,
+)
 from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
     build_default_capability_contract,
+)
+from argus.agent_runtime.confirmation_artifacts import (
+    confirmation_artifact_reference,
+    confirmation_id_from_payload,
+    validate_confirmation_execution_payload,
 )
 from argus.agent_runtime.stages.clarify import (
     StructuredClarificationGenerator,
@@ -76,10 +85,24 @@ class WorkflowState(TypedDict, total=False):
     confirmation_payload: dict[str, Any]
     failure_classification: str | None
     final_response_payload: dict[str, Any]
+    latest_failed_action_reference: ArtifactReference | dict[str, Any]
     next_actions: list[str]
 
 
 RUN_STATE_FIELD_NAMES = frozenset(RunState.model_fields)
+_TURN_SCOPED_OUTPUT_KEYS = frozenset(
+    {
+        "assistant_prompt",
+        "assistant_response",
+        "requested_field",
+        "optional_parameter_choices",
+        "failure_classification",
+        "final_response_payload",
+        "latest_failed_action_reference",
+        "next_actions",
+        "result_fact_bank",
+    }
+)
 
 
 class DefaultBacktestTool:
@@ -228,6 +251,7 @@ async def _clarify_node_async(
             contract=contract,
             clarification_generator=clarification_generator,
             language=_user(state).language_preference,
+            prefilled_assistant_prompt=state.get("assistant_response"),
         ),
     )
 
@@ -238,10 +262,15 @@ async def _execute_node_async(
     tool: Any,
     max_retries: int,
 ) -> WorkflowState:
+    run_state = _run_state(state)
+    launch_payload = state.get("confirmation_payload")
+    if _is_launch_request_payload(launch_payload):
+        run_state = run_state.model_copy(deep=True)
+        run_state.confirmation_payload = dict(launch_payload)
     return _apply_stage_result(
         state,
         await execute_stage_async(
-            state=_run_state(state),
+            state=run_state,
             tool=tool,
             max_retries=max_retries,
             language=_user(state).language_preference,
@@ -252,7 +281,10 @@ async def _execute_node_async(
 async def _explain_node_async(state: WorkflowState) -> WorkflowState:
     return _apply_stage_result(
         state,
-        await explain_stage_async(state=_run_state(state)),
+        await explain_stage_async(
+            state=_run_state(state),
+            language=_user(state).language_preference,
+        ),
     )
 
 
@@ -272,14 +304,24 @@ def _apply_stage_result(
         run_state=_run_state(state),
         patch=result.patch,
     )
+    cleared_output_keys = set(_TURN_SCOPED_OUTPUT_KEYS)
+    if (
+        outcome is WorkflowStageOutcome.END_RUN
+        and "assistant_response" not in result.patch
+        and isinstance(state.get("assistant_response"), str)
+    ):
+        cleared_output_keys.discard("assistant_response")
     workflow_state: WorkflowState = {
         **state,
+        **{key: None for key in cleared_output_keys},
         "run_state": run_state,
         "stage_outcome": outcome,
     }
 
     for key, value in result.patch.items():
-        if key in RUN_STATE_FIELD_NAMES:
+        if key in RUN_STATE_FIELD_NAMES and not (
+            key == "confirmation_payload" and _is_launch_request_payload(value)
+        ):
             continue
         workflow_state[key] = value
 
@@ -303,6 +345,8 @@ def _apply_stage_result(
 def _patched_run_state(*, run_state: RunState, patch: dict[str, Any]) -> RunState:
     payload = run_state.model_dump(mode="python")
     for key, value in patch.items():
+        if key == "confirmation_payload" and _is_launch_request_payload(value):
+            continue
         if key in RUN_STATE_FIELD_NAMES:
             payload[key] = value
     return RunState.model_validate(payload)
@@ -356,6 +400,21 @@ def _build_task_snapshot(
     latest_collection_reference = _latest_artifact_reference(
         artifact_references=artifact_references,
         artifact_kind="collection_action",
+    )
+    latest_failed_action_reference = _latest_artifact_reference(
+        artifact_references=artifact_references,
+        artifact_kind="failed_action",
+    )
+    latest_failed_action_reference = _current_failed_action_reference(
+        latest_failed_action_reference=latest_failed_action_reference,
+        prior_task_snapshot=prior_task_snapshot,
+        artifact_references=artifact_references,
+    )
+    active_confirmation_reference = _active_confirmation_reference(
+        run_state=run_state,
+        artifact_references=artifact_references,
+        prior_task_snapshot=prior_task_snapshot,
+        stage_outcome_value=str(stage_outcome_value),
     )
     preserve_pending_strategy = _should_preserve_pending_strategy(
         run_state=run_state,
@@ -412,6 +471,28 @@ def _build_task_snapshot(
                 else None
             )
         ),
+        latest_failed_action_reference=latest_failed_action_reference,
+        active_draft_reference=(
+            prior_task_snapshot.active_draft_reference
+            if prior_task_snapshot is not None
+            else None
+        ),
+        active_confirmation_reference=(
+            active_confirmation_reference
+        ),
+        saved_strategy_reference=(
+            prior_task_snapshot.saved_strategy_reference
+            if prior_task_snapshot is not None
+            else None
+        ),
+        artifact_references=(
+            artifact_references
+            or (
+                prior_task_snapshot.artifact_references
+                if prior_task_snapshot is not None
+                else []
+            )
+        ),
         last_unresolved_follow_up=(
             run_state.user_goal_summary
             if stage_outcome_value in {"await_user_reply", "await_approval"}
@@ -449,6 +530,62 @@ def _should_preserve_pending_strategy(
     return action is None or action.type != "cancel_confirmation"
 
 
+def _current_failed_action_reference(
+    *,
+    latest_failed_action_reference: ArtifactReference | None,
+    prior_task_snapshot: TaskSnapshot | None,
+    artifact_references: list[ArtifactReference],
+) -> ArtifactReference | None:
+    latest_failed_index = _latest_artifact_index(
+        artifact_references=artifact_references,
+        artifact_kind="failed_action",
+    )
+    prior_failed = (
+        prior_task_snapshot.latest_failed_action_reference
+        if prior_task_snapshot is not None
+        else None
+    )
+    current_failed = latest_failed_action_reference or prior_failed
+    if current_failed is None:
+        return None
+    decision = retry_lifecycle_after_artifact_event(
+        retry_artifact_id=current_failed.artifact_id,
+        latest_failed_artifact_id=current_failed.artifact_id,
+        new_artifact_kind=_latest_artifact_kind_after(
+            artifact_references=artifact_references,
+            index=latest_failed_index,
+        ),
+    )
+    if decision is not RetryLifecycleDecision.ACTIVE:
+        return None
+    return current_failed
+
+
+def _latest_artifact_index(
+    *,
+    artifact_references: list[ArtifactReference],
+    artifact_kind: str,
+) -> int | None:
+    for index in range(len(artifact_references) - 1, -1, -1):
+        if artifact_references[index].artifact_kind == artifact_kind:
+            return index
+    return None
+
+
+def _latest_artifact_kind_after(
+    *,
+    artifact_references: list[ArtifactReference],
+    index: int | None,
+) -> str | None:
+    if not artifact_references:
+        return None
+    if index is None:
+        return artifact_references[-1].artifact_kind
+    if index >= len(artifact_references) - 1:
+        return None
+    return artifact_references[-1].artifact_kind
+
+
 def _strategy_summary_has_content(strategy: StrategySummary) -> bool:
     return any(
         value not in (None, "", [], {})
@@ -468,8 +605,14 @@ def _build_thread_metadata(
         "last_stage_outcome": stage_outcome_value,
     }
     requested_field = workflow_state.get("requested_field")
+    if requested_field in (None, ""):
+        requested_field = run_state.requested_field
     if isinstance(requested_field, str) and requested_field:
         metadata["requested_field"] = requested_field
+    if run_state.response_intent is not None:
+        metadata["response_intent"] = run_state.response_intent.model_dump(
+            mode="python"
+        )
     pending_resolution = _pending_resolution_candidate(workflow_state=workflow_state)
     if pending_resolution is not None:
         metadata["pending_resolution"] = pending_resolution
@@ -509,7 +652,110 @@ def _resolve_artifact_references(state: WorkflowState) -> list[ArtifactReference
     references: list[ArtifactReference] = []
     for reference in raw_references:
         references.append(ArtifactReference.model_validate(reference))
-    return references
+    latest_failed = state.get("latest_failed_action_reference")
+    if latest_failed is not None:
+        references.append(ArtifactReference.model_validate(latest_failed))
+    return _dedupe_artifact_references(references)
+
+
+def _active_confirmation_reference(
+    *,
+    run_state: RunState,
+    artifact_references: list[ArtifactReference],
+    prior_task_snapshot: TaskSnapshot | None,
+    stage_outcome_value: str,
+) -> ArtifactReference | None:
+    if stage_outcome_value == "await_approval":
+        existing = _latest_artifact_reference(
+            artifact_references=artifact_references,
+            artifact_kind="confirmation",
+        )
+        if existing is not None:
+            return existing
+        payload = _confirmation_payload_dict(run_state.confirmation_payload)
+        if payload:
+            confirmation_id = confirmation_id_from_payload(payload)
+            return confirmation_artifact_reference(
+                confirmation_id=confirmation_id,
+                confirmation_payload=payload,
+            )
+    if (
+        stage_outcome_value == "ready_to_respond"
+        and prior_task_snapshot is not None
+        and prior_task_snapshot.pending_strategy_summary is not None
+        and prior_task_snapshot.active_confirmation_reference is not None
+    ):
+        action = run_state.structured_action
+        if action is None or action.type != "cancel_confirmation":
+            return _valid_active_confirmation_reference(
+                prior_task_snapshot.active_confirmation_reference
+            )
+    if stage_outcome_value in {
+        "approved_for_execution",
+        "execution_succeeded",
+        "execution_failed_recoverably",
+        "execution_failed_terminally",
+        "ready_to_respond",
+        "end_run",
+    }:
+        return None
+    return (
+        _valid_active_confirmation_reference(prior_task_snapshot.active_confirmation_reference)
+        if prior_task_snapshot is not None
+        else None
+    )
+
+
+def _confirmation_payload_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if value is None:
+        return {}
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(mode="python")
+        return dict(dumped) if isinstance(dumped, dict) else {}
+    return {}
+
+
+def _valid_active_confirmation_reference(
+    reference: ArtifactReference | None,
+) -> ArtifactReference | None:
+    if reference is None:
+        return None
+    payload = _confirmation_payload_dict(reference.metadata.get("confirmation_payload"))
+    if not payload:
+        return None
+    if not validate_confirmation_execution_payload(payload).executable:
+        return None
+    return reference
+
+
+def _dedupe_artifact_references(
+    references: list[ArtifactReference],
+) -> list[ArtifactReference]:
+    seen: set[tuple[str, str]] = set()
+    deduped: list[ArtifactReference] = []
+    for reference in references:
+        key = (reference.artifact_kind, reference.artifact_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(reference)
+    return deduped
+
+
+def _is_launch_request_payload(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    required_fields = {
+        "strategy_type",
+        "symbol",
+        "timeframe",
+        "date_range",
+        "sizing_mode",
+        "benchmark_symbol",
+    }
+    return required_fields.issubset(value)
 
 
 def _latest_artifact_reference(

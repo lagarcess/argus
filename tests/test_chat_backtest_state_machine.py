@@ -82,7 +82,7 @@ def _conversation(client: TestClient) -> dict[str, Any]:
 def _confirmation_runtime_result() -> dict[str, Any]:
     return {
         "stage_outcome": "await_approval",
-        "assistant_response": "I read this as AAPL buy and hold.",
+        "assistant_response": "Ready to test AAPL with buy and hold.",
         "confirmation_payload": {
             "strategy": {
                 "strategy_type": "buy_and_hold",
@@ -106,6 +106,17 @@ def _confirmation_runtime_result() -> dict[str, Any]:
                 "fees": {"value": 0.0, "source": "default", "label": "Fees"},
                 "slippage": {"value": 0.0, "source": "default", "label": "Slippage"},
             },
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": ["AAPL"],
+                "timeframe": "1D",
+                "date_range": {"start": "2025-05-03", "end": "2026-05-03"},
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000.0,
+                "benchmark_symbol": "SPY",
+            },
+            "validation": {"executable": True},
         },
     }
 
@@ -197,6 +208,178 @@ def _result_runtime_result() -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize("benchmark_symbol", ["QQQ", "IWM"])
+def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
+    benchmark_symbol: str,
+) -> None:
+    from argus.api.chat.persistence import build_runtime_backtest_run
+
+    run = build_runtime_backtest_run(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        result_card={
+            "title": "AAPL buy and hold",
+            "rows": [],
+            "metrics": [],
+            "assumptions": [f"Benchmark: {benchmark_symbol}"],
+            "actions": [],
+        },
+        envelope={
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "asset_universe": ["AAPL"],
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "benchmark_symbol": benchmark_symbol,
+            },
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
+            "benchmark_metrics": {
+                "symbol": benchmark_symbol,
+                "aggregate": {"total_return_pct": 8.1},
+            },
+        },
+        classify_symbol_func=lambda symbol: SymbolAsset(
+            symbol=symbol.strip().upper(), asset_class="equity"
+        ),
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+    )
+
+    assert run is not None
+    assert run.benchmark_symbol == benchmark_symbol
+    assert run.config_snapshot["benchmark_symbol"] == benchmark_symbol
+    assert run.config_snapshot["resolved_parameters"]["benchmark_symbol"] == (
+        benchmark_symbol
+    )
+
+
+def test_chat_stream_final_payload_uses_engine_result_card_benchmark_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    result_card = {
+        "title": "AAPL buy and hold",
+        "rows": [
+            {"key": "ending_value", "label": "Ending value", "value": "$1,400"},
+            {
+                "key": "benchmark_delta",
+                "label": "Compared with QQQ",
+                "value": "Beat QQQ by 8.1 percentage points",
+            },
+        ],
+        "metrics": [
+            {"key": "ending_value", "label": "Ending value", "value": "$1,400"},
+            {
+                "key": "benchmark_delta",
+                "label": "Compared with QQQ",
+                "value": "Beat QQQ by 8.1 percentage points",
+            },
+        ],
+        "assumptions": ["Long-only", "Equal weight", "Benchmark: QQQ"],
+        "benchmark_note": "Compared with QQQ.",
+        "actions": [],
+    }
+
+    def _runtime(**_: Any) -> dict[str, Any]:
+        return {
+            "stage_outcome": "end_run",
+            "assistant_response": "Grounded result summary.",
+            "final_response_payload": {
+                "result_card": result_card,
+                "result": {
+                    "resolved_strategy": {
+                        "strategy_type": "buy_and_hold",
+                        "symbol": "AAPL",
+                        "asset_universe": ["AAPL"],
+                    },
+                    "resolved_parameters": {
+                        "timeframe": "1D",
+                        "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                        "benchmark_symbol": "QQQ",
+                    },
+                    "metrics": {
+                        "aggregate": {
+                            "performance": {
+                                "total_return_pct": 35.0,
+                                "delta_vs_benchmark_pct": 8.1,
+                            }
+                        }
+                    },
+                    "benchmark_metrics": {
+                        "symbol": "QQQ",
+                        "aggregate": {"total_return_pct": 27.0},
+                    },
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "run the confirmed AAPL idea",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    card = final["final_response_payload"]["result_card"]
+    assert card["rows"][1]["label"] == "Compared with QQQ"
+    assert card["rows"][1]["value"] == "Beat QQQ by 8.1 percentage points"
+    assert final["result_card"]["metrics"][1]["label"] == "Compared with QQQ"
+    assert final["run"]["conversation_result_card"]["assumptions"][-1] == "Benchmark: QQQ"
+
+
+def test_runtime_backtest_run_prefers_resolved_explicit_benchmark_over_default() -> None:
+    from argus.api.chat.persistence import build_runtime_backtest_run
+
+    run = build_runtime_backtest_run(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        result_card={
+            "title": "BTC buy and hold",
+            "rows": [],
+            "metrics": [],
+            "assumptions": ["Benchmark: ETH"],
+            "actions": [],
+        },
+        envelope={
+            "resolved_strategy": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "BTC",
+                "asset_universe": ["BTC"],
+            },
+            "resolved_parameters": {
+                "timeframe": "1D",
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                "benchmark_symbol": "ETH",
+            },
+            "metrics": {"aggregate": {"performance": {"total_return_pct": 12.4}}},
+            "benchmark_metrics": {"aggregate": {"total_return_pct": 8.1}},
+        },
+        classify_symbol_func=lambda symbol: SymbolAsset(
+            symbol=symbol.strip().upper(), asset_class="crypto"
+        ),
+        default_benchmark_func=lambda _asset_class, _symbols: "BTC",
+    )
+
+    assert run is not None
+    assert run.benchmark_symbol == "ETH"
+    assert run.config_snapshot["benchmark_symbol"] == "ETH"
+
+
 def _stream_events_from_runtime(runtime):
     async def _events(**kwargs: Any):
         yield {"type": "final", "payload": runtime(**kwargs)}
@@ -206,8 +389,9 @@ def _stream_events_from_runtime(runtime):
 
 @pytest.fixture(autouse=True)
 def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import backtest_service, chat_service
+    from argus.api import backtest_service
     from argus.api import state as api_state
+    from argus.api.chat import persistence as chat_persistence
 
     monkeypatch.setattr(api_state, "supabase_gateway", None)
     monkeypatch.setattr(
@@ -216,7 +400,7 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
     )
     monkeypatch.setattr(
-        chat_service,
+        chat_persistence,
         "classify_symbol",
         lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
     )
@@ -263,43 +447,11 @@ def test_chat_stream_emits_structured_confirmation_actions(
         "adjust_assumptions",
         "cancel_confirmation",
     ]
-    assert confirmation["actions"] == [
-        {
-            "id": "run-backtest",
-            "type": "run_backtest",
-            "label": "Run backtest",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "change-dates",
-            "type": "change_dates",
-            "label": "Change dates",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "change-asset",
-            "type": "change_asset",
-            "label": "Change asset",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "adjust-assumptions",
-            "type": "adjust_assumptions",
-            "label": "Adjust assumptions",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-        {
-            "id": "cancel-confirmation",
-            "type": "cancel_confirmation",
-            "label": "Cancel",
-            "presentation": "confirmation",
-            "payload": {"confirmation_id": confirmation_id},
-        },
-    ]
+    for action in confirmation["actions"]:
+        assert action["presentation"] == "confirmation"
+        assert action["payload"]["confirmation_id"] == confirmation_id
+        assert action["payload"]["artifact_id"] == confirmation_id
+        assert action["payload"]["launch_payload_hash"]
 
 
 def test_chat_stream_persists_confirmation_metadata_and_preview(
@@ -445,6 +597,13 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         },
     )
     assert create_confirmation.status_code == 200
+    confirmation = _stream_payloads(create_confirmation.text, "confirmation")[0][
+        "confirmation"
+    ]
+    for action in confirmation["actions"]:
+        assert action["presentation"] == "confirmation"
+        assert action["payload"]["confirmation_id"] == confirmation["confirmation_id"]
+        assert action["payload"]["conversation_id"] == conversation["id"]
 
     response = client.post(
         "/api/v1/chat/stream",
@@ -543,7 +702,10 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
 def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import chat_service
+    from argus.api.chat.breakdown import (
+        fallback_result_breakdown_message,
+        result_breakdown_context,
+    )
     from argus.api.routers import agent as agent_router
 
     runtime_calls = 0
@@ -560,7 +722,11 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
         "stream_agent_turn_events",
         _stream_events_from_runtime(_runtime),
     )
-    monkeypatch.setattr(chat_service, "build_openrouter_model", lambda _task: None)
+    monkeypatch.setattr(
+        agent_router,
+        "result_breakdown_message",
+        lambda run: fallback_result_breakdown_message(result_breakdown_context(run)),
+    )
     client = _client()
     conversation = _conversation(client)
     confirmation = client.post(
@@ -606,14 +772,20 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert runtime_calls == 1
     assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
-    assert "### What Happened" in breakdown
-    assert "**Total return:**" in breakdown
-    assert "### Benchmark Context" in breakdown
+    assert "### Quick Breakdown" not in breakdown
+    assert "**What was tested.**" in breakdown
+    assert "**What moved the result.**" in breakdown
+    assert "**Risks and assumptions.**" in breakdown
+    assert "**Try next.**" in breakdown
+    assert "- Result:" not in breakdown
+    assert "- Next step:" not in breakdown
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert run_id in messages.text
     assistant = messages.json()["items"][-1]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
+    assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
+    assert assistant["metadata"]["result_fact_bank"]["symbols"] == ["AAPL"]
     assert "result_card" not in assistant["metadata"]
 
 
@@ -714,10 +886,8 @@ def test_result_action_with_run_from_another_conversation_does_not_fallback() ->
 def test_show_breakdown_action_rejects_mismatched_conversation_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from argus.api import chat_service
     from argus.api import state as api_state
 
-    monkeypatch.setattr(chat_service, "build_openrouter_model", lambda _task: None)
     client = _client()
     active_conversation = _conversation(client)
     other_conversation = _conversation(client)
@@ -773,9 +943,12 @@ def test_show_breakdown_action_rejects_mismatched_conversation_context(
     assert "result_run_id" not in assistant["metadata"]
 
 
-def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
+def test_save_strategy_action_creates_strategy_from_latest_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from argus.api import state as api_state
 
+    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "true")
     client = _client()
     conversation = _conversation(client)
     user_id = client.get("/api/v1/me").json()["user"]["id"]
@@ -842,6 +1015,28 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
     assert "Saved" in text
     strategies = client.get("/api/v1/strategies").json()["items"]
     assert [strategy["symbols"] for strategy in strategies] == [["AAPL"]]
+    saved_strategy_id = strategies[0]["id"]
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["saved_strategy_id"] == saved_strategy_id
+    assert final["result_strategy_id"] == saved_strategy_id
+    assert final["result_run_id"] == run_id
+    stored_run = api_state.store.backtest_runs[run_id]
+    assert stored_run.strategy_id == saved_strategy_id
+    assert stored_run.conversation_result_card["saved_strategy_id"] == saved_strategy_id
+    assert stored_run.conversation_result_card["saved_state"] == {
+        "status": "saved",
+        "strategy_id": saved_strategy_id,
+    }
+    assert all(
+        action["type"] != "save_strategy"
+        for action in stored_run.conversation_result_card.get("actions", [])
+    )
+    assistant = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ][-1]
+    assert assistant["metadata"]["saved_strategy_id"] == saved_strategy_id
+    assert assistant["metadata"]["result_strategy_id"] == saved_strategy_id
+    assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
 
     duplicate = client.post(
         "/api/v1/chat/stream",
@@ -863,8 +1058,111 @@ def test_save_strategy_action_creates_strategy_from_latest_result() -> None:
     assert duplicate.status_code == 200
     strategies_after_duplicate = client.get("/api/v1/strategies").json()["items"]
     assert [strategy["id"] for strategy in strategies_after_duplicate] == [
-        strategies[0]["id"]
+        saved_strategy_id
     ]
+
+
+def test_save_strategy_action_is_history_preserved_when_strategies_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api import state as api_state
+
+    composed_save_response: dict[str, Any] = {}
+
+    async def compose_private_alpha_save_response(**kwargs: Any) -> str:
+        composed_save_response.update(kwargs)
+        return "I cannot move this into Strategies here, but the run stays reachable from this chat and Recents."
+
+    monkeypatch.setenv("ARGUS_STRATEGIES_ENABLED", "false")
+    monkeypatch.setattr(
+        "argus.api.routers.agent.compose_private_alpha_save_response",
+        compose_private_alpha_save_response,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    user_id = client.get("/api/v1/me").json()["user"]["id"]
+    run_id = api_state.store.new_id()
+    api_state.store.backtest_runs[run_id] = BacktestRun(
+        id=run_id,
+        conversation_id=conversation["id"],
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={"aggregate": {"performance": {"total_return_pct": 12.4}}},
+        config_snapshot={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2025-05-03",
+            "end_date": "2026-05-03",
+            "starting_capital": 10000,
+            "benchmark_symbol": "SPY",
+        },
+        conversation_result_card={
+            "title": "AAPL buy and hold",
+            "date_range": {
+                "start": "2025-05-03",
+                "end": "2026-05-03",
+                "display": "May 3, 2025 to May 3, 2026",
+            },
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return (%)",
+                    "value": "+12.4%",
+                }
+            ],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+    api_state.store.backtest_run_owners[run_id] = user_id
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "save_strategy",
+                "label": "Save strategy",
+                "presentation": "result",
+                "payload": {
+                    "run_id": run_id,
+                    "conversation_id": conversation["id"],
+                },
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    text = _stream_payloads(response.text, "token")[0]["text"]
+    assert "Saved" not in text
+    assert "Strategy was saved" not in text
+    assert composed_save_response["user_message"] == "save this strategy"
+    assert composed_save_response["metadata"]["run_id"] == run_id
+    assert composed_save_response["metadata"]["symbols"] == ["AAPL"]
+    assert composed_save_response["metadata"]["benchmark_symbol"] == "SPY"
+    assert composed_save_response["metadata"]["metrics"] == {
+        "aggregate": {"performance": {"total_return_pct": 12.4}}
+    }
+    assert composed_save_response["metadata"]["config_snapshot"] == {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "start_date": "2025-05-03",
+        "end_date": "2026-05-03",
+        "starting_capital": 10000,
+        "benchmark_symbol": "SPY",
+    }
+    assert composed_save_response["metadata"]["result_card"]["title"] == (
+        "AAPL buy and hold"
+    )
+    assert client.get("/api/v1/strategies").json()["items"] == []
 
 
 def test_chat_stream_requires_message_or_action() -> None:
@@ -919,7 +1217,9 @@ def test_learn_basics_symbol_followup_does_not_leak_entry_prompt(
     second_text = _stream_payloads(second.text, "token")[0]["text"]
     assert "help you choose a sensible next step" in first_text
     assert "What should trigger the buy?" not in second_text
-    assert "could not process that turn" in second_text
+    assert "reliable test setup" in second_text
+    assert "draft" not in second_text.lower()
+    assert "interpreter" not in second_text.lower()
 
 
 def test_discovery_endpoints_return_assets_and_indicators(
@@ -943,7 +1243,7 @@ def test_discovery_endpoints_return_assets_and_indicators(
         discovery_router,
         "search_indicators",
         lambda q, limit=12: [
-            IndicatorInfo("rsi", "RSI", "Relative Strength Index", "supported")
+            IndicatorInfo("rsi", "RSI", "Relative Strength Index", "executable")
         ],
     )
     client = _client()
@@ -955,6 +1255,7 @@ def test_discovery_endpoints_return_assets_and_indicators(
     assert assets.json()["items"][0]["insert_text"] == "AAPL"
     assert indicators.status_code == 200
     assert indicators.json()["items"][0]["provider"] == "pandas-ta-classic"
+    assert indicators.json()["items"][0]["support_status"] == "supported"
 
 
 def test_discovery_assets_display_currency_pair_label(

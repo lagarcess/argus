@@ -1,42 +1,36 @@
 "use client";
 
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import {
-  Archive,
   ArrowDown,
-  ChevronRight,
-  History,
-  PanelLeft,
-  MessageSquarePlus,
-  MoreHorizontal,
+  Copy,
+  Edit2,
+  MoreVertical,
+  Pin,
   Plus,
-  Search,
-  Settings,
   Trash2,
   TrendingUp,
   Bitcoin,
   LineChart,
-  Layers,
-  Compass,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { ArgusLogo } from "@/components/ArgusLogo";
+import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
+import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
+import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 import {
   createConversation,
-  deleteCollection,
   deleteConversation,
-  deleteStrategy,
-  formatRelativeDate,
+  getBacktestRun,
   getMe,
   getConversationMessages,
-  getStarterPrompts,
+  listConversations,
   listHistory,
-  searchGlobal,
-  patchCollection,
+  logoutFromApi,
   patchConversation,
   patchMe,
-  patchStrategy,
   resultCardFromConversationCard,
   resultCardFromRun,
   streamChatMessage,
@@ -51,18 +45,64 @@ import {
   type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
-import CollectionPicker from "./CollectionPicker";
-import CollectionsView from "../views/CollectionsView";
+import {
+  chatExploratorySuggestionsEnabled,
+  collectionsEnabled,
+  omnisearchEnabled,
+  privateAlphaOnboardingEnabled,
+  strategiesEnabled,
+} from "@/lib/private-alpha-flags";
+import {
+  failedActionRetryActionFromMetadata,
+  hasFailedActionMetadata,
+  isRetryAction,
+  retryLastTurnActionFromMessage,
+  retryLastTurnFailedAssistantIdFromAction,
+  retryLastTurnMessageFromAction,
+  retryLoadConversationIdFromAction,
+} from "@/lib/chat-retry-actions";
+import {
+  activeConversationRouteStateFromUrl,
+  shouldStartConversationForVisibleEmptyChat,
+  targetConversationIdForSend,
+  type ActiveConversationRouteState,
+} from "@/lib/chat-conversation-routing";
+import {
+  conversationLoadFailureMessage,
+  shouldShowConversationDisclaimer,
+} from "@/lib/chat-conversation-load-state";
+import { writeClipboardText } from "@/lib/clipboard";
+import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
+import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
+import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import { type ChatActionOption, type ChatMention, type Message, type StrategyConfirmationPayload } from "./types";
+import {
+  applyConsumedResultActions,
+  applyConfirmationActionEffects,
+  confirmationActionEffectFromAction,
+  confirmationActionEffectsFromApi,
+  consumeResultActionOnMessages,
+  consumedResultActionsFromApi,
+  hiddenSaveActionMessageIdsFromApi,
+  isBreakdownActionMetadata,
+  normalizeConfirmationHistory,
+  resultActionRunId,
+  settleOpenConfirmationsAfterTextFinal,
+} from "./artifact-history";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-type View = "chat" | "strategies" | "collections" | "settings";
+type View = "chat" | "strategies" | "settings";
+type SendOptions = {
+  renderUserMessage?: boolean;
+  replacementAssistantId?: string;
+};
 type OnboardingChoice = {
   goal: PrimaryGoal;
   title: string;
@@ -70,53 +110,164 @@ type OnboardingChoice = {
 };
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
-const ACTIVE_CONVERSATION_STORAGE_KEY = "argus.activeConversationId";
+const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
+const POST_TURN_TITLE_REFRESH_DELAYS_MS = [0, 1500, 5000, 9000, 13000];
 
 type HydratedMessages = {
   messages: Message[];
   inputActions: ChatActionOption[];
 };
 
-function readActiveConversationId() {
+function readActiveConversationRouteState(): ActiveConversationRouteState {
+  if (typeof window === "undefined") {
+    return {
+      conversationId: null,
+      isChatRoute: false,
+      isNewChatRoute: false,
+    };
+  }
+  try {
+    return activeConversationRouteStateFromUrl(
+      window.location.href,
+      ACTIVE_CONVERSATION_QUERY_KEY,
+    );
+  } catch {
+    return {
+      conversationId: null,
+      isChatRoute: false,
+      isNewChatRoute: false,
+    };
+  }
+}
+
+function readActiveConversationIdFromUrl() {
+  return readActiveConversationRouteState().conversationId;
+}
+
+function persistActiveConversationRoute(conversationId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (url.pathname !== "/chat") return;
+    if (url.searchParams.get(ACTIVE_CONVERSATION_QUERY_KEY) === conversationId) {
+      return;
+    }
+    url.searchParams.set(ACTIVE_CONVERSATION_QUERY_KEY, conversationId);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+  } catch {
+    // URL state is a convenience for reload recovery; chat still works without it.
+  }
+}
+
+function rememberActiveConversationId(conversationId: string) {
+  persistActiveConversationRoute(conversationId);
+}
+
+function clearActiveConversationRoute(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+    const url = new URL(window.location.href);
+    if (url.pathname !== "/chat") return null;
+    if (!url.searchParams.has(ACTIVE_CONVERSATION_QUERY_KEY)) return null;
+    url.searchParams.delete(ACTIVE_CONVERSATION_QUERY_KEY);
+    const query = url.searchParams.toString();
+    const nextRoute = query ? `${url.pathname}?${query}` : url.pathname;
+    window.history.replaceState(
+      window.history.state,
+      "",
+      nextRoute,
+    );
+    return nextRoute;
   } catch {
+    // URL state is optional recovery metadata.
     return null;
   }
 }
 
-function persistActiveConversationId(conversationId: string) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
-  } catch {
-    // Storage can be unavailable in restricted browser contexts.
-  }
-}
-
-function clearActiveConversationId() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
-  } catch {
-    // Storage can be unavailable in restricted browser contexts.
-  }
+function clearActiveConversationPointer() {
+  return clearActiveConversationRoute();
 }
 
 function latestInputActions(messages: Message[]) {
+  if (hasActiveArtifactActionSet(messages)) {
+    return [];
+  }
   const latestAi = [...messages].reverse().find((message) => message.role === "ai");
-  return (latestAi?.actions ?? []).filter((action) => action.type !== "save_strategy");
+  if (
+    latestAi?.kind === "strategy_confirmation" ||
+    latestAi?.kind === "strategy_result"
+  ) {
+    return [];
+  }
+  return (latestAi?.actions ?? []).filter(
+    (action) =>
+      action.type !== "save_strategy" &&
+      action.artifactType !== "failed_action",
+  );
 }
 
-function isBreakdownActionMetadata(metadata: Record<string, unknown>) {
-  const chatAction = metadata.chat_action;
-  return (
-    typeof chatAction === "object" &&
-    chatAction !== null &&
-    "type" in chatAction &&
-    chatAction.type === "show_breakdown"
-  );
+const CARD_SCOPED_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>([
+  "run_backtest",
+  "change_dates",
+  "change_asset",
+  "adjust_assumptions",
+  "cancel_confirmation",
+  "show_breakdown",
+  "refine_strategy",
+  "save_strategy",
+]);
+
+const CONFIRMATION_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>([
+  "run_backtest",
+  "change_dates",
+  "change_asset",
+  "adjust_assumptions",
+  "cancel_confirmation",
+]);
+
+function isCardScopedAction(action: ChatActionOption) {
+  return Boolean(action.type && CARD_SCOPED_ACTION_TYPES.has(action.type));
+}
+
+function isConfirmationAction(action: ChatActionOption | undefined) {
+  return Boolean(action?.type && CONFIRMATION_ACTION_TYPES.has(action.type));
+}
+
+function actionHasCardScopedOwnership(action: ChatActionOption) {
+  return isCardScopedAction(action) || action.presentation === "confirmation" || action.presentation === "result";
+}
+
+function visibleInputActions(actions: ChatActionOption[]) {
+  return actions.filter((action) => action.type !== "save_strategy");
+}
+
+function visibleComposerActions(actions: ChatActionOption[]) {
+  return visibleInputActions(actions).filter((action) => !isCardScopedAction(action));
+}
+
+function isFailedActionRetry(action: ChatActionOption | undefined) {
+  if (!action) return false;
+  return action.type === "retry_failed_action" || action.artifactType === "failed_action";
+}
+
+function hasActiveArtifactActionSet(messages: Message[]) {
+  return messages.some((message) => {
+    if (message.kind === "strategy_confirmation" && message.confirmation) {
+      if (
+        message.confirmation.confirmation_state &&
+        message.confirmation.confirmation_state !== "active"
+      ) {
+        return false;
+      }
+      const activeActions = message.confirmation.actions ?? message.actions ?? [];
+      return activeActions.some(actionHasCardScopedOwnership);
+    }
+    if (message.kind === "strategy_result" && message.result) {
+      const activeActions = message.result.actions ?? message.actions ?? [];
+      return activeActions.some(actionHasCardScopedOwnership);
+    }
+    return false;
+  });
 }
 
 function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[]) {
@@ -127,11 +278,42 @@ function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[
 }
 
 function resultActionRequiresRunContext(action: ChatActionOption) {
-  return action.type === "show_breakdown" || action.type === "save_strategy";
+  return (
+    action.type === "show_breakdown" ||
+    action.type === "save_strategy" ||
+    action.type === "refine_strategy"
+  );
+}
+
+function consumeConfirmationActionOnMessages(
+  messages: Message[],
+  action: ChatActionOption | undefined,
+): Message[] {
+  const effect = confirmationActionEffectFromAction(action);
+  if (!effect) {
+    return messages;
+  }
+  return applyConfirmationActionEffects(messages, [effect]);
 }
 
 function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
   return Boolean(runId && conversationId);
+}
+
+function historyItemBelongsToConversation(
+  item: HistoryItem,
+  targetConversationId: string,
+) {
+  return item.id === targetConversationId || item.conversation_id === targetConversationId;
+}
+
+function isMissingConversationLoadError(error: unknown) {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const status = "status" in error ? Number(error.status) : null;
+  const code = "code" in error && typeof error.code === "string" ? error.code : null;
+  return status === 403 || status === 404 || code === "not_found";
 }
 
 function hydrateResultActions(
@@ -164,19 +346,185 @@ function hydrateResultActions(
         conversation_id: context.conversationId,
         strategy_name: context.strategyName,
         symbols: context.symbols ?? [],
-        template: context.template ?? "",
-        asset_class: context.assetClass ?? "equity",
+        ...(context.template !== undefined ? { template: context.template } : {}),
+        ...(context.assetClass ? { asset_class: context.assetClass } : {}),
       },
       value: action.value,
     }));
 }
 
+function stringOrNull(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function recordOrNull(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringArrayOrNull(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const values = value.map(String).filter(Boolean);
+  return values.length > 0 ? values : null;
+}
+
+function isHydratableResultCard(value: unknown): value is ConversationResultCard {
+  const card = recordOrNull(value);
+  const dateRange = recordOrNull(card?.date_range);
+  return Boolean(
+    card &&
+      typeof card.title === "string" &&
+      typeof card.status_label === "string" &&
+      Array.isArray(card.rows) &&
+      Array.isArray(card.assumptions) &&
+      Array.isArray(card.actions) &&
+      dateRange &&
+      typeof dateRange.start === "string" &&
+      typeof dateRange.end === "string" &&
+      typeof dateRange.display === "string",
+  );
+}
+
+function assetClassOrUndefined(value: unknown): AssetClass | undefined {
+  return value === "crypto" || value === "equity" || value === "currency_pair"
+    ? value
+    : undefined;
+}
+
+function resultActionContextFromMetadata(
+  metadata: Record<string, unknown>,
+  card: ReturnType<typeof resultCardFromConversationCard>,
+) {
+  const factBank = recordOrNull(metadata.result_fact_bank);
+  const configSnapshot = recordOrNull(factBank?.config_snapshot);
+  const symbols = card.symbols ?? stringArrayOrNull(factBank?.symbols) ?? [];
+  return {
+    symbols,
+    template: stringOrNull(configSnapshot?.template),
+    assetClass: assetClassOrUndefined(factBank?.asset_class),
+  };
+}
+
+function savedStrategyIdFromMetadata(metadata: Record<string, unknown>) {
+  return stringOrNull(metadata.saved_strategy_id);
+}
+
+function savedStrategyIdFromFinalPayload(payload: Record<string, unknown>) {
+  return stringOrNull(payload.saved_strategy_id);
+}
+
+function resultRunIdFromFinalPayload(
+  payload: Record<string, unknown>,
+  action?: ChatActionOption,
+) {
+  const run = payload.run;
+  const runId =
+    typeof run === "object" && run !== null && "id" in run
+      ? stringOrNull(run.id)
+      : null;
+  return (
+    stringOrNull(payload.result_run_id) ??
+    stringOrNull(payload.latest_run_id) ??
+    runId ??
+    stringOrNull(action?.payload?.run_id)
+  );
+}
+
+function markComposerActionsInactive(messages: Message[]): Message[] {
+  return messages.map((message) => {
+    if (message.kind === "strategy_result" && message.result) {
+      const resultActions = message.result.actions ?? message.actions;
+      return {
+        ...message,
+        actions: undefined,
+        result: {
+          ...message.result,
+          actions: resultActions,
+        },
+      };
+    }
+    if (message.kind === "strategy_confirmation" && message.confirmation) {
+      const confirmationActions = message.confirmation.actions ?? message.actions;
+      return {
+        ...message,
+        actions: undefined,
+        confirmation: {
+          ...message.confirmation,
+          actions: confirmationActions,
+        },
+      };
+    }
+    return message.actions ? { ...message, actions: undefined } : message;
+  });
+}
+
+function markResultCardSaved(
+  messages: Message[],
+  runId: string | null,
+  savedStrategyId: string,
+): Message[] {
+  if (!runId) return messages;
+  return messages.map((message) => {
+    if (message.kind !== "strategy_result" || !message.result || message.result.runId !== runId) {
+      return message;
+    }
+    const resultActions = message.result.actions?.map((action) =>
+      action.type === "save_strategy" ? { ...action, savedStrategyId } : action,
+    );
+    const messageActions = message.actions?.map((action) =>
+      action.type === "save_strategy" ? { ...action, savedStrategyId } : action,
+    );
+    return {
+      ...message,
+      savedStrategyId,
+      savingStrategy: false,
+      actions: messageActions ?? resultActions ?? message.actions,
+      result: {
+        ...message.result,
+        savedStrategyId,
+        savingStrategy: false,
+        strategyId: message.result.strategyId ?? savedStrategyId,
+        actions: resultActions ?? message.result.actions,
+      },
+    };
+  });
+}
+
+function markResultCardSaving(
+  messages: Message[],
+  runId: string | null,
+  savingStrategy: boolean,
+): Message[] {
+  if (!runId) return messages;
+  return messages.map((message) => {
+    if (message.kind !== "strategy_result" || !message.result || message.result.runId !== runId) {
+      return message;
+    }
+    return {
+      ...message,
+      result: {
+        ...message.result,
+        savingStrategy,
+      },
+    };
+  });
+}
+
 function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
-  const messages: Message[] = items.map((m) => {
+  const consumedResultActions = consumedResultActionsFromApi(items);
+  const confirmationActionEffects = confirmationActionEffectsFromApi(items);
+  const hiddenMessageIds = new Set([
+    ...hiddenSaveActionMessageIdsFromApi(items),
+    ...confirmationActionEffects.hiddenMessageIds,
+  ]);
+  const messages: Message[] = items.filter((m) => !hiddenMessageIds.has(m.id)).map((m) => {
     const metadata = m.metadata ?? {};
     const chatAction = metadata.chat_action as ChatActionOption | undefined;
     const confirmation = metadata.confirmation_card as StrategyConfirmationPayload | undefined;
-    const resultCard = metadata.result_card as ConversationResultCard | undefined;
+    const resultCard = metadata.result_card;
     if (m.role === "user" && chatAction && typeof chatAction === "object") {
       return {
         id: m.id,
@@ -189,34 +537,48 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
     if (
       m.role !== "user" &&
       !isBreakdownActionMetadata(metadata) &&
-      resultCard &&
-      Array.isArray(resultCard.rows)
+      isHydratableResultCard(resultCard)
     ) {
       const runId = String(metadata.result_run_id ?? metadata.latest_run_id ?? "");
       const conversationId =
         typeof metadata.result_conversation_id === "string"
           ? metadata.result_conversation_id
           : m.conversation_id;
+      const resultStrategyId = stringOrNull(metadata.result_strategy_id);
+      const savedStrategyId = savedStrategyIdFromMetadata(metadata);
+      const factBank = recordOrNull(metadata.result_fact_bank);
+      const configSnapshot = recordOrNull(factBank?.config_snapshot);
       const card = resultCardFromConversationCard(resultCard, {
         id: runId,
-        strategy_id: metadata.result_strategy_id == null ? null : String(metadata.result_strategy_id),
+        strategy_id: resultStrategyId,
+        benchmark_symbol: stringOrNull(factBank?.benchmark_symbol) ?? undefined,
+        config_snapshot: configSnapshot ?? undefined,
       });
+      const resultActionContext = resultActionContextFromMetadata(metadata, card);
       const restoredActions = hydrateResultActions(card.actions ?? [], {
         runId: card.runId,
         strategyId: card.strategyId,
         conversationId,
         strategyName: card.strategyName,
-        symbols: card.symbols ?? [],
-        template: "",
-        assetClass: "equity",
+        symbols: resultActionContext.symbols,
+        template: resultActionContext.template ?? undefined,
+        assetClass: resultActionContext.assetClass,
       });
       return {
         id: m.id,
         role: "ai",
         kind: "strategy_result",
         content: m.content,
-        result: { ...card, actions: restoredActions },
+        result: {
+          ...card,
+          symbols: resultActionContext.symbols,
+          template: resultActionContext.template ?? undefined,
+          assetClass: resultActionContext.assetClass,
+          savedStrategyId,
+          actions: restoredActions,
+        },
         actions: restoredActions,
+        savedStrategyId,
       };
     }
     if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
@@ -229,79 +591,24 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         actions: confirmation.actions ?? [],
       };
     }
-    return {
-      id: m.id,
-      role: m.role === "user" ? "user" : "ai",
-      kind: "text",
-      content: m.content,
-    };
+    return hydrateTextMessageFromApi(m, {
+      contentPresentation:
+        m.role !== "user" && isBreakdownActionMetadata(metadata)
+          ? "result_breakdown"
+          : undefined,
+    });
   });
 
-  const normalized = normalizeConfirmationHistory(messages);
+  const normalized = normalizeRetryActionHistory(
+    applyConsumedResultActions(
+      applyConfirmationActionEffects(
+        normalizeConfirmationHistory(messages),
+        confirmationActionEffects.effects,
+      ),
+      consumedResultActions,
+    ),
+  );
   return { messages: normalized, inputActions: latestInputActions(normalized) };
-}
-
-function normalizeConfirmationHistory(messages: Message[]): Message[] {
-  const lastResultIndex = messages.reduce(
-    (latest, message, index) =>
-      message.kind === "strategy_result" ? index : latest,
-    -1,
-  );
-  const latestConfirmationIndex = messages.reduce(
-    (latest, message, index) =>
-      message.kind === "strategy_confirmation" && index > lastResultIndex
-        ? index
-        : latest,
-    -1,
-  );
-  return messages.map((message, index) => {
-    if (message.kind !== "strategy_confirmation" || !message.confirmation) {
-      return message;
-    }
-    const shouldSupersede =
-      index < lastResultIndex ||
-      (latestConfirmationIndex >= 0 && index !== latestConfirmationIndex);
-    if (!shouldSupersede) {
-      return {
-        ...message,
-        confirmation: {
-          ...message.confirmation,
-          confirmation_state: "active",
-        },
-        actions: message.confirmation.actions ?? message.actions,
-      };
-    }
-    return supersedePriorConfirmations(message);
-  });
-}
-
-function supersedePriorConfirmations(message: Message): Message {
-  if (message.kind !== "strategy_confirmation" || !message.confirmation) {
-    return message;
-  }
-  return {
-    ...message,
-    confirmation: {
-      ...message.confirmation,
-      confirmation_state: "superseded",
-      statusLabel: "Updated",
-      actions: [],
-    },
-    actions: [],
-  };
-}
-
-function supersedeOpenConfirmations(messages: Message[]): Message[] {
-  const lastResultIndex = messages.reduce(
-    (latest, message, index) =>
-      message.kind === "strategy_result" ? index : latest,
-    -1,
-  );
-  return messages.map((message, index) =>
-    message.kind === "strategy_confirmation" && index > lastResultIndex
-      ? supersedePriorConfirmations(message)
-      : message,
-  );
 }
 
 function chatStreamErrorText(detail: string | undefined, fallback: string) {
@@ -312,9 +619,8 @@ function chatStreamErrorText(detail: string | undefined, fallback: string) {
 
 export default function ChatInterface() {
   const { t, i18n } = useTranslation();
-  const collectionsEnabled = process.env.NEXT_PUBLIC_COLLECTIONS_ENABLED === "true";
+  const router = useRouter();
 
-  const [starterActions, setStarterActions] = useState<ChatActionOption[]>([]);
   const onboardingChoices = useMemo<OnboardingChoice[]>(
     () => [
       {
@@ -357,54 +663,65 @@ export default function ChatInterface() {
   const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<View>("chat");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [showChatOptions, setShowChatOptions] = useState(false);
-  const [activeChatOptionsPanel, setActiveChatOptionsPanel] = useState<
-    "none" | "history" | "collection"
-  >("none");
+  const [pendingHeaderDeleteId, setPendingHeaderDeleteId] = useState<string | null>(null);
+  const [isDeletingHeaderChat, setIsDeletingHeaderChat] = useState(false);
+  const [headerRenameValue, setHeaderRenameValue] = useState("");
+  const [isRenamingHeaderChat, setIsRenamingHeaderChat] = useState(false);
+  const [isSavingHeaderRename, setIsSavingHeaderRename] = useState(false);
+  const [isPinningHeaderChat, setIsPinningHeaderChat] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
-  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingMoreSearch, setIsLoadingMoreSearch] = useState(false);
+  const [isStreamingResponse, setIsStreamingResponse] = useState(false);
+  const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showOnboardingGoalCards, setShowOnboardingGoalCards] = useState(false);
-  const [collectionPickerTarget, setCollectionPickerTarget] = useState<{
-    runId: string;
-    strategyId: string | null;
-    strategyName: string;
-    symbols: string[];
-    template: string;
-    assetClass: AssetClass;
-  } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
   const [feedbackState, setFeedbackState] = useState<{
     isOpen: boolean;
     type: "bug" | "feature" | "general" | "rating";
     rating?: "positive" | "negative";
     context?: Record<string, unknown>;
   }>({ isOpen: false, type: "general" });
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>("collapsed");
+  const [isSidebarPreferenceModalOpen, setIsSidebarPreferenceModalOpen] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const chatOptionsRef = useRef<HTMLDivElement>(null);
+  const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
-  };
+  }, []);
+
+  const resetToEmptyChatSurface = useCallback(() => {
+    const clearedRoute = clearActiveConversationPointer();
+    if (clearedRoute) {
+      router.replace(clearedRoute, { scroll: false });
+    }
+    setConversationId(null);
+    setMessages([]);
+    setInputActions([]);
+    setStreamStatus(null);
+    setIsHydratingConversation(false);
+    setIsStreamingResponse(false);
+    setShowChatOptions(false);
+    setIsRenamingHeaderChat(false);
+    setHeaderRenameValue("");
+    setCurrentView("chat");
+  }, [router]);
 
   const mergeHistoryItems = (existing: HistoryItem[], incoming: HistoryItem[]) => {
     const seen = new Set(existing.map((item) => `${item.type}:${item.id}`));
@@ -430,10 +747,7 @@ export default function ChatInterface() {
       assetClass: run.asset_class,
     });
 
-  const visibleInputActions = (actions: ChatActionOption[]) =>
-    actions.filter((action) => action.type !== "save_strategy");
-
-  const loadHistoryPage = async (nextCursor?: string | null, append = false) => {
+  const loadHistoryPage = useCallback(async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({
       limit: 30,
       cursor: nextCursor ?? undefined,
@@ -445,14 +759,52 @@ export default function ChatInterface() {
     );
     setHistoryItems((prev) => (append ? mergeHistoryItems(prev, filtered) : filtered));
     setHistoryNextCursor(next_cursor);
-  };
+  }, []);
 
   // ── History ────────────────────────────────────────────────────────────────
 
   /** Imperative refresh — safe to call from event handlers */
-  const refreshHistory = () => {
+  const refreshHistory = useCallback(() => {
     loadHistoryPage(null, false).catch(() => undefined);
-  };
+  }, [loadHistoryPage]);
+
+  function clearPostTurnHistoryRefreshTimers() {
+    for (const timerId of postTurnHistoryRefreshTimersRef.current) {
+      window.clearTimeout(timerId);
+    }
+    postTurnHistoryRefreshTimersRef.current = [];
+  }
+
+  function schedulePostTurnHistoryRefresh(targetConversationId?: string | null) {
+    clearPostTurnHistoryRefreshTimers();
+    let settled = false;
+
+    const refreshAndCheckTitle = async () => {
+      if (settled) return;
+      try {
+        await loadHistoryPage(null, false);
+        if (!targetConversationId) return;
+        const { items } = await listConversations({ limit: 50 });
+        const conversation = items.find((item) => item.id === targetConversationId);
+        if (
+          conversation?.title_source === "ai_generated" ||
+          conversation?.title_source === "user_renamed"
+        ) {
+          settled = true;
+          await loadHistoryPage(null, false);
+        }
+      } catch {
+        // Title/sidebar refresh is fail-open; later scheduled attempts can still pick it up.
+      }
+    };
+
+    for (const delay of POST_TURN_TITLE_REFRESH_DELAYS_MS) {
+      const timerId = window.setTimeout(() => {
+        void refreshAndCheckTitle().catch(() => undefined);
+      }, delay);
+      postTurnHistoryRefreshTimersRef.current.push(timerId);
+    }
+  }
 
   const loadMoreHistory = () => {
     if (!historyNextCursor || isLoadingMoreHistory) return;
@@ -464,7 +816,17 @@ export default function ChatInterface() {
 
   useEffect(() => {
     loadHistoryPage(null, false).catch(() => undefined);
-  }, []);
+  }, [loadHistoryPage]);
+
+  useEffect(
+    () => () => {
+      for (const timerId of postTurnHistoryRefreshTimersRef.current) {
+        window.clearTimeout(timerId);
+      }
+      postTurnHistoryRefreshTimersRef.current = [];
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isSidebarOpen) {
@@ -473,71 +835,50 @@ export default function ChatInterface() {
   }, [isSidebarOpen]);
 
   useEffect(() => {
-    const query = searchText.trim();
-    if (currentView !== "chat" || query.length === 0) {
-      setSearchResults([]);
-      setSearchNextCursor(null);
-      setIsSearching(false);
-      return;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      setIsSearching(true);
-      searchGlobal({ q: query, limit: 20 })
-        .then(({ items, next_cursor }) => {
-          if (cancelled) return;
-          setSearchResults(
-            collectionsEnabled ? items : items.filter((item) => item.type !== "collection"),
-          );
-          setSearchNextCursor(next_cursor);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setSearchResults([]);
-          setSearchNextCursor(null);
-        })
-        .finally(() => {
-          if (cancelled) return;
-          setIsSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [searchText, currentView, collectionsEnabled]);
-
-  const loadMoreSearch = async () => {
-    const query = searchText.trim();
-    if (!searchNextCursor || !query || isLoadingMoreSearch) return;
-    setIsLoadingMoreSearch(true);
     try {
-      const { items, next_cursor } = await searchGlobal({
-        q: query,
-        limit: 20,
-        cursor: searchNextCursor,
-      });
-      setSearchResults((prev) => {
-        const seen = new Set(prev.map((item) => `${item.type}:${item.id}`));
-        const merged = [...prev];
-        const visibleItems = collectionsEnabled
-          ? items
-          : items.filter((item) => item.type !== "collection");
-        for (const item of visibleItems) {
-          const key = `${item.type}:${item.id}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            merged.push(item);
-          }
-        }
-        return merged;
-      });
-      setSearchNextCursor(next_cursor);
-    } finally {
-      setIsLoadingMoreSearch(false);
+      const saved = window.localStorage.getItem("argus:sidebar_mode") as SidebarMode | null;
+      if (saved === "expanded" || saved === "collapsed" || saved === "hover") {
+        setSidebarMode(saved);
+        setIsSidebarOpen(saved === "expanded");
+      }
+    } catch {
+      // Local preferences are optional.
     }
+  }, []);
+
+  useEffect(() => {
+    if (!omnisearchEnabled) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
+        return;
+      }
+      event.preventDefault();
+      setSearchOverlayOpen(true);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!strategiesEnabled && currentView === "strategies") {
+      setCurrentView("chat");
+    }
+  }, [currentView]);
+
+  const handleSetSidebarMode = (mode: SidebarMode) => {
+    setSidebarMode(mode);
+    try {
+      window.localStorage.setItem("argus:sidebar_mode", mode);
+    } catch {
+      // Local preferences are optional.
+    }
+    if (mode === "expanded") setIsSidebarOpen(true);
+    if (mode === "collapsed" || mode === "hover") setIsSidebarOpen(false);
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen((open) => !open);
   };
 
   // ── Init conversation ──────────────────────────────────────────────────────
@@ -552,48 +893,63 @@ export default function ChatInterface() {
           await i18n.changeLanguage(resolvedLanguage);
         }
         const stage = meResponse?.user?.onboarding?.stage;
-        const activeConversationId = readActiveConversationId();
+        const activeConversationId = readActiveConversationIdFromUrl();
         if (activeConversationId) {
           try {
             const { items } = await getConversationMessages(activeConversationId, 50);
             if (cancelled) return;
             const hydrated = hydrateMessagesFromApi(items);
+            if (hydrated.messages.length === 0) {
+              // clear empty persisted conversations from the active route.
+              resetToEmptyChatSurface();
+              setShowOnboardingGoalCards(
+                privateAlphaOnboardingEnabled &&
+                (stage === "language_selection" || stage === "primary_goal_selection"),
+              );
+              return;
+            }
+            rememberActiveConversationId(activeConversationId);
             setConversationId(activeConversationId);
             setMessages(hydrated.messages);
             setInputActions(hydrated.inputActions);
             setShowOnboardingGoalCards(
+              privateAlphaOnboardingEnabled &&
               hydrated.messages.length === 0
               && (stage === "language_selection" || stage === "primary_goal_selection"),
             );
 
-            const prompts = await getStarterPrompts().catch(() => []);
-            if (cancelled) return;
-            setStarterActions(prompts.map((p, i) => ({
-              id: `starter-${i}`,
-              label: p,
-              value: p,
-            })));
             return;
-          } catch {
-            clearActiveConversationId();
+          } catch (error) {
+            if (cancelled) return;
+            if (isMissingConversationLoadError(error)) {
+              setHistoryItems((prev) =>
+                prev.filter((item) => !historyItemBelongsToConversation(item, activeConversationId)),
+              );
+              resetToEmptyChatSurface();
+              setShowOnboardingGoalCards(
+                privateAlphaOnboardingEnabled &&
+                (stage === "language_selection" || stage === "primary_goal_selection"),
+              );
+              return;
+            }
+            rememberActiveConversationId(activeConversationId);
+            setConversationId(activeConversationId);
+            setMessages([
+              conversationLoadFailureMessage(activeConversationId, t('chat.error_load')),
+            ]);
+            setInputActions([]);
+            setShowOnboardingGoalCards(false);
+            return;
           }
         }
 
-        const { conversation } = await createConversation(resolvedLanguage);
         if (cancelled) return;
-        persistActiveConversationId(conversation.id);
-        setConversationId(conversation.id);
-        setMessages([]);
+        resetToEmptyChatSurface();
         setShowOnboardingGoalCards(
-          stage === "language_selection" || stage === "primary_goal_selection",
+          privateAlphaOnboardingEnabled &&
+          (stage === "language_selection" || stage === "primary_goal_selection"),
         );
 
-        const prompts = await getStarterPrompts().catch(() => []);
-        setStarterActions(prompts.map((p, i) => ({
-          id: `starter-${i}`,
-          label: p,
-          value: p,
-        })));
       } catch {
         if (cancelled) return;
         setMessages([
@@ -609,6 +965,8 @@ export default function ChatInterface() {
     return () => {
       cancelled = true;
     };
+    // Bootstraps the active conversation once; re-running on i18n updates would create noisy chat reloads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateScrollPositionState = () => {
@@ -641,82 +999,115 @@ export default function ChatInterface() {
     setIsSidebarOpen(false);
     closeChatOptions();
     setCurrentView("chat");
-    persistActiveConversationId(convId);
+    rememberActiveConversationId(convId);
     setConversationId(convId);
-    setMessages([]);
-    setInputActions([]);
     setStreamStatus(t('common.loading'));
+    setIsHydratingConversation(true);
     try {
       const { items } = await getConversationMessages(convId, 50);
       const hydrated = hydrateMessagesFromApi(items);
+      if (hydrated.messages.length === 0) {
+        // Keep empty persisted conversations from the active route.
+        resetToEmptyChatSurface();
+        return;
+      }
       setMessages(hydrated.messages);
       setInputActions(hydrated.inputActions);
-    } catch {
-      setMessages([
-        {
-          id: "resume-error",
-          role: "ai",
-          kind: "text",
-          content: t('chat.error_load'),
-        },
-      ]);
+    } catch (error) {
+      if (isMissingConversationLoadError(error)) {
+        setHistoryItems((prev) =>
+          prev.filter((item) => !historyItemBelongsToConversation(item, convId)),
+        );
+        resetToEmptyChatSurface();
+        showToast(t('chat.error_load'));
+        return;
+      }
+      setMessages([conversationLoadFailureMessage(convId, t('chat.error_load'))]);
+      setInputActions([]);
+      showToast(t('chat.error_load'));
     } finally {
       setStreamStatus(null);
+      setIsHydratingConversation(false);
     }
+  };
+
+  const loadConversationForRun = async (item: Pick<HistoryItem | SearchItem, "id" | "conversation_id">) => {
+    if (item.conversation_id) {
+      void loadConversation(item.conversation_id);
+      return;
+    }
+    try {
+      const { run } = await getBacktestRun(item.id);
+      if (run.conversation_id) {
+        void loadConversation(run.conversation_id);
+        return;
+      }
+    } catch {
+      // Fall through to the chat surface if the run is unavailable.
+    }
+    setCurrentView("chat");
+    setIsSidebarOpen(false);
+  };
+
+  const openHistoryItem = (item: HistoryItem | SearchItem) => {
+    if (item.type === "chat") {
+      void loadConversation(item.id);
+      return;
+    }
+    if (strategiesEnabled && item.type === "strategy") {
+      setCurrentView("strategies");
+      setIsSidebarOpen(false);
+      return;
+    }
+    if (item.type === "run") {
+      void loadConversationForRun(item);
+      return;
+    }
+    setCurrentView("chat");
+    setIsSidebarOpen(false);
   };
 
   // ── Start new chat ─────────────────────────────────────────────────────────
 
-  const startNewChat = async () => {
+  const startNewChat = useCallback(async () => {
+    resetToEmptyChatSurface();
+    setIsSidebarOpen(false);
     try {
-      const { conversation } = await createConversation(i18n.language);
-      persistActiveConversationId(conversation.id);
-      setConversationId(conversation.id);
-      setIsSidebarOpen(false);
-      setCurrentView("chat");
-      setMessages([]);
-      setInputActions([]);
-      try {
-        const me = await getMe();
-        const stage = me.user.onboarding.stage;
-        setShowOnboardingGoalCards(
-          stage === "language_selection" || stage === "primary_goal_selection",
-        );
-      } catch {
-        setShowOnboardingGoalCards(false);
-      }
-      void refreshHistory();
-      return conversation.id;
-    } catch (err) {
-      console.error("Failed to start new chat:", err);
-      return null;
+      const me = await getMe();
+      const stage = me.user.onboarding.stage;
+      setShowOnboardingGoalCards(
+        privateAlphaOnboardingEnabled &&
+        (stage === "language_selection" || stage === "primary_goal_selection"),
+      );
+    } catch {
+      setShowOnboardingGoalCards(false);
     }
-  };
+    void refreshHistory();
+    return null;
+  }, [refreshHistory, resetToEmptyChatSurface]);
 
-  const handleTriggerPrompt = async (type: 'strategy' | 'collection', customPrompt?: string) => {
+  const handleConversationRemoved = useCallback((removedConversationId: string) => {
+    setHistoryItems((prev) =>
+      prev.filter((item) => !historyItemBelongsToConversation(item, removedConversationId)),
+    );
+    refreshHistory();
+    if (removedConversationId !== conversationId) return;
+    resetToEmptyChatSurface();
+  }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
+
+  const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
     setCurrentView("chat");
     setIsSidebarOpen(false);
 
     // 2. Start new chat
-    const newConvId = await startNewChat();
-    if (!newConvId) return;
+    await startNewChat();
 
     // 3. Define the localized prompt or use custom
-    let prompt: string;
-    if (customPrompt) {
-      prompt = customPrompt;
-    } else {
-      const promptKey = type === 'strategy'
-        ? 'chat.trigger_create_strategy'
-        : 'chat.trigger_create_collection';
-
-      const fallback = type === 'strategy'
-        ? 'I want to create a new strategy.'
-        : 'I want to create a new collection.';
-
-      prompt = t(promptKey, fallback);
-    }
+    const prompt = customPrompt ?? t(
+      'chat.trigger_create_strategy',
+      'I want to create a new strategy.',
+    );
 
     // 4. Send it
     void handleSend(prompt);
@@ -728,14 +1119,67 @@ export default function ChatInterface() {
     text: string,
     mentionsOrAction?: ChatMention[] | ChatActionOption,
     actionArg?: ChatActionOption,
+    options?: SendOptions,
   ) => {
     const trimmed = text.trim();
-    if (!trimmed || !conversationId) return;
+    if (!trimmed) return;
+    if (isStreamingResponse) return;
     const mentions = Array.isArray(mentionsOrAction) ? mentionsOrAction : [];
     const action = Array.isArray(mentionsOrAction) ? actionArg : mentionsOrAction;
+    const replacementAssistantId = options?.replacementAssistantId?.trim() || undefined;
+    const routeState = readActiveConversationRouteState();
+    let targetConversationId = targetConversationIdForSend({
+      routeConversationId: routeState.conversationId,
+      stateConversationId: conversationId,
+      action,
+    });
+    const shouldCreateNewRouteConversation = shouldStartConversationForVisibleEmptyChat({
+      routeState,
+      visibleMessageCount: messages.length,
+      hasStructuredAction: Boolean(action?.type),
+    });
+    let shouldResetMessagesForNewConversation = false;
+
+    if (shouldCreateNewRouteConversation) {
+      try {
+        const { conversation } = await createConversation(i18n.language);
+        targetConversationId = conversation.id;
+        shouldResetMessagesForNewConversation = true;
+        rememberActiveConversationId(conversation.id);
+        setConversationId(conversation.id);
+        void refreshHistory();
+      } catch (err) {
+        console.error("Failed to start conversation before sending:", err);
+        showToast(t('chat.error_generic'));
+        return;
+      }
+    }
+
+    if (!targetConversationId && !action?.type) {
+      try {
+        const { conversation } = await createConversation(i18n.language);
+        targetConversationId = conversation.id;
+        shouldResetMessagesForNewConversation = messages.length === 0;
+        rememberActiveConversationId(conversation.id);
+        setConversationId(conversation.id);
+        void refreshHistory();
+      } catch (err) {
+        console.error("Failed to start conversation before sending:", err);
+        showToast(t('chat.error_generic'));
+        return;
+      }
+    }
+
+    if (!targetConversationId) return;
+
+    if (targetConversationId !== conversationId) {
+      rememberActiveConversationId(targetConversationId);
+      setConversationId(targetConversationId);
+    }
 
     setIsSidebarOpen(false);
     shouldAutoScrollRef.current = true;
+    const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -745,15 +1189,40 @@ export default function ChatInterface() {
       mentions,
       selectedAction: action,
     };
-    const assistantId = crypto.randomUUID();
+    const assistantId = replacementAssistantId ?? crypto.randomUUID();
+    const retryLastTurnAction = action?.type
+      ? null
+      : retryLastTurnActionFromMessage(trimmed, {
+          assistantMessageId: assistantId,
+        });
 
-    setMessages((prev) => [
-      ...prev.map((m) => ({ ...m, actions: undefined })),
-      userMsg,
-      { id: assistantId, role: "ai", kind: "text", content: "" },
-    ]);
+    setMessages((prev) => {
+      const baseMessages = consumeConfirmationActionOnMessages(
+        consumeResultActionOnMessages(
+          markComposerActionsInactive(
+            shouldResetMessagesForNewConversation ? [] : prev,
+          ),
+          action,
+        ),
+        action,
+      );
+      return appendOrReplacePendingAssistantMessage(baseMessages, {
+        assistantId,
+        pendingAssistant: {
+          id: assistantId,
+          role: "ai",
+          kind: "text",
+          content: "",
+          contentPresentation:
+            action?.type === "show_breakdown" ? "result_breakdown" : undefined,
+        },
+        userMessage: userMsg,
+        renderUserMessage,
+      });
+    });
     setInputActions([]);
     setStreamStatus(null);
+    setIsStreamingResponse(true);
 
     const streamInput: string | ChatActionRequest = action?.type
       ? {
@@ -769,6 +1238,7 @@ export default function ChatInterface() {
         setStreamStatus(t(`chat.status.${event.data.stage}`) || t('chat.status.preparing'));
       }
       if (event.event === "token") {
+        setStreamStatus(null);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
@@ -778,39 +1248,69 @@ export default function ChatInterface() {
         );
       }
       if (event.event === "error") {
+        const persistedErrorMessageId = event.data.message_id?.trim();
+        const visibleRetryAction =
+          retryLastTurnAction && persistedErrorMessageId
+            ? retryLastTurnActionFromMessage(trimmed, {
+                assistantMessageId: persistedErrorMessageId,
+              })
+            : retryLastTurnAction;
         setInputActions([]);
         setStreamStatus(null);
+        setIsStreamingResponse(false);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
               ? {
                   ...m,
+                  id: persistedErrorMessageId || m.id,
                   content: chatStreamErrorText(
                     event.data.detail,
                     t('chat.error_backtest'),
                   ),
+                  actions: visibleRetryAction ? [visibleRetryAction] : m.actions,
                 }
               : m,
           ),
         );
       }
       if (event.event === "final") {
+        setStreamStatus(null);
+        setIsStreamingResponse(false);
+        const finalPayload = event.data as typeof event.data & Record<string, unknown>;
         const finalText = event.data.assistant_response ?? event.data.assistant_prompt ?? "";
         const finalStageOutcome = event.data.stage_outcome;
+        const finalRetryActions = [
+          failedActionRetryActionFromMetadata(finalPayload),
+        ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
+        const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
+        const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
+        if (action?.type === "save_strategy" && savedStrategyId) {
+          setMessages((prev) =>
+            markResultCardSaved(
+              prev,
+              resultRunIdFromFinalPayload(finalPayload, action),
+              savedStrategyId,
+            ),
+          );
+        }
         if (event.data.confirmation) {
           const confirmation = event.data.confirmation as StrategyConfirmationPayload;
-          setInputActions(confirmation.actions ?? []);
+          setInputActions([]);
           setMessages((prev) =>
-            normalizeConfirmationHistory(
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      kind: "strategy_confirmation",
-                      content: undefined,
-                      confirmation,
-                    }
-                  : m,
+            normalizeRetryActionHistory(
+              normalizeConfirmationHistory(
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        kind: "strategy_confirmation",
+                        content: undefined,
+                        confirmation,
+                        actions: confirmation.actions ?? [],
+                      }
+                    : m,
+                ),
               ),
             ),
           );
@@ -818,37 +1318,58 @@ export default function ChatInterface() {
           const run = event.data.run as BacktestRun;
           const baseCard = resultCardFromRun(run);
           const resultActions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
-          const card = { ...baseCard, actions: resultActions };
-          setInputActions(visibleInputActions(resultActions));
+          const card = {
+            ...baseCard,
+            savedStrategyId: savedStrategyId ?? run.strategy_id ?? null,
+            actions: resultActions,
+          };
+          setInputActions([]);
           setMessages((prev) =>
-            normalizeConfirmationHistory(
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                    ...m,
-                    kind: "strategy_result",
-                    content: m.content || finalText || undefined,
-                    result: card,
-                    actions: resultActions,
-                    }
-                  : m,
+            normalizeRetryActionHistory(
+              normalizeConfirmationHistory(
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        kind: "strategy_result",
+                        content: m.content || finalText || undefined,
+                        result: card,
+                        actions: resultActions,
+                        savedStrategyId: card.savedStrategyId,
+                      }
+                    : m,
+                ),
               ),
             ),
           );
         } else if (finalText) {
           setMessages((prev) => {
             const nextMessages = prev.map((m) =>
-              m.id === assistantId && !m.content
-                ? { ...m, content: finalText }
-                : m,
+              mergeFinalTextMessage(m, {
+                assistantId,
+                finalText,
+                finalActions: finalRetryActions,
+                contentPresentation:
+                  action?.type === "show_breakdown"
+                    ? "result_breakdown"
+                    : undefined,
+              }),
             );
             if (
+              isConfirmationAction(action) ||
               finalStageOutcome === "await_user_reply" ||
               finalStageOutcome === "needs_clarification"
             ) {
-              return supersedeOpenConfirmations(nextMessages);
+              return normalizeRetryActionHistory(
+                settleOpenConfirmationsAfterTextFinal(nextMessages, {
+                  action,
+                  finalActions: finalRetryActions,
+                  hasFailedAction: finalHasFailedAction,
+                  stageOutcome: finalStageOutcome,
+                }),
+              );
             }
-            return nextMessages;
+            return normalizeRetryActionHistory(nextMessages);
           });
         }
       }
@@ -863,7 +1384,8 @@ export default function ChatInterface() {
       }
       if (event.event === "done") {
         setStreamStatus(null);
-        refreshHistory();
+        setIsStreamingResponse(false);
+        schedulePostTurnHistoryRefresh(targetConversationId);
       }
     };
 
@@ -877,13 +1399,13 @@ export default function ChatInterface() {
       );
 
     try {
-      await streamToConversation(conversationId);
+      await streamToConversation(targetConversationId);
     } catch (err: unknown) {
       if (err instanceof ChatStreamError && err.status === 404 && !action?.type) {
         try {
-          clearActiveConversationId();
+          clearActiveConversationPointer();
           const { conversation } = await createConversation(i18n.language);
-          persistActiveConversationId(conversation.id);
+          rememberActiveConversationId(conversation.id);
           setConversationId(conversation.id);
           await streamToConversation(conversation.id);
           return;
@@ -893,6 +1415,7 @@ export default function ChatInterface() {
       }
       setInputActions([]);
       setStreamStatus(null);
+      setIsStreamingResponse(false);
       const status = (err as { status?: number }).status;
       const isRateLimit = status === 429;
       const fallbackMessage =
@@ -907,6 +1430,7 @@ export default function ChatInterface() {
                 content: isRateLimit
                   ? t('chat.rate_limit_error')
                   : fallbackMessage,
+                actions: retryLastTurnAction ? [retryLastTurnAction] : m.actions,
               }
             : m,
         ),
@@ -915,7 +1439,18 @@ export default function ChatInterface() {
   };
 
   const handleOnboardingGoalChoice = async (goal: PrimaryGoal) => {
-    if (!conversationId) return;
+    let targetConversationId = conversationId;
+    if (!targetConversationId) {
+      try {
+        const { conversation } = await createConversation(i18n.language);
+        targetConversationId = conversation.id;
+        rememberActiveConversationId(conversation.id);
+        setConversationId(conversation.id);
+      } catch {
+        showToast(t('chat.error_generic'));
+        return;
+      }
+    }
     const isSkip = goal === "surprise_me";
     const hiddenMessage = isSkip ? "__ONBOARDING_SKIP__" : `__ONBOARDING_GOAL__:${goal}`;
     const userCopy = isSkip
@@ -931,17 +1466,18 @@ export default function ChatInterface() {
 
     setMessages((prev) => {
       shouldAutoScrollRef.current = true;
-      const base = prev.map((m) => ({ ...m, actions: undefined }));
+      const base = markComposerActionsInactive(prev);
       if (isSkip) {
         return [...base, { id: assistantId, role: "ai", kind: "text", content: "" }];
       }
       return [...base, userMsg, { id: assistantId, role: "ai", kind: "text", content: "" }];
     });
     setStreamStatus(t("chat.status.understanding"));
+    setIsStreamingResponse(true);
     setIsSidebarOpen(false);
 
     try {
-      await streamChatMessage(conversationId, hiddenMessage, i18n.language, (event) => {
+      await streamChatMessage(targetConversationId, hiddenMessage, i18n.language, (event) => {
         if (event.event === "token") {
           setMessages((prev) =>
             prev.map((m) =>
@@ -953,6 +1489,7 @@ export default function ChatInterface() {
         }
         if (event.event === "error") {
           setStreamStatus(null);
+          setIsStreamingResponse(false);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -966,8 +1503,9 @@ export default function ChatInterface() {
         }
         if (event.event === "done") {
           setStreamStatus(null);
+          setIsStreamingResponse(false);
           setShowOnboardingGoalCards(false);
-          refreshHistory();
+          schedulePostTurnHistoryRefresh(targetConversationId);
         }
       });
       await patchMe({
@@ -975,18 +1513,13 @@ export default function ChatInterface() {
           stage: "ready",
           language_confirmed: true,
           primary_goal: goal,
-          completed: false,
+          completed: true,
         },
       });
 
-      const prompts = await getStarterPrompts().catch(() => []);
-      setStarterActions(prompts.map((p, i) => ({
-        id: `starter-${i}`,
-        label: p,
-        value: p,
-      })));
     } catch {
       setStreamStatus(null);
+      setIsStreamingResponse(false);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -999,61 +1532,165 @@ export default function ChatInterface() {
 
   // ── Action routing ─────────────────────────────────────────────────────────
 
-  const handleRename = async (id: string, newTitle: string, type: string) => {
-    try {
-      if (type === 'chat') await patchConversation(id, { title: newTitle });
-      else if (type === 'strategies') await patchStrategy(id, { name: newTitle });
-      else if (type === 'collections') await patchCollection(id, { name: newTitle });
+  const handleSaveStrategyAction = async (action: ChatActionOption) => {
+    const routeState = readActiveConversationRouteState();
+    const targetConversationId = targetConversationIdForSend({
+      routeConversationId: routeState.conversationId,
+      stateConversationId: conversationId,
+      action,
+    });
+    if (!targetConversationId) return;
+    if (targetConversationId !== conversationId) {
+      rememberActiveConversationId(targetConversationId);
+      setConversationId(targetConversationId);
+    }
+    if (!strategiesEnabled) {
+      showToast(t(
+        "chat.private_alpha_result_kept",
+        "This result is already kept in conversation/history.",
+      ));
+      return;
+    }
+    const runId = resultActionRunId(action) ?? null;
+    const streamInput: ChatActionRequest = {
+      type: "save_strategy",
+      label: action.label,
+      payload: action.payload,
+      presentation: action.presentation,
+    };
 
-      setHistoryItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, title: newTitle } : item)),
-      );
-      setEditingId(null);
-    } catch (err) {
-      console.error("Failed to rename:", err);
-      showToast(t('chat.error_generic'));
+    try {
+      setMessages((prev) => markResultCardSaving(prev, runId, true));
+      await streamChatMessage(targetConversationId, streamInput, i18n.language, (event) => {
+        if (event.event === "final") {
+          const finalPayload = event.data as typeof event.data & Record<string, unknown>;
+          const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
+          if (savedStrategyId) {
+            setMessages((prev) =>
+              markResultCardSaved(
+                prev,
+                resultRunIdFromFinalPayload(finalPayload, action),
+                savedStrategyId,
+              ),
+            );
+            showToast(t("chat.saved"));
+          } else if (event.data.assistant_response) {
+            showToast(event.data.assistant_response);
+          }
+        }
+        if (event.event === "error") {
+          showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
+        }
+        if (event.event === "done") {
+          schedulePostTurnHistoryRefresh(targetConversationId);
+        }
+      }, []);
+    } catch (err: unknown) {
+      const message =
+        err instanceof ChatStreamError && err.message
+          ? err.message
+          : t('chat.error_generic');
+          showToast(message);
+    }
+    finally {
+      setMessages((prev) => markResultCardSaving(prev, runId, false));
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutFromApi();
+    } catch {
+      // Even if the network is unavailable, leave the authenticated surface.
+    } finally {
+      window.location.href = "/";
+    }
+  };
+
+  const handleCancelConfirmationAction = async (action: ChatActionOption) => {
+    const routeState = readActiveConversationRouteState();
+    const targetConversationId = targetConversationIdForSend({
+      routeConversationId: routeState.conversationId,
+      stateConversationId: conversationId,
+      action,
+    });
+    if (!targetConversationId || isStreamingResponse) return;
+    if (targetConversationId !== conversationId) {
+      rememberActiveConversationId(targetConversationId);
+      setConversationId(targetConversationId);
+    }
+    const effect = confirmationActionEffectFromAction(action);
+    if (!effect) return;
+    const streamInput: ChatActionRequest = {
+      type: "cancel_confirmation",
+      label: action.label,
+      payload: action.payload,
+      presentation: action.presentation,
+    };
+
+    setInputActions([]);
+    setStreamStatus(null);
+    setIsStreamingResponse(true);
+    try {
+      await streamChatMessage(targetConversationId, streamInput, i18n.language, (event) => {
+        if (event.event === "final") {
+          setMessages((prev) =>
+            applyConfirmationActionEffects(markComposerActionsInactive(prev), [effect]),
+          );
+        }
+        if (event.event === "error") {
+          showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
+        }
+        if (event.event === "done") {
+          schedulePostTurnHistoryRefresh(targetConversationId);
+        }
+      }, []);
+    } catch (err: unknown) {
+      const message =
+        err instanceof ChatStreamError && err.message
+          ? err.message
+          : t('chat.error_generic');
+      showToast(message);
+    } finally {
+      setIsStreamingResponse(false);
+      setStreamStatus(null);
     }
   };
 
   const handleAction = (action: ChatActionOption) => {
     const value = action.value ?? "";
-    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
-      if (action.payload) {
-        setCollectionPickerTarget({
-          runId: String(action.payload.run_id ?? ""),
-          strategyId: action.payload.strategy_id == null ? null : String(action.payload.strategy_id),
-          strategyName: String(action.payload.strategy_name ?? "My strategy"),
-          symbols: Array.isArray(action.payload.symbols) ? action.payload.symbols.map(String) : [],
-          template: String(action.payload.template ?? ""),
-          assetClass: (action.payload.asset_class === "crypto" ? "crypto" : "equity"),
-        });
-        return;
-      }
+    if (action.type === "save_strategy") {
+      void handleSaveStrategyAction(action);
+      return;
+    }
+    if (action.type === "cancel_confirmation") {
+      void handleCancelConfirmationAction(action);
+      return;
     }
     if (value === "/action:new-chat") {
       void startNewChat();
       return;
     }
-    if (collectionsEnabled && value.startsWith("/action:add-to-collection:")) {
-      // Format: /action:add-to-collection:<runId>:<strategyId>:<symbols>:<assetClass>
-      const parts = value.split(":");
-      const runId = parts[2];
-      const strategyId = parts[3] || null;
-      const symbols = (parts[4] ?? "").split(",").filter(Boolean);
-      const assetClass = (parts[5] ?? "equity") as AssetClass;
-      // Find the result card title from messages for strategy name
-      const resultMsg = messages.find(
-        (m) => m.kind === "strategy_result" && m.result,
-      );
-      const strategyName = resultMsg?.result?.strategyName ?? "My strategy";
-      setCollectionPickerTarget({
-        runId,
-        strategyId,
-        strategyName,
-        symbols,
-        template: "rsi_mean_reversion",
-        assetClass,
-      });
+    if (action.type === "retry_last_turn") {
+      const retryText = retryLastTurnMessageFromAction(action);
+      const failedAssistantId = retryLastTurnFailedAssistantIdFromAction(action);
+      if (retryText) {
+        void handleSend(retryText, [], undefined, {
+          renderUserMessage: false,
+          replacementAssistantId: failedAssistantId ?? undefined,
+        });
+      }
+      return;
+    }
+    if (action.type === "retry_load_conversation") {
+      const retryConversationId = retryLoadConversationIdFromAction(action);
+      if (retryConversationId) {
+        void loadConversation(retryConversationId);
+      }
+      return;
+    }
+    if (isFailedActionRetry(action)) {
+      void handleSend(action.label || value, action);
       return;
     }
     setInputActions(consumeInputAction(action, inputActions));
@@ -1062,9 +1699,98 @@ export default function ChatInterface() {
 
   // ── Chat options helpers ───────────────────────────────────────────────────
 
-  const closeChatOptions = () => {
+  const closeChatOptions = useCallback(() => {
     setShowChatOptions(false);
-    setActiveChatOptionsPanel("none");
+    setIsRenamingHeaderChat(false);
+  }, []);
+
+  const activeHistoryChat = useMemo(
+    () =>
+      conversationId
+        ? historyItems.find(
+            (item) =>
+              item.type === "chat" &&
+              historyItemBelongsToConversation(item, conversationId),
+          ) ?? null
+        : null,
+    [conversationId, historyItems],
+  );
+
+  const handleCopyConversationLink = async () => {
+    if (!conversationId) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const copied = await writeClipboardText(
+      `${origin}/chat?conversation=${conversationId}`,
+    );
+    showToast(t(copied ? 'chat.copy_success' : 'chat.copy_failed'));
+    closeChatOptions();
+  };
+
+  const handleStartHeaderRename = () => {
+    if (!conversationId) return;
+    setHeaderRenameValue(
+      activeHistoryChat?.title && activeHistoryChat.title !== t('chat.new_chat')
+        ? activeHistoryChat.title
+        : "",
+    );
+    setIsRenamingHeaderChat(true);
+  };
+
+  const handleSaveHeaderRename = async () => {
+    if (!conversationId || isSavingHeaderRename) return;
+    const nextTitle = headerRenameValue.trim();
+    if (!nextTitle) {
+      setIsRenamingHeaderChat(false);
+      return;
+    }
+    setIsSavingHeaderRename(true);
+    try {
+      await patchConversation(conversationId, { title: nextTitle });
+      refreshHistory();
+      showToast(t('common.save'));
+      closeChatOptions();
+    } catch {
+      showToast(t('chat.rename_failed'));
+    } finally {
+      setIsSavingHeaderRename(false);
+    }
+  };
+
+  const handleToggleHeaderPin = async () => {
+    if (!conversationId || isPinningHeaderChat) return;
+    setIsPinningHeaderChat(true);
+    try {
+      await patchConversation(conversationId, {
+        pinned: !Boolean(activeHistoryChat?.pinned),
+      });
+      refreshHistory();
+      closeChatOptions();
+    } catch {
+      showToast(t('common.error_occurred'));
+    } finally {
+      setIsPinningHeaderChat(false);
+    }
+  };
+
+  const handleRequestHeaderDelete = () => {
+    if (!conversationId) return;
+    setPendingHeaderDeleteId(conversationId);
+    closeChatOptions();
+  };
+
+  const handleConfirmHeaderDelete = async () => {
+    if (!pendingHeaderDeleteId || isDeletingHeaderChat) return;
+    setIsDeletingHeaderChat(true);
+    try {
+      await deleteConversation(pendingHeaderDeleteId);
+      showToast(t('common.delete'));
+      handleConversationRemoved(pendingHeaderDeleteId);
+    } catch {
+      showToast(t('common.error_occurred'));
+    } finally {
+      setIsDeletingHeaderChat(false);
+      setPendingHeaderDeleteId(null);
+    }
   };
 
   useEffect(() => {
@@ -1079,72 +1805,24 @@ export default function ChatInterface() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showChatOptions]);
+  }, [closeChatOptions, showChatOptions]);
 
-  const handleArchiveChat = async () => {
-    if (!conversationId) return;
-    try {
-      await patchConversation(conversationId, { archived: true });
-      showToast(t("common.archived"));
-      closeChatOptions();
-      void startNewChat();
-    } catch {
-      showToast(t("common.error_occurred"));
-    }
-  };
-
-  const handleAddToCollection = () => {
-    // Find the latest strategy result in the message list
-    const lastStrategyMsg = [...messages].reverse().find(m => m.kind === "strategy_result" && m.result);
-    if (lastStrategyMsg?.result) {
-      const res = lastStrategyMsg.result;
-      setCollectionPickerTarget({
-        runId: res.runId ?? "",
-        strategyId: res.strategyId ?? null,
-        strategyName: res.strategyName,
-        symbols: [],
-        template: "",
-        assetClass: "equity",
-      });
-      closeChatOptions();
-    } else {
-      showToast(t('chat.error_load'));
-    }
-  };
-
-  // ── Recent items grouped by type ───────────────────────────────────────────
-  const groupedHistory = useMemo(() => {
-    const groups: { label: string; items: HistoryItem[] }[] = [];
-    const today: HistoryItem[] = [];
-    const yesterday: HistoryItem[] = [];
-    const last7Days: HistoryItem[] = [];
-    const earlier: HistoryItem[] = [];
-
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const yesterdayStart = todayStart - 86400000;
-    const last7DaysStart = todayStart - 86400000 * 6;
-
-    historyItems.forEach((item) => {
-      const d = new Date(item.created_at).getTime();
-      if (d >= todayStart) {
-        today.push(item);
-      } else if (d >= yesterdayStart) {
-        yesterday.push(item);
-      } else if (d >= last7DaysStart) {
-        last7Days.push(item);
-      } else {
-        earlier.push(item);
-      }
-    });
-
-    if (today.length > 0) groups.push({ label: t("chat.history.today"), items: today });
-    if (yesterday.length > 0) groups.push({ label: t("chat.history.yesterday"), items: yesterday });
-    if (last7Days.length > 0) groups.push({ label: t("chat.history.last_7_days"), items: last7Days });
-    if (earlier.length > 0) groups.push({ label: t("chat.history.earlier"), items: earlier });
-
-    return groups;
-  }, [historyItems, t]);
+  const composerActions = hasActiveArtifactActionSet(messages)
+    ? []
+    : visibleComposerActions(inputActions);
+  const latestAssistantContent =
+    [...messages].reverse().find((message) => message.role === "ai")?.content?.trim() ?? "";
+  const showStreamStatus = Boolean(streamStatus && latestAssistantContent.length === 0);
+  const showExploratorySuggestions =
+    chatExploratorySuggestionsEnabled && showSuggestions;
+  const showConversationDisclaimer = shouldShowConversationDisclaimer(
+    messages,
+    isStreamingResponse,
+  );
+  const chatInputPlaceholder =
+    messages.length === 0
+      ? t("chat.input_placeholder")
+      : t("chat.followup_placeholder", "Ask a follow-up...");
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1152,274 +1830,78 @@ export default function ChatInterface() {
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-[#f9f9f9] text-black dark:bg-[#141517] dark:text-white md:flex-row">
 
       {/* ── Desktop sidebar ── */}
-      <aside
-        className={`flex flex-col border-r border-black/5 bg-white transition-all duration-300 ease-in-out overflow-x-hidden dark:border-white/5 dark:bg-[#141517] ${ isSidebarOpen ? "w-72" : "w-14" }`}
-      >
-        {/* Sidebar Header: Brand & Toggle */}
-        <div className="flex h-20 items-center px-[6px] pb-4 pt-6 overflow-hidden">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all duration-300 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-            aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {isSidebarOpen ? (
-              <PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />
-            ) : (
-              <ArgusLogo  className="h-8 w-8 text-black dark:text-white" />
-            )}
-          </button>
-          <span className={`font-display pl-3 text-[22px] font-bold tracking-tight text-black transition-all duration-300 dark:text-white ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-            argus
-          </span>
-        </div>
+      <ChatSidebar
+        isOpen={isSidebarOpen}
+        onToggle={toggleSidebar}
+        currentView={currentView}
+        conversationId={conversationId}
+        isRecentsExpanded={isRecentsExpanded}
+        onToggleRecents={() => setIsRecentsExpanded((expanded) => !expanded)}
+        historyItems={historyItems}
+        historyNextCursor={historyNextCursor}
+        isLoadingMoreHistory={isLoadingMoreHistory}
+        onNewChat={() => {
+          void startNewChat();
+          setIsSidebarOpen(false);
+        }}
+        onNavigate={(view) => {
+          setCurrentView(view);
+          setIsSidebarOpen(false);
+        }}
+        onOpenItem={openHistoryItem}
+        onLoadMoreHistory={loadMoreHistory}
+        onOpenSearch={() => {
+          if (omnisearchEnabled) {
+            setSearchOverlayOpen(true);
+          }
+        }}
+        onHistoryMutated={refreshHistory}
+        onConversationRemoved={handleConversationRemoved}
+        onLogout={() => {
+          void handleLogout();
+        }}
+        onFeedback={(type) => {
+          setFeedbackState({
+            isOpen: true,
+            type,
+            context: { surface: "sidebar", conversation_id: conversationId },
+          });
+        }}
+        onOpenSidebarPreference={() => setIsSidebarPreferenceModalOpen(true)}
+        mode={sidebarMode}
+        strategiesEnabled={strategiesEnabled}
+        omnisearchEnabled={omnisearchEnabled}
+      />
 
-        <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-[6px] pb-4 pt-2">
-          {/* Main Navigation */}
-          <button
-            onClick={() => {
-              void startNewChat();
-              setIsSidebarOpen(false);
-            }}
-            className="group mb-2 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
-          >
-            <div className="flex h-11 w-11 items-center justify-center">
-              <Plus className="h-5 w-5 text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
-            </div>
-            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-              {t('chat.new_chat')}
-            </span>
-          </button>
+      {omnisearchEnabled && searchOverlayOpen && (
+        <ChatCommandPalette
+          onClose={() => setSearchOverlayOpen(false)}
+          onOpenConversation={(convId) => {
+            setSearchOverlayOpen(false);
+            void loadConversation(convId);
+          }}
+          activeConversationId={conversationId}
+          onMutated={refreshHistory}
+          onConversationRemoved={handleConversationRemoved}
+        />
+      )}
 
-          <button
-            onClick={() => {
-              setCurrentView("strategies");
-              setIsSidebarOpen(false);
-            }}
-            className={`group mb-2 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${ currentView === "strategies" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
-          >
-            <div className="flex h-11 w-11 items-center justify-center">
-              <Compass className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
-            </div>
-            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-              {t('common.strategies')}
-            </span>
-          </button>
-
-          {collectionsEnabled && (
-            <button
-              onClick={() => {
-                setCurrentView("collections");
-                setIsSidebarOpen(false);
-              }}
-              className={`group mb-6 flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${ currentView === "collections" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
-            >
-              <div className="flex h-11 w-11 items-center justify-center">
-                <Layers className="h-[22px] w-[22px] text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
-              </div>
-              <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-                {t('common.collections')}
-              </span>
-            </button>
-          )}
-
-          {/* History Accordion */}
-          <div className="mb-2">
-            <button
-              onClick={() => setIsRecentsExpanded(!isRecentsExpanded)}
-              className="flex h-11 w-full items-center justify-between rounded-[14px] px-0 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center">
-                  <History className="h-[22px] w-[22px] text-black/60 dark:text-white/60" />
-                </div>
-                <span className={`font-display pl-3 tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-                  {t('common.recents')}
-                </span>
-              </div>
-              <div className={`pr-4 transition-opacity duration-300 ${ isSidebarOpen ? "block opacity-100" : "hidden opacity-0 pointer-events-none" }`}>
-                <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isRecentsExpanded ? "rotate-90" : ""}`} />
-              </div>
-            </button>
-
-            {isRecentsExpanded && (
-              <div className="space-y-0.5 pb-2">
-                {currentView === "chat" && searchText.trim().length > 0 ? (
-                  <>
-                    {isSearching ? (
-                      <div className="px-11 py-4 text-[13px] text-black/45 dark:text-white/45">
-                        {t("common.loading")}
-                      </div>
-                    ) : searchResults.length === 0 ? (
-                      <div className="px-11 py-6">
-                        <p className={`text-[13px] leading-relaxed text-black/30 transition-all duration-300 dark:text-white/30 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-                          {t("common.no_items")}
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        {searchResults.map((item) => (
-                          <button
-                            key={`${item.type}:${item.id}`}
-                            onClick={() => {
-                              if (item.type === "chat") {
-                                void loadConversation(item.id);
-                                return;
-                              }
-                              if (item.type === "strategy") {
-                                setCurrentView("strategies");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "collection") {
-                                setCurrentView("collections");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "run") {
-                                if (item.conversation_id) {
-                                  void loadConversation(item.conversation_id);
-                                } else {
-                                  setCurrentView("chat");
-                                  setIsSidebarOpen(false);
-                                }
-                                return;
-                              }
-                              setCurrentView("chat");
-                              setIsSidebarOpen(false);
-                            }}
-                            className="group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5"
-                          >
-                            <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
-                            <div className={`min-w-0 flex-1 pl-3 pr-4 transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-                              <span className="font-display block truncate text-[15px] font-medium tracking-tight">
-                                {item.title}
-                              </span>
-                              <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
-                                {item.matched_text}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                        {searchNextCursor && (
-                          <button
-                            type="button"
-                            onClick={() => void loadMoreSearch()}
-                            disabled={isLoadingMoreSearch}
-                            className="mx-11 mt-2 rounded-[12px] border border-black/10 px-3 py-1.5 text-[12px] font-medium text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
-                          >
-                            {isLoadingMoreSearch ? t("common.loading") : t("common.retry")}
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </>
-                ) : historyItems.length === 0 ? (
-                  <div className="px-11 py-6">
-                    <p className={`text-[13px] leading-relaxed text-black/30 transition-all duration-300 dark:text-white/30 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-                      {t('chat.no_recent_activity')}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-6 pb-4">
-                    {groupedHistory.map((group) => (
-                      <div key={group.label} className="flex flex-col">
-                        <div className={`px-11 py-2 transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "opacity-0 invisible h-0 overflow-hidden" }`}>
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
-                            {group.label}
-                          </span>
-                        </div>
-                        {group.items.map((item) => (
-                          <button
-                            key={`${item.type}:${item.id}`}
-                            onClick={() => {
-                              if (item.type === "chat") {
-                                void loadConversation(item.id);
-                                return;
-                              }
-                              if (item.type === "strategy") {
-                                setCurrentView("strategies");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "collection") {
-                                setCurrentView("collections");
-                                setIsSidebarOpen(false);
-                                return;
-                              }
-                              if (item.type === "run") {
-                                if (item.conversation_id) {
-                                  void loadConversation(item.conversation_id);
-                                } else {
-                                  setCurrentView("chat");
-                                  setIsSidebarOpen(false);
-                                }
-                                return;
-                              }
-                              setCurrentView("chat");
-                              setIsSidebarOpen(false);
-                            }}
-                            className={`group relative flex w-full items-center gap-3 rounded-[14px] px-0 py-2.5 transition-all duration-200 ${ item.type === "chat" && conversationId === item.id ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
-                          >
-                            <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
-                            <div className={`min-w-0 flex-1 pl-3 pr-4 transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-                              <span className="font-display block truncate text-[15px] font-medium tracking-tight">
-                                {item.title}
-                              </span>
-                              <span className="mt-0.5 block text-[12px] text-black/40 dark:text-white/40">
-                                {t(`common.${item.type}`, item.type)}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {historyNextCursor && currentView === "chat" && searchText.trim().length === 0 && (
-                  <button
-                    type="button"
-                    onClick={() => loadMoreHistory()}
-                    disabled={isLoadingMoreHistory}
-                    className="mx-11 mt-2 rounded-[12px] border border-black/10 px-3 py-1.5 text-[12px] font-medium text-black/70 hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
-                  >
-                    {isLoadingMoreHistory ? t("common.loading") : t("common.retry")}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Search & Settings */}
-        <div className="border-t border-black/5 p-[6px] dark:border-white/5">
-          <div className="relative mb-4 h-11 overflow-hidden">
-            <div className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center">
-              <Search className="h-4 w-4 text-black/30 dark:text-white/30" />
-            </div>
-            <input
-              type="text"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder={t('common.search')}
-              className={`font-display h-11 w-full rounded-[14px] bg-black/[0.03] pl-[62px] pr-4 text-[15px] font-medium outline-none transition-all placeholder:text-black/30 hover:bg-black/[0.05] focus:bg-white focus:ring-1 focus:ring-black/5 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:hover:bg-white/[0.05] dark:focus:bg-[#1f2225] dark:focus:ring-white/5 ${ isSidebarOpen ? "block" : "hidden" }`}
-            />
-          </div>
-
-          <button
-            onClick={() => {
-              setCurrentView("settings");
-            }}
-            className={`group flex h-11 w-full items-center gap-3 rounded-[14px] px-0 transition-all duration-200 ${ currentView === "settings" ? "bg-black/5 dark:bg-white/5" : "hover:bg-black/5 dark:hover:bg-white/5" }`}
-          >
-            <div className="flex h-11 w-11 items-center justify-center">
-              <Settings className="h-5 w-5 text-black/60 transition-colors group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
-            </div>
-            <span className={`font-display pl-3 text-[15px] font-medium tracking-tight transition-all duration-300 ${ isSidebarOpen ? "opacity-100" : "absolute left-[72px] opacity-0 pointer-events-none" }`}>
-              {t('common.settings')}
-            </span>
-          </button>
-        </div>
-      </aside>
+      <ConfirmDialog
+        isOpen={Boolean(pendingHeaderDeleteId)}
+        title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
+        description={t(
+          "sidebar.delete_confirm.description",
+          "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+          { title: t("common.conversation", "Conversation") },
+        )}
+        confirmLabel={t("sidebar.delete_confirm.confirm", "Delete conversation")}
+        cancelLabel={t("common.cancel", "Cancel")}
+        isBusy={isDeletingHeaderChat}
+        onCancel={() => {
+          if (!isDeletingHeaderChat) setPendingHeaderDeleteId(null);
+        }}
+        onConfirm={() => void handleConfirmHeaderDelete()}
+      />
 
       {/* ── Main panel ── */}
       <section
@@ -1433,9 +1915,8 @@ export default function ChatInterface() {
 
           {/* Title (Always Centered relative to Content) */}
           <h1 className="font-display pointer-events-auto text-[17px] font-semibold tracking-tight text-black/80 dark:text-white/80 md:text-[18px]">
-            {currentView === "chat" && (messages.length > 0 ? t('common.conversation', 'Conversation') : t('chat.new_chat'))}
+            {currentView === "chat" && messages.length > 0 && t('common.conversation', 'Conversation')}
             {currentView === "strategies" && t('common.strategies')}
-            {currentView === "collections" && t('common.collections')}
           </h1>
 
           {/* Action Button (Always Right-Anchored) */}
@@ -1448,98 +1929,97 @@ export default function ChatInterface() {
                   className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                   aria-label="Chat options"
                 >
-                  <History className="h-5 w-5" />
+                  <MoreVertical className="h-5 w-5" />
                 </button>
                 {showChatOptions && (
                   <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-black/5 bg-white pb-7 pt-2 dark:border-white/5 dark:bg-[#1f2225] md:absolute md:bottom-auto md:right-0 md:left-auto md:top-full md:mt-2 md:w-[260px] md:rounded-[20px] md:border md:pb-2">
                     <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
-                    {activeChatOptionsPanel === "none" && (
+                    {!isRenamingHeaderChat ? (
                       <div className="py-1">
                         <button
                           type="button"
-                          onClick={() => { closeChatOptions(); void startNewChat(); }}
+                          disabled={!conversationId}
+                          onClick={() => { void handleCopyConversationLink(); }}
                           className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                         >
-                          <Plus className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                          {t('chat.new_chat')}
+                          <Copy className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('chat.copy_conversation_link', 'Copy conversation link')}
                         </button>
-                        {collectionsEnabled && (
-                          <button
-                            type="button"
-                            onClick={handleAddToCollection}
-                            className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                          >
-                            <Layers className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            {t('common.add_to_collection')}
-                          </button>
-                        )}
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); setActiveChatOptionsPanel("history"); }}
-                          className="group flex w-full items-center justify-between px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                          disabled={!conversationId}
+                          onClick={handleStartHeaderRename}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
                         >
-                          <span className="flex items-center gap-4">
-                            <History className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                            {t('chat.view_history')}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-black/30 dark:text-white/30 transition-transform group-hover:translate-x-0.5" />
+                          <Edit2 className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {t('chat.rename_chat', 'Rename chat')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!conversationId || isPinningHeaderChat}
+                          onClick={() => { void handleToggleHeaderPin(); }}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
+                        >
+                          <Pin className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
+                          {activeHistoryChat?.pinned
+                            ? t('chat.unpin_chat', 'Unpin chat')
+                            : t('chat.pin_chat', 'Pin chat')}
                         </button>
                         <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
                         <button
                           type="button"
-                          onClick={() => {
-                            if (!conversationId) return;
-                            deleteConversation(conversationId)
-                              .then(() => {
-                                showToast(t('common.delete'));
-                                refreshHistory();
-                                void startNewChat();
-                                closeChatOptions();
-                              })
-                              .catch(() => showToast(t('common.error_occurred')));
-                          }}
-                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
+                          disabled={!conversationId || isDeletingHeaderChat}
+                          onClick={handleRequestHeaderDelete}
+                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-red-500/10 md:px-5 md:py-3 md:text-[15px]"
                         >
                           <Trash2 className="h-[18px] w-[18px] md:h-4 md:w-4" />
                           {t('chat.delete_chat')}
                         </button>
                       </div>
-                    )}
-                    {activeChatOptionsPanel === "history" && (
-                      <div className="py-1">
-                        <button
-                          type="button"
-                          onClick={() => setActiveChatOptionsPanel("none")}
-                          className="flex w-full items-center justify-between px-6 py-3 text-left text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white md:px-5"
-                        >
-                          {t('chat.past_sessions')}
-                          <ChevronRight className="h-4 w-4 -rotate-90" />
-                        </button>
-                        <div className="max-h-[300px] overflow-y-auto pb-1">
-                          {historyItems.filter(i => i.type === "chat").map((item: HistoryItem) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                void loadConversation(item.id);
-                                closeChatOptions();
-                              }}
-                              className="flex w-full flex-col px-6 py-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3"
-                            >
-                              <span className="truncate text-[15px] font-medium">{item.title}</span>
-                              <span className="mt-1 truncate text-[13px] text-black/45 dark:text-white/45">{item.subtitle}</span>
-                            </button>
-                          ))}
+                    ) : (
+                      <form
+                        className="space-y-2 px-5 py-3"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void handleSaveHeaderRename();
+                        }}
+                      >
+                        <label className="block text-[12px] font-medium text-black/45 dark:text-white/45">
+                          {t('chat.rename_chat', 'Rename chat')}
+                        </label>
+                        <input
+                          autoFocus
+                          value={headerRenameValue}
+                          onChange={(event) => setHeaderRenameValue(event.target.value.slice(0, 80))}
+                          className="w-full rounded-[12px] border border-black/10 bg-black/[0.02] px-3 py-2 text-[14px] font-medium text-black outline-none focus:border-black/25 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus:border-white/25"
+                          maxLength={80}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={isSavingHeaderRename}
+                            className="min-h-9 flex-1 rounded-full bg-black px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-85 disabled:opacity-50 dark:bg-white dark:text-black"
+                          >
+                            {t('common.save')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingHeaderRename}
+                            onClick={() => setIsRenamingHeaderChat(false)}
+                            className="min-h-9 flex-1 rounded-full border border-black/10 px-3 py-1.5 text-[13px] font-medium text-black/70 transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
+                          >
+                            {t('common.cancel')}
+                          </button>
                         </div>
-                      </div>
+                      </form>
                     )}
                   </div>
                 )}
               </div>
             )}
-            {(currentView === "strategies" || currentView === "collections") && (
+            {strategiesEnabled && currentView === "strategies" && (
               <button
-                onClick={() => handleTriggerPrompt(currentView === "strategies" ? "strategy" : "collection")}
+                onClick={() => handleTriggerPrompt("strategy")}
                 className="flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                 aria-label="New item"
               >
@@ -1560,7 +2040,11 @@ export default function ChatInterface() {
                 </h1>
 
                 <div className="w-full max-w-2xl">
-                  <ChatInput onSend={handleSend} />
+                  <ChatInput
+                    onSend={handleSend}
+                    disabled={isStreamingResponse}
+                    placeholder={chatInputPlaceholder}
+                  />
                 </div>
 
                 {showOnboardingGoalCards && (
@@ -1605,55 +2089,55 @@ export default function ChatInterface() {
                   </div>
                 )}
 
-                {/* Show/Hide Suggestions Toggle */}
-                <div className="mt-4">
+                {/* Starter Actions / Chips */}
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => setShowSuggestions(!showSuggestions)}
-                    className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Test Apple against SPY for 2024 and show me the result.'))}
+                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
-                    {showSuggestions ? t('chat.hide_suggestions') : t('chat.show_suggestions')}
+                    <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
+                    {t('chat.starter_actions.tsla.label', 'Test Apple vs SPY')}
+                  </button>
+                  <button
+                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024.'))}
+                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                  >
+                    <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
+                    {t('chat.starter_actions.btc.label', 'Test Bitcoin (BTC) hold')}
+                  </button>
+                  <button
+                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024.'))}
+                    className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
+                  >
+                    <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
+                    {t('chat.starter_actions.dca.label', 'Test weekly Nvidia buys')}
                   </button>
                 </div>
 
-                <div className={`mt-6 w-full flex flex-col items-center transition-all duration-500 ease-in-out overflow-hidden ${ showSuggestions ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none' }`}>
-                  {/* Starter Actions / Chips */}
-                  <div className="flex flex-wrap items-center justify-center gap-3">
-                      <button
-                        onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Show me TSLA analysis'))}
-                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                      >
-                        <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
-                        {t('chat.starter_actions.tsla.label', 'TSLA Analysis')}
-                      </button>
-                      <button
-                        onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Show me BTC trends'))}
-                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                      >
-                        <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
-                        {t('chat.starter_actions.btc.label', 'BTC Trends')}
-                      </button>
-                      <button
-                        onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Explain DCA strategy'))}
-                        className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
-                      >
-                        <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />
-                        {t('chat.starter_actions.dca.label', 'DCA Strategy')}
-                      </button>
-                    </div>
-
-                    {/* Example Questions */}
-                    <div className="mt-12 flex flex-col items-center gap-4 text-center">
-                      <button onClick={() => handleSend(t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
-                        {t('chat.example_queries.q1', 'What if I bought Apple whenever it dipped hard?')}
-                      </button>
-                      <button onClick={() => handleSend(t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
-                        {t('chat.example_queries.q2', 'Test a momentum breakout strategy on Bitcoin.')}
-                      </button>
-                      <button onClick={() => handleSend(t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
-                        {t('chat.example_queries.q3', 'How would a simple DCA strategy perform on Tesla?')}
-                      </button>
-                    </div>
+                {chatExploratorySuggestionsEnabled && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowSuggestions(!showSuggestions)}
+                      className="text-[14px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
+                    >
+                      {showSuggestions ? t('chat.hide_suggestions') : t('chat.show_suggestions')}
+                    </button>
                   </div>
+                )}
+
+                {showExploratorySuggestions && (
+                  <div className="mt-8 flex flex-col items-center gap-4 text-center">
+                    <button onClick={() => handleSend(t('chat.example_queries.q1', 'What if I bought Apple after big drops?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                      {t('chat.example_queries.q1', 'What if I bought Apple after big drops?')}
+                    </button>
+                    <button onClick={() => handleSend(t('chat.example_queries.q2', 'What if I bought Bitcoin when it starts rising?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                      {t('chat.example_queries.q2', 'What if I bought Bitcoin when it starts rising?')}
+                    </button>
+                    <button onClick={() => handleSend(t('chat.example_queries.q3', 'What if I bought Tesla every month?'))} className="text-[14px] text-black/50 hover:text-black hover:underline dark:text-white/50 dark:hover:text-white transition-colors">
+                      {t('chat.example_queries.q3', 'What if I bought Tesla every month?')}
+                    </button>
+                  </div>
+                )}
                 </div>
             ) : (
               <>
@@ -1663,7 +2147,7 @@ export default function ChatInterface() {
                 <div
                   ref={scrollContainerRef}
                   onScroll={updateScrollPositionState}
-                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[126px] pt-[86px]"
+                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[190px] pt-[86px]"
                 >
                   <div className="space-y-8">
                     {messages.map((msg, index) => {
@@ -1672,29 +2156,36 @@ export default function ChatInterface() {
                       const isWorkingMessage =
                         isLatestAi &&
                         msg.kind === "text" &&
-                        (!!streamStatus || (msg.content ?? "") === "");
+                        (isStreamingResponse || !!streamStatus || (msg.content ?? "") === "");
                       return (
                         <ChatMessage
                           key={msg.id}
                           message={msg}
                           onAction={handleAction}
                           onFeedback={(type, context, rating) => {
-                            setFeedbackState({ isOpen: true, type, context, rating });
+                            setFeedbackState({
+                              isOpen: true,
+                              type,
+                              context: { ...context, conversation_id: conversationId },
+                              rating,
+                            });
                             setIsSidebarOpen(false);
                           }}
+                          onToast={showToast}
                           isLatest={isLatestAi}
                           isStreaming={isWorkingMessage}
+                          conversationId={conversationId}
                         />
                       );
                     })}
-                    {streamStatus && (
+                    {showStreamStatus && (
                       <div className="ml-12">
                         <span className="animate-ethereal-shimmer text-[13px] text-black/45 dark:text-white/45">
                           {streamStatus}
                         </span>
                       </div>
                     )}
-                    <div ref={bottomRef} />
+                    <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
                 </div>
 
@@ -1714,9 +2205,9 @@ export default function ChatInterface() {
                         </button>
                       </div>
                     )}
-                    {visibleInputActions(inputActions).length > 0 && !streamStatus && (
+                    {composerActions.length > 0 && !streamStatus && !isStreamingResponse && !isHydratingConversation && (
                       <div className="mb-3 flex flex-wrap justify-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {visibleInputActions(inputActions).map((action) => (
+                        {composerActions.map((action) => (
                           <button
                             key={action.id ?? action.type ?? action.label}
                             type="button"
@@ -1728,7 +2219,19 @@ export default function ChatInterface() {
                         ))}
                       </div>
                     )}
-                    <ChatInput onSend={handleSend} />
+                    <ChatInput
+                      onSend={handleSend}
+                      disabled={isStreamingResponse || isHydratingConversation}
+                      placeholder={chatInputPlaceholder}
+                    />
+                    {showConversationDisclaimer && (
+                      <p
+                        data-testid="chat-disclaimer"
+                        className="mt-3 text-center text-[13px] font-normal leading-[1.45] text-black/40 dark:text-white/40"
+                      >
+                        {t("chat.disclaimer", "Argus can make mistakes. For education only. Not financial advice.")}
+                      </p>
+                    )}
                   </div>
                 </div>
               </>
@@ -1736,20 +2239,10 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {currentView === "strategies" && (
+        {strategiesEnabled && currentView === "strategies" && (
           <StrategiesView
             onMenuClick={() => setIsSidebarOpen((o) => !o)}
             onAddClick={() => handleTriggerPrompt('strategy')}
-            searchText={searchText}
-            onSearchChange={setSearchText}
-            isSidebarOpen={isSidebarOpen}
-            onTriggerPrompt={handleTriggerPrompt}
-          />
-        )}
-        {collectionsEnabled && currentView === "collections" && (
-          <CollectionsView
-            onMenuClick={() => setIsSidebarOpen((o) => !o)}
-            onAddClick={() => handleTriggerPrompt('collection')}
             searchText={searchText}
             onSearchChange={setSearchText}
             isSidebarOpen={isSidebarOpen}
@@ -1760,33 +2253,32 @@ export default function ChatInterface() {
           <SettingsView
             onClose={() => setCurrentView("chat")}
             onLogout={() => {
-              window.location.href = "/";
+              void handleLogout();
             }}
             onFeedback={(type, context) => {
-              setFeedbackState({ isOpen: true, type, context });
+              setFeedbackState({
+                isOpen: true,
+                type,
+                context: { ...context, conversation_id: conversationId },
+              });
               setIsSidebarOpen(false);
             }}
           />
         )}
-      </section>
 
-      {/* ── Collection picker sheet ── */}
-      {collectionsEnabled && collectionPickerTarget && (
-        <CollectionPicker
-          strategyId={collectionPickerTarget.strategyId}
-          strategyFallback={{
-            name: collectionPickerTarget.strategyName,
-            template: collectionPickerTarget.template,
-            asset_class: collectionPickerTarget.assetClass,
-            symbols: collectionPickerTarget.symbols,
-          }}
-          onClose={() => setCollectionPickerTarget(null)}
-          onSuccess={(collectionName) => {
-            setCollectionPickerTarget(null);
-            showToast(t('chat.added_to_collection', { name: collectionName }));
-          }}
-        />
-      )}
+        {/* ── Toast ── */}
+        {toast && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-[100] flex justify-center px-4">
+            <div
+              role="status"
+              aria-live="polite"
+              className="max-w-[min(720px,calc(100vw-2rem))] animate-in rounded-full border border-black/10 bg-white px-5 py-2.5 text-center text-[14px] font-medium text-black/80 shadow-[0_18px_60px_rgba(15,23,42,0.18)] duration-300 fade-in slide-in-from-bottom-2 dark:border-white/10 dark:bg-[#1f2225] dark:text-white/80 dark:shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+            >
+              {toast}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* ── Feedback Dialog ── */}
       <FeedbackDialog
@@ -1797,12 +2289,14 @@ export default function ChatInterface() {
         context={feedbackState.context}
       />
 
-      {/* ── Toast ── */}
-      {toast && (
-        <div className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300 rounded-full bg-black dark:bg-white px-5 py-2.5 text-[14px] font-medium text-white dark:text-black">
-          {toast}
-        </div>
+      {isSidebarPreferenceModalOpen && (
+        <SidebarPreferenceModal
+          mode={sidebarMode}
+          onSelect={handleSetSidebarMode}
+          onClose={() => setIsSidebarPreferenceModalOpen(false)}
+        />
       )}
+
     </div>
   );
 }

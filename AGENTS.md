@@ -191,9 +191,141 @@ Usage:
 
 ## 🚀 Quick Start (Local Development)
 
-1. **Initialize workspace**: Run `.github/setup.sh` (Poetry + Bun + mock data ready)
-2. **Start dev environment**: Terminal 1: `poetry run fastapi dev src/argus/api/main.py`, Terminal 2: `cd web && bun run dev`
-3. **Build + test**: `poetry run pytest` (backend), `bun test` (frontend)
+Argus supports two primary local scenarios. Choose the script first; do not
+manually juggle backend mode flags for normal work.
+
+### Fast Iteration (Dev Mode)
+**Use this for:** Building features, debugging, UI work, isolated testing — no persistence needed.
+
+1. **Initialize workspace** (one time):
+   ```bash
+   .github/setup.sh
+   ```
+
+2. **Activate Dev Mode** (Terminal 1: Backend):
+   ```bash
+   .github/dev.sh
+   ```
+   This sources `.env` if present, then overrides backend runtime flags for fast
+   synthetic-data development.
+
+3. **Start frontend** (Terminal 2):
+   ```bash
+   cd web && bun run dev
+   ```
+
+4. **Frontend env**: for fast mock-auth dev, set in `web/.env.local`:
+   ```bash
+   NEXT_PUBLIC_MOCK_AUTH=true
+   NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+   ```
+
+5. **Access**: Open `http://localhost:3000` → Auto-logs in as "Mock Developer"
+
+6. **Build + test**:
+   ```bash
+   poetry run pytest tests/
+   cd web && bun test
+   ```
+
+### Production Parity (QA Mode)
+**Use this for:** End-to-end testing, launch validation, browser QA matrix, release verification.
+
+1. **Initialize workspace** (one time):
+   ```bash
+   .github/setup.sh
+   ```
+   Your `.env` should already contain real Supabase credentials and API keys.
+
+2. **Activate QA Mode** (Terminal 1: Backend):
+   ```bash
+   .github/qa.sh
+   ```
+   This requires real Supabase, OpenRouter, Alpaca, and `DATABASE_URL` values in
+   `.env`, then overrides backend runtime flags for strict production-parity QA.
+
+3. **Start frontend** (Terminal 2):
+   ```bash
+   cd web && bun run dev
+   ```
+
+   For real auth QA, set in `web/.env.local`:
+   ```bash
+   NEXT_PUBLIC_MOCK_AUTH=false
+   NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+   ```
+
+4. **Run full QA suite**:
+   ```bash
+   # Backend contract & runtime tests
+   poetry run pytest tests/agent_runtime/ -q
+   
+   # Frontend integration
+   cd web && bun test __tests__/
+   
+   # Browser QA (if Playwright is set up)
+   bun run test:e2e
+   ```
+
+### What Each Mode Script Does
+
+**`.github/dev.sh`** sets:
+- `ARGUS_PERSISTENCE_MODE=memory` — Ephemeral, no database writes
+- `ARGUS_DEV_MEMORY_FALLBACK=true` — Tolerant (failures don't block the chat)
+- `ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` — Hardcoded test assets (no API calls)
+- `ARGUS_CHECKPOINTER_MODE=memory` — No checkpoint persistence
+- `ARGUS_MOCK_AUTH=true` — Backend mock auth for local development
+
+**`.github/qa.sh`** sets:
+- `ARGUS_PERSISTENCE_MODE=supabase` — Durable, all writes go to Supabase
+- `ARGUS_DEV_MEMORY_FALLBACK=false` — Strict (errors propagate for debugging)
+- `ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider` — Real provider-backed asset resolution
+- `ARGUS_CHECKPOINTER_MODE=postgres` — Runtime recovery/reload through Supabase Postgres
+- `ARGUS_MOCK_AUTH=false` — Real backend auth validation
+
+**Your `.env` stays mostly constant** — It stores credentials and safe defaults.
+The scripts are authoritative for backend mode flags, so you should not need to
+remember the right `ARGUS_*` combination for dev vs QA.
+
+**Recorded provider fixtures** are not the default manual QA path. They are for
+deterministic provider tests or CI when `ARGUS_ASSET_FIXTURE_PATH` points to a
+provider-shaped asset catalog snapshot. Until such a snapshot is generated and
+versioned, manual QA should use `live_provider` so symbol recognition exercises
+the same provider-backed resolution path production will use.
+
+### Feature Flags (All Private-Alpha)
+Keep these disabled unless explicitly testing:
+```bash
+NEXT_PUBLIC_STRATEGIES_ENABLED=false
+NEXT_PUBLIC_COLLECTIONS_ENABLED=false
+NEXT_PUBLIC_OMNISEARCH_ENABLED=false
+NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+NEXT_PUBLIC_PRIVATE_ALPHA_ONBOARDING_ENABLED=false
+```
+
+### Frontend Environment (web/.env.local)
+Create `web/.env.local` with frontend-specific settings:
+```bash
+cp web/.env.local.example web/.env.local
+```
+
+For fast Dev Mode:
+```bash
+NEXT_PUBLIC_MOCK_AUTH=true
+NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+NEXT_PUBLIC_STRATEGIES_ENABLED=false
+NEXT_PUBLIC_COLLECTIONS_ENABLED=false
+NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+```
+
+For QA Mode with real Supabase auth:
+```bash
+NEXT_PUBLIC_MOCK_AUTH=false
+NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1
+NEXT_PUBLIC_STRATEGIES_ENABLED=false
+NEXT_PUBLIC_COLLECTIONS_ENABLED=false
+NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
+```
 
 ---
 
@@ -208,9 +340,13 @@ Usage:
 - **Scheduled Framework**: [`.agent/.jules/README.md`](./.agent/.jules/README.md)
 
 ### 🛡️ Developer Identity: Mock Auth Mode
-To bypass the Supabase OAuth wall in development environments (e.g., remote VMs), set the following environment variable:
+To bypass the Supabase auth wall in fast Dev Mode, set the following frontend
+environment variable:
 
 `NEXT_PUBLIC_MOCK_AUTH=true`
+
+Keep `NEXT_PUBLIC_MOCK_AUTH=false` for QA Mode when validating signup, login,
+logout, persistence, reload, and private-alpha allowlist behavior.
 
 **Benefits for Agents:**
 - **Auth Bypass**: Instantly logs in as "Mock Developer" (mock user).
@@ -218,6 +354,98 @@ To bypass the Supabase OAuth wall in development environments (e.g., remote VMs)
 - **Access Control**: Grants access to `/builder`, `/strategies`, etc., without OAuth.
 
 
+---
+
+## ⚙️ Architectural Patterns
+
+### 1. Fail-Open Deterministic Fallback
+Used for: LLM-backed features that must never block the chat
+
+Pattern:
+- Try LLM with bounded timeout (ThreadPoolExecutor)
+- On timeout/failure → deterministic fallback
+- Log failure but don't expose to user
+- Route receipt captures outcome for ops
+
+Example: `result_breakdown_message()` in src/argus/api/chat/breakdown.py
+
+### 2. Task-Scoped Execution Budget
+Used for: All OpenRouter calls
+
+Pattern:
+- Each task (interpretation, breakdown, naming) has own profile
+- Profile controls: temperature, max_tokens, timeout_seconds, max_retries
+- Same code path; different budgets based on task importance
+- Route receipt captures latency, model, tier, token usage
+
+Example: OPENROUTER_PROFILES in src/argus/llm/openrouter.py
+
+### 3. Stage Result Contract
+Used for: Runtime decision-making stages
+
+Pattern:
+- Stage returns StageResult(outcome: str, stage_patch: dict)
+- Outcome drives routing (ready_to_confirm, needs_clarification, etc.)
+- Patch contains only state mutations
+- Stage is pure function of (state, contract)
+
+Example: confirm_stage() in src/argus/agent_runtime/stages/confirm.py
+
+### 4. Response Voice Contract
+Used for: All assistant-facing prose
+
+Pattern:
+- Explicit tone contract defined in response_style.py
+- Anti-patterns: dense PDF tone, metric dumps, generic lists, jargon
+- Deterministic facts ground LLM language
+- No raw enums or internal field names in user-facing text
+
+Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
+
+### 5. Provider Mode Abstraction
+Used for: Making asset/market data deterministic without HTTP mocking
+
+Pattern:
+- `ARGUS_MARKET_DATA_PROVIDER_MODE` controls data source.
+- Modes:
+  - `live_provider`: real provider catalog/data; default for manual QA and production-like validation.
+  - `recorded_provider_fixture`: provider-shaped catalog snapshot; deterministic tests/CI only and requires `ARGUS_ASSET_FIXTURE_PATH`.
+  - `synthetic_unit_fixture`: small hardcoded unit fixture; fast Dev Mode only.
+- Code path unchanged; only data source changes.
+- Enables deterministic testing with real code paths without making synthetic fixtures look like production truth.
+
+Example: _asset_provider_mode() in src/argus/domain/market_data/assets.py
+
+### 6. Capability Contract Pattern
+Used for: Validating what's executable vs draft-only
+
+Pattern:
+- CapabilityContract class centralizes "can I execute this?"
+- Returns ranked candidates, not binary yes/no
+- Used by interpret → confirm → execute → capability Q&A
+- Single source of truth across all surfaces
+
+### 7. Semantic Integrity Rules
+Used for: Preserving user intent across edits and defaults
+
+Pattern:
+- User-explicit constraints (dates, assets, cadence) are immutable
+- Defaults only fill gaps, never overwrite user intent
+- If constraint cannot be preserved → clarify, don't override
+- For DCA: recurring_contribution is sacred once set
+
+Example: conserve_semantic_constraints() in src/argus/agent_runtime/semantic_integrity.py
+
+### 8. Anti-Pattern Checklist
+Never do this:
+- ❌ Regex/phrase gates before LLM interpretation
+- ❌ Strategy name routing (use intent + capability contract)
+- ❌ Parallel chat orchestrators (LangGraph is the only brain)
+- ❌ Frontend prose inventing strategy state
+- ❌ Raw enum/field names in assistant voice
+- ❌ Unsupported causality from context packets
+- ❌ Silent defaults overwriting user constraints
+- ❌ Duplicate action surfaces (one button per action, owned by one component)
 ---
 
 ## 🛑 Never-Violate Standards
@@ -270,3 +498,29 @@ Priority order of authority:
 6. Existing code
 
 *Argus should feel modern, intelligent, simple, trustworthy, and fast — never intimidating.*
+
+---
+
+## Commit / Checkpoint Discipline
+
+For multi-step or high-risk work, do not accumulate large uncommitted diffs.
+
+Before starting:
+- Check `git status`.
+- Identify any user-owned changes and do not overwrite them.
+- Use a branch/worktree for substantial work.
+
+During implementation:
+- Prefer atomic, single-purpose changes.
+- After each coherent slice, run focused verification.
+- If the slice is working, create a conventional commit checkpoint before moving to the next slice.
+- Do not let runtime/UI work grow into 50-file uncommitted diffs unless explicitly approved.
+
+For long plans:
+- Each worker/slice should end with: tests run, browser smoke note if applicable, known caveats, and either a commit or a clear reason it remains uncommitted.
+
+Never:
+- Commit unrelated user changes.
+- Hide broken work in a broad checkpoint.
+- Use vague commit messages.
+- Leave large exploratory diffs without explaining rollback risk.

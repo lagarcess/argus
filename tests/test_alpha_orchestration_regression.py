@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.runtime import run_agent_turn
@@ -29,8 +31,21 @@ async def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         return ResolvedAssetStub(symbol.upper(), "equity")
 
+    def resolve_candidate_stub(
+        symbol: str,
+        *,
+        field: str,
+        source: str,
+    ) -> SimpleNamespace:
+        del field, source
+        return SimpleNamespace(status="resolved", asset=resolve_stub(symbol))
+
     monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
-    monkeypatch.setattr(extraction_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        extraction_module,
+        "resolve_asset_candidate",
+        resolve_candidate_stub,
+    )
 
     responses = iter(
         [
@@ -51,13 +66,22 @@ async def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch
                 task_relation="refine",
                 requires_clarification=True,
                 user_goal_summary="El usuario eligio una regla RSI.",
-                candidate_strategy_draft=StrategySummary(
-                    raw_user_phrasing=("quiero probar una reversion a la media con RSI"),
-                    strategy_type="indicator_threshold",
-                    strategy_thesis="Comprar cuando RSI indica sobreventa.",
-                    entry_logic="RSI drops below 30",
-                    exit_logic="RSI rises above 55",
-                ),
+                    candidate_strategy_draft=StrategySummary(
+                        raw_user_phrasing=("quiero probar una reversion a la media con RSI"),
+                        strategy_type="indicator_threshold",
+                        strategy_thesis="Comprar cuando RSI indica sobreventa.",
+                        entry_logic="RSI drops below 30",
+                        exit_logic="RSI rises above 55",
+                        extra_parameters={
+                            "indicator": "rsi",
+                            "indicator_parameters": {
+                                "indicator": "rsi",
+                                "indicator_period": 14,
+                                "entry_threshold": 30,
+                                "exit_threshold": 55,
+                            },
+                        },
+                    ),
                 missing_required_fields=["asset_universe", "date_range"],
                 semantic_turn_act="answer_pending_need",
             ),
@@ -66,10 +90,10 @@ async def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch
                 task_relation="refine",
                 requires_clarification=False,
                 user_goal_summary="El usuario completo activo, capital y periodo.",
-                candidate_strategy_draft=StrategySummary(
-                    raw_user_phrasing=(
-                        "Quiero GOOG, con capital de 10mil, 1 anio hacia atras "
-                        "desde hoy"
+                    candidate_strategy_draft=StrategySummary(
+                        raw_user_phrasing=(
+                            "Quiero GOOG, con capital de 10mil, 1 anio hacia atras "
+                            "desde hoy"
                     ),
                     strategy_type="indicator_threshold",
                     strategy_thesis="Comprar GOOG cuando RSI indica sobreventa.",
@@ -77,10 +101,19 @@ async def test_spanish_multiturn_strategy_context_uses_agent_runtime(monkeypatch
                     asset_class="equity",
                     entry_logic="RSI drops below 30",
                     exit_logic="RSI rises above 55",
-                    date_range="last year",
-                    sizing_mode="capital_amount",
-                    capital_amount=10000,
-                ),
+                        date_range="last year",
+                        sizing_mode="capital_amount",
+                        capital_amount=10000,
+                        extra_parameters={
+                            "indicator": "rsi",
+                            "indicator_parameters": {
+                                "indicator": "rsi",
+                                "indicator_period": 14,
+                                "entry_threshold": 30,
+                                "exit_threshold": 55,
+                            },
+                        },
+                    ),
                 semantic_turn_act="answer_pending_need",
             ),
         ]

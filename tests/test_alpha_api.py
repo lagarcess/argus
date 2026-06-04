@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 import pytest
 from argus.api.main import app
+from argus.api.message_store import memory_message
 from argus.domain.market_data.assets import ResolvedAsset
 from fastapi.testclient import TestClient
 
@@ -226,9 +227,6 @@ def _patch_engine_io(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
         raising=False,
     )
-    monkeypatch.setattr(
-        agent_router, "run_agent_turn", _runtime_success_for_message_async
-    )
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime_success_events)
     monkeypatch.setattr(domain_engine, "resolve_asset", _fake_resolve_asset)
     monkeypatch.setattr(domain_engine, "fetch_ohlcv", _fake_fetch_ohlcv)
@@ -321,6 +319,45 @@ def test_conversation_messages_and_patch_follow_contract() -> None:
     assert patched.json()["conversation"]["pinned"] is True
 
 
+def test_unknown_conversation_messages_return_not_found() -> None:
+    client = _client()
+
+    response = client.get(
+        "/api/v1/conversations/00000000-0000-4000-8000-000000000000/messages"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
+def test_deleted_conversation_messages_return_not_found() -> None:
+    client = _client()
+    _set_onboarding_ready(client, primary_goal="test_stock_idea")
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+
+    stream = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Backtest Tesla when it dips",
+            "language": "en",
+        },
+    )
+    assert stream.status_code == 200
+
+    hydrated = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+    assert hydrated.status_code == 200
+    assert len(hydrated.json()["items"]) > 0
+
+    deleted = client.delete(f"/api/v1/conversations/{conversation['id']}")
+    assert deleted.status_code == 200
+
+    response = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+
+
 def test_backtest_rejects_mixed_asset_symbols_with_problem_details() -> None:
     client = _client()
 
@@ -395,17 +432,194 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
         run["metrics"]["aggregate"]["performance"]["total_return_pct"], float
     )
     assert run["conversation_result_card"]["assumptions"] == [
-        "Universe: TSLA.",
-        "Simulation uses long-only preset.",
-        "Starting capital: $1,000.",
-        "Allocation: equal weight.",
-        "No slippage or fees included.",
-        "Benchmark: SPY.",
+        "Long-only",
+        "Equal weight",
+        "No fees/slippage",
+        "Benchmark: SPY",
     ]
+    assert run["conversation_result_card"]["benchmark_note"] is None
 
     history = client.get("/api/v1/history")
     assert history.status_code == 200
     assert [item["type"] for item in history.json()["items"]] == ["run", "chat"]
+
+
+def test_history_excludes_archived_and_deleted_chats_by_default() -> None:
+    client = _client()
+
+    client.post("/api/v1/conversations", json={"title": "Active idea"})
+    archived = client.post(
+        "/api/v1/conversations", json={"title": "Archived idea"}
+    ).json()["conversation"]
+    deleted = client.post("/api/v1/conversations", json={"title": "Deleted idea"}).json()[
+        "conversation"
+    ]
+
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{archived['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/v1/conversations/{deleted['id']}").status_code == 200
+
+    response = client.get("/api/v1/history")
+
+    assert response.status_code == 200
+    chat_titles = [
+        item["title"] for item in response.json()["items"] if item["type"] == "chat"
+    ]
+    assert chat_titles == ["Active idea"]
+
+
+def test_deleted_conversation_restore_moves_chat_back_to_recents() -> None:
+    client = _client()
+
+    conversation = client.post(
+        "/api/v1/conversations",
+        json={"title": "Restorable idea"},
+    ).json()["conversation"]
+    memory_message(
+        conversation_id=conversation["id"],
+        role="user",
+        content="Can you test a DOGE buy-and-hold idea?",
+    )
+
+    assert client.delete(f"/api/v1/conversations/{conversation['id']}").status_code == 200
+    default_deleted_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history").json()["items"]
+        if item["type"] == "chat"
+    }
+    recently_deleted_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history?deleted=true").json()["items"]
+        if item["type"] == "chat"
+    }
+    assert conversation["id"] not in default_deleted_ids
+    assert conversation["id"] in recently_deleted_ids
+    assert (
+        client.get(f"/api/v1/conversations/{conversation['id']}/messages").status_code
+        == 404
+    )
+
+    restore = client.patch(
+        f"/api/v1/conversations/{conversation['id']}",
+        json={"deleted_at": None},
+    )
+
+    assert restore.status_code == 200
+    assert restore.json()["conversation"]["deleted_at"] is None
+    restored_default_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history").json()["items"]
+        if item["type"] == "chat"
+    }
+    restored_deleted_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history?deleted=true").json()["items"]
+        if item["type"] == "chat"
+    }
+    assert conversation["id"] in restored_default_ids
+    assert conversation["id"] not in restored_deleted_ids
+    assert (
+        client.get(f"/api/v1/conversations/{conversation['id']}/messages").status_code
+        == 200
+    )
+
+
+def test_history_can_return_archived_chats_without_deleted_chats() -> None:
+    client = _client()
+
+    active = client.post("/api/v1/conversations", json={"title": "Active idea"}).json()[
+        "conversation"
+    ]
+    archived = client.post(
+        "/api/v1/conversations", json={"title": "Archived idea"}
+    ).json()["conversation"]
+    deleted = client.post("/api/v1/conversations", json={"title": "Deleted idea"}).json()[
+        "conversation"
+    ]
+
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{archived['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{deleted['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/v1/conversations/{deleted['id']}").status_code == 200
+
+    response = client.get("/api/v1/history?archived=true")
+
+    assert response.status_code == 200
+    chat_titles = [
+        item["title"] for item in response.json()["items"] if item["type"] == "chat"
+    ]
+    assert chat_titles == ["Archived idea"]
+    assert active["id"] not in {item["id"] for item in response.json()["items"]}
+
+
+def test_history_filters_runs_by_parent_conversation_lifecycle() -> None:
+    client = _client()
+
+    active = client.post("/api/v1/conversations", json={"title": "Active idea"}).json()[
+        "conversation"
+    ]
+    archived = client.post(
+        "/api/v1/conversations", json={"title": "Archived idea"}
+    ).json()["conversation"]
+    deleted = client.post("/api/v1/conversations", json={"title": "Deleted idea"}).json()[
+        "conversation"
+    ]
+
+    for symbol, conversation in (
+        ("AAPL", active),
+        ("TSLA", archived),
+        ("MSFT", deleted),
+    ):
+        response = client.post(
+            "/api/v1/backtests/run",
+            headers={"Idempotency-Key": f"{symbol.lower()}-history-lifecycle"},
+            json={
+                "conversation_id": conversation["id"],
+                "template": "rsi_mean_reversion",
+                "asset_class": "equity",
+                "symbols": [symbol],
+            },
+        )
+        assert response.status_code == 200
+
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{archived['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/v1/conversations/{deleted['id']}").status_code == 200
+
+    default_history = client.get("/api/v1/history").json()["items"]
+    archived_history = client.get("/api/v1/history?archived=true").json()["items"]
+    deleted_history = client.get("/api/v1/history?deleted=true").json()["items"]
+
+    assert {
+        item["conversation_id"] for item in default_history if item["type"] == "run"
+    } == {active["id"]}
+    assert {
+        item["conversation_id"] for item in archived_history if item["type"] == "run"
+    } == {archived["id"]}
+    assert {
+        item["conversation_id"] for item in deleted_history if item["type"] == "run"
+    } == {deleted["id"]}
 
 
 def test_execution_realism_payload_is_ignored_when_feature_flag_off(
@@ -477,7 +691,7 @@ def test_backtest_rejects_unsupported_parameters_payload() -> None:
     assert response.json()["code"] == "unsupported_parameters"
 
 
-def test_backtest_rejects_lookback_over_three_years() -> None:
+def test_backtest_allows_equity_lookback_beyond_three_years() -> None:
     client = _client()
     response = client.post(
         "/api/v1/backtests/run",
@@ -489,8 +703,24 @@ def test_backtest_rejects_lookback_over_three_years() -> None:
             "end_date": "2024-01-10",
         },
     )
+    assert response.status_code == 200
+    assert response.json()["run"]["asset_class"] == "equity"
+
+
+def test_backtest_rejects_equity_start_before_provider_history() -> None:
+    client = _client()
+    response = client.post(
+        "/api/v1/backtests/run",
+        json={
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "start_date": "2015-12-31",
+            "end_date": "2016-01-15",
+        },
+    )
     assert response.status_code == 422
-    assert response.json()["code"] == "invalid_lookback_window"
+    assert response.json()["code"] == "provider_history_start_unavailable"
 
 
 def test_backtest_rejects_unknown_symbol() -> None:

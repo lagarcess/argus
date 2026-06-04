@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, AtSign } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { searchDiscovery, type DiscoveryItem } from "@/lib/argus-api";
+import { chatExploratorySuggestionsEnabled } from "@/lib/private-alpha-flags";
 import {
   composerMentions,
   deleteTokenBeforeOffset,
@@ -19,9 +20,22 @@ import type { ChatMention } from "./types";
 
 type ChatInputProps = {
   onSend: (text: string, mentions?: ChatMention[]) => void;
+  disabled?: boolean;
+  placeholder?: string;
 };
 
-export default function ChatInput({ onSend }: ChatInputProps) {
+export type DiscoverySection = {
+  label: string;
+  items: DiscoveryItem[];
+};
+
+const EMPTY_CHAT_PROMPTS: string[] = [];
+
+export default function ChatInput({
+  onSend,
+  disabled = false,
+  placeholder,
+}: ChatInputProps) {
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
   const [composerHasContent, setComposerHasContent] = useState(false);
@@ -39,10 +53,16 @@ export default function ChatInput({ onSend }: ChatInputProps) {
   const activeMentionOffsetRef = useRef<number | null>(null);
   const composerIsEmpty = !composerHasContent;
 
-  const prompts = useMemo(() => {
+  const localizedPrompts = useMemo(() => {
     const p = t("chat.placeholder_prompts", { returnObjects: true });
     return Array.isArray(p) ? p : [];
   }, [t]);
+  const prompts = chatExploratorySuggestionsEnabled ? localizedPrompts : EMPTY_CHAT_PROMPTS;
+  const inputPlaceholder = placeholder ?? t("chat.input_placeholder");
+  const discoverySections = discoverySectionsForDisplay(
+    discoveryItems,
+    discoveryQuery,
+  );
 
   useEffect(() => {
     setIsMounted(true);
@@ -118,11 +138,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
         searchDiscovery("indicators", query, 5).catch(() => ({ items: [] })),
       ]).then(([assets, indicators]) => {
         if (cancelled) return;
-        setDiscoveryItems(
-          [...assets.items, ...indicators.items]
-            .sort((a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query))
-            .slice(0, 8),
-        );
+        setDiscoveryItems(mergeDiscoveryItems(assets.items, indicators.items, query, 8));
       });
     }, 180);
 
@@ -164,6 +180,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (disabled) return;
     const current = readCurrentSegments();
     const message = serializeComposerSegments(current);
     if (message) {
@@ -237,34 +254,46 @@ export default function ChatInput({ onSend }: ChatInputProps) {
       {isDiscoveryOpen && (
         <div className="absolute bottom-full left-0 z-30 mb-2 w-full overflow-hidden rounded-[20px] border border-black/10 bg-white dark:border-white/10 dark:bg-[#1f2227]">
           <div className="border-b border-black/5 px-4 py-2 text-[12px] font-medium text-black/45 dark:border-white/5 dark:text-white/45">
-            Search assets and indicators
+            {discoveryQuery.trim()
+              ? t("chat.discovery.searching", "Search results")
+              : t("chat.discovery.prompt", "Mention an asset or indicator")}
           </div>
-          {discoveryItems.length > 0 ? (
+          {discoverySections.length > 0 ? (
             <div className="max-h-64 overflow-y-auto py-1">
-              {discoveryItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => insertDiscoveryItem(item)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-[14px] font-medium text-black dark:text-white">
-                      {item.label}
-                    </span>
-                    <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
-                      {displayDiscoveryDescription(item)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
-                    {item.type}
-                  </span>
-                </button>
+              {discoverySections.map((section) => (
+                <div key={section.label}>
+                  <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/35 dark:text-white/35">
+                    {t(discoverySectionLabelKey(section.label), section.label)}
+                  </div>
+                  {section.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => insertDiscoveryItem(item)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-black/5 dark:hover:bg-white/5"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[14px] font-medium text-black dark:text-white">
+                          {item.label}
+                        </span>
+                        <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
+                          {displayDiscoveryDescription(item)}
+                        </span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
+                        {discoveryBadgeLabel(item)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           ) : (
             <div className="px-4 py-4 text-[14px] text-black/50 dark:text-white/50">
-              Type after @ to search supported assets and indicators.
+              {t(
+                "chat.discovery.empty",
+                "Type after @ to search supported assets and indicators.",
+              )}
             </div>
           )}
         </div>
@@ -273,7 +302,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
       <button
         type="button"
         onClick={openDiscovery}
-        className="absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
+        className="absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
         aria-label="Find asset or indicator"
       >
         <AtSign className="h-4 w-4" />
@@ -284,8 +313,9 @@ export default function ChatInput({ onSend }: ChatInputProps) {
           ref={editorRef}
           data-testid="chat-input"
           role="textbox"
-          aria-label={t("chat.input_placeholder")}
-          contentEditable
+          aria-disabled={disabled}
+          aria-label={inputPlaceholder}
+          contentEditable={!disabled}
           suppressContentEditableWarning
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -321,7 +351,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
 
         {isMounted && animState === "idle" && composerIsEmpty && !isFocused && (
           <div className="pointer-events-none absolute left-14 top-2 text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500">
-            {t("chat.input_placeholder")}
+            {inputPlaceholder}
           </div>
         )}
 
@@ -342,7 +372,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
         <button
           type="submit"
           data-testid="chat-send"
-          disabled={composerIsEmpty}
+          disabled={composerIsEmpty || disabled}
           className="rounded-full bg-black p-2.5 text-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
         >
           <ArrowUp className="h-5 w-5 stroke-[2.5]" />
@@ -363,6 +393,92 @@ function rankDiscoveryItem(item: DiscoveryItem, query: string) {
   if (prefix && item.type === "asset") return 2;
   if (prefix) return 3;
   return item.type === "asset" ? 4 : 5;
+}
+
+function mergeDiscoveryItems(
+  assets: DiscoveryItem[],
+  indicators: DiscoveryItem[],
+  query: string,
+  limit: number,
+) {
+  const sortedAssets = [...assets].sort(
+    (a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query),
+  );
+  const sortedIndicators = [...indicators].sort(
+    (a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query),
+  );
+  const merged: DiscoveryItem[] = [];
+  const seen = new Set<string>();
+
+  const push = (item: DiscoveryItem | undefined) => {
+    if (!item || seen.has(item.id) || merged.length >= limit) return;
+    seen.add(item.id);
+    merged.push(item);
+  };
+
+  for (
+    let index = 0;
+    merged.length < limit &&
+    (index < sortedAssets.length || index < sortedIndicators.length);
+    index++
+  ) {
+    const indicator = sortedIndicators[index];
+    const asset = sortedAssets[index];
+    if (indicator && rankDiscoveryItem(indicator, query) <= 1) {
+      push(indicator);
+      push(asset);
+    } else {
+      push(asset);
+      push(indicator);
+    }
+  }
+
+  return merged;
+}
+
+export function discoverySectionsForDisplay(
+  items: DiscoveryItem[],
+  query: string,
+): DiscoverySection[] {
+  const visibleItems = items.filter((item) => item.id && item.label);
+  if (visibleItems.length === 0) return [];
+  if (query.trim()) {
+    return [{ label: "Search results", items: visibleItems }];
+  }
+
+  const sections: DiscoverySection[] = [
+    {
+      label: "Popular assets",
+      items: visibleItems.filter((item) => item.type === "asset"),
+    },
+    {
+      label: "Runnable indicators",
+      items: visibleItems.filter(
+        (item) => item.type === "indicator" && item.support_status === "supported",
+      ),
+    },
+    {
+      label: "Draft-only indicators",
+      items: visibleItems.filter(
+        (item) => item.type === "indicator" && item.support_status !== "supported",
+      ),
+    },
+  ];
+  return sections.filter((section) => section.items.length > 0);
+}
+
+function discoverySectionLabelKey(label: string) {
+  if (label === "Popular assets") return "chat.discovery.sections.assets";
+  if (label === "Runnable indicators") return "chat.discovery.sections.indicators";
+  if (label === "Draft-only indicators") return "chat.discovery.sections.draft";
+  return "chat.discovery.sections.results";
+}
+
+function discoveryBadgeLabel(item: DiscoveryItem) {
+  if (item.type === "asset") return "asset";
+  if (item.support_status === "supported") return "runnable";
+  if (item.support_status === "unavailable") return "unavailable";
+  return "draft";
 }
 
 function writeSegmentsToEditor(root: HTMLDivElement | null, segments: ComposerSegment[]) {
@@ -620,6 +736,16 @@ const DEFAULT_DISCOVERY_ITEMS: DiscoveryItem[] = [
     support_status: "supported",
   },
   {
+    id: "indicator:sma",
+    type: "indicator",
+    label: "SMA",
+    symbol: "sma",
+    description: "Simple moving average",
+    insert_text: "SMA",
+    provider: "pandas-ta-classic",
+    support_status: "supported",
+  },
+  {
     id: "indicator:rsi",
     type: "indicator",
     label: "RSI",
@@ -628,5 +754,25 @@ const DEFAULT_DISCOVERY_ITEMS: DiscoveryItem[] = [
     insert_text: "RSI",
     provider: "pandas-ta-classic",
     support_status: "supported",
+  },
+  {
+    id: "indicator:macd",
+    type: "indicator",
+    label: "MACD",
+    symbol: "macd",
+    description: "Moving Average Convergence Divergence",
+    insert_text: "MACD",
+    provider: "pandas-ta-classic",
+    support_status: "supported",
+  },
+  {
+    id: "indicator:atr",
+    type: "indicator",
+    label: "ATR",
+    symbol: "atr",
+    description: "Average true range",
+    insert_text: "ATR",
+    provider: "pandas-ta-classic",
+    support_status: "draft_only",
   },
 ];

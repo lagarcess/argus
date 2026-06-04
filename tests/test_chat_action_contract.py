@@ -55,6 +55,54 @@ def _user_id(client: TestClient) -> str:
     return str(response.json()["user"]["id"])
 
 
+def test_artifact_metadata_fields_are_backward_compatible() -> None:
+    from argus.agent_runtime.state.models import ArtifactReference, TaskSnapshot
+
+    reference = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id="confirm-1",
+        artifact_status="active",
+        metadata={"confirmation_id": "confirm-1"},
+    )
+    snapshot = TaskSnapshot(
+        active_confirmation_reference=reference,
+        artifact_references=[reference],
+    )
+
+    assert snapshot.active_confirmation_reference.artifact_id == "confirm-1"
+    assert snapshot.artifact_references[0].artifact_status == "active"
+
+
+def test_confirmation_card_is_not_ready_without_validated_launch_payload() -> None:
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    card = runtime_confirmation_card(
+        {
+            "stage_outcome": "await_approval",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "signal_strategy",
+                    "asset_universe": ["SPY"],
+                    "asset_class": "equity",
+                    "date_range": "last month",
+                    "entry_logic": "starts rising",
+                },
+                "optional_parameters": {},
+            },
+        },
+        confirmation_id="confirm-1",
+    )
+
+    assert card is not None
+    assert card["statusLabel"] == "Needs change"
+    assert [action["type"] for action in card["actions"]] == [
+        "change_dates",
+        "change_asset",
+        "adjust_assumptions",
+        "cancel_confirmation",
+    ]
+
+
 def test_change_asset_action_uses_structured_runtime_context() -> None:
     client = _client()
     conversation = _conversation(client)

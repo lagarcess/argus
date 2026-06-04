@@ -213,6 +213,23 @@ def list_messages(
     cursor: str | None = Query(None),
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedMessages:
+    conversation = (
+        api_state.supabase_gateway.get_conversation(
+            user_id=user.id,
+            conversation_id=conversation_id,
+        )
+        if api_state.supabase_gateway
+        else api_state.store.conversations.get(conversation_id)
+    )
+    if not conversation or conversation.deleted_at is not None:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="Conversation not found.",
+        )
+
     items: list[Message] | None = None
     if api_state.supabase_gateway is not None:
         try:
@@ -221,6 +238,12 @@ def list_messages(
                 conversation_id=conversation_id,
                 limit=None,
             )
+            if (
+                dev_memory_fallback_enabled()
+                and conversation_id in api_state.store.conversations
+                and api_state.store.messages.get(conversation_id)
+            ):
+                items = api_state.store.messages.get(conversation_id, [])
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -232,6 +255,14 @@ def list_messages(
 
     if items is None:
         conversation = api_state.store.conversations.get(conversation_id)
+        if conversation is not None and conversation.deleted_at is not None:
+            raise problem(
+                request,
+                status_code=404,
+                code="not_found",
+                title="Not Found",
+                detail="Conversation not found.",
+            )
         if not conversation:
             return PaginatedMessages(items=[])
         items = api_state.store.messages.get(conversation_id, [])

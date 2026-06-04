@@ -1,14 +1,21 @@
 import { getSupabaseClient } from "./supabase-client";
+import type { AssetClass } from "./argus-types";
 import type {
   ChatActionOption,
   ChatMention,
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
 import { normalizeEnabledLanguage } from "./language-features";
+import {
+  displayResultActionLabel,
+  displayResultBenchmarkNote,
+  displayResultMetricLabel,
+  resultMetricDisplayOrder,
+} from "./result-card-display";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
-export type AssetClass = "equity" | "crypto" | "currency_pair";
+export type { AssetClass } from "./argus-types";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
@@ -57,7 +64,7 @@ export type ConversationResultCard = {
   };
   status_label: string;
   rows: ApiMetricRow[];
-  benchmark_note?: string;
+  benchmark_note?: string | null;
   assumptions: string[];
   actions: ChatActionOption[];
   chart?: ResultChartPayload | null;
@@ -110,6 +117,17 @@ export type ApiUser = {
     language_confirmed: boolean;
     primary_goal: PrimaryGoal | null;
   };
+};
+
+type AuthSessionPayload = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+};
+
+type AuthResponsePayload = {
+  session?: AuthSessionPayload | null;
+  user?: Record<string, unknown> | null;
 };
 
 /** Backend message shape (distinct from the frontend chat Message type) */
@@ -194,7 +212,7 @@ export type ChatStreamEvent =
   | { event: "final"; data: ChatFinalPayload }
   | { event: "confirmation"; data: { confirmation: StrategyConfirmationPayload } }
   | { event: "result"; data: { run: BacktestRun } }
-  | { event: "error"; data: { code?: string; detail: string } }
+  | { event: "error"; data: { code?: string; detail: string; message_id?: string } }
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
@@ -202,6 +220,7 @@ export type ChatFinalPayload = {
   assistant_response?: string | null;
   assistant_prompt?: string | null;
   confirmation?: StrategyConfirmationPayload | null;
+  confirmation_cancelled?: { confirmation_id?: string | null } | null;
   confirmation_payload?: Record<string, unknown> | null;
   pending_strategy?: {
     strategy: Record<string, unknown>;
@@ -262,26 +281,44 @@ export type ApiLanguage = "en" | "es-419";
 
 export function resultCardFromConversationCard(
   card: ConversationResultCard,
-  run?: Pick<BacktestRun, "id" | "strategy_id">,
+  run?: Pick<BacktestRun, "id" | "strategy_id"> &
+    Partial<Pick<BacktestRun, "benchmark_symbol" | "config_snapshot">>,
 ) {
+  const rows = [...card.rows].sort(
+    (a, b) => resultMetricDisplayOrder(a) - resultMetricDisplayOrder(b),
+  );
+
   return {
     strategyName: card.title,
     strategyLabel: card.strategy_label,
     symbols: card.symbols,
     period: card.date_range.display,
     statusLabel: card.status_label,
-    metrics: card.rows.map((row) => ({ label: row.label, value: row.value })),
-    benchmarkNote: card.benchmark_note,
+    metrics: rows.map((row) => ({
+      label: displayResultMetricLabel(row, run?.benchmark_symbol),
+      value: row.value,
+    })),
+    benchmarkNote: displayResultBenchmarkNote(card.benchmark_note),
     assumptions: card.assumptions,
+    configSnapshot: run?.config_snapshot,
     runId: run?.id,
     strategyId: run?.strategy_id ?? null,
-    actions: card.actions,
+    actions: card.actions.map((action) => ({
+      ...action,
+      label: displayResultActionLabel(action),
+    })),
     chart: card.chart ?? null,
   };
 }
 
 export function resultCardFromRun(run: BacktestRun) {
-  return resultCardFromConversationCard(run.conversation_result_card, run);
+  return {
+    ...resultCardFromConversationCard(run.conversation_result_card, run),
+    symbols: run.symbols,
+    template: String(run.config_snapshot?.template ?? ""),
+    assetClass: run.asset_class,
+    configSnapshot: run.config_snapshot,
+  };
 }
 
 export function normalizeApiLanguage(language?: string | null): ApiLanguage {
@@ -336,6 +373,7 @@ async function apiFetch<T>(
   console.log(`[argus-api] Fetching ${API_BASE}${path}`, options);
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...authHeaders, ...(options?.headers || {}) },
+    credentials: "include",
     ...options,
   });
   if (!response.ok) {
@@ -354,6 +392,50 @@ async function apiFetch<T>(
     throw error;
   }
   return response.json() as Promise<T>;
+}
+
+async function unauthenticatedApiFetch<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers || {}),
+    },
+    credentials: "include",
+    ...options,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const detail = (body as { detail?: unknown }).detail;
+    const message =
+      typeof detail === "object" && detail !== null && "detail" in detail
+        ? String((detail as { detail?: unknown }).detail ?? "")
+        : typeof detail === "string"
+          ? detail
+          : `API error ${response.status}`;
+    const error = new Error(message) as Error & { status: number; code: string };
+    error.status = response.status;
+    error.code = String((body as Record<string, unknown>).code ?? "unknown");
+    throw error;
+  }
+  return response.json() as Promise<T>;
+}
+
+async function persistBrowserSession(payload: AuthResponsePayload) {
+  const session = payload.session;
+  if (!session?.access_token || !session.refresh_token) {
+    return;
+  }
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return;
+  }
+  await supabase.auth.setSession({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+  });
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -383,10 +465,42 @@ export async function patchMe(patch: ProfilePatch) {
 }
 
 export async function getStarterPrompts() {
-  return apiFetch<string[]>("/onboarding/starter-prompts");
+  const response = await apiFetch<{ prompts: string[] }>("/chat/starter-prompts");
+  return response.prompts;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export async function signupWithEmail(payload: {
+  email: string;
+  password: string;
+  display_name?: string | null;
+  username?: string | null;
+}) {
+  const response = await unauthenticatedApiFetch<AuthResponsePayload>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  await persistBrowserSession(response);
+  return response;
+}
+
+export async function loginWithEmail(payload: { email: string; password: string }) {
+  const response = await unauthenticatedApiFetch<AuthResponsePayload>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  await persistBrowserSession(response);
+  return response;
+}
+
+export async function logoutFromApi() {
+  try {
+    return await apiFetch<{ success: boolean }>("/auth/logout", { method: "POST" });
+  } finally {
+    await getSupabaseClient()?.auth.signOut().catch(() => null);
+  }
+}
 
 export async function createConversation(language?: string | null) {
   const payload: { title: null; language?: ApiLanguage } = { title: null };
@@ -444,10 +558,11 @@ export async function deleteConversation(conversationId: string) {
 
 // ─── History ──────────────────────────────────────────────────────────────────
 
-export async function listHistory(params: { limit?: number; cursor?: string; deleted?: boolean } = {}) {
-  const { limit = 20, cursor, deleted } = params;
+export async function listHistory(params: { limit?: number; cursor?: string; archived?: boolean; deleted?: boolean } = {}) {
+  const { limit = 20, cursor, archived, deleted } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
+  if (archived !== undefined) searchParams.append("archived", String(archived));
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
 
   return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(
@@ -581,6 +696,10 @@ export async function runBacktest(payload: {
   });
 }
 
+export async function getBacktestRun(runId: string) {
+  return apiFetch<{ run: BacktestRun }>(`/backtests/${runId}`);
+}
+
 // ─── Chat stream ──────────────────────────────────────────────────────────────
 
 export async function streamChatMessage(
@@ -705,6 +824,8 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
       data: {
         code: typeof payload.code === "string" ? payload.code : undefined,
         detail: String(payload.message ?? payload.detail ?? "Chat stream failed"),
+        message_id:
+          typeof payload.message_id === "string" ? payload.message_id : undefined,
       },
     };
   }

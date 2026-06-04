@@ -4,10 +4,29 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from argus.api import state as api_state
-from argus.api.dependencies import auth_response, current_user, problem
+from argus.api.dependencies import (
+    auth_response,
+    current_user,
+    private_alpha_access_problem,
+    problem,
+)
 from argus.api.schemas import LoginRequest, SignupRequest, User
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
+
+
+def _require_private_alpha_access(request: Request, email: str) -> None:
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for authentication.",
+        )
+    if api_state.supabase_gateway.private_alpha_email_allowed(email):
+        return
+    raise private_alpha_access_problem(request)
 
 
 @router.get("/auth/session")
@@ -25,6 +44,7 @@ def signup(request: Request, body: SignupRequest) -> JSONResponse:
             title="Internal Error",
             detail="Supabase persistence is required for authentication.",
         )
+    _require_private_alpha_access(request, body.email)
     try:
         result = api_state.supabase_gateway.signup(
             email=body.email,
@@ -53,6 +73,7 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             title="Internal Error",
             detail="Supabase persistence is required for authentication.",
         )
+    _require_private_alpha_access(request, body.email)
     try:
         result = api_state.supabase_gateway.login(
             email=body.email, password=body.password

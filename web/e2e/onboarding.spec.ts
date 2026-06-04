@@ -6,7 +6,13 @@ type OnboardingStage =
   | "ready"
   | "completed";
 
-async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<void> {
+type MockChatBoot = {
+  profilePatches: Array<{ onboarding?: Record<string, unknown> }>;
+};
+
+async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<MockChatBoot> {
+  const profilePatches: MockChatBoot["profilePatches"] = [];
+
   await page.route("**/api/v1/conversations", async (route) => {
     if (route.request().method() === "POST") {
       return route.fulfill({
@@ -37,8 +43,9 @@ async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<void> {
     const method = route.request().method();
     if (method === "PATCH") {
       const body = route.request().postDataJSON() as {
-        onboarding?: { primary_goal?: string | null };
+        onboarding?: { completed?: boolean; primary_goal?: string | null };
       };
+      profilePatches.push(body as MockChatBoot["profilePatches"][number]);
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -48,7 +55,7 @@ async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<void> {
             language: "en",
             locale: "en-US",
             onboarding: {
-              completed: false,
+              completed: body.onboarding?.completed ?? true,
               stage: "ready",
               language_confirmed: true,
               primary_goal: body.onboarding?.primary_goal ?? "surprise_me",
@@ -129,31 +136,36 @@ async function mockChatBoot(page: Page, stage: OnboardingStage): Promise<void> {
       ].join("\n"),
     }),
   );
+
+  return { profilePatches };
 }
 
-test("shows onboarding goal cards for first-time user", async ({ page }) => {
-  await mockChatBoot(page, "language_selection");
+test("skips onboarding friction for first-time private-alpha users", async ({ page }) => {
+  const boot = await mockChatBoot(page, "language_selection");
   await page.goto("/chat", { waitUntil: "networkidle" });
 
-  await expect(page.getByTestId("onboarding-goal-cards")).toBeVisible({
+  await expect(page.getByTestId("chat-input")).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByTestId("onboarding-goal-learn_basics")).toBeVisible();
-  await expect(page.getByTestId("onboarding-goal-test_stock_idea")).toBeVisible();
-  await expect(page.getByTestId("onboarding-skip")).toBeVisible();
+  await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
+  await expect(page.getByTestId("onboarding-skip")).toHaveCount(0);
+  await expect
+    .poll(() => boot.profilePatches.length, { timeout: 15_000 })
+    .toBeGreaterThan(0);
+  expect(boot.profilePatches.at(-1)?.onboarding).toMatchObject({
+    completed: true,
+    primary_goal: "surprise_me",
+    stage: "ready",
+  });
 });
 
-test("submits onboarding skip and hides cards", async ({ page }) => {
+test("primary-goal onboarding records enter chat without a skip step", async ({ page }) => {
   await mockChatBoot(page, "primary_goal_selection");
   await page.goto("/chat", { waitUntil: "networkidle" });
 
-  await expect(page.getByTestId("onboarding-skip")).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId("onboarding-skip").click();
-
-  await expect(page.getByTestId("onboarding-goal-cards")).toBeHidden();
-  await expect(
-    page.getByText("Great. I'll guide you with a starter idea to begin."),
-  ).toBeVisible();
+  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("onboarding-skip")).toHaveCount(0);
+  await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
 });
 
 test("does not show onboarding cards for completed users", async ({ page }) => {
@@ -163,19 +175,35 @@ test("does not show onboarding cards for completed users", async ({ page }) => {
   await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
 });
 
-test("shows global sidebar search results in chat view", async ({ page }) => {
+test("ready onboarding records enter chat even if legacy completed flag is false", async ({ page }) => {
+  await mockChatBoot(page, "ready");
+  await page.goto("/chat", { waitUntil: "networkidle" });
+
+  await expect(page.getByText("Choose your language")).toHaveCount(0);
+  await expect(page.getByTestId("onboarding-goal-cards")).toHaveCount(0);
+});
+
+test("hides global sidebar search under private-alpha defaults", async ({ page }) => {
   await mockChatBoot(page, "completed");
   await page.goto("/chat", { waitUntil: "networkidle" });
 
-  await page.getByPlaceholder("Search").fill("tesla");
-  await expect(page.getByText("Tesla strategy")).toBeVisible();
+  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByPlaceholder("Search")).toHaveCount(0);
+  await expect(page.getByText("Tesla strategy")).toHaveCount(0);
 });
 
-test("login page honors spanish i18n preference", async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem("i18nextLng", "es-419");
-  });
-  await page.goto("/login", { waitUntil: "networkidle" });
+test("signup and login expose persisted account entry", async ({ page }) => {
+  await page.goto("/?auth=signup", { waitUntil: "networkidle" });
 
-  await expect(page.getByText("Inicia sesion para continuar")).toBeVisible();
+  await expect(page.getByPlaceholder("Name")).toBeVisible();
+  await expect(page.getByPlaceholder("Email address")).toBeVisible();
+  await expect(page.getByPlaceholder("Password")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign up" })).toBeVisible();
+  await expect(page.getByText(/guest/i)).toHaveCount(0);
+
+  await page.goto("/?auth=login", { waitUntil: "networkidle" });
+
+  await expect(page.getByPlaceholder("Email address")).toBeVisible();
+  await expect(page.getByPlaceholder("Password")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
 });

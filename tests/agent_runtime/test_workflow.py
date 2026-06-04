@@ -1,13 +1,35 @@
 from __future__ import annotations
 
 import pytest
-from argus.agent_runtime.graph.workflow import build_workflow
-from argus.agent_runtime.runtime import run_agent_turn, stream_agent_turn_events
+from argus.agent_runtime.graph.workflow import (
+    WorkflowStageOutcome,
+    _apply_stage_result,
+    _build_task_snapshot,
+    build_workflow,
+)
+from argus.agent_runtime.runtime import (
+    _compose_runtime_response,
+    _public_result,
+    run_agent_turn,
+    stream_agent_turn_events,
+)
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
+    StageResult,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot, UserState
+from argus.agent_runtime.stages.next_step import next_step_stage
+from argus.agent_runtime.state.models import (
+    ArtifactReference,
+    FinalResponsePayload,
+    ResponseIntent,
+    RunState,
+    SimplificationOption,
+    StrategySummary,
+    TaskSnapshot,
+    UnsupportedConstraint,
+    UserState,
+)
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -15,6 +37,30 @@ class ResolvedAssetStub:
     def __init__(self, canonical_symbol: str, asset_class: str) -> None:
         self.canonical_symbol = canonical_symbol
         self.asset_class = asset_class
+
+
+def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
+    prior_failed = ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id="failed-run-1",
+        artifact_status="failed",
+        metadata={"retryable": True},
+    )
+    confirmation = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id="confirm-1",
+        artifact_status="active",
+        metadata={},
+    )
+
+    snapshot = _build_task_snapshot(
+        run_state=RunState(current_user_message="review this"),
+        stage_outcome=WorkflowStageOutcome.AWAIT_APPROVAL,
+        prior_task_snapshot=TaskSnapshot(latest_failed_action_reference=prior_failed),
+        artifact_references=[confirmation],
+    )
+
+    assert snapshot.latest_failed_action_reference is None
 
 
 class RsiConfirmationInterpreter:
@@ -72,6 +118,54 @@ class AssetAnswerInterpreter:
         )
 
 
+class NoisyAssetAnswerInterpreter:
+    def __init__(self, mapped_symbol: str) -> None:
+        self.mapped_symbol = mapped_symbol
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="continue",
+            requires_clarification=True,
+            user_goal_summary="User supplied a replacement asset, but prose was noisy.",
+            assistant_response="The answer needs asset clarification.",
+            candidate_strategy_draft=StrategySummary(asset_universe=[self.mapped_symbol]),
+            confidence=0.72,
+            semantic_turn_act="educational_question",
+        )
+
+
+class AssetAnswerThenApprovalInterpreter:
+    def __init__(self, mapped_symbol: str) -> None:
+        self.mapped_symbol = mapped_symbol
+        self.requests: list[InterpretationRequest] = []
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.requests.append(request)
+        if len(self.requests) == 1:
+            return StructuredInterpretation(
+                intent="conversation_followup",
+                task_relation="continue",
+                requires_clarification=True,
+                user_goal_summary="User supplied a replacement asset.",
+                assistant_response="The answer needs asset clarification.",
+                candidate_strategy_draft=StrategySummary(
+                    asset_universe=[self.mapped_symbol]
+                ),
+                confidence=0.72,
+                semantic_turn_act="educational_question",
+            )
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="continue",
+            requires_clarification=False,
+            user_goal_summary="User approved the visible confirmation.",
+            candidate_strategy_draft=StrategySummary(),
+            confidence=0.96,
+            semantic_turn_act="approval",
+        )
+
+
 class ConversationalInterpreter:
     async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
         return StructuredInterpretation(
@@ -82,6 +176,44 @@ class ConversationalInterpreter:
             assistant_response="I help turn investing ideas into supported backtests.",
             confidence=0.94,
             semantic_turn_act="educational_question",
+        )
+
+
+class ShortWindowCrossoverInterpreter:
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="User wants a short-window moving-average crossover.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="signal_strategy",
+                strategy_thesis="Test SPY on a 20/50 SMA crossover.",
+                asset_universe=["SPY"],
+                asset_class="equity",
+                date_range="past month",
+                entry_logic="20-day SMA crosses above 50-day SMA",
+                exit_logic="20-day SMA crosses below 50-day SMA",
+                entry_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bullish",
+                },
+                exit_rule={
+                    "type": "moving_average_crossover",
+                    "fast_indicator": "sma",
+                    "fast_period": 20,
+                    "slow_indicator": "sma",
+                    "slow_period": 50,
+                    "direction": "bearish",
+                },
+            ),
+            confidence=0.94,
+            semantic_turn_act="new_idea",
         )
 
 
@@ -119,6 +251,296 @@ class ApprovalInterpreter:
         )
 
 
+class IndicatorDateRepairInterpreter:
+    def __init__(self) -> None:
+        self.turns = 0
+
+    async def ainvoke(self, request: InterpretationRequest) -> StructuredInterpretation:
+        self.turns += 1
+        if self.turns == 1:
+            return StructuredInterpretation(
+                intent="backtest_execution",
+                task_relation="new_task",
+                requires_clarification=False,
+                user_goal_summary="User wants a TSLA RSI threshold test.",
+                candidate_strategy_draft=StrategySummary(
+                    raw_user_phrasing=request.current_user_message,
+                    strategy_type="indicator_threshold",
+                    strategy_thesis="Test TSLA with RSI threshold entries.",
+                    asset_universe=["TSLA"],
+                    asset_class="equity",
+                    date_range={"start": "2015-01-01", "end": "2024-12-31"},
+                    entry_logic="Buy when RSI(14) drops to 30 or below",
+                    exit_logic="Sell when RSI(14) rises to 55 or above",
+                    extra_parameters={
+                        "raw_strategy_type": "rsi_mean_reversion",
+                        "indicator": "rsi",
+                        "indicator_parameters": {
+                            "indicator": "rsi",
+                            "indicator_period": 14,
+                            "entry_threshold": 30,
+                            "exit_threshold": 55,
+                        },
+                    },
+                ),
+                confidence=0.94,
+                semantic_turn_act="new_idea",
+            )
+        return StructuredInterpretation(
+            intent="backtest_execution",
+            task_relation="refine",
+            requires_clarification=False,
+            user_goal_summary="User supplied the shorter supported date range.",
+            candidate_strategy_draft=StrategySummary(
+                raw_user_phrasing=request.current_user_message,
+                strategy_type="indicator_threshold",
+                date_range={"start": "2021-01-01", "end": "2024-01-01"},
+                extra_parameters={"raw_strategy_type": "indicator_threshold"},
+                refinement_of="prior strategy card",
+            ),
+            confidence=0.94,
+            semantic_turn_act="answer_pending_need",
+        )
+
+
+def test_runtime_preserves_explicit_stage_prompt_over_composed_intent() -> None:
+    run_state = RunState.new(
+        current_user_message="use a 20-day SMA crossing above the 50-day SMA",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["period"],
+        requested_fields=["date_range"],
+        facts={"strategy": {"strategy_type": "signal_strategy"}},
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "That rule needs more historical bars than the selected window "
+                "can provide. Choose a longer date range, or use a shorter "
+                "indicator period so the backtest has enough data to evaluate "
+                "the signal."
+            ),
+        }
+    )
+
+    assert result["assistant_prompt"].startswith("That rule needs more historical bars")
+
+
+def test_next_step_preserves_completed_result_answer() -> None:
+    run_state = RunState.new(
+        current_user_message="",
+        recent_thread_history=[],
+    )
+    run_state.final_response_payload = FinalResponsePayload(
+        result={"total_return": 0.14},
+        summary="Completed run",
+    )
+    state = {
+        "run_state": run_state,
+        "user": UserState(user_id="u1"),
+        "stage_outcome": WorkflowStageOutcome.READY_TO_RESPOND,
+        "assistant_response": "Grounded result readout.",
+    }
+
+    updated = _apply_stage_result(state, next_step_stage(state=run_state))
+
+    assert updated["stage_outcome"] == WorkflowStageOutcome.END_RUN
+    assert updated["assistant_response"] == "Grounded result readout."
+    assert updated["next_actions"] == [
+        "refine_strategy",
+        "compare_benchmark",
+        "save_strategy",
+    ]
+
+
+def test_runtime_recovers_offline_clarifier_with_composed_intent() -> None:
+    run_state = RunState.new(
+        current_user_message="Test buying SPY when it starts rising.",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["period", "rule_definition"],
+        requested_fields=["date_range", "entry_logic"],
+        facts={
+            "strategy": {
+                "strategy_type": "signal_strategy",
+                "asset_universe": ["SPY"],
+            }
+        },
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "I could not generate the clarifying question right now. "
+                "Please try again."
+            ),
+        }
+    )
+
+    assert "try again" not in result["assistant_prompt"].lower()
+    assert "date window" in result["assistant_prompt"]
+    assert "specific testable rule" in result["assistant_prompt"]
+
+
+def test_runtime_preserves_successful_llm_rule_clarification() -> None:
+    run_state = RunState.new(
+        current_user_message="Test buying SPY when it starts rising.",
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["rule_definition"],
+        requested_fields=["entry_logic"],
+        facts={
+            "strategy": {
+                "strategy_type": "signal_strategy",
+                "asset_universe": ["SPY"],
+            }
+        },
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "Could you please define what starts rising means in terms of "
+                "price movement, indicators, or other measurable criteria?"
+            ),
+        }
+    )
+
+    assert result["assistant_prompt"].startswith("Could you please define")
+    assert result["assistant_prompt"].endswith("measurable criteria?")
+    assert result["assistant_response"] == result["assistant_prompt"]
+
+
+def test_runtime_preserves_specific_dca_execution_clarification() -> None:
+    run_state = RunState.new(
+        current_user_message=(
+            "I would like to invest in LYFT over 5 years feb 2020-feb 2025, "
+            "$200,000 of capital"
+        ),
+        recent_thread_history=[],
+    )
+    run_state.response_intent = ResponseIntent(
+        kind="clarification",
+        semantic_needs=["sizing_amount"],
+        requested_fields=["capital_amount"],
+        facts={
+            "strategy": {
+                "strategy_type": "dca_accumulation",
+                "asset_universe": ["LYFT"],
+                "asset_class": "equity",
+                "date_range": {"start": "2020-02-01", "end": "2025-02-28"},
+                "extra_parameters": {"initial_capital": 200000},
+            }
+        },
+    )
+
+    result = _compose_runtime_response(
+        {
+            "run_state": run_state,
+            "assistant_prompt": (
+                "I can test recurring buys for LYFT. How much should each "
+                "recurring purchase be, and how often should those buys happen?"
+            ),
+        }
+    )
+
+    prompt = result["assistant_prompt"]
+    assert "LYFT" in prompt
+    assert "recurring purchase" in prompt
+    assert "how often" in prompt.lower()
+    assert "one more detail" not in prompt.lower()
+
+
+def test_workflow_publishes_pending_response_intent_options_for_recovery() -> None:
+    strategy = StrategySummary(
+        strategy_type="dca_accumulation",
+        strategy_thesis="Quarterly recurring buys for MSFT.",
+        asset_universe=["MSFT"],
+        asset_class="equity",
+        date_range={"start": "2021-01-01", "end": "2023-12-31"},
+        capital_amount=750,
+        cadence="quarterly",
+        extra_parameters={
+            "recurring_contribution": 750,
+            "total_budget": 9000,
+            "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "total_capital": "cap",
+            },
+        },
+    )
+    constraint = UnsupportedConstraint(
+        category="unsupported_dca_starting_principal",
+        raw_value="$9,000 contribution cap",
+        explanation=(
+            "The DCA engine can run the recurring contribution but not the cap."
+        ),
+        simplification_options=[
+            SimplificationOption(
+                label="Run recurring buys only",
+                replacement_values={"ignore_initial_capital": True},
+            )
+        ],
+    )
+    response_intent = {
+        "kind": "unsupported_recovery",
+        "semantic_needs": ["simplification_choice"],
+        "facts": {"unsupported_constraints": [constraint.model_dump(mode="python")]},
+        "options": [
+            {
+                "label": "Run recurring buys only",
+                "replacement_values": {"ignore_initial_capital": True},
+            }
+        ],
+    }
+
+    updated = _apply_stage_result(
+        {
+            "run_state": RunState.new(
+                current_user_message=(
+                    "try buying $750 of MSFT quarterly from 2021 through 2023 "
+                    "with a $9,000 cap"
+                ),
+                recent_thread_history=[],
+            ),
+            "user": UserState(user_id="u1"),
+            "latest_task_snapshot": None,
+        },
+        StageResult(
+            outcome="needs_clarification",
+            stage_patch={
+                "candidate_strategy_draft": strategy.model_dump(mode="python"),
+                "optional_parameter_status": {
+                    "unsupported_constraints": [constraint.model_dump(mode="python")]
+                },
+                "response_intent": response_intent,
+            },
+        ),
+    )
+
+    metadata_intent = updated["selected_thread_metadata"]["response_intent"]
+    assert metadata_intent["kind"] == "unsupported_recovery"
+    assert metadata_intent["semantic_needs"] == ["simplification_choice"]
+    assert metadata_intent["options"][0]["replacement_values"] == {
+        "ignore_initial_capital": True
+    }
+
+    public = _public_result(updated)
+    assert public["pending_strategy"]["response_intent"]["options"][0][
+        "replacement_values"
+    ] == {"ignore_initial_capital": True}
+
+
 @pytest.mark.asyncio
 async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> None:
     from argus.agent_runtime import resolution as resolution_module
@@ -148,7 +570,85 @@ async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> Non
     assert result["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
     assert result["pending_strategy"]["strategy"]["asset_universe"] == ["TSLA"]
     assert result["pending_strategy"]["missing_required_fields"] == []
-    assert "I read this as" in result["assistant_prompt"]
+    assert result.get("assistant_prompt") is None
+    assert "RSI" in result["confirmation_payload"]["strategy"]["entry_logic"]
+
+
+@pytest.mark.asyncio
+async def test_workflow_preserves_confirmation_validation_prompt(monkeypatch) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=ShortWindowCrossoverInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        thread_id="thread-short-window-crossover",
+        message="Use a 20-day SMA crossing above the 50-day SMA over the last month.",
+    )
+
+    assert result["stage_outcome"] == "await_user_reply"
+    assert "enough bars" in result["assistant_prompt"]
+    assert "longer date range" in result["assistant_prompt"]
+    assert result["pending_strategy"]["requested_field"] == "date_range"
+    assert "confirmation_payload" not in result
+
+
+@pytest.mark.asyncio
+async def test_workflow_preserves_indicator_parameters_when_user_repairs_date_range(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=IndicatorDateRepairInterpreter(),
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+    thread_id = "thread-indicator-date-repair"
+
+    first = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="test tsla rsi below 30 and sell above 55 since 2015",
+    )
+
+    assert first["stage_outcome"] == "await_user_reply"
+    assert first["pending_strategy"]["requested_field"] == "date_range"
+
+    second = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="use jan 1 2021 to jan 1 2024",
+    )
+
+    assert second["stage_outcome"] == "await_approval"
+    strategy = second["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == ["TSLA"]
+    assert strategy["entry_logic"] == "Buy when RSI(14) drops to 30 or below"
+    assert strategy["extra_parameters"]["indicator"] == "rsi"
+    assert strategy["extra_parameters"]["indicator_parameters"] == {
+        "indicator": "rsi",
+        "indicator_period": 14,
+        "entry_threshold": 30,
+        "exit_threshold": 55,
+    }
+    assert second["pending_strategy"]["missing_required_fields"] == []
 
 
 @pytest.mark.asyncio
@@ -248,6 +748,166 @@ async def test_workflow_clears_requested_field_after_chip_answer_confirmation(
     assert answer_result["confirmation_payload"]["strategy"]["asset_universe"] == ["TSLA"]
     assert answer_result["pending_strategy"]["requested_field"] is None
     assert answer_result["pending_strategy"]["missing_required_fields"] == []
+
+
+@pytest.mark.parametrize(
+    ("answer", "resolved_symbol"),
+    [("google", "GOOGL"), ("microsoft", "MSFT")],
+)
+@pytest.mark.asyncio
+async def test_workflow_pending_asset_answer_contract_wins_over_noisy_interpreter_copy(
+    monkeypatch,
+    answer: str,
+    resolved_symbol: str,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().casefold()
+        if normalized == answer.casefold() or normalized == resolved_symbol.casefold():
+            return ResolvedAssetStub(resolved_symbol, "equity")
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=NoisyAssetAnswerInterpreter(resolved_symbol),
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test TSLA with an RSI threshold rule.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 30,
+                "exit_threshold": 55,
+            },
+        },
+    )
+
+    prompt_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=f"thread-noisy-asset-answer-{resolved_symbol}",
+        message="Change asset",
+        action_context={
+            "type": "change_asset",
+            "label": "Change asset",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+
+    assert prompt_result["stage_outcome"] == "await_user_reply"
+    assert prompt_result["pending_strategy"]["requested_field"] == "asset_universe"
+
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=f"thread-noisy-asset-answer-{resolved_symbol}",
+        message=answer,
+    )
+
+    assert answer_result["stage_outcome"] == "await_approval"
+    strategy = answer_result["confirmation_payload"]["strategy"]
+    assert strategy["asset_universe"] == [resolved_symbol]
+    assert strategy["entry_logic"] == "Buy when RSI(14) drops to 30 or below"
+    assert strategy["exit_logic"] == "Sell when RSI(14) rises to 55 or above"
+    assert "assistant_response" not in answer_result
+    assert answer_result["pending_strategy"]["requested_field"] is None
+
+
+@pytest.mark.asyncio
+async def test_workflow_typed_approval_after_card_edit_defers_to_card_action(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        normalized = symbol.strip().casefold()
+        if normalized in {"google", "googl"}:
+            return ResolvedAssetStub("GOOGL", "equity")
+        return ResolvedAssetStub(symbol.upper(), "equity")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=AssetAnswerThenApprovalInterpreter("GOOGL"),
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+    pending = StrategySummary(
+        strategy_type="indicator_threshold",
+        strategy_thesis="Test TSLA with an RSI threshold rule.",
+        asset_universe=["TSLA"],
+        asset_class="equity",
+        date_range={"start": "2024-01-01", "end": "2024-12-31"},
+        entry_logic="Buy when RSI(14) drops to 30 or below",
+        exit_logic="Sell when RSI(14) rises to 55 or above",
+        extra_parameters={
+            "indicator": "rsi",
+            "indicator_parameters": {
+                "indicator": "rsi",
+                "indicator_period": 14,
+                "entry_threshold": 30,
+                "exit_threshold": 55,
+            },
+        },
+    )
+    thread_id = "thread-approval-after-card-edit"
+
+    await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Change asset",
+        action_context={
+            "type": "change_asset",
+            "label": "Change asset",
+            "presentation": "confirmation",
+            "payload": {},
+        },
+        fallback_latest_task_snapshot=TaskSnapshot(
+            pending_strategy_summary=pending,
+        ),
+        fallback_selected_thread_metadata={"last_stage_outcome": "await_approval"},
+    )
+    answer_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="google",
+    )
+
+    assert answer_result["stage_outcome"] == "await_approval"
+    state_snapshot = await workflow.aget_state({"configurable": {"thread_id": thread_id}})
+    snapshot = state_snapshot.values["latest_task_snapshot"]
+    assert snapshot.active_confirmation_reference is not None
+
+    approval_result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="yes, run it",
+    )
+
+    assert approval_result["stage_outcome"] == "ready_to_respond"
+    assert "visible card" in approval_result["assistant_response"]
+    assert "simulation" in approval_result["assistant_response"]
+    assert "confirmation_payload" not in approval_result
 
 
 @pytest.mark.asyncio
@@ -369,4 +1029,7 @@ async def test_workflow_uses_checkpointer_for_thread_state(monkeypatch) -> None:
     assert snapshot is not None
     assert snapshot.pending_strategy_summary is not None
     assert snapshot.pending_strategy_summary.asset_universe == ["BTC"]
-    assert second["stage_outcome"] == "end_run"
+    assert second["stage_outcome"] == "ready_to_respond"
+    assert "visible card" in second["assistant_response"]
+    assert "simulation" in second["assistant_response"]
+    assert "run" not in second

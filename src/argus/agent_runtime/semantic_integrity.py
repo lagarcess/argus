@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 
+from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.state.models import (
     SimplificationOption,
     StrategySummary,
@@ -11,6 +12,8 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
+    format_display_date,
+    has_partial_explicit_date_range,
     normalize_date_range_candidate,
     resolve_date_range,
 )
@@ -19,6 +22,7 @@ from argus.agent_runtime.strategy_contract import (
 @dataclass(frozen=True)
 class SemanticConstraintEvidence:
     explicit_date_reference: bool = False
+    explicit_signal_rule_reference: bool = False
     normalized_date_range: str | dict[str, Any] | None = None
     recurring_contribution: float | None = None
     total_capital: float | None = None
@@ -40,51 +44,75 @@ class SemanticIntegrityReport:
 def conserve_semantic_constraints(
     *,
     strategy: StrategySummary,
-    current_user_message: str,
     selected_thread_metadata: dict[str, Any],
+    prior_strategy: StrategySummary | None = None,
     optional_parameter_values: dict[str, Any] | None = None,
+    supported_timeframes: tuple[str, ...] = (),
 ) -> SemanticIntegrityReport:
-    """Preserve explicit user constraints before a draft can reach confirmation."""
+    """Preserve typed LLM constraints before a draft can reach confirmation."""
 
     updated = strategy.model_copy(deep=True)
     optional_values = dict(optional_parameter_values or {})
     blocking_missing_fields: list[str] = []
     unsupported_constraints: list[UnsupportedConstraint] = []
     reason_codes: list[str] = []
-    evidence = SemanticConstraintEvidence(
-        explicit_date_reference=_contains_explicit_date_reference(current_user_message),
-        normalized_date_range=normalize_date_range_candidate(
-            None,
-            raw_user_phrasing=current_user_message,
-        ),
-    )
 
-    if evidence.explicit_date_reference:
-        if evidence.normalized_date_range is not None:
-            updated.date_range = evidence.normalized_date_range
-            reason_codes.append("semantic_date_constraint_preserved")
-        elif _date_range_looks_like_default(updated.date_range):
-            updated.date_range = None
-            blocking_missing_fields.append("date_range")
-            reason_codes.append("semantic_date_constraint_unresolved")
-
-    money_evidence = _money_role_evidence(
-        current_user_message=current_user_message,
-        requested_field=str(selected_thread_metadata.get("requested_field") or ""),
+    requested_field = str(selected_thread_metadata.get("requested_field") or "")
+    normalized_date_range = normalize_date_range_candidate(updated.date_range)
+    timeframe_as_date_range = explicit_date_range_value(
+        updated.timeframe,
+        supported_timeframes=supported_timeframes,
     )
+    if _field_base(requested_field) == "date_range" and timeframe_as_date_range:
+        if normalized_date_range in (None, "", [], {}):
+            normalized_date_range = updated.timeframe
+            updated.date_range = updated.timeframe
+        updated.timeframe = None
+        reason_codes.append("semantic_timeframe_reassigned_to_date_range")
+    if normalized_date_range not in (None, "", [], {}):
+        if normalized_date_range != updated.date_range:
+            updated.date_range = normalized_date_range
+        reason_codes.append("semantic_date_constraint_preserved")
+    if has_partial_explicit_date_range(updated.date_range):
+        blocking_missing_fields.append("date_range")
+        reason_codes.append("partial_date_range_requires_clarification")
+    invalid_date_constraint = _invalid_date_range_constraint(updated.date_range)
+    if invalid_date_constraint is not None:
+        unsupported_constraints.append(invalid_date_constraint)
+        blocking_missing_fields.append("date_range")
+        reason_codes.append("invalid_date_range_requires_correction")
+    normalized_timeframe = _supported_timeframe_value(
+        updated.timeframe,
+        supported_timeframes=supported_timeframes,
+    )
+    if normalized_timeframe is not None:
+        updated.timeframe = normalized_timeframe
+        optional_values["timeframe"] = normalized_timeframe
+        reason_codes.append("semantic_timeframe_constraint_preserved")
+
+    structured_signal_rule_reference = _strategy_has_signal_rule_payload(updated)
+
+    money_evidence = _structured_money_role_evidence(
+        strategy=updated,
+        requested_field=requested_field,
+    )
+    cadence = _structured_recurring_cadence(updated)
     evidence = SemanticConstraintEvidence(
-        explicit_date_reference=evidence.explicit_date_reference,
-        normalized_date_range=evidence.normalized_date_range,
+        explicit_date_reference=normalized_date_range not in (None, "", [], {}),
+        explicit_signal_rule_reference=structured_signal_rule_reference,
+        normalized_date_range=normalized_date_range,
         recurring_contribution=money_evidence.recurring_contribution,
         total_capital=money_evidence.total_capital,
-        recurring_cadence=_recurring_cadence_evidence(current_user_message),
+        recurring_cadence=cadence,
     )
+
     if executable_strategy_type(updated) == "dca_accumulation":
         if money_evidence.total_capital is not None:
             optional_values["initial_capital"] = money_evidence.total_capital
             unsupported_constraints.append(
                 _unsupported_dca_starting_principal_constraint(
-                    money_evidence.total_capital
+                    money_evidence.total_capital,
+                    source=money_evidence.total_capital_source,
                 )
             )
             reason_codes.append("semantic_dca_starting_principal_deferred")
@@ -95,8 +123,8 @@ def conserve_semantic_constraints(
             updated.capital_amount = None
             blocking_missing_fields.append("capital_amount")
             reason_codes.append("semantic_recurring_contribution_missing")
-        if evidence.recurring_cadence is not None:
-            updated.cadence = evidence.recurring_cadence
+        if cadence is not None:
+            updated.cadence = cadence
             reason_codes.append("semantic_recurring_cadence_preserved")
 
     return SemanticIntegrityReport(
@@ -109,19 +137,263 @@ def conserve_semantic_constraints(
     )
 
 
+def filter_unsubstantiated_timeframe_constraints(
+    *,
+    constraints: list[UnsupportedConstraint],
+    strategy: StrategySummary,
+    selected_thread_metadata: dict[str, Any],
+    supported_timeframes: tuple[str, ...] = (),
+) -> tuple[list[UnsupportedConstraint], list[str]]:
+    """Drop LLM constraints that mislabeled an explicit date answer as timeframe."""
+
+    requested_field = _field_base(
+        str(selected_thread_metadata.get("requested_field") or "")
+    )
+    if requested_field != "date_range":
+        return constraints, []
+
+    filtered: list[UnsupportedConstraint] = []
+    removed = False
+    for constraint in constraints:
+        if not _is_timeframe_constraint(constraint):
+            filtered.append(constraint)
+            continue
+        raw_value = constraint.raw_value or strategy.timeframe or strategy.date_range
+        if explicit_date_range_value(
+            raw_value,
+            supported_timeframes=supported_timeframes,
+        ):
+            removed = True
+            continue
+        filtered.append(constraint)
+
+    return (
+        filtered,
+        ["semantic_unsubstantiated_timeframe_constraint_removed"] if removed else [],
+    )
+
+
+@dataclass(frozen=True)
+class _MoneyRoleEvidence:
+    recurring_contribution: float | None = None
+    total_capital: float | None = None
+    total_capital_source: str | None = None
+
+
+def _structured_money_role_evidence(
+    *,
+    strategy: StrategySummary,
+    requested_field: str,
+) -> _MoneyRoleEvidence:
+    extra = dict(strategy.extra_parameters or {})
+    field_provenance = extra.get("field_provenance")
+    if not isinstance(field_provenance, dict):
+        field_provenance = {}
+
+    recurring = _first_number(
+        extra,
+        (
+            "recurring_contribution",
+            "contribution_amount",
+            "periodic_contribution",
+            "dca_contribution",
+        ),
+    )
+    total_key, total = _first_number_with_key(
+        extra,
+        (
+            "initial_capital",
+            "starting_capital",
+            "starting_principal",
+            "initial_lump_sum",
+            "initial_lump",
+            "lump_sum",
+            "total_capital",
+            "total_budget",
+            "max_budget",
+            "investment_budget",
+            "cap",
+            "contribution_cap",
+            "capital_cap",
+            "investment_cap",
+        ),
+    )
+
+    capital_source = str(field_provenance.get("capital_amount") or "").strip()
+    if capital_source in {
+        "initial_capital",
+        "starting_capital",
+        "starting_principal",
+        "initial_lump_sum",
+        "initial_lump",
+        "lump_sum",
+        "total_capital",
+        "total_budget",
+        "max_budget",
+        "investment_budget",
+        "cap",
+        "contribution_cap",
+        "capital_cap",
+        "investment_cap",
+    }:
+        total = total if total is not None else _coerce_number(strategy.capital_amount)
+        total_key = total_key or capital_source
+    elif capital_source in {
+        "recurring_contribution",
+        "contribution_amount",
+        "periodic_contribution",
+        "dca_contribution",
+        "user",
+        "explicit_user",
+    }:
+        recurring = recurring if recurring is not None else _coerce_number(
+            strategy.capital_amount
+        )
+    elif (
+        requested_field == "capital_amount"
+        and total is None
+        and recurring is None
+        and strategy.capital_amount is not None
+    ):
+        recurring = _coerce_number(strategy.capital_amount)
+    elif (
+        requested_field != "capital_amount"
+        and total is None
+        and recurring is None
+        and strategy.capital_amount is not None
+    ):
+        recurring = _coerce_number(strategy.capital_amount)
+
+    return _MoneyRoleEvidence(
+        recurring_contribution=recurring,
+        total_capital=total,
+        total_capital_source=total_key or capital_source or None,
+    )
+
+
+def explicit_date_range_value(
+    value: Any,
+    *,
+    supported_timeframes: tuple[str, ...] = (),
+) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    if _is_supported_timeframe_value(value, supported_timeframes=supported_timeframes):
+        return False
+    try:
+        resolution = resolve_date_range(value)
+    except Exception:
+        return False
+    return not resolution.used_default
+
+
+def _is_supported_timeframe_value(
+    value: str,
+    *,
+    supported_timeframes: tuple[str, ...],
+) -> bool:
+    return (
+        _supported_timeframe_value(value, supported_timeframes=supported_timeframes)
+        is not None
+    )
+
+
+def _supported_timeframe_value(
+    value: Any,
+    *,
+    supported_timeframes: tuple[str, ...],
+) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    for supported in supported_timeframes:
+        supported_value = str(supported).strip()
+        if normalized == supported_value.lower():
+            return supported_value
+    return None
+
+
+def _is_timeframe_constraint(constraint: UnsupportedConstraint) -> bool:
+    category = constraint.category.strip().lower()
+    return category in {"unsupported_time_granularity", "unsupported_timeframe"}
+
+
+def _field_base(field_name: str) -> str:
+    return field_name.split("[", 1)[0]
+
+
+def _structured_recurring_cadence(strategy: StrategySummary) -> str | None:
+    if strategy.cadence in {"daily", "weekly", "monthly", "quarterly", "yearly"}:
+        return strategy.cadence
+    extra = dict(strategy.extra_parameters or {})
+    cadence = extra.get("recurring_cadence") or extra.get("cadence")
+    if cadence in {"daily", "weekly", "monthly", "quarterly", "yearly"}:
+        return str(cadence)
+    return None
+
+
+def _strategy_has_signal_rule_payload(strategy: StrategySummary) -> bool:
+    return executable_rule_spec_from_strategy(strategy) is not None
+
+
+def _first_number(payload: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+    _, value = _first_number_with_key(payload, keys)
+    return value
+
+
+def _first_number_with_key(
+    payload: dict[str, Any],
+    keys: tuple[str, ...],
+) -> tuple[str | None, float | None]:
+    for key in keys:
+        value = _coerce_number(payload.get(key))
+        if value is not None:
+            return key, value
+    return None, None
+
+
+def _coerce_number(value: Any) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.strip().removeprefix("$").replace(",", "")
+        multiplier = 1.0
+        lowered = cleaned.lower()
+        for suffix, suffix_multiplier in (
+            ("thousand", 1_000.0),
+            ("million", 1_000_000.0),
+            ("k", 1_000.0),
+            ("m", 1_000_000.0),
+        ):
+            if lowered.endswith(suffix):
+                multiplier = suffix_multiplier
+                cleaned = cleaned[: -len(suffix)]
+                break
+        try:
+            return float(cleaned) * multiplier
+        except ValueError:
+            return None
+    return None
+
+
 def _unsupported_dca_starting_principal_constraint(
     total_capital: float,
+    *,
+    source: str | None = None,
 ) -> UnsupportedConstraint:
     formatted = _format_money(total_capital)
+    role_label = _dca_total_capital_role_label(source)
     # TODO(dca-engine): Support starting principal, contribution ceilings, and
     # recurring contributions as separate DCA execution inputs across engine
     # launch models, LangGraph contracts, confirmation cards, result assumptions,
     # and capability wording.
     return UnsupportedConstraint(
         category="unsupported_dca_starting_principal",
-        raw_value=f"{formatted} starting principal",
+        raw_value=f"{formatted} {role_label}",
         explanation=(
-            f"I understand {formatted} as starting principal, but the current "
+            f"I understand {formatted} as a {role_label}, but the current "
             "DCA backtest can only execute the recurring contribution. Starting "
             "principal and contribution caps are not executable in the same DCA "
             "run yet."
@@ -146,6 +418,89 @@ def _unsupported_dca_starting_principal_constraint(
     )
 
 
+def _dca_total_capital_role_label(source: str | None) -> str:
+    normalized = str(source or "").strip().lower()
+    if normalized in {"cap", "contribution_cap", "capital_cap", "investment_cap"}:
+        return "contribution cap"
+    if normalized in {"initial_lump_sum", "initial_lump", "lump_sum"}:
+        return "initial lump sum"
+    if normalized == "max_budget":
+        return "maximum budget"
+    if normalized in {"total_capital", "total_budget", "investment_budget"}:
+        return "total budget"
+    return "starting principal"
+
+
+def _invalid_date_range_constraint(value: Any) -> UnsupportedConstraint | None:
+    if value in (None, "", [], {}):
+        return None
+    current_date = date.today()
+    try:
+        resolution = resolve_date_range(value, today=current_date)
+    except Exception:
+        return None
+    if resolution.used_default:
+        return None
+    start = format_display_date(resolution.start)
+    end = format_display_date(resolution.end)
+    today = format_display_date(current_date)
+    if resolution.start <= resolution.end <= current_date:
+        return None
+    if resolution.end > current_date:
+        return UnsupportedConstraint(
+            category="invalid_date_range",
+            raw_value=_format_date_range_value(value),
+            explanation=(
+                f"I read the date window as {start} to {end}, but historical "
+                f"backtests need an end date on or before {today}."
+            ),
+            simplification_options=[
+                SimplificationOption(
+                    label="Choose an end date on or before today",
+                    replacement_values={"requested_field": "date_range"},
+                ),
+                SimplificationOption(
+                    label="Use year to date",
+                    replacement_values={"requested_field": "date_range"},
+                ),
+                SimplificationOption(
+                    label="Use a different date window",
+                    replacement_values={"requested_field": "date_range"},
+                ),
+            ],
+        )
+    return UnsupportedConstraint(
+        category="invalid_date_range",
+        raw_value=_format_date_range_value(value),
+        explanation=(
+            f"I read the date window as {start} to {end}, but the end date has "
+            "to come after the start date."
+        ),
+        simplification_options=[
+            SimplificationOption(
+                label="Choose an end date after the start date",
+                replacement_values={"requested_field": "date_range"},
+            ),
+            SimplificationOption(
+                label="Choose a start date before the end date",
+                replacement_values={"requested_field": "date_range"},
+            ),
+            SimplificationOption(
+                label="Use a different date window",
+                replacement_values={"requested_field": "date_range"},
+            ),
+        ],
+    )
+
+
+def _format_date_range_value(value: Any) -> str:
+    if isinstance(value, dict):
+        start = value.get("start") or value.get("from") or "?"
+        end = value.get("end") or value.get("to") or "?"
+        return f"{start} to {end}"
+    return str(value)
+
+
 def _dedupe_unsupported_constraints(
     constraints: list[UnsupportedConstraint],
 ) -> list[UnsupportedConstraint]:
@@ -162,188 +517,3 @@ def _dedupe_unsupported_constraints(
 
 def _format_money(value: float) -> str:
     return f"${value:,.0f}"
-
-
-def _contains_explicit_date_reference(message: str) -> bool:
-    normalized = _normalized_text(message)
-    if not normalized:
-        return False
-    return bool(
-        re.search(
-            r"\b(?:since|ytd|year to date|from|between|through|until|"
-            r"past|last|previous|ago|jan|january|feb|february|mar|march|"
-            r"apr|april|may|jun|june|jul|july|aug|august|sep|sept|"
-            r"september|oct|october|nov|november|dec|december)\b",
-            normalized,
-        )
-    )
-
-
-def _date_range_looks_like_default(value: Any) -> bool:
-    if value in (None, "", [], {}):
-        return True
-    if not isinstance(value, str):
-        return False
-    normalized = value.strip().lower().replace("_", " ")
-    if normalized in {"past year", "last year", "past 1 year", "last 1 year"}:
-        return True
-    return resolve_date_range(value).used_default
-
-
-@dataclass(frozen=True)
-class _MoneyRoleEvidence:
-    recurring_contribution: float | None = None
-    total_capital: float | None = None
-
-
-def _money_role_evidence(
-    *,
-    current_user_message: str,
-    requested_field: str,
-) -> _MoneyRoleEvidence:
-    normalized = _normalized_text(current_user_message)
-    recurring: float | None = None
-    total: float | None = None
-    matches = list(_iter_amount_matches(normalized))
-    for index, match in enumerate(matches):
-        value = _amount_value(match.group("amount"), match.group("suffix"))
-        if value is None:
-            continue
-        start, end = match.span()
-        previous_end = matches[index - 1].end() if index > 0 else max(0, start - 48)
-        next_start = (
-            matches[index + 1].start() if index + 1 < len(matches) else len(normalized)
-        )
-        before = normalized[max(previous_end, start - 48) : start]
-        after = normalized[end : min(next_start, end + 72)]
-        if _is_time_count_context(after=after):
-            continue
-        strong_recurring = _is_strong_recurring_context(before=before, after=after)
-        if (
-            _is_total_capital_context(
-                before=before,
-                after=after,
-            )
-            and not strong_recurring
-        ):
-            total = value
-            continue
-        if strong_recurring or _is_recurring_context(before=before, after=after):
-            recurring = value
-
-    if requested_field == "capital_amount" and recurring is None and total is None:
-        if len(matches) == 1:
-            match = matches[0]
-            recurring = _amount_value(match.group("amount"), match.group("suffix"))
-
-    return _MoneyRoleEvidence(
-        recurring_contribution=recurring,
-        total_capital=total,
-    )
-
-
-def _iter_amount_matches(text: str) -> Any:
-    return re.finditer(
-        r"(?<![a-z0-9])\$?\s*(?P<amount>\d+(?:,\d{3})*(?:\.\d+)?)\s*"
-        r"(?P<suffix>k|m|thousand|million)?(?![a-z0-9])",
-        text,
-    )
-
-
-def _is_time_count_context(*, after: str) -> bool:
-    return bool(
-        re.match(
-            r"\s*(?:day|days|week|weeks|month|months|quarter|quarters|year|years)\b",
-            after,
-        )
-    )
-
-
-def _amount_value(raw_amount: str | None, suffix: str | None) -> float | None:
-    if not raw_amount:
-        return None
-    try:
-        value = float(raw_amount.replace(",", ""))
-    except ValueError:
-        return None
-    multiplier = {
-        "k": 1_000.0,
-        "thousand": 1_000.0,
-        "m": 1_000_000.0,
-        "million": 1_000_000.0,
-    }.get(str(suffix or "").lower(), 1.0)
-    return value * multiplier
-
-
-def _is_total_capital_context(*, before: str, after: str) -> bool:
-    context = f"{before} {after}"
-    return bool(
-        re.search(
-            r"\b(?:total capital|total budget|overall budget|starting capital|"
-            r"initial capital|starting principal|initial principal|my total|"
-            r"account size|portfolio size|investment budget|total investment|"
-            r"total amount|overall amount|overall capital|available capital|"
-            r"available budget|budget|total|overall|max|maximum|cap|capped|"
-            r"ceiling|limit|limited)\b",
-            context,
-        )
-        or re.search(
-            r"\b(?:i|we)?\s*(?:have|got|with|using|use)\b.*\b(?:to invest|"
-            r"available|as budget|as a budget)\b",
-            context,
-        )
-    )
-
-
-def _is_strong_recurring_context(*, before: str, after: str) -> bool:
-    context = f"{before} {after}"
-    cadence_pattern = (
-        r"\b(?:daily|weekly|monthly|quarterly|yearly|annually|each day|"
-        r"every day|per day|each week|every week|per week|each month|"
-        r"every month|per month|each quarter|every quarter|per quarter|"
-        r"each year|every year|per year)\b"
-    )
-    recurring_verb_pattern = (
-        r"\b(?:recurring|recurrent|contribution|contribute|investing|buy|"
-        r"buys|purchase|purchases|dca)\b"
-    )
-    return bool(
-        re.match(rf"\s*{cadence_pattern}", after)
-        or re.search(r"\b(?:each|every|per)\b", after)
-        or (
-            re.search(recurring_verb_pattern, context)
-            and re.search(cadence_pattern, context)
-        )
-    )
-
-
-def _is_recurring_context(*, before: str, after: str) -> bool:
-    context = f"{before} {after}"
-    return bool(
-        re.search(
-            r"\b(?:recurring|recurrent|contribution|contribute|buy|buys|"
-            r"purchase|purchases|each week|every week|per week|each month|"
-            r"every month|per month|each day|every day|per day|each year|"
-            r"every year|per year)\b",
-            context,
-        )
-    )
-
-
-def _normalized_text(value: str) -> str:
-    lowered = value.lower()
-    lowered = re.sub(r"[^a-z0-9$.,\s]+", " ", lowered)
-    return re.sub(r"\s+", " ", lowered).strip()
-
-
-def _recurring_cadence_evidence(message: str) -> str | None:
-    normalized = _normalized_text(message)
-    if re.search(r"\b(?:daily|each day|every day|per day)\b", normalized):
-        return "daily"
-    if re.search(r"\b(?:weekly|each week|every week|per week)\b", normalized):
-        return "weekly"
-    if re.search(r"\b(?:monthly|each month|every month|per month)\b", normalized):
-        return "monthly"
-    if re.search(r"\b(?:yearly|annually|each year|every year|per year)\b", normalized):
-        return "yearly"
-    return None

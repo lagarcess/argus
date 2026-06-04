@@ -30,19 +30,68 @@
     "restore": "Restaurar",
     "permanently_delete": "Eliminar permanentemente",
     "submit": "Enviar",
+    "more": "Más",
+    "current": "Actual",
+    "collapse": "Contraer",
+    "expand": "Expandir",
+    "learn_more": "Más información",
     "and": "y",
     "tap_to_cancel": "Toca en cualquier otro lugar para cancelar"
   },
   "feedback": {
+    "title": "Enviar comentarios",
     "title_bug": "Reportar un error",
     "title_feature": "Sugerir función",
     "title_general": "Comentarios generales",
     "title_rating": "Compartir comentarios",
+    "eyebrow": "Comentarios",
+    "type_label": "Tipo de comentario",
+    "submit": "Enviar comentarios",
+    "success_detail": "Comentarios enviados.",
+    "max_files": "Máximo 5 archivos permitidos.",
+    "rating_message_fallback": "Calificación {{rating}} con etiquetas",
+    "additional_details": "Detalles adicionales",
+    "details": "Detalles",
+    "rating_placeholder": "Cuéntanos más sobre tu experiencia...",
+    "details_placeholder": "¿Qué tienes en mente?",
+    "attachments": "Adjuntos",
+    "attachments_with_count": "Adjuntos ({{count}}/5)",
+    "attach_files": "Haz clic para adjuntar archivos (máx. 5)",
+    "attach_files_feature": "Opcional: agrega una captura, boceto o ejemplo.",
+    "consent": "Autorizo al equipo de Argus a procesar estos comentarios y contactarme si necesitan más detalles.",
+    "consent_feature": "Autorizo al equipo de Argus a usar esta solicitud de función y contactarme si necesitan más contexto.",
+    "rating_positive_prompt": "¿Qué salió bien?",
+    "rating_negative_prompt": "¿Qué salió mal?",
+    "subheading": {
+      "positive": "¿Qué funcionó bien en esta respuesta?",
+      "negative": "¿Qué debería mejorar en esta respuesta?",
+      "bug": "Reporta un error.",
+      "feature": "Solicita una función para Argus.",
+      "general": "Comparte comentarios sobre tu experiencia con Argus."
+    },
+    "type": {
+      "general": "Comentarios generales",
+      "bug": "Reportar un error",
+      "feature": "Solicitar una función"
+    },
+    "bug": {
+      "title_field": "Título",
+      "title_placeholder": "Descripción breve del problema",
+      "steps_field": "Pasos para reproducirlo",
+      "steps_placeholder": "1. Ve a [Página/Vista]\n2. Haz clic en [Botón/Acción]\n3. Observa [Error/Comportamiento]",
+      "expected_field": "Resultado esperado",
+      "actual_field": "Resultado real",
+      "message_title": "Título",
+      "message_steps": "Pasos para reproducirlo",
+      "message_expected": "Resultado esperado",
+      "message_actual": "Resultado real"
+    },
     "placeholder": "Cuéntanos más...",
     "placeholder_details": "Compartir detalles (opcional)",
     "success": "¡Gracias por tus comentarios!",
     "error": "Error al enviar comentarios. Inténtalo de nuevo.",
-    "footer_note": "Tu conversación se incluirá con tus comentarios para ayudar a mejorar Argus.",
+    "footer_note": "Se puede incluir contexto de la app, como esta página y la hora, para entender mejor tus comentarios.",
+    "footer_note_conversation": "Se puede incluir el contexto de tu conversación actual para entender mejor estos comentarios.",
     "tags": {
       "positive": {
         "accurate": "Preciso y completo",
@@ -65,19 +114,21 @@
   "chat": {
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
     "input_placeholder": "Describe una idea de inversión...",
+    "followup_placeholder": "Haz una pregunta de seguimiento...",
+    "disclaimer": "Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
     "placeholder_prompts": [
-      "¿Y si comprara Tesla en caídas importantes?",
-      "¿Cómo funcionaría una estrategia DCA en Bitcoin?",
-      "Muéstrame cómo funciona un cruce de RSI en Apple.",
-      "¿Qué pasa si mantengo Nvidia durante alta volatilidad?",
+      "¿Cómo le fue a Apple contra SPY en 2024?",
+      "¿Y si comprara Bitcoin al inicio de 2024?",
+      "Explícame un término del mercado en palabras simples.",
+      "¿Qué pasa si mantengo Nvidia durante un año?",
       "Compara mantener ETH frente a BTC el último año.",
-      "Prueba una estrategia de ruptura de media móvil en SPY.",
+      "Prueba comprar SPY al inicio de 2024.",
       "¿Cómo funciona el trading de momentum para tecnológicas?",
-      "¿Y si invirtiera en acciones de dividendos en una recesión?",
-      "Simula una estrategia de seguimiento de tendencia en Solana.",
-      "¿Puedes explicar cómo funciona la reversión a la media?"
+      "¿Y si comprara $250 de Nvidia cada semana en 2024?",
+      "Prueba una idea simple de comprar y mantener Solana.",
+      "¿Por qué la gente compara una acción con SPY?"
     ],
     "view_history": "Ver historial",
     "chat_options": "Opciones de chat",
@@ -85,16 +136,16 @@
     "hide_suggestions": "Ocultar sugerencias",
     "starter_actions": {
       "tsla": {
-        "label": "Prueba caídas de Tesla",
-        "value": "¿Y si comprara Tesla en caídas importantes?"
+        "label": "Prueba Apple vs SPY",
+        "value": "Prueba Apple contra SPY del 1 de enero de 2024 al 31 de diciembre de 2024 y muéstrame el resultado."
       },
       "btc": {
-        "label": "Prueba momentum de Bitcoin",
-        "value": "Prueba una idea de ruptura de impulso en Bitcoin"
+        "label": "Prueba mantener Bitcoin (BTC)",
+        "value": "Prueba comprar BTC (Bitcoin) el 1 de enero de 2024 y mantenerlo hasta el 31 de diciembre de 2024."
       },
       "dca": {
-        "label": "Explora DCA",
-        "value": "Muéstrame una estrategia de acumulación DCA para Apple"
+        "label": "Prueba compras semanales de Nvidia",
+        "value": "Prueba esta idea de inversión. Estrategia: compras recurrentes. Activo: NVDA (Nvidia). Aporte recurrente: $250 por semana. Periodo: del 1 de enero de 2024 al 31 de diciembre de 2024."
       }
     },
     "example_queries": {
@@ -106,6 +157,10 @@
     "error_offline": "Argus aún no ha podido conectarse a la API. Inicia el servicio FastAPI y envía tu idea de nuevo.",
     "error_load": "No se pudo cargar esa conversación. Inténtalo de nuevo.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
+    "error_generic": "Algo salió mal. Inténtalo de nuevo.",
+    "result_trust_strip": "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
+    "result_trust_strip_label": "Contexto de confianza del resultado",
+    "view_details": "Ver detalles",
     "new_chat_ready": "Nuevo chat listo. ¿Qué idea deberíamos probar?",
     "resume_prompt": "Reanudando \"{{title}}\". ¿Qué te gustaría explorar ahora?",
     "try_new_strategy": "Probar una nueva estrategia",
@@ -114,10 +169,15 @@
       "today": "Hoy",
       "yesterday": "Ayer",
       "last_7_days": "Últimos 7 días",
+      "last_30_days": "Últimos 30 días",
       "earlier": "Anterior"
     },
     "no_recent_activity": "Sin actividad reciente aún. Tus estrategias y chats aparecerán aquí.",
     "new_chat": "Nuevo chat",
+    "copy_conversation_link": "Copiar enlace de conversación",
+    "rename_chat": "Renombrar chat",
+    "pin_chat": "Anclar chat",
+    "unpin_chat": "Desanclar chat",
     "delete_chat": "Eliminar chat",
     "past_sessions": "Sesiones pasadas",
     "archive_chat": "Archivar chat",
@@ -128,8 +188,63 @@
     "more_actions": "Más acciones",
     "copy_plaintext": "Copiar texto",
     "copy_id": "Copiar ID",
+    "copy_success": "Copiado",
+    "copy_failed": "No se pudo copiar",
     "report_issue": "Reportar problema",
+    "rename_failed": "No se pudo renombrar este chat. Inténtalo de nuevo.",
+    "saved": "Guardada",
+    "saving": "Guardando",
     "simulation_complete": "Simulación completa",
+    "result_card": {
+      "ending_value": "Valor final",
+      "total_return": "Rendimiento total",
+      "compared_with_benchmark": "Comparado con referencia",
+      "compared_with_symbol": "Comparado con {{symbol}}",
+      "worst_drop": "Peor caída",
+      "explain_result": "Explicar resultado",
+      "refine_idea": "Ajustar idea",
+      "save": "Guardar",
+      "unavailable": "No disponible",
+      "return_unavailable": "rendimiento no disponible",
+      "change": "cambio",
+      "gain": "ganancia",
+      "loss": "pérdida",
+      "total_return_suffix": "rendimiento total",
+      "benchmark_unavailable": "Referencia no disponible",
+      "percentage_points": "{{value}} puntos porcentuales",
+      "in_line_with": "En línea con {{symbol}}",
+      "beat_by": "Superó por {{value}}",
+      "lagged_by": "Quedó por debajo por {{value}}",
+      "details": {
+        "starting_capital": "Capital inicial",
+        "date_range": "Rango de fechas",
+        "timeframe": "Temporalidad",
+        "side": "Dirección",
+        "allocation": "Asignación",
+        "benchmark": "Referencia",
+        "cadence": "Cadencia",
+        "contribution": "Contribución",
+        "entry_rule": "Regla de entrada",
+        "exit_rule": "Regla de salida"
+      },
+      "timeframe": {
+        "daily": "Datos diarios",
+        "hourly": "Datos por hora",
+        "interval": "Datos de {{amount}} {{unit}}",
+        "generic": "Datos {{value}}"
+      }
+    },
+    "discovery": {
+      "prompt": "Menciona un activo o indicador",
+      "searching": "Resultados de búsqueda",
+      "empty": "Escribe después de @ para buscar activos e indicadores compatibles.",
+      "sections": {
+        "assets": "Activos populares",
+        "indicators": "Indicadores ejecutables",
+        "draft": "Indicadores solo borrador",
+        "results": "Resultados de búsqueda"
+      }
+    },
       "status": {
         "understanding": "Pensando...",
         "interpret": "Entendiendo tu idea...",
@@ -220,7 +335,11 @@
   "settings": {
     "title": "Ajustes",
     "profile": {
-      "display_name": "Nombre de usuario"
+      "display_name": "Nombre para mostrar",
+      "default_user": "Usuario",
+      "edit_display_name": "Editar nombre para mostrar",
+      "delete_account": "Eliminar cuenta",
+      "title": "Perfil"
     },
     "subscription": {
       "title": "Suscripción",
@@ -229,6 +348,8 @@
     "app": {
       "title": "App",
       "language": "Idioma de la app",
+      "sidebar": "Barra lateral",
+      "security": "Seguridad",
       "appearance": "Apariencia",
       "appearance_options": {
         "light": "Claro",
@@ -240,7 +361,20 @@
       "title": "Datos e información",
       "archived_chats": "Chats archivados",
       "recently_deleted": "Borrados recientemente",
+      "close_recently_deleted": "Cerrar borrados recientemente",
+      "deleted_retention_note": "Los elementos permanecen aquí temporalmente antes de eliminarse permanentemente.",
+      "deleted_item_note": "Puede eliminarse permanentemente pronto",
+      "no_deleted_items": "No hay elementos borrados recientemente",
+      "chat_item": "Chat",
+      "strategy_item": "Estrategia",
+      "delete_all_conversations": "Eliminar todas las conversaciones",
       "security": "Seguridad"
+    },
+    "help": {
+      "title": "Ayuda",
+      "terms": "Términos de Servicio",
+      "privacy": "Política de Privacidad",
+      "release_notes": "Notas de la versión"
     },
     "about": {
       "title": "Acerca de",
@@ -257,6 +391,29 @@
       "en": "Inglés",
       "es-419": "Español"
     }
+  },
+  "sidebar": {
+    "open": "Abrir barra lateral",
+    "close": "Cerrar barra lateral",
+    "delete_confirm": {
+      "title": "¿Eliminar esta conversación?",
+      "description": "Esto mueve “{{title}}” a Borrados recientemente. Puedes restaurarla antes de que se elimine permanentemente.",
+      "confirm": "Eliminar conversación"
+    }
+  },
+  "command_palette": {
+    "close": "Cerrar búsqueda",
+    "no_results": "No se encontraron resultados",
+    "no_conversations": "No hay conversaciones aún",
+    "rename_conversation": "Renombrar conversación",
+    "archive_conversation": "Archivar conversación",
+    "delete_conversation": "Eliminar conversación",
+    "preview": "Vista previa",
+    "preview_empty": "Abre esta conversación para ver sus mensajes.",
+    "open_conversation": "Abrir conversación",
+    "select_preview": "Selecciona una conversación para ver sus metadatos.",
+    "conversation_count_one": "{{count}} conversación",
+    "conversation_count_other": "{{count}} conversaciones"
   },
   "onboarding": {
     "prompt": "¿Cuál es tu objetivo principal ahora? No te preocupes, puedes cambiarlo después.",
@@ -306,6 +463,20 @@
       "errors": {
         "supabase_not_configured": "La autenticacion de Supabase no esta configurada."
       }
+    },
+    "signup": {
+      "subtitle": "Crea tu cuenta de alpha privada",
+      "name_placeholder": "Nombre",
+      "submit": "Registrarse",
+      "loading": "Creando cuenta...",
+      "new_account": "¿nuevo en argus?"
+    },
+    "password": {
+      "show": "Mostrar contrasena",
+      "hide": "Ocultar contrasena"
+    },
+    "errors": {
+      "generic": "Algo salio mal. Intentalo de nuevo."
     }
   },
   "landing": {

@@ -5,9 +5,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from loguru import logger
 
-from argus.api import chat_service, pagination, search_utils
+from argus.api import pagination, search_utils
 from argus.api import state as api_state
+from argus.api.chat.breakdown import llm_result_breakdown_message
+from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.dependencies import request_id_middleware
 from argus.api.routers import (
     agent,
@@ -28,20 +31,21 @@ from argus.api.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     checkpointer_cm = None
-    if api_state.PERSISTENCE_MODE == "supabase":
-        import os
-
-        database_url = os.getenv("DATABASE_URL", "").strip()
-        if not database_url:
-            raise RuntimeError(
-                "DATABASE_URL is required when ARGUS_PERSISTENCE_MODE=supabase."
-            )
+    if api_state.CHECKPOINTER_MODE == "postgres":
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-        checkpointer_cm = AsyncPostgresSaver.from_conn_string(database_url)
+        checkpointer_cm = AsyncPostgresSaver.from_conn_string(
+            api_state.DATABASE_URL,
+            serde=api_state.build_agent_runtime_checkpoint_serde(),
+        )
         checkpointer = await checkpointer_cm.__aenter__()
         await checkpointer.setup()
     else:
+        if api_state.PERSISTENCE_MODE == "supabase":
+            logger.info(
+                "Using Supabase product persistence with memory LangGraph checkpointer",
+                checkpointer_mode=api_state.CHECKPOINTER_MODE,
+            )
         checkpointer = api_state.build_agent_runtime_checkpointer()
 
     app.state.agent_runtime_checkpointer = checkpointer
@@ -122,5 +126,5 @@ _encode_cursor = pagination.encode_cursor
 _decode_cursor = pagination.decode_cursor
 _search_type_rank = search_utils.search_type_rank
 _score_search_item = search_utils.score_search_item
-_runtime_confirmation_card = chat_service.runtime_confirmation_card
-_llm_result_breakdown_message = chat_service.llm_result_breakdown_message
+_runtime_confirmation_card = runtime_confirmation_card
+_llm_result_breakdown_message = llm_result_breakdown_message

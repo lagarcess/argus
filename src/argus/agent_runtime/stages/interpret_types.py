@@ -35,8 +35,35 @@ SemanticTurnAct = Literal[
     "refine_current_idea",
     "educational_question",
     "result_followup",
+    "retry_failed_action",
     "approval",
     "unsupported_request",
+]
+ResultFollowupFocus = Literal[
+    "why_underperformed",
+    "max_drawdown",
+    "what_tested",
+    "next_experiment",
+    "assumptions",
+    "general",
+]
+CapabilityQuestionFocus = Literal[
+    "supported_strategies",
+    "supported_indicators",
+    "limits",
+    "assets",
+    "general",
+]
+ContextQuestionFocus = Literal[
+    "macro_context",
+    "corporate_events",
+    "market_movers",
+]
+ArtifactTarget = Literal[
+    "none",
+    "active_confirmation",
+    "pending_refinement",
+    "latest_result",
 ]
 
 
@@ -58,6 +85,10 @@ class InterpretDecision(BaseModel):
     unsupported_constraints: list[UnsupportedConstraint] = Field(default_factory=list)
     resolution_provenance: list[ResolutionProvenance] = Field(default_factory=list)
     semantic_turn_act: SemanticTurnAct | None = None
+    result_followup_focus: ResultFollowupFocus | None = None
+    capability_question_focus: CapabilityQuestionFocus | None = None
+    context_question_focus: ContextQuestionFocus | None = None
+    artifact_target: ArtifactTarget | None = None
 
     def to_patch(self) -> dict[str, Any]:
         ambiguous = [item.model_dump(mode="python") for item in self.ambiguous_fields]
@@ -95,6 +126,9 @@ class InterpretDecision(BaseModel):
             "unsupported_constraints": unsupported,
             "resolution_provenance": resolution_provenance,
             "semantic_turn_act": self.semantic_turn_act,
+            "result_followup_focus": self.result_followup_focus,
+            "capability_question_focus": self.capability_question_focus,
+            "context_question_focus": self.context_question_focus,
         }
 
 
@@ -127,6 +161,10 @@ class StructuredInterpretation(BaseModel):
         default_factory=ResponseProfileOverrides
     )
     semantic_turn_act: SemanticTurnAct | None = None
+    result_followup_focus: ResultFollowupFocus | None = None
+    capability_question_focus: CapabilityQuestionFocus | None = None
+    context_question_focus: ContextQuestionFocus | None = None
+    artifact_target: ArtifactTarget | None = None
 
 
 class InterpretationRequest(BaseModel):

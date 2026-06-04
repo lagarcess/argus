@@ -5,6 +5,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -15,6 +16,11 @@ from alpaca.trading.enums import AssetStatus
 from alpaca.trading.requests import GetAssetsRequest
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
+AssetProviderMode = Literal[
+    "live_provider",
+    "recorded_provider_fixture",
+    "synthetic_unit_fixture",
+]
 
 
 @dataclass(frozen=True)
@@ -25,25 +31,19 @@ class ResolvedAsset:
     raw_symbol: str
 
 
-ASSET_SEARCH_ALIASES = {
-    "alphabet": ("GOOG", "GOOGL"),
-    "amazon": ("AMZN",),
-    "apple": ("AAPL",),
-    "bitcoin": ("BTC", "BTCUSD"),
-    "btc": ("BTC", "BTCUSD"),
-    "ethereum": ("ETH", "ETHUSD"),
-    "ether": ("ETH", "ETHUSD"),
-    "euro dollar": ("EURUSD",),
-    "eur usd": ("EURUSD",),
-    "eurusd": ("EURUSD",),
-    "facebook": ("META",),
-    "forex": ("EURUSD",),
-    "google": ("GOOG", "GOOGL"),
-    "meta": ("META",),
-    "microsoft": ("MSFT",),
-    "netflix": ("NFLX",),
-    "nvidia": ("NVDA",),
-    "tesla": ("TSLA",),
+SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
+    "AAPL": ("equity", "Apple Inc.", "AAPL"),
+    "AMZN": ("equity", "Amazon.com Inc.", "AMZN"),
+    "BTC": ("crypto", "Bitcoin", "BTC/USD"),
+    "ETH": ("crypto", "Ethereum", "ETH/USD"),
+    "GOOG": ("equity", "Alphabet Inc. Class C", "GOOG"),
+    "GOOGL": ("equity", "Alphabet Inc. Class A", "GOOGL"),
+    "META": ("equity", "Meta Platforms Inc.", "META"),
+    "MSFT": ("equity", "Microsoft Corporation", "MSFT"),
+    "NFLX": ("equity", "Netflix Inc.", "NFLX"),
+    "NVDA": ("equity", "NVIDIA Corporation", "NVDA"),
+    "SPY": ("equity", "SPDR S&P 500 ETF Trust", "SPY"),
+    "TSLA": ("equity", "Tesla Inc.", "TSLA"),
 }
 
 
@@ -62,6 +62,17 @@ def _cache_ttl_seconds() -> int:
     except ValueError:
         value = 900
     return max(value, 60)
+
+
+def _asset_provider_mode() -> AssetProviderMode:
+    raw = (os.getenv("ARGUS_MARKET_DATA_PROVIDER_MODE") or "live_provider").strip()
+    if raw in {
+        "live_provider",
+        "recorded_provider_fixture",
+        "synthetic_unit_fixture",
+    }:
+        return raw  # type: ignore[return-value]
+    raise ValueError("invalid_provider_mode")
 
 
 def _normalize_symbol(symbol: str) -> str:
@@ -187,6 +198,10 @@ def _load_assets_from_kraken() -> dict[str, ResolvedAsset]:
     if not isinstance(pairs, dict):
         raise ValueError("asset_universe_unavailable")
 
+    return _load_kraken_asset_pairs(pairs)
+
+
+def _load_kraken_asset_pairs(pairs: dict[str, object]) -> dict[str, ResolvedAsset]:
     aliases: dict[str, ResolvedAsset] = {}
     for key, row in pairs.items():
         if not isinstance(row, dict) or row.get("status") not in {None, "online"}:
@@ -225,7 +240,88 @@ def _load_assets_from_kraken() -> dict[str, ResolvedAsset]:
     return aliases
 
 
+def _load_synthetic_unit_assets() -> dict[str, ResolvedAsset]:
+    aliases: dict[str, ResolvedAsset] = {}
+    for symbol, (asset_class, name, raw_symbol) in SYNTHETIC_UNIT_ASSETS.items():
+        resolved = ResolvedAsset(
+            canonical_symbol=symbol,
+            asset_class=asset_class,
+            name=name,
+            raw_symbol=raw_symbol,
+        )
+        _add_aliases(aliases, resolved, canonical=symbol)
+        aliases[name.lower().strip()] = resolved
+
+    return aliases
+
+
+def _load_recorded_provider_fixture_assets() -> dict[str, ResolvedAsset]:
+    raw_path = (os.getenv("ARGUS_ASSET_FIXTURE_PATH") or "").strip()
+    if not raw_path:
+        raise ValueError("asset_universe_unavailable")
+    fixture_path = Path(raw_path).expanduser()
+    try:
+        payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ValueError("asset_universe_unavailable") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("asset_universe_unavailable")
+
+    aliases: dict[str, ResolvedAsset] = {}
+    alpaca_assets = payload.get("alpaca_assets") or []
+    if isinstance(alpaca_assets, list):
+        aliases.update(_load_alpaca_asset_rows(alpaca_assets))
+
+    kraken_pairs = payload.get("kraken_asset_pairs") or payload.get("asset_pairs") or {}
+    if isinstance(kraken_pairs, dict):
+        aliases.update(_load_kraken_asset_pairs(kraken_pairs))
+
+    if not aliases:
+        raise ValueError("asset_universe_unavailable")
+    return aliases
+
+
+def _load_alpaca_asset_rows(rows: list[object]) -> dict[str, ResolvedAsset]:
+    aliases: dict[str, ResolvedAsset] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        status = str(row.get("status") or "active").lower()
+        if status != "active":
+            continue
+        raw_symbol = str(row.get("symbol") or "").upper()
+        raw_name = str(row.get("name") or "")
+        asset_class = _asset_class_for_row(str(row.get("asset_class") or ""))
+        if not raw_symbol or asset_class is None:
+            continue
+        canonical = (
+            _canonicalize_crypto_symbol(raw_symbol)
+            if asset_class == "crypto"
+            else _normalize_symbol(raw_symbol)
+        )
+        if not canonical:
+            continue
+        resolved = ResolvedAsset(
+            canonical_symbol=canonical,
+            asset_class=asset_class,
+            name=raw_name,
+            raw_symbol=raw_symbol,
+        )
+        _add_aliases(aliases, resolved, canonical=canonical)
+        name_alias = raw_name.lower().strip()
+        if name_alias:
+            aliases[name_alias] = resolved
+
+    return aliases
+
+
 def _load_asset_universe() -> dict[str, ResolvedAsset]:
+    mode = _asset_provider_mode()
+    if mode == "synthetic_unit_fixture":
+        return _load_synthetic_unit_assets()
+    if mode == "recorded_provider_fixture":
+        return _load_recorded_provider_fixture_assets()
+
     aliases: dict[str, ResolvedAsset] = {}
     first_error: Exception | None = None
     for loader in (_load_assets_from_alpaca, _load_assets_from_kraken):
@@ -280,7 +376,33 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
         if alt:
             return alt
 
+    confident_name_matches = _high_confidence_name_matches(symbol)
+    if len(confident_name_matches) == 1:
+        return confident_name_matches[0]
+
+    if _is_unresolved_ticker_like_query(symbol):
+        raise ValueError("invalid_symbol")
+
+    # 4. Provider-backed name search. This is intentionally sourced from the
+    # loaded catalog, so a common name can only resolve when a provider record
+    # exists in the active mode.
+    matches = search_assets(symbol, limit=2)
+    if matches and _name_match_score(lower_candidate, matches[0]) <= 1:
+        return matches[0]
+
     raise ValueError("invalid_symbol")
+
+
+def _is_unresolved_ticker_like_query(query: str) -> bool:
+    raw = str(query or "").strip()
+    compact = _compact_symbol(raw)
+    if not compact.isalpha() or not 2 <= len(compact) <= 5:
+        return False
+    return "/" not in raw and " " not in raw
+
+
+def is_ticker_like_query(query: str) -> bool:
+    return _is_unresolved_ticker_like_query(query)
 
 
 def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
@@ -293,13 +415,6 @@ def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
         return []
 
     scored: dict[str, tuple[int, ResolvedAsset]] = {}
-    for alias in ASSET_SEARCH_ALIASES.get(lowered_query, ()):
-        record = _ASSET_ALIAS_MAP.get(_normalize_symbol(alias)) or _ASSET_ALIAS_MAP.get(
-            alias.lower()
-        )
-        if record is not None:
-            scored[record.canonical_symbol] = (0, record)
-
     for alias, record in _ASSET_ALIAS_MAP.items():
         alias_upper = _normalize_symbol(alias)
         name_lower = record.name.lower().strip()
@@ -325,6 +440,35 @@ def search_assets(query: str, *, limit: int = 12) -> list[ResolvedAsset]:
         key=lambda item: (item[0], item[1].asset_class, item[1].canonical_symbol),
     )
     return [record for _, record in ranked[: max(1, min(limit, 25))]]
+
+
+def _high_confidence_name_matches(query: str) -> list[ResolvedAsset]:
+    lowered_query = query.lower().strip()
+    if not lowered_query:
+        return []
+    assert _ASSET_ALIAS_MAP is not None
+    seen: set[str] = set()
+    matches: list[tuple[int, ResolvedAsset]] = []
+    for record in _ASSET_ALIAS_MAP.values():
+        if record.canonical_symbol in seen:
+            continue
+        seen.add(record.canonical_symbol)
+        score = _name_match_score(lowered_query, record)
+        if score <= 1:
+            matches.append((score, record))
+    matches.sort(key=lambda item: (item[0], item[1].asset_class, item[1].canonical_symbol))
+    return [record for _, record in matches]
+
+
+def _name_match_score(query: str, record: ResolvedAsset) -> int:
+    name = record.name.lower().strip()
+    if query == name:
+        return 0
+    if name.startswith(query):
+        return 1
+    if query and query in name:
+        return 2
+    return 3
 
 
 def clear_asset_cache() -> None:

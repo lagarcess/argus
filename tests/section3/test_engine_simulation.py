@@ -211,6 +211,38 @@ def test_validate_backtest_config_rejects_custom_parameters() -> None:
         engine.validate_backtest_config(config)
 
 
+def test_validate_backtest_config_distinguishes_chronology_and_future_dates() -> None:
+    base_config = {
+        "template": "buy_and_hold",
+        "asset_class": "equity",
+        "symbols": ["AAPL"],
+        "timeframe": "1D",
+        "side": "long",
+        "starting_capital": 10000,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {},
+    }
+
+    with pytest.raises(ValueError, match="invalid_chronological_date_range"):
+        engine.validate_backtest_config(
+            {
+                **base_config,
+                "start_date": "2024-12-31",
+                "end_date": "2024-01-01",
+            }
+        )
+
+    with pytest.raises(ValueError, match="future_end_date"):
+        engine.validate_backtest_config(
+            {
+                **base_config,
+                "start_date": "2026-01-01",
+                "end_date": "2099-12-31",
+            }
+        )
+
+
 def test_validate_backtest_config_accepts_custom_rsi_thresholds() -> None:
     config = engine.normalize_backtest_config(
         {
@@ -261,7 +293,7 @@ def test_validate_backtest_config_rejects_out_of_bounds_indicator_threshold() ->
         engine.validate_backtest_config(config)
 
 
-def test_validate_backtest_config_rejects_lookback_over_three_years() -> None:
+def test_validate_backtest_config_allows_equity_history_beyond_three_years() -> None:
     config = engine.normalize_backtest_config(
         {
             "template": "dca_accumulation",
@@ -277,8 +309,52 @@ def test_validate_backtest_config_rejects_lookback_over_three_years() -> None:
             "parameters": {},
         }
     )
-    with pytest.raises(ValueError, match="invalid_lookback_window"):
+
+    engine.validate_backtest_config(config)
+
+
+def test_validate_backtest_config_rejects_equity_history_before_alpaca_window() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "equity",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "start_date": date(2015, 12, 31),
+            "end_date": date(2016, 1, 15),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "SPY",
+            "parameters": {},
+        }
+    )
+
+    with pytest.raises(ValueError) as excinfo:
         engine.validate_backtest_config(config)
+    assert str(excinfo.value) == "provider_history_start_unavailable"
+
+
+def test_validate_backtest_config_rejects_currency_pair_windows_by_kraken_candles() -> None:
+    config = engine.normalize_backtest_config(
+        {
+            "template": "buy_and_hold",
+            "asset_class": "currency_pair",
+            "symbols": ["EURUSD"],
+            "timeframe": "1h",
+            "start_date": date(2025, 1, 1),
+            "end_date": date(2025, 2, 15),
+            "side": "long",
+            "starting_capital": 10000,
+            "allocation_method": "equal_weight",
+            "benchmark_symbol": "EURUSD",
+            "parameters": {},
+        }
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        engine.validate_backtest_config(config)
+    assert str(excinfo.value) == "kraken_ohlc_window_exceeded"
 
 
 def test_build_benchmark_curve_aligns_and_normalizes() -> None:
@@ -382,13 +458,13 @@ def test_multi_symbol_aggregate_uses_equal_weight_capital() -> None:
 def test_indicator_signals_use_user_selected_thresholds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    index = pd.date_range("2025-01-01", periods=5, freq="D", tz="UTC")
-    bars = pd.DataFrame({"close": [100, 101, 102, 103, 104]}, index=index)
+    index = pd.date_range("2025-01-01", periods=16, freq="D", tz="UTC")
+    bars = pd.DataFrame({"close": list(range(100, 116))}, index=index)
     monkeypatch.setattr(
         engine,
         "_resolve_indicator_series",
         lambda data, *, indicator, period, fallback_col="close": pd.Series(
-            [35, 24, 29, 61, 50],
+            [35, 24, 29, 61, 50, *([50] * 11)],
             index=data.index,
         ),
     )
@@ -398,7 +474,7 @@ def test_indicator_signals_use_user_selected_thresholds(
             "template": "rsi_mean_reversion",
             "parameters": {
                 "indicator": "rsi",
-                "indicator_period": 10,
+                "indicator_period": 2,
                 "entry_threshold": 25,
                 "exit_threshold": 60,
             },
@@ -406,8 +482,10 @@ def test_indicator_signals_use_user_selected_thresholds(
         bars,
     )
 
-    assert entries.tolist() == [False, True, False, False, False]
-    assert exits.tolist() == [False, False, False, True, False]
+    assert entries.iloc[:5].tolist() == [False, True, False, False, False]
+    assert not entries.iloc[5:].any()
+    assert exits.iloc[:5].tolist() == [False, False, False, True, False]
+    assert not exits.iloc[5:].any()
 
 
 def test_compute_alpha_metrics_preserves_contract_shape_multi_symbol() -> None:
@@ -493,22 +571,38 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     card = engine.build_result_card(config, metrics)
     row_keys = [row["key"] for row in card["rows"]]
     assert row_keys[:4] == [
-        "total_return_pct",
         "cash_value",
-        "max_drawdown_pct",
+        "total_return_pct",
         "benchmark_delta",
+        "max_drawdown_pct",
     ]
     assert "win_rate" in row_keys
     actions = [a["type"] for a in card["actions"]]
     assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
-    assert card["actions"][0]["label"] == "Show a breakdown"
+    assert card["actions"][0]["label"] == "Explain result"
+    assert card["actions"][1]["label"] == "Save"
+    assert card["actions"][2]["label"] == "Refine idea"
+    labels = [row["label"] for row in card["rows"][:4]]
+    assert labels == [
+        "Ending value",
+        "Total return",
+        "Compared with SPY",
+        "Worst drop",
+    ]
+    assert card["assumptions"] == [
+        "Long-only",
+        "Equal weight",
+        "No fees/slippage",
+        "Benchmark: SPY",
+    ]
+    assert card["benchmark_note"] is None
 
     # Case 2: Multi-symbol (between 2 and 4)
     config["symbols"] = ["AAPL", "MSFT"]
     card = engine.build_result_card(config, metrics)
     actions = [a["type"] for a in card["actions"]]
     assert actions == ["show_breakdown", "save_strategy", "refine_strategy"]
-    assert card["actions"][1]["label"] == "Save strategy"
+    assert card["actions"][1]["label"] == "Save"
 
     # Case 3: Max symbols (5)
     config["symbols"] = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"]
@@ -519,7 +613,7 @@ def test_build_result_card_actions_by_symbol_count() -> None:
 
     # Verify Spanish labels
     card = engine.build_result_card(config, metrics, language="es-419")
-    assert card["actions"][1]["label"] == "Guardar estrategia"
+    assert card["actions"][1]["label"] == "Guardar"
 
 
 def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:
@@ -551,10 +645,10 @@ def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> 
     card = engine.build_result_card(config, metrics)
 
     assert [row["key"] for row in card["rows"]] == [
-        "total_return_pct",
         "cash_value",
-        "max_drawdown_pct",
+        "total_return_pct",
         "benchmark_delta",
+        "max_drawdown_pct",
     ]
 
 

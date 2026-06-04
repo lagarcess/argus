@@ -17,9 +17,14 @@ from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDa
 from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
+from argus.domain.market_data.capabilities import (
+    KRAKEN_MAX_OHLC_CANDLES,
+    KRAKEN_OHLC_TIMEFRAME_MINUTES,
+    expected_candle_count,
+)
+
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 KRAKEN_PUBLIC_API_BASE = "https://api.kraken.com/0"
-KRAKEN_MAX_OHLC_CANDLES = 720
 
 
 def _cache_location() -> str | None:
@@ -83,24 +88,26 @@ def _parse_timeframe(timeframe: str) -> TimeFrame:
 
 
 def _kraken_interval_minutes(timeframe: str) -> int:
-    normalized = timeframe.strip().lower()
-    mapping = {
-        "1h": 60,
-        "4h": 240,
-        "1d": 1440,
-    }
-    if normalized not in mapping:
+    normalized = _normalize_provider_timeframe(timeframe)
+    interval = KRAKEN_OHLC_TIMEFRAME_MINUTES.get(normalized)
+    if interval is None:
         raise ValueError("unsupported_timeframe")
-    return mapping[normalized]
+    return interval
+
+
+def _normalize_provider_timeframe(timeframe: str) -> str:
+    normalized = timeframe.strip()
+    return "1D" if normalized.lower() == "1d" else normalized.lower()
 
 
 def _expected_candle_count(
     *, start_date: date, end_date: date, interval_minutes: int
 ) -> int:
-    start_dt = _to_utc_datetime(start_date, end_of_day=False)
-    end_dt = _to_utc_datetime(end_date, end_of_day=True)
-    span_minutes = max(0, int((end_dt - start_dt).total_seconds() // 60))
-    return span_minutes // interval_minutes + 1
+    return expected_candle_count(
+        start_date=start_date,
+        end_date=end_date,
+        interval_minutes=interval_minutes,
+    )
 
 
 def _kraken_public_get(path: str, params: dict[str, object] | None = None) -> dict:

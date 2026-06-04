@@ -53,6 +53,12 @@ def raise_backtest_problem(
             "Unsupported Timeframe",
             "Supported timeframes are 1h, 2h, 4h, 6h, 12h, and 1D.",
         ),
+        "provider_timeframe_unavailable": (
+            422,
+            "Timeframe Unavailable",
+            "That asset is not available at the selected bar size in the current "
+            "launch path. Use 1h, 4h, or 1D bars for this kind of test.",
+        ),
         "unsupported_side": (
             422,
             "Unsupported Position Side",
@@ -78,10 +84,21 @@ def raise_backtest_problem(
             "Invalid Date Range",
             "start_date must be before end_date and end_date cannot be in the future.",
         ),
-        "invalid_lookback_window": (
+        "invalid_chronological_date_range": (
             422,
-            "Invalid Lookback Window",
-            "Alpha supports lookback windows up to 3 years.",
+            "Invalid Date Range",
+            "start_date must be before end_date.",
+        ),
+        "future_end_date": (
+            422,
+            "Future End Date",
+            "end_date cannot be later than today.",
+        ),
+        "provider_history_start_unavailable": (
+            422,
+            "History Unavailable",
+            "Equity launch history starts in 2016 for this path. Choose a start "
+            "date in 2016 or later.",
         ),
         "stablecoin_not_supported": (
             422,
@@ -105,10 +122,9 @@ def raise_backtest_problem(
         ),
         "kraken_ohlc_window_exceeded": (
             422,
-            "Kraken Data Window Exceeded",
-            "Currency and Kraken crypto data can use only the latest 720 "
-            "candles for the selected timeframe. Choose a shorter date range "
-            "or a wider timeframe.",
+            "Data Window Too Wide",
+            "That date range is too wide for the selected bar size in the current "
+            "launch path. Choose a shorter date range or a wider timeframe.",
         ),
     }
     status_code, title, detail = mapping.get(

@@ -169,7 +169,7 @@ Errors follow RFC 9457 Problem Details.
   "type": "https://api.argus.app/problems/unsupported-timeframe",
   "title": "Unsupported Timeframe",
   "status": 422,
-  "detail": "Supported timeframes are 1h, 2h, 4h, 6h, 12h, and 1D. Lookback cannot exceed 3 years.",
+  "detail": "Supported timeframes are 1h, 2h, 4h, 6h, 12h, and 1D. Provider availability depends on asset class, timeframe, and date range.",
   "code": "unsupported_timeframe",
   "request_id": "uuid"
 }
@@ -285,14 +285,20 @@ Application-facing user object.
 Message `metadata` may include structured continuity artifacts. Assistant
 messages may store `pending_strategy`, `confirmation_card`,
 `confirmation_payload`, `result_card`, `result_run_id`, `latest_run_id`,
-`result_strategy_id`, and `result_conversation_id`. User messages created by
-action chips may store `chat_action` so the transcript can hydrate the selected
-chip as an action item after reload. Clients use these fields to hydrate cards
-and actions after reload. Runtime execution still validates against the
-LangGraph checkpoint first. A confirmation card may include
-`confirmation_id` and `confirmation_state`; only the latest active confirmation
-can execute, and older cards are transcript history. Result actions that mutate
-state must reference a canonical run id.
+`result_strategy_id`, and `result_conversation_id`. Additive artifact metadata
+may also include `artifact_id`, `artifact_type`, `artifact_status`,
+`active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
+`failed_action`, and `result_fact_bank`. User messages created by action chips
+may store `chat_action` so the transcript can hydrate the selected chip as an
+action item after reload. Clients use these fields to hydrate cards and actions
+after reload. Runtime execution still validates against the LangGraph checkpoint
+first. A confirmation card may include `confirmation_id` and
+`confirmation_state`; only the latest active confirmation can execute, and older
+cards are transcript history. Result actions that mutate state must reference a
+canonical run id. `result_fact_bank` is a backend-provided, run-derived context
+object for result follow-ups; it is not a second metrics source of truth.
+`saved_strategy_id` marks a result artifact as already saved and must be treated
+as idempotent display state after reload.
 
 ## Strategy
 
@@ -678,7 +684,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 
 ### Timeframe & Lookback
 - **Supported:** "1h", "2h", "4h", "6h", "12h", "1D"
-- **Constraints:** No timeframe lower than "1h". Lookback cannot exceed 3 years. Daily defaults to a 12-month window when dates are omitted.
+- **Constraints:** No timeframe lower than "1h". Provider availability depends on asset class, timeframe, and date range: Alpaca equity history starts in 2016 for the launch path; Kraken OHLC currency-pair windows are limited to the latest 720 candles for the requested interval. Daily defaults to a 12-month window when dates are omitted.
 - *Return 422 for unsupported combinations.*
 
 ### Date Range
@@ -698,6 +704,14 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 
 **Supported auth mode:**
 - email + password
+
+**Private-alpha access:**
+- Private-alpha signup and login are gated by the server-side Supabase `private_alpha_allowlist` table.
+- `POST /auth/signup` must check the allowlist before calling Supabase Auth signup, so blocked emails do not create auth users or profiles.
+- `POST /auth/login` must also check the allowlist before creating a browser session, so disabled or unlisted emails cannot enter the app.
+- Authenticated API requests must also reject users whose email is missing from the allowlist or has been disabled, so an existing session cannot keep using hidden private-alpha access indefinitely.
+- The allowlist is intentionally minimal: `email`, `role`, `disabled_at`, `created_at`, and `updated_at`. Real invite email tracking is deferred until there is an invite workflow.
+- Access is not controlled by a frontend flag or comma-separated deployed env var.
 
 **Potential later modes:**
 - username + password mapped to email-backed identity
@@ -726,6 +740,18 @@ Create account.
 }
 ```
 
+**Private-alpha blocked response:**
+```json
+{
+  "type": "https://api.argus.app/problems/private-alpha-access-required",
+  "title": "Private Alpha Access",
+  "status": 403,
+  "detail": "Argus is in private alpha right now. Use the email that was invited, or ask the Argus team for access.",
+  "code": "private_alpha_access_required",
+  "request_id": "uuid"
+}
+```
+
 ## `POST /auth/login`
 
 **Request:**
@@ -744,6 +770,8 @@ Create account.
   "session": {}
 }
 ```
+
+**Private-alpha blocked response:** same `403 private_alpha_access_required` shape as signup.
 
 ## `POST /auth/logout`
 
@@ -939,17 +967,19 @@ Create new chat thread.
 
 ## `PATCH /conversations/{id}`
 
-Rename, pin, or archive.
+Rename, pin, archive, or restore a soft-deleted conversation.
 
 **Request:**
 ```json
 {
   "title": "New Name",
   "pinned": true,
-  "archived": false
+  "archived": false,
+  "deleted_at": null
 }
 ```
 *Note: User-provided title changes set `title_source = user_renamed`.*
+*Note: Recently deleted restore actions clear `deleted_at` by sending `null`.*
 
 ## `DELETE /conversations/{id}`
 
@@ -1001,8 +1031,54 @@ Soft delete conversation.
 - A DCA draft that contains unsupported starting principal / total capital semantics must route to clarification or simplification, not to a confident `Ready to run` card for both amounts.
 - `pending_strategy` metadata is the public reload/recovery artifact for pending, ready-for-confirmation, and awaiting-approval turns. It is not an executable approval by itself.
 - A runnable draft produced after a missing-field answer must emit confirmation before execution.
-- `show_breakdown` and `save_strategy` require canonical result run context.
+- `show_breakdown` and `save_strategy` require canonical result run context. In
+  private alpha, `save_strategy` must also respect server-side Strategies
+  gating (for example `ARGUS_STRATEGIES_ENABLED=false`) and must not create a
+  hidden saved-strategy object when the Strategies surface is disabled.
 - `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose.
+
+### Conversation Artifact Continuity Contract
+
+Chat turns that occur after a visible artifact must be interpreted against that
+artifact before they are treated as a standalone idea. This applies to button
+actions and to ordinary user text.
+
+**Artifact anchor resolution order:**
+1. `action.payload` artifact identifiers (`confirmation_id`, `run_id`,
+   `strategy_id`, `failed_action_id`, or `conversation_id`).
+2. Latest active confirmation metadata for the conversation.
+3. Latest completed result/run metadata for the conversation.
+4. Latest retryable failed-action metadata only when the user is retrying that
+   failed action.
+5. No anchor, which starts a new idea.
+
+**Patch semantics:**
+- The backend must build the next working draft from the anchor's canonical
+  payload: `confirmation_payload`, `backtest_runs.config_snapshot`,
+  saved-strategy state, or failed-action launch payload.
+- The user's message supplies a patch over that draft. Explicit new values win;
+  omitted values carry forward.
+- A partial edit such as "change the date range", "use NVDA instead", "make it
+  weekly", or "use $500" must not erase other canonical fields from the anchor.
+- Date, asset, cadence, money-role, timeframe, benchmark, and strategy-type
+  fields must preserve their prior canonical values unless the user explicitly
+  changes them or deterministic validation requires clarification.
+- If the patched draft is executable, the stream must return a new confirmation
+  payload. If it is not executable, the stream must return a targeted
+  clarification tied to the missing or invalid field.
+- Generic guidance responses such as "try next" are valid only for open-ended
+  result questions. They must not replace a patch response when the user is
+  modifying, rerunning, or retrying a known setup.
+
+**Retry semantics:**
+- `retry_last_turn` replays a specific failed user message and may include
+  `failed_assistant_id`.
+- `retry_failed_action` retries a specific failed action artifact and launch
+  payload.
+- A later user turn, new confirmation, completed result, or cancellation
+  supersedes stale retry affordances. Hydrated clients must hide or disable
+  stale retry actions when their referenced artifact is no longer the active
+  failed-action anchor.
 
 **Request:**
 ```json
@@ -1199,19 +1275,21 @@ data: [DONE]
 
 ## `PATCH /strategies/{id}`
 
-Rename, pin, metric preferences, update params.
+Rename, pin, metric preferences, update params, or restore a soft-deleted strategy.
 
 **Request:**
 ```json
 {
   "name": "Updated Name",
   "pinned": true,
+  "deleted_at": null,
   "metrics_preferences": [
     "win_rate",
     "sharpe_ratio"
   ]
 }
 ```
+*Note: Recently deleted restore actions clear `deleted_at` by sending `null`.*
 
 ## `DELETE /strategies/{id}`
 
@@ -1221,7 +1299,10 @@ Soft delete.
 
 # 14. Collections
 
-Launch flag: collection endpoints remain part of the API contract and the tables remain in Supabase, but dedicated collection UI should be hidden when `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`. Strategy saving from chat must use result/run state and should not depend on collections being visible.
+Private-alpha flag: collection endpoints remain part of the API contract and the
+tables remain in Supabase, but Collections are indefinitely deferred from the UI.
+Keep `NEXT_PUBLIC_COLLECTIONS_ENABLED=false`; no visible private-alpha path
+should create, attach, manage, search, or explain Collections.
 
 ## `GET /collections`
 
@@ -1415,6 +1496,8 @@ Mixed recent activity feed.
 - `cursor`
 - `type=all|chat|strategy|collection|run`
 - `asset_class=equity|crypto|currency_pair` (Optional filter)
+- `archived=false` (Optional; archived conversations are excluded by default)
+- `deleted=false` (Optional; soft-deleted items are excluded by default)
 
 **Response:**
 ```json
@@ -1567,7 +1650,7 @@ Not in current contract:
 
 When adding endpoints ask:
 
-> *Does this reduce friction for conversational investing idea testing?*
+> *Does this keep run facts reproducible, provider/source metadata explicit, and user-facing language separate from machine contracts?*
 
 If no, it likely should wait.
 

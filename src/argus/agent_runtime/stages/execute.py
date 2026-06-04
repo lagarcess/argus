@@ -1,18 +1,33 @@
 from __future__ import annotations
 
 import asyncio
-import re
+import hashlib
+import json
 from copy import deepcopy
 from typing import Any
 
 from argus.agent_runtime.recovery.policy import should_retry
+from argus.agent_runtime.rule_specs import (
+    executable_rule_spec_from_strategy,
+    indicator_threshold_rule,
+    opposite_moving_average_crossover_rule,
+    strategy_rule,
+)
 from argus.agent_runtime.stages.interpret import StageResult
-from argus.agent_runtime.state.models import ConfirmationPayload, RunState
+from argus.agent_runtime.state.models import (
+    ArtifactReference,
+    ConfirmationPayload,
+    RunState,
+)
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
     resolve_date_range,
 )
-from argus.domain.indicators import detect_executable_indicator_key
+from argus.domain.engine_launch.results import (
+    is_user_safe_failure_code,
+    user_safe_failure_detail,
+    user_safe_failure_message,
+)
 from argus.domain.market_data import resolve_asset
 
 
@@ -60,18 +75,24 @@ def execute_stage(
                 original_payload=payload,
                 corrected_payload=corrected_payload,
             ):
+                assistant_prompt = _fallback_prompt(
+                    error_type=failure_classification,
+                    error_message=_as_optional_str(envelope.get("error_message")),
+                    capability_context=capability_context,
+                )
                 return StageResult(
                     outcome="execution_failed_terminally",
                     stage_patch={
                         "tool_call_records": records,
                         "failure_classification": failure_classification,
-                        "assistant_prompt": _fallback_prompt(
-                            error_type=failure_classification,
-                            error_message=_as_optional_str(envelope.get("error_message")),
+                        "assistant_prompt": assistant_prompt,
+                        "final_response_payload": {"error": assistant_prompt},
+                        **_failed_action_reference_patch(
+                            payload=payload,
+                            failure_classification=failure_classification,
+                            error=assistant_prompt,
+                            retryable=False,
                         ),
-                        "final_response_payload": {
-                            "error": _as_optional_str(envelope.get("error_message")),
-                        },
                     },
                 )
         if not should_retry(
@@ -86,21 +107,21 @@ def execute_stage(
                 "unsupported_capability",
                 "ambiguous_user_intent",
             }:
+                assistant_prompt = _fallback_prompt(
+                    error_type=failure_classification,
+                    error_message=_as_optional_str(envelope.get("error_message")),
+                    capability_context=capability_context,
+                )
                 return StageResult(
                     outcome="needs_clarification",
                     stage_patch={
                         "tool_call_records": records,
                         "failure_classification": failure_classification,
-                        "assistant_prompt": _fallback_prompt(
-                            error_type=failure_classification,
-                            error_message=_as_optional_str(envelope.get("error_message")),
-                        ),
+                        "assistant_prompt": assistant_prompt,
                         "missing_required_fields": _missing_required_fields(
                             capability_context
                         ),
-                        "final_response_payload": {
-                            "error": _as_optional_str(envelope.get("error_message")),
-                        },
+                        "final_response_payload": {"error": assistant_prompt},
                     },
                 )
             recovery_prompt = _recoverable_execution_prompt(
@@ -119,20 +140,32 @@ def execute_stage(
                         "final_response_payload": {
                             "error": recovery_prompt,
                         },
+                        **_failed_action_reference_patch(
+                            payload=payload,
+                            failure_classification=failure_classification,
+                            error=recovery_prompt,
+                            retryable=True,
+                        ),
                     },
                 )
+            assistant_prompt = _fallback_prompt(
+                error_type=failure_classification,
+                error_message=_as_optional_str(envelope.get("error_message")),
+                capability_context=capability_context,
+            )
             return StageResult(
                 outcome="execution_failed_terminally",
                 stage_patch={
                     "tool_call_records": records,
                     "failure_classification": failure_classification,
-                    "assistant_prompt": _fallback_prompt(
-                        error_type=failure_classification,
-                        error_message=_as_optional_str(envelope.get("error_message")),
+                    "assistant_prompt": assistant_prompt,
+                    "final_response_payload": {"error": assistant_prompt},
+                    **_failed_action_reference_patch(
+                        payload=payload,
+                        failure_classification=failure_classification,
+                        error=assistant_prompt,
+                        retryable=False,
                     ),
-                    "final_response_payload": {
-                        "error": _as_optional_str(envelope.get("error_message")),
-                    },
                 },
             )
         if error_type == "parameter_validation_error":
@@ -155,19 +188,32 @@ def execute_stage(
                 "failure_classification": last_error_type,
                 "assistant_prompt": recovery_prompt,
                 "final_response_payload": {"error": recovery_prompt},
+                **_failed_action_reference_patch(
+                    payload=payload,
+                    failure_classification=last_error_type,
+                    error=recovery_prompt,
+                    retryable=True,
+                ),
             },
         )
 
+    assistant_prompt = _fallback_prompt(
+        error_type=last_error_type,
+        error_message=retry_exhausted,
+    )
     return StageResult(
         outcome="execution_failed_terminally",
         stage_patch={
             "tool_call_records": records,
             "failure_classification": last_error_type,
-            "assistant_prompt": _fallback_prompt(
-                error_type=last_error_type,
-                error_message=retry_exhausted,
+            "assistant_prompt": assistant_prompt,
+            "final_response_payload": {"error": assistant_prompt},
+            **_failed_action_reference_patch(
+                payload=payload,
+                failure_classification=last_error_type,
+                error=assistant_prompt,
+                retryable=False,
             ),
-            "final_response_payload": {"error": retry_exhausted},
         },
     )
 
@@ -200,7 +246,14 @@ def _confirmation_payload(state: RunState) -> dict[str, Any]:
 def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
     confirmation_payload = _confirmation_payload(state)
     if _is_launch_request_payload(confirmation_payload):
-        payload = dict(confirmation_payload)
+        payload = _normalize_launch_request_payload(dict(confirmation_payload))
+        payload["language"] = language
+        return payload
+    embedded_launch_payload = confirmation_payload.get("launch_payload")
+    if isinstance(embedded_launch_payload, dict) and _is_launch_request_payload(
+        embedded_launch_payload
+    ):
+        payload = _normalize_launch_request_payload(deepcopy(embedded_launch_payload))
         payload["language"] = language
         return payload
 
@@ -227,13 +280,22 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         "date_range": _resolve_date_range(strategy.get("date_range")),
         "entry_rule": _resolve_entry_rule(strategy, strategy_type),
         "exit_rule": _resolve_exit_rule(strategy, strategy_type),
+        "rule_spec": (
+            executable_rule_spec_from_strategy(strategy)
+            if strategy_type == "signal_strategy"
+            else None
+        ),
         "sizing_mode": sizing_mode,
         "capital_amount": capital_amount,
         "position_size": position_size if sizing_mode == "position_size" else None,
         "cadence": _resolve_cadence(strategy, optional_parameters, strategy_type),
         "parameters": _resolve_parameters(optional_parameters),
         "risk_rules": _resolve_risk_rules(strategy),
-        "benchmark_symbol": _resolve_benchmark_symbol(symbol, optional_parameters),
+        "benchmark_symbol": _resolve_benchmark_symbol(
+            symbol,
+            optional_parameters,
+            strategy=strategy,
+        ),
         "language": language,
     }
 
@@ -245,14 +307,22 @@ def _build_tool_call_record(
     envelope: dict[str, Any],
 ) -> dict[str, Any]:
     payload = envelope.get("payload")
+    error_type = _as_optional_str(envelope.get("error_type"))
+    capability_context = _safe_capability_context(
+        envelope.get("capability_context"),
+        failure_category=error_type,
+    )
     return {
         "tool_name": _tool_name(tool),
         "attempt": attempt,
         "success": bool(envelope.get("success")),
-        "error_type": _as_optional_str(envelope.get("error_type")),
-        "error_message": _as_optional_str(envelope.get("error_message")),
+        "error_type": error_type,
+        "error_message": _safe_error_message(
+            _as_optional_str(envelope.get("error_message")),
+            failure_category=error_type,
+        ),
         "retryable": bool(envelope.get("retryable")),
-        "capability_context": dict(envelope.get("capability_context") or {}),
+        "capability_context": capability_context,
         "payload": payload if isinstance(payload, dict) else {},
     }
 
@@ -273,10 +343,84 @@ def _final_response_payload(payload: Any) -> dict[str, Any]:
     return {"result": payload}
 
 
+def _failed_action_reference_patch(
+    *,
+    payload: dict[str, Any],
+    failure_classification: str | None,
+    error: str | None,
+    retryable: bool,
+) -> dict[str, Any]:
+    reference = ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id=_failed_action_id(payload=payload, error=error),
+        artifact_status="failed",
+        metadata={
+            "action_type": "run_backtest",
+            "launch_payload": deepcopy(payload),
+            "failure_classification": failure_classification,
+            "error": error,
+            "user_safe_message": error,
+            "retryable": retryable,
+            "recovery_mode": "reopen_confirmation",
+        },
+    )
+    return {
+        "latest_failed_action_reference": reference.model_dump(mode="python"),
+        "artifact_references": [reference.model_dump(mode="python")],
+    }
+
+
+def _failed_action_id(*, payload: dict[str, Any], error: str | None) -> str:
+    stable_payload = {"payload": payload, "error": error}
+    digest = hashlib.sha256(
+        json.dumps(stable_payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()[:16]
+    return f"failed-action-{digest}"
+
+
 def _as_optional_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _safe_capability_context(
+    value: Any,
+    *,
+    failure_category: str | None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    raw_failure_reason = _as_optional_str(
+        value.get("failure_reason") or value.get("failure_code")
+    )
+    safe_context = {
+        str(key): nested
+        for key, nested in value.items()
+        if key not in {"failure_reason", "failure_code"}
+    }
+    if raw_failure_reason is not None and "failure_detail" not in safe_context:
+        safe_context["failure_detail"] = user_safe_failure_detail(
+            failure_reason=raw_failure_reason,
+            failure_category=failure_category,
+        )
+    return safe_context
+
+
+def _safe_error_message(
+    error_message: str | None,
+    *,
+    failure_category: str | None,
+) -> str | None:
+    if error_message is None:
+        return None
+    if not is_user_safe_failure_code(error_message):
+        return error_message
+    safe_message = user_safe_failure_message(
+        failure_reason=error_message,
+        failure_category=failure_category,
+    )
+    return safe_message
 
 
 def _missing_required_fields(capability_context: dict[str, Any]) -> list[str]:
@@ -286,35 +430,74 @@ def _missing_required_fields(capability_context: dict[str, Any]) -> list[str]:
     return [str(field_name) for field_name in missing_fields]
 
 
-def _fallback_prompt(*, error_type: str | None, error_message: str | None) -> str | None:
+def _fallback_prompt(
+    *,
+    error_type: str | None,
+    error_message: str | None,
+    capability_context: dict[str, Any] | None = None,
+) -> str | None:
+    if _is_kraken_window_limit_error(error_message):
+        return (
+            "That date range is too wide for currency-pair data at the selected "
+            "bar size. "
+            "Use a shorter window, or choose 1h, 4h, or 1D bars based on what "
+            "still fits the idea."
+        )
+    if _is_provider_history_start_error(error_message):
+        return (
+            "That start date is earlier than the equity history Argus can use "
+            "right now. Choose a 2016-or-later start date and I can keep the "
+            "same idea."
+        )
     if _is_lookback_limit_error(error_message):
         return (
-            "That date range is longer than the current backtest engine supports. "
-            "Argus can run up to 3 years at a time right now. Choose a shorter "
-            "window, like February 7, 2021 - February 7, 2024, or change the "
-            "start and end dates."
+            "That date range is outside the available data history for the "
+            "selected asset and timeframe. Choose a shorter available window, or "
+            "change the start and end dates while keeping the same idea."
+        )
+    if error_type == "missing_required_input":
+        return (
+            "I need one more executable detail before I can run this. Tell me the "
+            "missing rule, asset, or date range and I will keep the current setup intact."
         )
     if error_type == "unsupported_capability":
-        if error_message:
-            return (
-                f"{error_message} I can help you reframe this into a supported backtest "
-                "or simplify it to a same-asset strategy Argus can run now."
-            )
         return (
             "That request is outside the current backtest capability. "
-            "I can help you reframe it into a supported same-asset strategy."
+            "I can help you reframe this into a supported backtest or simplify "
+            "it to a same-asset strategy Argus can run now."
         )
     if error_type == "ambiguous_user_intent":
-        if error_message:
-            return (
-                f"{error_message} Should I keep working on the current idea, "
-                "or are you starting a new backtest?"
-            )
         return (
             "I need one clarification before I run anything. "
             "Should I keep working on the current idea, or are you starting a new backtest?"
         )
-    return error_message
+    if error_type == "parameter_validation_error":
+        if _failure_detail(capability_context) == "future_date_window":
+            return user_safe_failure_message(
+                failure_reason="future_end_date",
+                failure_category=error_type,
+            )
+        return (
+            "I could not run this because one detail is not valid for the current "
+            "backtest. Adjust the asset, rules, or dates and I can try again from "
+            "the current setup."
+        )
+    if error_type == "upstream_dependency_error":
+        return (
+            "The run hit a temporary data or service issue. Try again from the "
+            "current setup or adjust it first."
+        )
+    return (
+        "The backtest could not complete. Try again from the current setup or "
+        "adjust it first."
+    )
+
+
+def _failure_detail(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    detail = value.get("failure_detail")
+    return str(detail).strip() if detail is not None else None
 
 
 def _recoverable_execution_prompt(
@@ -334,9 +517,9 @@ def _recoverable_execution_prompt(
 
     draft_label = _draft_label_from_payload(payload)
     return (
-        f"I still have the {draft_label}, but I could not get market data for that "
-        "run right now. Try again, change the dates, or choose a different supported "
-        "asset and I will keep the draft intact."
+        f"The {draft_label} setup is still here, but I could not get market data "
+        "for that run right now. Try again, change the dates, or choose a different "
+        "supported asset."
     )
 
 
@@ -351,7 +534,12 @@ def _is_market_data_unavailable_error(
         for record in records
         if isinstance(record, dict)
     )
-    return any("market_data_unavailable" in value for value in values)
+    values.extend(
+        str((record.get("capability_context") or {}).get("failure_detail") or "")
+        for record in records
+        if isinstance(record, dict) and isinstance(record.get("capability_context"), dict)
+    )
+    return any("market_data" in value for value in values)
 
 
 def _draft_label_from_payload(payload: dict[str, Any]) -> str:
@@ -367,6 +555,8 @@ def _draft_label_from_payload(payload: dict[str, Any]) -> str:
         return f"{symbol_prefix}buy-and-hold draft".strip()
     if strategy_type == "indicator_threshold":
         return f"{symbol_prefix}indicator-rule draft".strip()
+    if strategy_type == "signal_strategy":
+        return f"{symbol_prefix}signal-strategy draft".strip()
     return f"{symbol_prefix}strategy draft".strip()
 
 
@@ -374,7 +564,21 @@ def _is_lookback_limit_error(error_message: str | None) -> bool:
     if not error_message:
         return False
     normalized = error_message.strip().lower()
-    return "invalid_lookback_window" in normalized or "lookback" in normalized
+    return "invalid_lookback_window" in normalized
+
+
+def _is_kraken_window_limit_error(error_message: str | None) -> bool:
+    if not error_message:
+        return False
+    normalized = error_message.strip().lower()
+    return "kraken_ohlc_window_exceeded" in normalized
+
+
+def _is_provider_history_start_error(error_message: str | None) -> bool:
+    if not error_message:
+        return False
+    normalized = error_message.strip().lower()
+    return "provider_history_start_unavailable" in normalized
 
 
 def _corrected_payload(capability_context: dict[str, Any]) -> dict[str, Any] | None:
@@ -398,6 +602,7 @@ def _correction_preserves_user_intent(
         "asset_universe",
         "entry_logic",
         "exit_logic",
+        "rule_spec",
         "date_range",
     )
     return all(
@@ -418,6 +623,7 @@ def _strategy_fields(payload: dict[str, Any]) -> dict[str, Any]:
             "asset_universe": [payload.get("symbol")],
             "entry_logic": payload.get("entry_rule"),
             "exit_logic": payload.get("exit_rule"),
+            "rule_spec": payload.get("rule_spec"),
             "date_range": payload.get("date_range"),
         }
     strategy = payload.get("strategy", {})
@@ -479,12 +685,12 @@ def _retry_exhausted_message(records: list[dict[str, Any]]) -> str:
     if not records:
         return "Retry limit reached"
     last_record = records[-1]
-    error_message = _as_optional_str(last_record.get("error_message"))
-    if error_message:
-        return f"Retry limit reached after the last upstream failure: {error_message}"
     error_type = _as_optional_str(last_record.get("error_type"))
     if error_type:
-        return f"Retry limit reached after the last upstream failure: {error_type}"
+        return _fallback_prompt(
+            error_type=_runtime_failure_classification(error_type),
+            error_message=None,
+        ) or "Retry limit reached"
     return "Retry limit reached"
 
 
@@ -498,6 +704,35 @@ def _is_launch_request_payload(payload: dict[str, Any]) -> bool:
         "benchmark_symbol",
     }
     return required_fields.issubset(payload)
+
+
+def _normalize_launch_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    parameters = normalized.get("parameters")
+    if isinstance(parameters, dict):
+        normalized["parameters"] = _strategy_parameters_from_launch_payload(parameters)
+    return normalized
+
+
+def _strategy_parameters_from_launch_payload(parameters: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(parameters)
+    for field_name in ("fees", "slippage"):
+        value = normalized.get(field_name)
+        if _is_zero_like(value):
+            normalized.pop(field_name, None)
+    engine_options = normalized.get("engine_options")
+    if isinstance(engine_options, dict) and not engine_options:
+        normalized.pop("engine_options", None)
+    return normalized
+
+
+def _is_zero_like(value: Any) -> bool:
+    if value in (None, "", 0, 0.0, "0", "0.0"):
+        return True
+    try:
+        return float(value) == 0.0
+    except (TypeError, ValueError):
+        return False
 
 
 def _strategy_payload(
@@ -526,14 +761,20 @@ def _resolve_strategy_type(
     strategy: dict[str, Any],
     optional_parameters: dict[str, Any],
 ) -> str:
-    explicit_strategy_type = strategy.get("strategy_type")
-    if isinstance(explicit_strategy_type, str) and explicit_strategy_type:
-        return canonical_strategy_type(
-            explicit_strategy_type,
-            entry_logic=strategy.get("entry_logic"),
-            exit_logic=strategy.get("exit_logic"),
-            cadence=strategy.get("cadence"),
-        )
+    explicit_strategy_type = _explicit_strategy_type(strategy)
+    if explicit_strategy_type in {"buy_and_hold", "dca_accumulation"}:
+        return explicit_strategy_type
+    entry_rule = strategy_rule(strategy, "entry")
+    if isinstance(entry_rule, dict) and entry_rule.get("type") == "moving_average_crossover":
+        return "signal_strategy"
+    if executable_rule_spec_from_strategy(strategy) is not None:
+        return "signal_strategy"
+    if explicit_strategy_type == "indicator_threshold":
+        return explicit_strategy_type
+    if indicator_threshold_rule(strategy, "entry") is not None:
+        return "indicator_threshold"
+    if explicit_strategy_type == "signal_strategy":
+        return "signal_strategy"
 
     extra_parameters = strategy.get("extra_parameters")
     if isinstance(extra_parameters, dict):
@@ -551,9 +792,37 @@ def _resolve_strategy_type(
     cadence = _resolve_cadence(strategy, optional_parameters, "dca_accumulation")
     if cadence is not None:
         return "dca_accumulation"
-    if strategy.get("entry_logic") or strategy.get("exit_logic"):
-        return "indicator_threshold"
     return "buy_and_hold"
+
+
+def _explicit_strategy_type(strategy: dict[str, Any]) -> str | None:
+    candidates: list[Any] = [strategy.get("strategy_type")]
+    extra_parameters = strategy.get("extra_parameters")
+    if isinstance(extra_parameters, dict):
+        candidates.extend(
+            [
+                extra_parameters.get("raw_strategy_type"),
+                extra_parameters.get("strategy_type"),
+                extra_parameters.get("template"),
+            ]
+        )
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate:
+            continue
+        normalized = canonical_strategy_type(
+            candidate,
+            entry_logic=strategy.get("entry_logic"),
+            exit_logic=strategy.get("exit_logic"),
+            cadence=strategy.get("cadence"),
+        )
+        if normalized in {
+            "buy_and_hold",
+            "dca_accumulation",
+            "indicator_threshold",
+            "signal_strategy",
+        }:
+            return normalized
+    return None
 
 
 def _normalize_strategy_type(value: str) -> str:
@@ -589,58 +858,24 @@ def _resolve_entry_rule(
     strategy: dict[str, Any],
     strategy_type: str,
 ) -> dict[str, Any] | None:
-    if strategy_type != "indicator_threshold":
-        return None
-    return _parse_indicator_rule(strategy.get("entry_logic"))
+    if strategy_type == "signal_strategy":
+        return strategy_rule(strategy, "entry")
+    if strategy_type == "indicator_threshold":
+        return indicator_threshold_rule(strategy, "entry")
+    return None
 
 
 def _resolve_exit_rule(
     strategy: dict[str, Any],
     strategy_type: str,
 ) -> dict[str, Any] | None:
+    if strategy_type == "signal_strategy":
+        return strategy_rule(strategy, "exit") or opposite_moving_average_crossover_rule(
+            strategy_rule(strategy, "entry")
+        )
     if strategy_type != "indicator_threshold":
         return None
-    return _parse_indicator_rule(
-        strategy.get("exit_logic"),
-        default_indicator="rsi",
-    )
-
-
-def _parse_indicator_rule(
-    value: Any,
-    *,
-    default_indicator: str = "rsi",
-) -> dict[str, Any] | None:
-    if not isinstance(value, str):
-        return None
-
-    text = value.strip().lower()
-    if not text:
-        return None
-
-    threshold_match = re.search(
-        r"(?:below|under|above|over|<=|>=|<|>|drops?\s+(?:to|below)|"
-        r"rises?\s+(?:to|above))\s*(-?\d+(?:\.\d+)?)",
-        text,
-    )
-    if threshold_match is None:
-        without_indicator_period = re.sub(r"\b[a-z_]+\s*\(\s*\d+\s*\)", "", text)
-        threshold_match = re.search(r"(-?\d+(?:\.\d+)?)", without_indicator_period)
-    if threshold_match is None:
-        return None
-
-    if any(token in text for token in ("below", "under", "<")):
-        operator = "below"
-    elif any(token in text for token in ("above", "over", ">")):
-        operator = "above"
-    else:
-        return None
-
-    return {
-        "indicator": detect_executable_indicator_key(text, default=default_indicator),
-        "operator": operator,
-        "threshold": float(threshold_match.group(1)),
-    }
+    return indicator_threshold_rule(strategy, "exit")
 
 
 def _resolve_sizing_mode(optional_parameters: dict[str, Any]) -> str:
@@ -713,12 +948,12 @@ def _resolve_cadence(
 
 
 def _resolve_parameters(optional_parameters: dict[str, Any]) -> dict[str, Any]:
-    parameters: dict[str, Any] = {}
-    for field_name in ("fees", "slippage", "engine_options"):
-        value = _resolve_optional_value(optional_parameters, field_name)
-        if value is not None:
-            parameters[field_name] = value
-    return parameters
+    del optional_parameters
+    # User-visible execution assumptions are rendered on confirmation cards, but
+    # launch parameters are reserved for strategy inputs the backtest engine can
+    # execute. Leaking display assumptions into this namespace makes a valid card
+    # fail at run time with unsupported_parameters.
+    return {}
 
 
 def _resolve_risk_rules(strategy: dict[str, Any]) -> list[dict[str, Any]]:
@@ -734,7 +969,18 @@ def _resolve_risk_rules(strategy: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def _resolve_benchmark_symbol(symbol: str, optional_parameters: dict[str, Any]) -> str:
+def _resolve_benchmark_symbol(
+    symbol: str,
+    optional_parameters: dict[str, Any],
+    *,
+    strategy: dict[str, Any],
+) -> str:
+    benchmark = strategy.get("comparison_baseline")
+    if isinstance(benchmark, str) and benchmark.strip():
+        return benchmark.strip().upper()
+    strategy_benchmark = strategy.get("benchmark_symbol")
+    if isinstance(strategy_benchmark, str) and strategy_benchmark.strip():
+        return strategy_benchmark.strip().upper()
     value = _resolve_optional_value(optional_parameters, "benchmark_symbol")
     if isinstance(value, str) and value:
         return value.strip().upper()

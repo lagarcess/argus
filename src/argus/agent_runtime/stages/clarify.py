@@ -6,8 +6,17 @@ from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
+from argus.agent_runtime.stages.compose import (
+    compose_response_intent,
+    should_prefer_composed_intent,
+)
 from argus.agent_runtime.stages.interpret import StageResult
-from argus.agent_runtime.state.models import PendingNeedName, ResponseIntent, RunState
+from argus.agent_runtime.state.models import (
+    PendingNeedName,
+    ResponseIntent,
+    RunState,
+    StrategySummary,
+)
 
 OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
 OFFLINE_CLARIFICATION_FALLBACK = (
@@ -27,6 +36,7 @@ def clarify_stage(
     contract: CapabilityContract,
     clarification_generator: StructuredClarificationGenerator | None = None,
     language: str = "en",
+    prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
     return asyncio.run(
         clarify_stage_async(
@@ -34,6 +44,7 @@ def clarify_stage(
             contract=contract,
             clarification_generator=clarification_generator,
             language=language,
+            prefilled_assistant_prompt=prefilled_assistant_prompt,
         )
     )
 
@@ -44,6 +55,7 @@ async def clarify_stage_async(
     contract: CapabilityContract,
     clarification_generator: StructuredClarificationGenerator | None = None,
     language: str = "en",
+    prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
@@ -57,6 +69,11 @@ async def clarify_stage_async(
         unsupported_constraints=unsupported_constraints,
         optional_parameter_choices=optional_parameter_choices,
     )
+    unsupported_constraints = _blocking_unsupported_constraints(
+        state=state,
+        requested_fields=requested_fields,
+        unsupported_constraints=unsupported_constraints,
+    )
 
     if unsupported_constraints:
         options = _simplification_options(unsupported_constraints)
@@ -67,10 +84,15 @@ async def clarify_stage_async(
             facts={"unsupported_constraints": unsupported_constraints},
             options=options,
         )
+        assistant_prompt = _composed_prompt_for_response_intent(
+            state=state,
+            response_intent=response_intent,
+        )
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": await _generate_clarifying_question(
+                "assistant_prompt": assistant_prompt
+                or await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -81,7 +103,8 @@ async def clarify_stage_async(
                     language=language,
                 ),
                 "response_intent": response_intent,
-                "requested_field": None,
+                "requested_field": state.requested_field,
+                "missing_required_fields": list(state.missing_required_fields),
                 "unsupported_constraints": unsupported_constraints,
                 "simplification_options": options,
             },
@@ -109,7 +132,11 @@ async def clarify_stage_async(
                     language=language,
                 ),
                 "response_intent": response_intent,
-                "requested_field": None,
+                "requested_field": _requested_field_for_ambiguous_fields(
+                    state=state,
+                    requested_fields=requested_fields,
+                    ambiguous_fields=ambiguous_fields,
+                ),
                 "ambiguous_fields": ambiguous_fields,
             },
         )
@@ -144,10 +171,12 @@ async def clarify_stage_async(
 
     if _is_beginner_guidance_turn(state):
         response_intent = _response_intent(kind="beginner_guidance", state=state)
+        prefilled = _usable_prefilled_prompt(prefilled_assistant_prompt)
         return StageResult(
             outcome="await_user_reply",
             stage_patch={
-                "assistant_prompt": await _generate_clarifying_question(
+                "assistant_prompt": prefilled
+                or await _generate_clarifying_question(
                     state=state,
                     response_intent=response_intent,
                     missing_required_fields=[],
@@ -234,6 +263,26 @@ async def _generate_clarifying_question(
     return question or OFFLINE_CLARIFICATION_FALLBACK
 
 
+def _composed_prompt_for_response_intent(
+    *,
+    state: RunState,
+    response_intent: dict[str, object],
+) -> str | None:
+    state_with_intent = state.model_copy(
+        update={"response_intent": ResponseIntent.model_validate(response_intent)}
+    )
+    if not should_prefer_composed_intent(state_with_intent):
+        return None
+    return compose_response_intent(state_with_intent)
+
+
+def _usable_prefilled_prompt(value: str | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
 def _response_intent(
     *,
     kind: str,
@@ -244,6 +293,10 @@ def _response_intent(
     options: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     strategy = state.candidate_strategy_draft
+    semantic_needs = _expanded_semantic_needs(
+        strategy=strategy,
+        semantic_needs=semantic_needs or [],
+    )
     strategy_payload = (
         strategy.model_dump(mode="python")
         if hasattr(strategy, "model_dump")
@@ -253,7 +306,7 @@ def _response_intent(
     )
     payload = ResponseIntent(
         kind=kind,
-        semantic_needs=semantic_needs or [],
+        semantic_needs=semantic_needs,
         requested_fields=requested_fields or [],
         facts={
             "strategy": strategy_payload,
@@ -263,6 +316,23 @@ def _response_intent(
         options=options or [],
     )
     return payload.model_dump(mode="python")
+
+
+def _expanded_semantic_needs(
+    *,
+    strategy: StrategySummary,
+    semantic_needs: list[PendingNeedName],
+) -> list[PendingNeedName]:
+    needs = list(dict.fromkeys(semantic_needs))
+    if (
+        strategy.strategy_type == "dca_accumulation"
+        and "sizing_amount" in needs
+        and "schedule" not in needs
+        and strategy.cadence in (None, "", [], {})
+        and (strategy.extra_parameters or {}).get("cadence") in (None, "", [], {})
+    ):
+        needs.append("schedule")
+    return needs
 
 
 def _requested_fields(
@@ -289,14 +359,44 @@ def _requested_fields(
     return [
         field
         for field in state.missing_required_fields
-        if field in contract.required_fields or field == "capital_amount"
+        if field in contract.required_fields or field in {"capital_amount", "cadence"}
     ]
+
+
+def _requested_field_for_ambiguous_fields(
+    *,
+    state: RunState,
+    requested_fields: list[str],
+    ambiguous_fields: list[dict[str, object]],
+) -> str | None:
+    if state.requested_field:
+        return _field_base(state.requested_field)
+    base_fields = [
+        _field_base(field)
+        for field in requested_fields
+        if isinstance(field, str) and _field_base(field)
+    ]
+    if len(set(base_fields)) == 1:
+        return base_fields[0]
+    ambiguous_base_fields = [
+        _field_base(str(field.get("field_name") or ""))
+        for field in ambiguous_fields
+        if isinstance(field.get("field_name"), str)
+    ]
+    if len(set(ambiguous_base_fields)) == 1:
+        return ambiguous_base_fields[0]
+    return None
+
+
+def _field_base(field: str) -> str:
+    return field.split("[", 1)[0]
 
 
 def _semantic_needs_from_required_fields(fields: list[str]) -> list[PendingNeedName]:
     field_map: dict[str, PendingNeedName] = {
         "asset_universe": "asset_target",
         "capital_amount": "sizing_amount",
+        "cadence": "schedule",
         "date_range": "period",
         "entry_logic": "rule_definition",
         "exit_logic": "rule_definition",
@@ -371,6 +471,34 @@ def _unsupported_constraints(
     ]
 
 
+def _blocking_unsupported_constraints(
+    *,
+    state: RunState,
+    requested_fields: list[str],
+    unsupported_constraints: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    if not unsupported_constraints:
+        return []
+    if not _dca_execution_details_are_still_missing(state, requested_fields):
+        return unsupported_constraints
+    return [
+        constraint
+        for constraint in unsupported_constraints
+        if constraint.get("category") != "unsupported_dca_starting_principal"
+    ]
+
+
+def _dca_execution_details_are_still_missing(
+    state: RunState,
+    requested_fields: list[str],
+) -> bool:
+    strategy = state.candidate_strategy_draft
+    if strategy.strategy_type != "dca_accumulation":
+        return False
+    executable_fields = {"asset_universe", "date_range", "capital_amount", "cadence"}
+    return bool(executable_fields.intersection(requested_fields))
+
+
 def _simplification_options(
     unsupported_constraints: list[dict[str, object]],
 ) -> list[dict[str, object]]:
@@ -402,6 +530,6 @@ def _first_missing_required_field(
 ) -> str | None:
     required_fields = set(contract.required_fields)
     for field_name in missing_required_fields:
-        if field_name in required_fields or field_name == "capital_amount":
+        if field_name in required_fields or field_name in {"capital_amount", "cadence"}:
             return field_name
     return None

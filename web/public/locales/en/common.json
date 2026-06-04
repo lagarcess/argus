@@ -30,19 +30,68 @@
     "restore": "Restore",
     "permanently_delete": "Permanently delete",
     "submit": "Submit",
+    "more": "More",
+    "current": "Current",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "learn_more": "Learn more",
     "and": "and",
     "tap_to_cancel": "Tap elsewhere to cancel"
   },
   "feedback": {
+    "title": "Provide feedback",
     "title_bug": "Report a Bug",
     "title_feature": "Request a Feature",
     "title_general": "General Feedback",
     "title_rating": "Share feedback",
+    "eyebrow": "Feedback",
+    "type_label": "Feedback type",
+    "submit": "Submit feedback",
+    "success_detail": "Feedback submitted.",
+    "max_files": "Maximum 5 files allowed.",
+    "rating_message_fallback": "{{rating}} rating with tags",
+    "additional_details": "Additional details",
+    "details": "Details",
+    "rating_placeholder": "Tell us more about your experience...",
+    "details_placeholder": "What's on your mind?",
+    "attachments": "Attachments",
+    "attachments_with_count": "Attachments ({{count}}/5)",
+    "attach_files": "Click to attach files (max 5)",
+    "attach_files_feature": "Optional: add a screenshot, sketch, or example.",
+    "consent": "I consent to the Argus team processing this feedback and contacting me for follow-up details if necessary.",
+    "consent_feature": "I consent to the Argus team using this feature request and contacting me if follow-up would help.",
+    "rating_positive_prompt": "What went well?",
+    "rating_negative_prompt": "What went wrong?",
+    "subheading": {
+      "positive": "What worked well in this response?",
+      "negative": "What should be improved in this response?",
+      "bug": "File a bug report.",
+      "feature": "Request a feature for Argus.",
+      "general": "Share feedback about your Argus experience."
+    },
+    "type": {
+      "general": "General Feedback",
+      "bug": "Report a Bug",
+      "feature": "Request a Feature"
+    },
+    "bug": {
+      "title_field": "Title",
+      "title_placeholder": "Brief description of the issue",
+      "steps_field": "Steps to reproduce",
+      "steps_placeholder": "1. Go to [Page/View]\n2. Click on [Button/Action]\n3. See [Error/Behavior]",
+      "expected_field": "Expected outcome",
+      "actual_field": "Actual outcome",
+      "message_title": "Title",
+      "message_steps": "Steps to reproduce",
+      "message_expected": "Expected outcome",
+      "message_actual": "Actual outcome"
+    },
     "placeholder": "Tell us more...",
     "placeholder_details": "Share details (optional)",
     "success": "Thank you for your feedback!",
     "error": "Failed to send feedback. Please try again.",
-    "footer_note": "Your conversation will be included with your feedback to help improve Argus.",
+    "footer_note": "App context like this page and timestamp may be included to help us understand this feedback.",
+    "footer_note_conversation": "Your current conversation context may be included to help us understand this feedback.",
     "tags": {
       "positive": {
         "accurate": "Accurate and complete",
@@ -64,20 +113,22 @@
   },
   "chat": {
     "welcome": "Welcome to Argus. Tell me an investing idea in plain language and I will help test it with Alpha-safe assumptions.",
-    "input_placeholder": "Describe an investing idea...",
+    "input_placeholder": "Describe an investing idea",
+    "followup_placeholder": "Add a follow-up",
+    "disclaimer": "Argus can make mistakes. For education only. Not financial advice.",
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [
-      "What if I bought Tesla after big drops?",
-      "What if I bought Bitcoin every month?",
+      "How did Apple perform against SPY in 2024?",
+      "What if I bought Bitcoin at the start of 2024?",
       "Explain a market term in simple words.",
       "What happens if I hold Nvidia for a year?",
       "Compare Ethereum and Bitcoin over the last year.",
-      "Test buying SPY when it starts rising.",
+      "Test buying SPY at the start of 2024.",
       "How does buying strong stocks work?",
-      "What if I bought dividend stocks during a recession?",
-      "Try a simple Solana idea.",
-      "Why do people buy after a price drop?"
+      "What if I bought $250 of Nvidia every week in 2024?",
+      "Try a simple Solana buy-and-hold idea.",
+      "Why do people compare a stock to SPY?"
     ],
     "view_history": "View history",
     "chat_options": "Chat options",
@@ -85,16 +136,16 @@
     "hide_suggestions": "Hide suggestions",
     "starter_actions": {
       "tsla": {
-        "label": "Buy Tesla after drops",
-        "value": "What if I bought Tesla after big drops?"
+        "label": "Test Apple vs SPY",
+        "value": "Test Apple against SPY from January 1, 2024 through December 31, 2024 and show me the result."
       },
       "btc": {
-        "label": "Test Bitcoin strength",
-        "value": "What if I bought Bitcoin when it has been rising?"
+        "label": "Test Bitcoin (BTC) hold",
+        "value": "Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024."
       },
       "dca": {
-        "label": "Buy every month",
-        "value": "What if I bought a fixed amount every month?"
+        "label": "Test weekly Nvidia buys",
+        "value": "Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024."
       }
     },
     "example_queries": {
@@ -106,6 +157,10 @@
     "error_offline": "Argus could not reach the API yet. Start the FastAPI service, then send your idea again.",
     "error_load": "Could not load that conversation. Try again.",
     "error_backtest": "I couldn't finish that turn. Try once more, or start a fresh chat if this conversation was restored from an older local session.",
+    "error_generic": "Something went wrong. Try again.",
+    "result_trust_strip": "Historical simulation · No fees/slippage · Not advice",
+    "result_trust_strip_label": "Result trust context",
+    "view_details": "View details",
     "new_chat_ready": "New chat ready. What idea should we test?",
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",
     "try_new_strategy": "Try a new strategy",
@@ -114,10 +169,15 @@
       "today": "Today",
       "yesterday": "Yesterday",
       "last_7_days": "Last 7 days",
+      "last_30_days": "Last 30 days",
       "earlier": "Earlier"
     },
     "no_recent_activity": "No recent activity yet. Your strategies and chats will appear here.",
     "new_chat": "New chat",
+    "copy_conversation_link": "Copy conversation link",
+    "rename_chat": "Rename chat",
+    "pin_chat": "Pin chat",
+    "unpin_chat": "Unpin chat",
     "delete_chat": "Delete chat",
     "past_sessions": "Past sessions",
     "archive_chat": "Archive chat",
@@ -126,10 +186,65 @@
     "good_response": "Good response",
     "poor_response": "Poor response",
     "more_actions": "More Actions",
-    "copy_plaintext": "Copy Plaintext",
+    "copy_plaintext": "Copy Plain Text",
     "copy_id": "Copy ID",
+    "copy_success": "Copied",
+    "copy_failed": "Copy failed",
     "report_issue": "Report Issue",
+    "rename_failed": "Could not rename this chat. Try again.",
+    "saved": "Saved",
+    "saving": "Saving",
     "simulation_complete": "Simulation Complete",
+    "result_card": {
+      "ending_value": "Ending value",
+      "total_return": "Total return",
+      "compared_with_benchmark": "Compared with benchmark",
+      "compared_with_symbol": "Compared with {{symbol}}",
+      "worst_drop": "Worst drop",
+      "explain_result": "Explain result",
+      "refine_idea": "Refine idea",
+      "save": "Save",
+      "unavailable": "Unavailable",
+      "return_unavailable": "return unavailable",
+      "change": "change",
+      "gain": "gain",
+      "loss": "loss",
+      "total_return_suffix": "total return",
+      "benchmark_unavailable": "Benchmark unavailable",
+      "percentage_points": "{{value}} percentage points",
+      "in_line_with": "In line with {{symbol}}",
+      "beat_by": "Beat by {{value}}",
+      "lagged_by": "Lagged by {{value}}",
+      "details": {
+        "starting_capital": "Starting capital",
+        "date_range": "Date range",
+        "timeframe": "Timeframe",
+        "side": "Side",
+        "allocation": "Allocation",
+        "benchmark": "Benchmark",
+        "cadence": "Cadence",
+        "contribution": "Contribution",
+        "entry_rule": "Entry rule",
+        "exit_rule": "Exit rule"
+      },
+      "timeframe": {
+        "daily": "Daily data",
+        "hourly": "Hourly data",
+        "interval": "{{amount}}-{{unit}} data",
+        "generic": "{{value}} data"
+      }
+    },
+    "discovery": {
+      "prompt": "Mention an asset or indicator",
+      "searching": "Search results",
+      "empty": "Type after @ to search supported assets and indicators.",
+      "sections": {
+        "assets": "Popular assets",
+        "indicators": "Runnable indicators",
+        "draft": "Draft-only indicators",
+        "results": "Search results"
+      }
+    },
       "status": {
         "understanding": "Thinking...",
         "interpret": "Understanding your idea...",
@@ -164,8 +279,8 @@
     "best_performer": "Best performer",
     "suggestions": [
       {
-        "title": "RSI Mean Reversion",
-        "desc": "Buy oversold dips and sell overbought peaks.",
+        "title": "RSI Threshold",
+        "desc": "Buy or sell when RSI reaches chosen levels.",
         "prompt": "Design a strategy that buys the dip whenever the RSI falls below 30 and sells when it hits 70 for BTC."
       },
       {
@@ -220,7 +335,11 @@
   "settings": {
     "title": "Settings",
     "profile": {
-      "display_name": "Display Name"
+      "display_name": "Display name",
+      "default_user": "User",
+      "edit_display_name": "Edit display name",
+      "delete_account": "Delete account",
+      "title": "Profile"
     },
     "subscription": {
       "title": "Subscription",
@@ -229,6 +348,8 @@
     "app": {
       "title": "App",
       "language": "App language",
+      "sidebar": "Sidebar",
+      "security": "Security",
       "appearance": "Appearance",
       "appearance_options": {
         "light": "Light",
@@ -240,7 +361,20 @@
       "title": "Data & Information",
       "archived_chats": "Archived chats",
       "recently_deleted": "Recently deleted",
+      "close_recently_deleted": "Close recently deleted",
+      "deleted_retention_note": "Items stay here temporarily before permanent deletion.",
+      "deleted_item_note": "Eligible for permanent deletion soon",
+      "no_deleted_items": "No recently deleted items",
+      "chat_item": "Chat",
+      "strategy_item": "Strategy",
+      "delete_all_conversations": "Delete all conversations",
       "security": "Security"
+    },
+    "help": {
+      "title": "Help",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "release_notes": "Release Notes"
     },
     "about": {
       "title": "About",
@@ -260,6 +394,29 @@
       "en": "English",
       "es-419": "Spanish"
     }
+  },
+  "sidebar": {
+    "open": "Open sidebar",
+    "close": "Close sidebar",
+    "delete_confirm": {
+      "title": "Delete this conversation?",
+      "description": "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
+      "confirm": "Delete conversation"
+    }
+  },
+  "command_palette": {
+    "close": "Close search",
+    "no_results": "No results found",
+    "no_conversations": "No conversations yet",
+    "rename_conversation": "Rename conversation",
+    "archive_conversation": "Archive conversation",
+    "delete_conversation": "Delete conversation",
+    "preview": "Preview",
+    "preview_empty": "Open this conversation to view its messages.",
+    "open_conversation": "Open conversation",
+    "select_preview": "Select a conversation to preview its metadata.",
+    "conversation_count_one": "{{count}} conversation",
+    "conversation_count_other": "{{count}} conversations"
   },
   "onboarding": {
     "prompt": "What is your current primary goal? Don't worry, you can change it later.",
@@ -309,6 +466,20 @@
       "errors": {
         "supabase_not_configured": "Supabase auth is not configured."
       }
+    },
+    "signup": {
+      "subtitle": "Create your private alpha account",
+      "name_placeholder": "Name",
+      "submit": "Sign up",
+      "loading": "Creating account...",
+      "new_account": "new to argus?"
+    },
+    "password": {
+      "show": "Show password",
+      "hide": "Hide password"
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again."
     }
   },
   "landing": {

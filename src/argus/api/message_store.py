@@ -6,6 +6,7 @@ from loguru import logger
 
 from argus.agent_runtime.state.models import ConversationMessage
 from argus.api import state as api_state
+from argus.api.chat.previews import plain_text_preview
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import Conversation, Message
 from argus.domain.store import utcnow
@@ -32,10 +33,7 @@ def memory_conversation(
 
 
 def message_preview(content: str, max_length: int = 180) -> str | None:
-    preview = " ".join(content.split())
-    if not preview:
-        return None
-    return preview[:max_length]
+    return plain_text_preview(content, max_length=max_length)
 
 
 def memory_message(

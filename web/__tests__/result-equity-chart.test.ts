@@ -92,5 +92,26 @@ describe("ResultEquityChart marker disclosure", () => {
       seriesMarkers.length,
     );
     expect(seriesMarkers.filter((item) => item.text).length).toBeLessThanOrEqual(4);
+    expect(seriesMarkers.every((item) => item.size == null)).toBe(true);
+  });
+
+  test("can render restrained markers for the playground evidence card", () => {
+    const markers = Array.from({ length: 8 }, (_, index) =>
+      marker(index + 1, index % 2 === 0 ? "entry" : "exit"),
+    );
+
+    const seriesMarkers = buildVisibleSeriesMarkers({
+      markers,
+      visibleRange: logicalRange(0, 80),
+      chartWidth: 660,
+      dataIndexByTime: new Map(
+        markers.map((item, index) => [item.time, index]),
+      ),
+      restrained: true,
+    });
+
+    expect(seriesMarkers.some((item) => item.color === "rgba(112, 163, 141, 0.42)")).toBe(true);
+    expect(seriesMarkers.some((item) => item.color === "rgba(184, 92, 92, 0.38)")).toBe(true);
+    expect(seriesMarkers.every((item) => item.size === 0.46)).toBe(true);
   });
 });

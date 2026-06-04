@@ -1,3 +1,4 @@
+from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 from argus.domain.slot_normalizer import normalize_template_name
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
@@ -21,7 +22,7 @@ def test_dca_accumulation_has_cadence_parameter():
     spec = dca.parameters["dca_cadence"]
     assert spec.policy == "clarify_if_missing"
     assert spec.default == "monthly"
-    assert spec.allowed_values == ["daily", "weekly", "monthly"]
+    assert spec.allowed_values == list(SUPPORTED_DCA_CADENCE_VALUES)
 
 
 def test_strategy_aliases_are_present():

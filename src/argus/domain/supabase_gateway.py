@@ -8,6 +8,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
+import httpx
+
+from argus.api.chat.previews import plain_text_preview
 from argus.api.schemas import (
     BacktestRun,
     Collection,
@@ -18,7 +21,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.store import utcnow
-from supabase import Client, create_client
+from supabase import Client, ClientOptions, create_client
 
 
 class QuotaExceededError(Exception):
@@ -55,15 +58,76 @@ def _row_one(result: Any) -> dict[str, Any] | None:
 
 
 def _message_preview(content: str, max_length: int = 180) -> str | None:
-    preview = " ".join(content.split())
-    if not preview:
-        return None
-    return preview[:max_length]
+    return plain_text_preview(content, max_length=max_length)
+
+
+def _filter_history_runs_by_conversation_state(
+    runs: list[dict[str, Any]],
+    conversations: list[dict[str, Any]],
+    *,
+    archived: bool,
+    deleted: bool,
+) -> list[dict[str, Any]]:
+    conversations_by_id = {
+        str(row["id"]): row for row in conversations if row.get("id") is not None
+    }
+    include_orphan_runs = not archived and not deleted
+    filtered: list[dict[str, Any]] = []
+
+    for run in runs:
+        conversation_id = run.get("conversation_id")
+        if conversation_id is None:
+            if include_orphan_runs:
+                filtered.append(run)
+            continue
+        conversation = conversations_by_id.get(str(conversation_id))
+        if conversation is None:
+            if include_orphan_runs:
+                filtered.append(run)
+            continue
+        deleted_matches = (
+            conversation.get("deleted_at") is not None
+            if deleted
+            else conversation.get("deleted_at") is None
+        )
+        if deleted_matches and bool(conversation.get("archived", False)) == archived:
+            filtered.append(run)
+
+    return filtered
+
+
+def _filter_history_conversations_by_message_state(
+    conversations: list[dict[str, Any]],
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    conversation_ids_with_messages = {
+        str(row["conversation_id"])
+        for row in messages
+        if row.get("conversation_id") is not None
+    }
+    return [
+        row
+        for row in conversations
+        if row.get("id") is not None
+        and str(row["id"]) in conversation_ids_with_messages
+    ]
+
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def _supabase_client_options() -> ClientOptions:
+    return ClientOptions(
+        httpx_client=httpx.Client(http2=False, timeout=120),
+        postgrest_client_timeout=120,
+    )
 
 
 @dataclass
 class SupabaseGateway:
     client: Client
+    auth_client: Client | None = None
     mock_user_email: str | None = os.getenv("MOCK_USER_EMAIL")
     mock_user_password: str | None = os.getenv("MOCK_USER_PASSWORD")
     _cached_mock_user: User | None = None
@@ -76,7 +140,19 @@ class SupabaseGateway:
             raise RuntimeError(
                 "Supabase mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
             )
-        return cls(client=create_client(url, key))
+        auth_key = (
+            os.getenv("SUPABASE_ANON_KEY")
+            or os.getenv("SUPABASE_ANON_PUBLIC_KEY")
+            or key
+        )
+        return cls(
+            client=create_client(url, key, options=_supabase_client_options()),
+            auth_client=create_client(
+                url,
+                auth_key,
+                options=_supabase_client_options(),
+            ),
+        )
 
     def new_id(self) -> str:
         return str(uuid4())
@@ -103,6 +179,7 @@ class SupabaseGateway:
         user_id = user.id
         for table in (
             "feedback",
+            "usage_counters",
             "collection_strategies",
             "backtest_runs",
             "messages",
@@ -163,6 +240,19 @@ class SupabaseGateway:
         if user_id is None:
             raise RuntimeError("Unable to resolve mock auth user.")
 
+        existing = (
+            self.client.table("profiles")
+            .select("*")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        existing_row = _row_one(existing)
+        if existing_row is not None:
+            user = User.model_validate(existing_row)
+            self._cached_mock_user = user
+            return user
+
         now = _now_iso()
         profile = {
             "id": user_id,
@@ -192,7 +282,8 @@ class SupabaseGateway:
         username: str | None = None,
     ) -> dict[str, Any]:
         try:
-            response = self.client.auth.sign_up(
+            auth_client = self.auth_client or self.client
+            response = auth_client.auth.sign_up(
                 {
                     "email": email,
                     "password": password,
@@ -207,9 +298,27 @@ class SupabaseGateway:
         except Exception as e:
             raise RuntimeError(f"Signup failed: {e}") from e
 
+    def private_alpha_role_for_email(self, email: str) -> str | None:
+        rows = (
+            self.client.table("private_alpha_allowlist")
+            .select("email,role,disabled_at")
+            .eq("email", _normalize_email(email))
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        if not row or row.get("disabled_at") is not None:
+            return None
+        role = str(row.get("role") or "user").strip().lower()
+        return role if role in {"admin", "developer", "user"} else "user"
+
+    def private_alpha_email_allowed(self, email: str) -> bool:
+        return self.private_alpha_role_for_email(email) is not None
+
     def login(self, email: str, password: str) -> dict[str, Any]:
         try:
-            response = self.client.auth.sign_in_with_password(
+            auth_client = self.auth_client or self.client
+            response = auth_client.auth.sign_in_with_password(
                 {"email": email, "password": password}
             )
             if not response.session:
@@ -342,7 +451,7 @@ class SupabaseGateway:
             "conversation_id": conversation_id,
             "role": role,
             "content": content,
-            "metadata": metadata,
+            "metadata": metadata if metadata is not None else {},
             "created_at": _now_iso(),
         }
         created = self.client.table("messages").insert(payload).execute()
@@ -359,12 +468,90 @@ class SupabaseGateway:
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
 
+    def create_context_packet(
+        self,
+        *,
+        user_id: str,
+        packet: dict[str, Any],
+    ) -> dict[str, Any]:
+        payload = dict(packet)
+        payload["user_id"] = user_id
+        payload["packet"] = dict(packet)
+        created = self.client.table("context_packets").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
+    def attach_context_packet_to_run(
+        self,
+        *,
+        user_id: str,
+        attachment: dict[str, Any],
+    ) -> dict[str, Any]:
+        payload = {
+            "user_id": user_id,
+            "run_id": attachment["run_id"],
+            "context_packet_id": attachment["packet_id"],
+            "explanation_id": attachment.get("explanation_id"),
+            "attached_at": attachment.get("attached_at") or _now_iso(),
+            "immutable_snapshot": bool(attachment.get("immutable_snapshot", True)),
+        }
+        created = self.client.table("run_context_packets").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
+    def create_route_receipt(
+        self,
+        *,
+        user_id: str | None,
+        receipt: dict[str, Any],
+        conversation_id: str | None = None,
+        run_id: str | None = None,
+        message_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "run_id": run_id,
+            "message_id": message_id,
+            "task": receipt["task"],
+            "tier": receipt["tier"],
+            "model": receipt.get("model"),
+            "fallback_model": receipt.get("fallback_model"),
+            "mode": receipt["mode"],
+            "schema_name": receipt.get("schema_name"),
+            "latency_ms": receipt.get("latency_ms", 0),
+            "outcome": receipt["outcome"],
+            "failure_mode": receipt.get("failure_mode"),
+            "fallback_used": bool(receipt.get("fallback_used")),
+            "token_usage": receipt.get("token_usage"),
+            "context_packet_ids": receipt.get("context_packet_ids") or [],
+            "metadata": metadata or {},
+            "created_at": receipt.get("created_at") or _now_iso(),
+        }
+        created = self.client.table("route_receipts").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
     def get_backtest_run(self, *, user_id: str, run_id: str) -> BacktestRun | None:
         rows = (
             self.client.table("backtest_runs")
             .select("*")
             .eq("user_id", user_id)
             .eq("id", run_id)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(rows)
+        return BacktestRun.model_validate(row) if row else None
+
+    def get_latest_completed_run_for_conversation(
+        self, *, user_id: str, conversation_id: str
+    ) -> BacktestRun | None:
+        rows = (
+            self.client.table("backtest_runs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("conversation_id", conversation_id)
+            .eq("status", "completed")
+            .order("created_at", desc=True)
             .limit(1)
             .execute()
         )
@@ -400,17 +587,23 @@ class SupabaseGateway:
         ).eq("id", conversation_id).eq("user_id", user_id).execute()
 
     def list_history_rows(
-        self, *, user_id: str, limit: int | None, deleted: bool = False
+        self,
+        *,
+        user_id: str,
+        limit: int | None,
+        archived: bool = False,
+        deleted: bool = False,
     ) -> dict[str, list[dict[str, Any]]]:
         query_runs = (
             self.client.table("backtest_runs")
-            .select("id,conversation_result_card,created_at")
+            .select("id,conversation_id,conversation_result_card,created_at")
             .eq("user_id", user_id)
         )
         query_chats = (
             self.client.table("conversations")
-            .select("id,title,last_message_preview,pinned,updated_at,deleted_at")
+            .select("id,title,last_message_preview,pinned,updated_at,deleted_at,archived")
             .eq("user_id", user_id)
+            .eq("archived", archived)
         )
         query_strategies = (
             self.client.table("strategies")
@@ -455,6 +648,24 @@ class SupabaseGateway:
             chats = ordered_chats.limit(limit).execute().data or []
             strategies = ordered_strategies.limit(limit).execute().data or []
             collections = ordered_collections.limit(limit).execute().data or []
+        run_parent_conversations = self._fetch_history_run_conversation_states(
+            user_id=user_id,
+            runs=runs,
+        )
+        chat_message_states = self._fetch_history_conversation_message_states(
+            user_id=user_id,
+            conversations=chats,
+        )
+        runs = _filter_history_runs_by_conversation_state(
+            runs,
+            run_parent_conversations,
+            archived=archived,
+            deleted=deleted,
+        )
+        chats = _filter_history_conversations_by_message_state(
+            chats,
+            chat_message_states,
+        )
 
         return {
             "runs": runs,
@@ -462,6 +673,54 @@ class SupabaseGateway:
             "strategies": strategies,
             "collections": collections,
         }
+
+    def _fetch_history_run_conversation_states(
+        self,
+        *,
+        user_id: str,
+        runs: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        conversation_ids = sorted(
+            {
+                str(run["conversation_id"])
+                for run in runs
+                if run.get("conversation_id") is not None
+            }
+        )
+        if not conversation_ids:
+            return []
+        return (
+            self.client.table("conversations")
+            .select("id,archived,deleted_at")
+            .eq("user_id", user_id)
+            .in_("id", conversation_ids)
+            .execute()
+            .data
+            or []
+        )
+
+    def _fetch_history_conversation_message_states(
+        self,
+        *,
+        user_id: str,
+        conversations: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        conversation_ids = sorted(
+            {
+                str(conversation["id"])
+                for conversation in conversations
+                if conversation.get("id") is not None
+            }
+        )
+        if not conversation_ids:
+            return []
+        query = (
+            self.client.table("messages")
+            .select("conversation_id")
+            .eq("user_id", user_id)
+            .in_("conversation_id", conversation_ids)
+        )
+        return self._fetch_all_rows(lambda start, end: query.range(start, end))
 
     def search_rows(
         self, *, user_id: str, query: str, limit: int | None
@@ -799,9 +1058,17 @@ class SupabaseGateway:
 
     def get_or_create_profile_for_auth_user(self, auth_user: dict[str, Any]) -> User:
         user_id = auth_user["id"]
+        email = str(auth_user.get("email") or "").strip()
+        allowlist_role = self.private_alpha_role_for_email(email)
+        is_admin = allowlist_role in {"admin", "developer"}
         # Try to get existing profile
         existing = self.get_user(user_id=user_id)
         if existing is not None:
+            if is_admin and not existing.is_admin:
+                return self.update_user(
+                    user_id=user_id,
+                    updates={"id": user_id, "is_admin": True},
+                )
             return existing
 
         now = _now_iso()
@@ -809,12 +1076,13 @@ class SupabaseGateway:
         # Canonical defaults per requirements
         payload = {
             "id": user_id,
-            "email": auth_user.get("email"),
+            "email": email,
             "username": user_metadata.get("username"),
             "display_name": user_metadata.get("display_name"),
             "language": "en",
             "locale": "en-US",
             "theme": "dark",
+            "is_admin": is_admin,
             "onboarding": {
                 "completed": False,
                 "stage": "language_selection",

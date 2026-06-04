@@ -5,11 +5,8 @@ import {
   AlertCircle,
   Edit2,
   Layers,
-  Menu,
   Pin,
-  Plus,
   Search,
-  Settings,
   Trash2,
   X,
 } from "lucide-react";
@@ -17,7 +14,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   listCollections,
-  createCollection,
   patchCollection,
   deleteCollection as apiDeleteCollection,
   formatRelativeDate,
@@ -63,8 +59,6 @@ type CollectionsViewProps = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CollectionsView({
-  onMenuClick,
-  onAddClick,
   searchText,
   onSearchChange,
   isSidebarOpen,
@@ -79,7 +73,6 @@ export default function CollectionsView({
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(
     null,
   );
-  const [isCreating, setIsCreating] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -119,22 +112,6 @@ export default function CollectionsView({
   };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
-
-  const handleCreate = async () => {
-    setIsCreating(true);
-    try {
-      const { collection } = await createCollection();
-      const dateLabels = { today: t('common.today'), yesterday: t('common.yesterday') };
-      const display = mapCollection(collection, dateLabels);
-      setCollections((prev) => [display, ...prev]);
-      // Immediately enter rename mode for the new collection
-      setEditingId(display.id);
-    } catch {
-      // No-op — silently fail for now
-    } finally {
-      setIsCreating(false);
-    }
-  };
 
   const handleRename = async (id: string, newName: string) => {
     const trimmed = newName.trim();

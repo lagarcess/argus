@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
     StructuredInterpretation,
@@ -26,8 +28,21 @@ def _patch_resolve_asset(monkeypatch) -> None:
     def resolve_stub(symbol: str) -> ResolvedAssetStub:
         return ResolvedAssetStub(symbol.upper(), "equity")
 
+    def resolve_candidate_stub(
+        symbol: str,
+        *,
+        field: str,
+        source: str,
+    ) -> SimpleNamespace:
+        del field, source
+        return SimpleNamespace(status="resolved", asset=resolve_stub(symbol))
+
     monkeypatch.setattr(interpret_module, "resolve_asset", resolve_stub)
-    monkeypatch.setattr(extraction_module, "resolve_asset", resolve_stub)
+    monkeypatch.setattr(
+        extraction_module,
+        "resolve_asset_candidate",
+        resolve_candidate_stub,
+    )
 
 
 def _interpret_with(response: StructuredInterpretation):
@@ -35,6 +50,32 @@ def _interpret_with(response: StructuredInterpretation):
         return response
 
     return interpreter
+
+
+def _validated_confirmation_payload(strategy: StrategySummary) -> dict[str, object]:
+    symbol = strategy.asset_universe[0] if strategy.asset_universe else "SPY"
+    return {
+        "strategy": strategy.model_dump(mode="python"),
+        "optional_parameters": {},
+        "launch_payload": {
+            "strategy_type": strategy.strategy_type or "buy_and_hold",
+            "symbol": symbol,
+            "symbols": list(strategy.asset_universe),
+            "timeframe": "1D",
+            "date_range": {"start": "2025-05-14", "end": "2026-05-14"},
+            "entry_rule": None,
+            "exit_rule": None,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 1000,
+            "position_size": None,
+            "cadence": None,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "language": "en",
+        },
+        "validation": {"status": "ready_to_run", "executable": True},
+    }
 
 
 def test_partial_strategy_from_mock_interpreter_waits_for_missing_fields(
@@ -110,26 +151,26 @@ def test_ready_strategy_from_mock_interpreter_reaches_confirmation(monkeypatch) 
     assert result.decision.semantic_turn_act == "new_idea"
 
 
-def test_approval_uses_llm_semantic_turn_act_not_state_machine_confirmation(
+def test_text_approval_uses_llm_turn_act_but_defers_to_card_action(
     monkeypatch,
 ) -> None:
     _patch_resolve_asset(monkeypatch)
 
     pending = StrategySummary(
-        strategy_type="indicator_threshold",
-        strategy_thesis="Buy Apple when RSI is oversold.",
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Apple.",
         asset_universe=["AAPL"],
         asset_class="equity",
         date_range="last year",
-        entry_logic="RSI drops below 30",
-        exit_logic="RSI rises above 55",
     )
+    state = RunState.new(
+        current_user_message="yes run it",
+        recent_thread_history=[],
+    )
+    state.confirmation_payload = _validated_confirmation_payload(pending)
 
     result = interpret_stage(
-        state=RunState.new(
-            current_user_message="yes run it",
-            recent_thread_history=[],
-        ),
+        state=state,
         user=UserState(user_id="u1"),
         latest_task_snapshot=TaskSnapshot(
             latest_task_type="backtest_execution",
@@ -147,7 +188,6 @@ def test_approval_uses_llm_semantic_turn_act_not_state_machine_confirmation(
         ),
     )
 
-    assert result.outcome == "approved_for_execution"
-    assert result.patch["confirmation_payload"]["strategy"] == pending.model_dump(
-        mode="python"
-    )
+    assert result.outcome == "ready_to_respond"
+    assert "visible card" in result.patch["assistant_response"]
+    assert "start the simulation" in result.patch["assistant_response"]
