@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 
 
-class RetryLifecycleDecision(StrEnum):
+class RetryLifecycleDecision(str, Enum):
     ACTIVE = "active"
     SUPERSEDED = "superseded"
     EXPIRED = "expired"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 SUPERSEDING_ARTIFACT_KINDS = frozenset(
