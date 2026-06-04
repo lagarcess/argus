@@ -4,7 +4,7 @@ type ClipboardLike = {
 
 type TextareaLike = {
   value: string;
-  style?: Record<string, string>;
+  style?: Partial<Pick<CSSStyleDeclaration, "opacity" | "pointerEvents" | "position">>;
   focus: () => void;
   select: () => void;
   remove: () => void;
@@ -23,11 +23,31 @@ type ClipboardEnvironment = {
   document?: DocumentLike | null;
 };
 
+function runtimeClipboardDocument(): DocumentLike | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return {
+    createElement: (tagName) => document.createElement(tagName),
+    get body() {
+      return document.body
+        ? {
+            appendChild: (node: TextareaLike) => {
+              document.body.appendChild(node as HTMLTextAreaElement);
+            },
+          }
+        : undefined;
+    },
+    execCommand: (command) => document.execCommand(command),
+  };
+}
+
 function runtimeClipboardEnvironment(): ClipboardEnvironment {
   return {
     clipboard:
       typeof navigator !== "undefined" ? navigator.clipboard ?? null : null,
-    document: typeof document !== "undefined" ? document : null,
+    document: runtimeClipboardDocument(),
   };
 }
 
