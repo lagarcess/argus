@@ -272,10 +272,9 @@ async def _llm_explanation(
                 "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
                 "Return structured fields so the runtime can validate fact usage; "
                 "do not invent facts or supported next experiment kinds."
-                " For user-facing beat/lagged wording, use benchmark_comparison "
-                "or benchmark_delta_magnitude; do not phrase a lag as a negative "
-                "percentage return. When using benchmark_comparison, include that "
-                "fact phrase exactly."
+                " For user-facing beat/lagged wording, use the benchmark symbol "
+                "and benchmark_delta_magnitude from fact_bank; do not phrase a lag "
+                "as a negative percentage return."
             ),
         },
         {
@@ -435,7 +434,7 @@ def _render_quick_take_draft(
     for fact_id_value in response.fact_ids:
         fact_id = str(fact_id_value or "").strip()
         if fact_id not in fact_bank:
-            return None
+            continue
         used_fact_ids.add(fact_id)
     if not required_fact_ids.issubset(used_fact_ids):
         return None
@@ -492,12 +491,51 @@ def _quick_take_mentions_required_visible_facts(
         if line
     )
     benchmark_symbol = fact_bank.get("benchmark_symbol")
-    if benchmark_symbol and benchmark_symbol not in text:
+    if benchmark_symbol and not _contains_text(text, benchmark_symbol):
         return False
-    benchmark_comparison = fact_bank.get("benchmark_comparison")
-    if benchmark_comparison and benchmark_comparison not in text:
+    if not _mentions_benchmark_comparison(text=text, fact_bank=fact_bank):
         return False
     return True
+
+
+def _mentions_benchmark_comparison(
+    *,
+    text: str,
+    fact_bank: dict[str, str],
+) -> bool:
+    benchmark_comparison = fact_bank.get("benchmark_comparison")
+    if not benchmark_comparison:
+        return True
+    if _contains_text(text, benchmark_comparison):
+        return True
+    magnitude = fact_bank.get("benchmark_delta_magnitude")
+    magnitude_number = _first_numeric_token(magnitude)
+    return bool(magnitude_number and magnitude_number in _numeric_tokens(text))
+
+
+def _contains_text(text: str, needle: str) -> bool:
+    return needle.casefold() in text.casefold()
+
+
+def _first_numeric_token(value: str | None) -> str | None:
+    tokens = _numeric_tokens(value)
+    return tokens[0] if tokens else None
+
+
+def _numeric_tokens(value: str | None) -> list[str]:
+    normalized = str(value or "")
+    for separator in "%,;:()[]{}":
+        normalized = normalized.replace(separator, " ")
+    tokens: list[str] = []
+    for raw_token in normalized.split():
+        token = raw_token.strip()
+        try:
+            normalized_token = f"{float(token):.1f}"
+        except ValueError:
+            continue
+        if normalized_token not in tokens:
+            tokens.append(normalized_token)
+    return tokens
 
 
 def _next_check_kinds_are_supported(

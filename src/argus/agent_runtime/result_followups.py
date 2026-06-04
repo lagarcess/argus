@@ -566,7 +566,7 @@ def render_result_followup_draft(
     for fact_id_value in draft.fact_ids:
         fact_id = str(fact_id_value or "").strip()
         if fact_id not in fact_bank:
-            return None
+            continue
         if fact_id not in used_fact_ids:
             ordered_fact_ids.append(fact_id)
             used_fact_ids.add(fact_id)

@@ -243,6 +243,34 @@ def test_result_followup_rejects_dense_unstructured_answer() -> None:
     assert rendered is None
 
 
+def test_result_followup_ignores_unknown_optional_fact_ids_after_required_facts() -> None:
+    rendered = render_result_followup_draft(
+        draft=ResultFollowupDraft(
+            relative_performance_claim="beat_benchmark",
+            answer=(
+                "AAPL returned +39.7% in this historical run. Historical simulation "
+                "only, not a prediction."
+            ),
+            fact_ids=[
+                "symbols",
+                "total_return",
+                "caveat",
+                "optional_style_note",
+            ],
+        ),
+        fact_bank={
+            "symbols": "AAPL",
+            "total_return": "+39.7%",
+            "caveat": "Historical simulation only, not a prediction.",
+        },
+        required_fact_ids={"symbols", "total_return", "caveat"},
+        focus="general",
+    )
+
+    assert rendered is not None
+    assert "AAPL returned +39.7%" in rendered
+
+
 def test_result_followup_prompt_keeps_runtime_words_out_of_market_facts() -> None:
     messages = result_followup_llm_messages(
         fact_bank={

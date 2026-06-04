@@ -354,6 +354,71 @@ def test_anchor_resolution_prefers_targeted_active_confirmation() -> None:
     assert anchor.draft.comparison_baseline == "SPY"
 
 
+def test_anchor_resolution_uses_historical_confirmation_when_action_targets_older_card() -> None:
+    active_confirmation = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id="confirmation-current",
+        artifact_status="active",
+        metadata={
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["NVDA"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["NVDA"],
+                    "timeframe": "1D",
+                    "capital_amount": 1000,
+                    "benchmark_symbol": "QQQ",
+                },
+            },
+        },
+    )
+    historical_confirmation = ArtifactReference(
+        artifact_kind="confirmation",
+        artifact_id="artifact-old-confirmation",
+        artifact_status="superseded",
+        metadata={
+            "confirmation_id": "confirmation-old",
+            "confirmation_payload": {
+                "strategy": {
+                    "strategy_type": "buy_and_hold",
+                    "asset_universe": ["AAPL"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2023-01-01", "end": "2023-12-31"},
+                    "comparison_baseline": "SPY",
+                },
+                "launch_payload": {
+                    "strategy_type": "buy_and_hold",
+                    "symbols": ["AAPL"],
+                    "timeframe": "1D",
+                    "capital_amount": 500,
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        },
+    )
+    snapshot = TaskSnapshot(
+        active_confirmation_reference=active_confirmation,
+        artifact_references=[historical_confirmation],
+    )
+
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload={"confirmation_id": "confirmation-old"},
+    )
+
+    assert anchor.kind == "confirmation"
+    assert anchor.artifact_id == "confirmation-old"
+    assert anchor.draft is not None
+    assert anchor.draft.asset_universe == ["AAPL"]
+    assert anchor.draft.capital_amount == 500
+    assert anchor.draft.comparison_baseline == "SPY"
+
+
 def test_anchor_resolution_uses_result_when_action_targets_run() -> None:
     result = ArtifactReference(
         artifact_kind="backtest_result",
@@ -390,6 +455,62 @@ def test_anchor_resolution_uses_result_when_action_targets_run() -> None:
 
     assert anchor.kind == "result"
     assert anchor.artifact_id == "run-1"
+    assert anchor.draft is not None
+    assert anchor.draft.asset_universe == ["AAPL", "GOOG"]
+    assert anchor.draft.capital_amount == 200
+    assert anchor.draft.cadence == "monthly"
+
+
+def test_anchor_resolution_uses_historical_result_when_action_targets_older_run() -> None:
+    latest_result = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-current",
+        artifact_status="completed",
+        metadata={
+            "asset_class": "equity",
+            "symbols": ["NVDA"],
+            "benchmark_symbol": "QQQ",
+            "config_snapshot": {"template": "buy_and_hold"},
+        },
+    )
+    historical_result = ArtifactReference(
+        artifact_kind="backtest_result",
+        artifact_id="run-old",
+        artifact_status="completed",
+        metadata={
+            "asset_class": "equity",
+            "symbols": ["AAPL", "GOOG"],
+            "benchmark_symbol": "SPY",
+            "config_snapshot": {
+                "template": "dca_accumulation",
+                "symbols": ["AAPL", "GOOG"],
+                "resolved_strategy": {
+                    "strategy_type": "dca_accumulation",
+                    "asset_universe": ["AAPL", "GOOG"],
+                    "asset_class": "equity",
+                    "date_range": {"start": "2021-01-01", "end": "2024-01-31"},
+                    "capital_amount": 200,
+                    "cadence": "monthly",
+                },
+                "resolved_parameters": {
+                    "timeframe": "1D",
+                    "benchmark_symbol": "SPY",
+                },
+            },
+        },
+    )
+    snapshot = TaskSnapshot(
+        latest_backtest_result_reference=latest_result,
+        artifact_references=[historical_result],
+    )
+
+    anchor = resolve_artifact_anchor(
+        snapshot=snapshot,
+        action_payload={"run_id": "run-old"},
+    )
+
+    assert anchor.kind == "result"
+    assert anchor.artifact_id == "run-old"
     assert anchor.draft is not None
     assert anchor.draft.asset_universe == ["AAPL", "GOOG"]
     assert anchor.draft.capital_amount == 200

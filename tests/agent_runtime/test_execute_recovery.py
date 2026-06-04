@@ -1679,6 +1679,112 @@ async def test_explain_stage_async_renders_quick_take_from_canonical_facts(
 
 
 @pytest.mark.asyncio
+async def test_explain_stage_async_ignores_unknown_optional_fact_ids_after_required_facts(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "beat_benchmark",
+            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
+            "tested_bullet": "Tested AAPL buy and hold over the confirmed 2024 window.",
+            "meaning_bullet": "Optional metadata noise should not erase this grounded take.",
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Historical simulation only.",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+                "optional_style_note",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "AAPL buy and hold against QQQ.",
+            "asset_universe": ["AAPL"],
+            "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.35, "benchmark_return": 0.269},
+        "explanation_context": {"benchmark_symbol": "QQQ"},
+    }
+
+    result = await explain_stage_async(state=state)
+    response = result.stage_patch["assistant_response"]
+
+    assert "metadata noise should not erase this grounded take" in response
+
+
+@pytest.mark.asyncio
+async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "lagged_benchmark",
+            "takeaway": "AAPL trailed QQQ by 5.3 percentage points in this historical test.",
+            "tested_bullet": "Tested AAPL buy and hold over the confirmed window.",
+            "meaning_bullet": "The benchmark comparison is still visible without template wording.",
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Historical simulation only.",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "AAPL buy and hold against QQQ.",
+            "asset_universe": ["AAPL"],
+            "date_range": {"start": "2026-01-01", "end": "2026-05-31"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.151, "benchmark_return": 0.204},
+        "explanation_context": {"benchmark_symbol": "QQQ"},
+    }
+
+    result = await explain_stage_async(state=state)
+    response = result.stage_patch["assistant_response"]
+
+    assert "trailed QQQ by 5.3 percentage points" in response
+    assert "template wording" in response
+
+
+@pytest.mark.asyncio
 async def test_explain_stage_async_rejects_signed_benchmark_delta_copy(
     monkeypatch,
 ) -> None:

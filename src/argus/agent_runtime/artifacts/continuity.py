@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 from argus.agent_runtime.artifacts.drafts import (
     draft_from_confirmation_payload,
@@ -51,12 +51,24 @@ def resolve_artifact_anchor(
 
     run_id = _payload_id(payload, "run_id", "runId")
     if run_id:
-        return _matching_result_anchor(snapshot.latest_backtest_result_reference, run_id)
+        anchor = _matching_result_anchor(snapshot.latest_backtest_result_reference, run_id)
+        if anchor.kind != "none":
+            return anchor
+        return _matching_historical_result_anchor(
+            snapshot.artifact_references,
+            run_id,
+        )
 
     confirmation_id = _payload_id(payload, "confirmation_id", "artifact_id")
     if confirmation_id:
-        return _matching_confirmation_anchor(
+        anchor = _matching_confirmation_anchor(
             snapshot.active_confirmation_reference,
+            confirmation_id,
+        )
+        if anchor.kind != "none":
+            return anchor
+        return _matching_historical_confirmation_anchor(
+            snapshot.artifact_references,
             confirmation_id,
         )
 
@@ -185,6 +197,48 @@ def _matching_result_anchor(
     if reference is None or reference.artifact_id != requested_id:
         return _empty_anchor()
     return _result_anchor(reference)
+
+
+def _matching_historical_confirmation_anchor(
+    references: list[ArtifactReference],
+    requested_id: str,
+) -> ArtifactAnchor:
+    return _matching_historical_anchor(
+        references,
+        artifact_kind="confirmation",
+        requested_id=requested_id,
+        reference_id_func=_confirmation_reference_id,
+        anchor_func=_confirmation_anchor,
+    )
+
+
+def _matching_historical_result_anchor(
+    references: list[ArtifactReference],
+    requested_id: str,
+) -> ArtifactAnchor:
+    return _matching_historical_anchor(
+        references,
+        artifact_kind="backtest_result",
+        requested_id=requested_id,
+        reference_id_func=lambda reference: reference.artifact_id,
+        anchor_func=_result_anchor,
+    )
+
+
+def _matching_historical_anchor(
+    references: list[ArtifactReference],
+    *,
+    artifact_kind: str,
+    requested_id: str,
+    reference_id_func: Callable[[ArtifactReference], str],
+    anchor_func: Callable[[ArtifactReference], ArtifactAnchor],
+) -> ArtifactAnchor:
+    for reference in reversed(references):
+        if reference.artifact_kind != artifact_kind:
+            continue
+        if reference_id_func(reference) == requested_id:
+            return anchor_func(reference)
+    return _empty_anchor()
 
 
 def _confirmation_anchor(reference: ArtifactReference) -> ArtifactAnchor:
