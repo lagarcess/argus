@@ -387,6 +387,47 @@ def test_chat_stream_runtime_failure_persists_retry_last_turn_metadata(
     )
 
 
+def test_chat_stream_persists_runtime_start_marker_on_user_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    async def _crashing_stream_agent_turn_events(**_: Any):
+        raise RuntimeError("runtime died before first event")
+        yield {"type": "final", "payload": {}}
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _crashing_stream_agent_turn_events,
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Test AAPL and MSFT",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    user_message = next(item for item in messages if item["role"] == "user")
+    runtime_marker = user_message["metadata"]["agent_runtime_turn"]
+    assert runtime_marker["status"] == "started"
+    assert runtime_marker["conversation_id"] == conversation["id"]
+    assert runtime_marker["request_id"]
+    assert runtime_marker["started_at"]
+    assert messages[-1]["metadata"]["agent_runtime_stage_outcome"] == (
+        "agent_runtime_failure"
+    )
+
+
 def test_chat_stream_finalizes_ai_title_after_meaningful_turn(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

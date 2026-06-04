@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -529,6 +530,14 @@ class SupabaseGateway:
         }
         created = self.client.table("route_receipts").insert(payload).execute()
         return dict(_row_one(created) or {})
+
+    def health_check(self) -> dict[str, Any]:
+        started = time.perf_counter()
+        self.client.table("profiles").select("id").limit(1).execute()
+        return {
+            "status": "ready",
+            "duration_ms": int((time.perf_counter() - started) * 1000),
+        }
 
     def get_backtest_run(self, *, user_id: str, run_id: str) -> BacktestRun | None:
         rows = (

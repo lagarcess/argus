@@ -31,6 +31,17 @@ class ResolvedAsset:
     raw_symbol: str
 
 
+@dataclass(frozen=True)
+class AssetUniverseWarmupResult:
+    status: Literal["ready", "degraded"]
+    provider_mode: AssetProviderMode
+    alias_count: int
+    required_symbols: tuple[str, ...]
+    resolved_symbols: tuple[str, ...]
+    missing_symbols: tuple[str, ...]
+    duration_ms: int
+
+
 SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
     "AAPL": ("equity", "Apple Inc.", "AAPL"),
     "AMZN": ("equity", "Amazon.com Inc.", "AMZN"),
@@ -391,6 +402,35 @@ def resolve_asset(symbol: str) -> ResolvedAsset:
         return matches[0]
 
     raise ValueError("invalid_symbol")
+
+
+def warm_asset_universe(
+    *,
+    required_symbols: tuple[str, ...] = ("AAPL", "MSFT", "SPY"),
+    force: bool = False,
+) -> AssetUniverseWarmupResult:
+    started = time.perf_counter()
+    _refresh_asset_cache_if_needed(force=force)
+    assert _ASSET_ALIAS_MAP is not None
+
+    resolved: list[str] = []
+    missing: list[str] = []
+    for symbol in required_symbols:
+        try:
+            resolved.append(resolve_asset(symbol).canonical_symbol)
+        except Exception:
+            missing.append(symbol)
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    return AssetUniverseWarmupResult(
+        status="ready" if not missing else "degraded",
+        provider_mode=_asset_provider_mode(),
+        alias_count=len(_ASSET_ALIAS_MAP),
+        required_symbols=required_symbols,
+        resolved_symbols=tuple(resolved),
+        missing_symbols=tuple(missing),
+        duration_ms=duration_ms,
+    )
 
 
 def _is_unresolved_ticker_like_query(query: str) -> bool:
