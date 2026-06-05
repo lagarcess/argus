@@ -13,10 +13,11 @@ import {
 } from "../components/chat/composer-model";
 
 const goog = {
-  id: "asset:GOOG",
+  id: "asset:equity:GOOG",
   type: "asset" as const,
   label: "GOOG",
   symbol: "GOOG",
+  asset_class: "equity" as const,
   description: "Alphabet Class C",
   insert_text: "GOOG",
   provider: "alpaca",
@@ -51,10 +52,11 @@ describe("chat composer model", () => {
     expect(serializeComposerSegments(next)).toBe("Buy GOOG when it dips");
     expect(composerMentions(next)).toEqual([
       {
-        id: "asset:GOOG",
+        id: "asset:equity:GOOG",
         type: "asset",
         label: "GOOG",
         symbol: "GOOG",
+        asset_class: "equity",
         description: "Alphabet Class C",
         insert_text: "GOOG",
         support_status: "supported",
@@ -73,10 +75,11 @@ describe("chat composer model", () => {
 
     expect(composerMentions(segments)).toEqual([
       {
-        id: "asset:GOOG",
+        id: "asset:equity:GOOG",
         type: "asset",
         label: "GOOG",
         symbol: "GOOG",
+        asset_class: "equity",
         description: "Alphabet Class C",
         insert_text: "GOOG",
         support_status: "supported",

@@ -5,7 +5,7 @@ import calendar
 import inspect
 import os
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, cast, get_args
 
 from argus.agent_runtime.artifacts.patch_policy import (
@@ -63,6 +63,7 @@ from argus.agent_runtime.semantic_integrity import (
 from argus.agent_runtime.stages.artifact_context import (
     LEGACY_RESULT_EXPLANATION_TARGET_INFERRED,
     LEGACY_RESULT_FOLLOWUP_TARGET_INFERRED,
+    launch_payload_from_failed_action,
 )
 from argus.agent_runtime.stages.artifact_context import (
     draft_assumptions_response as _draft_assumptions_response,
@@ -169,6 +170,15 @@ _USER_GROUNDED_CADENCE_SOURCES = frozenset(
 class _LiveContextCuriosityFacts:
     content: str
     packet_symbols: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _ProvenanceAsset:
+    canonical_symbol: str
+    asset_class: str
+    raw_symbol: str = ""
+    name: str = ""
+
 
 STRATEGY_TURN_ACTS: set[SemanticTurnAct] = {
     "new_idea",
@@ -729,6 +739,10 @@ async def _stage_result_from_interpretation(
                 "missing_required_fields": [],
             }
         )
+    if expects_strategy_route and state.context_hints:
+        incoming_strategy.resolution_provenance = _dedupe_resolution_provenance(
+            [*incoming_strategy.resolution_provenance, *state.context_hints]
+        )
     strategy = (
         _strategy_with_execution_defaults(_canonicalized_strategy(incoming_strategy))
         if expects_strategy_route
@@ -997,6 +1011,13 @@ async def _stage_result_from_interpretation(
     )
     if approval_result is not None:
         return approval_result
+    runnable_prompt_result = _runnable_prompt_example_result_if_applicable(
+        decision=decision,
+        snapshot=snapshot,
+        current_user_message=state.current_user_message,
+    )
+    if runnable_prompt_result is not None:
+        return runnable_prompt_result
     retry_result = _retry_failed_action_stage_result_if_applicable(
         decision=decision,
         snapshot=snapshot,
@@ -1796,6 +1817,88 @@ async def _supported_strategy_education_repair_if_needed(
         current_user_message=current_user_message,
         capability_contract=capability_contract,
     )
+
+
+def _runnable_prompt_example_result_if_applicable(
+    *,
+    decision: InterpretDecision,
+    snapshot: TaskSnapshot | None,
+    current_user_message: str,
+) -> StageResult | None:
+    if not _message_asks_for_runnable_prompt_example(current_user_message):
+        return None
+    prompt = _runnable_prompt_example_from_failed_action(snapshot)
+    reason_code = (
+        "retry_failed_action_prompt_example_suppressed"
+        if decision.semantic_turn_act == "retry_failed_action"
+        else "runnable_prompt_example_route_suppressed"
+    )
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision.model_copy(
+            update={
+                "intent": "conversation_followup",
+                "task_relation": "continue",
+                "requires_clarification": False,
+                "candidate_strategy_draft": StrategySummary(),
+                "missing_required_fields": [],
+                "reason_codes": [
+                    *decision.reason_codes,
+                    reason_code,
+                ],
+                "semantic_turn_act": "educational_question",
+                "capability_question_focus": "general",
+                "artifact_target": "none",
+            }
+        ),
+        stage_patch={"assistant_response": prompt},
+    )
+
+
+def _message_asks_for_runnable_prompt_example(message: str) -> bool:
+    tokens = set(_plain_word_tokens(message))
+    if "prompt" not in tokens and "example" not in tokens:
+        return False
+    if not tokens & {"run", "runnable", "errors", "error"}:
+        return False
+    return bool(
+        tokens
+        & {
+            "example",
+            "give",
+            "provide",
+            "show",
+            "suggest",
+            "try",
+            "what",
+            "which",
+            "write",
+        }
+    )
+
+
+def _runnable_prompt_example_from_failed_action(snapshot: TaskSnapshot | None) -> str:
+    payload = (
+        launch_payload_from_failed_action(snapshot.latest_failed_action_reference)
+        if snapshot is not None
+        else None
+    )
+    symbol = "Amazon stock"
+    start = "January 1, 2026"
+    end = (date.today() - timedelta(days=1)).isoformat()
+    if isinstance(payload, dict):
+        raw_symbol = str(
+            (payload.get("symbols") or [payload.get("symbol") or ""])[0]
+            if isinstance(payload.get("symbols"), list)
+            else payload.get("symbol") or ""
+        ).strip()
+        if raw_symbol:
+            symbol = f"{raw_symbol.upper()} stock"
+        date_range = payload.get("date_range")
+        if isinstance(date_range, dict):
+            start = str(date_range.get("start") or start)
+            end = str(date_range.get("end") or end)
+    return f'Try: "Buy and hold {symbol} from {start} through {end}."'
 
 
 def _answer_contradicts_supported_strategy_families(answer: str) -> bool:
@@ -3873,7 +3976,11 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
     provenance: list[ResolutionProvenance] = []
 
     for index, symbol in enumerate(updated.asset_universe):
-        resolution = _resolve_asset_candidate(
+        resolution = _trusted_user_mention_resolution(
+            updated,
+            index=index,
+            symbol=symbol,
+        ) or _resolve_asset_candidate(
             symbol,
             field=f"asset_universe[{index}]",
             source=_asset_resolution_source_for_canonicalization(
@@ -3905,6 +4012,47 @@ def _canonicalized_strategy(strategy: StrategySummary) -> StrategySummary:
         [*updated.resolution_provenance, *provenance]
     )
     return updated
+
+
+def _trusted_user_mention_resolution(
+    strategy: StrategySummary,
+    *,
+    index: int,
+    symbol: str,
+) -> AssetResolution | None:
+    field = f"asset_universe[{index}]"
+    normalized_symbol = str(symbol or "").strip().upper()
+    for item in strategy.resolution_provenance:
+        if item.source != "user_mention":
+            continue
+        if item.candidate_kind != "asset" or item.resolution_status != "resolved":
+            continue
+        if item.validated_by != "provider_catalog":
+            continue
+        if _field_base(item.field) != "asset_universe":
+            continue
+        if item.field != field and len(strategy.asset_universe) > 1:
+            continue
+        canonical = str(item.canonical_symbol or "").strip().upper()
+        raw_text = str(item.raw_text or "").strip().upper()
+        asset_class = str(item.asset_class or "").strip()
+        if asset_class not in _BACKTEST_ASSET_CLASSES:
+            continue
+        if normalized_symbol not in {canonical, raw_text}:
+            continue
+        asset = _ProvenanceAsset(
+            canonical_symbol=canonical or normalized_symbol,
+            asset_class=asset_class,
+            raw_symbol=canonical or normalized_symbol,
+        )
+        return AssetResolution(
+            status="resolved",
+            raw_text=item.raw_text,
+            asset=asset,
+            candidates=(asset,),
+            provenance=item,
+        )
+    return None
 
 
 def _strategy_with_current_message_asset_grounding(

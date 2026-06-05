@@ -501,6 +501,7 @@ function createTokenElement(item: DiscoveryItem) {
   token.dataset.tokenType = item.type;
   token.dataset.tokenLabel = item.label;
   token.dataset.tokenSymbol = item.symbol ?? "";
+  token.dataset.tokenAssetClass = item.asset_class ?? "";
   token.dataset.tokenDescription = displayDiscoveryDescription(item);
   token.dataset.tokenInsertText = item.insert_text;
   token.dataset.tokenProvider = item.provider;
@@ -531,6 +532,13 @@ function tokenClassName(type: DiscoveryItem["type"]) {
   return `${base} ${type === "asset" ? asset : indicator}`;
 }
 
+function assetClassFromDataset(value: string | undefined): DiscoveryItem["asset_class"] {
+  if (value === "equity" || value === "crypto" || value === "currency_pair") {
+    return value;
+  }
+  return null;
+}
+
 function readSegmentsFromEditor(root: HTMLDivElement | null): ComposerSegment[] {
   if (!root) return [{ type: "text", text: "" }];
   const segments: ComposerSegment[] = [];
@@ -559,6 +567,7 @@ function readSegmentsFromEditor(root: HTMLDivElement | null): ComposerSegment[] 
           type: node.dataset.tokenType === "indicator" ? "indicator" : "asset",
           label: node.dataset.tokenLabel ?? node.dataset.tokenInsertText ?? "",
           symbol: node.dataset.tokenSymbol || null,
+          asset_class: assetClassFromDataset(node.dataset.tokenAssetClass),
           description: node.dataset.tokenDescription || null,
           insert_text: node.dataset.tokenInsertText ?? node.textContent ?? "",
           provider: node.dataset.tokenProvider ?? "",
@@ -667,6 +676,7 @@ function setCaretTextOffset(root: HTMLDivElement | null, targetOffset: number) {
           type: node.dataset.tokenType === "indicator" ? "indicator" : "asset",
           label: node.dataset.tokenLabel ?? "",
           symbol: node.dataset.tokenSymbol || null,
+          asset_class: assetClassFromDataset(node.dataset.tokenAssetClass),
           description: node.dataset.tokenDescription || null,
           insert_text: node.dataset.tokenInsertText ?? node.textContent ?? "",
           provider: node.dataset.tokenProvider ?? "",
@@ -696,40 +706,44 @@ function setCaretTextOffset(root: HTMLDivElement | null, targetOffset: number) {
 
 const DEFAULT_DISCOVERY_ITEMS: DiscoveryItem[] = [
   {
-    id: "asset:GOOG",
+    id: "asset:equity:GOOG",
     type: "asset",
     label: "GOOG",
     symbol: "GOOG",
+    asset_class: "equity",
     description: "Alphabet Class C",
     insert_text: "GOOG",
     provider: "alpaca",
     support_status: "supported",
   },
   {
-    id: "asset:AAPL",
+    id: "asset:equity:AAPL",
     type: "asset",
     label: "AAPL",
     symbol: "AAPL",
+    asset_class: "equity",
     description: "Apple",
     insert_text: "AAPL",
     provider: "alpaca",
     support_status: "supported",
   },
   {
-    id: "asset:NVDA",
+    id: "asset:equity:NVDA",
     type: "asset",
     label: "NVDA",
     symbol: "NVDA",
+    asset_class: "equity",
     description: "Nvidia",
     insert_text: "NVDA",
     provider: "alpaca",
     support_status: "supported",
   },
   {
-    id: "asset:BTC",
+    id: "asset:crypto:BTC",
     type: "asset",
     label: "BTC",
     symbol: "BTC",
+    asset_class: "crypto",
     description: "Bitcoin",
     insert_text: "BTC",
     provider: "alpaca",

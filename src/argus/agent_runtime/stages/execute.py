@@ -274,6 +274,7 @@ def _launch_payload(state: RunState, *, language: str = "en") -> dict[str, Any]:
         "strategy_type": strategy_type,
         "symbol": symbol,
         "symbols": symbols,
+        "asset_class": strategy.get("asset_class"),
         "timeframe": _resolve_optional_value(
             optional_parameters, "timeframe", default="1D"
         ),
@@ -984,6 +985,13 @@ def _resolve_benchmark_symbol(
     value = _resolve_optional_value(optional_parameters, "benchmark_symbol")
     if isinstance(value, str) and value:
         return value.strip().upper()
+    asset_class = strategy.get("asset_class")
+    if asset_class == "equity":
+        return "SPY"
+    if asset_class == "crypto":
+        return "BTC"
+    if asset_class == "currency_pair":
+        return symbol.strip().upper()
     try:
         asset = resolve_asset(symbol)
     except Exception:

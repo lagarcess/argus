@@ -265,6 +265,7 @@ def mention_to_provenance(
         status = "unsupported"
     elif support_status == "unavailable":
         status = "unavailable_for_requested_run"
+    asset_class = _mention_asset_class(mention) if candidate_kind == "asset" else None
     return ResolutionProvenance(
         field=f"asset_universe[{index}]" if candidate_kind == "asset" else "entry_logic",
         raw_text=raw_text,
@@ -272,18 +273,33 @@ def mention_to_provenance(
         candidate_kind=candidate_kind,
         resolution_status=status,
         canonical_symbol=canonical or None,
-        asset_class=(
-            str(mention.get("description")).lower()
-            if candidate_kind == "asset"
-            and str(mention.get("description") or "").lower()
-            in {"equity", "crypto", "currency_pair"}
-            else None
-        ),
+        asset_class=asset_class,
         validated_by=(
             "provider_catalog" if candidate_kind == "asset" else "indicator_registry"
         ),
         confidence="high",
     )
+
+
+def _mention_asset_class(mention: dict[str, Any]) -> str | None:
+    explicit = str(mention.get("asset_class") or "").strip().lower()
+    if explicit in {"equity", "crypto", "currency_pair"}:
+        return explicit
+    raw_id = str(mention.get("id") or "").strip().lower()
+    id_parts = raw_id.split(":")
+    if len(id_parts) >= 3 and id_parts[0] == "asset":
+        id_asset_class = id_parts[1]
+        if id_asset_class in {"equity", "crypto", "currency_pair"}:
+            return id_asset_class
+    description = str(mention.get("description") or "").strip().lower()
+    labels = {
+        "stock": "equity",
+        "equity": "equity",
+        "crypto": "crypto",
+        "currency pair": "currency_pair",
+        "currency_pair": "currency_pair",
+    }
+    return labels.get(description)
 
 
 def _asset_resolution(

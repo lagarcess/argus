@@ -260,6 +260,7 @@ export type DiscoveryItem = {
   type: "asset" | "indicator";
   label: string;
   symbol?: string | null;
+  asset_class?: AssetClass | null;
   description?: string | null;
   insert_text: string;
   provider: string;
