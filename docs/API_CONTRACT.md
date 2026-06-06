@@ -570,11 +570,23 @@ references it through `result_run_id`.
 ```json
 {
   "id": "uuid",
+  "user_id": "uuid",
   "conversation_id": "uuid",
   "request_message_id": "uuid",
   "confirmation_message_id": "uuid",
-  "status": "running",
+  "idempotency_key": "uuid-or-client-key",
   "payload_hash": "sha256:...",
+  "launch_payload": {
+    "strategy": {},
+    "config": {}
+  },
+  "status": "running",
+  "priority": "normal",
+  "attempts": 1,
+  "max_attempts": 1,
+  "queued_at": "timestamp",
+  "started_at": "timestamp",
+  "finished_at": null,
   "result_run_id": null,
   "failure_code": null,
   "failure_detail": null,

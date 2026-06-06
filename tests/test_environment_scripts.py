@@ -181,6 +181,20 @@ def test_render_blueprint_keeps_true_secrets_manual() -> None:
         assert api_env[key] == {"key": key, "sync": False}
 
 
+def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None:
+    env_example = _source(".env.example")
+    env_contract = ENV_CONTRACT.read_text()
+    render_config = yaml.safe_load(_source("render.yaml"))
+
+    assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK=" in env_example
+    assert "ARGUS_WORKFLOW_PROOF_PLAN=" in env_example
+    assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
+    assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
+    assert "ARGUS_WORKFLOW_PROOF_PLAN" in env_contract
+    assert "DATABASE_URL" in env_contract
+    assert all(service["type"] != "workflow" for service in render_config["services"])
+
+
 def test_render_blueprint_preserves_optional_posthog_key() -> None:
     env_contract = ENV_CONTRACT.read_text()
     web_env = _render_env("argus-app")
