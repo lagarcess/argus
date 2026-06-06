@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import traceback
 from collections.abc import Callable, Mapping
+from datetime import date, datetime
 from typing import Any, Protocol
+from uuid import UUID
 
 from argus.api.schemas import BacktestRun
 from argus.domain.backtest_run_builder import build_backtest_run_from_result
@@ -354,6 +356,10 @@ def _required_str(row: Mapping[str, Any], key: str) -> str:
 def _json_safe(value: Any) -> Any:
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
+    if isinstance(value, datetime | date):
+        return value.isoformat()
+    if isinstance(value, UUID):
+        return str(value)
     if isinstance(value, list):
         return [_json_safe(item) for item in value]
     if isinstance(value, tuple):

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import importlib
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import ModuleType
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -281,6 +281,24 @@ def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
         gateway.row["execution_metadata"]["workflow_backtest"]["failure_category"]
         == "upstream_dependency_error"
     )
+
+
+def test_backtest_workflow_json_safe_normalizes_postgres_scalars() -> None:
+    from workflows.backtest_job import _json_safe
+
+    user_id = uuid4()
+    created_at = datetime(2026, 6, 6, 12, 30, tzinfo=timezone.utc)
+    payload = {
+        "id": user_id,
+        "created_at": created_at,
+        "nested": {"date": date(2026, 6, 6), "uuids": [UUID(str(user_id))]},
+    }
+
+    assert _json_safe(payload) == {
+        "id": str(user_id),
+        "created_at": created_at.isoformat(),
+        "nested": {"date": "2026-06-06", "uuids": [str(user_id)]},
+    }
 
 
 def test_workflow_task_registration_includes_proof_and_real_backtest(
