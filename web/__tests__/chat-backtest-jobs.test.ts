@@ -167,6 +167,24 @@ describe("chat backtest jobs", () => {
     expect(updated.result?.actions?.[0].payload?.run_id).toBe("run-1");
   });
 
+  test("succeeded durable job replaces queued placeholder with completed readout", () => {
+    const [updated] = applyBacktestJobUpdate([queuedJobMessage()], {
+      job: job({
+        status: "succeeded",
+        result_run_id: "run-1",
+        finished_at: "2026-06-06T12:00:04Z",
+      }),
+      run: run(),
+    });
+
+    expect(updated.kind).toBe("strategy_result");
+    expect(updated.content).toContain("Quick take");
+    expect(updated.content).toContain("AAPL buy and hold");
+    expect(updated.content).toContain("+12.4% total return");
+    expect(updated.content).not.toContain("I started the backtest");
+    expect(updated.content).not.toContain("as soon as it is ready");
+  });
+
   test("succeeded durable job settles its confirmation as run complete", () => {
     const confirmationMessage: Message = supersedePriorConfirmations(
       {
