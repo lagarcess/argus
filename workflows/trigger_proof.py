@@ -11,7 +11,7 @@ def _task_id(explicit: str | None = None) -> str:
     value = (
         explicit
         or os.getenv("ARGUS_RENDER_WORKFLOW_PROOF_TASK")
-        or "argus-render-workflow-proof/workflow_proof"
+        or "argus-backtests/workflow_proof"
     ).strip()
     if "/" not in value:
         raise RuntimeError(

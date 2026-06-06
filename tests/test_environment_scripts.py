@@ -130,6 +130,26 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         assert legacy_key not in render_yaml
 
 
+def test_render_workflow_task_slug_is_single_current_default() -> None:
+    env_example = _source(".env.example")
+    env_contract = ENV_CONTRACT.read_text()
+    trigger_proof = _source("workflows/trigger_proof.py")
+
+    assert 'ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"' in env_contract
+    assert "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof" in env_example
+    assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK=argus-backtests/workflow_proof" in env_example
+    assert 'or "argus-backtests/workflow_proof"' in trigger_proof
+    assert "argus-render-workflow-proof" not in env_example
+    assert "argus-render-workflow-proof" not in trigger_proof
+
+
+def test_env_example_declares_render_api_key_once() -> None:
+    env_example = _source(".env.example")
+
+    assert env_example.count("\nRENDER_API_KEY=") == 1
+    assert "Reuse the RENDER_API_KEY declared" in env_example
+
+
 def test_render_blueprint_declares_shared_render_env_contract_vars() -> None:
     assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
     assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
@@ -209,6 +229,18 @@ def test_workflow_proof_seed_usage_allows_disposable_preview_user() -> None:
     assert ".github/workflow-proof.sh seed [--user-id <uuid>]" in proof_script
     assert "Seed creates a disposable proof auth/profile row" in proof_script
     assert "local or preview Supabase database" in proof_script
+
+
+def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert 'source "$SCRIPT_DIR/argus-env.sh"' in source
+    assert "ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT" in source
+    assert "/v1/services/${service_id}/env-vars/${key}" in source
+    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in source
+    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true" in source
+    assert "ARGUS_WORKFLOW_DATABASE_URL" in source
+    assert "set -x" not in source
 
 
 def test_render_blueprint_preserves_optional_posthog_key() -> None:
