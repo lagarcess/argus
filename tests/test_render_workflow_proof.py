@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -107,6 +108,71 @@ def test_workflow_proof_requires_secret_database_url() -> None:
         require_database_url({})
 
     assert require_database_url({"DATABASE_URL": "postgres://user:secret@example/db"})
+
+
+def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from workflows import proof
+
+    class SeedGateway:
+        def __init__(self) -> None:
+            self.profile: dict[str, str] | None = None
+            self.conversation_user_id: str | None = None
+            self.job_args: dict[str, str | None] | None = None
+
+        def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
+            self.profile = {"user_id": user_id, "email": email}
+
+        def create_proof_conversation(self, *, user_id: str) -> str:
+            assert self.profile is not None
+            assert self.profile["user_id"] == user_id
+            self.conversation_user_id = user_id
+            return "00000000-0000-4000-8000-000000000001"
+
+        def create_proof_job(
+            self,
+            *,
+            user_id: str,
+            conversation_id: str,
+            nonce: str,
+            idempotency_key: str | None = None,
+        ) -> dict[str, object]:
+            self.job_args = {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "nonce": nonce,
+                "idempotency_key": idempotency_key,
+            }
+            return {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "status": "queued",
+            }
+
+    gateway = SeedGateway()
+    monkeypatch.setattr(proof.PostgresProofJobGateway, "from_env", lambda: gateway)
+
+    exit_code = proof.main(["seed", "--nonce", "internet-proof"])
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert UUID(output["user_id"])
+    assert output["email"] == f"render-workflow-proof+{output['user_id']}@example.invalid"
+    assert output["job_id"] == "00000000-0000-4000-8000-000000000002"
+    assert output["conversation_id"] == "00000000-0000-4000-8000-000000000001"
+    assert output["nonce"] == "internet-proof"
+    assert output["status"] == "queued"
+    assert gateway.profile == {"user_id": output["user_id"], "email": output["email"]}
+    assert gateway.conversation_user_id == output["user_id"]
+    assert gateway.job_args == {
+        "user_id": output["user_id"],
+        "conversation_id": output["conversation_id"],
+        "nonce": "internet-proof",
+        "idempotency_key": None,
+    }
 
 
 def test_backtest_jobs_migration_defines_durable_workflow_boundary() -> None:

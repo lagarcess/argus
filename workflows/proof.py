@@ -11,6 +11,7 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 PROOF_KIND = "render_workflow_proof"
+PROOF_EMAIL_DOMAIN = "example.invalid"
 
 
 class WorkflowProofError(RuntimeError):
@@ -51,6 +52,10 @@ def require_database_url(env: Mapping[str, str] | None = None) -> str:
 def stable_payload_hash(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def proof_user_email(user_id: str) -> str:
+    return f"render-workflow-proof+{user_id}@{PROOF_EMAIL_DOMAIN}"
 
 
 def _json_safe(value: Any) -> Any:
@@ -213,6 +218,82 @@ class PostgresProofJobGateway:
                     raise WorkflowProofError(f"Backtest job {job_id} was not found.")
         return _json_safe(row)
 
+    def ensure_proof_profile(self, *, user_id: str, email: str) -> None:
+        from psycopg.types.json import Jsonb
+
+        onboarding = {
+            "completed": False,
+            "stage": "language_selection",
+            "language_confirmed": False,
+            "primary_goal": None,
+        }
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into auth.users (
+                      id,
+                      aud,
+                      role,
+                      email,
+                      email_confirmed_at,
+                      raw_app_meta_data,
+                      raw_user_meta_data,
+                      created_at,
+                      updated_at,
+                      is_anonymous
+                    )
+                    values (
+                      %(user_id)s,
+                      'authenticated',
+                      'authenticated',
+                      %(email)s,
+                      now(),
+                      %(app_metadata)s,
+                      '{}'::jsonb,
+                      now(),
+                      now(),
+                      false
+                    )
+                    on conflict (id) do nothing
+                    """,
+                    {
+                        "user_id": user_id,
+                        "email": email,
+                        "app_metadata": Jsonb(
+                            {"provider": "email", "providers": ["email"]}
+                        ),
+                    },
+                )
+                cur.execute(
+                    """
+                    insert into public.profiles (
+                      id,
+                      email,
+                      display_name,
+                      language,
+                      locale,
+                      theme,
+                      onboarding
+                    )
+                    values (
+                      %(user_id)s,
+                      %(email)s,
+                      'Render Workflow Proof',
+                      'en',
+                      'en-US',
+                      'dark',
+                      %(onboarding)s
+                    )
+                    on conflict (id) do nothing
+                    """,
+                    {
+                        "user_id": user_id,
+                        "email": email,
+                        "onboarding": Jsonb(onboarding),
+                    },
+                )
+
     def create_proof_conversation(self, *, user_id: str) -> str:
         conversation_id = str(uuid4())
         with self._connect() as conn:
@@ -283,11 +364,14 @@ def _dump_json(payload: Mapping[str, Any]) -> None:
 
 def _seed(args: argparse.Namespace) -> int:
     gateway = PostgresProofJobGateway.from_env()
+    user_id = str(UUID(args.user_id)) if args.user_id else str(uuid4())
+    email = proof_user_email(user_id)
+    gateway.ensure_proof_profile(user_id=user_id, email=email)
     conversation_id = args.conversation_id
     if not conversation_id:
-        conversation_id = gateway.create_proof_conversation(user_id=args.user_id)
+        conversation_id = gateway.create_proof_conversation(user_id=user_id)
     row = gateway.create_proof_job(
-        user_id=args.user_id,
+        user_id=user_id,
         conversation_id=conversation_id,
         nonce=args.nonce,
         idempotency_key=args.idempotency_key,
@@ -295,6 +379,8 @@ def _seed(args: argparse.Namespace) -> int:
     _dump_json(
         {
             "job_id": row["id"],
+            "user_id": user_id,
+            "email": email,
             "conversation_id": row["conversation_id"],
             "nonce": args.nonce,
             "status": row["status"],
@@ -333,7 +419,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     seed = subcommands.add_parser("seed")
-    seed.add_argument("--user-id", required=True)
+    seed.add_argument("--user-id")
     seed.add_argument("--conversation-id")
     seed.add_argument("--nonce")
     seed.add_argument("--idempotency-key")

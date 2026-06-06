@@ -14,11 +14,14 @@ fi
 usage() {
   cat <<'USAGE'
 Usage:
-  .github/workflow-proof.sh seed --user-id <uuid> [--conversation-id <uuid>] [--nonce <value>]
+  .github/workflow-proof.sh seed [--user-id <uuid>] [--conversation-id <uuid>] [--nonce <value>]
   .github/workflow-proof.sh local --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh remote --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh direct --job-id <uuid> --nonce <value>
   .github/workflow-proof.sh verify --job-id <uuid>
+
+Seed creates a disposable proof auth/profile row when --user-id is omitted.
+Use it only against a local or preview Supabase database for validation.
 
 Local Render validation:
   1. pip install -r workflows/requirements.txt

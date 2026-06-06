@@ -42,6 +42,7 @@
 - Test: `tests/test_environment_scripts.py`
 
 - [x] Add a CLI that can seed a proof row, trigger local/remote Render task execution, and verify the row.
+- [x] Allow proof seeding to create a disposable preview/local auth profile when no `--user-id` is supplied.
 - [x] Add a shell wrapper with explicit `seed`, `local`, `remote`, `verify`, and `direct` commands.
 - [x] Document required secret and non-secret environment variables.
 

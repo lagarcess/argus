@@ -195,6 +195,14 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 
+def test_workflow_proof_seed_usage_allows_disposable_preview_user() -> None:
+    proof_script = _source(".github/workflow-proof.sh")
+
+    assert ".github/workflow-proof.sh seed [--user-id <uuid>]" in proof_script
+    assert "Seed creates a disposable proof auth/profile row" in proof_script
+    assert "local or preview Supabase database" in proof_script
+
+
 def test_render_blueprint_preserves_optional_posthog_key() -> None:
     env_contract = ENV_CONTRACT.read_text()
     web_env = _render_env("argus-app")
