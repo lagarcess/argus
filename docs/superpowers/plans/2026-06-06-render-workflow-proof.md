@@ -89,7 +89,7 @@
 - [x] Persist Render task-run metadata under `execution_metadata.workflow_dispatch`.
 - [x] Keep the current API in-process result path as the user-facing result while proof dispatch runs out-of-process.
 - [x] Add per-user and global running/queued limits for shadow job creation.
-- [x] Add `.github/render-env-sync.sh` commands to inspect redacted API dispatch env, enable dispatch intentionally, disable dispatch, and sync workflow proof env.
+- [x] Add `.github/render-env-sync.sh` commands to inspect redacted API workflow env, sync `api-safe-off`, sync proof-only `api-proof-shadow-on`, sync real `api-real-workflow-on`, and sync workflow proof env.
 
 ### Task 7: Current Boundary And Remaining Scope
 

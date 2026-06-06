@@ -273,11 +273,13 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "require_local_env ALPACA_SECRET_KEY" in source
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY' in source
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY' in source
-    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE' in source
+    assert (
+        'put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE' in source
+    )
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ENABLE_MARKET_DATA_CACHE' in source
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_PAPER_TRADING' in source
     assert "workflow-runtime" in source
-    assert 'https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}' in source
+    assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
     assert ".buildConfig + {buildCommand: $build_command}" in source
     assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in source
@@ -311,12 +313,15 @@ def test_env_example_separates_shadow_jobs_from_workflow_dispatch() -> None:
 
 def test_render_env_sync_can_inspect_and_safely_disable_dispatch() -> None:
     source = _source(".github/render-env-sync.sh")
-    dispatch_off_block = source.split("sync_api_dispatch_off() {", maxsplit=1)[1].split(
+    dispatch_off_block = source.split("sync_api_safe_off() {", maxsplit=1)[1].split(
         "\n}",
         maxsplit=1,
     )[0]
 
     assert ".github/render-env-sync.sh api-status" in source
+    assert ".github/render-env-sync.sh api-safe-off" in source
+    assert ".github/render-env-sync.sh api-proof-shadow-on" in source
+    assert ".github/render-env-sync.sh api-real-workflow-on" in source
     assert "print_api_status()" in source
     assert "<redacted-present>" in source
     assert "<missing-or-empty>" in source
@@ -325,7 +330,51 @@ def test_render_env_sync_can_inspect_and_safely_disable_dispatch() -> None:
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED false" in dispatch_off_block
     assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED false" in dispatch_off_block
     assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED false" in dispatch_off_block
+    assert "ARGUS_BACKTEST_WORKFLOW_TASK" in dispatch_off_block
+    assert "ARGUS_BACKTEST_REAL_WORKFLOW_TASK" in dispatch_off_block
     assert 'delete_render_env "$API_SERVICE_ID" RENDER_API_KEY' in dispatch_off_block
+
+
+def test_render_env_sync_separates_proof_and_real_api_modes() -> None:
+    source = _source(".github/render-env-sync.sh")
+    proof_block = source.split("sync_api_proof_shadow_on() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+    real_block = source.split("sync_api_real_workflow_on() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+
+    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in proof_block
+    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true" in proof_block
+    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED false" in proof_block
+    assert (
+        'ARGUS_BACKTEST_WORKFLOW_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"'
+        in proof_block
+    )
+    assert (
+        'ARGUS_BACKTEST_REAL_WORKFLOW_TASK "$ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT"'
+        in proof_block
+    )
+    assert (
+        'put_render_env "$API_SERVICE_ID" RENDER_API_KEY "$RENDER_API_KEY"' in proof_block
+    )
+
+    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in real_block
+    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true" in real_block
+    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED true" in real_block
+    assert (
+        'ARGUS_BACKTEST_WORKFLOW_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"'
+        in real_block
+    )
+    assert (
+        'ARGUS_BACKTEST_REAL_WORKFLOW_TASK "$ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT"'
+        in real_block
+    )
+    assert (
+        'put_render_env "$API_SERVICE_ID" RENDER_API_KEY "$RENDER_API_KEY"' in real_block
+    )
 
 
 def test_render_blueprint_preserves_optional_posthog_key() -> None:
@@ -341,9 +390,12 @@ def test_render_blueprint_preserves_optional_posthog_key() -> None:
 
 def test_warmup_script_defaults_to_private_launch_render_urls() -> None:
     warmup = _source(".github/warmup-render.sh")
+    env_contract = ENV_CONTRACT.read_text()
 
-    assert "https://argus-app-suz5.onrender.com" in warmup
-    assert "https://argus-ohr5.onrender.com" in warmup
+    assert "https://argus-app-suz5.onrender.com" in env_contract
+    assert "https://argus-ohr5.onrender.com" in env_contract
+    assert "ARGUS_PRIVATE_LAUNCH_APP_URL" in warmup
+    assert "ARGUS_PRIVATE_LAUNCH_API_URL" in warmup
     assert "/health" in warmup
     assert "Argus product path is ready for testers" in warmup
 
@@ -351,6 +403,23 @@ def test_warmup_script_defaults_to_private_launch_render_urls() -> None:
 def test_warmup_script_checks_product_readiness_endpoint() -> None:
     warmup = _source(".github/warmup-render.sh")
 
+    assert 'source "$SCRIPT_DIR/argus-env.sh"' in warmup
+    assert "argus_load_root_env" in warmup
     assert "/internal/readiness" in warmup
     assert "ARGUS_OPS_TOKEN" in warmup
     assert "Authorization: Bearer ${OPS_TOKEN}" in warmup
+
+
+def test_warmup_script_can_assert_expected_api_mode_without_mutating_render() -> None:
+    warmup = _source(".github/warmup-render.sh")
+
+    assert "--expect-mode <safe-off|proof-shadow|real-workflow>" in warmup
+    assert "assert_api_mode()" in warmup
+    assert '"$SCRIPT_DIR/render-env-sync.sh" api-status' in warmup
+    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=false" in warmup
+    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=true" in warmup
+    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true" in warmup
+    assert "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof" in warmup
+    assert "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job" in warmup
+    assert "put_render_env" not in warmup
+    assert "delete_render_env" not in warmup

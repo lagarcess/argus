@@ -18,17 +18,23 @@ usage() {
   cat <<'USAGE'
 Usage:
   .github/render-env-sync.sh api-status
-  .github/render-env-sync.sh api-dispatch-on
-  .github/render-env-sync.sh api-dispatch-off
+  .github/render-env-sync.sh api-safe-off
+  .github/render-env-sync.sh api-proof-shadow-on
+  .github/render-env-sync.sh api-real-workflow-on
   .github/render-env-sync.sh workflow-proof
   .github/render-env-sync.sh workflow-runtime
 
 Commands:
-  api-status        Print redacted API dispatch env status for argus-api.
-  api-dispatch-on   Enable shadow job creation + Render Workflow dispatch on argus-api.
-  api-dispatch-off  Disable API shadow job creation + dispatch and blank its Render key.
-  workflow-proof    Sync workflow DB/task/provider env vars on argus-backtests.
-  workflow-runtime  Sync workflow build/start commands on argus-backtests.
+  api-status              Print redacted API workflow env status for argus-api.
+  api-safe-off            Disable API job dispatch/execution and blank its Render key.
+  api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
+  api-real-workflow-on    Enable real async dispatch to run_backtest_job.
+  workflow-proof          Sync workflow DB/task/provider env vars on argus-backtests.
+  workflow-runtime        Sync workflow build/start commands on argus-backtests.
+
+Compatibility aliases:
+  api-dispatch-on   Alias for api-proof-shadow-on.
+  api-dispatch-off  Alias for api-safe-off.
 
 Required local env:
   RENDER_API_KEY
@@ -135,7 +141,7 @@ print_api_status() {
   ' | sort
 }
 
-sync_api_dispatch_on() {
+sync_api_proof_shadow_on() {
   require_local_env RENDER_API_KEY
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true
@@ -149,11 +155,27 @@ sync_api_dispatch_on() {
   put_render_env "$API_SERVICE_ID" RENDER_API_KEY "$RENDER_API_KEY"
 }
 
-sync_api_dispatch_off() {
+sync_api_real_workflow_on() {
+  require_local_env RENDER_API_KEY
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED true
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_REAL_WORKFLOW_TASK "$ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT"
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT "${ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT:-1}"
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT "${ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT:-2}"
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT "${ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT:-5}"
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT "${ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT:-10}"
+  put_render_env "$API_SERVICE_ID" RENDER_API_KEY "$RENDER_API_KEY"
+}
+
+sync_api_safe_off() {
   require_local_env RENDER_API_KEY
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_SHADOW_ENABLED false
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED false
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED false
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_WORKFLOW_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
+  put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_REAL_WORKFLOW_TASK "$ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT"
   delete_render_env "$API_SERVICE_ID" RENDER_API_KEY
 }
 
@@ -212,11 +234,22 @@ case "$command" in
   api-status)
     print_api_status
     ;;
+  api-safe-off)
+    sync_api_safe_off
+    ;;
+  api-proof-shadow-on)
+    sync_api_proof_shadow_on
+    ;;
+  api-real-workflow-on)
+    sync_api_real_workflow_on
+    ;;
   api-dispatch-on)
-    sync_api_dispatch_on
+    echo "api-dispatch-on is an alias for api-proof-shadow-on"
+    sync_api_proof_shadow_on
     ;;
   api-dispatch-off)
-    sync_api_dispatch_off
+    echo "api-dispatch-off is an alias for api-safe-off"
+    sync_api_safe_off
     ;;
   workflow-proof)
     sync_workflow_proof
