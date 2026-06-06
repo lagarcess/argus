@@ -104,21 +104,31 @@ Preferences, language, theme, feedback, account actions.
 Client (Next.js Web/PWA)
         |
         v
-API Layer (FastAPI / Render)
+Frontend App Shell (argus-app / Render web service today)
+        |
+        v
+API Control Plane (argus-api / FastAPI / Render)
         |
         +--> Supabase (Auth + Postgres + Storage)
         |
         +--> OpenRouter (LLM)
         |
-        +--> Market Data Provider (alpaca)
-        |
-        +--> Cache Layer (Optional Early Alpha)
-        |
-        +--> Backtest Engine (Simulation Logic)
+        +--> Render Workflow (Backtest Execution Plane)
+                |
+                +--> Supabase Market Data Cache
+                |
+                +--> Market Data Provider (Alpaca / Kraken)
+                |
+                +--> Backtest Engine (Simulation Logic)
+                |
+                +--> Supabase Result Records
 ```
 
 **Later Optional:**
-- **Queue / Job Runner**: (RQ / Celery / Dramatiq) for long-running backtests, retries, and burst smoothing.
+- **Static/CDN Frontend Delivery**: only after a route/auth audit proves the app
+  experience and authorization model remain intact.
+- **Alternate Execution Backend**: always-on workers or external compute if
+  Render Workflows do not meet reliability or cost needs.
 ---
 # 5. Frontend Architecture
 
@@ -162,11 +172,13 @@ The backend should coordinate systems, not become monolithic business chaos.
 - Route requests
 - Persist data
 - Call LLM provider
-- Call engine
-- Call market data provider
+- Create durable backtest jobs
+- Trigger execution workflows
+- Hydrate job/result state from Supabase
 - Stream responses
 - Enforce quotas (Usage Counters)
 - Enforce rate limits
+- Enforce per-user and global backtest concurrency limits
 - Enforce engine constraints
 - Enforce asset_class coherence (Same-asset runs only)
 - Expose clean APIs
@@ -176,6 +188,7 @@ The backend should coordinate systems, not become monolithic business chaos.
 - Rendering UI logic
 - Storing long-term state in memory
 - Becoming deeply stateful
+- Importing or executing the heavy backtest stack in the API startup path
 
 # 7. Communication Protocols
 
@@ -187,7 +200,7 @@ The backend should coordinate systems, not become monolithic business chaos.
 
 - AI token streaming
 - Progress updates
-- "Running backtest..."
+- Request-scoped stage updates
 - Partial explanations
 
 **Why:**
@@ -195,6 +208,19 @@ The backend should coordinate systems, not become monolithic business chaos.
 - Simpler than WebSockets
 - Ideal for one-way streaming
 - Lower implementation overhead
+
+## Backtest Job Status
+
+**Chosen Alpha Transport:** Supabase Realtime on durable job rows
+
+**Use for:**
+
+- queued/running/succeeded/failed/canceled/expired job updates
+- result-card hydration after the chat request has ended
+- refresh/reload recovery from durable state
+
+API SSE remains request-scoped. Do not hold long-lived API streams open for
+workflow-duration backtests.
 
 ## Standard Request / Response (REST)
 
@@ -235,19 +261,23 @@ Canonical state store.
 - Messages
 - Strategies
 - Collections
+- Backtest jobs
 - Backtest history
 - Archived / deleted records
 - Feedback records
 
-### Cache Layer (Optional Early Alpha)
+### Market Data Cache
 
-Temporary performance state. In-memory fallback (e.g. `cachetools`) is allowed for non-critical acceleration, but must not be the source of truth for persistence or quotas.
+Temporary performance state owned by Supabase first. It accelerates repeat
+provider reads across users and workflows, but it is not the source of truth for
+portfolio results, persistence, or quotas.
 
 **Owns:**
 
-- Hot market data (acceleration only)
-- Response caches
-- Rate-limit buckets (if Redis is present)
+- Fresh market data snapshots keyed by provider, asset class, symbol, timeframe,
+  data window, and schema version
+- Expiry metadata based on market/timeframe clocks
+- Cache hit/miss evidence for job execution metadata
 
 ## Stateless Systems
 
@@ -262,13 +292,18 @@ Build prompt → call LLM → parse response → validate facts → route.
 - No in-process session state is stored outside the checkpointer. `InMemorySessionManager` is not used.
 - One LLM call per turn for intent classification. Downstream calls (explain, clarify, name suggestion) are permitted but do not reclassify intent.
 
-### Execution Worker (Stateless)
+### Execution Workflow (Stateless)
 
-The runtime compute process that executes simulations.
+The runtime compute process that executes simulations. In the private-alpha
+target architecture this is a Render Workflow task, not the API process. It
+loads pandas/numpy/vectorbt/numba and the backtest engine only for the lifetime
+of the job.
 
 ### Backtest Engine (Domain Logic)
 
 The simulation logic (Numba/Python) that calculates metrics and returns results.
+It remains domain code in the monorepo, but the production runtime boundary is
+the workflow execution plane.
 
 *Stateless systems should scale horizontally later.*
 
@@ -282,7 +317,7 @@ The simulation logic (Numba/Python) that calculates metrics and returns results.
 - Database
 - Row Security
 - Storage (if needed)
-- Realtime (later)
+- Realtime job status updates
 
 ### OpenRouter
 
@@ -501,14 +536,20 @@ Mapped internally to:
 1. User requests simulation in chat
 2. API validates request (symbol set, **asset_class parity**, and quota)
 3. AI extracts supported strategy config if needed
-4. Backend fetches market data (cache first)
-5. Strategy kernel produces raw signals
-6. Execution reducer applies long-only position state, cash, sizing, and policy
+4. API creates a durable `backtest_jobs` row with status `queued`
+5. API triggers a Render Workflow with a compact job id or payload reference
+6. Workflow marks the job `running`
+7. Workflow reads fresh market data from Supabase cache or fetches from provider
+   on cache miss
+8. Strategy kernel produces raw signals
+9. Execution reducer applies long-only position state, cash, sizing, and policy
    constraints
-7. Engine computes metrics and chart markers from executed fills only
-8. Results persisted
-9. Results streamed/rendered to user
-10. Run appears in history
+10. Engine computes metrics and chart markers from executed fills only
+11. Workflow persists immutable `backtest_runs`
+12. Workflow marks the job `succeeded` or `failed`
+13. Supabase Realtime notifies the browser of job status changes
+14. The chat UI hydrates result or failure state from durable Supabase records
+15. Run appears in history
 
 The execution ledger is the boundary between strategy logic and result
 presentation. Signals are diagnostics until they become order intents and fills.
@@ -584,8 +625,9 @@ Design clean seams now, not heavy systems now.
 
 - Stateless APIs
 - Explicit contracts
-- Isolated workers
-- Cache layer
+- Render Workflow execution boundary
+- Supabase-backed market data cache
+- Durable job status
 - Normalized data model
 
 ## Later
@@ -601,10 +643,12 @@ Design clean seams now, not heavy systems now.
 
 Simple, scalable, and practical Alpha hosting.
 
-- **Frontend**: Next.js deployment (Render Static Site).
+- **Frontend**: current Next.js Render web service; static/CDN only after a
+  route/auth audit proves it preserves the app experience and authorization
+  boundary.
 - **Backend**: Render Web Service (FastAPI).
 - **Database/Auth**: Supabase (Postgres + Auth).
-- **Workers**: Initially bundled with backend service; split into dedicated Execution Workers later.
+- **Backtest Execution**: Render Workflows for pay-per-run execution.
 
 # 19. Failure Handling Standards
 

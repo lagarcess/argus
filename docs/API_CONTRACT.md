@@ -115,11 +115,19 @@ Every API response should include rate-limit headers where applicable:
 - `crypto`
 - `currency_pair`
 
-## Backtest Status (Alpha Enum)
+## Backtest Run Status (Alpha Enum)
 - `queued`
 - `running`
 - `completed`
 - `failed`
+
+## Backtest Job Status (Private Alpha Target Enum)
+- `queued`
+- `running`
+- `succeeded`
+- `failed`
+- `canceled`
+- `expired`
 
 ## Idempotency
 Alpha supports server-side idempotency for expensive state-changing operations.
@@ -553,6 +561,46 @@ Immutable simulation result.
 - `chart.markers` contains capped entry/exit events derived from executed fills only. Raw strategy signals, blocked exits while flat, and duplicate blocked entries must not appear as chart markers.
 - The frontend must keep TradingView attribution visible when rendering Lightweight Charts.
 
+## Backtest Job
+
+Durable asynchronous execution state for a chat-confirmed backtest. A job is not
+the result truth; a successful job writes an immutable `backtest_runs` record and
+references it through `result_run_id`.
+
+```json
+{
+  "id": "uuid",
+  "conversation_id": "uuid",
+  "request_message_id": "uuid",
+  "confirmation_message_id": "uuid",
+  "status": "running",
+  "payload_hash": "sha256:...",
+  "result_run_id": null,
+  "failure_code": null,
+  "failure_detail": null,
+  "retryable": false,
+  "execution_metadata": {
+    "workflow_run_id": "render-workflow-run-id",
+    "cache_status": "miss",
+    "provider_fetch_ms": 420,
+    "compute_ms": 1800
+  },
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+```
+
+**Job contract:**
+- Supabase is the source of truth for job lifecycle state.
+- Supabase Realtime is the selected private-alpha status transport for job row
+  changes.
+- API SSE remains request-scoped for chat turn stages and must not be treated as
+  the long-running backtest status channel.
+- The frontend must hydrate queued/running/succeeded/failed state from durable
+  job rows after refresh or missed realtime events.
+- `backtest_jobs.status` tracks lifecycle; `failure_code`, `failure_detail`,
+  `retryable`, and `execution_metadata` explain failures and retries.
+
 ---
 
 # 5. Metrics Catalog
@@ -664,6 +712,7 @@ The canonical backtest config used by the engine for execution and reproducibili
 
 ### DCA / Recurring-Buy Amount Semantics
 - **Current executable amount:** one recurring contribution amount.
+- **Supported cadences:** `daily`, `weekly`, `biweekly`, `monthly`, `quarterly`.
 - **Stored field:** `StrategySummary.capital_amount` continues to mean the recurring contribution for DCA / recurring-buy drafts.
 - **Not currently executable in DCA:** separate starting principal, total capital budget, contribution ceiling, or maximum invested cap.
 - If the user supplies both a recurring contribution and a starting/total capital amount, Argus must preserve the distinction conversationally, but must not show `Ready to run` as if both amounts will execute in the DCA engine.
@@ -1378,6 +1427,11 @@ Detach strategy.
 - `Idempotency-Key`: `uuid` (Required to prevent duplicate engine runs)
 
 Run directly from saved strategy or inline config.
+
+Private-alpha chat execution should prefer the durable `backtest_jobs` flow
+instead of executing heavy backtests synchronously inside the API process. This
+direct endpoint remains a contract for direct/manual execution paths until the
+job API surface is formalized.
 
 **Request: Saved Strategy**
 ```json

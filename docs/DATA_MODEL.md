@@ -41,11 +41,14 @@ Supabase owns:
 - messages
 - strategies
 - collections
+- backtest jobs
 - backtest runs
 - feedback
 - telemetry-ready product state
 
-Render/FastAPI owns orchestration and compute, not long-term state.
+Render/FastAPI owns orchestration and compute, not long-term state. Render
+Workflows own temporary backtest execution, but job lifecycle and result truth
+remain in Supabase.
 
 ---
 
@@ -61,6 +64,7 @@ messages
 strategies
 collections
 collection_strategies
+backtest_jobs
 backtest_runs
 feedback
 usage_counters
@@ -83,6 +87,7 @@ auth.users
 profiles
    ├── conversations
    │      ├── messages
+   │      ├── backtest_jobs
    │      └── backtest_runs
    │
    ├── strategies
@@ -337,6 +342,73 @@ Represents an immutable result of a simulation. Every run is reproducible from i
   deterministic guardrails.
 ---
 
+## 12.1 backtest_jobs
+
+Represents durable lifecycle state for an asynchronous backtest execution job.
+Jobs are the bridge between the chat/API control plane and the Render Workflow
+execution plane.
+
+`backtest_jobs` is not the canonical result record. Successful jobs write a
+canonical immutable `backtest_runs` row and reference it through
+`result_run_id`.
+
+### Fields
+- `id`: `uuid` (Primary Key)
+- `user_id`: `uuid` (References `profiles.id`)
+- `conversation_id`: `uuid` (References `conversations.id`)
+- `request_message_id`: `uuid` (Nullable, references `messages.id`)
+- `confirmation_message_id`: `uuid` (Nullable, references `messages.id`)
+- `idempotency_key`: `text` (Nullable)
+- `payload_hash`: `text`
+- `launch_payload`: `jsonb`
+- `status`: `text`
+- `priority`: `text` (Default: `'normal'`)
+- `attempts`: `integer` (Default: `0`)
+- `max_attempts`: `integer` (Default: `1`)
+- `queued_at`: `timestamptz`
+- `started_at`: `timestamptz` (Nullable)
+- `finished_at`: `timestamptz` (Nullable)
+- `result_run_id`: `uuid` (Nullable, references `backtest_runs.id`)
+- `failure_code`: `text` (Nullable)
+- `failure_detail`: `text` (Nullable)
+- `retryable`: `boolean` (Default: `false`)
+- `execution_metadata`: `jsonb` (Default: `{}`)
+- `created_at`: `timestamptz`
+- `updated_at`: `timestamptz`
+
+### Enums
+- **status**: `queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`
+- **priority**: `normal` initially; future values may support admin or canary
+  jobs.
+
+### Failure Semantics
+Job lifecycle status is separate from engine/runtime failure semantics.
+
+- `status` answers where the job is in its lifecycle.
+- `failure_code` is a stable machine code such as `market_data_unavailable`,
+  `invalid_date_range`, `unsupported_indicator`, or `workflow_timeout`.
+- `failure_detail` is a user-safe grouping such as `market_data_issue`,
+  `invalid_date_window`, `unsupported_rule`, or `execution_failed`.
+- `retryable` is computed from the failure category, failure code, attempts, and
+  whether an intent-preserving corrected payload exists.
+- `execution_metadata` may store private operational evidence such as workflow
+  run id, cache hit/miss, provider fetch duration, compute duration, attempt
+  count, and source error kind.
+
+Unknown failures default to `failed`, `failed_internal` semantics,
+`retryable=false`, and a safe generic user message until a new stable
+`failure_code` is intentionally added.
+
+### Notes
+- Jobs are idempotent by user and payload/idempotency key.
+- The UI must hydrate queued/running/succeeded/failed state from durable rows,
+  not frontend-invented state.
+- Supabase Realtime is the selected private-alpha job-status transport.
+- API SSE remains request-scoped and should not be used as a long-lived stream
+  for workflow-duration jobs.
+
+---
+
 # 13. Backtest Metrics Shape
 
 Backtest results use a standardized nested shape.
@@ -374,7 +446,7 @@ Tracks resource consumption for quotas and limits.
 ### Fields
 - `id`: `uuid` (Primary Key)
 - `user_id`: `uuid` (References `profiles.id`)
-- `resource`: `text` (e.g., `backtest_runs`, `chat_messages`)
+- `resource`: `text` (e.g., `backtest_runs`, `backtest_jobs`, `chat_messages`)
 - `period`: `text` (e.g., `hour`, `day`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`
@@ -389,7 +461,7 @@ Tracks resource consumption for quotas and limits.
 - **Cleanup Index**: `(period_end)`
 
 ### Alpha Enums
-- **Resource**: `chat_messages`, `backtest_runs`
+- **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`
 - **Period**: `hour`, `day`
 
 ### Notes
@@ -468,7 +540,7 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - Users may only `SELECT`, `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`.
 
 ### Tables Requiring RLS
-- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_runs`, `feedback`, `usage_counters`.
+- `private_alpha_allowlist`, `profiles`, `conversations`, `messages`, `strategies`, `collections`, `collection_strategies`, `backtest_jobs`, `backtest_runs`, `feedback`, `usage_counters`.
 
 ### Private Alpha Allowlist
 - No `anon` or `authenticated` role access is required.
@@ -487,6 +559,9 @@ Every user-owned table must enforce strict Row Level Security (RLS).
 - **strategies (gin)**: `USING gin(symbols)`
 - **collections**: `(user_id, updated_at DESC)`, `(user_id, pinned)`, `(user_id, deleted_at)`
 - **collection_strategies**: `(collection_id)`, `(strategy_id)`
+- **backtest_jobs**: `(user_id, status, queued_at DESC)`, `(conversation_id, created_at DESC)`, `(result_run_id)`
+- **backtest_jobs unique/idempotency**: `(user_id, idempotency_key)` where `idempotency_key is not null`
+- **backtest_jobs payload lookup**: `(user_id, payload_hash, created_at DESC)`
 - **backtest_runs**: `(user_id, created_at DESC)`, `(conversation_id)`, `(strategy_id)`
 - **backtest_runs (gin)**: `USING gin(symbols)`
 - **feedback**: `(user_id, created_at DESC)`
@@ -526,6 +601,13 @@ Short-window protection against abuse or runaway UI loops.
 - **Chat**: Max 10 messages per minute.
 - **Mechanism**: Enforced via standard `Retry-After` headers.
 
+### Layer 2.5: Backtest Concurrency
+Durable job backpressure protects the chat API from compute spikes.
+- **Per user**: 1 running backtest, 2 queued backtests.
+- **Global**: 5 running backtests, 10 queued backtests.
+- **Mechanism**: Enforced against `backtest_jobs` before creating or starting a
+  new workflow job.
+
 ### Layer 3: Daily / Rolling Quotas
 Generous usage boundaries tracked via the `usage_counters` table.
 - **Backtest Runs**: 50 per day.
@@ -539,12 +621,16 @@ Generous usage boundaries tracked via the `usage_counters` table.
 1. **Authenticate**: Resolve `user_id` from session.
 2. **Hard Constraints**: Validate `backtest_run` inputs against Engine Constraints.
 3. **Check Counters**: Query `usage_counters` for applicable resource/period.
-4. **Exceedance Policy**:
+4. **Check Job Backpressure**: Query `backtest_jobs` for per-user and global
+   queued/running limits before creating a workflow job.
+5. **Exceedance Policy**:
    - If rate limit exceeded: Return `429 Too Many Requests`.
    - If daily quota exhausted: Return `429` (Alpha policy).
-5. **Execute**: Perform the operation.
-6. **Increment**: Update/Insert the `usage_counters` row.
-7. **Response**: Return result with rate-limit headers.
+   - If job backpressure limit is hit: return a product-safe queued/try-later
+     response instead of starting unbounded compute.
+6. **Execute**: Create a durable job and trigger workflow execution.
+7. **Increment**: Update/Insert the `usage_counters` row.
+8. **Response**: Return result or job state with rate-limit headers.
 
 ### Admin Bypass
 Users with `profiles.is_admin = true` may have quota and rate-limit checks bypassed by backend logic.
