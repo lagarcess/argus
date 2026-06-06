@@ -1,4 +1,5 @@
 import type { AssetClass } from "@/lib/argus-types";
+import type { BacktestJob } from "@/lib/argus-api";
 
 export type StrategyResultMetric = {
   label: string;
@@ -29,6 +30,7 @@ export type ResultChartPayload = {
 export type ArtifactType =
   | "strategy_draft"
   | "confirmation"
+  | "backtest_job"
   | "backtest_run"
   | "result_review"
   | "failed_action"
@@ -119,13 +121,19 @@ export type StrategyConfirmationPayload = {
 export type Message = {
   id: string;
   role: "user" | "ai";
-  kind?: "text" | "strategy_result" | "strategy_confirmation" | "action";
+  kind?:
+    | "text"
+    | "strategy_result"
+    | "strategy_confirmation"
+    | "backtest_job"
+    | "action";
   contentPresentation?: "result_breakdown" | "conversation_load_failure";
   content?: string;
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
   confirmation?: StrategyConfirmationPayload;
+  backtestJob?: BacktestJob;
   isLoadingResult?: boolean;
   actions?: ChatActionOption[];
   artifactId?: string;

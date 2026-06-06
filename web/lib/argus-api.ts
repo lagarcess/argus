@@ -17,6 +17,13 @@ import {
 
 export type { AssetClass } from "./argus-types";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
+export type BacktestJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "canceled"
+  | "expired";
 export type TitleSource = "system_default" | "ai_generated" | "user_renamed";
 export type HistoryItemType = "chat" | "strategy" | "collection" | "run";
 export type OnboardingStage =
@@ -90,6 +97,28 @@ export type BacktestRun = {
   chart?: ResultChartPayload | null;
   trades?: Record<string, unknown>[] | null;
   created_at: string;
+};
+
+export type BacktestJob = {
+  id: string;
+  conversation_id: string;
+  request_message_id?: string | null;
+  confirmation_message_id?: string | null;
+  status: BacktestJobStatus;
+  result_run_id?: string | null;
+  failure_code?: string | null;
+  failure_detail?: string | null;
+  retryable: boolean;
+  queued_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type BacktestJobResponse = {
+  job: BacktestJob;
+  run: BacktestRun | null;
 };
 
 export type Conversation = {
@@ -229,6 +258,7 @@ export type ChatFinalPayload = {
     pending_resolution?: Record<string, unknown> | null;
   } | null;
   run?: BacktestRun | null;
+  backtest_job?: BacktestJob | null;
   next_actions?: string[];
   message_id?: string | null;
 };
@@ -702,6 +732,10 @@ export async function runBacktest(payload: {
 
 export async function getBacktestRun(runId: string) {
   return apiFetch<{ run: BacktestRun }>(`/backtests/${runId}`);
+}
+
+export async function getBacktestJob(jobId: string) {
+  return apiFetch<BacktestJobResponse>(`/backtest-jobs/${jobId}`);
 }
 
 // ─── Chat stream ──────────────────────────────────────────────────────────────

@@ -259,19 +259,21 @@ class ShadowBacktestJobTool:
         )
 
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self._maybe_create_shadow_job(payload)
+        job = self._maybe_create_shadow_job(payload)
+        if self._should_return_async_job(job):
+            return async_backtest_job_envelope(job)
         return self._delegate.run(payload)
 
-    def _maybe_create_shadow_job(self, payload: dict[str, Any]) -> None:
+    def _maybe_create_shadow_job(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         if not backtest_jobs_shadow_enabled():
-            return
+            return None
 
         context = current_backtest_job_shadow_context()
         if context is None:
             logger.warning(
                 "Backtest job shadow flag enabled without request context; skipping",
             )
-            return
+            return None
 
         try:
             gateway = self._gateway_getter()
@@ -291,7 +293,7 @@ class ShadowBacktestJobTool:
                     user_id=context.user_id,
                     conversation_id=context.conversation_id,
                 )
-                return
+                return None
             payload_digest = payload_hash(payload)
             job = gateway.create_backtest_job(
                 user_id=context.user_id,
@@ -321,6 +323,7 @@ class ShadowBacktestJobTool:
                     job=job,
                     payload_digest=payload_digest,
                 )
+                return dict(job)
         except Exception as exc:
             if not self._dev_memory_fallback_getter():
                 raise
@@ -330,6 +333,30 @@ class ShadowBacktestJobTool:
                 user_id=context.user_id,
                 conversation_id=context.conversation_id,
             )
+        return None
+
+    @staticmethod
+    def _should_return_async_job(job: dict[str, Any] | None) -> bool:
+        if job is None:
+            return False
+        if not (
+            backtest_jobs_shadow_enabled()
+            and backtest_jobs_dispatch_enabled()
+            and backtest_workflow_execution_enabled()
+        ):
+            return False
+        launch_payload = job.get("launch_payload")
+        if not isinstance(launch_payload, dict):
+            return False
+        if launch_payload.get("kind") != REAL_BACKTEST_JOB_KIND:
+            return False
+        context = current_backtest_job_shadow_context()
+        if context is None or context.created_job_id is None:
+            return False
+        status = str(job.get("status") or "").strip().lower()
+        if status in {"succeeded", "failed", "canceled", "expired"}:
+            return True
+        return context.workflow_dispatch_started
 
     def _maybe_dispatch_shadow_job(
         self,
@@ -402,6 +429,39 @@ class ShadowBacktestJobTool:
         task_run_id = str(workflow_dispatch.get("task_run_id") or "").strip()
         context.workflow_task_run_id = task_run_id or None
         return True
+
+
+def public_backtest_job_payload(job: dict[str, Any]) -> dict[str, Any]:
+    public_keys = (
+        "id",
+        "conversation_id",
+        "request_message_id",
+        "confirmation_message_id",
+        "status",
+        "result_run_id",
+        "failure_code",
+        "failure_detail",
+        "retryable",
+        "queued_at",
+        "started_at",
+        "finished_at",
+        "created_at",
+        "updated_at",
+    )
+    return {key: job.get(key) for key in public_keys if key in job}
+
+
+def async_backtest_job_envelope(job: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "success": True,
+        "payload": {"backtest_job": public_backtest_job_payload(job)},
+        "error_type": None,
+        "error_message": None,
+        "retryable": False,
+        "capability_context": {
+            "execution_status": str(job.get("status") or "queued"),
+        },
+    }
 
 
 def link_shadow_backtest_job_result(

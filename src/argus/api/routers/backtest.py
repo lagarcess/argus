@@ -5,7 +5,13 @@ from fastapi import APIRouter, Depends, Header, Request
 from argus.api import state as api_state
 from argus.api.backtest_service import create_run_from_payload
 from argus.api.dependencies import current_user, problem
-from argus.api.schemas import BacktestRunRequest, BacktestRunResponse, User
+from argus.api.schemas import (
+    BacktestJob,
+    BacktestJobResponse,
+    BacktestRunRequest,
+    BacktestRunResponse,
+    User,
+)
 from argus.domain.supabase_gateway import QuotaExceededError
 
 router = APIRouter(prefix="/api/v1", tags=["backtests"])
@@ -92,6 +98,41 @@ def run_backtest(
     if idempotency_key:
         api_state.store.idempotency[(user.id, endpoint, idempotency_key)] = run
     return BacktestRunResponse(run=run)
+
+
+@router.get("/backtest-jobs/{job_id}", response_model=BacktestJobResponse)
+def get_backtest_job(
+    job_id: str,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> BacktestJobResponse:
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for backtest job status.",
+        )
+
+    job = api_state.supabase_gateway.get_backtest_job(user_id=user.id, job_id=job_id)
+    if not job:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail="Backtest job not found.",
+        )
+
+    run = None
+    result_run_id = job.get("result_run_id")
+    if isinstance(result_run_id, str) and result_run_id:
+        run = api_state.supabase_gateway.get_backtest_run(
+            user_id=user.id,
+            run_id=result_run_id,
+        )
+    return BacktestJobResponse(job=BacktestJob.model_validate(job), run=run)
 
 
 @router.get("/backtests/{run_id}", response_model=BacktestRunResponse)

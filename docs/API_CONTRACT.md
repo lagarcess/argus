@@ -1253,6 +1253,30 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
 }
 ```
 
+When chat execution is accepted as an asynchronous durable job instead of a
+completed in-stream run, the final payload includes `backtest_job` and omits
+`run` until the workflow writes the canonical result:
+
+```json
+{
+  "type": "final",
+  "payload": {
+    "stage_outcome": "ready_to_respond",
+    "assistant_response": "I started the backtest. I will show the result here as soon as it is ready.",
+    "backtest_job": {
+      "id": "uuid",
+      "conversation_id": "uuid",
+      "status": "queued",
+      "result_run_id": null,
+      "failure_code": null,
+      "failure_detail": null,
+      "retryable": false
+    },
+    "message_id": "uuid"
+  }
+}
+```
+
 When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
 or `await_approval`, the final payload may include:
 
@@ -1536,6 +1560,87 @@ canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
   }
 }
 ```
+
+## `GET /backtest-jobs/{id}`
+
+Return one user-owned durable async backtest job and, once available, the
+canonical immutable run linked by `result_run_id`.
+
+This endpoint is a small polling/recovery fallback for private-alpha browsers
+that missed Supabase Realtime updates. Supabase `backtest_jobs` remains the
+source of truth, and API SSE must still end with the current chat turn instead
+of staying open for workflow-duration execution.
+
+**Response: queued/running**
+```json
+{
+  "job": {
+    "id": "uuid",
+    "conversation_id": "uuid",
+    "request_message_id": "uuid",
+    "confirmation_message_id": "uuid",
+    "status": "running",
+    "result_run_id": null,
+    "failure_code": null,
+    "failure_detail": null,
+    "retryable": false,
+    "queued_at": "timestamp",
+    "started_at": "timestamp",
+    "finished_at": null,
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  },
+  "run": null
+}
+```
+
+**Response: succeeded**
+```json
+{
+  "job": {
+    "id": "uuid",
+    "conversation_id": "uuid",
+    "request_message_id": "uuid",
+    "confirmation_message_id": "uuid",
+    "status": "succeeded",
+    "result_run_id": "uuid",
+    "failure_code": null,
+    "failure_detail": null,
+    "retryable": false,
+    "queued_at": "timestamp",
+    "started_at": "timestamp",
+    "finished_at": "timestamp",
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  },
+  "run": {
+    "id": "uuid",
+    "status": "completed",
+    "conversation_result_card": {}
+  }
+}
+```
+
+**Response: failed/canceled/expired**
+```json
+{
+  "job": {
+    "id": "uuid",
+    "conversation_id": "uuid",
+    "status": "failed",
+    "result_run_id": null,
+    "failure_code": "market_data_unavailable",
+    "failure_detail": "market_data_issue",
+    "retryable": true,
+    "finished_at": "timestamp"
+  },
+  "run": null
+}
+```
+
+**Error rules:**
+- `404 Not Found`: job is missing or not owned by the authenticated user.
+- `500 Server Error`: durable persistence is unavailable in a non-dev path.
 
 ## `GET /backtests/{id}`
 

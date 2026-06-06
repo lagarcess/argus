@@ -10,6 +10,9 @@ Locale = Literal["en-US", "es-419"]
 Theme = Literal["dark", "light", "system"]
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
+BacktestJobStatus = Literal[
+    "queued", "running", "succeeded", "failed", "canceled", "expired"
+]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 StrategyTemplate = Literal[
@@ -242,6 +245,28 @@ class BacktestRun(BaseModel):
 
 class BacktestRunResponse(BaseModel):
     run: BacktestRun
+
+
+class BacktestJob(BaseModel):
+    id: str
+    conversation_id: str
+    request_message_id: str | None = None
+    confirmation_message_id: str | None = None
+    status: BacktestJobStatus
+    result_run_id: str | None = None
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    retryable: bool = False
+    queued_at: datetime | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class BacktestJobResponse(BaseModel):
+    job: BacktestJob
+    run: BacktestRun | None = None
 
 
 class HistoryItem(BaseModel):

@@ -245,8 +245,9 @@ def test_shadow_backtest_job_tool_dispatches_real_task_only_when_execution_enabl
     with backtest_job_shadow_context(_context()):
         result = tool.run(payload)
 
-    assert result == {"success": True, "payload": {"result": "ok"}}
-    assert events == ["job", "dispatch", "metadata", "delegate"]
+    assert result["success"] is True
+    assert result["payload"]["backtest_job"]["id"] == "job-1"
+    assert events == ["job", "dispatch", "metadata"]
     assert gateway.jobs[0]["launch_payload"] == {
         "kind": "run_backtest_job",
         "schema_version": "backtest_job_launch/v1",
@@ -261,6 +262,7 @@ def test_shadow_backtest_job_tool_dispatches_real_task_only_when_execution_enabl
         gateway.metadata_updates[0]["execution_metadata"]["workflow_dispatch"]["task"]
         == "argus-backtests/run_backtest_job"
     )
+    assert delegate.calls == []
 
 
 def test_shadow_backtest_job_tool_does_not_redispatch_existing_job(

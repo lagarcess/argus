@@ -883,6 +883,12 @@ async def chat_stream(
                     runtime_result.pop("assistant_prompt", None)
                 result_card = runtime_result_card(runtime_result)
                 envelope = runtime_result_envelope(runtime_result)
+                backtest_job = None
+                final_response_payload = runtime_result.get("final_response_payload")
+                if isinstance(final_response_payload, dict) and isinstance(
+                    final_response_payload.get("backtest_job"), dict
+                ):
+                    backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
 
                 if result_card is not None:
@@ -955,6 +961,10 @@ async def chat_stream(
                     runtime_result["confirmation"] = confirmation_card
                 if result_card is not None:
                     metadata["result_card"] = result_card
+                if backtest_job is not None:
+                    metadata["backtest_job"] = backtest_job
+                    metadata["backtest_job_id"] = backtest_job.get("id")
+                    runtime_result["backtest_job"] = backtest_job
                 latest_failed_action_reference = runtime_result.get(
                     "latest_failed_action_reference"
                 )

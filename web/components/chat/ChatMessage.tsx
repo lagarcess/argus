@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
+import BacktestJobCard from "./BacktestJobCard";
 import { type ChatActionOption, type ChatMention, Message } from "./types";
 import { postFeedback } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
@@ -222,6 +223,10 @@ export default function ChatMessage({
               {displayContent && (
                 <ResultReadout content={displayContent} />
               )}
+            </div>
+          ) : message.kind === "backtest_job" && message.backtestJob ? (
+            <div className="w-full max-w-[min(100%,660px)]">
+              <BacktestJobCard job={message.backtestJob} />
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
             <div className="w-full max-w-[min(100%,660px)]">

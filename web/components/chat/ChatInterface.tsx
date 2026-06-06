@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   createConversation,
   deleteConversation,
+  getBacktestJob,
   getBacktestRun,
   getMe,
   getConversationMessages,
@@ -42,6 +43,7 @@ import {
   type ConversationResultCard,
   type HistoryItem,
   type BacktestRun,
+  type BacktestJobResponse,
   type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
@@ -76,6 +78,12 @@ import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
 import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
+import {
+  applyBacktestJobUpdate,
+  backtestJobFromFinalPayload,
+  backtestJobMessageFromApi,
+  pendingBacktestJobIds,
+} from "@/lib/chat-backtest-jobs";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
@@ -581,6 +589,10 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         savedStrategyId,
       };
     }
+    const backtestJobMessage = backtestJobMessageFromApi(m);
+    if (backtestJobMessage) {
+      return backtestJobMessage;
+    }
     if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
       return {
         id: m.id,
@@ -698,6 +710,23 @@ export default function ChatInterface() {
   const chatOptionsRef = useRef<HTMLDivElement>(null);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const pendingBacktestJobKey = useMemo(
+    () => pendingBacktestJobIds(messages).join("|"),
+    [messages],
+  );
+
+  const applyDurableBacktestJobResponse = useCallback(
+    (response: BacktestJobResponse) => {
+      setMessages((prev) =>
+        normalizeRetryActionHistory(
+          normalizeConfirmationHistory(
+            applyBacktestJobUpdate(prev, response),
+          ),
+        ),
+      );
+    },
+    [],
+  );
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
@@ -993,6 +1022,49 @@ export default function ChatInterface() {
     }
   }, [messages.length, streamStatus]);
 
+  useEffect(() => {
+    if (!pendingBacktestJobKey) {
+      return;
+    }
+    let cancelled = false;
+    const timers: number[] = [];
+    const jobIds = pendingBacktestJobKey.split("|").filter(Boolean);
+
+    const pollJob = async (jobId: string, attempt = 0) => {
+      try {
+        const response = await getBacktestJob(jobId);
+        if (cancelled) {
+          return;
+        }
+        applyDurableBacktestJobResponse(response);
+        const shouldContinue =
+          response.job.status === "queued" ||
+          response.job.status === "running" ||
+          (response.job.status === "succeeded" && !response.run);
+        if (shouldContinue && attempt < 45) {
+          timers.push(window.setTimeout(() => {
+            void pollJob(jobId, attempt + 1);
+          }, 2000));
+        }
+      } catch {
+        if (!cancelled && attempt < 5) {
+          timers.push(window.setTimeout(() => {
+            void pollJob(jobId, attempt + 1);
+          }, 3000));
+        }
+      }
+    };
+
+    jobIds.forEach((jobId) => {
+      void pollJob(jobId);
+    });
+
+    return () => {
+      cancelled = true;
+      timers.forEach(window.clearTimeout);
+    };
+  }, [applyDurableBacktestJobResponse, pendingBacktestJobKey]);
+
   // ── Load existing conversation ─────────────────────────────────────────────
 
   const loadConversation = async (convId: string) => {
@@ -1285,6 +1357,7 @@ export default function ChatInterface() {
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
+        const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
         if (action?.type === "save_strategy" && savedStrategyId) {
           setMessages((prev) =>
             markResultCardSaved(
@@ -1338,6 +1411,31 @@ export default function ChatInterface() {
                         savedStrategyId: card.savedStrategyId,
                       }
                     : m,
+                ),
+              ),
+            ),
+          );
+        } else if (finalBacktestJob) {
+          setInputActions([]);
+          setMessages((prev) =>
+            normalizeRetryActionHistory(
+              normalizeConfirmationHistory(
+                applyBacktestJobUpdate(
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          kind: "backtest_job",
+                          content: finalText || m.content || undefined,
+                          backtestJob: finalBacktestJob,
+                          artifactId: finalBacktestJob.id,
+                          artifactType: "backtest_job",
+                          artifactStatus: finalBacktestJob.status,
+                          actions: undefined,
+                        }
+                      : m,
+                  ),
+                  { job: finalBacktestJob, run: null },
                 ),
               ),
             ),

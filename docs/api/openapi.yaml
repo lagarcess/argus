@@ -120,6 +120,13 @@ paths:
           description: Completed Alpha backtest run.
         "422":
           description: Problem Details for unsupported Alpha requests.
+  /api/v1/backtest-jobs/{id}:
+    get:
+      responses:
+        "200":
+          description: Durable async backtest job state, with linked run when available.
+        "404":
+          description: Job not found or inaccessible.
   /api/v1/backtests/{id}:
     get:
       responses:
@@ -180,6 +187,84 @@ components:
         conversation_result_card:
           type: object
           description: Beginner-friendly inline chat result card.
+    BacktestJob:
+      type: object
+      required:
+        - id
+        - conversation_id
+        - status
+        - retryable
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        request_message_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        confirmation_message_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        status:
+          enum: [queued, running, succeeded, failed, canceled, expired]
+        result_run_id:
+          type:
+            - string
+            - "null"
+          format: uuid
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_detail:
+          type:
+            - string
+            - "null"
+        retryable:
+          type: boolean
+        queued_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        started_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        finished_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        created_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        updated_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+    BacktestJobResponse:
+      type: object
+      required:
+        - job
+        - run
+      properties:
+        job:
+          $ref: "#/components/schemas/BacktestJob"
+        run:
+          oneOf:
+            - $ref: "#/components/schemas/BacktestRun"
+            - type: "null"
     Collection:
       type: object
       description: Lightweight organizational grouping of strategies.
