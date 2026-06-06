@@ -592,18 +592,20 @@ describe("Argus Alpha frontend contract", () => {
 
   test("result actions carry canonical run and conversation context", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const resultActions = readFileSync(join(root, "lib/chat-result-actions.ts"), "utf-8");
 
     expect(chat).toContain("hydrateResultActions");
-    expect(chat).toContain("runId: run.id");
-    expect(chat).toContain("strategyId: run.strategy_id ?? null");
-    expect(chat).toContain("conversationId: run.conversation_id ?? undefined");
+    expect(resultActions).toContain("hydrateResultActions");
+    expect(resultActions).toContain("runId: run.id");
+    expect(resultActions).toContain("strategyId: run.strategy_id ?? null");
+    expect(resultActions).toContain("conversationId: run.conversation_id ?? undefined");
     expect(chat).toContain("metadata.result_conversation_id");
     expect(chat).toContain("resultActionContextFromMetadata(metadata, card)");
     expect(chat).toContain("assetClassOrUndefined(factBank?.asset_class)");
     expect(chat).not.toContain('template: "",\n        assetClass: "equity"');
-    expect(chat).toContain("resultActionRequiresRunContext");
-    expect(chat).toContain("hasResultActionContext(context.runId, context.conversationId)");
-    expect(chat).toContain("presentation: \"result\"");
+    expect(resultActions).toContain("resultActionRequiresRunContext");
+    expect(resultActions).toContain("hasResultActionContext(context.runId, context.conversationId)");
+    expect(resultActions).toContain("presentation: \"result\"");
   });
 
   test("artifact actions stay attached to historical cards", () => {

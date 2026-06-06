@@ -77,6 +77,10 @@ import { writeClipboardText } from "@/lib/clipboard";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
+import {
+  hydrateResultActions,
+  hydrateResultActionsForRun,
+} from "@/lib/chat-result-actions";
 import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
 import {
   applyBacktestJobUpdate,
@@ -285,14 +289,6 @@ function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[
   return [];
 }
 
-function resultActionRequiresRunContext(action: ChatActionOption) {
-  return (
-    action.type === "show_breakdown" ||
-    action.type === "save_strategy" ||
-    action.type === "refine_strategy"
-  );
-}
-
 function consumeConfirmationActionOnMessages(
   messages: Message[],
   action: ChatActionOption | undefined,
@@ -302,10 +298,6 @@ function consumeConfirmationActionOnMessages(
     return messages;
   }
   return applyConfirmationActionEffects(messages, [effect]);
-}
-
-function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
-  return Boolean(runId && conversationId);
 }
 
 function historyItemBelongsToConversation(
@@ -322,43 +314,6 @@ function isMissingConversationLoadError(error: unknown) {
   const status = "status" in error ? Number(error.status) : null;
   const code = "code" in error && typeof error.code === "string" ? error.code : null;
   return status === 403 || status === 404 || code === "not_found";
-}
-
-function hydrateResultActions(
-  actions: ChatActionOption[],
-  context: {
-    runId?: string;
-    strategyId?: string | null;
-    conversationId?: string;
-    strategyName?: string;
-    symbols?: string[];
-    template?: string;
-    assetClass?: AssetClass;
-  },
-) {
-  return actions
-    .filter(
-      (action) =>
-        !resultActionRequiresRunContext(action) ||
-        hasResultActionContext(context.runId, context.conversationId),
-    )
-    .map((action) => ({
-      id: action.id || action.type || action.label,
-      label: action.label,
-      type: action.type,
-      presentation: "result" as const,
-      payload: {
-        ...(action.payload ?? {}),
-        run_id: context.runId ?? "",
-        strategy_id: context.strategyId ?? null,
-        conversation_id: context.conversationId,
-        strategy_name: context.strategyName,
-        symbols: context.symbols ?? [],
-        ...(context.template !== undefined ? { template: context.template } : {}),
-        ...(context.assetClass ? { asset_class: context.assetClass } : {}),
-      },
-      value: action.value,
-    }));
 }
 
 function stringOrNull(value: unknown) {
@@ -764,17 +719,6 @@ export default function ChatInterface() {
     }
     return merged;
   };
-
-  const hydrateResultActionsForRun = (actions: ChatActionOption[], run: BacktestRun): ChatActionOption[] =>
-    hydrateResultActions(actions, {
-      runId: run.id,
-      strategyId: run.strategy_id ?? null,
-      conversationId: run.conversation_id ?? undefined,
-      strategyName: run.conversation_result_card.title,
-      symbols: run.symbols,
-      template: String(run.config_snapshot?.template ?? ""),
-      assetClass: run.asset_class,
-    });
 
   const loadHistoryPage = useCallback(async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({

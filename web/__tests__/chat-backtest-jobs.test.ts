@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  normalizeConfirmationHistory,
+  supersedePriorConfirmations,
+} from "../components/chat/artifact-history";
+import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
   backtestJobMessageFromApi,
@@ -161,6 +165,72 @@ describe("chat backtest jobs", () => {
     expect(updated.result?.runId).toBe("run-1");
     expect(updated.result?.strategyName).toBe("AAPL buy and hold");
     expect(updated.result?.actions?.[0].payload?.run_id).toBe("run-1");
+  });
+
+  test("succeeded durable job settles its confirmation as run complete", () => {
+    const confirmationMessage: Message = supersedePriorConfirmations(
+      {
+        id: "confirmation-message-1",
+        role: "ai",
+        kind: "strategy_confirmation",
+        confirmation: {
+          confirmation_id: "confirmation-1",
+          confirmation_state: "active",
+          title: "AAPL buy and hold",
+          statusLabel: "Ready to run",
+          summary: "Ready to test AAPL.",
+          rows: [],
+          actions: [],
+        },
+        actions: [],
+      },
+      "Running",
+    );
+    const queuedMessages = normalizeConfirmationHistory(
+      applyBacktestJobUpdate([confirmationMessage, queuedJobMessage()], {
+        job: job({ status: "queued" }),
+        run: null,
+      }),
+    );
+    const completedMessages = normalizeConfirmationHistory(
+      applyBacktestJobUpdate(queuedMessages, {
+        job: job({
+          status: "succeeded",
+          result_run_id: "run-1",
+          finished_at: "2026-06-06T12:00:04Z",
+        }),
+        run: run(),
+      }),
+    );
+
+    expect(completedMessages[0].confirmation?.statusLabel).toBe("Run complete");
+    expect(completedMessages[1].kind).toBe("strategy_result");
+  });
+
+  test("job card locale copy does not expose implementation plumbing", () => {
+    const localeFiles = [
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    ];
+    const forbidden = [
+      /workflow/i,
+      /chat stream/i,
+      /durable job/i,
+      /job record/i,
+      /canonical run/i,
+      /flujo/i,
+      /stream/i,
+      /trabajo durable/i,
+      /ejecuci[oó]n can[oó]nica/i,
+    ];
+
+    for (const copy of localeFiles) {
+      const parsed = JSON.parse(copy) as { chat?: { backtest_job?: unknown } };
+      const jobCopy = JSON.stringify(parsed.chat?.backtest_job ?? {});
+      for (const pattern of forbidden) {
+        expect(jobCopy).not.toMatch(pattern);
+      }
+    }
   });
 
   test("chat stream, polling, and reload paths use durable job helpers", () => {

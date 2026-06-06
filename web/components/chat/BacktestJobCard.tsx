@@ -65,15 +65,15 @@ function backtestJobCopy(
       body: job.retryable
         ? t(
             "chat.backtest_job.failed_retryable_body",
-            "The run stopped before a result was saved. You can retry this idea from the latest confirmation.",
+            "The run stopped before Argus could save a result. You can retry this idea from the latest confirmation.",
           )
         : t(
             "chat.backtest_job.failed_body",
-            "The run stopped before a result was saved. Adjust the idea if needed and try again.",
+            "The run stopped before Argus could save a result. Adjust the idea if needed and try again.",
           ),
       detail: t(
         "chat.backtest_job.failed_detail",
-        "The conversation is saved, and this status came from the durable job record.",
+        "The conversation is saved, and this status will stay here.",
       ),
       icon: AlertTriangle,
       statusLabel: t("chat.backtest_job.failed_status", "Could not run"),
@@ -101,11 +101,11 @@ function backtestJobCopy(
     return {
       body: t(
         "chat.backtest_job.succeeded_body",
-        "The run finished. Argus is loading the saved result card.",
+        "The result is ready. Argus is loading the saved card.",
       ),
       detail: t(
         "chat.backtest_job.succeeded_detail",
-        "Results are shown only after the canonical run is available.",
+        "The completed result will replace this progress card.",
       ),
       icon: CheckCircle2,
       statusLabel: t("chat.backtest_job.succeeded_status", "Result ready"),
@@ -117,11 +117,11 @@ function backtestJobCopy(
     return {
       body: t(
         "chat.backtest_job.running_body",
-        "The workflow is calculating the result in the background.",
+        "Argus is calculating the result in the background.",
       ),
       detail: t(
         "chat.backtest_job.running_detail",
-        "You can leave this chat and come back; the job state is saved.",
+        "You can leave this chat and come back; progress is saved.",
       ),
       icon: Loader2,
       statusLabel: t("chat.backtest_job.running_status", "Running"),
@@ -132,11 +132,11 @@ function backtestJobCopy(
   return {
     body: t(
       "chat.backtest_job.queued_body",
-      "The workflow has the request and will start shortly.",
+      "Argus has the request and will start shortly.",
     ),
     detail: t(
       "chat.backtest_job.queued_detail",
-      "The chat stream can end while the durable job continues.",
+      "You can leave this chat and come back; progress is saved.",
     ),
     icon: Clock3,
     statusLabel: t("chat.backtest_job.queued_status", "Queued"),

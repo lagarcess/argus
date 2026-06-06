@@ -604,12 +604,13 @@ references it through `result_run_id`.
 
 **Job contract:**
 - Supabase is the source of truth for job lifecycle state.
-- Supabase Realtime is the selected private-alpha status transport for job row
-  changes.
+- The private-alpha UI currently polls the job status endpoint; Supabase Realtime
+  remains the selected target transport for job row changes once subscriptions
+  are wired.
 - API SSE remains request-scoped for chat turn stages and must not be treated as
   the long-running backtest status channel.
 - The frontend must hydrate queued/running/succeeded/failed/canceled/expired
-  state from durable job rows after refresh or missed realtime events.
+  state from durable job rows after refresh or missed status updates.
 - `backtest_jobs.status` tracks lifecycle; `failure_code`, `failure_detail`,
   `retryable`, and `execution_metadata` explain failures and retries.
 
@@ -1566,10 +1567,11 @@ canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
 Return one user-owned durable async backtest job and, once available, the
 canonical immutable run linked by `result_run_id`.
 
-This endpoint is a small polling/recovery fallback for private-alpha browsers
-that missed Supabase Realtime updates. Supabase `backtest_jobs` remains the
-source of truth, and API SSE must still end with the current chat turn instead
-of staying open for workflow-duration execution.
+This endpoint is the current private-alpha polling transport for durable job
+state and will remain the recovery fallback if Supabase Realtime is later added.
+Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
+with the current chat turn instead of staying open for workflow-duration
+execution.
 
 **Response: queued/running**
 ```json

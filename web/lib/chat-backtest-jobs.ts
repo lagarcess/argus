@@ -6,7 +6,8 @@ import {
   type BacktestJobStatus,
   type BacktestRun,
 } from "./argus-api";
-import type { ChatActionOption, Message } from "@/components/chat/types";
+import { hydrateResultActionsForRun } from "./chat-result-actions";
+import type { Message } from "@/components/chat/types";
 
 const ACTIVE_JOB_STATUSES = new Set<BacktestJobStatus>([
   "queued",
@@ -108,27 +109,6 @@ function resultMessageFromRun(message: Message, run: BacktestRun): Message {
   };
 }
 
-function hydrateResultActionsForRun(
-  actions: ChatActionOption[],
-  run: BacktestRun,
-): ChatActionOption[] {
-  return actions.map((action) => ({
-    ...action,
-    id: action.id || action.type || action.label,
-    presentation: "result" as const,
-    payload: {
-      ...(action.payload ?? {}),
-      run_id: run.id,
-      strategy_id: run.strategy_id ?? null,
-      conversation_id: run.conversation_id,
-      strategy_name: run.conversation_result_card.title,
-      symbols: run.symbols,
-      template: String(run.config_snapshot?.template ?? ""),
-      asset_class: run.asset_class,
-    },
-  }));
-}
-
 function settleConfirmationLabelsForJob(
   messages: Message[],
   job: BacktestJob,
@@ -158,12 +138,6 @@ function settleConfirmationLabelsForJob(
 }
 
 function confirmationStatusLabelForJob(status: BacktestJobStatus): string | null {
-  if (status === "queued") {
-    return "Queued";
-  }
-  if (status === "running") {
-    return "Running";
-  }
   if (status === "failed") {
     return "Could not run";
   }
