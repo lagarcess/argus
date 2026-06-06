@@ -31,15 +31,21 @@ export function serializeComposerSegments(segments: ComposerSegment[]) {
 export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
   return segments
     .filter((segment): segment is ComposerTokenSegment => segment.type === "token")
-    .map(({ token }) => ({
-      id: token.id,
-      type: token.type,
-      label: token.label,
-      symbol: token.symbol ?? null,
-      description: token.description ?? null,
-      insert_text: token.insert_text,
-      support_status: token.support_status,
-    }));
+    .map(({ token }) => {
+      const mention: ChatMention = {
+        id: token.id,
+        type: token.type,
+        label: token.label,
+        symbol: token.symbol ?? null,
+        description: token.description ?? null,
+        insert_text: token.insert_text,
+        support_status: token.support_status,
+      };
+      if (token.type === "asset") {
+        mention.asset_class = token.asset_class ?? null;
+      }
+      return mention;
+    });
 }
 
 export function isComposerEmpty(segments: ComposerSegment[]) {

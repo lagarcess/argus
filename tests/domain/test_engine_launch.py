@@ -6,7 +6,11 @@ from typing import Any
 import pandas as pd
 import pytest
 from argus.domain.engine import _build_signals
-from argus.domain.engine_launch.adapter import _provider_metadata, run_launch_backtest
+from argus.domain.engine_launch.adapter import (
+    _provider_metadata,
+    _resolve_request_symbols,
+    run_launch_backtest,
+)
 from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     LaunchExecutionEnvelope,
@@ -258,6 +262,50 @@ def test_provider_metadata_distinguishes_market_data_sources() -> None:
     assert crypto_metadata["provider"] == "alpaca"
     assert crypto_metadata["fallback_provider"] == "kraken"
     assert crypto_metadata["source_policy"] == "alpaca_crypto_with_kraken_fallback"
+
+
+def test_launch_request_explicit_asset_class_preserves_selected_equity_symbol(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="CVX",
+        symbols=["CVX"],
+        asset_class="equity",
+        timeframe="1D",
+        date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=1000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    def classify_symbol_stub(symbol: str):
+        asset_class = "crypto" if symbol == "CVX" else "equity"
+        return type(
+            "ResolvedAsset",
+            (),
+            {
+                "canonical_symbol": symbol,
+                "asset_class": asset_class,
+                "symbol": symbol,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        classify_symbol_stub,
+    )
+
+    symbols, asset_class = _resolve_request_symbols(request)
+
+    assert symbols == ["CVX"]
+    assert asset_class == "equity"
 
 
 def test_buy_and_hold_adapter_returns_envelope_card_and_context(

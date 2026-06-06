@@ -16,6 +16,7 @@ from argus.agent_runtime.stages.interpret import (
 from argus.agent_runtime.state.models import (
     AmbiguousField,
     ArtifactReference,
+    ResolutionProvenance,
     ResponseIntent,
     ResponseProfileOverrides,
     RunState,
@@ -1856,6 +1857,228 @@ def test_structured_confirmation_action_uses_snapshot_payload_when_turn_payload_
 
     assert result.outcome == "approved_for_execution"
     assert result.patch["confirmation_payload"]["launch_payload"]["symbol"] == "TSLA"
+
+
+def test_selected_asset_mention_provenance_keeps_equity_symbol_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    def _resolve_asset(query: str) -> ResolvedAssetStub:
+        normalized = query.strip().upper()
+        return ResolvedAssetStub(
+            normalized,
+            "crypto" if normalized == "CVX" else "equity",
+        )
+
+    monkeypatch.setattr(interpret_module, "resolve_asset", _resolve_asset)
+    state = RunState.new(
+        current_user_message="cool, let's try buying and holding CVX this year so far",
+        recent_thread_history=[],
+        context_hints=[
+            ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text="CVX",
+                source="user_mention",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="CVX",
+                asset_class="equity",
+                validated_by="provider_catalog",
+                confidence="high",
+            )
+        ],
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="Test selected Chevron stock.",
+        candidate_strategy_draft=StrategySummary(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold Chevron stock.",
+            asset_universe=["CVX"],
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = interpret_stage(
+        state=state,
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(response),
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["CVX"]
+    assert strategy.asset_class == "equity"
+    assert strategy.resolution_provenance[-1].source == "user_mention"
+
+    from argus.agent_runtime.stages.execute import _launch_payload
+
+    launch_state = RunState.new(current_user_message="", recent_thread_history=[])
+    launch_state.candidate_strategy_draft = strategy
+    launch_payload = _launch_payload(launch_state)
+
+    assert launch_payload["benchmark_symbol"] == "SPY"
+
+
+def test_runnable_prompt_request_does_not_retry_failed_action() -> None:
+    failed_reference = ArtifactReference(
+        artifact_kind="failed_action",
+        artifact_id="failed-action-1",
+        artifact_status="failed",
+        metadata={
+            "action_type": "run_backtest",
+            "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AMZN",
+                "symbols": ["AMZN"],
+                "timeframe": "1D",
+                "date_range": {"start": "2026-01-01", "end": "2026-06-03"},
+                "sizing_mode": "capital_amount",
+                "capital_amount": 1000,
+                "benchmark_symbol": "SPY",
+            },
+            "failure_classification": "upstream_dependency_error",
+            "error": "market_data_unavailable",
+            "retryable": True,
+        },
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for a runnable prompt example.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=(
+                "give me a prompt then that you can actually run without errors"
+            ),
+        ),
+        semantic_turn_act="retry_failed_action",
+        artifact_target="latest_result",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(
+            current_user_message=(
+                "give me a prompt then that you can actually run without errors"
+            ),
+            recent_thread_history=[],
+        ),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            latest_failed_action_reference=failed_reference,
+            artifact_references=[failed_reference],
+        ),
+        selected_thread_metadata={
+            "last_stage_outcome": "execution_failed_recoverably",
+            "fallback_source": "failed_action_metadata",
+        },
+        structured_interpreter=RecordingInterpreter(response),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert "confirmation_payload" not in result.patch
+    assert "candidate_strategy_draft" not in result.stage_patch
+
+
+def test_runnable_prompt_request_suppresses_prompt_asset_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda query: ResolvedAssetStub(query.strip().upper(), "crypto"),
+    )
+    message = "give me a prompt then that you can actually run without errors"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for a runnable prompt example.",
+        candidate_strategy_draft=StrategySummary(
+            raw_user_phrasing=message,
+            strategy_type="buy_and_hold",
+            strategy_thesis="PROMPT buy and hold",
+            asset_universe=["PROMPT"],
+            date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(current_user_message=message, recent_thread_history=[]),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=None,
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(response),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.stage_patch["assistant_response"].startswith("Try:")
+    assert "confirmation_payload" not in result.patch
+    assert result.decision.candidate_strategy_draft.asset_universe == []
+    assert "runnable_prompt_example_route_suppressed" in result.decision.reason_codes
+
+
+def test_runnable_prompt_request_handles_snapshot_without_failed_action() -> None:
+    message = "give me a prompt then that you can actually run without errors"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for a runnable prompt example.",
+        candidate_strategy_draft=StrategySummary(raw_user_phrasing=message),
+        semantic_turn_act="retry_failed_action",
+        artifact_target="latest_result",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(current_user_message=message, recent_thread_history=[]),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            latest_failed_action_reference=None,
+        ),
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(response),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.stage_patch["assistant_response"].startswith(
+        'Try: "Buy and hold Amazon stock'
+    )
+    assert "confirmation_payload" not in result.patch
+    assert "retry_failed_action_prompt_example_suppressed" in result.decision.reason_codes
+
+
+def test_launch_payload_carries_strategy_asset_class() -> None:
+    from argus.agent_runtime.stages.execute import _launch_payload
+
+    state = RunState.new(current_user_message="", recent_thread_history=[])
+    state.candidate_strategy_draft = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Chevron stock.",
+        asset_universe=["CVX"],
+        asset_class="equity",
+        date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        comparison_baseline="SPY",
+    )
+
+    launch_payload = _launch_payload(state)
+
+    assert launch_payload["asset_class"] == "equity"
+    assert launch_payload["symbols"] == ["CVX"]
+    assert launch_payload["benchmark_symbol"] == "SPY"
 
 
 def test_structured_confirmation_action_rejects_stale_artifact_identity() -> None:
