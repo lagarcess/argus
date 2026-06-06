@@ -168,6 +168,8 @@ describe("chat backtest jobs", () => {
   });
 
   test("succeeded durable job replaces queued placeholder with completed readout", () => {
+    const resultReadout =
+      "**Quick take**\n\nBackend generated readout.\n\n- Tested: AAPL buy and hold.";
     const [updated] = applyBacktestJobUpdate([queuedJobMessage()], {
       job: job({
         status: "succeeded",
@@ -175,14 +177,21 @@ describe("chat backtest jobs", () => {
         finished_at: "2026-06-06T12:00:04Z",
       }),
       run: run(),
+      result_readout: resultReadout,
     });
 
     expect(updated.kind).toBe("strategy_result");
-    expect(updated.content).toContain("Quick take");
-    expect(updated.content).toContain("AAPL buy and hold");
-    expect(updated.content).toContain("+12.4% total return");
+    expect(updated.content).toBe(resultReadout);
     expect(updated.content).not.toContain("I started the backtest");
     expect(updated.content).not.toContain("as soon as it is ready");
+  });
+
+  test("durable job hydration does not generate backend-owned quick takes in the frontend", () => {
+    const source = readFileSync(join(root, "lib/chat-backtest-jobs.ts"), "utf-8");
+
+    expect(source).not.toContain("completedResultReadout");
+    expect(source).not.toContain("heroDeltaEvidenceView");
+    expect(source).not.toContain("defaultResultCardDisplayCopy");
   });
 
   test("succeeded durable job settles its confirmation as run complete", () => {

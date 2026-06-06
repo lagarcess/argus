@@ -1573,6 +1573,11 @@ Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
 with the current chat turn instead of staying open for workflow-duration
 execution.
 
+For completed workflow-backed jobs, `result_readout` is backend-generated
+Markdown using the same explain-stage ownership as in-stream backtest results.
+The frontend renders this field when present; it must not synthesize a Quick
+take from result-card metrics.
+
 **Response: queued/running**
 ```json
 {
@@ -1592,7 +1597,8 @@ execution.
     "created_at": "timestamp",
     "updated_at": "timestamp"
   },
-  "run": null
+  "run": null,
+  "result_readout": null
 }
 ```
 
@@ -1619,7 +1625,8 @@ execution.
     "id": "uuid",
     "status": "completed",
     "conversation_result_card": {}
-  }
+  },
+  "result_readout": "**Quick take**\n\nThe strategy returned 12.4% while SPY returned 10.1% over the same period; it beat the benchmark.\n\n- Tested: AAPL buy and hold over January 1, 2024 to June 5, 2026.\n- Keep in mind: This is a return comparison, not causal attribution."
 }
 ```
 
@@ -1636,7 +1643,8 @@ execution.
     "retryable": true,
     "finished_at": "timestamp"
   },
-  "run": null
+  "run": null,
+  "result_readout": null
 }
 ```
 

@@ -132,7 +132,11 @@ def get_backtest_job(
             user_id=user.id,
             run_id=result_run_id,
         )
-    return BacktestJobResponse(job=BacktestJob.model_validate(job), run=run)
+    return BacktestJobResponse(
+        job=BacktestJob.model_validate(job),
+        run=run,
+        result_readout=_result_readout_from_job(job) if run is not None else None,
+    )
 
 
 @router.get("/backtests/{run_id}", response_model=BacktestRunResponse)
@@ -155,3 +159,17 @@ def get_backtest(
             detail="Backtest run not found.",
         )
     return BacktestRunResponse(run=run)
+
+
+def _result_readout_from_job(job: dict[str, object]) -> str | None:
+    execution_metadata = job.get("execution_metadata")
+    if not isinstance(execution_metadata, dict):
+        return None
+    workflow_metadata = execution_metadata.get("workflow_backtest")
+    if not isinstance(workflow_metadata, dict):
+        return None
+    result_readout = workflow_metadata.get("result_readout")
+    if not isinstance(result_readout, str):
+        return None
+    normalized = result_readout.strip()
+    return normalized or None

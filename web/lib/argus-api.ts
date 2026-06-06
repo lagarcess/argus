@@ -119,6 +119,7 @@ export type BacktestJob = {
 export type BacktestJobResponse = {
   job: BacktestJob;
   run: BacktestRun | null;
+  result_readout?: string | null;
 };
 
 export type Conversation = {

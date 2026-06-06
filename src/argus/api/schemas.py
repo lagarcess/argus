@@ -267,6 +267,7 @@ class BacktestJob(BaseModel):
 class BacktestJobResponse(BaseModel):
     job: BacktestJob
     run: BacktestRun | None = None
+    result_readout: str | None = None
 
 
 class HistoryItem(BaseModel):

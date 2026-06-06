@@ -7,10 +7,6 @@ import {
   type BacktestRun,
 } from "./argus-api";
 import { hydrateResultActionsForRun } from "./chat-result-actions";
-import {
-  defaultResultCardDisplayCopy,
-  heroDeltaEvidenceView,
-} from "./result-card-display";
 import type { Message } from "@/components/chat/types";
 
 const ACTIVE_JOB_STATUSES = new Set<BacktestJobStatus>([
@@ -81,7 +77,7 @@ export function applyBacktestJobUpdate(
       message.backtestJob?.id === response.job.id
     ) {
       if (response.job.status === "succeeded" && response.run) {
-        return resultMessageFromRun(message, response.run);
+        return resultMessageFromRun(message, response.run, response.result_readout);
       }
       return {
         ...message,
@@ -94,13 +90,17 @@ export function applyBacktestJobUpdate(
   return settleConfirmationLabelsForJob(updatedMessages, response.job);
 }
 
-function resultMessageFromRun(message: Message, run: BacktestRun): Message {
+function resultMessageFromRun(
+  message: Message,
+  run: BacktestRun,
+  resultReadout: string | null | undefined,
+): Message {
   const baseCard = resultCardFromRun(run);
   const actions = hydrateResultActionsForRun(baseCard.actions ?? [], run);
   return {
     ...message,
     kind: "strategy_result",
-    content: completedResultReadout(baseCard),
+    content: normalizedReadout(resultReadout) ?? "",
     backtestJob: undefined,
     result: {
       ...baseCard,
@@ -113,61 +113,12 @@ function resultMessageFromRun(message: Message, run: BacktestRun): Message {
   };
 }
 
-function completedResultReadout(result: ReturnType<typeof resultCardFromRun>): string {
-  const view = heroDeltaEvidenceView(result);
-  const title = cleanSentenceSubject(
-    result.strategyLabel ?? result.strategyName ?? "This backtest",
-  );
-  let outcome = "finished";
-
-  if (view.hero.value && view.hero.value !== defaultResultCardDisplayCopy.unavailable) {
-    outcome = `finished at ${view.hero.value}`;
+function normalizedReadout(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
   }
-  if (
-    view.hero.detail &&
-    view.hero.detail !== defaultResultCardDisplayCopy.returnUnavailable
-  ) {
-    outcome = `${outcome} with ${completedReturnDetail(view.hero.detail)}`;
-  }
-
-  const sentences = [`${title} ${outcome}.`];
-  if (
-    view.benchmark.value &&
-    view.benchmark.value !== defaultResultCardDisplayCopy.benchmarkUnavailable
-  ) {
-    sentences.push(
-      `${view.benchmark.label}, ${lowercaseFirst(view.benchmark.value)}.`,
-    );
-  }
-  if (
-    view.worstDrop.value &&
-    view.worstDrop.value !== defaultResultCardDisplayCopy.unavailable
-  ) {
-    sentences.push(`Worst drop was ${view.worstDrop.value}.`);
-  }
-
-  return `**Quick take**\n\n${sentences.join(" ")}`;
-}
-
-function cleanSentenceSubject(value: string): string {
-  const normalized = value.trim().replace(/\s+/g, " ");
-  return normalized || "This backtest";
-}
-
-function lowercaseFirst(value: string): string {
   const normalized = value.trim();
-  if (!normalized) {
-    return normalized;
-  }
-  return `${normalized[0].toLowerCase()}${normalized.slice(1)}`;
-}
-
-function completedReturnDetail(value: string): string {
-  const normalized = value.trim();
-  if (/^[-+]?\d+(?:\.\d+)?%$/.test(normalized)) {
-    return `${normalized} ${defaultResultCardDisplayCopy.totalReturnSuffix}`;
-  }
-  return normalized;
+  return normalized || null;
 }
 
 function settleConfirmationLabelsForJob(

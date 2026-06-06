@@ -142,6 +142,15 @@ class _HydrationGateway:
             "finished_at": "2026-06-06T12:00:04+00:00",
             "created_at": "2026-06-06T12:00:00+00:00",
             "updated_at": "2026-06-06T12:00:04+00:00",
+            "execution_metadata": {
+                "workflow_backtest": {
+                    "result_readout": (
+                        "**Quick take**\n\n"
+                        "Backend generated readout.\n\n"
+                        "- Tested: AAPL buy and hold."
+                    )
+                }
+            },
         }
 
     def get_backtest_run(self, *, user_id: str, run_id: str) -> BacktestRun | None:
@@ -266,9 +275,7 @@ def test_execute_stage_returns_job_artifact_without_result_explanation() -> None
 
     assert result.outcome == "ready_to_respond"
     assert result.patch["backtest_job"]["id"] == "job-async-1"
-    assert result.patch["final_response_payload"]["backtest_job"]["id"] == (
-        "job-async-1"
-    )
+    assert result.patch["final_response_payload"]["backtest_job"]["id"] == ("job-async-1")
     assert "started" in result.patch["assistant_response"].lower()
     assert result.patch["artifact_references"][0]["artifact_kind"] == "backtest_job"
 
@@ -289,3 +296,5 @@ def test_backtest_job_status_endpoint_returns_job_and_result(
     assert payload["job"]["result_run_id"] == "run-workflow-1"
     assert payload["run"]["id"] == "run-workflow-1"
     assert payload["run"]["conversation_result_card"]["title"] == "AAPL buy and hold"
+    assert payload["result_readout"].startswith("**Quick take**")
+    assert "Backend generated readout" in payload["result_readout"]

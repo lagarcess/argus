@@ -265,6 +265,11 @@ components:
           oneOf:
             - $ref: "#/components/schemas/BacktestRun"
             - type: "null"
+        result_readout:
+          description: Backend-generated Quick take markdown for completed workflow jobs.
+          type:
+            - string
+            - "null"
     Collection:
       type: object
       description: Lightweight organizational grouping of strategies.

@@ -6,6 +6,7 @@ from datetime import date, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
+from argus.agent_runtime.result_readout import result_readout_from_backtest_payload
 from argus.api.schemas import BacktestRun
 from argus.domain.backtest_run_builder import build_backtest_run_from_result
 from argus.domain.engine_launch.results import user_safe_failure_detail
@@ -140,6 +141,16 @@ def run_backtest_job(
                 retryable=False,
                 workflow_run_id=workflow_run_id,
             )
+        explanation_context = payload.get("explanation_context")
+        explanation_context_dict = (
+            dict(explanation_context) if isinstance(explanation_context, dict) else {}
+        )
+        result_readout = _safe_result_readout(
+            request=request,
+            envelope=envelope,
+            result_card=result_card,
+            explanation_context=explanation_context_dict,
+        )
 
         run = build_backtest_run_from_result(
             conversation_id=conversation_id,
@@ -170,6 +181,14 @@ def run_backtest_job(
                 "started_at": started_at,
                 "finished_at": finished_at,
                 "result_run_id": result_run_id,
+                **(
+                    {
+                        "result_readout": result_readout,
+                        "result_readout_source": "explain_stage",
+                    }
+                    if result_readout
+                    else {}
+                ),
             },
         )
         succeeded = gateway.link_backtest_job_result(
@@ -184,6 +203,7 @@ def run_backtest_job(
             "status": succeeded.get("status") or "succeeded",
             "result_run_id": result_run_id,
             "workflow_run_id": workflow_run_id,
+            **({"result_readout": result_readout} if result_readout else {}),
             "execution_metadata": _json_safe(
                 succeeded.get("execution_metadata") or succeeded_metadata
             ),
@@ -208,6 +228,25 @@ def _default_backtest_tool() -> BacktestTool:
     return RealBacktestTool()
 
 
+def _safe_result_readout(
+    *,
+    request: dict[str, Any],
+    envelope: dict[str, Any],
+    result_card: dict[str, Any],
+    explanation_context: dict[str, Any],
+) -> str | None:
+    try:
+        return result_readout_from_backtest_payload(
+            request=request,
+            envelope=envelope,
+            result_card=result_card,
+            explanation_context=explanation_context,
+            language=_optional_str(request.get("language")),
+        )
+    except Exception:
+        return None
+
+
 def _assert_real_job(row: Mapping[str, Any]) -> None:
     if row.get("status") != "queued":
         raise WorkflowBacktestJobError(
@@ -228,6 +267,13 @@ def _assert_real_job(row: Mapping[str, Any]) -> None:
 def _request_payload(row: Mapping[str, Any]) -> dict[str, Any]:
     request = _launch_payload(row).get("request")
     return dict(request) if isinstance(request, dict) else {}
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _launch_payload(row: Mapping[str, Any]) -> dict[str, Any]:

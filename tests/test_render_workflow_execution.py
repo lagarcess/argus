@@ -238,6 +238,45 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
     )
 
 
+def test_run_backtest_job_persists_backend_result_readout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows import backtest_job as workflow_module
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    readout = (
+        "**Quick take**\n\n"
+        "Backend generated readout.\n\n"
+        "- Tested: AAPL buy and hold."
+    )
+    monkeypatch.setattr(
+        workflow_module,
+        "result_readout_from_backtest_payload",
+        lambda **kwargs: readout,
+    )
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["result_readout"] == readout
+    metadata = gateway.row["execution_metadata"]["workflow_backtest"]
+    assert metadata["result_readout"] == readout
+    assert metadata["result_readout_source"] == "explain_stage"
+
+
 def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
     from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
 
