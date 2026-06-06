@@ -1,0 +1,1097 @@
+# Private Alpha Runtime Ownership And Backtest Capacity
+
+Status: Working draft
+Date: 2026-06-05
+Audience: Founder, engineering agents, product/architecture review
+
+## Purpose
+
+This document captures the current reliability and capacity findings from the
+private-alpha Render deployment, then frames the product, runtime ownership, and
+architecture questions Argus needs to answer before scaling the backtest
+experience.
+
+The goal is not to shrink Argus to fit a free hosting tier. The goal is to
+understand the minimum credible production architecture for learning whether
+trusted users value the product at a cost a founder can survive before PMF.
+
+## Current Finding
+
+Argus does not currently have a general user-concurrency problem. It has a
+backtest-job-concurrency problem.
+
+The private-alpha API currently runs chat orchestration and backtest execution in
+one process:
+
+```text
+FastAPI + auth + chat streaming + LangGraph + Supabase + OpenRouter client
++ pandas/numpy/vectorbt + provider clients + asset resolution + backtest compute
+```
+
+That shape works locally because a developer machine has memory headroom. It is
+fragile on Render Free because the API instance has 512 MB RAM and 0.1 CPU.
+Render Starter improves CPU but keeps the same 512 MB RAM, so it does not solve
+the current memory-pressure issue.
+
+The bottleneck is not raw market data volume. A two-symbol daily test over the
+observed window fetched only hundreds of rows per symbol. The memory pressure
+comes mostly from runtime/dependency overhead and in-process computation.
+
+The proposed direction is to make the API a lean control plane and move heavy
+backtest execution to pay-per-run compute. That lets API capacity and backtest
+capacity scale independently.
+
+## Local Memory Probe
+
+This is a rough local peak-RSS probe, not a formal benchmark. Values are
+directional and should be replaced with automated measurements when the
+production execution envelope is defined.
+
+| Step | Peak RSS |
+| --- | ---: |
+| Empty Python process | ~16 MB |
+| After importing pandas | ~72 MB |
+| After importing vectorbt | ~286 MB |
+| After Argus engine imports | ~300 MB |
+| After live symbol/provider resolution | ~366 MB |
+| After computing metrics | ~444 MB |
+
+Interpretation:
+
+- `vectorbt` and its dependency stack are the largest single observed jump.
+- Live provider/asset resolution adds meaningful memory before execution.
+- The price data itself is small relative to library/runtime overhead.
+- OpenRouter token usage affects cost and latency, but not local API memory at
+  this scale because LLM inference happens on OpenRouter infrastructure.
+
+### Current API Import Boundary Probe
+
+A focused import probe shows the current API still pulls heavy backtest
+dependencies through the agent runtime import graph:
+
+| Import Step | Peak RSS | Heavy Modules Loaded |
+| --- | ---: | --- |
+| Empty Python process | ~16 MB | none |
+| `fastapi` | ~48 MB | none |
+| API schemas | ~49 MB | none |
+| Supabase gateway | ~98 MB | none |
+| OpenRouter client | ~115 MB | none |
+| `argus.agent_runtime.graph.workflow` | ~383 MB | `pandas`, `numpy`, `vectorbt`, `numba`, engine modules |
+| `argus.api.main` | ~390 MB | `pandas`, `numpy`, `vectorbt`, `numba`, engine modules |
+
+This means the first reliability refactor is not merely "call a workflow
+instead of running a tool." The API import graph must stop importing the engine
+stack on startup. A future import-boundary test should fail if importing
+`argus.api.main` or the chat router loads `pandas`, `numpy`, `vectorbt`,
+`numba`, `argus.domain.engine`, or the engine launch adapter.
+
+## Product Truth
+
+The product promise should not be defined by Render Free.
+
+Argus is a chat-first investing idea validation system. Serious private-alpha
+users may reasonably test:
+
+- One symbol over 7 years using daily candles.
+- Several symbols over multi-year daily windows.
+- One symbol over 3 years using 4-hour candles.
+- Buy-and-hold, equal-weight multi-symbol runs, DCA/recurring buys, signal-based
+  entries/exits, and benchmark comparisons.
+- Currency-pair signal tests where provider windows make the request feasible.
+- Follow-up refinements in the same conversation.
+
+The right question is:
+
+```text
+What execution envelope must Argus support for credible private-alpha learning,
+and what production shape lets us support that envelope at a survivable cost?
+```
+
+## Product, Code, And Runtime Split
+
+We should separate three concerns that are currently mentally blended:
+
+| Layer | Recommended Shape | Why |
+| --- | --- | --- |
+| Product | One chat-first Argus experience | Users should not see service boundaries. |
+| Code | Modular monolith | One repo, one domain model, one contract, fast founder iteration. |
+| Runtime | Split API/control plane from backtest execution plane | Heavy compute should not risk the chat API process. |
+
+This is not a recommendation to move to many microservice repos. It is a
+recommendation to keep a modular monolith while introducing an asynchronous
+execution boundary for expensive backtests.
+
+## Reliability And Refactor Strategy
+
+The runtime split should make Argus reliable under load, not pretend to fix all
+conversation quality bugs.
+
+These are different layers:
+
+- Architecture reliability: API memory, backtest concurrency, queueing,
+  backpressure, durable job state, and recovery after refresh/restart.
+- Runtime quality: interpretation mistakes, awkward clarifying questions,
+  unsupported-capability drift, stale confirmation state, poor recovery copy,
+  and frontend hydration/rendering bugs.
+
+Changing the architecture carelessly can make the runtime quality worse by
+introducing new state-sync failures. The split must therefore preserve the
+current conversational semantics as much as possible while moving only the heavy
+execution side effect out of the API request path.
+
+### Two-Track Plan
+
+Track 1: reliability under load.
+
+- Keep the API responsive.
+- Move heavy backtest execution behind a durable job boundary.
+- Make job state observable: queued, running, succeeded, failed, canceled,
+  expired.
+- Add canaries that verify the user-visible state, not just infrastructure
+  health.
+- Avoid rewriting interpretation, clarification, or assistant voice while the
+  execution boundary is being introduced.
+
+Track 2: runtime quality and targeted refactor.
+
+- Use private-alpha sessions to collect real conversational failure patterns.
+- Triage by frequency and trust impact.
+- Fix the highest-impact macro patterns with tests.
+- Refactor only around a failing behavior, a stability boundary, or a proven
+  ownership boundary.
+
+### Refactor Paradox
+
+Argus has large files with mixed concerns, and some of those files likely hide
+runtime bugs. Broadly refactoring them before the bugs are observable is risky:
+it can preserve the same bad behavior in prettier files, or introduce new
+failures before users can test the product.
+
+The working rule:
+
+```text
+Reliability first, observability second, behavior fixes third, structural
+cleanup as a side effect of fixing real bugs.
+```
+
+Refactor technique:
+
+- Add characterization tests around the behavior before moving code.
+- Extract one narrow boundary at a time.
+- Preserve external API/product behavior unless the test intentionally changes
+  it.
+- Stop after the boundary is clearer and verified.
+- Do not bundle broad cleanup with the execution split.
+
+Good extraction candidates:
+
+- Job submission/status/persistence, because the architecture requires that
+  boundary.
+- Backtest execution adapter, because it moves to workflow/task compute.
+- Result artifact hydration, because queued jobs need durable UI recovery.
+- Date/strategy interpretation only after repeated user failures identify the
+  pattern.
+- Frontend chat state/rendering only after reload, hydration, or realtime bugs
+  are reproduced.
+
+## Target Ownership Model
+
+The high-level ownership model should be:
+
+| Thing | Owner | Notes |
+| --- | --- | --- |
+| Product experience | Argus app | Users experience one premium chat-first web app. |
+| Frontend app shell | Current `argus-app` web service; static/CDN only after route/auth audit | Keep the premium app intact; CDN is an optimization, not a launch prerequisite. |
+| Browser UI state and local cache | Browser app | Keep navigation, chat UI, and recent fetched data fast. |
+| Auth identity | Supabase Auth | Supabase owns users and sessions. |
+| API auth enforcement | `argus-api` | Every protected API request still validates auth server-side. |
+| Chat orchestration | `argus-api` | Interpret, coordinate, call LLM, create jobs, stream request-scoped chat status. |
+| LLM provider calls | `argus-api` | Provider keys stay server-side. |
+| Durable product state | Supabase Postgres | Conversations, messages, profiles, runs, jobs, counters. |
+| Runtime checkpoints | Supabase Postgres | LangGraph state should be reloadable after API restarts. |
+| Chat turn streaming | API SSE | Request-scoped token/stage streaming only. |
+| Backtest job status updates | Supabase Realtime | Chosen status transport for queued/running/succeeded/failed/canceled/expired updates without long-held API streams. |
+| Heavy backtest execution | Render Workflows | Load pandas/numpy/vectorbt only in temporary compute. |
+| Market data cache | Supabase Postgres first; Storage only for large blobs if needed | Shared durable cache, not hidden API memory or a second cache service. |
+| Manual warmups/canaries | Local runbook/script first | Use `.github/warmup-render.sh` before tester sessions. |
+| Scheduled warmups/canaries | Supabase Cron or external monitor, deferred | Add only if manual warmup becomes a bottleneck. |
+
+This gives Argus a premium app experience without requiring the frontend or API
+to carry the analytics engine in memory.
+
+Transport distinction:
+
+- API SSE is a request-scoped stream from FastAPI to the browser. Use it for the
+  current chat turn: tokens, stage starts, stage outcomes, and immediate final
+  text.
+- Supabase Realtime is a durable-state notification path. Use it for backtest
+  job row updates after the chat request has ended: queued, running, succeeded,
+  failed, canceled, or expired.
+
+The user should never see this distinction. The UI should show one coherent
+status story, hydrated from durable Supabase rows when the request stream is no
+longer active.
+
+For this milestone, Supabase Realtime is the selected job-status transport. Do
+not design a parallel API-SSE job stream for long-running backtests. The durable
+table remains the truth, so refresh/reload recovery should read job rows even if
+the browser missed a realtime event.
+
+### Market Data Cache Position
+
+Market data caching is a speed, provider-load, and repeatability tool. It is not
+the core blocker for the execution split, and this spec does not treat caching as
+a licensing workaround.
+
+The intended cache behavior is simple:
+
+- If user A asks for an AAPL daily snapshot and user B asks for the same fresh
+  snapshot shortly after, Argus should not query the provider twice.
+- The workflow checks Supabase before calling the market data provider.
+- A cache hit returns the already-stored snapshot.
+- A cache miss fetches from the provider, writes the snapshot with an expiry,
+  and records the cache miss in job metadata.
+- Expired snapshots are ignored immediately and deleted later by cleanup.
+
+Use Supabase as the first cache owner because it is already the durable product
+state plane. Render Key Value should be ignored for now; adding it would create
+another ownership and invalidation surface before Argus has measured that
+Supabase cannot handle the alpha cache shape.
+
+Working cache keys should include enough dimensions to avoid stale or mismatched
+data:
+
+```text
+provider
+asset_class
+symbol or provider_asset_id
+timeframe
+window_start
+window_end
+adjustment/currency options when applicable
+schema_version
+```
+
+Freshness should follow market/timeframe clocks rather than one generic TTL:
+
+- Equity daily bars: expire after the next relevant completed market session.
+- Equity intraday bars: expire after the requested bar should be complete, with
+  a small provider-lag buffer.
+- Crypto and currency pairs: expire by timeframe duration plus a small provider
+  lag buffer because those markets are continuous.
+
+For Alpha, prefer a boring Supabase Postgres table or JSONB snapshot table over
+new cache infrastructure. Supabase Storage can become useful if snapshots become
+large immutable files, but that is not the first implementation target.
+
+## Lean PMF Deployment Ladder
+
+The current target ladder is:
+
+```text
+Scheduled testing:
+  argus-app: current Free web service is acceptable; static/CDN is deferred
+  argus-api: Free web service, manually warmed before tester sessions
+  backtests: Render Workflows, pay per run
+  Supabase: durable state, auth, jobs, realtime
+  warmup: run .github/warmup-render.sh manually
+
+Anytime private alpha:
+  argus-app: static/CDN if route/auth audit passes, otherwise web service
+  argus-api: Starter web service if lean, so it does not spin down
+  backtests: Render Workflows, pay per run
+  Supabase: durable state, auth, jobs, realtime
+
+More API pressure:
+  argus-api: Standard web service if orchestration becomes CPU/memory bound
+  backtests: still Workflows, not API compute
+
+More backtest pressure:
+  increase workflow concurrency, task size, or queue limits
+  keep API modest and responsive
+```
+
+Important distinction:
+
+- Render service tier is the size of the compute instance for a service.
+- `argus-app` and `argus-api` are web services, not workers.
+- Render Workflows are temporary compute tasks for jobs.
+- An always-on background worker is a fallback option, not the preferred PMF
+  path if Workflows are reliable.
+
+## Proposed Leaner Runtime Design
+
+### 1. Frontend App Shell
+
+The eventual low-cost frontend shape is a CDN-delivered app shell after a
+route/auth audit confirms the product experience does not require a long-running
+Next server. This is not required for the first execution split; the current
+`argus-app` web service is acceptable while the API/backtest boundary is the
+active reliability blocker.
+
+This does not mean Argus becomes a brochure site. It means the browser downloads
+the app bundle from CDN/static hosting, then the app calls `argus-api`,
+Supabase, and Realtime for authenticated product behavior.
+
+Benefits:
+
+- No always-running Node process just to serve product screens.
+- Faster global delivery for JS/CSS/assets.
+- Less Render compute cost.
+- Frontend scale becomes mostly CDN bandwidth instead of server CPU/RAM.
+
+Current caveat:
+
+- The current Next app runs as a Render web service with `next start`.
+- `/chat` currently performs a server-side Supabase session check.
+- To move to static/CDN, the `/chat` auth guard would need to move to
+  client-side UX plus strict API-side authorization for real security.
+- Do not switch the app to static/CDN until a route/auth audit proves it will
+  preserve the premium app experience and not weaken authorization.
+
+The route/auth audit should check:
+
+- whether the app can build/export without a long-running Next server;
+- all routes that use `redirect()`, server-side cookies, server Supabase
+  clients, middleware/proxy behavior, or dynamic-only pages;
+- whether login/signup redirects and `/chat` access still feel correct when
+  auth gating becomes client UX plus API enforcement;
+- whether frontend env vars are browser-safe and no backend secret is required;
+- whether streaming chat, result cards, recents, i18n, and settings still behave
+  like a real app after static delivery.
+
+The app must still feel premium: chat UI, streaming, recents, result cards,
+settings, local caching, and realtime job progress should remain app-like.
+
+### 2. API Service
+
+The API service should stay thin and responsive.
+
+Responsibilities:
+
+- Authenticate users.
+- Handle chat messages and SSE progress.
+- Persist conversations and messages.
+- Interpret/confirm backtest intent.
+- Create durable backtest jobs.
+- Enforce per-user and global limits.
+- Return job status and rendered result artifacts.
+
+The API service should not synchronously execute heavy backtests on the chat
+request path once the async execution boundary exists.
+
+Minimal API memory should contain only:
+
+- FastAPI runtime and route handlers.
+- Request-scoped auth/session data.
+- Supabase and OpenRouter client/config.
+- Bounded recent chat context.
+- Selected task snapshot and artifact references.
+- Current LangGraph turn state.
+- Current SSE response buffer.
+- Small job submission/status payloads.
+
+The API should not hold:
+
+- Full conversation history forever.
+- Full user history.
+- Market data caches.
+- Provider asset catalogs unless they are tiny and bounded.
+- pandas/numpy/vectorbt or backtest engine imports.
+- Large result/chart artifacts except the one response being returned.
+
+Lean API acceptance test:
+
+- importing `argus.api.main` should not load `pandas`, `numpy`, `vectorbt`,
+  `numba`, `argus.domain.engine`, or the engine launch adapter;
+- startup RSS should be measured before and after the split;
+- the chat route should submit jobs through a narrow execution client or
+  repository interface, not through `RealBacktestTool` or engine adapters.
+
+### 3. Durable Job Table
+
+Supabase remains canonical state. Add a durable job table when the execution
+boundary is implemented.
+
+Working table shape:
+
+```text
+backtest_jobs
+- id uuid primary key
+- user_id uuid not null
+- conversation_id uuid not null
+- request_message_id uuid null
+- confirmation_message_id uuid null
+- idempotency_key text null
+- payload_hash text not null
+- launch_payload jsonb not null
+- status text not null
+  -- queued | running | succeeded | failed | canceled | expired
+- priority text not null default 'normal'
+- attempts integer not null default 0
+- max_attempts integer not null default 1
+- queued_at timestamptz not null
+- started_at timestamptz null
+- finished_at timestamptz null
+- result_run_id uuid null
+- failure_code text null
+- failure_detail text null
+- execution_metadata jsonb not null default '{}'
+- created_at timestamptz not null
+- updated_at timestamptz not null
+```
+
+Important properties:
+
+- Jobs are idempotent by user and payload/idempotency key.
+- Job status is durable and visible after refresh.
+- The job writes a canonical `backtest_runs` row on success.
+- The chat thread can render queued/running/succeeded/failed/canceled/expired
+  states from durable data, not frontend-invented state.
+
+### Job Failure Taxonomy
+
+Keep job lifecycle status separate from engine/runtime failure semantics:
+
+```text
+backtest_jobs.status:
+  queued | running | succeeded | failed | canceled | expired
+
+engine execution_status:
+  succeeded | blocked_unsupported | blocked_invalid_input |
+  failed_upstream | failed_internal
+
+failure_category:
+  missing_required_input | unsupported_capability |
+  parameter_validation_error | upstream_dependency_error |
+  internal_system_error | ambiguous_user_intent
+```
+
+The job status answers "where is this job in its lifecycle?" The execution
+status and failure fields answer "why did the run succeed or fail?"
+
+Initial mapping:
+
+| Engine execution status | Job status | Retry default | Product response |
+| --- | --- | --- | --- |
+| `succeeded` | `succeeded` | no | Persist `backtest_runs` and hydrate result card. |
+| `blocked_unsupported` | `failed` | no | Preserve idea and offer supported alternatives. |
+| `blocked_invalid_input` | `failed` | only with intent-preserving mechanical correction | Ask user to adjust invalid dates, sizing, rule, or payload field. |
+| `failed_upstream` | `failed` | yes when provider/service error is transient and attempts remain | Offer retry from the same setup. |
+| `failed_internal` | `failed` | no by default | Show safe generic failure, record details privately, triage from logs/metadata. |
+
+Failure records should be flexible but structured:
+
+- `failure_code`: stable machine code such as `market_data_unavailable`,
+  `invalid_date_range`, `unsupported_indicator`, or `workflow_timeout`.
+- `failure_detail`: user-safe grouping such as `market_data_issue`,
+  `invalid_date_window`, `unsupported_rule`, or `execution_failed`.
+- `retryable`: computed from `failure_category`, `failure_code`, attempts, and
+  whether an intent-preserving corrected payload exists.
+- `execution_metadata.raw_error_kind`: private/debug-only source classification
+  for new errors that do not yet have a first-class code.
+
+When Argus encounters a new failure shape, default to `failed_internal`,
+`retryable=false`, and a safe generic user message. Then add a new
+`failure_code` only after we understand whether the failure is transient,
+invalid input, unsupported capability, or a true internal bug.
+
+### 4. Execution Plane: Workflow First, Worker Fallback
+
+There are two viable execution-plane options. The PMF-preferred option is
+pay-per-run Workflows because private-alpha traffic is likely bursty and
+uncertain.
+
+#### Option A: Render Workflows / Pay-Per-Run Compute
+
+Use Render Workflows for backtest task runs. Render docs describe workflows as
+managed orchestration for long-running distributed tasks, where each task run
+gets a separate instance and Render bills compute prorated by the second.
+
+Pros:
+
+- Pay mostly when users run backtests.
+- A task can use `standard` compute, currently 1 CPU and 2 GB RAM, without
+  keeping that compute always on.
+- Bursts map naturally to multiple task runs.
+- Render queues tasks when workspace concurrency is exhausted.
+- The API can stay small because heavy imports live in task processes.
+
+Cons:
+
+- New integration surface.
+- Requires job idempotency and durable status handling.
+- Workflow task arguments have size limits, so pass compact IDs/payloads rather
+  than large inline artifacts.
+- Workflows are a newer Render product and should be validated before relying on
+  them for user-facing reliability.
+- Render Hobby currently allows more workflow concurrency than Argus should
+  expose at first; product limits should start at 5 global running jobs and 10
+  queued jobs.
+
+#### Option B: Always-On Worker Service
+
+Run a separate Render background worker or private service from the same repo.
+
+Pros:
+
+- Simple mental model.
+- Easy local reproduction.
+- Same codebase and dependency management.
+
+Cons:
+
+- Always-on monthly cost.
+- Capacity is fixed unless manually or automatically scaled.
+- Each worker carries the heavy backtest stack in memory even while idle.
+
+Capacity model:
+
+```text
+active_backtests ~= number_of_worker_instances * safe_jobs_per_worker
+```
+
+Until measured, assume one active heavy backtest per 1 CPU.
+
+### 5. Backpressure
+
+Backpressure is product reliability, not just infrastructure.
+
+Initial private-alpha limits:
+
+```text
+Per user:
+- 1 running backtest
+- 2 queued backtests
+
+Global:
+- 5 running backtests
+- 10 queued backtests before returning a "try later" response
+
+Per job:
+- 60 second product timeout from workflow start, then fail honestly
+```
+
+Render Workflows currently allow a higher Hobby workspace base concurrency
+ceiling than this, but Argus should intentionally cap lower until benchmarks
+prove the envelope. Render's platform queue is not a substitute for product
+backpressure because it does not know user fairness, chat UX, or alpha trust.
+
+When a user exceeds limits, Argus should respond in product language:
+
+- "That run is queued."
+- "You already have a run in progress."
+- "This test is larger than the current alpha limit; narrow the symbols, date
+  range, or timeframe."
+
+The system should not hang, silently drop work, or let one user's backtests
+degrade chat for everyone.
+
+With this design, too many backtests should degrade into honest queueing, not a
+broken chat/API experience. Users should still be able to send messages, inspect
+history, or continue other conversations while jobs run.
+
+### 6. Autoscale Or Pay-Per-Run Compute
+
+There are two scaling models:
+
+```text
+Vertical scaling:
+One bigger instance handles heavier or more work.
+
+Horizontal scaling:
+More instances handle more independent jobs at the same time.
+```
+
+Backtests are naturally horizontal when each run is independent. For Alpha,
+horizontal pay-per-run compute is more attractive than buying a large always-on
+API instance.
+
+API scale and backtest scale should become separate decisions:
+
+- If chat orchestration is slow, scale `argus-api`.
+- If backtests are queued too long, scale workflow concurrency/task size.
+- If database reads/writes are slow, optimize Supabase queries/indexes/RLS and
+  then consider a Supabase upgrade.
+
+## Back-Of-The-Envelope Render Cost Model
+
+These numbers are for decision-making, not guarantees. Verify against current
+Render pricing before making budget commitments.
+
+### Recommended Split Model
+
+| Component | Low-Cost Session Testing | Anytime Private Alpha | Scale Path |
+| --- | --- | --- | --- |
+| `argus-app` | Current Free web service; static/CDN deferred | Static/CDN after route/auth audit, otherwise web service | Prefer CDN/static if proven safe; avoid app server only when feasible |
+| `argus-api` | Free web service, manually warmed before sessions | Starter web service if lean | Standard only if orchestration is the bottleneck |
+| Backtests | Render Workflows | Render Workflows | More concurrency or larger workflow task tier |
+| Supabase | Existing project | Existing project | Optimize then upgrade if DB is bottleneck |
+
+Starter is attractive only after the API is lean because it removes spin-down
+and adds CPU while keeping 512 MB RAM. It does not solve the current monolith
+memory issue if the API still imports the heavy backtest stack.
+
+### Historical / Escape-Hatch In-Process API Model
+
+| Instance | RAM / CPU | Rough Trust Level Today | Comment |
+| --- | ---: | --- | --- |
+| Free | 512 MB / 0.1 CPU | Not reliable for serious runs | Memory ceiling is already hit. |
+| Starter | 512 MB / 0.5 CPU | Still not reliable | More CPU, same memory ceiling. |
+| Standard | 2 GB / 1 CPU | Temporary diagnostic/escape hatch only | Not target architecture; still couples chat and compute. |
+| Pro | 4 GB / 2 CPU | Comfortable but expensive | Does not fix the architectural coupling. |
+| Pro Plus | 8 GB / 4 CPU | Likely overkill now | Useful only if one process must do many heavy jobs. |
+
+In-process capacity is limited by the smallest of memory, CPU, provider limits,
+and request timeout behavior. It also risks the API experience when backtests
+are heavy.
+
+This model documents why a simple tier upgrade is not the chosen design.
+
+### Fallback Only: Always-On Worker Model
+
+Do not start here if Workflows validate; this is a backup execution backend
+behind the same durable job table.
+
+Assume one active heavy backtest per 1 CPU until measured.
+
+| Worker Instance | Rough Active Runs Per Worker | Monthly Cost Shape |
+| --- | ---: | --- |
+| Standard, 2 GB / 1 CPU | 1 active run | Fixed monthly cost per worker |
+| Pro, 4 GB / 2 CPU | 2 active runs | Higher fixed monthly cost |
+| Pro Plus, 8 GB / 4 CPU | 4 active runs | Likely not needed for private alpha |
+
+Horizontal Standard workers are often cleaner than one large worker unless a
+single job needs more than 2 GB RAM.
+
+### Render Workflows Model
+
+As of the referenced Render docs, workflow task instances include:
+
+| Workflow Task Instance | Specs | Price |
+| --- | ---: | ---: |
+| starter | 0.5 CPU / 512 MB | $0.05/hour |
+| standard | 1 CPU / 2 GB | $0.20/hour |
+| pro | 2 CPU / 4 GB | $0.40/hour |
+
+Standard workflow task cost examples:
+
+| Runtime | Approx Cost At $0.20/hour |
+| ---: | ---: |
+| 10 seconds | $0.00056 |
+| 30 seconds | $0.00167 |
+| 60 seconds | $0.00333 |
+| 5 minutes | $0.01667 |
+| 10 minutes | $0.03333 |
+
+If a backtest takes 30 seconds on a standard workflow task, then 1,000 backtests
+would cost roughly $1.67 of workflow compute, excluding API hosting, bandwidth,
+provider costs, database costs, and LLM token costs.
+
+For Argus private alpha, the initial workflow task should target a 60-second
+product timeout. The Render default of hours is a platform ceiling, not an Argus
+UX goal. Most supported simple backtests should complete in seconds once cold
+start, dependency import, provider fetch, compute, charting, and persistence are
+measured separately.
+
+This is why execution speed matters twice:
+
+- Faster jobs improve UX.
+- Faster jobs reduce pay-per-run compute cost.
+
+## What Each Design Affords
+
+| Design | What It Affords | What It Does Not Afford |
+| --- | --- | --- |
+| Current monolith on Free | Cheap deployment, manual testing | Serious backtest reliability |
+| Current monolith on Standard | Quick PMF experiment with more headroom | Clean burst handling or API isolation |
+| Current app service + Free API + Workflows | Cheapest manually warmed PMF sessions without frontend migration | Always-ready API or CDN economics |
+| Static/CDN app + Starter API + Workflows | Minimum always-ready lean private alpha after route/auth audit | Heavy API imports or unlimited chat bursts |
+| Fallback: API + always-on worker | Predictable queue and isolated compute | Pay only when jobs run |
+| API + Render Workflows | Burst-friendly pay-per-run backtests | Zero integration work |
+| API + external compute provider | Potentially best long-term cost/perf tuning | Highest integration and ops tax |
+
+## Proposed PMF Experiment Architecture
+
+Near-term target:
+
+```text
+Browser / current argus-app web service
+  (static/CDN later only if route/auth audit justifies it)
+  -> Render argus-api web service
+       -> Supabase Auth/Postgres/Realtime
+       -> OpenRouter for interpretation/explanation
+       -> Render Workflow for backtest execution
+            -> Supabase market data cache
+            -> market data provider on cache miss
+            -> backtest engine
+            -> Supabase result artifact
+```
+
+Operational behavior:
+
+1. User confirms a backtest in chat.
+2. API validates auth, quota, and job limits.
+3. API creates `backtest_jobs` with status `queued`.
+4. API emits a chat progress state.
+5. API triggers a workflow with a compact job ID or payload reference.
+6. Workflow marks job `running`.
+7. Workflow imports the heavy analytics stack.
+8. Workflow reads fresh market data from Supabase cache or fetches from the
+   provider on cache miss.
+9. Workflow executes the backtest.
+10. Workflow writes `backtest_runs`.
+11. Workflow marks job `succeeded` or `failed`.
+12. Chat hydrates the result from durable state.
+
+This keeps the product chat-first while preventing the chat API from carrying
+every heavy backtest dependency and execution spike.
+
+If Workflows are not reliable enough, the fallback is an always-on worker
+service reading the same durable job table. The product/API contract should not
+depend on which execution backend is currently active.
+
+## Answered Constraints And Remaining Questions
+
+### Answered By Render Selection
+
+These are decided enough for the next design pass:
+
+- `argus-app`: keep the current web service for now. Static/CDN is a later
+  cost/performance optimization after a route/auth audit.
+- `argus-api`: Free is acceptable for manually warmed testing if the API is
+  lean. Starter is the first "usable any time" option after the heavy backtest
+  stack is removed from the API.
+- Heavy backtests: use Render Workflows, not the API process.
+- First workflow task tier: `standard`, currently 1 CPU / 2 GB RAM.
+- Render Workflow Hobby base concurrency is higher than Argus should expose
+  initially. Start with Argus product caps of 5 global running jobs and 10
+  global queued jobs.
+- Workflow task arguments must stay compact. Pass a job id or payload reference,
+  not market data blobs or large result artifacts.
+- Market data cache: Supabase is the default owner. Cache for speed and provider
+  load, not as a separate product source of truth. Ignore Render Key Value until
+  measurement proves Supabase is the bottleneck.
+- Render's default long task timeout is not the product timeout. Argus should
+  start with a 60-second product timeout for supported private-alpha backtests.
+
+### Answered By Current Codebase
+
+The current executable envelope already appears in the runtime, API schema, and
+launch validation code:
+
+| Question | Current Answer |
+| --- | --- |
+| Max symbols | 1 to 5 symbols per run. |
+| Asset classes | Equity, crypto, and currency pairs exist in code; runs must stay within one asset class. |
+| Allocation | Equal weight only for multi-symbol runs. |
+| Position side | Long-only. |
+| Default timeframe | `1D` when omitted. |
+| Supported timeframes | `1h`, `2h`, `4h`, `6h`, `12h`, `1D`, subject to provider availability. |
+| Date window behavior | Direct backend normalization falls back to 12 months when dates are omitted, but the chat runtime requires or confirms a date range before presenting a runnable confirmation. Treat 12 months as a safety fallback, not a silent product promise. |
+| Equity history floor | Current launch path rejects equity starts before 2016-01-01. |
+| Currency-pair window | Kraken-backed currency-pair OHLC supports `1h`, `4h`, `1D` and is limited to the latest 720 candles. |
+| Benchmarks | Equity defaults to `SPY`; crypto defaults to `BTC`; currency pairs default to the tested pair. Explicit benchmark must match asset class. |
+| Capital | Starting capital defaults to `$1,000`; valid range is `$1,000` to `$100,000,000`. |
+| DCA sizing | One recurring contribution amount. Separate starting principal, total budget, or investment ceiling is conversational only for now. |
+| DCA cadences | `daily`, `weekly`, `biweekly`, `monthly`, `quarterly`. |
+| Executable strategy families | Runtime canonical types are `buy_and_hold`, `dca_accumulation`, `indicator_threshold`, and `signal_strategy`. |
+| User-facing strategy envelope | Buy and hold; recurring buys/DCA; enter/exit based on signal rules. Portfolio construction remains deferred. |
+| Signal strategies | `indicator_threshold` is the simple indicator-threshold macro path, currently RSI-style below/above thresholds. `signal_strategy` is the generic rule-spec path, including moving-average and MACD crossover shapes. Both should be benchmarked before being treated as equally safe as buy-and-hold/DCA. |
+| Stablecoins | Explicitly unsupported. |
+| Existing failure envelope | Launch execution already distinguishes `succeeded`, `blocked_unsupported`, `blocked_invalid_input`, `failed_upstream`, and `failed_internal`. Job rows should store lifecycle status separately and align failure fields with the taxonomy above. |
+| LLM task budgets | OpenRouter task profiles already bound most calls around 6 to 12 seconds with task-specific token caps. |
+| Quotas/rate limits | Supabase `usage_counters` already supports quota/rate-limit enforcement; job concurrency limits are additive and should not replace usage counters. |
+
+### Initial Private-Alpha Product Envelope
+
+Use this as the first capacity target until benchmarks say otherwise:
+
+```text
+Users:
+- 10 allowlisted private-alpha users
+- assume a smaller active subset during a coordinated testing session
+
+Backtest jobs:
+- 1 running backtest per user
+- 2 queued backtests per user
+- 5 running backtests globally
+- 10 queued backtests globally
+- 60 second product timeout after workflow start
+
+Execution:
+- all backtests cross the durable job boundary
+- fast jobs may feel inline in the chat UI
+- longer jobs should immediately show queued/running state
+```
+
+This preserves the product shape without letting one user's heavy test consume
+the chat API.
+
+### Capacity Answers And Measurement Targets
+
+1. Lean API footprint after split: current evidence says `argus.api.main` peaks
+   around ~390 MB locally because `graph.workflow` imports the heavy engine
+   stack. The next measurable target is to remove those imports from API
+   startup and re-run the probe. A plausible lean target is closer to the
+   FastAPI + Supabase + OpenRouter path, but it is not proven until measured.
+2. Workflow cold-start plus dependency-import overhead: not measured yet because
+   the workflow service does not exist. Current local proxy is roughly the jump
+   from ~115 MB to ~390 MB and about 1.1 seconds of additional import time on
+   the developer machine. Measure this on Render `standard` workflow compute.
+3. Benchmark timings: use the expanded benchmark matrix below and measure cold
+   start/import, provider fetch, compute, chart/result build, persistence, and
+   job-status update latency separately.
+4. Private-alpha safe strategy set: target the full current code set
+   eventually, but gate the promise by benchmarks and failure behavior. If
+   signal paths are flaky, keep them behind recovery language rather than
+   removing them from the architecture.
+5. Currency pairs: include them in benchmarks and envelope planning because
+   signal/indicator strategies are especially relevant there. Provider windows
+   make currency pairs narrower than equities/crypto, so communicate feasible
+   windows honestly.
+6. Static/CDN audit: not urgent for the execution split. It becomes worthwhile
+   when app service sleep/cost becomes annoying or when we want CDN economics.
+   The audit exists because the current app uses server-side Supabase session
+   checks and redirects, not because static delivery is less premium.
+7. API tier: Free API is acceptable for founder-only or one manually warmed user
+   at a time after the API is lean. Starter is the first "usable any time"
+   option once benchmarks prove the API fits in 512 MB without heavy imports.
+
+### Cost Envelope
+
+The founder owns cost thresholds. This spec should support cost decisions by
+measuring per-run compute time, token use, provider usage, API tier needs, and
+workflow concurrency, not by declaring a budget in the architecture document.
+
+### Reliability Envelope
+
+Do not hard-code product limits as permanent promises yet. Implement flexible
+knobs with conservative defaults:
+
+- per-user running jobs;
+- per-user queued jobs;
+- global running jobs;
+- global queued jobs;
+- workflow start timeout;
+- product-visible job timeout;
+- max attempts;
+- retryable failure categories;
+- queue max age;
+- stale-job expiration;
+- realtime/SSE keepalive and timeout values.
+
+Initial default target remains:
+
+```text
+1 running job per user
+2 queued jobs per user
+5 running jobs globally
+10 queued jobs globally
+60 second product timeout after workflow start
+```
+
+Provider observability should start with what we already have access to:
+
+- Render service logs, CPU/memory metrics, request metrics, workflow run history,
+  and workspace audit logs.
+- Supabase Logs Explorer, Auth Audit Logs, Realtime logs/limits, Postgres logs,
+  and durable job/run rows.
+- PostHog later, when product analytics needs outweigh integration friction.
+
+Initial audit routine after each private-alpha smoke or tester session:
+
+1. Render: inspect API/app logs and service metrics for restarts, memory pressure,
+   slow requests, failed deploys, and workflow failures.
+2. Supabase Auth: confirm the expected login/signup events in Auth Audit Logs.
+3. Supabase Postgres: confirm `conversations`, `messages`, `backtest_runs`,
+   `route_receipts`, and later `backtest_jobs` increment for the tested user and
+   conversation.
+4. Product rows: verify persisted rows contain enough identifiers to correlate a
+   user-visible failure with a Render request, workflow run, provider fetch, and
+   persisted result.
+
+When `backtest_jobs` is added, `execution_metadata` should include:
+
+- workflow run id;
+- cache hit/miss and cache key;
+- provider fetch duration;
+- compute duration;
+- chart/result build duration;
+- attempt count;
+- failure category and retryability;
+- relevant external request ids when providers expose them.
+
+This becomes Argus' first production audit trail. Provider dashboards remain the
+system-level view; Supabase durable rows become the product-level truth.
+
+### Architecture Envelope
+
+Questions that remain real but can be answered by trying:
+
+- Can Render Workflows run the current engine reliably from the same repo?
+- Does workflow cold start matter for the private-alpha user experience?
+- Is workflow failure/retry behavior good enough for trusted-user testing?
+- Does a Free lean API stay responsive during one manually warmed tester
+  session?
+- Does Starter become enough for "usable any time" after the import split?
+
+Questions already answered enough for this pass:
+
+- Heavy backtests should not run inside the API process.
+- API and backtest capacity should scale independently.
+- A static/CDN app is optional optimization, not required for the execution
+  boundary.
+- Scheduled warmups are deferred while manual `.github/warmup-render.sh` is
+  acceptable.
+- Supabase durable records should own jobs, job status, run truth, and reload
+  recovery.
+- Market data caching belongs in Supabase first and should be implemented only
+  after the execution boundary exists or provider-fetch measurements show it is
+  slowing the experience.
+
+### Refactor Envelope
+
+Execution-boundary files that likely require focused changes:
+
+- `src/argus/api/state.py`
+- `src/argus/agent_runtime/tools/real_backtest.py`
+- `src/argus/agent_runtime/stages/execute.py`
+- `src/argus/agent_runtime/graph/workflow.py`
+- `src/argus/domain/engine_launch/adapter.py`
+- `src/argus/domain/backtesting/**`
+- `src/argus/api/routers/agent.py`
+- `src/argus/api/chat_service.py`
+
+Conversational-runtime bug/refactor files that should be handled by observed
+failure patterns, not bundled into the execution split:
+
+- `src/argus/agent_runtime/llm_interpreter.py`
+- `src/argus/agent_runtime/stages/interpret.py`
+- `src/argus/agent_runtime/strategy_contract.py`
+- `src/argus/agent_runtime/result_followups.py`
+- `src/argus/agent_runtime/stages/explain.py`
+- `web/components/chat/ChatInterface.tsx`
+- `web/lib/argus-api.ts`
+
+Required characterization tests before extraction:
+
+- importing API modules does not import heavy backtest dependencies;
+- a ready confirmation creates a durable job instead of executing inline;
+- completed jobs write canonical `backtest_runs`;
+- failed jobs preserve existing failure categories;
+- refresh/reload hydrates queued/running/succeeded/failed/canceled/expired job
+  state;
+- retry behavior distinguishes transient upstream failures from invalid payloads.
+
+Desirable but deferred refactors:
+
+- splitting the 6k-line interpreter file;
+- broad UI state cleanup;
+- renaming internal strategy families;
+- new portfolio abstractions.
+
+## Benchmark Plan
+
+When we are ready to measure, create a benchmark matrix that runs the same cases
+locally and in production-like compute. The benchmark should measure API import
+footprint separately from workflow execution footprint.
+
+Suggested execution cases:
+
+| Case | Symbols | Window | Timeframe | Asset Class | Strategy |
+| --- | ---: | --- | --- | --- | --- |
+| A | 1 | 7 years | 1D | equity | buy-and-hold |
+| B | 5 | 7 years | 1D | equity | equal-weight buy-and-hold |
+| C | 1 | 3 years | 4h | crypto | buy-and-hold |
+| D | 3 | 3 years | 4h | crypto | equal-weight buy-and-hold |
+| E | 1 | 7 years | 1D | equity | DCA monthly |
+| F | 1 | 7 years | 1D | equity | DCA weekly |
+| G | 1 | 3 years | 4h | crypto | DCA biweekly or monthly |
+| H | 1 | 7 years | 1D | equity | RSI threshold |
+| I | 1 | 7 years | 1D | equity | moving average crossover |
+| J | 1 | latest feasible 720-candle window | 4h | currency_pair | RSI threshold |
+| K | 1 | latest feasible 720-candle window | 4h | currency_pair | moving average or MACD crossover |
+| L | 5 concurrent jobs | mixed A-I | mixed | mixed | queue/backpressure smoke |
+
+Currency-pair intraday windows must respect Kraken's latest 720-candle limit.
+For example, a 4-hour currency-pair test is roughly a 120-day maximum window,
+not a 3-year promise.
+
+Metrics to capture:
+
+- API cold start and startup RSS.
+- API import-boundary loaded modules.
+- Workflow cold start and dependency import duration.
+- Wall-clock duration.
+- Peak RSS.
+- CPU time.
+- Provider fetch duration.
+- Market data cache lookup duration.
+- Market data cache hit/miss rate.
+- Market data cache write duration on miss.
+- Engine compute duration.
+- Chart/result-card build duration.
+- Job creation duration.
+- Workflow trigger latency.
+- Job status update latency.
+- Supabase Realtime delivery latency, when implemented.
+- LLM interpretation latency.
+- LLM result-summary latency.
+- Persisted job/run/message rows.
+- Failure code and retry behavior.
+
+Concurrency benchmarks:
+
+- 1 job while the API is idle.
+- 5 simultaneous jobs globally.
+- 2 queued jobs for the same user.
+- 10 queued jobs globally.
+- one invalid envelope retry/failure case.
+- one upstream transient failure retry case.
+
+Acceptance should be based on a concrete product envelope rather than the
+developer machine working locally.
+
+## Near-Term Decision
+
+The recommended next decision is not "which Render tier should we buy?"
+
+The recommended next decision is:
+
+```text
+What is the smallest private-alpha execution envelope that gives us honest PMF
+signal from serious users?
+```
+
+After that, choose the cheapest runtime shape that can keep that promise:
+
+- If testing is scheduled, keep API Free only after making it lean and manually
+  warm it before sessions with `.github/warmup-render.sh`.
+- If Argus must be available any time, move the lean API to Starter first.
+- If API orchestration becomes the bottleneck, then consider Standard for API.
+- If backtests become the bottleneck, scale workflow concurrency/task size, not
+  the API.
+- If the frontend route/auth audit confirms static/CDN delivery, prefer that
+  over paying for an app server.
+- Keep scheduled warmups deferred until manual warmup becomes operationally
+  annoying or tester sessions become less predictable.
+- Treat large-file refactors as boundary-driven work, not a prerequisite for the
+  execution split unless the file sits directly on the job/execution boundary.
+
+## References
+
+- Render Workflows overview: https://render.com/docs/workflows
+- Render Workflows limits and pricing: https://render.com/docs/workflows-limits
+- Render service scaling: https://render.com/docs/scaling
+- Render service metrics: https://render.com/docs/service-metrics
+- Render logs: https://render.com/docs/logging
+- Render audit logs: https://render.com/docs/audit-logs
+- Render background workers: https://render.com/docs/background-workers
+- Render free instances: https://render.com/docs/free
+- Render pricing: https://render.com/pricing
+- Supabase Logs Explorer: https://supabase.com/docs/guides/telemetry/logs
+- Supabase Auth Audit Logs: https://supabase.com/docs/guides/auth/audit-logs
+- Supabase Realtime Postgres Changes: https://supabase.com/docs/guides/realtime/postgres-changes
+- Supabase Realtime limits: https://supabase.com/docs/guides/realtime/limits
+- Supabase Cron: https://supabase.com/docs/guides/cron

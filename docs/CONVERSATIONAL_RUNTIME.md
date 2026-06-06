@@ -126,10 +126,17 @@ Supabase-backed persistence owns conversation continuity:
 
 - `conversations` stores the active thread.
 - `messages` stores user/assistant text and structured card metadata.
+- `backtest_jobs` stores durable queued/running/succeeded/failed/canceled/expired
+  execution lifecycle state for chat-confirmed backtests.
 - `backtest_runs` stores immutable config, metrics, result card, chart, and event markers.
 - `strategies` stores saved result-backed ideas for the Strategies surface.
 
-Reloading or navigating away from chat must hydrate both visible messages and structured UI artifacts, including confirmation cards, result cards, latest run ids, and available actions. A reload must not turn a structured result into plain text only.
+Confirmed backtests should cross the durable job boundary. The API creates or
+references a job, Render Workflow execution writes the result, and Supabase
+Realtime carries job status changes to the browser. API SSE remains scoped to
+the current chat turn.
+
+Reloading or navigating away from chat must hydrate both visible messages and structured UI artifacts, including confirmation cards, queued/running job cards, result cards, latest run ids, and available actions. A reload must not turn a structured result into plain text only.
 
 Runtime memory remains checkpoint-first. If a pending confirmation action arrives after reload, the API validates the LangGraph checkpoint before execution. Message metadata may supply a conservative fallback snapshot only when it contains structured confirmation payload; otherwise the assistant asks the user to reconfirm instead of silently running incomplete state. Result follow-ups may recover the latest canonical run reference from message metadata and `backtest_runs`, but Save Strategy must still use a concrete run id from the result card.
 
@@ -154,7 +161,7 @@ empty state should expose Collections.
 
 - Basic product and education questions.
 - Buy and hold for same-asset supported symbols.
-- DCA / recurring accumulation with monthly or weekly cadence and one recurring contribution amount.
+- DCA / recurring accumulation with daily, weekly, biweekly, monthly, or quarterly cadence and one recurring contribution amount.
 - Indicator threshold strategies when the indicator registry marks the indicator executable.
 - Single-asset-class backtests with up to 5 symbols.
 - Equity benchmark default: `SPY`.
