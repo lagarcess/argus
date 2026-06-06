@@ -29,10 +29,12 @@ class _Gateway:
         *,
         should_raise: bool = False,
         create_result: dict[str, object] | None = None,
+        backpressure_counts: dict[tuple[str, str | None], int] | None = None,
     ) -> None:
         self.events = events
         self.should_raise = should_raise
         self.create_result = create_result
+        self.backpressure_counts = backpressure_counts or {}
         self.jobs: list[dict[str, object]] = []
         self.metadata_updates: list[dict[str, object]] = []
         self.result_links: list[dict[str, object]] = []
@@ -55,6 +57,15 @@ class _Gateway:
         self.events.append("link")
         self.result_links.append(payload)
         return {"id": payload["job_id"], **payload}
+
+    def count_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> int:
+        return min(self.backpressure_counts.get((status, user_id), 0), limit)
 
 
 class _Dispatcher:
@@ -249,6 +260,35 @@ def test_shadow_backtest_job_tool_does_not_redispatch_existing_job(
     assert context.workflow_dispatch_started is True
     assert context.workflow_task_run_id == "task-run-existing"
     assert gateway.metadata_updates == []
+
+
+def test_shadow_backtest_job_tool_skips_job_when_backpressure_limit_hit(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    events: list[str] = []
+    gateway = _Gateway(events, backpressure_counts={("running", "user-1"): 1})
+    dispatcher = _Dispatcher(events)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: True,
+        dispatcher_getter=lambda: dispatcher,
+    )
+    payload = _payload()
+    context = _context()
+
+    with backtest_job_shadow_context(context):
+        result = tool.run(payload)
+
+    assert result == {"success": True, "payload": {"result": "ok"}}
+    assert events == ["delegate"]
+    assert gateway.jobs == []
+    assert dispatcher.calls == []
+    assert context.created_job_id is None
+    assert delegate.calls == [payload]
 
 
 def test_shadow_backtest_job_write_failure_falls_back_to_in_process_execution(

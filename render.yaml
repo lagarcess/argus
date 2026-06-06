@@ -40,6 +40,14 @@ services:
         value: "false"
       - key: ARGUS_BACKTEST_WORKFLOW_TASK
         value: argus-backtests/workflow_proof
+      - key: ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT
+        value: "1"
+      - key: ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT
+        value: "2"
+      - key: ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT
+        value: "5"
+      - key: ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT
+        value: "10"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKET_BUDGET_SECONDS

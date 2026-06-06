@@ -528,6 +528,19 @@ class SupabaseGateway:
         row = _row_one(result)
         return dict(row) if row is not None else None
 
+    def count_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> int:
+        query = self.client.table("backtest_jobs").select("id").eq("status", status)
+        if user_id is not None:
+            query = query.eq("user_id", user_id)
+        result = query.limit(max(1, limit)).execute()
+        return len(result.data or [])
+
     def merge_backtest_job_execution_metadata(
         self,
         *,

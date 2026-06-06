@@ -18,6 +18,10 @@ TRUE_VALUES = {"1", "true", "yes", "on"}
 SHADOW_JOB_SCHEMA_VERSION = "backtest_job_launch/v1"
 DEFAULT_WORKFLOW_TASK = "argus-backtests/workflow_proof"
 RENDER_TASK_RUNS_URL = "https://api.render.com/v1/task-runs"
+DEFAULT_USER_RUNNING_LIMIT = 1
+DEFAULT_USER_QUEUED_LIMIT = 2
+DEFAULT_GLOBAL_RUNNING_LIMIT = 5
+DEFAULT_GLOBAL_QUEUED_LIMIT = 10
 
 
 @dataclass
@@ -33,6 +37,14 @@ class BacktestJobShadowContext:
     workflow_dispatch_started: bool = False
     workflow_task_run_id: str | None = None
     workflow_dispatch_error: str | None = None
+
+
+@dataclass(frozen=True)
+class BacktestJobBackpressureLimits:
+    user_running: int
+    user_queued: int
+    global_running: int
+    global_queued: int
 
 
 _shadow_context: ContextVar[BacktestJobShadowContext | None] = ContextVar(
@@ -124,6 +136,63 @@ def _workflow_task_id() -> str:
     ).strip()
 
 
+def _int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        logger.warning("Invalid integer environment value; using default", key=name)
+        return default
+
+
+def backtest_job_backpressure_limits() -> BacktestJobBackpressureLimits:
+    return BacktestJobBackpressureLimits(
+        user_running=_int_env(
+            "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT",
+            DEFAULT_USER_RUNNING_LIMIT,
+        ),
+        user_queued=_int_env(
+            "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT",
+            DEFAULT_USER_QUEUED_LIMIT,
+        ),
+        global_running=_int_env(
+            "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT",
+            DEFAULT_GLOBAL_RUNNING_LIMIT,
+        ),
+        global_queued=_int_env(
+            "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT",
+            DEFAULT_GLOBAL_QUEUED_LIMIT,
+        ),
+    )
+
+
+def _backpressure_reason(
+    *,
+    gateway: Any,
+    user_id: str,
+    limits: BacktestJobBackpressureLimits,
+) -> str | None:
+    count_jobs = getattr(gateway, "count_backtest_jobs", None)
+    if count_jobs is None:
+        return None
+
+    checks = (
+        ("user_running", "running", user_id, limits.user_running),
+        ("user_queued", "queued", user_id, limits.user_queued),
+        ("global_running", "running", None, limits.global_running),
+        ("global_queued", "queued", None, limits.global_queued),
+    )
+    for reason, status, scoped_user_id, limit in checks:
+        if limit <= 0:
+            return reason
+        count = count_jobs(status=status, user_id=scoped_user_id, limit=limit + 1)
+        if count >= limit:
+            return reason
+    return None
+
+
 class RenderWorkflowDispatcher:
     def __init__(
         self,
@@ -195,6 +264,19 @@ class ShadowBacktestJobTool:
                 raise RuntimeError(
                     "Supabase persistence is required for shadow backtest jobs."
                 )
+            backpressure_reason = _backpressure_reason(
+                gateway=gateway,
+                user_id=context.user_id,
+                limits=backtest_job_backpressure_limits(),
+            )
+            if backpressure_reason is not None:
+                logger.warning(
+                    "Shadow backtest job backpressure hit; skipping durable job",
+                    reason=backpressure_reason,
+                    user_id=context.user_id,
+                    conversation_id=context.conversation_id,
+                )
+                return
             payload_digest = payload_hash(payload)
             job = gateway.create_backtest_job(
                 user_id=context.user_id,

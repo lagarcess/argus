@@ -115,6 +115,10 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED",
         "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED",
         "ARGUS_BACKTEST_WORKFLOW_TASK",
+        "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT",
+        "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT",
+        "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT",
+        "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT",
         "NEXT_PUBLIC_ARGUS_API_URL",
         "NEXT_PUBLIC_MOCK_AUTH",
     ):
@@ -239,6 +243,8 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "/v1/services/${service_id}/env-vars/${key}" in source
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in source
     assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true" in source
+    assert "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT" in source
+    assert "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT" in source
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "set -x" not in source
 
