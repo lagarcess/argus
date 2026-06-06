@@ -1880,7 +1880,7 @@ def _message_asks_for_runnable_prompt_example(message: str) -> bool:
 def _runnable_prompt_example_from_failed_action(snapshot: TaskSnapshot | None) -> str:
     payload = (
         launch_payload_from_failed_action(snapshot.latest_failed_action_reference)
-        if snapshot is not None
+        if snapshot is not None and snapshot.latest_failed_action_reference is not None
         else None
     )
     symbol = "Amazon stock"

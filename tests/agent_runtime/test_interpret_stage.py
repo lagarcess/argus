@@ -2029,6 +2029,38 @@ def test_runnable_prompt_request_suppresses_prompt_asset_strategy(
     assert "runnable_prompt_example_route_suppressed" in result.decision.reason_codes
 
 
+def test_runnable_prompt_request_handles_snapshot_without_failed_action() -> None:
+    message = "give me a prompt then that you can actually run without errors"
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User asks for a runnable prompt example.",
+        candidate_strategy_draft=StrategySummary(raw_user_phrasing=message),
+        semantic_turn_act="retry_failed_action",
+        artifact_target="latest_result",
+    )
+
+    result = interpret_stage(
+        state=RunState.new(current_user_message=message, recent_thread_history=[]),
+        user=UserState(user_id="u1", expertise_level="advanced"),
+        latest_task_snapshot=TaskSnapshot(
+            latest_task_type="backtest_execution",
+            completed=False,
+            latest_failed_action_reference=None,
+        ),
+        selected_thread_metadata={},
+        structured_interpreter=RecordingInterpreter(response),
+    )
+
+    assert result.outcome == "ready_to_respond"
+    assert result.stage_patch["assistant_response"].startswith(
+        'Try: "Buy and hold Amazon stock'
+    )
+    assert "confirmation_payload" not in result.patch
+    assert "retry_failed_action_prompt_example_suppressed" in result.decision.reason_codes
+
+
 def test_launch_payload_carries_strategy_asset_class() -> None:
     from argus.agent_runtime.stages.execute import _launch_payload
 
