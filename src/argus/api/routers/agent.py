@@ -38,6 +38,11 @@ from argus.api.chat.artifacts import (
     result_followup_metadata_from_run,
     saved_strategy_metadata,
 )
+from argus.api.chat.backtest_jobs import (
+    BacktestJobShadowContext,
+    reset_backtest_job_shadow_context,
+    set_backtest_job_shadow_context,
+)
 from argus.api.chat.breakdown import result_breakdown_message
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.chat.onboarding import (
@@ -171,6 +176,13 @@ def _strategies_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _clean_optional_header(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
 def _confirmation_artifact_id_from_runtime_result(
     runtime_result: dict[str, Any],
 ) -> str | None:
@@ -211,7 +223,7 @@ async def chat_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
-    del idempotency_key
+    clean_idempotency_key = _clean_optional_header(idempotency_key)
     headers = {
         "X-Request-Id": request.state.request_id,
         "X-RateLimit-Limit": "200",
@@ -372,6 +384,7 @@ async def chat_stream(
         for index, mention in enumerate(payload.mentions)
     ]
     cancel_confirmation_action = is_cancel_confirmation_action(payload)
+    request_message_record = None
     if onboarding_goal is None and not cancel_confirmation_action:
         user_metadata: dict[str, Any] = {
             "agent_runtime_turn": {
@@ -390,7 +403,7 @@ async def chat_stream(
             ]
         if payload.action is not None:
             user_metadata["chat_action"] = payload.action.model_dump(mode="python")
-        create_message(
+        request_message_record = create_message(
             user_id=user.id,
             conversation_id=conversation.id,
             role="user",
@@ -802,6 +815,19 @@ async def chat_stream(
         receipt_metadata: dict[str, Any] = {}
 
         receipt_token = begin_openrouter_route_receipt_capture()
+        shadow_context_token = set_backtest_job_shadow_context(
+            BacktestJobShadowContext(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                request_message_id=(
+                    request_message_record.id if request_message_record else None
+                ),
+                confirmation_message_id=None,
+                idempotency_key=clean_idempotency_key,
+                request_id=request.state.request_id,
+                chat_action=action_context,
+            )
+        )
         try:
             runtime_events = stream_agent_turn_events(
                 workflow=workflow,
@@ -1052,6 +1078,7 @@ async def chat_stream(
             yield sse_done()
             return
         finally:
+            reset_backtest_job_shadow_context(shadow_context_token)
             persist_route_receipts(
                 receipts=end_openrouter_route_receipt_capture(receipt_token),
                 user_id=user.id,

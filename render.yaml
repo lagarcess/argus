@@ -34,6 +34,8 @@ services:
         value: https://argus-app-suz5.onrender.com
       - key: ARGUS_STRATEGIES_ENABLED
         value: "false"
+      - key: ARGUS_BACKTEST_JOBS_SHADOW_ENABLED
+        value: "false"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKET_BUDGET_SECONDS

@@ -469,6 +469,53 @@ class SupabaseGateway:
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
 
+    def create_backtest_job(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        payload_hash: str,
+        launch_payload: dict[str, Any],
+        request_message_id: str | None = None,
+        confirmation_message_id: str | None = None,
+        idempotency_key: str | None = None,
+        execution_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        clean_idempotency_key = (
+            idempotency_key.strip()
+            if isinstance(idempotency_key, str) and idempotency_key.strip()
+            else None
+        )
+        if clean_idempotency_key is not None:
+            existing = (
+                self.client.table("backtest_jobs")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("idempotency_key", clean_idempotency_key)
+                .limit(1)
+                .execute()
+            )
+            existing_row = _row_one(existing)
+            if existing_row is not None:
+                return dict(existing_row)
+
+        payload = {
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "request_message_id": request_message_id,
+            "confirmation_message_id": confirmation_message_id,
+            "idempotency_key": clean_idempotency_key,
+            "payload_hash": payload_hash,
+            "launch_payload": launch_payload,
+            "status": "queued",
+            "priority": "normal",
+            "attempts": 0,
+            "max_attempts": 1,
+            "execution_metadata": execution_metadata or {},
+        }
+        created = self.client.table("backtest_jobs").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
     def create_context_packet(
         self,
         *,

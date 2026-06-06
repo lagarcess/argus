@@ -120,6 +120,124 @@ def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     assert receipt_row["context_packet_ids"] == ["packet-1"]
 
 
+class _BacktestJobClient:
+    def __init__(self, existing_jobs: list[dict[str, Any]] | None = None) -> None:
+        self.existing_jobs = existing_jobs or []
+        self.inserted_jobs: list[dict[str, Any]] = []
+
+    def table(self, table_name: str):
+        assert table_name == "backtest_jobs"
+        return _BacktestJobTable(self)
+
+
+class _BacktestJobTable:
+    def __init__(self, client: _BacktestJobClient) -> None:
+        self.client = client
+        self.operation: str | None = None
+        self.payload: dict[str, Any] | None = None
+        self.filters: dict[str, object] = {}
+        self.limit_count: int | None = None
+
+    def select(self, _columns: str):
+        self.operation = "select"
+        return self
+
+    def insert(self, payload: dict[str, Any]):
+        self.operation = "insert"
+        self.payload = payload
+        return self
+
+    def eq(self, key: str, value: object):
+        self.filters[key] = value
+        return self
+
+    def limit(self, count: int):
+        self.limit_count = count
+        return self
+
+    def execute(self):
+        if self.operation == "select":
+            rows = [
+                row
+                for row in self.client.existing_jobs
+                if all(row.get(key) == value for key, value in self.filters.items())
+            ]
+            if self.limit_count is not None:
+                rows = rows[: self.limit_count]
+            return SimpleNamespace(data=rows)
+        if self.operation == "insert" and self.payload is not None:
+            self.client.inserted_jobs.append(self.payload)
+            return SimpleNamespace(data=[{"id": "job-1", **self.payload}])
+        return SimpleNamespace(data=[])
+
+
+def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
+    client = _BacktestJobClient()
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.create_backtest_job(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        request_message_id="message-1",
+        confirmation_message_id=None,
+        idempotency_key="idem-1",
+        payload_hash="sha256:abc",
+        launch_payload={
+            "schema_version": "backtest_job_launch/v1",
+            "source": "chat_runtime",
+            "request": {"symbol": "AAPL"},
+        },
+        execution_metadata={"shadow_mode": True, "source": "api_chat"},
+    )
+
+    assert row["id"] == "job-1"
+    assert client.inserted_jobs == [
+        {
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "request_message_id": "message-1",
+            "confirmation_message_id": None,
+            "idempotency_key": "idem-1",
+            "payload_hash": "sha256:abc",
+            "launch_payload": {
+                "schema_version": "backtest_job_launch/v1",
+                "source": "chat_runtime",
+                "request": {"symbol": "AAPL"},
+            },
+            "status": "queued",
+            "priority": "normal",
+            "attempts": 0,
+            "max_attempts": 1,
+            "execution_metadata": {"shadow_mode": True, "source": "api_chat"},
+        }
+    ]
+
+
+def test_create_backtest_job_reuses_existing_idempotency_key() -> None:
+    existing_job = {
+        "id": "job-existing",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "idempotency_key": "idem-1",
+        "payload_hash": "sha256:existing",
+        "launch_payload": {},
+        "status": "queued",
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.create_backtest_job(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        idempotency_key=" idem-1 ",
+        payload_hash="sha256:new",
+        launch_payload={"request": {"symbol": "MSFT"}},
+    )
+
+    assert row == existing_job
+    assert client.inserted_jobs == []
+
+
 class _MockAuthAdmin:
     def get_user_by_email(self, _email: str) -> object:
         raise RuntimeError("fall back to profile lookup")

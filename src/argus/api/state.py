@@ -13,6 +13,7 @@ from argus.agent_runtime.graph.workflow import build_workflow
 from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
 from argus.agent_runtime.tools.real_backtest import RealBacktestTool
+from argus.api.chat.backtest_jobs import ShadowBacktestJobTool
 from argus.domain.store import AlphaStore
 from argus.domain.supabase_gateway import SupabaseGateway
 
@@ -30,10 +31,22 @@ store = AlphaStore()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
 
 
+def _dev_memory_fallback_enabled() -> bool:
+    return os.getenv("ARGUS_DEV_MEMORY_FALLBACK", "").strip().lower() == "true"
+
+
+def build_backtest_tool() -> ShadowBacktestJobTool:
+    return ShadowBacktestJobTool(
+        delegate=RealBacktestTool(),
+        gateway_getter=lambda: supabase_gateway,
+        dev_memory_fallback_getter=_dev_memory_fallback_enabled,
+    )
+
+
 def build_agent_runtime_workflow(*, checkpointer: Any):
     return build_workflow(
         contract=agent_runtime_capability_contract,
-        tool=RealBacktestTool(),
+        tool=build_backtest_tool(),
         structured_interpreter=OpenRouterStructuredInterpreter(
             contract=agent_runtime_capability_contract,
         ),
