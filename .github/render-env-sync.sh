@@ -27,7 +27,7 @@ Commands:
   api-status        Print redacted API dispatch env status for argus-api.
   api-dispatch-on   Enable shadow job creation + Render Workflow dispatch on argus-api.
   api-dispatch-off  Disable API shadow job creation + dispatch and blank its Render key.
-  workflow-proof    Sync workflow proof DB/task env vars on argus-backtests.
+  workflow-proof    Sync workflow DB/task/provider env vars on argus-backtests.
   workflow-runtime  Sync workflow build/start commands on argus-backtests.
 
 Required local env:
@@ -35,6 +35,8 @@ Required local env:
 
 Additional local env for workflow-proof:
   ARGUS_WORKFLOW_DATABASE_URL or SUPABASE_POSTGRES_TRANSACTION_POOLER_URL
+  ALPACA_API_KEY
+  ALPACA_SECRET_KEY
 USAGE
 }
 
@@ -143,6 +145,8 @@ sync_api_dispatch_off() {
 
 sync_workflow_proof() {
   require_local_env RENDER_API_KEY
+  require_local_env ALPACA_API_KEY
+  require_local_env ALPACA_SECRET_KEY
   local workflow_database_url="${ARGUS_WORKFLOW_DATABASE_URL:-${SUPABASE_POSTGRES_TRANSACTION_POOLER_URL:-}}"
   if [ -z "$workflow_database_url" ] || [[ "$workflow_database_url" == YOUR_* ]] || [[ "$workflow_database_url" == your_* ]]; then
     echo "ARGUS_WORKFLOW_DATABASE_URL or SUPABASE_POSTGRES_TRANSACTION_POOLER_URL is required."
@@ -152,6 +156,11 @@ sync_workflow_proof() {
   put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_WORKFLOW_DATABASE_URL "$workflow_database_url"
   put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_RENDER_WORKFLOW_PROOF_TASK "$ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT"
   put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_WORKFLOW_PROOF_PLAN "${ARGUS_WORKFLOW_PROOF_PLAN:-starter}"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE "${ARGUS_MARKET_DATA_PROVIDER_MODE:-live_provider}"
+  put_render_env "$WORKFLOW_SERVICE_ID" ENABLE_MARKET_DATA_CACHE "${ENABLE_MARKET_DATA_CACHE:-false}"
+  put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY "$ALPACA_API_KEY"
+  put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY "$ALPACA_SECRET_KEY"
+  put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_PAPER_TRADING "${ALPACA_PAPER_TRADING:-true}"
 }
 
 sync_workflow_runtime() {

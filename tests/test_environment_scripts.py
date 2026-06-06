@@ -239,6 +239,11 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
     assert "ARGUS_WORKFLOW_PROOF_PLAN" in env_contract
+    assert "ARGUS_MARKET_DATA_PROVIDER_MODE" in env_contract
+    assert "ENABLE_MARKET_DATA_CACHE" in env_contract
+    assert "ALPACA_API_KEY" in env_contract
+    assert "ALPACA_SECRET_KEY" in env_contract
+    assert "ALPACA_PAPER_TRADING" in env_contract
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 
@@ -264,6 +269,13 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT" in source
     assert "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT" in source
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
+    assert "require_local_env ALPACA_API_KEY" in source
+    assert "require_local_env ALPACA_SECRET_KEY" in source
+    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY' in source
+    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY' in source
+    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_MARKET_DATA_PROVIDER_MODE' in source
+    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ENABLE_MARKET_DATA_CACHE' in source
+    assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_PAPER_TRADING' in source
     assert "workflow-runtime" in source
     assert 'https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}' in source
     assert "render_workflow_json" in source
