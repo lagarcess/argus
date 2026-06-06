@@ -11,6 +11,15 @@ if [ -f .env ]; then
   set +a
 fi
 
+run_python() {
+  if [ -n "${ARGUS_WORKFLOW_PYTHON:-}" ]; then
+    "$ARGUS_WORKFLOW_PYTHON" "$@"
+    return
+  fi
+
+  poetry run python "$@"
+}
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -24,13 +33,21 @@ Seed creates a disposable proof auth/profile row when --user-id is omitted.
 Use it only against a local or preview Supabase database for validation.
 
 Local Render validation:
-  1. pip install -r workflows/requirements.txt
-  2. render workflows dev -- python workflows/main.py
+  1. poetry install --only workflows --no-root --no-interaction
+  2. render workflows dev -- poetry run python workflows/main.py
   3. RENDER_USE_LOCAL_DEV=true .github/workflow-proof.sh local --job-id ... --nonce ...
+
+This helper runs workflow Python entry points through `poetry run python` by default.
+Set ARGUS_WORKFLOW_PYTHON=/path/to/python only when using a prebuilt workflow venv.
 
 Remote validation requires:
   RENDER_API_KEY
   ARGUS_RENDER_WORKFLOW_PROOF_TASK={workflow-slug}/workflow_proof
+
+Future Render Workflow service settings:
+  Root Directory: .
+  Build Command: pip install poetry && poetry config virtualenvs.create false && poetry install --only workflows --no-root --no-interaction
+  Start Command: poetry run python workflows/main.py
 
 All modes that touch Supabase require DATABASE_URL as a secret.
 USAGE
@@ -45,20 +62,20 @@ shift
 
 case "$command" in
   seed)
-    python workflows/proof.py seed "$@"
+    run_python workflows/proof.py seed "$@"
     ;;
   local)
     export RENDER_USE_LOCAL_DEV=true
-    python workflows/trigger_proof.py "$@"
+    run_python workflows/trigger_proof.py "$@"
     ;;
   remote)
-    python workflows/trigger_proof.py "$@"
+    run_python workflows/trigger_proof.py "$@"
     ;;
   direct)
-    python workflows/proof.py direct "$@"
+    run_python workflows/proof.py direct "$@"
     ;;
   verify)
-    python workflows/proof.py verify "$@"
+    run_python workflows/proof.py verify "$@"
     ;;
   help|-h|--help)
     usage

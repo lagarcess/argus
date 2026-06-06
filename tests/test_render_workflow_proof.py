@@ -6,6 +6,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -263,13 +268,26 @@ def test_api_contract_documents_backtest_job_boundary_fields() -> None:
         assert field in section
 
 
-def test_workflow_requirements_keep_render_sdk_isolated_from_api_install() -> None:
+def test_workflow_dependencies_are_managed_by_poetry_group() -> None:
     requirements_path = ROOT / "workflows" / "requirements.txt"
-    assert requirements_path.exists()
-    requirements = requirements_path.read_text(encoding="utf-8")
+    assert not requirements_path.exists()
 
-    assert "render_sdk>=0.7.0" in requirements
-    assert "psycopg[binary]" in requirements
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    workflow_group = pyproject["tool"]["poetry"]["group"]["workflows"]
+    workflow_deps = workflow_group["dependencies"]
+    proof_script = (ROOT / ".github" / "workflow-proof.sh").read_text(encoding="utf-8")
 
-    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "render_sdk" not in pyproject
+    assert workflow_group["optional"] is True
+    assert workflow_deps["render-sdk"] == ">=0.7.0,<0.8.0"
+    assert workflow_deps["psycopg"] == {
+        "version": ">=3.3.4,<4.0.0",
+        "extras": ["binary"],
+    }
+    assert "poetry install --only workflows --no-root --no-interaction" in proof_script
+    assert "poetry run python" in proof_script
+    assert "Root Directory: ." in proof_script
+    assert "Start Command: poetry run python workflows/main.py" in proof_script
+    assert "run_python workflows/proof.py" in proof_script
+    assert "run_python workflows/trigger_proof.py" in proof_script
+    assert "\n    python workflows/proof.py" not in proof_script
+    assert "\n    python workflows/trigger_proof.py" not in proof_script

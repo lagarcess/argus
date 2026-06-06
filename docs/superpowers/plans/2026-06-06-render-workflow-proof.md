@@ -4,7 +4,7 @@
 
 **Goal:** Validate the Render Workflow execution boundary with a tiny durable proof job before moving real backtests out of the API.
 
-**Architecture:** Add the future `backtest_jobs` durable boundary now, then run a proof-only Render Workflow task that transitions one proof job from `queued` to `running` to `succeeded`. Keep workflow dependencies isolated under `workflows/` so the API import graph and chat/runtime behavior remain unchanged.
+**Architecture:** Add the future `backtest_jobs` durable boundary now, then run a proof-only Render Workflow task that transitions one proof job from `queued` to `running` to `succeeded`. Keep workflow dependencies isolated in the optional Poetry `workflows` group so the API import graph and chat/runtime behavior remain unchanged.
 
 **Tech Stack:** Python 3.10, Render Workflows Python SDK, psycopg, Supabase Postgres, pytest.
 
@@ -25,12 +25,14 @@
 - Create: `workflows/__init__.py`
 - Create: `workflows/proof.py`
 - Create: `workflows/main.py`
-- Create: `workflows/requirements.txt`
+- Modify: `pyproject.toml`
+- Modify: `poetry.lock`
 - Test: `tests/test_render_workflow_proof.py`
 
 - [x] Implement a pure `run_workflow_proof()` function that accepts a gateway, validates `launch_payload.kind == "render_workflow_proof"`, writes `running`, writes `succeeded`, reads back the row, and returns a JSON-safe result.
 - [x] Implement a `PostgresProofJobGateway` backed by `DATABASE_URL`.
 - [x] Register `workflow_proof(job_id, nonce)` in `workflows/main.py` using Render Workflows.
+- [x] Manage Render Workflow runtime dependencies through the optional Poetry `workflows` group; do not maintain a separate `workflows/requirements.txt`.
 
 ### Task 3: Validation Entry Points
 

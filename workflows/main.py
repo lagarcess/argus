@@ -7,7 +7,8 @@ try:
 except ModuleNotFoundError as exc:  # pragma: no cover - exercised in workflow env
     raise RuntimeError(
         "render_sdk is required to run the Render Workflow service. Install "
-        "workflows/requirements.txt in the workflow runtime."
+        "the Poetry workflows group with: "
+        "poetry install --only workflows --no-root --no-interaction."
     ) from exc
 
 try:

@@ -1,2 +1,0 @@
-render_sdk>=0.7.0,<0.8.0
-psycopg[binary]>=3.3.4,<4.0.0
