@@ -65,13 +65,27 @@ put_render_env() {
 delete_render_env() {
   local service_id="$1"
   local key="$2"
+  local status
 
-  curl -fsS \
-    --request DELETE \
-    --url "https://api.render.com/v1/services/${service_id}/env-vars/${key}" \
-    --header "Authorization: Bearer ${RENDER_API_KEY}" \
-    --header "Accept: application/json" \
-    >/dev/null
+  status="$(
+    curl -sS \
+      -o /dev/null \
+      -w "%{http_code}" \
+      --request DELETE \
+      --url "https://api.render.com/v1/services/${service_id}/env-vars/${key}" \
+      --header "Authorization: Bearer ${RENDER_API_KEY}" \
+      --header "Accept: application/json"
+  )"
+
+  if [ "$status" = "404" ]; then
+    echo "already absent ${service_id}:${key}"
+    return
+  fi
+
+  if [[ "$status" != 2* ]]; then
+    echo "failed to delete ${service_id}:${key} (HTTP ${status})"
+    exit 1
+  fi
 
   echo "deleted ${service_id}:${key}"
 }

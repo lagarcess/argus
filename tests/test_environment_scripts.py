@@ -320,6 +320,8 @@ def test_render_env_sync_can_inspect_and_safely_disable_dispatch() -> None:
     assert "print_api_status()" in source
     assert "<redacted-present>" in source
     assert "<missing-or-empty>" in source
+    assert 'if [ "$status" = "404" ]' in source
+    assert "already absent ${service_id}:${key}" in source
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED false" in dispatch_off_block
     assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED false" in dispatch_off_block
     assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED false" in dispatch_off_block
