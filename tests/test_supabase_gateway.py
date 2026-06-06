@@ -124,6 +124,7 @@ class _BacktestJobClient:
     def __init__(self, existing_jobs: list[dict[str, Any]] | None = None) -> None:
         self.existing_jobs = existing_jobs or []
         self.inserted_jobs: list[dict[str, Any]] = []
+        self.updated_jobs: list[dict[str, Any]] = []
 
     def table(self, table_name: str):
         assert table_name == "backtest_jobs"
@@ -144,6 +145,11 @@ class _BacktestJobTable:
 
     def insert(self, payload: dict[str, Any]):
         self.operation = "insert"
+        self.payload = payload
+        return self
+
+    def update(self, payload: dict[str, Any]):
+        self.operation = "update"
         self.payload = payload
         return self
 
@@ -168,6 +174,15 @@ class _BacktestJobTable:
         if self.operation == "insert" and self.payload is not None:
             self.client.inserted_jobs.append(self.payload)
             return SimpleNamespace(data=[{"id": "job-1", **self.payload}])
+        if self.operation == "update" and self.payload is not None:
+            matches = [
+                row
+                for row in self.client.existing_jobs
+                if all(row.get(key) == value for key, value in self.filters.items())
+            ]
+            updated = {**matches[0], **self.payload} if matches else dict(self.payload)
+            self.client.updated_jobs.append(updated)
+            return SimpleNamespace(data=[updated])
         return SimpleNamespace(data=[])
 
 
@@ -236,6 +251,82 @@ def test_create_backtest_job_reuses_existing_idempotency_key() -> None:
 
     assert row == existing_job
     assert client.inserted_jobs == []
+
+
+def test_merge_backtest_job_execution_metadata_preserves_existing_fields() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.merge_backtest_job_execution_metadata(
+        user_id="user-1",
+        job_id="job-1",
+        execution_metadata={"workflow_dispatch": {"task_run_id": "task-run-1"}},
+    )
+
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "workflow_dispatch": {"task_run_id": "task-run-1"},
+    }
+    assert client.updated_jobs[0]["execution_metadata"] == row["execution_metadata"]
+
+
+def test_link_backtest_job_result_marks_succeeded_when_api_owns_shadow_lifecycle() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "queued",
+        "result_run_id": None,
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.link_backtest_job_result(
+        user_id="user-1",
+        job_id="job-1",
+        result_run_id="run-1",
+        execution_metadata={
+            "api_in_process_result": {"result_run_id": "run-1"},
+        },
+        mark_succeeded=True,
+    )
+
+    assert row["status"] == "succeeded"
+    assert row["result_run_id"] == "run-1"
+    assert row["finished_at"]
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "api_in_process_result": {"result_run_id": "run-1"},
+    }
+
+
+def test_link_backtest_job_result_does_not_overwrite_existing_result() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "succeeded",
+        "result_run_id": "run-existing",
+        "execution_metadata": {},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.link_backtest_job_result(
+        user_id="user-1",
+        job_id="job-1",
+        result_run_id="run-new",
+    )
+
+    assert row == existing_job
+    assert client.updated_jobs == []
 
 
 class _MockAuthAdmin:

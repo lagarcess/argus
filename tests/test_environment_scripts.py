@@ -112,6 +112,9 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         "ARGUS_CHECKPOINTER_MODE",
         "ARGUS_MOCK_AUTH",
         "ARGUS_CORS_ALLOW_ORIGINS",
+        "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED",
+        "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED",
+        "ARGUS_BACKTEST_WORKFLOW_TASK",
         "NEXT_PUBLIC_ARGUS_API_URL",
         "NEXT_PUBLIC_MOCK_AUTH",
     ):
@@ -173,6 +176,7 @@ def test_render_blueprint_keeps_true_secrets_manual() -> None:
         "DATABASE_URL",
         "SUPABASE_SERVICE_ROLE_KEY",
         "SUPABASE_JWT_SECRET",
+        "RENDER_API_KEY",
         "OPENROUTER_API_KEY",
         "ALPACA_API_KEY",
         "ALPACA_SECRET_KEY",

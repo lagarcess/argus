@@ -516,6 +516,74 @@ class SupabaseGateway:
         created = self.client.table("backtest_jobs").insert(payload).execute()
         return dict(_row_one(created) or {})
 
+    def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
+        result = (
+            self.client.table("backtest_jobs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(result)
+        return dict(row) if row is not None else None
+
+    def merge_backtest_job_execution_metadata(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Backtest job not found or not owned by user.")
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata)
+        updated = (
+            self.client.table("backtest_jobs")
+            .update({"execution_metadata": metadata, "updated_at": _now_iso()})
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .execute()
+        )
+        return dict(_row_one(updated) or {})
+
+    def link_backtest_job_result(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        result_run_id: str,
+        execution_metadata: dict[str, Any] | None = None,
+        mark_succeeded: bool = False,
+    ) -> dict[str, Any]:
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Backtest job not found or not owned by user.")
+        if existing.get("result_run_id"):
+            return existing
+
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata or {})
+        payload: dict[str, Any] = {
+            "result_run_id": result_run_id,
+            "execution_metadata": metadata,
+            "updated_at": _now_iso(),
+        }
+        if mark_succeeded:
+            payload["status"] = "succeeded"
+            payload["finished_at"] = _now_iso()
+
+        updated = (
+            self.client.table("backtest_jobs")
+            .update(payload)
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .execute()
+        )
+        return dict(_row_one(updated) or {})
+
     def create_context_packet(
         self,
         *,

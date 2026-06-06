@@ -40,6 +40,7 @@ from argus.api.chat.artifacts import (
 )
 from argus.api.chat.backtest_jobs import (
     BacktestJobShadowContext,
+    link_shadow_backtest_job_result,
     reset_backtest_job_shadow_context,
     set_backtest_job_shadow_context,
 )
@@ -822,7 +823,7 @@ async def chat_stream(
                 request_message_id=(
                     request_message_record.id if request_message_record else None
                 ),
-                confirmation_message_id=None,
+                confirmation_message_id=runtime_fallback.confirmation_message_id,
                 idempotency_key=clean_idempotency_key,
                 request_id=request.state.request_id,
                 chat_action=action_context,
@@ -967,6 +968,12 @@ async def chat_stream(
                     if isinstance(failed_action_metadata, dict):
                         metadata["failed_action"] = dict(failed_action_metadata)
                 if run is not None:
+                    link_shadow_backtest_job_result(
+                        user_id=user.id,
+                        run_id=run.id,
+                        gateway=api_state.supabase_gateway,
+                        dev_memory_fallback_enabled=dev_memory_fallback_enabled(),
+                    )
                     receipt_run_id = run.id
                     result_card = run.conversation_result_card
                     metadata["result_card"] = result_card

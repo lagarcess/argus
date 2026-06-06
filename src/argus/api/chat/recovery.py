@@ -35,6 +35,7 @@ class RuntimeFallbackContext:
     selected_thread_metadata: dict[str, Any] | None = None
     artifact_references: list[ArtifactReference] | None = None
     confirmation_payload: dict[str, Any] | None = None
+    confirmation_message_id: str | None = None
     recovery_message: str | None = None
 
 
@@ -201,6 +202,7 @@ def confirmation_metadata_fallback_context(
             },
             artifact_references=[confirmation_reference],
             confirmation_payload=payload,
+            confirmation_message_id=message.id,
         )
     return None
 
