@@ -114,7 +114,9 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
         "ARGUS_CORS_ALLOW_ORIGINS",
         "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED",
         "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED",
+        "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED",
         "ARGUS_BACKTEST_WORKFLOW_TASK",
+        "ARGUS_BACKTEST_REAL_WORKFLOW_TASK",
         "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT",
         "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT",
         "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT",
@@ -143,7 +145,15 @@ def test_render_workflow_task_slug_is_single_current_default() -> None:
         'ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"'
         in env_contract
     )
+    assert (
+        'ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT="argus-backtests/run_backtest_job"'
+        in env_contract
+    )
     assert "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof" in env_example
+    assert (
+        "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job"
+        in env_example
+    )
     assert (
         "ARGUS_RENDER_WORKFLOW_PROOF_TASK=argus-backtests/workflow_proof" in env_example
     )
@@ -269,6 +279,12 @@ def test_env_example_separates_shadow_jobs_from_workflow_dispatch() -> None:
     assert "durable" in shadow_block
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=false" in shadow_block
     assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=false" in dispatch_block
+    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false" in dispatch_block
+    assert "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof" in dispatch_block
+    assert (
+        "ARGUS_BACKTEST_REAL_WORKFLOW_TASK=argus-backtests/run_backtest_job"
+        in dispatch_block
+    )
     assert "still returns the current in-process result" in dispatch_block
 
 
@@ -285,6 +301,7 @@ def test_render_env_sync_can_inspect_and_safely_disable_dispatch() -> None:
     assert "<missing-or-empty>" in source
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED false" in dispatch_off_block
     assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED false" in dispatch_off_block
+    assert "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED false" in dispatch_off_block
     assert 'delete_render_env "$API_SERVICE_ID" RENDER_API_KEY' in dispatch_off_block
 
 

@@ -353,6 +353,72 @@ def test_link_backtest_job_result_does_not_overwrite_existing_result() -> None:
     assert client.updated_jobs == []
 
 
+def test_mark_backtest_job_running_filters_by_user_and_increments_attempts() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "queued",
+        "attempts": 0,
+        "started_at": None,
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.mark_backtest_job_running(
+        user_id="user-1",
+        job_id="job-1",
+        execution_metadata={"workflow_backtest": {"workflow_run_id": "task-run-1"}},
+    )
+
+    assert row["status"] == "running"
+    assert row["attempts"] == 1
+    assert row["started_at"]
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "workflow_backtest": {"workflow_run_id": "task-run-1"},
+    }
+    assert client.updated_jobs[0]["user_id"] == "user-1"
+    assert client.updated_jobs[0]["id"] == "job-1"
+
+
+def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "running",
+        "failure_code": None,
+        "failure_detail": None,
+        "retryable": False,
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.mark_backtest_job_failed(
+        user_id="user-1",
+        job_id="job-1",
+        failure_code="upstream_dependency_error",
+        failure_detail="market_data_issue",
+        retryable=True,
+        execution_metadata={"workflow_backtest": {"failure_category": "market_data"}},
+    )
+
+    assert row["status"] == "failed"
+    assert row["failure_code"] == "upstream_dependency_error"
+    assert row["failure_detail"] == "market_data_issue"
+    assert row["retryable"] is True
+    assert row["finished_at"]
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "workflow_backtest": {"failure_category": "market_data"},
+    }
+    assert client.updated_jobs[0]["user_id"] == "user-1"
+    assert client.updated_jobs[0]["id"] == "job-1"
+
+
 class _MockAuthAdmin:
     def get_user_by_email(self, _email: str) -> object:
         raise RuntimeError("fall back to profile lookup")

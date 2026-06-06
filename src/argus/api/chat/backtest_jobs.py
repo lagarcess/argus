@@ -17,6 +17,9 @@ from loguru import logger
 TRUE_VALUES = {"1", "true", "yes", "on"}
 SHADOW_JOB_SCHEMA_VERSION = "backtest_job_launch/v1"
 DEFAULT_WORKFLOW_TASK = "argus-backtests/workflow_proof"
+DEFAULT_REAL_WORKFLOW_TASK = "argus-backtests/run_backtest_job"
+PROOF_JOB_KIND = "render_workflow_proof"
+REAL_BACKTEST_JOB_KIND = "run_backtest_job"
 RENDER_TASK_RUNS_URL = "https://api.render.com/v1/task-runs"
 DEFAULT_USER_RUNNING_LIMIT = 1
 DEFAULT_USER_QUEUED_LIMIT = 2
@@ -66,6 +69,13 @@ def backtest_jobs_dispatch_enabled() -> bool:
     )
 
 
+def backtest_workflow_execution_enabled() -> bool:
+    return (
+        os.getenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "").strip().lower()
+        in TRUE_VALUES
+    )
+
+
 @contextmanager
 def backtest_job_shadow_context(
     context: BacktestJobShadowContext | None,
@@ -109,7 +119,9 @@ def shadow_launch_payload(
     context: BacktestJobShadowContext,
 ) -> dict[str, Any]:
     launch_payload: dict[str, Any] = {
-        "kind": "render_workflow_proof",
+        "kind": REAL_BACKTEST_JOB_KIND
+        if backtest_workflow_execution_enabled()
+        else PROOF_JOB_KIND,
         "schema_version": SHADOW_JOB_SCHEMA_VERSION,
         "source": "chat_runtime",
         "request": _json_safe_payload(payload),
@@ -128,6 +140,10 @@ def _utcnow_iso() -> str:
 
 
 def _workflow_task_id() -> str:
+    if backtest_workflow_execution_enabled():
+        return (
+            os.getenv("ARGUS_BACKTEST_REAL_WORKFLOW_TASK") or DEFAULT_REAL_WORKFLOW_TASK
+        ).strip()
     return (
         os.getenv("ARGUS_BACKTEST_WORKFLOW_TASK")
         or os.getenv("ARGUS_RENDER_WORKFLOW_PROOF_TASK")
@@ -404,22 +420,33 @@ def link_shadow_backtest_job_result(
         raise RuntimeError("Supabase persistence is required to link backtest jobs.")
 
     mark_succeeded = not context.workflow_dispatch_started
+    linked_at = _utcnow_iso()
     metadata: dict[str, Any] = {
         "api_in_process_result": {
             "result_run_id": run_id,
-            "linked_at": _utcnow_iso(),
+            "linked_at": linked_at,
             "marked_succeeded": mark_succeeded,
         }
     }
     if context.workflow_task_run_id:
         metadata["workflow_dispatch"] = {
             "task_run_id": context.workflow_task_run_id,
-            "result_linked_at": _utcnow_iso(),
+            "result_linked_at": linked_at,
         }
     if context.workflow_dispatch_error:
         metadata["workflow_dispatch_error"] = context.workflow_dispatch_error
 
     try:
+        if context.workflow_dispatch_started and backtest_workflow_execution_enabled():
+            metadata["api_in_process_result"]["job_result_column_owned_by"] = (
+                REAL_BACKTEST_JOB_KIND
+            )
+            gateway.merge_backtest_job_execution_metadata(
+                user_id=user_id,
+                job_id=context.created_job_id,
+                execution_metadata=metadata,
+            )
+            return
         gateway.link_backtest_job_result(
             user_id=user_id,
             job_id=context.created_job_id,

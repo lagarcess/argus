@@ -223,6 +223,46 @@ def test_shadow_backtest_job_tool_dispatches_job_when_dispatch_flag_enabled(
     assert delegate.calls == [payload]
 
 
+def test_shadow_backtest_job_tool_dispatches_real_task_only_when_execution_enabled(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    monkeypatch.delenv("ARGUS_BACKTEST_REAL_WORKFLOW_TASK", raising=False)
+    events: list[str] = []
+    gateway = _Gateway(events)
+    dispatcher = _Dispatcher(events)
+    delegate = _DelegateTool(events)
+    tool = ShadowBacktestJobTool(
+        delegate=delegate,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: True,
+        dispatcher_getter=lambda: dispatcher,
+    )
+    payload = _payload()
+
+    with backtest_job_shadow_context(_context()):
+        result = tool.run(payload)
+
+    assert result == {"success": True, "payload": {"result": "ok"}}
+    assert events == ["job", "dispatch", "metadata", "delegate"]
+    assert gateway.jobs[0]["launch_payload"] == {
+        "kind": "run_backtest_job",
+        "schema_version": "backtest_job_launch/v1",
+        "source": "chat_runtime",
+        "request": payload,
+        "chat_action": {
+            "type": "run_backtest",
+            "payload": {"confirmation_id": "confirmation-1"},
+        },
+    }
+    assert (
+        gateway.metadata_updates[0]["execution_metadata"]["workflow_dispatch"]["task"]
+        == "argus-backtests/run_backtest_job"
+    )
+
+
 def test_shadow_backtest_job_tool_does_not_redispatch_existing_job(
     monkeypatch,
 ) -> None:
@@ -391,6 +431,37 @@ def test_link_shadow_backtest_job_result_leaves_lifecycle_to_dispatch() -> None:
     assert link["result_run_id"] == "run-1"
     assert link["mark_succeeded"] is False
     assert link["execution_metadata"]["workflow_dispatch"]["task_run_id"] == "task-run-1"
+
+
+def test_link_shadow_backtest_job_result_leaves_result_link_to_real_workflow(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    events: list[str] = []
+    gateway = _Gateway(events)
+    context = _context()
+    context.created_job_id = "job-1"
+    context.workflow_dispatch_started = True
+    context.workflow_task_run_id = "task-run-1"
+
+    with backtest_job_shadow_context(context):
+        link_shadow_backtest_job_result(
+            user_id="user-1",
+            run_id="run-1",
+            gateway=gateway,
+            dev_memory_fallback_enabled=True,
+        )
+
+    assert events == ["metadata"]
+    assert gateway.result_links == []
+    metadata = gateway.metadata_updates[0]["execution_metadata"]
+    assert metadata["api_in_process_result"]["result_run_id"] == "run-1"
+    assert metadata["api_in_process_result"]["marked_succeeded"] is False
+    assert (
+        metadata["api_in_process_result"]["job_result_column_owned_by"]
+        == "run_backtest_job"
+    )
+    assert metadata["workflow_dispatch"]["task_run_id"] == "task-run-1"
 
 
 def test_render_workflow_dispatcher_posts_to_render_task_api(

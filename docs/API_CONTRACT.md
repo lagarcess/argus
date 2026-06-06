@@ -1452,11 +1452,13 @@ instead of executing heavy backtests synchronously inside the API process. This
 direct endpoint remains a contract for direct/manual execution paths until the
 job API surface is formalized.
 
-Current private-alpha hardening supports shadow job creation and proof workflow
-dispatch behind flags while preserving the existing in-process result response.
-The real backtest engine moves into the workflow execution plane in a later
-slice; until then, the proof task validates the API -> Render Workflow ->
-Supabase lifecycle boundary without changing the user-facing chat result.
+Current private-alpha hardening supports shadow job creation, proof workflow
+dispatch, and default-off real workflow execution behind flags while preserving
+the existing in-process result response. The proof task remains a separate smoke
+check for the API -> Render Workflow -> Supabase lifecycle boundary. When
+`ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`, dispatch uses the distinct
+`run_backtest_job` task so the workflow can execute the real backtest, persist a
+canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
 
 **Request: Saved Strategy**
 ```json

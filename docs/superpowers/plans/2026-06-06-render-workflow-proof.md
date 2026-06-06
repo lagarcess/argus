@@ -94,12 +94,13 @@
 ### Task 7: Current Boundary And Remaining Scope
 
 This branch now proves the control-plane boundary through a real Render Workflow
-task run. It does **not** move the real backtest engine into the workflow yet.
+task run. A follow-on slice now adds a separate default-off `run_backtest_job`
+task for real execution while keeping this proof task available for smoke checks.
 
 - [x] Durable job table exists locally and in live Supabase.
 - [x] API can create shadow jobs and link the current in-process run result.
 - [x] API can start the Render Workflow proof task when explicitly enabled.
 - [x] Backpressure knobs exist for user/global queued and running job limits.
 - [x] Render Blueprint defaults keep shadow and dispatch disabled.
-- [ ] Future slice: move the real backtest engine and heavy dependencies into the Render Workflow execution plane.
+- [x] Future slice: move the real backtest engine and heavy dependencies into the Render Workflow execution plane behind `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false` by default.
 - [ ] Future slice: add frontend async job-state rendering through Supabase Realtime or API polling.
