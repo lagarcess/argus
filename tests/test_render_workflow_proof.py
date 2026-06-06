@@ -110,6 +110,34 @@ def test_workflow_proof_requires_secret_database_url() -> None:
     assert require_database_url({"DATABASE_URL": "postgres://user:secret@example/db"})
 
 
+def test_trigger_proof_serializes_generated_sdk_models() -> None:
+    from workflows.trigger_proof import _json_safe
+
+    class GeneratedSdkModel:
+        def to_dict(self) -> dict[str, object]:
+            return {
+                "id": "trn-local",
+                "status": "completed",
+                "attempts": [
+                    {
+                        "status": "completed",
+                        "result": {"job_id": "job-local"},
+                    }
+                ],
+            }
+
+    assert _json_safe(GeneratedSdkModel()) == {
+        "id": "trn-local",
+        "status": "completed",
+        "attempts": [
+            {
+                "status": "completed",
+                "result": {"job_id": "job-local"},
+            }
+        ],
+    }
+
+
 def test_seed_cli_creates_disposable_profile_for_empty_preview_branch(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

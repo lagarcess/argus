@@ -24,6 +24,8 @@ def _task_id(explicit: str | None = None) -> str:
 def _json_safe(value: Any) -> Any:
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
+    if hasattr(value, "to_dict"):
+        return _json_safe(value.to_dict())
     if hasattr(value, "__dict__"):
         return {
             key: _json_safe(item)
