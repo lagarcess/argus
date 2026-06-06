@@ -11,6 +11,9 @@ if [ -f .env ]; then
   set +a
 fi
 
+# shellcheck disable=SC1091
+source .github/argus-env.sh
+
 run_python() {
   if [ -n "${ARGUS_WORKFLOW_PYTHON:-}" ]; then
     "$ARGUS_WORKFLOW_PYTHON" "$@"
@@ -33,7 +36,7 @@ Seed creates a disposable proof auth/profile row when --user-id is omitted.
 Use it only against a local or preview Supabase database for validation.
 
 Local Render validation:
-  1. poetry install --only workflows --no-root --no-interaction
+  1. poetry install --only main,workflows --no-interaction
   2. render workflows dev -- poetry run python workflows/main.py
   3. RENDER_USE_LOCAL_DEV=true .github/workflow-proof.sh local --job-id ... --nonce ...
 
@@ -47,7 +50,7 @@ Remote validation requires:
 
 Future Render Workflow service settings:
   Root Directory: .
-  Build Command: pip install poetry && poetry config virtualenvs.create false && poetry install --only workflows --no-root --no-interaction
+  Build Command: pip install poetry && poetry config virtualenvs.create false && poetry install --only main,workflows --no-interaction
   Start Command: poetry run python workflows/main.py
 
 All modes that touch Supabase require ARGUS_WORKFLOW_DATABASE_URL as a secret.

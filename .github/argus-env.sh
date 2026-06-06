@@ -9,6 +9,8 @@ ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID="srv-d78tanmuk2gs73e17nn0"
 ARGUS_RENDER_BACKTESTS_WORKFLOW_ID="wfl-d8hpsmuq1p3s73duv3q0"
 ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"
 ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT="argus-backtests/run_backtest_job"
+ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="pip install poetry && poetry config virtualenvs.create false && poetry install --only main,workflows --no-interaction"
+ARGUS_RENDER_WORKFLOW_START_COMMAND="poetry run python workflows/main.py"
 
 ARGUS_QA_REQUIRED_ENV=(
   SUPABASE_PROJECT_URL

@@ -21,12 +21,14 @@ Usage:
   .github/render-env-sync.sh api-dispatch-on
   .github/render-env-sync.sh api-dispatch-off
   .github/render-env-sync.sh workflow-proof
+  .github/render-env-sync.sh workflow-runtime
 
 Commands:
   api-status        Print redacted API dispatch env status for argus-api.
   api-dispatch-on   Enable shadow job creation + Render Workflow dispatch on argus-api.
   api-dispatch-off  Disable API shadow job creation + dispatch and blank its Render key.
   workflow-proof    Sync workflow proof DB/task env vars on argus-backtests.
+  workflow-runtime  Sync workflow build/start commands on argus-backtests.
 
 Required local env:
   RENDER_API_KEY
@@ -144,6 +146,23 @@ sync_workflow_proof() {
   put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_WORKFLOW_PROOF_PLAN "${ARGUS_WORKFLOW_PROOF_PLAN:-starter}"
 }
 
+sync_workflow_runtime() {
+  require_local_env RENDER_API_KEY
+  if ! command -v render >/dev/null 2>&1; then
+    echo "render CLI is required to sync workflow runtime settings."
+    exit 1
+  fi
+
+  render services update "$WORKFLOW_SERVICE_ID" \
+    --build-command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" \
+    --start-command "$ARGUS_RENDER_WORKFLOW_START_COMMAND" \
+    --confirm \
+    --output json \
+    >/dev/null
+
+  echo "synced ${WORKFLOW_SERVICE_ID}:workflow-runtime"
+}
+
 command="${1:-}"
 case "$command" in
   api-status)
@@ -157,6 +176,9 @@ case "$command" in
     ;;
   workflow-proof)
     sync_workflow_proof
+    ;;
+  workflow-runtime)
+    sync_workflow_runtime
     ;;
   help|-h|--help)
     usage

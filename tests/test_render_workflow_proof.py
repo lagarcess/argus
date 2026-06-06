@@ -280,7 +280,7 @@ def test_api_contract_documents_backtest_job_boundary_fields() -> None:
         assert field in section
 
 
-def test_workflow_dependencies_are_managed_by_poetry_group() -> None:
+def test_workflow_dependencies_install_argus_runtime_and_workflow_group() -> None:
     requirements_path = ROOT / "workflows" / "requirements.txt"
     assert not requirements_path.exists()
 
@@ -295,7 +295,9 @@ def test_workflow_dependencies_are_managed_by_poetry_group() -> None:
         "version": ">=3.3.4,<4.0.0",
         "extras": ["binary"],
     }
-    assert "poetry install --only workflows --no-root --no-interaction" in proof_script
+    assert "poetry install --only main,workflows --no-interaction" in proof_script
+    assert "--only workflows" not in proof_script
+    assert "--no-root" not in proof_script
     assert "poetry run python" in proof_script
     assert "Root Directory: ." in proof_script
     assert "Start Command: poetry run python workflows/main.py" in proof_script

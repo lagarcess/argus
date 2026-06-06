@@ -252,15 +252,22 @@ def test_workflow_proof_seed_usage_allows_disposable_preview_user() -> None:
 
 def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     source = _source(".github/render-env-sync.sh")
+    env_contract = ENV_CONTRACT.read_text()
 
     assert 'source "$SCRIPT_DIR/argus-env.sh"' in source
     assert "ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT" in source
+    assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in env_contract
+    assert "ARGUS_RENDER_WORKFLOW_START_COMMAND" in env_contract
     assert "/v1/services/${service_id}/env-vars/${key}" in source
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in source
     assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true" in source
     assert "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT" in source
     assert "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT" in source
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
+    assert "workflow-runtime" in source
+    assert 'render services update "$WORKFLOW_SERVICE_ID"' in source
+    assert '--build-command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND"' in source
+    assert '--start-command "$ARGUS_RENDER_WORKFLOW_START_COMMAND"' in source
     assert "set -x" not in source
 
 
