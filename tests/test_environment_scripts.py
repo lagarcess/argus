@@ -266,6 +266,8 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "workflow-runtime" in source
     assert 'https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}' in source
+    assert "render_workflow_json" in source
+    assert ".buildConfig + {buildCommand: $build_command}" in source
     assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in source
     assert "ARGUS_RENDER_WORKFLOW_START_COMMAND" in source
     assert "set -x" not in source

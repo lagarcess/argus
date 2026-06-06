@@ -84,6 +84,14 @@ render_env_json() {
     --header "Accept: application/json"
 }
 
+render_workflow_json() {
+  curl -fsS \
+    --request GET \
+    --url "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json"
+}
+
 print_api_status() {
   require_local_env RENDER_API_KEY
   render_env_json "$API_SERVICE_ID" | jq -r '
@@ -148,6 +156,21 @@ sync_workflow_proof() {
 
 sync_workflow_runtime() {
   require_local_env RENDER_API_KEY
+  local current_workflow
+  local update_payload
+
+  current_workflow="$(render_workflow_json)"
+  update_payload="$(
+    jq -nc \
+      --argjson workflow "$current_workflow" \
+      --arg build_command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" \
+      --arg run_command "$ARGUS_RENDER_WORKFLOW_START_COMMAND" \
+      '{
+        buildConfig: ($workflow.buildConfig + {buildCommand: $build_command}),
+        runCommand: $run_command,
+        autoDeployTrigger: "off"
+      }'
+  )"
 
   curl -fsS \
     --request PATCH \
@@ -155,18 +178,7 @@ sync_workflow_runtime() {
     --header "Authorization: Bearer ${RENDER_API_KEY}" \
     --header "Accept: application/json" \
     --header "Content-Type: application/json" \
-    --data "$(
-      jq -nc \
-        --arg build_command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" \
-        --arg run_command "$ARGUS_RENDER_WORKFLOW_START_COMMAND" \
-        '{
-          buildConfig: {
-            buildCommand: $build_command
-          },
-          runCommand: $run_command,
-          autoDeployTrigger: "off"
-        }'
-    )" \
+    --data "$update_payload" \
     >/dev/null
 
   echo "synced ${WORKFLOW_SERVICE_ID}:workflow-runtime"
