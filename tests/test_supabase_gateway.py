@@ -264,11 +264,14 @@ def test_count_backtest_jobs_filters_status_user_and_limit() -> None:
     )
     gateway = SupabaseGateway(client=client)
 
-    assert gateway.count_backtest_jobs(
-        status="queued",
-        user_id="user-1",
-        limit=1,
-    ) == 1
+    assert (
+        gateway.count_backtest_jobs(
+            status="queued",
+            user_id="user-1",
+            limit=1,
+        )
+        == 1
+    )
     assert gateway.count_backtest_jobs(status="queued", limit=10) == 3
 
 
@@ -295,7 +298,9 @@ def test_merge_backtest_job_execution_metadata_preserves_existing_fields() -> No
     assert client.updated_jobs[0]["execution_metadata"] == row["execution_metadata"]
 
 
-def test_link_backtest_job_result_marks_succeeded_when_api_owns_shadow_lifecycle() -> None:
+def test_link_backtest_job_result_marks_succeeded_when_api_owns_shadow_lifecycle() -> (
+    None
+):
     existing_job = {
         "id": "job-1",
         "user_id": "user-1",
@@ -551,7 +556,9 @@ class _HistoryTable:
     def in_(self, key: str, values: list[object]):
         expected = {str(value) for value in values}
         self.rows = [
-            row for row in self.rows if row.get(key) is not None and str(row[key]) in expected
+            row
+            for row in self.rows
+            if row.get(key) is not None and str(row[key]) in expected
         ]
         return self
 
@@ -585,9 +592,7 @@ class _HistoryNotFilter:
 
     def is_(self, key: str, value: object):
         if value == "null":
-            self.query.rows = [
-                row for row in self.query.rows if row.get(key) is not None
-            ]
+            self.query.rows = [row for row in self.query.rows if row.get(key) is not None]
         return self.query
 
 
@@ -611,8 +616,7 @@ def test_gateway_history_filters_runs_by_parent_conversation_state() -> None:
         "run-orphan",
     }
     assert {
-        row["id"]
-        for row in gateway.list_history_rows(user_id="user-1", limit=1)["runs"]
+        row["id"] for row in gateway.list_history_rows(user_id="user-1", limit=1)["runs"]
     } == {"run-active"}
     assert {row["id"] for row in archived_rows["runs"]} == {"run-archived"}
     assert {row["id"] for row in deleted_rows["runs"]} == {"run-deleted"}

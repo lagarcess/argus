@@ -139,9 +139,14 @@ def test_render_workflow_task_slug_is_single_current_default() -> None:
     env_contract = ENV_CONTRACT.read_text()
     trigger_proof = _source("workflows/trigger_proof.py")
 
-    assert 'ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"' in env_contract
+    assert (
+        'ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"'
+        in env_contract
+    )
     assert "ARGUS_BACKTEST_WORKFLOW_TASK=argus-backtests/workflow_proof" in env_example
-    assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK=argus-backtests/workflow_proof" in env_example
+    assert (
+        "ARGUS_RENDER_WORKFLOW_PROOF_TASK=argus-backtests/workflow_proof" in env_example
+    )
     assert 'or "argus-backtests/workflow_proof"' in trigger_proof
     assert "argus-render-workflow-proof" not in env_example
     assert "argus-render-workflow-proof" not in trigger_proof
@@ -247,6 +252,40 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT" in source
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "set -x" not in source
+
+
+def test_env_example_separates_shadow_jobs_from_workflow_dispatch() -> None:
+    env_example = _source(".env.example")
+    shadow_block = env_example.split("# Backtest jobs shadow mode", maxsplit=1)[1].split(
+        "# Backtest jobs workflow dispatch",
+        maxsplit=1,
+    )[0]
+    dispatch_block = env_example.split(
+        "# Backtest jobs workflow dispatch",
+        maxsplit=1,
+    )[1].split("# Collections", maxsplit=1)[0]
+
+    assert "workflow dispatch" not in shadow_block.lower()
+    assert "durable" in shadow_block
+    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED=false" in shadow_block
+    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED=false" in dispatch_block
+    assert "still returns the current in-process result" in dispatch_block
+
+
+def test_render_env_sync_can_inspect_and_safely_disable_dispatch() -> None:
+    source = _source(".github/render-env-sync.sh")
+    dispatch_off_block = source.split("sync_api_dispatch_off() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+
+    assert ".github/render-env-sync.sh api-status" in source
+    assert "print_api_status()" in source
+    assert "<redacted-present>" in source
+    assert "<missing-or-empty>" in source
+    assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED false" in dispatch_off_block
+    assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED false" in dispatch_off_block
+    assert 'delete_render_env "$API_SERVICE_ID" RENDER_API_KEY' in dispatch_off_block
 
 
 def test_render_blueprint_preserves_optional_posthog_key() -> None:

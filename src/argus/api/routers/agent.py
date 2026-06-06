@@ -1049,8 +1049,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
             )
             assistant_text = (
-                "Something went wrong. Your conversation is saved. "
-                "Please try again."
+                "Something went wrong. Your conversation is saved. " "Please try again."
             )
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",

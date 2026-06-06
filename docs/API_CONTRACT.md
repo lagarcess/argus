@@ -1452,6 +1452,12 @@ instead of executing heavy backtests synchronously inside the API process. This
 direct endpoint remains a contract for direct/manual execution paths until the
 job API surface is formalized.
 
+Current private-alpha hardening supports shadow job creation and proof workflow
+dispatch behind flags while preserving the existing in-process result response.
+The real backtest engine moves into the workflow execution plane in a later
+slice; until then, the proof task validates the API -> Render Workflow ->
+Supabase lifecycle boundary without changing the user-facing chat result.
+
 **Request: Saved Strategy**
 ```json
 {

@@ -48,7 +48,9 @@ class _Gateway:
         self.jobs.append(payload)
         return {"id": "job-1", **payload}
 
-    def merge_backtest_job_execution_metadata(self, **payload: object) -> dict[str, object]:
+    def merge_backtest_job_execution_metadata(
+        self, **payload: object
+    ) -> dict[str, object]:
         self.events.append("metadata")
         self.metadata_updates.append(payload)
         return {"id": payload["job_id"], **payload}
@@ -211,9 +213,9 @@ def test_shadow_backtest_job_tool_dispatches_job_when_dispatch_flag_enabled(
                     "task": "argus-backtests/workflow_proof",
                     "task_run_id": "task-run-1",
                     "status": "pending",
-                    "dispatched_at": gateway.metadata_updates[0][
-                        "execution_metadata"
-                    ]["workflow_dispatch"]["dispatched_at"],
+                    "dispatched_at": gateway.metadata_updates[0]["execution_metadata"][
+                        "workflow_dispatch"
+                    ]["dispatched_at"],
                 }
             },
         }

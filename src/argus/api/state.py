@@ -82,9 +82,7 @@ def build_agent_runtime_checkpoint_serde() -> JsonPlusSerializer:
 
 
 def build_agent_runtime_checkpointer() -> MemorySaver:
-    return MemorySaver(
-        serde=build_agent_runtime_checkpoint_serde()
-    )
+    return MemorySaver(serde=build_agent_runtime_checkpoint_serde())
 
 
 def get_agent_runtime_workflow(request: Request | None = None):

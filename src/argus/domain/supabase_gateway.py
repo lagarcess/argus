@@ -109,8 +109,7 @@ def _filter_history_conversations_by_message_state(
     return [
         row
         for row in conversations
-        if row.get("id") is not None
-        and str(row["id"]) in conversation_ids_with_messages
+        if row.get("id") is not None and str(row["id"]) in conversation_ids_with_messages
     ]
 
 
@@ -142,9 +141,7 @@ class SupabaseGateway:
                 "Supabase mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
             )
         auth_key = (
-            os.getenv("SUPABASE_ANON_KEY")
-            or os.getenv("SUPABASE_ANON_PUBLIC_KEY")
-            or key
+            os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_PUBLIC_KEY") or key
         )
         return cls(
             client=create_client(url, key, options=_supabase_client_options()),
@@ -242,11 +239,7 @@ class SupabaseGateway:
             raise RuntimeError("Unable to resolve mock auth user.")
 
         existing = (
-            self.client.table("profiles")
-            .select("*")
-            .eq("id", user_id)
-            .limit(1)
-            .execute()
+            self.client.table("profiles").select("*").eq("id", user_id).limit(1).execute()
         )
         existing_row = _row_one(existing)
         if existing_row is not None:

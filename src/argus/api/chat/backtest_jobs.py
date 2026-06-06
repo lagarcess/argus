@@ -55,8 +55,7 @@ _shadow_context: ContextVar[BacktestJobShadowContext | None] = ContextVar(
 
 def backtest_jobs_shadow_enabled() -> bool:
     return (
-        os.getenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "").strip().lower()
-        in TRUE_VALUES
+        os.getenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "").strip().lower() in TRUE_VALUES
     )
 
 

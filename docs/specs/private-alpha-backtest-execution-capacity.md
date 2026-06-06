@@ -904,14 +904,17 @@ Initial audit routine after each private-alpha smoke or tester session:
 1. Render: inspect API/app logs and service metrics for restarts, memory pressure,
    slow requests, failed deploys, and workflow failures.
 2. Supabase Auth: confirm the expected login/signup events in Auth Audit Logs.
-3. Supabase Postgres: confirm `conversations`, `messages`, `backtest_runs`,
-   `route_receipts`, and later `backtest_jobs` increment for the tested user and
+3. Supabase Postgres: confirm `conversations`, `messages`, `backtest_jobs`,
+   `backtest_runs`, and `route_receipts` increment for the tested user and
    conversation.
 4. Product rows: verify persisted rows contain enough identifiers to correlate a
    user-visible failure with a Render request, workflow run, provider fetch, and
    persisted result.
 
-When `backtest_jobs` is added, `execution_metadata` should include:
+`backtest_jobs.execution_metadata` should include the cross-system identifiers
+needed to audit a user-visible result or failure. The proof-dispatch boundary
+currently records the API request id, payload hash, Render Workflow task run id,
+and in-process result link. Real workflow backtest execution should add:
 
 - workflow run id;
 - cache hit/miss and cache key;

@@ -17,13 +17,15 @@ WORKFLOW_SERVICE_ID="${ARGUS_RENDER_WORKFLOW_SERVICE_ID:-$ARGUS_RENDER_BACKTESTS
 usage() {
   cat <<'USAGE'
 Usage:
+  .github/render-env-sync.sh api-status
   .github/render-env-sync.sh api-dispatch-on
   .github/render-env-sync.sh api-dispatch-off
   .github/render-env-sync.sh workflow-proof
 
 Commands:
+  api-status        Print redacted API dispatch env status for argus-api.
   api-dispatch-on   Enable shadow job creation + Render Workflow dispatch on argus-api.
-  api-dispatch-off  Disable API shadow job creation + dispatch on argus-api.
+  api-dispatch-off  Disable API shadow job creation + dispatch and blank its Render key.
   workflow-proof    Sync workflow proof DB/task env vars on argus-backtests.
 
 Required local env:
@@ -56,6 +58,55 @@ put_render_env() {
   echo "synced ${service_id}:${key}"
 }
 
+delete_render_env() {
+  local service_id="$1"
+  local key="$2"
+
+  curl -fsS \
+    --request DELETE \
+    --url "https://api.render.com/v1/services/${service_id}/env-vars/${key}" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json" \
+    >/dev/null
+
+  echo "deleted ${service_id}:${key}"
+}
+
+render_env_json() {
+  local service_id="$1"
+
+  curl -fsS \
+    --request GET \
+    --url "https://api.render.com/v1/services/${service_id}/env-vars" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json"
+}
+
+print_api_status() {
+  require_local_env RENDER_API_KEY
+  render_env_json "$API_SERVICE_ID" | jq -r '
+    [
+      "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED",
+      "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED",
+      "ARGUS_BACKTEST_WORKFLOW_TASK",
+      "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT",
+      "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT",
+      "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT",
+      "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT",
+      "RENDER_API_KEY"
+    ] as $keys
+    | [ .[]?.envVar? ] as $vars
+    | $keys[]
+    | . as $key
+    | ($vars | map(select(.key == $key)) | .[0].value // null) as $value
+    | if $key == "RENDER_API_KEY" then
+        "\($key)=\(if ($value // "") == "" then "<missing-or-empty>" else "<redacted-present>" end)"
+      else
+        "\($key)=\($value // "<missing>")"
+      end
+  ' | sort
+}
+
 sync_api_dispatch_on() {
   require_local_env RENDER_API_KEY
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true
@@ -72,6 +123,7 @@ sync_api_dispatch_off() {
   require_local_env RENDER_API_KEY
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_SHADOW_ENABLED false
   put_render_env "$API_SERVICE_ID" ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED false
+  delete_render_env "$API_SERVICE_ID" RENDER_API_KEY
 }
 
 sync_workflow_proof() {
@@ -89,6 +141,9 @@ sync_workflow_proof() {
 
 command="${1:-}"
 case "$command" in
+  api-status)
+    print_api_status
+    ;;
   api-dispatch-on)
     sync_api_dispatch_on
     ;;

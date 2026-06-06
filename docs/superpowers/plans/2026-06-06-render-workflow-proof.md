@@ -55,4 +55,51 @@
 - `git status --short --branch`
 
 - [x] Confirm focused tests pass.
-- [ ] Report external blockers separately: Render CLI, Supabase CLI/local project config, Render Dashboard service creation, and sandbox Supabase credentials.
+- [x] Report external blockers separately: Render CLI, Supabase CLI/local project config, Render Dashboard service creation, and sandbox Supabase credentials.
+
+### Task 5: API Shadow Job Creation
+
+**Files:**
+- Create: `src/argus/api/chat/backtest_jobs.py`
+- Modify: `src/argus/api/state.py`
+- Modify: `src/argus/api/routers/agent.py`
+- Modify: `src/argus/domain/supabase_gateway.py`
+- Test: `tests/test_backtest_jobs_shadow.py`
+- Test: `tests/test_supabase_gateway.py`
+
+- [x] Add `ARGUS_BACKTEST_JOBS_SHADOW_ENABLED`, default-off in docs and Render Blueprint defaults.
+- [x] Wrap the existing in-process backtest tool so the API can create a durable `backtest_jobs` row before the current user-facing execution path.
+- [x] Preserve the current in-process result path as the response shown to the user.
+- [x] Link successful in-process `backtest_runs` back to the shadow job through `result_run_id`.
+- [x] Fail open in dev/memory fallback mode and fail closed in strict QA mode.
+
+### Task 6: Proof Dispatch And Backpressure
+
+**Files:**
+- Modify: `src/argus/api/chat/backtest_jobs.py`
+- Modify: `src/argus/domain/supabase_gateway.py`
+- Modify: `.github/render-env-sync.sh`
+- Modify: `.github/argus-env.sh`
+- Modify: `render.yaml`
+- Test: `tests/test_backtest_jobs_shadow.py`
+- Test: `tests/test_environment_scripts.py`
+
+- [x] Add `ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED`, default-off in docs and Render Blueprint defaults.
+- [x] Dispatch the Render Workflow proof task when both shadow and dispatch flags are enabled.
+- [x] Persist Render task-run metadata under `execution_metadata.workflow_dispatch`.
+- [x] Keep the current API in-process result path as the user-facing result while proof dispatch runs out-of-process.
+- [x] Add per-user and global running/queued limits for shadow job creation.
+- [x] Add `.github/render-env-sync.sh` commands to inspect redacted API dispatch env, enable dispatch intentionally, disable dispatch, and sync workflow proof env.
+
+### Task 7: Current Boundary And Remaining Scope
+
+This branch now proves the control-plane boundary through a real Render Workflow
+task run. It does **not** move the real backtest engine into the workflow yet.
+
+- [x] Durable job table exists locally and in live Supabase.
+- [x] API can create shadow jobs and link the current in-process run result.
+- [x] API can start the Render Workflow proof task when explicitly enabled.
+- [x] Backpressure knobs exist for user/global queued and running job limits.
+- [x] Render Blueprint defaults keep shadow and dispatch disabled.
+- [ ] Future slice: move the real backtest engine and heavy dependencies into the Render Workflow execution plane.
+- [ ] Future slice: add frontend async job-state rendering through Supabase Realtime or API polling.
