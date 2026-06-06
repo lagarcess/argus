@@ -12,6 +12,8 @@ from uuid import UUID, uuid4
 
 PROOF_KIND = "render_workflow_proof"
 PROOF_EMAIL_DOMAIN = "example.invalid"
+WORKFLOW_DATABASE_URL_ENV = "ARGUS_WORKFLOW_DATABASE_URL"
+LEGACY_DATABASE_URL_ENV = "DATABASE_URL"
 
 
 class WorkflowProofError(RuntimeError):
@@ -40,11 +42,14 @@ def utcnow_iso() -> str:
 
 def require_database_url(env: Mapping[str, str] | None = None) -> str:
     source = os.environ if env is None else env
-    database_url = (source.get("DATABASE_URL") or "").strip()
+    database_url = (
+        source.get(WORKFLOW_DATABASE_URL_ENV) or source.get(LEGACY_DATABASE_URL_ENV) or ""
+    ).strip()
     if not database_url:
         raise RuntimeError(
-            "DATABASE_URL is required for Render Workflow proof jobs. Configure it "
-            "as a secret in the Render Workflow service."
+            f"{WORKFLOW_DATABASE_URL_ENV} is required for Render Workflow proof jobs. "
+            f"Configure it as a Render secret. {LEGACY_DATABASE_URL_ENV} is still "
+            "accepted as a local/backward-compatible fallback."
         )
     return database_url
 

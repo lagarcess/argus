@@ -30,7 +30,7 @@
 - Test: `tests/test_render_workflow_proof.py`
 
 - [x] Implement a pure `run_workflow_proof()` function that accepts a gateway, validates `launch_payload.kind == "render_workflow_proof"`, writes `running`, writes `succeeded`, reads back the row, and returns a JSON-safe result.
-- [x] Implement a `PostgresProofJobGateway` backed by `DATABASE_URL`.
+- [x] Implement a `PostgresProofJobGateway` backed by workflow-scoped `ARGUS_WORKFLOW_DATABASE_URL`, with `DATABASE_URL` accepted only as a local/backward-compatible fallback.
 - [x] Register `workflow_proof(job_id, nonce)` in `workflows/main.py` using Render Workflows.
 - [x] Manage Render Workflow runtime dependencies through the optional Poetry `workflows` group; do not maintain a separate `workflows/requirements.txt`.
 

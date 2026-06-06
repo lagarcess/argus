@@ -109,10 +109,22 @@ def test_workflow_proof_rejects_non_proof_jobs() -> None:
 def test_workflow_proof_requires_secret_database_url() -> None:
     from workflows.proof import require_database_url
 
-    with pytest.raises(RuntimeError, match="DATABASE_URL"):
+    with pytest.raises(RuntimeError, match="ARGUS_WORKFLOW_DATABASE_URL"):
         require_database_url({})
 
-    assert require_database_url({"DATABASE_URL": "postgres://user:secret@example/db"})
+    assert require_database_url(
+        {"ARGUS_WORKFLOW_DATABASE_URL": "postgres://workflow:secret@example/db"}
+    )
+    assert require_database_url({"DATABASE_URL": "postgres://legacy:secret@example/db"})
+    assert (
+        require_database_url(
+            {
+                "ARGUS_WORKFLOW_DATABASE_URL": "postgres://workflow:secret@example/db",
+                "DATABASE_URL": "postgres://legacy:secret@example/db",
+            }
+        )
+        == "postgres://workflow:secret@example/db"
+    )
 
 
 def test_trigger_proof_serializes_generated_sdk_models() -> None:

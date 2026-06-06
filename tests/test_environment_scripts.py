@@ -187,11 +187,15 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     render_config = yaml.safe_load(_source("render.yaml"))
 
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK=" in env_example
+    assert (
+        "ARGUS_WORKFLOW_DATABASE_URL=YOUR_SUPABASE_POSTGRES_TRANSACTION_POOLER_URL"
+        in env_example
+    )
     assert "ARGUS_WORKFLOW_PROOF_PLAN=" in env_example
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
+    assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
     assert "ARGUS_WORKFLOW_PROOF_PLAN" in env_contract
-    assert "DATABASE_URL" in env_contract
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 

@@ -43,13 +43,15 @@ Set ARGUS_WORKFLOW_PYTHON=/path/to/python only when using a prebuilt workflow ve
 Remote validation requires:
   RENDER_API_KEY
   ARGUS_RENDER_WORKFLOW_PROOF_TASK={workflow-slug}/workflow_proof
+  ARGUS_WORKFLOW_DATABASE_URL=<Supabase transaction pooler URL>
 
 Future Render Workflow service settings:
   Root Directory: .
   Build Command: pip install poetry && poetry config virtualenvs.create false && poetry install --only workflows --no-root --no-interaction
   Start Command: poetry run python workflows/main.py
 
-All modes that touch Supabase require DATABASE_URL as a secret.
+All modes that touch Supabase require ARGUS_WORKFLOW_DATABASE_URL as a secret.
+DATABASE_URL is accepted only as a local/backward-compatible fallback.
 USAGE
 }
 
