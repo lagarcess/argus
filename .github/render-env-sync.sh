@@ -148,16 +148,25 @@ sync_workflow_proof() {
 
 sync_workflow_runtime() {
   require_local_env RENDER_API_KEY
-  if ! command -v render >/dev/null 2>&1; then
-    echo "render CLI is required to sync workflow runtime settings."
-    exit 1
-  fi
 
-  render services update "$WORKFLOW_SERVICE_ID" \
-    --build-command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" \
-    --start-command "$ARGUS_RENDER_WORKFLOW_START_COMMAND" \
-    --confirm \
-    --output json \
+  curl -fsS \
+    --request PATCH \
+    --url "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json" \
+    --header "Content-Type: application/json" \
+    --data "$(
+      jq -nc \
+        --arg build_command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" \
+        --arg run_command "$ARGUS_RENDER_WORKFLOW_START_COMMAND" \
+        '{
+          buildConfig: {
+            buildCommand: $build_command
+          },
+          runCommand: $run_command,
+          autoDeployTrigger: "off"
+        }'
+    )" \
     >/dev/null
 
   echo "synced ${WORKFLOW_SERVICE_ID}:workflow-runtime"

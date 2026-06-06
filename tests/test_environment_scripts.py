@@ -265,9 +265,9 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT" in source
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "workflow-runtime" in source
-    assert 'render services update "$WORKFLOW_SERVICE_ID"' in source
-    assert '--build-command "$ARGUS_RENDER_WORKFLOW_BUILD_COMMAND"' in source
-    assert '--start-command "$ARGUS_RENDER_WORKFLOW_START_COMMAND"' in source
+    assert 'https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}' in source
+    assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in source
+    assert "ARGUS_RENDER_WORKFLOW_START_COMMAND" in source
     assert "set -x" not in source
 
 
