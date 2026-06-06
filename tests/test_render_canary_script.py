@@ -29,7 +29,8 @@ def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
     source = _source(".github/canary-render.sh")
 
     assert (
-        "Test an equal-weight AAPL and MSFT strategy from 2025 to 2026 to date"
+        "Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, "
+        "2025 through June 5, 2026 with 10,000 dollars"
         in source
     )
     assert '"type":"run_backtest"' in source

@@ -11,7 +11,7 @@ SUPABASE_URL="${ARGUS_CANARY_SUPABASE_URL:-}"
 SUPABASE_SERVICE_ROLE_KEY="${ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY:-}"
 TIMEOUT_SECONDS="${ARGUS_CANARY_TIMEOUT_SECONDS:-240}"
 POLL_SLEEP_SECONDS="${ARGUS_CANARY_POLL_SLEEP_SECONDS:-5}"
-PROMPT="${ARGUS_CANARY_PROMPT:-Test an equal-weight AAPL and MSFT strategy from 2025 to 2026 to date}"
+PROMPT="${ARGUS_CANARY_PROMPT:-Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, 2025 through June 5, 2026 with 10,000 dollars}"
 
 if [ -z "$EMAIL" ]; then
   echo "ARGUS_CANARY_EMAIL is required."
