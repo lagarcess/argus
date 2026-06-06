@@ -884,9 +884,14 @@ async def chat_stream(
                 result_card = runtime_result_card(runtime_result)
                 envelope = runtime_result_envelope(runtime_result)
                 backtest_job = None
+                raw_backtest_job = runtime_result.get("backtest_job")
+                if isinstance(raw_backtest_job, dict):
+                    backtest_job = dict(raw_backtest_job)
                 final_response_payload = runtime_result.get("final_response_payload")
-                if isinstance(final_response_payload, dict) and isinstance(
-                    final_response_payload.get("backtest_job"), dict
+                if (
+                    backtest_job is None
+                    and isinstance(final_response_payload, dict)
+                    and isinstance(final_response_payload.get("backtest_job"), dict)
                 ):
                     backtest_job = dict(final_response_payload["backtest_job"])
                 run = None

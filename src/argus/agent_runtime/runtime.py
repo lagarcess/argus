@@ -251,6 +251,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "pending_strategy",
         "optional_parameter_choices",
         "confirmation_payload",
+        "backtest_job",
         "next_actions",
         "failure_classification",
         "final_response_payload",

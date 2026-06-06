@@ -33,7 +33,10 @@ def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
         in source
     )
     assert '"type":"run_backtest"' in source
+    assert "/api/v1/backtest-jobs" in source
+    assert "conversation did not persist async backtest_job metadata" in source
     assert "backtest_run" in source
+    assert "backtest_jobs" in source
     assert "route_receipts" in source
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
 
@@ -42,6 +45,6 @@ def test_canary_passes_json_arguments_after_python_stdin_marker() -> None:
     source = _source(".github/canary-render.sh")
 
     assert 'python3 - "$MESSAGES_JSON" <<' in source
-    assert 'python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" <<' in source
+    assert 'python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" "$BACKTEST_JOB_ID" <<' in source
     assert 'python3 - <<\'PY\' "$MESSAGES_JSON"' not in source
     assert 'python3 - <<\'PY\' "$BACKTEST_ROWS" "$RECEIPT_ROWS"' not in source

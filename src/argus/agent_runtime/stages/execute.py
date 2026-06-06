@@ -60,6 +60,7 @@ def execute_stage(
                         "tool_call_records": records,
                         "failure_classification": None,
                         "assistant_response": _async_backtest_job_message(async_job),
+                        "backtest_job": async_job,
                         "final_response_payload": {"backtest_job": async_job},
                         "artifact_references": [
                             ArtifactReference(

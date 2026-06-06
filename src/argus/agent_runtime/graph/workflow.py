@@ -83,6 +83,7 @@ class WorkflowState(TypedDict, total=False):
     requested_field: str | None
     optional_parameter_choices: list[str]
     confirmation_payload: dict[str, Any]
+    backtest_job: dict[str, Any]
     failure_classification: str | None
     final_response_payload: dict[str, Any]
     latest_failed_action_reference: ArtifactReference | dict[str, Any]
@@ -96,6 +97,7 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "assistant_response",
         "requested_field",
         "optional_parameter_choices",
+        "backtest_job",
         "failure_classification",
         "final_response_payload",
         "latest_failed_action_reference",

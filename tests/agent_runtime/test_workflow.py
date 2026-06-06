@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from argus.agent_runtime.graph.workflow import (
     WorkflowStageOutcome,
@@ -177,6 +179,36 @@ class ConversationalInterpreter:
             confidence=0.94,
             semantic_turn_act="educational_question",
         )
+
+
+class AsyncBacktestJobTool:
+    def run(self, payload: dict[str, Any]) -> dict[str, Any]:
+        del payload
+        return {
+            "success": True,
+            "payload": {
+                "backtest_job": {
+                    "id": "job-async-1",
+                    "conversation_id": "thread-async-job",
+                    "request_message_id": "request-message-1",
+                    "confirmation_message_id": "confirmation-message-1",
+                    "status": "queued",
+                    "result_run_id": None,
+                    "failure_code": None,
+                    "failure_detail": None,
+                    "retryable": False,
+                    "queued_at": "2026-06-06T12:00:00Z",
+                    "started_at": None,
+                    "finished_at": None,
+                    "created_at": "2026-06-06T12:00:00Z",
+                    "updated_at": "2026-06-06T12:00:00Z",
+                }
+            },
+            "error_type": None,
+            "error_message": None,
+            "retryable": False,
+            "capability_context": {"execution_status": "queued"},
+        }
 
 
 class ShortWindowCrossoverInterpreter:
@@ -572,6 +604,59 @@ async def test_workflow_requires_confirmation_before_execute(monkeypatch) -> Non
     assert result["pending_strategy"]["missing_required_fields"] == []
     assert result.get("assistant_prompt") is None
     assert "RSI" in result["confirmation_payload"]["strategy"]["entry_logic"]
+
+
+@pytest.mark.asyncio
+async def test_workflow_run_backtest_action_returns_async_job_payload(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import resolution as resolution_module
+
+    def resolve_stub(symbol: str) -> ResolvedAssetStub:
+        return ResolvedAssetStub(symbol.upper(), "crypto")
+
+    monkeypatch.setattr(resolution_module, "resolve_market_asset", resolve_stub)
+
+    workflow = build_workflow(
+        structured_interpreter=ApprovalInterpreter(),
+        tool=AsyncBacktestJobTool(),
+        checkpointer=MemorySaver(),
+    )
+    user = UserState(user_id="u1", expertise_level="beginner")
+    thread_id = "thread-async-job"
+
+    confirmation = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Buy and hold BTC over the last year",
+    )
+
+    confirmation_reference = confirmation["artifact_references"][0]
+    confirmation_metadata = confirmation_reference["metadata"]
+    action = {
+        "type": "run_backtest",
+        "label": "Run backtest",
+        "presentation": "confirmation",
+        "payload": {
+            "artifact_id": confirmation_reference["artifact_id"],
+            "confirmation_id": confirmation_reference["artifact_id"],
+            "conversation_id": thread_id,
+            "launch_payload_hash": confirmation_metadata["launch_payload_hash"],
+        },
+    }
+    result = await run_agent_turn(
+        workflow=workflow,
+        user=user,
+        thread_id=thread_id,
+        message="Run backtest",
+        action_context=action,
+    )
+
+    assert result["stage_outcome"] == "ready_to_respond"
+    assert result["backtest_job"]["id"] == "job-async-1"
+    assert result["final_response_payload"]["backtest_job"]["id"] == "job-async-1"
+    assert result["artifact_references"][0]["artifact_kind"] == "backtest_job"
 
 
 @pytest.mark.asyncio

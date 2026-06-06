@@ -265,6 +265,7 @@ def test_execute_stage_returns_job_artifact_without_result_explanation() -> None
     result = execute_stage(state=state, tool=_AsyncJobTool(), max_retries=1)
 
     assert result.outcome == "ready_to_respond"
+    assert result.patch["backtest_job"]["id"] == "job-async-1"
     assert result.patch["final_response_payload"]["backtest_job"]["id"] == (
         "job-async-1"
     )
