@@ -1087,11 +1087,12 @@ actions and to ordinary user text.
   "message": "Quiero probar comprar cuando baja Tesla",
   "mentions": [
     {
-      "id": "asset:BTC",
+      "id": "asset:crypto:BTC",
       "type": "asset",
       "label": "Bitcoin",
       "symbol": "BTC",
-      "description": "Bitcoin",
+      "asset_class": "crypto",
+      "description": "Crypto",
       "insert_text": "BTC",
       "support_status": "supported"
     }
@@ -1100,7 +1101,13 @@ actions and to ordinary user text.
 }
 ```
 
-`mentions` is optional composer provenance. It records user-selected asset or indicator hints from the input affordance, but it does not rewrite `message`, bypass LLM interpretation, or create hidden execution state. Backend resolution still validates extracted candidates after interpretation.
+`mentions` is optional composer provenance. It records user-selected asset or
+indicator hints from the input affordance, but it does not rewrite `message`,
+bypass LLM interpretation, or create hidden execution state. Asset mentions
+should include durable `asset_class` (`equity`, `crypto`, or `currency_pair`)
+and IDs shaped as `asset:{asset_class}:{symbol}` so selected ambiguous symbols
+preserve the user's chosen asset identity. Backend resolution still validates
+extracted candidates after interpretation.
 
 **Required Header:**
 - `Idempotency-Key`: `uuid` (Highly recommended to prevent double-submits)

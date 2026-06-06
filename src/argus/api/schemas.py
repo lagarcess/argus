@@ -298,6 +298,7 @@ class ChatMentionPayload(BaseModel):
     type: Literal["asset", "indicator"]
     label: str
     symbol: str | None = None
+    asset_class: AssetClass | None = None
     description: str | None = None
     insert_text: str
     support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
@@ -324,6 +325,7 @@ class DiscoveryItem(BaseModel):
     type: Literal["asset", "indicator"]
     label: str
     symbol: str | None = None
+    asset_class: AssetClass | None = None
     description: str | None = None
     insert_text: str
     provider: str

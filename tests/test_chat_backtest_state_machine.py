@@ -699,6 +699,60 @@ def test_chat_stream_passes_and_persists_composer_mention_provenance(
     assert user_message["metadata"]["resolution_provenance"][0]["raw_text"] == "BTC"
 
 
+def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    seen: dict[str, Any] = {}
+
+    def _runtime(**kwargs: Any) -> dict[str, Any]:
+        seen.update(kwargs)
+        return _confirmation_runtime_result()
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(_runtime),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "cool, let's try buying and holding CVX this year so far",
+            "mentions": [
+                {
+                    "id": "asset:equity:CVX",
+                    "type": "asset",
+                    "label": "CVX · Chevron Corporation",
+                    "symbol": "CVX",
+                    "asset_class": "equity",
+                    "description": "Stock",
+                    "insert_text": "CVX",
+                    "support_status": "supported",
+                }
+            ],
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen["context_hints"][0]["source"] == "user_mention"
+    assert seen["context_hints"][0]["canonical_symbol"] == "CVX"
+    assert seen["context_hints"][0]["asset_class"] == "equity"
+
+    user_message = client.get(
+        f"/api/v1/conversations/{conversation['id']}/messages"
+    ).json()["items"][0]
+    assert user_message["metadata"]["mentions"][0]["asset_class"] == "equity"
+    assert (
+        user_message["metadata"]["resolution_provenance"][0]["asset_class"] == "equity"
+    )
+
+
 def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

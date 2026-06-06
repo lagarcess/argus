@@ -52,7 +52,7 @@ def discovery_assets(
     return DiscoveryResponse(
         items=[
             DiscoveryItem(
-                id=f"asset:{asset.canonical_symbol}",
+                id=f"asset:{asset.asset_class}:{asset.canonical_symbol}",
                 type="asset",
                 label=(
                     f"{asset.canonical_symbol} \u00b7 {asset.name}"
@@ -60,6 +60,7 @@ def discovery_assets(
                     else asset.canonical_symbol
                 ),
                 symbol=asset.canonical_symbol,
+                asset_class=asset.asset_class,
                 description=display_asset_class(asset.asset_class),
                 insert_text=asset.canonical_symbol,
                 provider="alpaca",

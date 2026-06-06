@@ -13,6 +13,7 @@ LaunchStrategyType = Literal[
     "indicator_threshold",
     "signal_strategy",
 ]
+AssetClass = Literal["equity", "crypto", "currency_pair"]
 SizingMode = Literal["capital_amount", "position_size"]
 Cadence = Literal["daily", "weekly", "biweekly", "monthly", "quarterly"]
 ExecutionStatus = Literal[
@@ -33,6 +34,7 @@ class LaunchBacktestRequest(BaseModel):
     strategy_type: LaunchStrategyType
     symbol: str
     symbols: list[str] = Field(default_factory=list)
+    asset_class: AssetClass | None = None
     timeframe: str
     date_range: DateRange
     entry_rule: dict[str, Any] | None = None
