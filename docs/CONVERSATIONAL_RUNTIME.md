@@ -126,8 +126,8 @@ Supabase-backed persistence owns conversation continuity:
 
 - `conversations` stores the active thread.
 - `messages` stores user/assistant text and structured card metadata.
-- `backtest_jobs` stores durable queued/running/succeeded/failed execution
-  lifecycle state for chat-confirmed backtests.
+- `backtest_jobs` stores durable queued/running/succeeded/failed/canceled/expired
+  execution lifecycle state for chat-confirmed backtests.
 - `backtest_runs` stores immutable config, metrics, result card, chart, and event markers.
 - `strategies` stores saved result-backed ideas for the Strategies surface.
 

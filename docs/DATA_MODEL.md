@@ -401,8 +401,8 @@ Unknown failures default to `failed`, `failed_internal` semantics,
 
 ### Notes
 - Jobs are idempotent by user and payload/idempotency key.
-- The UI must hydrate queued/running/succeeded/failed state from durable rows,
-  not frontend-invented state.
+- The UI must hydrate queued/running/succeeded/failed/canceled/expired state
+  from durable rows, not frontend-invented state.
 - Supabase Realtime is the selected private-alpha job-status transport.
 - API SSE remains request-scoped and should not be used as a long-lived stream
   for workflow-duration jobs.

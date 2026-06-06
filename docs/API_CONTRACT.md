@@ -596,8 +596,8 @@ references it through `result_run_id`.
   changes.
 - API SSE remains request-scoped for chat turn stages and must not be treated as
   the long-running backtest status channel.
-- The frontend must hydrate queued/running/succeeded/failed state from durable
-  job rows after refresh or missed realtime events.
+- The frontend must hydrate queued/running/succeeded/failed/canceled/expired
+  state from durable job rows after refresh or missed realtime events.
 - `backtest_jobs.status` tracks lifecycle; `failure_code`, `failure_detail`,
   `retryable`, and `execution_metadata` explain failures and retries.
 

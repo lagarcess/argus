@@ -145,7 +145,8 @@ Track 1: reliability under load.
 
 - Keep the API responsive.
 - Move heavy backtest execution behind a durable job boundary.
-- Make job state observable: queued, running, succeeded, failed, canceled.
+- Make job state observable: queued, running, succeeded, failed, canceled,
+  expired.
 - Add canaries that verify the user-visible state, not just infrastructure
   health.
 - Avoid rewriting interpretation, clarification, or assistant voice while the
@@ -209,7 +210,7 @@ The high-level ownership model should be:
 | Durable product state | Supabase Postgres | Conversations, messages, profiles, runs, jobs, counters. |
 | Runtime checkpoints | Supabase Postgres | LangGraph state should be reloadable after API restarts. |
 | Chat turn streaming | API SSE | Request-scoped token/stage streaming only. |
-| Backtest job status updates | Supabase Realtime | Chosen status transport for queued/running/succeeded/failed updates without long-held API streams. |
+| Backtest job status updates | Supabase Realtime | Chosen status transport for queued/running/succeeded/failed/canceled/expired updates without long-held API streams. |
 | Heavy backtest execution | Render Workflows | Load pandas/numpy/vectorbt only in temporary compute. |
 | Market data cache | Supabase Postgres first; Storage only for large blobs if needed | Shared durable cache, not hidden API memory or a second cache service. |
 | Manual warmups/canaries | Local runbook/script first | Use `.github/warmup-render.sh` before tester sessions. |
@@ -445,8 +446,8 @@ Important properties:
 - Jobs are idempotent by user and payload/idempotency key.
 - Job status is durable and visible after refresh.
 - The job writes a canonical `backtest_runs` row on success.
-- The chat thread can render queued/running/succeeded/failed states from
-  durable data, not frontend-invented state.
+- The chat thread can render queued/running/succeeded/failed/canceled/expired
+  states from durable data, not frontend-invented state.
 
 ### Job Failure Taxonomy
 
@@ -979,7 +980,8 @@ Required characterization tests before extraction:
 - a ready confirmation creates a durable job instead of executing inline;
 - completed jobs write canonical `backtest_runs`;
 - failed jobs preserve existing failure categories;
-- refresh/reload hydrates queued/running/succeeded/failed job state;
+- refresh/reload hydrates queued/running/succeeded/failed/canceled/expired job
+  state;
 - retry behavior distinguishes transient upstream failures from invalid payloads.
 
 Desirable but deferred refactors:
