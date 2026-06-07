@@ -127,9 +127,9 @@ compute stack:
 
 | Import Step | Peak RSS | Heavy Modules Loaded |
 | --- | ---: | --- |
-| Empty Python process | 16.1 MB | none |
-| `argus.api.main` import | 120.7 MB | none |
-| `/health` via `TestClient` | 121.7 MB | none |
+| Empty Python process | 22.4 MB | none |
+| `argus.api.main` import | 123.4 MB | none |
+| `/health` via `TestClient` | 124.4 MB | none |
 
 Evidence command:
 
@@ -146,6 +146,146 @@ execution modules. Lightweight strategy/date/rule contract modules may still be
 loaded by the API because the LangGraph runtime must validate supported
 capability facts after LLM interpretation. Heavy backtest execution remains
 behind the workflow/backtest execution path.
+
+The repeatable benchmark harness below measured the same local API path with a
+sampled subprocess peak RSS of 134.4 MB. `/internal/readiness?force=true`
+successfully warmed the agent runtime workflow without importing the heavy
+backtest stack; the readiness response was still `degraded` in local memory mode
+because Supabase persistence was intentionally unavailable.
+
+### Automated Local Benchmark Pass
+
+The infrastructure benchmark harness lives at
+`scripts/benchmarks/backtest_infra_benchmark.py`.
+
+Default command:
+
+```bash
+poetry run python scripts/benchmarks/backtest_infra_benchmark.py
+```
+
+Default output:
+
+- `temp/benchmarks/backtest-infra/latest.json`
+- `temp/benchmarks/backtest-infra/latest.md`
+- timestamped JSON/Markdown files in the same directory
+
+The harness keeps benchmark code outside production runtime. It runs API import,
+workflow import, and workflow execution probes in child processes so the parent
+can sample peak RSS with `psutil`. It defaults to
+`ARGUS_MARKET_DATA_PROVIDER_MODE=synthetic_unit_fixture` and an in-memory fake
+workflow gateway, so it does not require live Supabase writes or provider
+credentials. Live provider mode is opt-in and gated by:
+
+```bash
+ARGUS_BENCHMARK_LIVE_PROVIDER=true \
+poetry run python scripts/benchmarks/backtest_infra_benchmark.py \
+  --provider-mode live_provider
+```
+
+Generated artifact schema:
+
+```text
+argus_backtest_infra_benchmark/v1
+```
+
+The JSON artifact records API import RSS/timings, workflow dependency import
+RSS/timings, per-case execution wall time, peak RSS, provider fetch calls/rows,
+provider fetch time split by engine/chart phase, engine compute time, chart/card
+build time, fake persistence timing, and a queue/backpressure smoke check.
+
+Local benchmark run:
+
+```text
+Generated: 2026-06-07T04:54:03.792684+00:00
+Provider mode: synthetic_unit_fixture
+Artifact: temp/benchmarks/backtest-infra/latest.json
+```
+
+#### What Was Measured Locally
+
+| Area | Local Finding |
+| --- | ---: |
+| API import subprocess peak RSS | 134.4 MB |
+| Empty Python process RSS in API probe | 22.4 MB |
+| RSS after `argus.api.main` import | 123.4 MB |
+| RSS after `/health` | 124.4 MB |
+| Forbidden heavy modules after `/health` | 0 |
+| Forbidden heavy modules after readiness/workflow warmup | 0 |
+| Workflow module import | 64.1 ms |
+| RSS after workflow job module import | 38.4 MB |
+| Real backtest tool import | 1,920.7 ms |
+| RSS after real backtest tool import | 298.8 MB |
+| Workflow import subprocess peak RSS | 299.0 MB |
+
+Representative local workflow execution cases:
+
+| Case | Status | Wall Time | Peak RSS | Provider Fetch | Engine Net | Chart Net |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 equity, 7y, 1D, buy-and-hold | succeeded | 1,325.5 ms | 408.3 MB | 8.4 ms | 1,297.3 ms | 19.1 ms |
+| 5 equity, 7y, 1D, equal-weight buy-and-hold | succeeded | 1,336.4 ms | 412.1 MB | 7.1 ms | 1,253.7 ms | 75.1 ms |
+| 1 crypto, 3y, 4h, buy-and-hold | succeeded | 1,441.4 ms | 411.2 MB | 3.3 ms | 1,388.9 ms | 48.5 ms |
+| 1 equity, 7y, 1D, DCA monthly | succeeded | 28.9 ms | 301.3 MB | 1.8 ms | 14.4 ms | 12.3 ms |
+| 1 equity, 7y, 1D, DCA weekly | succeeded | 27.2 ms | 301.8 MB | 1.8 ms | 11.1 ms | 13.8 ms |
+| 1 equity, 7y, 1D, RSI threshold | succeeded | 1,263.0 ms | 410.8 MB | 2.3 ms | 1,237.5 ms | 22.5 ms |
+| 1 equity, 7y, 1D, moving-average crossover | succeeded | 1,233.7 ms | 410.4 MB | 1.9 ms | 1,211.5 ms | 19.7 ms |
+
+Backpressure smoke:
+
+| Limit Check | Result |
+| --- | --- |
+| under limits | admitted |
+| 1 running per user | blocked with `user_running` |
+| 2 queued per user | blocked with `user_queued` |
+| 5 running globally | blocked with `global_running` |
+| 10 queued globally | blocked with `global_queued` |
+
+Current interpretation:
+
+- The API remains lean enough for the current 512 MB API memory envelope in this
+  local probe because it stays near 124 MB after import and health, and does not
+  load pandas/numpy/vectorbt/numba or engine execution modules.
+- Workflow cold start is dominated by importing the real backtest tool and heavy
+  analytics stack: roughly 1.9 seconds and a jump from 38.4 MB to 298.8 MB.
+- Representative non-DCA strategy execution peaks around 408-412 MB locally in
+  synthetic provider mode. That fits a 2 GB workflow task with broad headroom,
+  but must be remeasured on Render `standard` workflow compute before assuming
+  the same RSS or latency.
+- In synthetic provider mode, provider fetch time is intentionally tiny. The
+  measured wall time is therefore mostly engine/vectorbt compute and chart
+  construction. Live provider fetch and Supabase cache behavior remain
+  unmeasured.
+- DCA currently avoids the vectorbt portfolio path and is much cheaper in local
+  execution time, while still inheriting the imported workflow process RSS.
+- The current queue/backpressure defaults match the private-alpha target of
+  1 running per user, 2 queued per user, 5 running globally, and 10 queued
+  globally.
+
+Still unmeasured:
+
+- Real Render Workflow task cold start, import time, wall time, CPU, and peak
+  RSS on `standard` workflow compute.
+- Live Alpaca/Kraken provider fetch latency, failure/retry shape, and provider
+  request identifiers.
+- Supabase job creation, run insert, job status update, cache lookup/write, and
+  Realtime delivery latency.
+- Workflow dispatch latency through the Render API and task-run queue.
+- Concurrent workflow execution with 5 global jobs and queued-job drain time.
+- Currency-pair 720-candle RSI/moving-average cases.
+- LLM interpretation and LLM result-summary latency; this infra harness does not
+  exercise Argus voice or result prose generation.
+
+Caveats:
+
+- Local synthetic provider mode measures compute/runtime shape, not live market
+  data latency.
+- Fake persistence timings are intentionally near zero and should not be read as
+  Supabase write performance.
+- The local machine has more CPU and memory headroom than Render Free/Starter
+  API instances and likely differs from Render Workflow `standard` task CPU.
+- The harness patches result readout generation to avoid changing or measuring
+  Argus voice during this infrastructure slice. The next slice remains the
+  Argus voice parity gate.
 
 ## Product Truth
 
@@ -896,17 +1036,24 @@ the chat API.
 
 ### Capacity Answers And Measurement Targets
 
-1. Lean API footprint after split: current evidence says `argus.api.main` plus
-   `/health` peaks around ~121.7 MB locally and does not import the heavy
-   backtest compute stack. Keep `tests/test_api_import_boundary.py` as the
-   regression gate for API startup.
-2. Workflow cold-start plus dependency-import overhead: not measured yet because
-   the workflow service does not exist. Current local proxy is roughly the jump
-   from ~115 MB to ~390 MB and about 1.1 seconds of additional import time on
-   the developer machine. Measure this on Render `standard` workflow compute.
-3. Benchmark timings: use the expanded benchmark matrix below and measure cold
-   start/import, provider fetch, compute, chart/result build, persistence, and
-   job-status update latency separately.
+1. Lean API footprint after split: current automated local evidence says
+   `argus.api.main` plus `/health` peaks around 134.4 MB at the subprocess
+   level, with process RSS around 124.4 MB after `/health`, and does not import
+   the heavy backtest compute stack. Keep
+   `tests/test_api_import_boundary.py` and
+   `tests/perf/test_backtest_infra_benchmark.py` as regression gates for API
+   startup and the benchmark harness.
+2. Workflow cold-start plus dependency-import overhead: local workflow module
+   import is small (38.4 MB RSS after import, 64.1 ms), but importing the real
+   backtest tool loads pandas/numpy/vectorbt/numba and raises RSS to 298.8 MB,
+   with about 1.9 seconds of import time on the developer machine. Measure this
+   on Render `standard` workflow compute before tier decisions.
+3. Benchmark timings: the first local synthetic benchmark pass measured API
+   import, workflow import, execution wall time, peak RSS, synthetic provider
+   fetch time, engine compute, chart/result-card build, fake persistence, and
+   queue/backpressure smoke. Live provider, real Supabase persistence, Render
+   dispatch, Realtime delivery, and Render workflow concurrency remain
+   unmeasured.
 4. Private-alpha safe strategy set: target the full current code set
    eventually, but gate the promise by benchmarks and failure behavior. If
    signal paths are flaky, keep them behind recovery language rather than
@@ -1073,16 +1220,23 @@ parity gate above.
 | Lazy wrapper functions in `src/argus/api/routers/agent.py` preserve test seams while avoiding eager heavy imports. | They are useful now, but can become an accidental service locator if more responsibilities accumulate there. | Keep wrappers small and local to import-boundary preservation. Do not route product logic through them. | When adding another lazy wrapper or moving result/readout code. | No |
 | Static/CDN feasibility for `argus-app` remains unproven. | A static/CDN app could remove one always-on compute service, but only if current auth/session/chat behavior supports it without degrading UX. | Defer until the API/workflow split is stable. Current Next web service remains acceptable. | When optimizing monthly cost after reliability is proven, or before changing Render app service type. | No |
 | Market-data caching in Supabase is desirable but not part of the first execution boundary. | Shared short-lived symbol/timeframe snapshots can reduce provider calls and speed repeated backtests, but cache invalidation by market clock adds design complexity. | Defer until provider-fetch timings show it matters. Prefer Supabase-owned TTL/cache metadata before Render KV unless evidence says otherwise. | After benchmark data shows provider fetch is a material latency or cost driver. | No |
-| Benchmark matrix still needs real numbers for API RSS, workflow cold start, workflow peak RSS, execution time, and provider fetch time. | Without measurements, tier and concurrency decisions are back-of-envelope estimates. | Keep the benchmark plan below as the measurement contract. Do not tune tiers blindly. | Before private-alpha scale-up beyond manual/developer smoke, or before paying for larger compute. | Required before scale-up |
+| Benchmark matrix now has first local synthetic numbers for API RSS, workflow import, workflow peak RSS, representative execution time, synthetic provider fetch time, and queue/backpressure smoke. | These measurements are enough to stop treating the architecture as purely theoretical, but they do not prove Render/Supabase/live-provider behavior. | Keep the benchmark harness as the repeatable measurement contract. Refresh it on Render `standard` workflow compute and live provider/Supabase paths before tuning paid tiers. | Before private-alpha scale-up beyond manual/developer smoke, or before paying for larger compute. | Required before scale-up |
 | Async job failure taxonomy is still coarse. | Retry UX depends on distinguishing transient provider/LLM failures from malformed envelopes, unsupported strategies, auth/quota errors, and fatal engine bugs. | Keep current retry behavior, but design job status/failure reasons so new categories can be added without schema churn. | When implementing retry UI for async jobs or observing new failure clusters in logs. | No |
 | Large mixed-concern runtime files remain concerning. | Refactoring them too early risks moving bugs around before we understand observed failure patterns. | Use boundary-driven refactors only. Do not split large files just for aesthetics inside this milestone. | When a file sits directly on the execution boundary or repeated production failures cluster in that file. | No |
 | New portfolio abstractions remain out of alpha scope. | Users may eventually need portfolio-level workflows, but adding them now expands product semantics before PMF signal. | Keep same-asset, long-only, equal-weight/backtest-first scope. | After private-alpha feedback shows portfolio workflows are a repeated blocker. | No |
 
 ## Benchmark Plan
 
-When we are ready to measure, create a benchmark matrix that runs the same cases
-locally and in production-like compute. The benchmark should measure API import
-footprint separately from workflow execution footprint.
+The automated harness now runs a local version of this matrix:
+
+```bash
+poetry run python scripts/benchmarks/backtest_infra_benchmark.py
+```
+
+It measures API import footprint separately from workflow import and workflow
+execution footprint. The default local run uses synthetic market data and fake
+persistence. Production-like measurements should run the same command on Render
+Workflow compute and, when intentionally opted in, live provider/Supabase paths.
 
 Suggested execution cases:
 
@@ -1100,6 +1254,10 @@ Suggested execution cases:
 | J | 1 | latest feasible 720-candle window | 4h | currency_pair | RSI threshold |
 | K | 1 | latest feasible 720-candle window | 4h | currency_pair | moving average or MACD crossover |
 | L | 5 concurrent jobs | mixed A-I | mixed | mixed | queue/backpressure smoke |
+
+The first automated local pass covers A, B, C, E, F, H, I, and L. Cases D, G,
+J, K, true concurrent workflow execution, live provider latency, and real
+Supabase persistence remain to be measured.
 
 Currency-pair intraday windows must respect Kraken's latest 720-candle limit.
 For example, a 4-hour currency-pair test is roughly a 120-day maximum window,
