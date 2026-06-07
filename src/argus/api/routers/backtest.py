@@ -3,7 +3,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Header, Request
 
 from argus.api import state as api_state
-from argus.api.backtest_service import create_run_from_payload
 from argus.api.dependencies import current_user, problem
 from argus.api.schemas import (
     BacktestJob,
@@ -85,6 +84,8 @@ def run_backtest(
         }
     if not data.get("template"):
         data["template"] = "rsi_mean_reversion"
+    from argus.api.backtest_service import create_run_from_payload
+
     run = create_run_from_payload(
         data,
         request,

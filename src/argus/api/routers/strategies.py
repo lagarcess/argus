@@ -17,7 +17,6 @@ from argus.api.schemas import (
     SuccessResponse,
     User,
 )
-from argus.domain.engine import classify_symbol, default_benchmark
 from argus.domain.store import utcnow
 
 router = APIRouter(prefix="/api/v1", tags=["strategies"])
@@ -48,6 +47,8 @@ def create_strategy(
             payload=strategy_payload,
         )
     else:
+        from argus.domain.engine import classify_symbol, default_benchmark
+
         now = utcnow()
         benchmark = payload.benchmark_symbol or default_benchmark(payload.asset_class)
         strategy = Strategy(

@@ -11,8 +11,6 @@ from loguru import logger
 
 from argus.api import pagination, search_utils
 from argus.api import state as api_state
-from argus.api.chat.breakdown import llm_result_breakdown_message
-from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.dependencies import request_id_middleware
 from argus.api.routers import (
     agent,
@@ -75,9 +73,7 @@ async def lifespan(app: FastAPI):
 
     app.state.agent_runtime_checkpointer = checkpointer
     app.state.agent_runtime_checkpointer_cm = checkpointer_cm
-    app.state.agent_runtime_workflow = api_state.build_agent_runtime_workflow(
-        checkpointer=checkpointer
-    )
+    app.state.agent_runtime_workflow = None
     try:
         yield
     finally:
@@ -147,5 +143,15 @@ _encode_cursor = pagination.encode_cursor
 _decode_cursor = pagination.decode_cursor
 _search_type_rank = search_utils.search_type_rank
 _score_search_item = search_utils.score_search_item
-_runtime_confirmation_card = runtime_confirmation_card
-_llm_result_breakdown_message = llm_result_breakdown_message
+
+
+def _runtime_confirmation_card(*args, **kwargs):  # type: ignore[no-untyped-def]
+    from argus.api.chat.confirmation import runtime_confirmation_card
+
+    return runtime_confirmation_card(*args, **kwargs)
+
+
+def _llm_result_breakdown_message(*args, **kwargs):  # type: ignore[no-untyped-def]
+    from argus.api.chat.breakdown import llm_result_breakdown_message
+
+    return llm_result_breakdown_message(*args, **kwargs)

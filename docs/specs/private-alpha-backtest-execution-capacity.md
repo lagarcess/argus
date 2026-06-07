@@ -121,24 +121,26 @@ Interpretation:
 
 ### Current API Import Boundary Probe
 
-A focused import probe shows the current API still pulls heavy backtest
-dependencies through the agent runtime import graph:
+A focused import-boundary regression now verifies that importing the FastAPI app,
+starting `TestClient`, and calling `/health` do not load the heavy backtest
+compute stack:
 
 | Import Step | Peak RSS | Heavy Modules Loaded |
 | --- | ---: | --- |
-| Empty Python process | ~16 MB | none |
-| `fastapi` | ~48 MB | none |
-| API schemas | ~49 MB | none |
-| Supabase gateway | ~98 MB | none |
-| OpenRouter client | ~115 MB | none |
-| `argus.agent_runtime.graph.workflow` | ~383 MB | `pandas`, `numpy`, `vectorbt`, `numba`, engine modules |
-| `argus.api.main` | ~390 MB | `pandas`, `numpy`, `vectorbt`, `numba`, engine modules |
+| Empty Python process | 16.1 MB | none |
+| `argus.api.main` import | 120.7 MB | none |
+| `/health` via `TestClient` | 121.7 MB | none |
 
-This means the first reliability refactor is not merely "call a workflow
-instead of running a tool." The API import graph must stop importing the engine
-stack on startup. A future import-boundary test should fail if importing
-`argus.api.main` or the chat router loads `pandas`, `numpy`, `vectorbt`,
-`numba`, `argus.domain.engine`, or the engine launch adapter.
+Evidence command:
+
+```bash
+poetry run pytest tests/test_api_import_boundary.py -q --no-cov -s
+```
+
+The regression fails if API startup or `/health` imports `pandas`, `vectorbt`,
+`vectorbtpro`, `numba`, `scipy`, `argus.analysis`, `argus.domain.engine`,
+`argus.domain.backtesting`, or `argus.domain.engine_launch.adapter`. Heavy
+backtest execution remains behind the workflow/backtest execution path.
 
 ## Product Truth
 
@@ -889,11 +891,10 @@ the chat API.
 
 ### Capacity Answers And Measurement Targets
 
-1. Lean API footprint after split: current evidence says `argus.api.main` peaks
-   around ~390 MB locally because `graph.workflow` imports the heavy engine
-   stack. The next measurable target is to remove those imports from API
-   startup and re-run the probe. A plausible lean target is closer to the
-   FastAPI + Supabase + OpenRouter path, but it is not proven until measured.
+1. Lean API footprint after split: current evidence says `argus.api.main` plus
+   `/health` peaks around ~121.7 MB locally and does not import the heavy
+   backtest compute stack. Keep `tests/test_api_import_boundary.py` as the
+   regression gate for API startup.
 2. Workflow cold-start plus dependency-import overhead: not measured yet because
    the workflow service does not exist. Current local proxy is roughly the jump
    from ~115 MB to ~390 MB and about 1.1 seconds of additional import time on

@@ -5,16 +5,11 @@ from typing import Any
 
 from loguru import logger
 
-from argus.agent_runtime.confirmation_artifacts import (
-    confirmation_artifact_reference,
-    confirmation_id_from_payload,
-)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     StrategySummary,
     TaskSnapshot,
 )
-from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.api import state as api_state
 from argus.api.chat.artifacts import (
     result_reference_from_run,
@@ -134,6 +129,12 @@ def confirmation_metadata_fallback_context(
     user_id: str,
     conversation_id: str,
 ) -> RuntimeFallbackContext | None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+        confirmation_id_from_payload,
+    )
+    from argus.agent_runtime.strategy_contract import strategy_can_be_approved
+
     messages = _recent_messages_for_conversation(
         user_id=user_id,
         conversation_id=conversation_id,

@@ -10,11 +10,6 @@ from typing import Literal
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import AssetClass as AlpacaAssetClass
-from alpaca.trading.enums import AssetStatus
-from alpaca.trading.requests import GetAssetsRequest
-
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 AssetProviderMode = Literal[
     "live_provider",
@@ -153,6 +148,11 @@ def _add_aliases(
 
 
 def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
+    from alpaca.trading.client import TradingClient
+    from alpaca.trading.enums import AssetClass as AlpacaAssetClass
+    from alpaca.trading.enums import AssetStatus
+    from alpaca.trading.requests import GetAssetsRequest
+
     key = (os.getenv("ALPACA_API_KEY") or "").strip()
     secret = (os.getenv("ALPACA_SECRET_KEY") or "").strip()
     if not key or not secret:

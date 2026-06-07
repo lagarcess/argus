@@ -8,11 +8,6 @@ from fastapi import FastAPI, Request
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
-from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.graph.workflow import build_workflow
-from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
-from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
-from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.api.chat.backtest_jobs import ShadowBacktestJobTool
 from argus.domain.store import AlphaStore
 from argus.domain.supabase_gateway import SupabaseGateway
@@ -26,7 +21,6 @@ if not CHECKPOINTER_MODE:
     CHECKPOINTER_MODE = (
         "postgres" if PERSISTENCE_MODE == "supabase" and DATABASE_URL else "memory"
     )
-agent_runtime_capability_contract = build_default_capability_contract()
 store = AlphaStore()
 supabase_gateway = SupabaseGateway.from_env() if PERSISTENCE_MODE == "supabase" else None
 
@@ -36,6 +30,8 @@ def _dev_memory_fallback_enabled() -> bool:
 
 
 def build_backtest_tool() -> ShadowBacktestJobTool:
+    from argus.agent_runtime.tools.real_backtest import RealBacktestTool
+
     return ShadowBacktestJobTool(
         delegate=RealBacktestTool(),
         gateway_getter=lambda: supabase_gateway,
@@ -44,6 +40,14 @@ def build_backtest_tool() -> ShadowBacktestJobTool:
 
 
 def build_agent_runtime_workflow(*, checkpointer: Any):
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.graph.workflow import build_workflow
+    from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
+    from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
+
+    agent_runtime_capability_contract = build_default_capability_contract()
     return build_workflow(
         contract=agent_runtime_capability_contract,
         tool=build_backtest_tool(),
@@ -93,8 +97,10 @@ def get_agent_runtime_workflow(request: Request | None = None):
 
     workflow = getattr(target_app.state, "agent_runtime_workflow", None)
     if workflow is None:
-        checkpointer = build_agent_runtime_checkpointer()
-        target_app.state.agent_runtime_checkpointer = checkpointer
+        checkpointer = getattr(target_app.state, "agent_runtime_checkpointer", None)
+        if checkpointer is None:
+            checkpointer = build_agent_runtime_checkpointer()
+            target_app.state.agent_runtime_checkpointer = checkpointer
         workflow = build_agent_runtime_workflow(checkpointer=checkpointer)
         target_app.state.agent_runtime_workflow = workflow
     return workflow

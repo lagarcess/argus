@@ -6,10 +6,7 @@ from datetime import date, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
-from argus.agent_runtime.result_readout import result_readout_from_backtest_payload
 from argus.api.schemas import BacktestRun
-from argus.domain.backtest_run_builder import build_backtest_run_from_result
-from argus.domain.engine_launch.results import user_safe_failure_detail
 
 try:
     from workflows.proof import require_database_url, utcnow_iso
@@ -69,6 +66,14 @@ class BacktestJobGateway(Protocol):
 class BacktestTool(Protocol):
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Execute the Argus launch backtest payload."""
+
+
+def result_readout_from_backtest_payload(*args: Any, **kwargs: Any) -> str:
+    from argus.agent_runtime.result_readout import (
+        result_readout_from_backtest_payload as _result_readout_from_backtest_payload,
+    )
+
+    return _result_readout_from_backtest_payload(*args, **kwargs)
 
 
 def run_backtest_job(
@@ -151,6 +156,8 @@ def run_backtest_job(
             result_card=result_card,
             explanation_context=explanation_context_dict,
         )
+
+        from argus.domain.backtest_run_builder import build_backtest_run_from_result
 
         run = build_backtest_run_from_result(
             conversation_id=conversation_id,
@@ -317,6 +324,8 @@ def _mark_failed_from_tool_result(
         raw_failure_detail = capability_context.get("failure_detail")
         if isinstance(raw_failure_detail, str) and raw_failure_detail.strip():
             failure_detail = raw_failure_detail.strip()
+    from argus.domain.engine_launch.results import user_safe_failure_detail
+
     failure_detail = failure_detail or user_safe_failure_detail(
         failure_reason=failure_code,
         failure_category=failure_code,

@@ -7,7 +7,24 @@ from .assets import (
     search_assets,
     warm_asset_universe,
 )
-from .provider import clear_market_data_cache, fetch_ohlcv, fetch_price_series
+
+
+def clear_market_data_cache() -> None:
+    from .provider import clear_market_data_cache as _clear_market_data_cache
+
+    return _clear_market_data_cache()
+
+
+def fetch_ohlcv(*args, **kwargs):
+    from .provider import fetch_ohlcv as _fetch_ohlcv
+
+    return _fetch_ohlcv(*args, **kwargs)
+
+
+def fetch_price_series(*args, **kwargs):
+    from .provider import fetch_price_series as _fetch_price_series
+
+    return _fetch_price_series(*args, **kwargs)
 
 __all__ = [
     "ResolvedAsset",
