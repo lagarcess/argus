@@ -33,13 +33,22 @@ def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
         "2025 through June 5, 2026 with 10,000 dollars"
         in source
     )
-    assert '"type":"run_backtest"' in source
+    assert 'action.get("type") == "run_backtest"' in source
     assert "/api/v1/backtest-jobs" in source
     assert "conversation did not persist async backtest_job metadata" in source
     assert "backtest_run" in source
     assert "backtest_jobs" in source
     assert "route_receipts" in source
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
+
+
+def test_canary_uses_confirmation_card_run_action_payload() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "RUN_ACTION=" in source
+    assert "confirmation stream did not include run_backtest action" in source
+    assert '"payload": {}' not in source
+    assert 'json.loads(os.environ["RUN_ACTION"])' in source
 
 
 def test_canary_passes_json_arguments_after_python_stdin_marker() -> None:

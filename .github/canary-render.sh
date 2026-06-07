@@ -80,6 +80,7 @@ curl -fsS -N \
   -d "$CHAT_BODY" \
   "${API_URL}/api/v1/chat/stream" > "$CONFIRMATION_STREAM"
 
+RUN_ACTION="$(
 python3 - "$CONFIRMATION_STREAM" <<'PY'
 import json
 import pathlib
@@ -97,27 +98,46 @@ if "data: [DONE]" not in stream:
     raise SystemExit("confirmation stream did not finish")
 if any(event.get("type") == "error" for event in events):
     raise SystemExit("confirmation stream returned error")
-if not any(
-    event.get("type") == "final" and event.get("payload", {}).get("confirmation")
-    for event in events
-):
-    raise SystemExit("confirmation stream did not return a confirmation")
-PY
 
-# Canary action includes "type":"run_backtest".
+confirmations = []
+for event in events:
+    if event.get("type") != "final":
+        continue
+    payload = event.get("payload", {})
+    if not isinstance(payload, dict):
+        continue
+    for key in ("confirmation", "confirmation_card"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            confirmations.append(value)
+    final_response_payload = payload.get("final_response_payload")
+    if isinstance(final_response_payload, dict):
+        for key in ("confirmation", "confirmation_card"):
+            value = final_response_payload.get(key)
+            if isinstance(value, dict):
+                confirmations.append(value)
+
+if not confirmations:
+    raise SystemExit("confirmation stream did not return a confirmation")
+
+for confirmation in confirmations:
+    for action in confirmation.get("actions") or []:
+        if isinstance(action, dict) and action.get("type") == "run_backtest":
+            print(json.dumps(action, sort_keys=True))
+            raise SystemExit(0)
+
+raise SystemExit("confirmation stream did not include run_backtest action")
+PY
+)"
+
 RUN_BODY="$(
-  CONVERSATION_ID="$CONVERSATION_ID" python3 - <<'PY'
+  CONVERSATION_ID="$CONVERSATION_ID" RUN_ACTION="$RUN_ACTION" python3 - <<'PY'
 import json
 import os
 
 print(json.dumps({
     "conversation_id": os.environ["CONVERSATION_ID"],
-    "action": {
-        "type": "run_backtest",
-        "label": "Run backtest",
-        "presentation": "confirmation",
-        "payload": {},
-    },
+    "action": json.loads(os.environ["RUN_ACTION"]),
     "language": "en",
 }))
 PY
