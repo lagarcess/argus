@@ -161,6 +161,9 @@ class _BacktestJobTable:
         self.limit_count = count
         return self
 
+    def order(self, _column: str, *, desc: bool = False):
+        return self
+
     def execute(self):
         if self.operation == "select":
             rows = [
@@ -273,6 +276,26 @@ def test_count_backtest_jobs_filters_status_user_and_limit() -> None:
         == 1
     )
     assert gateway.count_backtest_jobs(status="queued", limit=10) == 3
+
+
+def test_list_backtest_jobs_filters_status_user_and_limit() -> None:
+    client = _BacktestJobClient(
+        existing_jobs=[
+            {"id": "job-1", "user_id": "user-1", "status": "running"},
+            {"id": "job-2", "user_id": "user-1", "status": "running"},
+            {"id": "job-3", "user_id": "user-2", "status": "running"},
+            {"id": "job-4", "user_id": "user-1", "status": "queued"},
+        ]
+    )
+    gateway = SupabaseGateway(client=client)
+
+    rows = gateway.list_backtest_jobs(
+        status="running",
+        user_id="user-1",
+        limit=1,
+    )
+
+    assert rows == [{"id": "job-1", "user_id": "user-1", "status": "running"}]
 
 
 def test_merge_backtest_job_execution_metadata_preserves_existing_fields() -> None:

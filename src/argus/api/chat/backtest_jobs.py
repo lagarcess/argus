@@ -204,9 +204,57 @@ def _backpressure_reason(
         if limit <= 0:
             return reason
         count = count_jobs(status=status, user_id=scoped_user_id, limit=limit + 1)
+        if count >= limit and _reconcile_backpressure_blockers(
+            gateway=gateway,
+            fallback_user_id=user_id,
+            status=status,
+            user_id=scoped_user_id,
+            limit=limit + 1,
+        ):
+            count = count_jobs(status=status, user_id=scoped_user_id, limit=limit + 1)
         if count >= limit:
             return reason
     return None
+
+
+def _reconcile_backpressure_blockers(
+    *,
+    gateway: Any,
+    fallback_user_id: str,
+    status: str,
+    user_id: str | None,
+    limit: int,
+) -> bool:
+    list_jobs = getattr(gateway, "list_backtest_jobs", None)
+    if list_jobs is None:
+        return False
+
+    try:
+        jobs = list_jobs(status=status, user_id=user_id, limit=limit)
+    except Exception as exc:
+        logger.warning(
+            "Backtest job backpressure reconciliation listing failed",
+            error=str(exc),
+            status=status,
+            user_id=user_id,
+        )
+        return False
+
+    changed = False
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        owner_user_id = str(job.get("user_id") or user_id or fallback_user_id)
+        before = str(job.get("status") or "").strip().lower()
+        reconciled = reconcile_terminal_render_task_run(
+            gateway=gateway,
+            user_id=owner_user_id,
+            job=job,
+        )
+        after = str((reconciled or {}).get("status") or "").strip().lower()
+        if before and after and after != before:
+            changed = True
+    return changed
 
 
 class RenderWorkflowDispatcher:

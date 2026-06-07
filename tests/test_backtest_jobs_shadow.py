@@ -81,6 +81,70 @@ class _Dispatcher:
         return {"id": "task-run-1", "status": "pending"}
 
 
+class _FakeTerminalTaskRunClient:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+        self.calls: list[str] = []
+
+    def get_task_run(self, task_run_id: str) -> dict[str, object]:
+        self.calls.append(task_run_id)
+        return dict(self.payload)
+
+
+class _BackpressureReconciliationGateway(_Gateway):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__(events)
+        self.blocking_failed = False
+        self.failed_updates: list[dict[str, object]] = []
+
+    def count_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> int:
+        if status == "running" and user_id == "user-1" and not self.blocking_failed:
+            return min(1, limit)
+        return 0
+
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, object]]:
+        if status != "running" or user_id != "user-1" or self.blocking_failed:
+            return []
+        return [
+            {
+                "id": "blocking-job-1",
+                "user_id": "user-1",
+                "status": "running",
+                "execution_metadata": {
+                    "workflow_dispatch": {
+                        "task_run_id": "trn-blocking-timeout",
+                    }
+                },
+            }
+        ][:limit]
+
+    def mark_backtest_job_failed(self, **payload: object) -> dict[str, object]:
+        self.events.append("reconcile")
+        self.blocking_failed = True
+        self.failed_updates.append(payload)
+        return {
+            "id": payload["job_id"],
+            "user_id": payload["user_id"],
+            "status": "failed",
+            "failure_code": payload["failure_code"],
+            "failure_detail": payload["failure_detail"],
+            "retryable": payload["retryable"],
+            "execution_metadata": payload.get("execution_metadata") or {},
+        }
+
+
 def _payload() -> dict[str, object]:
     return {
         "strategy_type": "buy_and_hold",
@@ -333,6 +397,49 @@ def test_shadow_backtest_job_tool_skips_job_when_backpressure_limit_hit(
     assert dispatcher.calls == []
     assert context.created_job_id is None
     assert delegate.calls == [payload]
+
+
+def test_shadow_backtest_job_tool_reconciles_terminal_blocker_before_backpressure(
+    monkeypatch,
+) -> None:
+    from argus.api.chat import backtest_jobs as backtest_job_helpers
+
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_SHADOW_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED", "true")
+    task_client = _FakeTerminalTaskRunClient(
+        {
+            "id": "trn-blocking-timeout",
+            "status": "failed",
+            "error": "task timed out",
+            "completedAt": "2026-06-07T07:21:51Z",
+        }
+    )
+    monkeypatch.setattr(
+        backtest_job_helpers,
+        "RenderTaskRunClient",
+        lambda: task_client,
+    )
+    events: list[str] = []
+    gateway = _BackpressureReconciliationGateway(events)
+    dispatcher = _Dispatcher(events)
+    tool = ShadowBacktestJobTool(
+        delegate=None,
+        gateway_getter=lambda: gateway,
+        dev_memory_fallback_getter=lambda: False,
+        dispatcher_getter=lambda: dispatcher,
+    )
+    context = _context()
+
+    with backtest_job_shadow_context(context):
+        result = tool.run(_payload())
+
+    assert result["success"] is True
+    assert result["payload"]["backtest_job"]["id"] == "job-1"
+    assert events == ["reconcile", "job", "dispatch", "metadata"]
+    assert task_client.calls == ["trn-blocking-timeout"]
+    assert gateway.failed_updates[0]["failure_code"] == "workflow_task_timeout"
+    assert context.created_job_id == "job-1"
 
 
 def test_shadow_backtest_job_write_failure_falls_back_to_in_process_execution(

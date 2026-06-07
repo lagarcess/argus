@@ -534,6 +534,24 @@ class SupabaseGateway:
         result = query.limit(max(1, limit)).execute()
         return len(result.data or [])
 
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        query = (
+            self.client.table("backtest_jobs")
+            .select("*")
+            .eq("status", status)
+            .order("created_at", desc=True)
+        )
+        if user_id is not None:
+            query = query.eq("user_id", user_id)
+        result = query.limit(max(1, limit)).execute()
+        return [dict(row) for row in result.data or []]
+
     def merge_backtest_job_execution_metadata(
         self,
         *,
