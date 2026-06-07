@@ -22,6 +22,7 @@ Usage:
   .github/render-env-sync.sh api-proof-shadow-on
   .github/render-env-sync.sh api-real-workflow-on
   .github/render-env-sync.sh workflow-proof
+  .github/render-env-sync.sh workflow-release [commit]
   .github/render-env-sync.sh workflow-runtime
 
 Commands:
@@ -30,6 +31,7 @@ Commands:
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
   workflow-proof          Sync workflow DB/task/provider env vars on argus-backtests.
+  workflow-release        Release argus-backtests so env/build changes reach new runs.
   workflow-runtime        Sync workflow build/start commands on argus-backtests.
 
 Compatibility aliases:
@@ -43,6 +45,15 @@ Additional local env for workflow-proof:
   ARGUS_WORKFLOW_DATABASE_URL or SUPABASE_POSTGRES_TRANSACTION_POOLER_URL
   ALPACA_API_KEY
   ALPACA_SECRET_KEY
+  OPENROUTER_API_KEY
+  ARGUS_UTILITY_MODEL
+  ARGUS_UTILITY_FALLBACK_MODEL
+  ARGUS_CHAT_MODEL
+  ARGUS_CHAT_FALLBACK_MODEL
+  ARGUS_STRUCTURED_MODEL
+  ARGUS_STRUCTURED_FALLBACK_MODEL
+  ARGUS_CONTEXT_MODEL
+  ARGUS_CONTEXT_FALLBACK_MODEL
 USAGE
 }
 
@@ -183,6 +194,15 @@ sync_workflow_proof() {
   require_local_env RENDER_API_KEY
   require_local_env ALPACA_API_KEY
   require_local_env ALPACA_SECRET_KEY
+  require_local_env OPENROUTER_API_KEY
+  require_local_env ARGUS_UTILITY_MODEL
+  require_local_env ARGUS_UTILITY_FALLBACK_MODEL
+  require_local_env ARGUS_CHAT_MODEL
+  require_local_env ARGUS_CHAT_FALLBACK_MODEL
+  require_local_env ARGUS_STRUCTURED_MODEL
+  require_local_env ARGUS_STRUCTURED_FALLBACK_MODEL
+  require_local_env ARGUS_CONTEXT_MODEL
+  require_local_env ARGUS_CONTEXT_FALLBACK_MODEL
   local workflow_database_url="${ARGUS_WORKFLOW_DATABASE_URL:-${SUPABASE_POSTGRES_TRANSACTION_POOLER_URL:-}}"
   if [ -z "$workflow_database_url" ] || [[ "$workflow_database_url" == YOUR_* ]] || [[ "$workflow_database_url" == your_* ]]; then
     echo "ARGUS_WORKFLOW_DATABASE_URL or SUPABASE_POSTGRES_TRANSACTION_POOLER_URL is required."
@@ -197,6 +217,15 @@ sync_workflow_proof() {
   put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY "$ALPACA_API_KEY"
   put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY "$ALPACA_SECRET_KEY"
   put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_PAPER_TRADING "${ALPACA_PAPER_TRADING:-true}"
+  put_render_env "$WORKFLOW_SERVICE_ID" OPENROUTER_API_KEY "$OPENROUTER_API_KEY"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_UTILITY_MODEL "$ARGUS_UTILITY_MODEL"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_UTILITY_FALLBACK_MODEL "$ARGUS_UTILITY_FALLBACK_MODEL"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CHAT_MODEL "$ARGUS_CHAT_MODEL"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CHAT_FALLBACK_MODEL "$ARGUS_CHAT_FALLBACK_MODEL"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_STRUCTURED_MODEL "$ARGUS_STRUCTURED_MODEL"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_STRUCTURED_FALLBACK_MODEL "$ARGUS_STRUCTURED_FALLBACK_MODEL"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CONTEXT_MODEL "$ARGUS_CONTEXT_MODEL"
+  put_render_env "$WORKFLOW_SERVICE_ID" ARGUS_CONTEXT_FALLBACK_MODEL "$ARGUS_CONTEXT_FALLBACK_MODEL"
 }
 
 sync_workflow_runtime() {
@@ -229,6 +258,19 @@ sync_workflow_runtime() {
   echo "synced ${WORKFLOW_SERVICE_ID}:workflow-runtime"
 }
 
+sync_workflow_release() {
+  require_local_env RENDER_API_KEY
+  local commit="${1:-}"
+  if [ -z "$commit" ]; then
+    commit="$(git rev-parse HEAD)"
+  fi
+
+  render workflows versions release "$WORKFLOW_SERVICE_ID" \
+    --commit "$commit" \
+    --wait \
+    --confirm
+}
+
 command="${1:-}"
 case "$command" in
   api-status)
@@ -253,6 +295,9 @@ case "$command" in
     ;;
   workflow-proof)
     sync_workflow_proof
+    ;;
+  workflow-release)
+    sync_workflow_release "${2:-}"
     ;;
   workflow-runtime)
     sync_workflow_runtime

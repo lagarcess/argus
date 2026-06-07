@@ -244,6 +244,15 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ALPACA_API_KEY" in env_contract
     assert "ALPACA_SECRET_KEY" in env_contract
     assert "ALPACA_PAPER_TRADING" in env_contract
+    assert "OPENROUTER_API_KEY" in env_contract
+    assert "ARGUS_UTILITY_MODEL" in env_contract
+    assert "ARGUS_UTILITY_FALLBACK_MODEL" in env_contract
+    assert "ARGUS_CHAT_MODEL" in env_contract
+    assert "ARGUS_CHAT_FALLBACK_MODEL" in env_contract
+    assert "ARGUS_STRUCTURED_MODEL" in env_contract
+    assert "ARGUS_STRUCTURED_FALLBACK_MODEL" in env_contract
+    assert "ARGUS_CONTEXT_MODEL" in env_contract
+    assert "ARGUS_CONTEXT_FALLBACK_MODEL" in env_contract
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 
@@ -268,9 +277,41 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED true" in source
     assert "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT" in source
     assert "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT" in source
+
+
+def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
+    source = _source(".github/render-env-sync.sh")
+    workflow_block = source.split("sync_workflow_proof() {", maxsplit=1)[1].split(
+        "\n}",
+        maxsplit=1,
+    )[0]
+
+    for key in (
+        "OPENROUTER_API_KEY",
+        "ARGUS_UTILITY_MODEL",
+        "ARGUS_UTILITY_FALLBACK_MODEL",
+        "ARGUS_CHAT_MODEL",
+        "ARGUS_CHAT_FALLBACK_MODEL",
+        "ARGUS_STRUCTURED_MODEL",
+        "ARGUS_STRUCTURED_FALLBACK_MODEL",
+        "ARGUS_CONTEXT_MODEL",
+        "ARGUS_CONTEXT_FALLBACK_MODEL",
+    ):
+        assert f"require_local_env {key}" in workflow_block
+        assert f'put_render_env "$WORKFLOW_SERVICE_ID" {key} "${key}"' in workflow_block
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "require_local_env ALPACA_API_KEY" in source
     assert "require_local_env ALPACA_SECRET_KEY" in source
+
+
+def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert ".github/render-env-sync.sh workflow-release [commit]" in source
+    assert "sync_workflow_release()" in source
+    assert 'render workflows versions release "$WORKFLOW_SERVICE_ID"' in source
+    assert "--wait" in source
+    assert "--confirm" in source
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_API_KEY' in source
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_SECRET_KEY' in source
     assert (
