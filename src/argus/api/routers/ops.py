@@ -49,14 +49,23 @@ async def run_readiness_checks(request: Request, *, force: bool) -> dict[str, An
     checks: list[dict[str, Any]] = []
 
     started = time.perf_counter()
-    workflow_ready = getattr(request.app.state, "agent_runtime_workflow", None) is not None
-    checks.append(
-        _check(
-            "agent_runtime_workflow",
-            "ready" if workflow_ready else "degraded",
-            int((time.perf_counter() - started) * 1000),
+    try:
+        api_state.get_agent_runtime_workflow(request)
+        checks.append(
+            _check(
+                "agent_runtime_workflow",
+                "ready",
+                int((time.perf_counter() - started) * 1000),
+            )
         )
-    )
+    except Exception:
+        checks.append(
+            _check(
+                "agent_runtime_workflow",
+                "degraded",
+                int((time.perf_counter() - started) * 1000),
+            )
+        )
 
     started = time.perf_counter()
     if api_state.supabase_gateway is None:
@@ -101,7 +110,9 @@ async def run_readiness_checks(request: Request, *, force: bool) -> dict[str, An
             )
         )
 
-    status = "ready" if all(check["status"] == "ready" for check in checks) else "degraded"
+    status = (
+        "ready" if all(check["status"] == "ready" for check in checks) else "degraded"
+    )
     return {"status": status, "checks": checks}
 
 

@@ -196,6 +196,30 @@ def _confirmation_id_for_runtime_card(runtime_result: dict[str, Any]) -> str:
     return fallback or api_state.store.new_id()
 
 
+async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
+    from argus.agent_runtime.result_followups import (
+        compose_private_alpha_save_response as _compose_private_alpha_save_response,
+    )
+
+    return await _compose_private_alpha_save_response(**kwargs)
+
+
+def fallback_private_alpha_save_response() -> str:
+    from argus.agent_runtime.result_followups import (
+        fallback_private_alpha_save_response as _fallback_private_alpha_save_response,
+    )
+
+    return _fallback_private_alpha_save_response()
+
+
+def result_breakdown_message(run: BacktestRun | None) -> str:
+    from argus.api.chat.breakdown import (
+        result_breakdown_message as _result_breakdown_message,
+    )
+
+    return _result_breakdown_message(run)
+
+
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
 def list_starter_prompts(
     user: User = Depends(current_user),  # noqa: B008
@@ -643,11 +667,6 @@ async def chat_stream(
                     "strategy again, then save it from the result card."
                 )
             elif not _strategies_enabled():
-                from argus.agent_runtime.result_followups import (
-                    compose_private_alpha_save_response,
-                    fallback_private_alpha_save_response,
-                )
-
                 run_fact_bank = result_fact_bank(run)
                 metadata["result_fact_bank"] = run_fact_bank
                 metadata["latest_run_id"] = run.id
@@ -701,8 +720,6 @@ async def chat_stream(
             return
 
         if payload.action is not None and payload.action.type == "show_breakdown":
-            from argus.api.chat.breakdown import result_breakdown_message
-
             run = run_for_result_action(
                 payload=payload,
                 user=user,

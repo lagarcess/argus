@@ -8,7 +8,10 @@ from fastapi import FastAPI, Request
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
-from argus.api.chat.backtest_jobs import ShadowBacktestJobTool
+from argus.api.chat.backtest_jobs import (
+    ShadowBacktestJobTool,
+    backtest_workflow_execution_enabled,
+)
 from argus.domain.store import AlphaStore
 from argus.domain.supabase_gateway import SupabaseGateway
 
@@ -30,10 +33,14 @@ def _dev_memory_fallback_enabled() -> bool:
 
 
 def build_backtest_tool() -> ShadowBacktestJobTool:
-    from argus.agent_runtime.tools.real_backtest import RealBacktestTool
+    delegate: Any | None = None
+    if not backtest_workflow_execution_enabled():
+        from argus.agent_runtime.tools.real_backtest import RealBacktestTool
+
+        delegate = RealBacktestTool()
 
     return ShadowBacktestJobTool(
-        delegate=RealBacktestTool(),
+        delegate=delegate,
         gateway_getter=lambda: supabase_gateway,
         dev_memory_fallback_getter=_dev_memory_fallback_enabled,
     )

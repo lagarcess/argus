@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
+from argus.agent_runtime.clarification_contract import OFFLINE_CLARIFICATION_FALLBACK
 from argus.agent_runtime.stages.compose import (
     compose_response_intent,
     should_prefer_composed_intent,
@@ -17,14 +18,13 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
+from argus.agent_runtime.workflow_contract import (
+    TOKEN_STREAM_NODES,
+    WORKFLOW_NODE_NAMES,
+)
 
 MAX_RECENT_THREAD_HISTORY = 6
-OFFLINE_CLARIFICATION_FALLBACK = (
-    "I could not generate the clarifying question right now. Please try again."
-)
 WorkflowState = dict[str, Any]
-TOKEN_STREAM_NODES = {"clarify", "explain", "next_step"}
-WORKFLOW_NODE_NAMES = {"interpret", "clarify", "confirm", "execute", "explain", "next_step"}
 
 
 def build_workflow_input(

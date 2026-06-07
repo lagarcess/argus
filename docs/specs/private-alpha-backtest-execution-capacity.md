@@ -137,10 +137,15 @@ Evidence command:
 poetry run pytest tests/test_api_import_boundary.py -q --no-cov -s
 ```
 
-The regression fails if API startup or `/health` imports `pandas`, `vectorbt`,
-`vectorbtpro`, `numba`, `scipy`, `argus.analysis`, `argus.domain.engine`,
-`argus.domain.backtesting`, or `argus.domain.engine_launch.adapter`. Heavy
-backtest execution remains behind the workflow/backtest execution path.
+The regression fails if API startup, `/health`, readiness warmup, or lazy
+workflow construction imports the heavy compute modules: `pandas`, `numpy`,
+`vectorbt`, `vectorbtpro`, `numba`, `scipy`, `argus.analysis`,
+`argus.domain.engine`, `argus.domain.engine_launch.adapter`, the pandas-backed
+market-data provider, indicator execution, or backtesting runner/chart/metric
+execution modules. Lightweight strategy/date/rule contract modules may still be
+loaded by the API because the LangGraph runtime must validate supported
+capability facts after LLM interpretation. Heavy backtest execution remains
+behind the workflow/backtest execution path.
 
 ## Product Truth
 

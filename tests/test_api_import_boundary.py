@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 import subprocess
@@ -9,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FORBIDDEN_MODULE_PREFIXES = (
+FORBIDDEN_BACKTEST_COMPUTE_MODULE_PREFIXES = (
+    "numpy",
     "pandas",
     "vectorbt",
     "vectorbtpro",
@@ -17,8 +19,14 @@ FORBIDDEN_MODULE_PREFIXES = (
     "scipy",
     "argus.analysis",
     "argus.domain.engine",
-    "argus.domain.backtesting",
+    "argus.domain.backtesting.charts",
+    "argus.domain.backtesting.execution",
+    "argus.domain.backtesting.metrics",
+    "argus.domain.backtesting.runner",
+    "argus.domain.backtesting.signals",
     "argus.domain.engine_launch.adapter",
+    "argus.domain.indicator_execution",
+    "argus.domain.market_data.provider",
 )
 
 
@@ -27,6 +35,58 @@ def test_api_startup_health_does_not_import_backtest_compute_stack() -> None:
     assert result["health_status_code"] == 200
     assert result["health_body"]["status"] == "healthy"
     assert result["forbidden_loaded"] == []
+
+
+def test_api_real_workflow_build_does_not_import_backtest_compute_stack() -> None:
+    result = _run_import_probe()
+    assert result["workflow_loaded"] is True
+    assert result["forbidden_after_workflow"] == []
+
+
+def test_api_readiness_warms_lazy_workflow_without_backtest_compute_stack() -> None:
+    result = _run_import_probe()
+    readiness = result["readiness_body"]
+    checks = {
+        str(check.get("name")): check
+        for check in readiness.get("checks", [])
+        if isinstance(check, dict)
+    }
+
+    assert checks["agent_runtime_workflow"]["status"] == "ready"
+    assert result["forbidden_after_readiness"] == []
+
+
+def test_runtime_uses_lightweight_workflow_contract_for_shared_runtime_names() -> None:
+    runtime_path = REPO_ROOT / "src" / "argus" / "agent_runtime" / "runtime.py"
+    tree = ast.parse(runtime_path.read_text(encoding="utf-8"))
+
+    imports_contract = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "argus.agent_runtime.workflow_contract"
+        for node in ast.walk(tree)
+    )
+    assert imports_contract
+
+    forbidden_local_assignments = {
+        "OFFLINE_CLARIFICATION_FALLBACK",
+        "TOKEN_STREAM_NODES",
+        "WORKFLOW_NODE_NAMES",
+    }
+    assigned_names = {
+        target.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign | ast.AnnAssign)
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+        if isinstance(target, ast.Name)
+    }
+    assert forbidden_local_assignments.isdisjoint(assigned_names)
+
+    workflow_contract_path = (
+        REPO_ROOT / "src" / "argus" / "agent_runtime" / "workflow_contract.py"
+    )
+    assert "OFFLINE_CLARIFICATION_FALLBACK" not in workflow_contract_path.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_api_import_probe_reports_memory_smoke() -> None:
@@ -57,6 +117,7 @@ def _run_import_probe() -> dict[str, Any]:
             "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "true",
             "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "true",
             "ARGUS_MARKET_DATA_PROVIDER_MODE": "synthetic_unit_fixture",
+            "ARGUS_OPS_TOKEN": "test-token",
             "PYTHONPATH": str(REPO_ROOT / "src"),
         }
     )
@@ -78,7 +139,7 @@ _IMPORT_PROBE_SCRIPT = textwrap.dedent(
     import sys
 
 
-    FORBIDDEN_MODULE_PREFIXES = {FORBIDDEN_MODULE_PREFIXES!r}
+    FORBIDDEN_MODULE_PREFIXES = {FORBIDDEN_BACKTEST_COMPUTE_MODULE_PREFIXES!r}
 
 
     def rss_mb():
@@ -100,6 +161,7 @@ _IMPORT_PROBE_SCRIPT = textwrap.dedent(
 
     baseline = rss_mb()
     from argus.api.main import app
+    from argus.api import state as api_state
 
     after_import = rss_mb()
     from fastapi.testclient import TestClient
@@ -110,6 +172,21 @@ _IMPORT_PROBE_SCRIPT = textwrap.dedent(
         health_body = response.json()
 
     after_health = rss_mb()
+    forbidden_after_health = forbidden_loaded()
+
+    with TestClient(app) as client:
+        readiness_response = client.get(
+            "/internal/readiness?force=true",
+            headers={{"Authorization": "Bearer test-token"}},
+        )
+        readiness_status_code = readiness_response.status_code
+        readiness_body = readiness_response.json()
+
+    forbidden_after_readiness = forbidden_loaded()
+    workflow = api_state.get_agent_runtime_workflow()
+    workflow_loaded = workflow is not None
+    forbidden_after_workflow = forbidden_loaded()
+
     print(
         json.dumps(
             {{
@@ -120,7 +197,12 @@ _IMPORT_PROBE_SCRIPT = textwrap.dedent(
                 }},
                 "health_status_code": health_status_code,
                 "health_body": health_body,
-                "forbidden_loaded": forbidden_loaded(),
+                "readiness_status_code": readiness_status_code,
+                "readiness_body": readiness_body,
+                "workflow_loaded": workflow_loaded,
+                "forbidden_loaded": forbidden_after_health,
+                "forbidden_after_readiness": forbidden_after_readiness,
+                "forbidden_after_workflow": forbidden_after_workflow,
             }},
             sort_keys=True,
         )

@@ -246,7 +246,7 @@ class ShadowBacktestJobTool:
     def __init__(
         self,
         *,
-        delegate: Any,
+        delegate: Any | None,
         gateway_getter: Callable[[], Any | None],
         dev_memory_fallback_getter: Callable[[], bool],
         dispatcher_getter: Callable[[], Any | None] | None = None,
@@ -262,6 +262,11 @@ class ShadowBacktestJobTool:
         job = self._maybe_create_shadow_job(payload)
         if self._should_return_async_job(job):
             return async_backtest_job_envelope(job)
+        if self._delegate is None:
+            raise RuntimeError(
+                "Backtest workflow execution is enabled, but no async job was "
+                "created for this request."
+            )
         return self._delegate.run(payload)
 
     def _maybe_create_shadow_job(self, payload: dict[str, Any]) -> dict[str, Any] | None:

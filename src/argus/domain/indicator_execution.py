@@ -4,7 +4,7 @@ from typing import Any
 
 import pandas as pd
 
-from argus.domain.indicators import IndicatorExecutionSpec
+from argus.domain.indicators import IndicatorExecutionSpec, indicator_parameters_from_ref
 
 
 def compute_indicator_output(
@@ -27,69 +27,14 @@ def compute_indicator_output(
         return source.rolling(period, min_periods=period).mean().astype(float)
     if spec.key == "ema":
         period = int(parameters["period"])
-        return source.ewm(span=period, adjust=False, min_periods=period).mean().astype(
-            float
+        return (
+            source.ewm(span=period, adjust=False, min_periods=period).mean().astype(float)
         )
     if spec.key == "macd":
         return _macd_output(source, parameters, output)
     if spec.key == "bbands":
         return _bbands_output(source, parameters, output)
     raise ValueError("unsupported_indicator")
-
-
-def indicator_parameters_from_ref(
-    spec: IndicatorExecutionSpec,
-    ref: dict[str, Any],
-) -> dict[str, int | float | str]:
-    raw = dict(spec.default_parameters)
-    if "period" in ref:
-        raw["period" if spec.key in {"rsi", "sma", "ema"} else "length"] = ref["period"]
-    raw.update(ref.get("parameters") if isinstance(ref.get("parameters"), dict) else {})
-
-    normalized: dict[str, int | float | str] = {}
-    for parameter in spec.parameter_schema:
-        raw_value = raw.get(parameter.key)
-        if raw_value is None and parameter.key == "indicator_period":
-            raw_value = raw.get("period", parameter.default)
-        if raw_value is None:
-            raw_value = parameter.default
-        value = _coerce_parameter(raw_value, parameter.value_type)
-        if parameter.min_value is not None and float(value) < float(parameter.min_value):
-            raise ValueError("invalid_indicator_parameter")
-        if parameter.max_value is not None and float(value) > float(parameter.max_value):
-            raise ValueError("invalid_indicator_parameter")
-        normalized[parameter.key] = value
-
-    if spec.key in {"rsi", "sma", "ema"}:
-        period = int(float(normalized.get("indicator_period", raw.get("period", spec.default_period))))
-        normalized["period"] = period
-    if spec.key == "macd":
-        fast = int(float(normalized["fast"]))
-        slow = int(float(normalized["slow"]))
-        signal = int(float(normalized["signal"]))
-        if fast >= slow:
-            raise ValueError("invalid_indicator_parameter")
-        normalized.update({"fast": fast, "slow": slow, "signal": signal})
-    if spec.key == "bbands":
-        normalized["length"] = int(float(normalized["length"]))
-        normalized["std"] = float(normalized["std"])
-
-    return normalized
-
-
-def indicator_warmup_from_ref(
-    spec: IndicatorExecutionSpec,
-    ref: dict[str, Any],
-) -> int:
-    parameters = indicator_parameters_from_ref(spec, ref)
-    if spec.key == "macd":
-        return max(
-            int(spec.warmup_bars),
-            int(parameters["slow"]) + int(parameters["signal"]),
-        )
-    if spec.key == "bbands":
-        return max(int(spec.warmup_bars), int(parameters["length"]))
-    return max(int(spec.warmup_bars), int(parameters.get("period", spec.default_period)))
 
 
 def _default_output_role(spec: IndicatorExecutionSpec) -> str:
@@ -100,16 +45,9 @@ def _default_output_role(spec: IndicatorExecutionSpec) -> str:
     return "value"
 
 
-def _coerce_parameter(value: object, value_type: str) -> int | float | str:
-    if value_type == "string":
-        return str(value)
-    if value_type == "integer":
-        return int(float(value))
-    numeric = float(value)
-    return int(numeric) if numeric.is_integer() else numeric
-
-
-def _format_output_template(template: str, parameters: dict[str, int | float | str]) -> str:
+def _format_output_template(
+    template: str, parameters: dict[str, int | float | str]
+) -> str:
     formatted = dict(parameters)
     if "std" in formatted:
         formatted["std"] = f"{float(formatted['std']):.1f}"
@@ -146,15 +84,20 @@ def _macd_output(
         if isinstance(frame, pd.DataFrame):
             from argus.domain.indicators import EXECUTABLE_INDICATORS
 
-            return _select_output(frame, EXECUTABLE_INDICATORS["macd"], output, parameters)
+            return _select_output(
+                frame, EXECUTABLE_INDICATORS["macd"], output, parameters
+            )
     except Exception:
         pass
 
-    macd = close.ewm(span=fast, adjust=False, min_periods=fast).mean() - close.ewm(
-        span=slow,
-        adjust=False,
-        min_periods=slow,
-    ).mean()
+    macd = (
+        close.ewm(span=fast, adjust=False, min_periods=fast).mean()
+        - close.ewm(
+            span=slow,
+            adjust=False,
+            min_periods=slow,
+        ).mean()
+    )
     signal_line = macd.ewm(span=signal, adjust=False, min_periods=signal).mean()
     if output == "macd":
         return macd.astype(float)
@@ -179,7 +122,9 @@ def _bbands_output(
         if isinstance(frame, pd.DataFrame):
             from argus.domain.indicators import EXECUTABLE_INDICATORS
 
-            return _select_output(frame, EXECUTABLE_INDICATORS["bbands"], output, parameters)
+            return _select_output(
+                frame, EXECUTABLE_INDICATORS["bbands"], output, parameters
+            )
     except Exception:
         pass
 

@@ -7,6 +7,7 @@ from argus.agent_runtime.strategy_contract import (
     MONTH_ALIASES,
     parse_relative_date_token,
 )
+from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 MONTH_TOKENS = frozenset(MONTH_ALIASES)
@@ -45,10 +46,12 @@ def current_message_execution_context_tokens(
     if not tokens:
         return set()
     capability = STRATEGY_CAPABILITIES.get(str(strategy_type or "").strip())
-    if capability is None:
-        return set()
-
     matched_tokens: set[str] = set()
+    if _strategy_type_uses_indicator_context(strategy_type):
+        matched_tokens.update(_matched_indicator_context_tokens(tokens))
+    if capability is None:
+        return matched_tokens
+
     for parameter in capability.parameters.values():
         alias_phrases: list[str] = []
         for value in parameter.allowed_values:
@@ -65,6 +68,25 @@ def current_message_execution_context_tokens(
             alias_tokens = field_fidelity_tokens(alias)
             if alias_tokens and _contains_ordered_token_span(tokens, alias_tokens):
                 matched_tokens.update(alias_tokens)
+    return matched_tokens
+
+
+def _strategy_type_uses_indicator_context(strategy_type: str | None) -> bool:
+    return str(strategy_type or "").strip() in {
+        "indicator_threshold",
+        "rsi_mean_reversion",
+        "signal_strategy",
+    }
+
+
+def _matched_indicator_context_tokens(tokens: list[str]) -> set[str]:
+    matched_tokens: set[str] = set()
+    for spec in EXECUTABLE_INDICATORS.values():
+        phrases = [spec.key, spec.label, *spec.aliases]
+        for phrase in phrases:
+            phrase_tokens = field_fidelity_tokens(str(phrase).casefold())
+            if phrase_tokens and _contains_ordered_token_span(tokens, phrase_tokens):
+                matched_tokens.update(phrase_tokens)
     return matched_tokens
 
 

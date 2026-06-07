@@ -37,16 +37,8 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
+from argus.agent_runtime.workflow_contract import WorkflowNode
 from langgraph.graph import END, StateGraph
-
-
-class WorkflowNode(str, Enum):
-    INTERPRET = "interpret"
-    CLARIFY = "clarify"
-    CONFIRM = "confirm"
-    EXECUTE = "execute"
-    EXPLAIN = "explain"
-    NEXT_STEP = "next_step"
 
 
 class WorkflowRoute(str, Enum):
@@ -479,9 +471,7 @@ def _build_task_snapshot(
             if prior_task_snapshot is not None
             else None
         ),
-        active_confirmation_reference=(
-            active_confirmation_reference
-        ),
+        active_confirmation_reference=active_confirmation_reference,
         saved_strategy_reference=(
             prior_task_snapshot.saved_strategy_reference
             if prior_task_snapshot is not None
@@ -612,9 +602,7 @@ def _build_thread_metadata(
     if isinstance(requested_field, str) and requested_field:
         metadata["requested_field"] = requested_field
     if run_state.response_intent is not None:
-        metadata["response_intent"] = run_state.response_intent.model_dump(
-            mode="python"
-        )
+        metadata["response_intent"] = run_state.response_intent.model_dump(mode="python")
     pending_resolution = _pending_resolution_candidate(workflow_state=workflow_state)
     if pending_resolution is not None:
         metadata["pending_resolution"] = pending_resolution
@@ -702,7 +690,9 @@ def _active_confirmation_reference(
     }:
         return None
     return (
-        _valid_active_confirmation_reference(prior_task_snapshot.active_confirmation_reference)
+        _valid_active_confirmation_reference(
+            prior_task_snapshot.active_confirmation_reference
+        )
         if prior_task_snapshot is not None
         else None
     )
