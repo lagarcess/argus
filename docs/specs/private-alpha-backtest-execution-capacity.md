@@ -349,9 +349,8 @@ Current interpretation:
 Still unmeasured:
 
 - Real Render Workflow CPU and peak RSS on `standard` workflow compute.
-- Workflow-internal split between dependency import, provider fetch, engine
-  execution, chart/result-card build, LLM readout generation, and Supabase
-  persistence.
+- Live workflow-internal timing values from a deployed run after the
+  workflow-internal timing metadata contract ships.
 - Live Alpaca/Kraken provider fetch latency, failure/retry shape, and provider
   request identifiers as separate timing dimensions.
 - Supabase job creation, run insert, job status update, cache lookup/write, and
@@ -359,6 +358,52 @@ Still unmeasured:
 - Concurrent workflow execution with 5 global jobs and queued-job drain time.
 - Currency-pair 720-candle RSI/moving-average cases.
 - LLM interpretation and LLM result-summary latency as isolated sub-metrics.
+
+### Workflow-Internal Timing Metadata Contract
+
+Completed and failed real workflow backtest jobs may now persist timing evidence
+under:
+
+```text
+backtest_jobs.execution_metadata.workflow_backtest.timings_ms
+```
+
+The persisted object uses millisecond values rounded to three decimals. The
+current stable keys are:
+
+| Key | Meaning |
+| --- | --- |
+| `workflow_task_total` | Workflow task elapsed time from job fetch through the final timing snapshot. |
+| `job_fetch` | Time spent fetching the durable `backtest_jobs` row. |
+| `mark_running` | Time spent marking the job `running`. |
+| `dependency_or_tool_load` | Time spent loading the default real backtest tool when the workflow constructs it. Omitted when a test or harness injects a tool. |
+| `backtest_tool_run_total` | Time spent inside the backtest tool run call. |
+| `provider_fetch_total` | Total provider/cache fetch time observed by the launch adapter. This includes fetches nested inside compute, chart build, and initial price lookup. |
+| `engine_compute_total` | Time spent in the engine metric computation call. This may include nested provider fetch time. |
+| `chart_result_build_total` | Time spent building the chart and result card. This may include chart data fetch time. |
+| `backtest_run_persist` | Time spent writing the immutable `backtest_runs` row. |
+| `result_readout_total` | Time spent generating the backend result readout. |
+| `link_result` | Time spent linking the job to the persisted run and marking it succeeded. |
+
+These phase values are observability evidence, not a strict additive waterfall.
+`provider_fetch_total` can overlap with `engine_compute_total` and
+`chart_result_build_total` because provider calls happen inside those phases.
+Do not sum all keys to recreate wall time; use `workflow_task_total` for the
+workflow-owned wall-clock measure.
+
+Failure paths preserve whatever timings have already been collected alongside
+the existing failure metadata. If a phase is not reached, its key is omitted
+rather than filled with a synthetic value.
+
+The deployed internet benchmark now extracts these values from Supabase
+verification when present and surfaces them in:
+
+- `runs[].workflow_timings_ms`
+- `runs[].supabase_verification.backtest_job.workflow_timings_ms`
+- the Markdown `Workflow Internal Timings` table
+
+This document does not claim live values for these fields yet. A new live
+benchmark must be run after deployment before updating the live findings table.
 
 Caveats:
 
@@ -1215,9 +1260,9 @@ and in-process result link. Real workflow backtest execution should add:
 
 - workflow run id;
 - cache hit/miss and cache key;
-- provider fetch duration;
-- compute duration;
-- chart/result build duration;
+- `workflow_backtest.timings_ms` with workflow task, provider fetch, compute,
+  chart/result build, result readout, and persistence timings where cleanly
+  observable;
 - attempt count;
 - failure category and retryability;
 - relevant external request ids when providers expose them.
@@ -1355,7 +1400,7 @@ The first automated local pass covers A, B, C, E, F, H, I, and L. The first live
 internet pass covers the AAPL/MSFT golden-path buy-and-hold case with real
 Supabase persistence, live provider behavior, workflow dispatch, and LLM result
 readout. Cases D, G, J, K, true concurrent workflow execution, and isolated
-provider/Supabase/LLM sub-timings remain to be measured.
+provider/Supabase/LLM sub-timings remain to be measured live.
 
 Currency-pair intraday windows must respect Kraken's latest 720-candle limit.
 For example, a 4-hour currency-pair test is roughly a 120-day maximum window,

@@ -44,6 +44,18 @@ class FakeBacktestJobGateway:
         self.created_runs.append({"user_id": user_id, "run": run})
         return run
 
+    def merge_backtest_job_execution_metadata(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, object],
+    ) -> dict[str, object]:
+        assert self.row["user_id"] == user_id
+        assert self.row["id"] == job_id
+        self.row["execution_metadata"] = execution_metadata
+        return dict(self.row)
+
     def link_backtest_job_result(
         self,
         *,
@@ -186,6 +198,18 @@ def _successful_tool_result() -> dict[str, object]:
     }
 
 
+def _successful_tool_result_with_timings() -> dict[str, object]:
+    result = _successful_tool_result()
+    result["execution_metadata"] = {
+        "timings_ms": {
+            "provider_fetch_total": 12.3456,
+            "engine_compute_total": 45.6789,
+            "chart_result_build_total": 7.8912,
+        }
+    }
+    return result
+
+
 def test_run_backtest_job_rejects_proof_payloads() -> None:
     from workflows.backtest_job import WorkflowBacktestJobError, run_backtest_job
 
@@ -247,6 +271,44 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
         gateway.row["execution_metadata"]["workflow_backtest"]["workflow_run_id"]
         == "local-run"
     )
+
+
+def test_run_backtest_job_persists_workflow_internal_timings_on_success() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result_with_timings()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["status"] == "succeeded"
+    metadata = gateway.row["execution_metadata"]["workflow_backtest"]
+    timings = metadata["timings_ms"]
+    assert timings["provider_fetch_total"] == pytest.approx(12.346)
+    assert timings["engine_compute_total"] == pytest.approx(45.679)
+    assert timings["chart_result_build_total"] == pytest.approx(7.891)
+    for key in (
+        "workflow_task_total",
+        "job_fetch",
+        "mark_running",
+        "backtest_tool_run_total",
+        "backtest_run_persist",
+        "result_readout_total",
+        "link_result",
+    ):
+        assert timings[key] >= 0.0
 
 
 def test_run_backtest_job_persists_backend_result_readout(
@@ -433,6 +495,57 @@ def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:
         gateway.row["execution_metadata"]["workflow_backtest"]["failure_category"]
         == "upstream_dependency_error"
     )
+    timings = gateway.row["execution_metadata"]["workflow_backtest"]["timings_ms"]
+    assert timings["workflow_task_total"] >= 0.0
+    assert timings["job_fetch"] >= 0.0
+    assert timings["mark_running"] >= 0.0
+    assert timings["backtest_tool_run_total"] >= 0.0
+
+
+def test_run_backtest_job_tool_failure_preserves_collected_timings() -> None:
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+    tool = FakeBacktestTool(
+        {
+            "success": False,
+            "payload": None,
+            "error_type": "market_data_unavailable",
+            "error_message": "Market data is temporarily unavailable.",
+            "retryable": True,
+            "capability_context": {"failure_detail": "market_data_issue"},
+            "execution_metadata": {
+                "timings_ms": {
+                    "provider_fetch_total": 22.2222,
+                    "engine_compute_total": 33.3333,
+                }
+            },
+        }
+    )
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=tool,
+        workflow_run_id="local-run",
+    )
+
+    assert result["status"] == "failed"
+    metadata = gateway.row["execution_metadata"]["workflow_backtest"]
+    assert metadata["failure_category"] == "market_data_unavailable"
+    assert metadata["failure_detail"] == "market_data_issue"
+    timings = metadata["timings_ms"]
+    assert timings["provider_fetch_total"] == pytest.approx(22.222)
+    assert timings["engine_compute_total"] == pytest.approx(33.333)
+    assert timings["workflow_task_total"] >= 0.0
+    assert timings["backtest_tool_run_total"] >= 0.0
 
 
 def test_backtest_workflow_json_safe_normalizes_postgres_scalars() -> None:

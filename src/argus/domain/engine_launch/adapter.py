@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import date
+from math import isfinite
 from typing import Any
 
 from loguru import logger
@@ -38,7 +40,7 @@ from argus.domain.engine_launch.strategies import (
     rule_spec_from_request,
     validate_launch_supported,
 )
-from argus.domain.market_data import fetch_price_series
+from argus.domain.market_data import fetch_ohlcv, fetch_price_series
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,7 @@ class LaunchExecutionAdapterResult:
     envelope: LaunchExecutionEnvelope
     result_card: dict[str, Any] | None = None
     explanation_context: dict[str, Any] | None = None
+    timings_ms: dict[str, float] = field(default_factory=dict)
 
 
 def run_launch_backtest(
@@ -53,55 +56,136 @@ def run_launch_backtest(
     *,
     language: str = "en",
 ) -> LaunchExecutionAdapterResult:
+    recorder = _LaunchTimingRecorder()
     try:
         validate_launch_supported(request)
     except ValueError as exc:
         category, status = _normalize_value_error(str(exc))
-        return _blocked_result(
-            request,
-            execution_status=status,
-            failure_category=category,
-            failure_reason=str(exc),
+        return _with_timings(
+            _blocked_result(
+                request,
+                execution_status=status,
+                failure_category=category,
+                failure_reason=str(exc),
+            ),
+            recorder=recorder,
         )
 
     try:
         if request.strategy_type == "dca_accumulation":
-            result = _run_dca_accumulation(request, language=language)
+            result = _run_dca_accumulation(
+                request,
+                language=language,
+                recorder=recorder,
+            )
         elif request.strategy_type == "signal_strategy":
-            result = _run_signal_strategy(request, language=language)
+            result = _run_signal_strategy(
+                request,
+                language=language,
+                recorder=recorder,
+            )
         elif request.strategy_type == "indicator_threshold":
-            result = _run_indicator_threshold(request, language=language)
+            result = _run_indicator_threshold(
+                request,
+                language=language,
+                recorder=recorder,
+            )
         else:
-            result = _run_buy_and_hold(request, language=language)
+            result = _run_buy_and_hold(
+                request,
+                language=language,
+                recorder=recorder,
+            )
     except ValueError as exc:
         category, status = _normalize_value_error(str(exc))
-        return LaunchExecutionAdapterResult(
-            envelope=build_failure_envelope(
-                request=request,
-                execution_status=status,
-                failure_category=category,
-                failure_reason=str(exc),
-            )
+        return _with_timings(
+            LaunchExecutionAdapterResult(
+                envelope=build_failure_envelope(
+                    request=request,
+                    execution_status=status,
+                    failure_category=category,
+                    failure_reason=str(exc),
+                )
+            ),
+            recorder=recorder,
         )
     except Exception:
-        return LaunchExecutionAdapterResult(
-            envelope=build_failure_envelope(
-                request=request,
-                execution_status="failed_internal",
-                failure_category="internal_system_error",
-                failure_reason="launch_execution_failed",
-            )
+        return _with_timings(
+            LaunchExecutionAdapterResult(
+                envelope=build_failure_envelope(
+                    request=request,
+                    execution_status="failed_internal",
+                    failure_category="internal_system_error",
+                    failure_reason="launch_execution_failed",
+                )
+            ),
+            recorder=recorder,
         )
-    return result
+    return _with_timings(result, recorder=recorder)
+
+
+class _LaunchTimingRecorder:
+    def __init__(self) -> None:
+        self._timings_ms: dict[str, float] = {}
+
+    def record_elapsed(self, name: str, started: float) -> None:
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        if isfinite(elapsed_ms) and elapsed_ms >= 0.0:
+            self._timings_ms[name] = self._timings_ms.get(name, 0.0) + elapsed_ms
+
+    def fetch_ohlcv(self, *args: Any, **kwargs: Any) -> Any:
+        started = time.perf_counter()
+        try:
+            return fetch_ohlcv(*args, **kwargs)
+        finally:
+            self.record_elapsed("provider_fetch_total", started)
+
+    def fetch_price_series(self, *args: Any, **kwargs: Any) -> Any:
+        started = time.perf_counter()
+        try:
+            return fetch_price_series(*args, **kwargs)
+        finally:
+            self.record_elapsed("provider_fetch_total", started)
+
+    def compute_alpha_metrics(self, config: dict[str, Any]) -> dict[str, Any]:
+        started = time.perf_counter()
+        try:
+            return compute_alpha_metrics(
+                config,
+                fetch_ohlcv_func=self.fetch_ohlcv,
+                fetch_price_series_func=self.fetch_price_series,
+            )
+        finally:
+            self.record_elapsed("engine_compute_total", started)
+
+    def snapshot(self) -> dict[str, float]:
+        return {
+            name: round(elapsed_ms, 3)
+            for name, elapsed_ms in sorted(self._timings_ms.items())
+        }
+
+
+def _with_timings(
+    result: LaunchExecutionAdapterResult,
+    *,
+    recorder: _LaunchTimingRecorder,
+) -> LaunchExecutionAdapterResult:
+    return LaunchExecutionAdapterResult(
+        envelope=result.envelope,
+        result_card=result.result_card,
+        explanation_context=result.explanation_context,
+        timings_ms=recorder.snapshot(),
+    )
 
 
 def _run_indicator_threshold(
     request: LaunchBacktestRequest,
     *,
     language: str,
+    recorder: _LaunchTimingRecorder,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class)
+    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -116,8 +200,13 @@ def _run_indicator_threshold(
     )
     validate_backtest_config(config)
 
-    metrics = compute_alpha_metrics(config)
-    result_card = _build_launch_result_card(config, metrics, language=language)
+    metrics = recorder.compute_alpha_metrics(config)
+    result_card = _build_launch_result_card(
+        config,
+        metrics,
+        language=language,
+        recorder=recorder,
+    )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
         metrics=metrics,
@@ -187,9 +276,10 @@ def _run_signal_strategy(
     request: LaunchBacktestRequest,
     *,
     language: str,
+    recorder: _LaunchTimingRecorder,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class)
+    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -204,8 +294,13 @@ def _run_signal_strategy(
     )
     validate_backtest_config(config)
 
-    metrics = compute_alpha_metrics(config)
-    result_card = _build_launch_result_card(config, metrics, language=language)
+    metrics = recorder.compute_alpha_metrics(config)
+    result_card = _build_launch_result_card(
+        config,
+        metrics,
+        language=language,
+        recorder=recorder,
+    )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
         metrics=metrics,
@@ -269,9 +364,10 @@ def _run_dca_accumulation(
     request: LaunchBacktestRequest,
     *,
     language: str,
+    recorder: _LaunchTimingRecorder,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class)
+    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
     recurring_allocation = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -286,8 +382,13 @@ def _run_dca_accumulation(
     )
     _validate_launch_config(config)
 
-    metrics = compute_alpha_metrics(config)
-    result_card = _build_launch_result_card(config, metrics, language=language)
+    metrics = recorder.compute_alpha_metrics(config)
+    result_card = _build_launch_result_card(
+        config,
+        metrics,
+        language=language,
+        recorder=recorder,
+    )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
         metrics=metrics,
@@ -345,9 +446,10 @@ def _run_buy_and_hold(
     request: LaunchBacktestRequest,
     *,
     language: str,
+    recorder: _LaunchTimingRecorder,
 ) -> LaunchExecutionAdapterResult:
     symbols, asset_class = _resolve_request_symbols(request)
-    initial_price = _initial_price(request, asset_class=asset_class)
+    initial_price = _initial_price(request, asset_class=asset_class, recorder=recorder)
     starting_capital = resolve_starting_capital(
         request,
         initial_price=initial_price,
@@ -360,8 +462,13 @@ def _run_buy_and_hold(
     )
     validate_backtest_config(config)
 
-    metrics = compute_alpha_metrics(config)
-    result_card = _build_launch_result_card(config, metrics, language=language)
+    metrics = recorder.compute_alpha_metrics(config)
+    result_card = _build_launch_result_card(
+        config,
+        metrics,
+        language=language,
+        recorder=recorder,
+    )
     benchmark_metrics = build_benchmark_metrics(
         request=request,
         metrics=metrics,
@@ -466,9 +573,17 @@ def _build_launch_result_card(
     metrics: dict[str, Any],
     *,
     language: str,
+    recorder: _LaunchTimingRecorder | None = None,
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     try:
-        chart = build_result_chart(config)
+        if recorder is None:
+            chart = build_result_chart(config)
+        else:
+            chart = build_result_chart(
+                config,
+                fetch_ohlcv_func=recorder.fetch_ohlcv,
+            )
     except Exception as exc:
         logger.warning("Result chart build failed", error=str(exc))
         chart = None
@@ -478,6 +593,9 @@ def _build_launch_result_card(
         if "chart" not in str(exc):
             raise
         return build_result_card(config, metrics, language=language)
+    finally:
+        if recorder is not None:
+            recorder.record_elapsed("chart_result_build_total", started)
 
 
 def _validate_launch_config(config: dict[str, Any]) -> None:
@@ -578,13 +696,14 @@ def _initial_price(
     request: LaunchBacktestRequest,
     *,
     asset_class: str,
+    recorder: _LaunchTimingRecorder,
 ) -> float | None:
     if request.sizing_mode != "position_size":
         return None
     if len(request.symbols) > 1:
         raise ValueError("unsupported_multi_symbol_position_size")
 
-    series = fetch_price_series(
+    series = recorder.fetch_price_series(
         symbol=request.symbol,
         asset_class=asset_class,
         start_date=date.fromisoformat(request.date_range.start),

@@ -45,6 +45,7 @@ class RealBacktestTool:
                     "result_card": result.result_card,
                     "explanation_context": result.explanation_context,
                 },
+                "execution_metadata": {"timings_ms": result.timings_ms},
                 "error_type": None,
                 "error_message": None,
                 "retryable": False,
@@ -58,6 +59,7 @@ class RealBacktestTool:
         return {
             "success": False,
             "payload": None,
+            "execution_metadata": {"timings_ms": result.timings_ms},
             "error_type": error_type,
             "error_message": user_safe_failure_message(
                 failure_reason=failure_reason,

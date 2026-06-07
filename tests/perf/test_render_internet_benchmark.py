@@ -130,6 +130,13 @@ def test_markdown_summary_reports_live_timings_and_unavailable_metrics() -> None
                     "result_readout_source": "llm_explain_stage",
                     "result_readout_fallback_used": False,
                 },
+                "workflow_timings_ms": {
+                    "workflow_task_total": 71000.0,
+                    "provider_fetch_total": 1400.0,
+                    "engine_compute_total": 3000.0,
+                    "chart_result_build_total": 500.0,
+                    "result_readout_total": 900.0,
+                },
             }
         ],
         "metrics_unavailable": ["api_rss_mb", "workflow_peak_rss_mb"],
@@ -144,6 +151,9 @@ def test_markdown_summary_reports_live_timings_and_unavailable_metrics() -> None
     assert "13.00s" in markdown
     assert "12.00s" in markdown
     assert "llm_explain_stage" in markdown
+    assert "Workflow Internal Timings" in markdown
+    assert "Provider Fetch" in markdown
+    assert "1.40s" in markdown
     assert "api_rss_mb" in markdown
     assert "workflow_peak_rss_mb" in markdown
 
@@ -167,6 +177,15 @@ def test_safe_job_summary_extracts_workflow_timestamps_and_durations() -> None:
                 "workflow_backtest": {
                     "result_readout_source": "llm_explain_stage",
                     "result_readout_fallback_used": False,
+                    "timings_ms": {
+                        "workflow_task_total": 71000.1234,
+                        "provider_fetch_total": 1400.2345,
+                        "engine_compute_total": 3000.3456,
+                        "chart_result_build_total": 500.4567,
+                        "backtest_run_persist": 120.5678,
+                        "result_readout_total": 900.6789,
+                        "link_result": 80.7891,
+                    },
                 },
             },
         }
@@ -177,4 +196,13 @@ def test_safe_job_summary_extracts_workflow_timestamps_and_durations() -> None:
         "queued_to_started": 16500.0,
         "started_to_finished": 54500.0,
         "queued_to_finished": 71000.0,
+    }
+    assert summary["workflow_timings_ms"] == {
+        "workflow_task_total": 71000.123,
+        "provider_fetch_total": 1400.235,
+        "engine_compute_total": 3000.346,
+        "chart_result_build_total": 500.457,
+        "backtest_run_persist": 120.568,
+        "result_readout_total": 900.679,
+        "link_result": 80.789,
     }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
@@ -207,29 +208,51 @@ def _dca_equity_curve(
 
 
 def build_benchmark_curve(
-    config: dict[str, Any], target_index: pd.DatetimeIndex
+    config: dict[str, Any],
+    target_index: pd.DatetimeIndex,
+    *,
+    fetch_price_series_func: Callable[..., Any] | None = None,
 ) -> dict[str, Any]:
     return _runner.build_benchmark_curve(
         config,
         target_index,
-        fetch_price_series_func=fetch_price_series,
+        fetch_price_series_func=fetch_price_series_func or fetch_price_series,
     )
 
 
-def compute_alpha_metrics(config: dict[str, Any]) -> dict[str, Any]:
+def compute_alpha_metrics(
+    config: dict[str, Any],
+    *,
+    fetch_ohlcv_func: Callable[..., Any] | None = None,
+    fetch_price_series_func: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
     # Compatibility note: the underlying runner still uses Portfolio.from_signals.
+    def benchmark_curve(
+        benchmark_config: dict[str, Any],
+        target_index: pd.DatetimeIndex,
+    ) -> dict[str, Any]:
+        return build_benchmark_curve(
+            benchmark_config,
+            target_index,
+            fetch_price_series_func=fetch_price_series_func,
+        )
+
     return _runner.compute_alpha_metrics(
         config,
-        fetch_ohlcv_func=fetch_ohlcv,
+        fetch_ohlcv_func=fetch_ohlcv_func or fetch_ohlcv,
         build_signals_func=_build_signals,
-        build_benchmark_curve_func=build_benchmark_curve,
+        build_benchmark_curve_func=benchmark_curve,
     )
 
 
-def build_result_chart(config: dict[str, Any]) -> dict[str, Any]:
+def build_result_chart(
+    config: dict[str, Any],
+    *,
+    fetch_ohlcv_func: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
     return _charts.build_result_chart(
         config,
-        fetch_ohlcv_func=fetch_ohlcv,
+        fetch_ohlcv_func=fetch_ohlcv_func or fetch_ohlcv,
         build_signals_func=_build_signals,
     )
 

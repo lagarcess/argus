@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import time
 import traceback
 from collections.abc import Callable, Mapping
 from datetime import date, datetime
+from math import isfinite
 from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 from argus.api.schemas import BacktestRun
+from loguru import logger
 
 if TYPE_CHECKING:
     from argus.agent_runtime.result_readout import ResultReadout
@@ -65,6 +68,15 @@ class BacktestJobGateway(Protocol):
     ) -> dict[str, Any]:
         """Persist a structured workflow failure."""
 
+    def merge_backtest_job_execution_metadata(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Merge non-lifecycle execution metadata onto an existing job."""
+
 
 class BacktestTool(Protocol):
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -90,7 +102,10 @@ def run_backtest_job(
     workflow_run_id: str | None = None,
     run_id_factory: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
+    timings = _WorkflowTimingRecorder()
+    phase_started = time.perf_counter()
     row = gateway.fetch_job(job_id)
+    timings.record_elapsed("job_fetch", phase_started)
     if row is None:
         raise WorkflowBacktestJobError(f"Backtest job {job_id} was not found.")
     _assert_real_job(row)
@@ -107,16 +122,26 @@ def run_backtest_job(
             "started_at": started_at,
         },
     )
+    phase_started = time.perf_counter()
     running = gateway.mark_backtest_job_running(
         user_id=user_id,
         job_id=job_id,
         execution_metadata=running_metadata,
         started_at=started_at,
     )
+    timings.record_elapsed("mark_running", phase_started)
 
-    tool = backtest_tool or _default_backtest_tool()
+    if backtest_tool is None:
+        phase_started = time.perf_counter()
+        tool = _default_backtest_tool()
+        timings.record_elapsed("dependency_or_tool_load", phase_started)
+    else:
+        tool = backtest_tool
     try:
+        phase_started = time.perf_counter()
         result = tool.run(request)
+        timings.record_elapsed("backtest_tool_run_total", phase_started)
+        timings.merge(_tool_timings_ms(result))
         if not bool(result.get("success")):
             return _mark_failed_from_tool_result(
                 gateway,
@@ -125,6 +150,7 @@ def run_backtest_job(
                 user_id=user_id,
                 result=result,
                 workflow_run_id=workflow_run_id,
+                timings=timings,
             )
 
         payload = result.get("payload")
@@ -138,6 +164,7 @@ def run_backtest_job(
                 failure_detail="execution_failed",
                 retryable=False,
                 workflow_run_id=workflow_run_id,
+                timings=timings,
             )
         envelope = payload.get("envelope")
         result_card = payload.get("result_card")
@@ -151,17 +178,20 @@ def run_backtest_job(
                 failure_detail="execution_failed",
                 retryable=False,
                 workflow_run_id=workflow_run_id,
+                timings=timings,
             )
         explanation_context = payload.get("explanation_context")
         explanation_context_dict = (
             dict(explanation_context) if isinstance(explanation_context, dict) else {}
         )
+        phase_started = time.perf_counter()
         result_readout = _safe_result_readout(
             request=request,
             envelope=envelope,
             result_card=result_card,
             explanation_context=explanation_context_dict,
         )
+        timings.record_elapsed("result_readout_total", phase_started)
 
         from argus.domain.backtest_run_builder import build_backtest_run_from_result
 
@@ -181,9 +211,12 @@ def run_backtest_job(
                 failure_detail="execution_failed",
                 retryable=False,
                 workflow_run_id=workflow_run_id,
+                timings=timings,
             )
 
+        phase_started = time.perf_counter()
         created = gateway.create_backtest_run(user_id=user_id, run=run)
+        timings.record_elapsed("backtest_run_persist", phase_started)
         result_run_id = _created_run_id(created, fallback=run.id)
         finished_at = utcnow_iso()
         succeeded_metadata = _merge_workflow_metadata(
@@ -194,15 +227,25 @@ def run_backtest_job(
                 "started_at": started_at,
                 "finished_at": finished_at,
                 "result_run_id": result_run_id,
+                "timings_ms": timings.snapshot(),
                 **_result_readout_metadata(result_readout),
             },
         )
+        phase_started = time.perf_counter()
         succeeded = gateway.link_backtest_job_result(
             user_id=user_id,
             job_id=job_id,
             result_run_id=result_run_id,
             execution_metadata=succeeded_metadata,
             mark_succeeded=True,
+        )
+        timings.record_elapsed("link_result", phase_started)
+        succeeded = _persist_final_workflow_timings(
+            gateway,
+            user_id=user_id,
+            job_id=job_id,
+            row=succeeded,
+            timings=timings,
         )
         return {
             "job_id": str(succeeded.get("id") or job_id),
@@ -232,6 +275,7 @@ def run_backtest_job(
             retryable=False,
             workflow_run_id=workflow_run_id,
             source_error=exc,
+            timings=timings,
         )
 
 
@@ -328,6 +372,88 @@ def _merge_workflow_metadata(
     return metadata
 
 
+class _WorkflowTimingRecorder:
+    def __init__(self) -> None:
+        self._task_started = time.perf_counter()
+        self._timings_ms: dict[str, float] = {}
+
+    def record_elapsed(self, name: str, started: float) -> None:
+        self.add(name, (time.perf_counter() - started) * 1000.0)
+
+    def add(self, name: str, elapsed_ms: Any) -> None:
+        if isinstance(elapsed_ms, bool):
+            return
+        try:
+            numeric = float(elapsed_ms)
+        except (TypeError, ValueError):
+            return
+        if not isfinite(numeric) or numeric < 0.0:
+            return
+        self._timings_ms[name] = self._timings_ms.get(name, 0.0) + numeric
+
+    def merge(self, timings_ms: Mapping[str, Any]) -> None:
+        for name, elapsed_ms in timings_ms.items():
+            self.add(str(name), elapsed_ms)
+
+    def record_workflow_total(self) -> None:
+        self._timings_ms["workflow_task_total"] = (
+            time.perf_counter() - self._task_started
+        ) * 1000.0
+
+    def snapshot(self) -> dict[str, float]:
+        return {
+            name: round(elapsed_ms, 3)
+            for name, elapsed_ms in sorted(self._timings_ms.items())
+        }
+
+
+def _tool_timings_ms(result: Mapping[str, Any]) -> dict[str, float]:
+    metadata = result.get("execution_metadata")
+    if not isinstance(metadata, dict):
+        return {}
+    raw_timings = metadata.get("timings_ms")
+    if not isinstance(raw_timings, dict):
+        return {}
+    timings: dict[str, float] = {}
+    for name, elapsed_ms in raw_timings.items():
+        if not isinstance(name, str) or isinstance(elapsed_ms, bool):
+            continue
+        try:
+            numeric = float(elapsed_ms)
+        except (TypeError, ValueError):
+            continue
+        if isfinite(numeric) and numeric >= 0.0:
+            timings[name] = numeric
+    return timings
+
+
+def _persist_final_workflow_timings(
+    gateway: BacktestJobGateway,
+    *,
+    user_id: str,
+    job_id: str,
+    row: Mapping[str, Any],
+    timings: _WorkflowTimingRecorder,
+) -> dict[str, Any]:
+    timings.record_workflow_total()
+    metadata = _merge_workflow_metadata(row, {"timings_ms": timings.snapshot()})
+    try:
+        updated = gateway.merge_backtest_job_execution_metadata(
+            user_id=user_id,
+            job_id=job_id,
+            execution_metadata=metadata,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Backtest workflow timing metadata merge failed",
+            error=str(exc),
+            job_id=job_id,
+        )
+        updated = dict(row)
+        updated["execution_metadata"] = metadata
+    return updated
+
+
 def _mark_failed_from_tool_result(
     gateway: BacktestJobGateway,
     *,
@@ -336,6 +462,7 @@ def _mark_failed_from_tool_result(
     user_id: str,
     result: dict[str, Any],
     workflow_run_id: str | None,
+    timings: _WorkflowTimingRecorder,
 ) -> dict[str, Any]:
     failure_code = str(result.get("error_type") or "failed_internal")
     capability_context = result.get("capability_context")
@@ -359,6 +486,7 @@ def _mark_failed_from_tool_result(
         failure_detail=failure_detail,
         retryable=bool(result.get("retryable")),
         workflow_run_id=workflow_run_id,
+        timings=timings,
     )
 
 
@@ -373,6 +501,7 @@ def _mark_failed(
     retryable: bool,
     workflow_run_id: str | None,
     source_error: Exception | None = None,
+    timings: _WorkflowTimingRecorder | None = None,
 ) -> dict[str, Any]:
     finished_at = utcnow_iso()
     failure_patch: dict[str, Any] = {
@@ -383,6 +512,8 @@ def _mark_failed(
         "failure_detail": failure_detail,
         "retryable": retryable,
     }
+    if timings is not None:
+        failure_patch["timings_ms"] = timings.snapshot()
     if source_error is not None:
         failure_patch["source_error_type"] = type(source_error).__name__
         failure_patch["source_traceback"] = traceback.format_exception_only(
@@ -399,6 +530,14 @@ def _mark_failed(
         execution_metadata=metadata,
         finished_at=finished_at,
     )
+    if timings is not None:
+        failed = _persist_final_workflow_timings(
+            gateway,
+            user_id=user_id,
+            job_id=job_id,
+            row=failed,
+            timings=timings,
+        )
     return {
         "job_id": str(failed.get("id") or job_id),
         "status": failed.get("status") or "failed",
@@ -511,6 +650,38 @@ class PostgresBacktestJobGateway:
                     raise WorkflowBacktestJobError(
                         f"Backtest job {job_id} was not queued or not found."
                     )
+        return _json_safe(row)
+
+    def merge_backtest_job_execution_metadata(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        from psycopg.types.json import Jsonb
+
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.backtest_jobs
+                    set execution_metadata = %(execution_metadata)s,
+                        updated_at = %(updated_at)s
+                    where id = %(job_id)s
+                      and user_id = %(user_id)s
+                    returning *
+                    """,
+                    {
+                        "job_id": job_id,
+                        "user_id": user_id,
+                        "execution_metadata": Jsonb(execution_metadata),
+                        "updated_at": utcnow_iso(),
+                    },
+                )
+                row = cur.fetchone()
+                if row is None:
+                    raise WorkflowBacktestJobError(f"Backtest job {job_id} not found.")
         return _json_safe(row)
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> dict[str, Any]:

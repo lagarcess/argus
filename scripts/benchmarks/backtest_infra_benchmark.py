@@ -699,13 +699,15 @@ def _install_phase_instrumentation(
 
     engine.fetch_ohlcv = fetch_ohlcv
     engine.fetch_price_series = fetch_price_series
+    adapter.fetch_ohlcv = fetch_ohlcv
+    adapter.fetch_price_series = fetch_price_series
 
-    def timed_compute(config: dict[str, Any]) -> dict[str, Any]:
+    def timed_compute(config: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         previous = recorder.active_phase
         recorder.active_phase = "engine_compute"
         started = time.perf_counter()
         try:
-            return original_compute(config)
+            return original_compute(config, **kwargs)
         finally:
             recorder.add_timing(
                 "engine_compute_total",
@@ -713,12 +715,12 @@ def _install_phase_instrumentation(
             )
             recorder.active_phase = previous
 
-    def timed_chart(config: dict[str, Any]) -> dict[str, Any]:
+    def timed_chart(config: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         previous = recorder.active_phase
         recorder.active_phase = "chart_build"
         started = time.perf_counter()
         try:
-            return original_chart(config)
+            return original_chart(config, **kwargs)
         finally:
             recorder.add_timing(
                 "chart_build_total",
@@ -826,6 +828,24 @@ class _BenchmarkGateway:
         )
         self.recorder.add_persistence(
             "mark_backtest_job_running",
+            (time.perf_counter() - started) * 1000.0,
+        )
+        return dict(self.row)
+
+    def merge_backtest_job_execution_metadata(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        del user_id, job_id
+        started = time.perf_counter()
+        metadata = dict(self.row.get("execution_metadata") or {})
+        metadata.update(execution_metadata)
+        self.row["execution_metadata"] = metadata
+        self.recorder.add_persistence(
+            "merge_backtest_job_execution_metadata",
             (time.perf_counter() - started) * 1000.0,
         )
         return dict(self.row)

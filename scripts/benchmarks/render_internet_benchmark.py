@@ -7,6 +7,7 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
+from math import isfinite
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -142,6 +143,40 @@ def render_markdown_summary(report: dict[str, Any]) -> str:
             )
             + " |"
         )
+    workflow_timing_rows = _workflow_timing_rows(report)
+    if workflow_timing_rows:
+        lines.extend(
+            [
+                "",
+                "## Workflow Internal Timings",
+                "",
+                "| Case | Iteration | Task Total | Dependency/Tool | Provider Fetch | Engine Compute | Chart/Result | Result Readout | Run Persist | Link Result |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for run, workflow_timings in workflow_timing_rows:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        str(run.get("case_id") or ""),
+                        str(run.get("iteration") or ""),
+                        _format_seconds(workflow_timings.get("workflow_task_total")),
+                        _format_seconds(
+                            workflow_timings.get("dependency_or_tool_load")
+                        ),
+                        _format_seconds(workflow_timings.get("provider_fetch_total")),
+                        _format_seconds(workflow_timings.get("engine_compute_total")),
+                        _format_seconds(
+                            workflow_timings.get("chart_result_build_total")
+                        ),
+                        _format_seconds(workflow_timings.get("result_readout_total")),
+                        _format_seconds(workflow_timings.get("backtest_run_persist")),
+                        _format_seconds(workflow_timings.get("link_result")),
+                    ]
+                )
+                + " |"
+            )
     unavailable = report.get("metrics_unavailable") or []
     if unavailable:
         lines.extend(
@@ -376,6 +411,9 @@ def _run_live_case(
             conversation_id=conversation_id,
             job_id=job_id,
         )
+        workflow_timings_ms = _workflow_timings_from_verification(
+            supabase_verification
+        )
         task_run_id = _task_run_id_from_supabase(supabase_verification)
         task_run = _fetch_render_task_run(
             task_run_id=task_run_id,
@@ -396,6 +434,7 @@ def _run_live_case(
             "run_id": run_id,
             "task_run_id": task_run_id,
             "timings_ms": _rounded_timings(timings),
+            "workflow_timings_ms": workflow_timings_ms,
             "stream_event_counts": {
                 "confirmation": len(confirmation_events.events),
                 "run": len(run_events.events),
@@ -730,6 +769,7 @@ def safe_job_summary(job: dict[str, Any]) -> dict[str, Any]:
     workflow_status = None
     result_source = None
     fallback_used = None
+    workflow_timings_ms: dict[str, float] = {}
     if isinstance(metadata, dict):
         workflow_dispatch = metadata.get("workflow_dispatch")
         if isinstance(workflow_dispatch, dict):
@@ -740,6 +780,7 @@ def safe_job_summary(job: dict[str, Any]) -> dict[str, Any]:
             task_run_id = task_run_id or workflow_backtest.get("workflow_run_id")
             result_source = workflow_backtest.get("result_readout_source")
             fallback_used = workflow_backtest.get("result_readout_fallback_used")
+            workflow_timings_ms = _workflow_timings_ms(workflow_backtest)
     return {
         "id": job.get("id"),
         "status": job.get("status"),
@@ -752,7 +793,52 @@ def safe_job_summary(job: dict[str, Any]) -> dict[str, Any]:
         "result_readout_source": result_source,
         "result_readout_fallback_used": fallback_used,
         "timings_ms": _job_status_timings_ms(job),
+        "workflow_timings_ms": workflow_timings_ms,
     }
+
+
+def _workflow_timing_rows(
+    report: dict[str, Any],
+) -> list[tuple[dict[str, Any], dict[str, float]]]:
+    rows: list[tuple[dict[str, Any], dict[str, float]]] = []
+    for run in report.get("runs", []):
+        if not isinstance(run, dict):
+            continue
+        timings = run.get("workflow_timings_ms")
+        if not isinstance(timings, dict) or not timings:
+            timings = _workflow_timings_from_verification(
+                run.get("supabase_verification")
+            )
+        if timings:
+            rows.append((run, timings))
+    return rows
+
+
+def _workflow_timings_from_verification(value: Any) -> dict[str, float]:
+    if not isinstance(value, dict):
+        return {}
+    job = value.get("backtest_job")
+    if not isinstance(job, dict):
+        return {}
+    timings = job.get("workflow_timings_ms")
+    return dict(timings) if isinstance(timings, dict) else {}
+
+
+def _workflow_timings_ms(workflow_backtest: dict[str, Any]) -> dict[str, float]:
+    raw = workflow_backtest.get("timings_ms")
+    if not isinstance(raw, dict):
+        return {}
+    timings: dict[str, float] = {}
+    for name, elapsed_ms in raw.items():
+        if not isinstance(name, str) or isinstance(elapsed_ms, bool):
+            continue
+        try:
+            numeric = float(elapsed_ms)
+        except (TypeError, ValueError):
+            continue
+        if isfinite(numeric) and numeric >= 0.0:
+            timings[name] = round(numeric, 3)
+    return timings
 
 
 def _job_status_timings_ms(job: dict[str, Any]) -> dict[str, float]:
