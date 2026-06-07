@@ -1057,12 +1057,26 @@ Required characterization tests before extraction:
 - normal happy-path canaries fail if completed results use deterministic
   fallback voice unexpectedly.
 
-Desirable but deferred refactors:
+## Deferred Debt Register
 
-- splitting the 6k-line interpreter file;
-- broad UI state cleanup;
-- renaming internal strategy families;
-- new portfolio abstractions.
+These items were discovered while implementing the execution split. They are
+real debt, but they are not part of the current milestone unless they threaten
+production reliability, user trust, data correctness, or the hard Argus voice
+parity gate above.
+
+| Finding | Why It Matters | Current Decision | Trigger To Revisit | Blocking? |
+| --- | --- | --- | --- | --- |
+| `WorkflowState` has two meanings: the LangGraph `TypedDict` state and a loose runtime `dict[str, Any]` alias. | The name collision makes runtime/debug conversations harder and can hide contract drift. | Keep behavior unchanged for this milestone. Rename the runtime alias later to something like `WorkflowInput` or `RuntimeWorkflowPayload`. | When touching runtime graph construction, workflow hydration, or type contracts again. | No |
+| `WorkflowNode` and `WorkflowRoute` intentionally overlap in string values but model different concepts. | Node identity and routing decisions are easy to confuse when reading or extending the graph. | Keep both concepts, but document that `WorkflowRoute.END` is a terminal route, not a node. Avoid adding new enums without clarifying ownership. | When adding graph nodes, new route outcomes, or route-level tests. | No |
+| `OFFLINE_CLARIFICATION_FALLBACK` is an existing deterministic clarification fallback, separate from the retry framework. | It can preserve chat continuity when LLM clarification fails, but visible deterministic copy can weaken Argus voice if it becomes common-path behavior. | Keep as safety fallback only. Include it in the Argus voice parity audit, with route receipts/observability showing when it is used. | If clarification fallback appears in happy-path canaries or user-facing QA without an upstream LLM failure. | Voice-gate item |
+| Deterministic result prose exists in result-facing files such as `result_followups.py` and `stages/explain.py`. | Some deterministic structure is useful for reproducibility, but normal result readouts must preserve the established LLM/schema-grounded Argus voice. | Do not expand deterministic result copy during infra slices. Audit all result-facing prose before merge. | Before opening a merge-ready PR, and whenever async workflow completion writes user-visible result text. | Voice-gate item |
+| Lazy wrapper functions in `src/argus/api/routers/agent.py` preserve test seams while avoiding eager heavy imports. | They are useful now, but can become an accidental service locator if more responsibilities accumulate there. | Keep wrappers small and local to import-boundary preservation. Do not route product logic through them. | When adding another lazy wrapper or moving result/readout code. | No |
+| Static/CDN feasibility for `argus-app` remains unproven. | A static/CDN app could remove one always-on compute service, but only if current auth/session/chat behavior supports it without degrading UX. | Defer until the API/workflow split is stable. Current Next web service remains acceptable. | When optimizing monthly cost after reliability is proven, or before changing Render app service type. | No |
+| Market-data caching in Supabase is desirable but not part of the first execution boundary. | Shared short-lived symbol/timeframe snapshots can reduce provider calls and speed repeated backtests, but cache invalidation by market clock adds design complexity. | Defer until provider-fetch timings show it matters. Prefer Supabase-owned TTL/cache metadata before Render KV unless evidence says otherwise. | After benchmark data shows provider fetch is a material latency or cost driver. | No |
+| Benchmark matrix still needs real numbers for API RSS, workflow cold start, workflow peak RSS, execution time, and provider fetch time. | Without measurements, tier and concurrency decisions are back-of-envelope estimates. | Keep the benchmark plan below as the measurement contract. Do not tune tiers blindly. | Before private-alpha scale-up beyond manual/developer smoke, or before paying for larger compute. | Required before scale-up |
+| Async job failure taxonomy is still coarse. | Retry UX depends on distinguishing transient provider/LLM failures from malformed envelopes, unsupported strategies, auth/quota errors, and fatal engine bugs. | Keep current retry behavior, but design job status/failure reasons so new categories can be added without schema churn. | When implementing retry UI for async jobs or observing new failure clusters in logs. | No |
+| Large mixed-concern runtime files remain concerning. | Refactoring them too early risks moving bugs around before we understand observed failure patterns. | Use boundary-driven refactors only. Do not split large files just for aesthetics inside this milestone. | When a file sits directly on the execution boundary or repeated production failures cluster in that file. | No |
+| New portfolio abstractions remain out of alpha scope. | Users may eventually need portfolio-level workflows, but adding them now expands product semantics before PMF signal. | Keep same-asset, long-only, equal-weight/backtest-first scope. | After private-alpha feedback shows portfolio workflows are a repeated blocker. | No |
 
 ## Benchmark Plan
 
