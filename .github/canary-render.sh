@@ -215,6 +215,13 @@ if status == "succeeded":
     run = payload.get("run")
     if not isinstance(run, dict) or not run.get("id"):
         raise SystemExit("backtest job succeeded without linked run")
+    source = payload.get("result_readout_source")
+    fallback_used = payload.get("result_readout_fallback_used")
+    if source != "llm_explain_stage" or fallback_used is not False:
+        raise SystemExit(
+            "backtest job did not preserve LLM result readout voice: "
+            f"source={source!r} fallback_used={fallback_used!r}"
+        )
     print(f"succeeded:{run['id']}")
 elif status in {"failed", "canceled", "expired"}:
     detail = job.get("failure_detail") or job.get("failure_code") or ""
@@ -309,7 +316,7 @@ if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
       curl -fsS \
         -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
         -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-        "${SUPABASE_URL}/rest/v1/backtest_jobs?select=id,status,result_run_id&id=eq.${BACKTEST_JOB_ID}&limit=1"
+        "${SUPABASE_URL}/rest/v1/backtest_jobs?select=id,status,result_run_id,execution_metadata&id=eq.${BACKTEST_JOB_ID}&limit=1"
     )"
   fi
   python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" "$BACKTEST_JOB_ID" <<'PY'
@@ -326,9 +333,28 @@ if not receipt_rows:
     raise SystemExit("Supabase verifier did not find canary route_receipts")
 if job_id and not job_rows:
     raise SystemExit("Supabase verifier did not find canary backtest_job")
+if job_id:
+    job = job_rows[0]
+    if not job.get("result_run_id"):
+        raise SystemExit("Supabase verifier found canary backtest_job without result_run_id")
+    execution_metadata = job.get("execution_metadata")
+    if not isinstance(execution_metadata, dict):
+        raise SystemExit("Supabase verifier found canary backtest_job without execution_metadata")
+    workflow_metadata = execution_metadata.get("workflow_backtest")
+    if not isinstance(workflow_metadata, dict):
+        raise SystemExit(
+            "Supabase verifier found canary backtest_job without workflow_backtest metadata"
+        )
+    source = workflow_metadata.get("result_readout_source")
+    fallback_used = workflow_metadata.get("result_readout_fallback_used")
+    if source != "llm_explain_stage" or fallback_used is not False:
+        raise SystemExit(
+            "Supabase verifier found non-LLM result readout voice: "
+            f"source={source!r} fallback_used={fallback_used!r}"
+        )
 PY
 else
   echo "Skipping Supabase verifier; set ARGUS_CANARY_SUPABASE_URL and ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY to verify DB rows."
 fi
 
-echo "Canary passed: confirmation, run_backtest action, async job/run result, and messages are present."
+echo "Canary passed: confirmation, run_backtest action, async job/run result, LLM readout voice, and messages are present."

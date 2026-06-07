@@ -42,6 +42,17 @@ def test_canary_exercises_confirmation_and_run_backtest_action() -> None:
     assert "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY" in source
 
 
+def test_canary_fails_async_jobs_that_use_result_readout_fallback() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert 'source = payload.get("result_readout_source")' in source
+    assert 'fallback_used = payload.get("result_readout_fallback_used")' in source
+    assert 'source != "llm_explain_stage" or fallback_used is not False' in source
+    assert "backtest job did not preserve LLM result readout voice" in source
+    assert "select=id,status,result_run_id,execution_metadata" in source
+    assert 'workflow_metadata = execution_metadata.get("workflow_backtest")' in source
+
+
 def test_canary_uses_confirmation_card_run_action_payload() -> None:
     source = _source(".github/canary-render.sh")
 
