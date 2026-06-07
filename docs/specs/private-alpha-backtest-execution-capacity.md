@@ -93,6 +93,19 @@ Hard acceptance criteria:
   may extract shared modules, but it must not create a second result voice or a
   duplicate mini-renderer.
 
+Current implementation checkpoint:
+
+- Workflow-completed result readouts now call the shared async explain-stage
+  path used by the mainline runtime instead of the synchronous deterministic
+  fallback renderer.
+- Completed job metadata and `GET /backtest-jobs/{id}` expose
+  `result_readout_source`, `result_readout_fallback_used`, and
+  `result_readout_failure_mode` so canaries can fail when the happy path falls
+  back unexpectedly.
+- This closes the known async workflow-completed Quick take parity gap. It does
+  not remove the broader merge gate for result follow-ups, retry/recovery copy,
+  and other result-facing prose paths.
+
 Until this gate is satisfied, the milestone branch may continue accumulating
 implementation slices, but it is not merge-ready.
 
@@ -1222,6 +1235,7 @@ parity gate above.
 | Market-data caching in Supabase is desirable but not part of the first execution boundary. | Shared short-lived symbol/timeframe snapshots can reduce provider calls and speed repeated backtests, but cache invalidation by market clock adds design complexity. | Defer until provider-fetch timings show it matters. Prefer Supabase-owned TTL/cache metadata before Render KV unless evidence says otherwise. | After benchmark data shows provider fetch is a material latency or cost driver. | No |
 | Benchmark matrix now has first local synthetic numbers for API RSS, workflow import, workflow peak RSS, representative execution time, synthetic provider fetch time, and queue/backpressure smoke. | These measurements are enough to stop treating the architecture as purely theoretical, but they do not prove Render/Supabase/live-provider behavior. | Keep the benchmark harness as the repeatable measurement contract. Refresh it on Render `standard` workflow compute and live provider/Supabase paths before tuning paid tiers. | Before private-alpha scale-up beyond manual/developer smoke, or before paying for larger compute. | Required before scale-up |
 | Async job failure taxonomy is still coarse. | Retry UX depends on distinguishing transient provider/LLM failures from malformed envelopes, unsupported strategies, auth/quota errors, and fatal engine bugs. | Keep current retry behavior, but design job status/failure reasons so new categories can be added without schema churn. | When implementing retry UI for async jobs or observing new failure clusters in logs. | No |
+| `test_execute_stage_uses_currency_pair_as_default_benchmark` currently fails in the broader recovery suite (`EUR/USD` is passed where the test expects canonical `EURUSD`). | This is a currency-pair runtime/default-benchmark correctness issue, not an async workflow voice issue. It can affect trust for FX-style tests if left unresolved. | Track as separate runtime correctness work. Do not mix it into the voice-parity slice unless currency-pair canaries become part of the immediate private-alpha smoke. | Before advertising currency-pair backtests to testers, or before using the full recovery suite as a merge gate. | No for this slice |
 | Large mixed-concern runtime files remain concerning. | Refactoring them too early risks moving bugs around before we understand observed failure patterns. | Use boundary-driven refactors only. Do not split large files just for aesthetics inside this milestone. | When a file sits directly on the execution boundary or repeated production failures cluster in that file. | No |
 | New portfolio abstractions remain out of alpha scope. | Users may eventually need portfolio-level workflows, but adding them now expands product semantics before PMF signal. | Keep same-asset, long-only, equal-weight/backtest-first scope. | After private-alpha feedback shows portfolio workflows are a repeated blocker. | No |
 

@@ -268,6 +268,9 @@ class BacktestJobResponse(BaseModel):
     job: BacktestJob
     run: BacktestRun | None = None
     result_readout: str | None = None
+    result_readout_source: str | None = None
+    result_readout_fallback_used: bool | None = None
+    result_readout_failure_mode: str | None = None
 
 
 class HistoryItem(BaseModel):

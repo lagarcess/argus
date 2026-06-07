@@ -10,6 +10,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, NamedTuple
 from uuid import uuid4
 
@@ -212,7 +213,10 @@ def run_backpressure_smoke() -> dict[str, Any]:
             "name": name,
             "admitted": reason is None,
             "reason": reason,
-            "counts": {f"{status}:{user or 'global'}": count for (status, user), count in counts.items()},
+            "counts": {
+                f"{status}:{user or 'global'}": count
+                for (status, user), count in counts.items()
+            },
         }
 
     return {
@@ -466,7 +470,14 @@ def _child_workflow_case_probe(case_id: str) -> None:
 
     recorder = _PhaseRecorder()
     _install_phase_instrumentation(recorder=recorder, provider_mode=provider_mode)
-    workflow_module.result_readout_from_backtest_payload = lambda **_: None
+    workflow_module.result_readout_with_metadata_from_backtest_payload = (
+        lambda **_: SimpleNamespace(
+            text=None,
+            source="benchmark_skipped",
+            fallback_used=False,
+            failure_mode=None,
+        )
+    )
 
     job_id = str(uuid4())
     gateway = _BenchmarkGateway(
@@ -995,10 +1006,7 @@ def run_benchmark(
 def write_outputs(*, report: dict[str, Any], output_dir: Path) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     stamp = (
-        str(report["generated_at"])
-        .replace(":", "-")
-        .replace("+", "-")
-        .replace(".", "-")
+        str(report["generated_at"]).replace(":", "-").replace("+", "-").replace(".", "-")
     )
     json_path = output_dir / f"backtest-infra-{stamp}.json"
     markdown_path = output_dir / f"backtest-infra-{stamp}.md"

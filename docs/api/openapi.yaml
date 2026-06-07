@@ -270,6 +270,21 @@ components:
           type:
             - string
             - "null"
+        result_readout_source:
+          description: Provenance for the backend-generated Quick take markdown.
+          type:
+            - string
+            - "null"
+        result_readout_fallback_used:
+          description: Whether the deterministic fallback renderer produced the readout.
+          type:
+            - boolean
+            - "null"
+        result_readout_failure_mode:
+          description: Optional reason the normal result readout path could not complete.
+          type:
+            - string
+            - "null"
     Collection:
       type: object
       description: Lightweight organizational grouping of strategies.

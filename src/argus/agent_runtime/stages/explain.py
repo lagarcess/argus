@@ -43,6 +43,10 @@ QuickTakeEmphasis = Literal[
     "neutral",
 ]
 
+RESULT_READOUT_SOURCE_LLM = "llm_explain_stage"
+RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK = "deterministic_fallback"
+RESULT_READOUT_FAILURE_LLM_UNAVAILABLE = "llm_unavailable_or_rejected"
+
 
 class QuickTakeDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -178,7 +182,12 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
     fallback = explain_stage(state=state, language=language)
     fallback_text = fallback.stage_patch.get("assistant_response")
     if not isinstance(fallback_text, str) or not fallback_text:
-        return fallback
+        return _with_response_source(
+            fallback,
+            source=RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK,
+            fallback_used=True,
+            failure_mode=RESULT_READOUT_FAILURE_LLM_UNAVAILABLE,
+        )
 
     llm_text = await _llm_explanation(
         state=state,
@@ -186,7 +195,12 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
         language=language,
     )
     if llm_text is None:
-        return fallback
+        return _with_response_source(
+            fallback,
+            source=RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK,
+            fallback_used=True,
+            failure_mode=RESULT_READOUT_FAILURE_LLM_UNAVAILABLE,
+        )
     return StageResult(
         outcome=fallback.outcome,
         stage_patch={
@@ -195,7 +209,30 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
                 heading="Quick take",
                 body=llm_text,
             ),
+            "assistant_response_source": RESULT_READOUT_SOURCE_LLM,
+            "assistant_response_fallback_used": False,
         },
+    )
+
+
+def _with_response_source(
+    result: StageResult,
+    *,
+    source: str,
+    fallback_used: bool,
+    failure_mode: str | None = None,
+) -> StageResult:
+    patch = {
+        **result.stage_patch,
+        "assistant_response_source": source,
+        "assistant_response_fallback_used": fallback_used,
+    }
+    if failure_mode:
+        patch["assistant_response_failure_mode"] = failure_mode
+    return StageResult(
+        outcome=result.outcome,
+        decision=result.decision,
+        stage_patch=patch,
     )
 
 
@@ -977,8 +1014,7 @@ def _compact_execution_note(execution_note: str) -> str:
 def _next_check_line(*, execution_note: str | None) -> str | None:
     if execution_note and execution_note.startswith("No entry trades were executed"):
         return (
-            "Loosen the entry threshold or widen the window before judging the "
-            "idea."
+            "Loosen the entry threshold or widen the window before judging the " "idea."
         )
     return None
 

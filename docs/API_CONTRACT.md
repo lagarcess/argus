@@ -1574,9 +1574,12 @@ with the current chat turn instead of staying open for workflow-duration
 execution.
 
 For completed workflow-backed jobs, `result_readout` is backend-generated
-Markdown using the same explain-stage ownership as in-stream backtest results.
-The frontend renders this field when present; it must not synthesize a Quick
-take from result-card metrics.
+Markdown using the same async explain-stage ownership as in-stream backtest
+results. The frontend renders this field when present; it must not synthesize a
+Quick take from result-card metrics. `result_readout_source` and
+`result_readout_fallback_used` expose whether the normal LLM/schema-grounded
+path produced the readout or whether Argus intentionally fell back to the
+deterministic safety renderer.
 
 **Response: queued/running**
 ```json
@@ -1598,7 +1601,10 @@ take from result-card metrics.
     "updated_at": "timestamp"
   },
   "run": null,
-  "result_readout": null
+  "result_readout": null,
+  "result_readout_source": null,
+  "result_readout_fallback_used": null,
+  "result_readout_failure_mode": null
 }
 ```
 
@@ -1626,7 +1632,10 @@ take from result-card metrics.
     "status": "completed",
     "conversation_result_card": {}
   },
-  "result_readout": "**Quick take**\n\nThe strategy returned 12.4% while SPY returned 10.1% over the same period; it beat the benchmark.\n\n- Tested: AAPL buy and hold over January 1, 2024 to June 5, 2026.\n- Keep in mind: This is a return comparison, not causal attribution."
+  "result_readout": "**Quick take**\n\nThe strategy returned 12.4% while SPY returned 10.1% over the same period; it beat the benchmark.\n\n- Tested: AAPL buy and hold over January 1, 2024 to June 5, 2026.\n- Keep in mind: This is a return comparison, not causal attribution.",
+  "result_readout_source": "llm_explain_stage",
+  "result_readout_fallback_used": false,
+  "result_readout_failure_mode": null
 }
 ```
 
@@ -1644,7 +1653,10 @@ take from result-card metrics.
     "finished_at": "timestamp"
   },
   "run": null,
-  "result_readout": null
+  "result_readout": null,
+  "result_readout_source": null,
+  "result_readout_fallback_used": null,
+  "result_readout_failure_mode": null
 }
 ```
 

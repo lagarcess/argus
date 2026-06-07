@@ -148,8 +148,19 @@ def _successful_tool_result() -> dict[str, object]:
                     "date_range": "past year",
                     "benchmark_symbol": "SPY",
                 },
-                "metrics": {"aggregate": {"total_return_pct": 12.3}},
-                "benchmark_metrics": {"symbol": "SPY"},
+                "metrics": {
+                    "aggregate": {
+                        "total_return": 0.123,
+                        "total_return_pct": 12.3,
+                        "performance": {"total_return_pct": 12.3},
+                    }
+                },
+                "benchmark_metrics": {
+                    "symbol": "SPY",
+                    "benchmark_return_pct": 8.1,
+                    "total_return": 0.081,
+                    "total_return_pct": 8.1,
+                },
                 "provider_metadata": {"provider": "synthetic_unit_fixture"},
             },
             "result_card": {
@@ -241,6 +252,8 @@ def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_ru
 def test_run_backtest_job_persists_backend_result_readout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from argus.agent_runtime.result_readout import ResultReadout
+
     from workflows import backtest_job as workflow_module
     from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
 
@@ -251,8 +264,12 @@ def test_run_backtest_job_persists_backend_result_readout(
     )
     monkeypatch.setattr(
         workflow_module,
-        "result_readout_from_backtest_payload",
-        lambda **kwargs: readout,
+        "result_readout_with_metadata_from_backtest_payload",
+        lambda **kwargs: ResultReadout(
+            text=readout,
+            source="llm_explain_stage",
+            fallback_used=False,
+        ),
     )
     job = _job_row(
         launch_payload={
@@ -274,7 +291,103 @@ def test_run_backtest_job_persists_backend_result_readout(
     assert result["result_readout"] == readout
     metadata = gateway.row["execution_metadata"]["workflow_backtest"]
     assert metadata["result_readout"] == readout
-    assert metadata["result_readout_source"] == "explain_stage"
+    assert metadata["result_readout_source"] == "llm_explain_stage"
+    assert metadata["result_readout_fallback_used"] is False
+
+
+def test_run_backtest_job_uses_mainline_llm_quick_take_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "beat_benchmark",
+            "takeaway": (
+                "AAPL beat SPY by 4.2 percentage points in this historical test."
+            ),
+            "tested_bullet": "Tested AAPL buy and hold over the requested window.",
+            "meaning_bullet": "The result is grounded in the completed backtest run.",
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Historical simulation only.",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert "AAPL beat SPY by 4.2 percentage points" in result["result_readout"]
+    metadata = gateway.row["execution_metadata"]["workflow_backtest"]
+    assert metadata["result_readout_source"] == "llm_explain_stage"
+    assert metadata["result_readout_fallback_used"] is False
+
+
+def test_run_backtest_job_marks_result_readout_fallback_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    async def failing_quick_take_plan(**_: object) -> dict[str, object]:
+        raise RuntimeError("model unavailable")
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        failing_quick_take_plan,
+    )
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["result_readout"].startswith("**Quick take**")
+    metadata = gateway.row["execution_metadata"]["workflow_backtest"]
+    assert metadata["result_readout_source"] == "deterministic_fallback"
+    assert metadata["result_readout_fallback_used"] is True
 
 
 def test_run_backtest_job_marks_tool_failure_with_structured_metadata() -> None:

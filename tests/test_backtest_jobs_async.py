@@ -148,7 +148,9 @@ class _HydrationGateway:
                         "**Quick take**\n\n"
                         "Backend generated readout.\n\n"
                         "- Tested: AAPL buy and hold."
-                    )
+                    ),
+                    "result_readout_source": "llm_explain_stage",
+                    "result_readout_fallback_used": False,
                 }
             },
         }
@@ -298,3 +300,5 @@ def test_backtest_job_status_endpoint_returns_job_and_result(
     assert payload["run"]["conversation_result_card"]["title"] == "AAPL buy and hold"
     assert payload["result_readout"].startswith("**Quick take**")
     assert "Backend generated readout" in payload["result_readout"]
+    assert payload["result_readout_source"] == "llm_explain_stage"
+    assert payload["result_readout_fallback_used"] is False

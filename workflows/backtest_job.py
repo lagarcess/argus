@@ -3,10 +3,13 @@ from __future__ import annotations
 import traceback
 from collections.abc import Callable, Mapping
 from datetime import date, datetime
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 from argus.api.schemas import BacktestRun
+
+if TYPE_CHECKING:
+    from argus.agent_runtime.result_readout import ResultReadout
 
 try:
     from workflows.proof import require_database_url, utcnow_iso
@@ -68,12 +71,15 @@ class BacktestTool(Protocol):
         """Execute the Argus launch backtest payload."""
 
 
-def result_readout_from_backtest_payload(*args: Any, **kwargs: Any) -> str:
+def result_readout_with_metadata_from_backtest_payload(
+    *args: Any,
+    **kwargs: Any,
+) -> "ResultReadout":
     from argus.agent_runtime.result_readout import (
-        result_readout_from_backtest_payload as _result_readout_from_backtest_payload,
+        result_readout_with_metadata_from_backtest_payload as _result_readout,
     )
 
-    return _result_readout_from_backtest_payload(*args, **kwargs)
+    return _result_readout(*args, **kwargs)
 
 
 def run_backtest_job(
@@ -188,14 +194,7 @@ def run_backtest_job(
                 "started_at": started_at,
                 "finished_at": finished_at,
                 "result_run_id": result_run_id,
-                **(
-                    {
-                        "result_readout": result_readout,
-                        "result_readout_source": "explain_stage",
-                    }
-                    if result_readout
-                    else {}
-                ),
+                **_result_readout_metadata(result_readout),
             },
         )
         succeeded = gateway.link_backtest_job_result(
@@ -210,7 +209,14 @@ def run_backtest_job(
             "status": succeeded.get("status") or "succeeded",
             "result_run_id": result_run_id,
             "workflow_run_id": workflow_run_id,
-            **({"result_readout": result_readout} if result_readout else {}),
+            **({"result_readout": result_readout.text} if result_readout.text else {}),
+            "result_readout_source": result_readout.source,
+            "result_readout_fallback_used": result_readout.fallback_used,
+            **(
+                {"result_readout_failure_mode": result_readout.failure_mode}
+                if result_readout.failure_mode
+                else {}
+            ),
             "execution_metadata": _json_safe(
                 succeeded.get("execution_metadata") or succeeded_metadata
             ),
@@ -241,9 +247,11 @@ def _safe_result_readout(
     envelope: dict[str, Any],
     result_card: dict[str, Any],
     explanation_context: dict[str, Any],
-) -> str | None:
+) -> "ResultReadout":
+    from argus.agent_runtime.result_readout import unavailable_result_readout
+
     try:
-        return result_readout_from_backtest_payload(
+        return result_readout_with_metadata_from_backtest_payload(
             request=request,
             envelope=envelope,
             result_card=result_card,
@@ -251,7 +259,19 @@ def _safe_result_readout(
             language=_optional_str(request.get("language")),
         )
     except Exception:
-        return None
+        return unavailable_result_readout()
+
+
+def _result_readout_metadata(result_readout: "ResultReadout") -> dict[str, Any]:
+    metadata = {
+        "result_readout_source": result_readout.source,
+        "result_readout_fallback_used": result_readout.fallback_used,
+    }
+    if result_readout.text:
+        metadata["result_readout"] = result_readout.text
+    if result_readout.failure_mode:
+        metadata["result_readout_failure_mode"] = result_readout.failure_mode
+    return metadata
 
 
 def _assert_real_job(row: Mapping[str, Any]) -> None:

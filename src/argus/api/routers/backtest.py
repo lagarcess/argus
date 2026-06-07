@@ -133,10 +133,13 @@ def get_backtest_job(
             user_id=user.id,
             run_id=result_run_id,
         )
+    readout = _result_readout_from_job(job) if run is not None else None
+    readout_metadata = _result_readout_metadata_from_job(job) if run is not None else {}
     return BacktestJobResponse(
         job=BacktestJob.model_validate(job),
         run=run,
-        result_readout=_result_readout_from_job(job) if run is not None else None,
+        result_readout=readout,
+        **readout_metadata,
     )
 
 
@@ -174,3 +177,23 @@ def _result_readout_from_job(job: dict[str, object]) -> str | None:
         return None
     normalized = result_readout.strip()
     return normalized or None
+
+
+def _result_readout_metadata_from_job(job: dict[str, object]) -> dict[str, object]:
+    execution_metadata = job.get("execution_metadata")
+    if not isinstance(execution_metadata, dict):
+        return {}
+    workflow_metadata = execution_metadata.get("workflow_backtest")
+    if not isinstance(workflow_metadata, dict):
+        return {}
+    metadata: dict[str, object] = {}
+    source = workflow_metadata.get("result_readout_source")
+    if isinstance(source, str) and source.strip():
+        metadata["result_readout_source"] = source.strip()
+    fallback_used = workflow_metadata.get("result_readout_fallback_used")
+    if isinstance(fallback_used, bool):
+        metadata["result_readout_fallback_used"] = fallback_used
+    failure_mode = workflow_metadata.get("result_readout_failure_mode")
+    if isinstance(failure_mode, str) and failure_mode.strip():
+        metadata["result_readout_failure_mode"] = failure_mode.strip()
+    return metadata

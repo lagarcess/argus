@@ -1,14 +1,34 @@
 from __future__ import annotations
 
-from typing import Any
+import asyncio
+from collections.abc import Coroutine
+from dataclasses import dataclass
+from threading import Thread
+from typing import Any, TypeVar
 
-from argus.agent_runtime.stages.explain import explain_stage
+from argus.agent_runtime.stages.explain import (
+    RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK,
+    RESULT_READOUT_SOURCE_LLM,
+    explain_stage_async,
+)
 from argus.agent_runtime.state.models import (
     ConfirmationPayload,
     FinalResponsePayload,
     RunState,
     StrategySummary,
 )
+
+RESULT_READOUT_SOURCE_UNAVAILABLE = "unavailable"
+RESULT_READOUT_FAILURE_GENERATION_FAILED = "result_readout_generation_failed"
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class ResultReadout:
+    text: str | None
+    source: str
+    fallback_used: bool
+    failure_mode: str | None = None
 
 
 def result_readout_from_backtest_payload(
@@ -20,6 +40,46 @@ def result_readout_from_backtest_payload(
     language: str | None = None,
 ) -> str | None:
     """Render backend-owned completed-result prose from canonical backtest payloads."""
+
+    return result_readout_with_metadata_from_backtest_payload(
+        request=request,
+        envelope=envelope,
+        result_card=result_card,
+        explanation_context=explanation_context,
+        language=language,
+    ).text
+
+
+def result_readout_with_metadata_from_backtest_payload(
+    *,
+    request: dict[str, Any],
+    envelope: dict[str, Any],
+    result_card: dict[str, Any],
+    explanation_context: dict[str, Any] | None,
+    language: str | None = None,
+) -> ResultReadout:
+    """Synchronously compose the completed-result prose and its provenance."""
+
+    return _run_coroutine_sync(
+        result_readout_with_metadata_from_backtest_payload_async(
+            request=request,
+            envelope=envelope,
+            result_card=result_card,
+            explanation_context=explanation_context,
+            language=language,
+        )
+    )
+
+
+async def result_readout_with_metadata_from_backtest_payload_async(
+    *,
+    request: dict[str, Any],
+    envelope: dict[str, Any],
+    result_card: dict[str, Any],
+    explanation_context: dict[str, Any] | None,
+    language: str | None = None,
+) -> ResultReadout:
+    """Render completed-result prose through the mainline async explain path."""
 
     normalized_context = _normalized_explanation_context(
         envelope=envelope,
@@ -49,15 +109,78 @@ def result_readout_from_backtest_payload(
         explanation_context=normalized_context,
     )
 
-    result = explain_stage(
+    result = await explain_stage_async(
         state=state,
         language=_optional_str(language or request.get("language")) or "en",
     )
-    text = result.stage_patch.get("assistant_response")
+    patch = result.stage_patch
+    text = patch.get("assistant_response")
+    source = _optional_str(patch.get("assistant_response_source"))
+    fallback_used = bool(patch.get("assistant_response_fallback_used"))
+    failure_mode = _optional_str(patch.get("assistant_response_failure_mode"))
     if not isinstance(text, str):
-        return None
+        return ResultReadout(
+            text=None,
+            source=source or RESULT_READOUT_SOURCE_UNAVAILABLE,
+            fallback_used=True,
+            failure_mode=failure_mode or RESULT_READOUT_FAILURE_GENERATION_FAILED,
+        )
     normalized = text.strip()
-    return normalized or None
+    if not normalized:
+        return ResultReadout(
+            text=None,
+            source=source or RESULT_READOUT_SOURCE_UNAVAILABLE,
+            fallback_used=True,
+            failure_mode=failure_mode or RESULT_READOUT_FAILURE_GENERATION_FAILED,
+        )
+    return ResultReadout(
+        text=normalized,
+        source=source or _default_source_for_fallback(fallback_used),
+        fallback_used=fallback_used,
+        failure_mode=failure_mode,
+    )
+
+
+def unavailable_result_readout(
+    failure_mode: str = RESULT_READOUT_FAILURE_GENERATION_FAILED,
+) -> ResultReadout:
+    return ResultReadout(
+        text=None,
+        source=RESULT_READOUT_SOURCE_UNAVAILABLE,
+        fallback_used=True,
+        failure_mode=failure_mode,
+    )
+
+
+def _default_source_for_fallback(fallback_used: bool) -> str:
+    return (
+        RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK
+        if fallback_used
+        else RESULT_READOUT_SOURCE_LLM
+    )
+
+
+def _run_coroutine_sync(coroutine: Coroutine[Any, Any, T]) -> T:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+
+    result_box: dict[str, T] = {}
+    error_box: dict[str, BaseException] = {}
+
+    def runner() -> None:
+        try:
+            result_box["value"] = asyncio.run(coroutine)
+        except BaseException as exc:  # pragma: no cover - re-raised in caller thread
+            error_box["error"] = exc
+
+    thread = Thread(target=runner, name="argus-result-readout", daemon=True)
+    thread.start()
+    thread.join()
+    if "error" in error_box:
+        raise error_box["error"]
+    return result_box["value"]
 
 
 def _strategy_summary_from_payload(
