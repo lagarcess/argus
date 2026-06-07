@@ -29,9 +29,19 @@ except ModuleNotFoundError:  # pragma: no cover - supports `python workflows/mai
     from proof import PostgresProofJobGateway, run_workflow_proof
 
 
+def _positive_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return default
+
+
 app = Workflows(
     default_retry=Retry(max_retries=0, wait_duration_ms=1000),
-    default_timeout=60,
+    default_timeout=_positive_int_env("ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS", 300),
     default_plan=os.getenv("ARGUS_WORKFLOW_PROOF_PLAN", "starter"),
 )
 
@@ -46,7 +56,10 @@ def workflow_proof(job_id: str, nonce: str) -> dict[str, object]:
     )
 
 
-@app.task(name="run_backtest_job", timeout_seconds=60)
+@app.task(
+    name="run_backtest_job",
+    timeout_seconds=_positive_int_env("ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS", 300),
+)
 def run_backtest_job(job_id: str, nonce: str | None = None) -> dict[str, object]:
     del nonce
     return run_backtest_job_workflow(

@@ -21,6 +21,7 @@ DEFAULT_REAL_WORKFLOW_TASK = "argus-backtests/run_backtest_job"
 PROOF_JOB_KIND = "render_workflow_proof"
 REAL_BACKTEST_JOB_KIND = "run_backtest_job"
 RENDER_TASK_RUNS_URL = "https://api.render.com/v1/task-runs"
+WORKFLOW_METADATA_KEY = "workflow_backtest"
 DEFAULT_USER_RUNNING_LIMIT = 1
 DEFAULT_USER_QUEUED_LIMIT = 2
 DEFAULT_GLOBAL_RUNNING_LIMIT = 5
@@ -240,6 +241,205 @@ class RenderWorkflowDispatcher:
         response.raise_for_status()
         data = response.json()
         return dict(data) if isinstance(data, dict) else {"response": data}
+
+
+class RenderTaskRunClient:
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        endpoint: str = RENDER_TASK_RUNS_URL,
+    ) -> None:
+        self.api_key = (api_key or os.getenv("RENDER_API_KEY") or "").strip()
+        self.endpoint = endpoint.rstrip("/")
+
+    def get_task_run(self, task_run_id: str) -> dict[str, Any]:
+        if not self.api_key:
+            raise RuntimeError("RENDER_API_KEY is required to inspect task runs.")
+        response = httpx.get(
+            f"{self.endpoint}/{task_run_id}",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Accept": "application/json",
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return dict(data) if isinstance(data, dict) else {"response": data}
+
+
+def reconcile_terminal_render_task_run(
+    *,
+    gateway: Any,
+    user_id: str,
+    job: dict[str, Any] | None,
+    task_run_client: RenderTaskRunClient | None = None,
+) -> dict[str, Any] | None:
+    if job is None:
+        return None
+    status = str(job.get("status") or "").strip().lower()
+    if status not in {"queued", "running"}:
+        return job
+    task_run_id = _task_run_id_from_job(job)
+    if task_run_id is None:
+        return job
+
+    try:
+        task_run = (task_run_client or RenderTaskRunClient()).get_task_run(task_run_id)
+    except Exception as exc:
+        logger.warning(
+            "Render task run reconciliation skipped",
+            error=str(exc),
+            user_id=user_id,
+            job_id=job.get("id"),
+            task_run_id=task_run_id,
+        )
+        return job
+
+    task_status = str(task_run.get("status") or "").strip().lower()
+    if task_status not in {"failed", "canceled", "cancelled", "expired"}:
+        return job
+
+    failure_code, failure_detail, retryable = _workflow_task_failure(task_run)
+    finished_at = _task_run_completed_at(task_run) or _utcnow_iso()
+    reconciled = gateway.mark_backtest_job_failed(
+        user_id=user_id,
+        job_id=str(job.get("id") or ""),
+        failure_code=failure_code,
+        failure_detail=failure_detail,
+        retryable=retryable,
+        finished_at=finished_at,
+        execution_metadata=_terminal_task_run_metadata(
+            job=job,
+            task_run=task_run,
+            task_run_id=task_run_id,
+            failure_code=failure_code,
+            reconciled_at=_utcnow_iso(),
+        ),
+    )
+    return dict(reconciled)
+
+
+def _task_run_id_from_job(job: dict[str, Any]) -> str | None:
+    metadata = _dict_or_empty(job.get("execution_metadata"))
+    if not metadata:
+        return None
+    for key in ("workflow_dispatch", WORKFLOW_METADATA_KEY):
+        section = _dict_or_empty(metadata.get(key))
+        raw = section.get("task_run_id") or section.get("workflow_run_id")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
+
+
+def _task_run_error(task_run: dict[str, Any]) -> str:
+    raw = task_run.get("error")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    attempts = task_run.get("attempts")
+    if isinstance(attempts, list):
+        for attempt in reversed(attempts):
+            if not isinstance(attempt, dict):
+                continue
+            error = attempt.get("error")
+            if isinstance(error, str) and error.strip():
+                return error.strip()
+    return ""
+
+
+def _task_run_completed_at(task_run: dict[str, Any]) -> str | None:
+    for key in ("completedAt", "completed_at", "finishedAt", "finished_at"):
+        raw = task_run.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    attempts = task_run.get("attempts")
+    if isinstance(attempts, list):
+        for attempt in reversed(attempts):
+            if not isinstance(attempt, dict):
+                continue
+            for key in ("completedAt", "completed_at", "finishedAt", "finished_at"):
+                raw = attempt.get(key)
+                if isinstance(raw, str) and raw.strip():
+                    return raw.strip()
+    return None
+
+
+def _workflow_task_failure(task_run: dict[str, Any]) -> tuple[str, str, bool]:
+    status = str(task_run.get("status") or "").strip().lower()
+    error = _task_run_error(task_run).lower()
+    if "timed out" in error or "timeout" in error:
+        return (
+            "workflow_task_timeout",
+            "Backtest execution timed out before finishing.",
+            True,
+        )
+    if status in {"canceled", "cancelled"}:
+        return (
+            "workflow_task_canceled",
+            "Backtest execution was canceled before finishing.",
+            False,
+        )
+    if status == "expired":
+        return (
+            "workflow_task_expired",
+            "Backtest execution expired before finishing.",
+            True,
+        )
+    return (
+        "workflow_task_failed",
+        "Backtest execution failed before finishing.",
+        True,
+    )
+
+
+def _terminal_task_run_metadata(
+    *,
+    job: dict[str, Any],
+    task_run: dict[str, Any],
+    task_run_id: str,
+    failure_code: str,
+    reconciled_at: str,
+) -> dict[str, Any]:
+    metadata = _dict_or_empty(job.get("execution_metadata"))
+    task_status = str(task_run.get("status") or "").strip().lower()
+    task_error = _task_run_error(task_run)
+    completed_at = _task_run_completed_at(task_run)
+
+    workflow_dispatch = _dict_or_empty(metadata.get("workflow_dispatch"))
+    workflow_dispatch.update(
+        {
+            "task_run_id": task_run_id,
+            "status": task_status,
+            "failure_code": failure_code,
+            "reconciled_at": reconciled_at,
+        }
+    )
+    if task_error:
+        workflow_dispatch["error"] = task_error
+    if completed_at:
+        workflow_dispatch["completed_at"] = completed_at
+    metadata["workflow_dispatch"] = workflow_dispatch
+
+    workflow_metadata = _dict_or_empty(metadata.get(WORKFLOW_METADATA_KEY))
+    workflow_metadata.update(
+        {
+            "workflow_run_id": task_run_id,
+            "workflow_run_status": task_status,
+            "failure_code": failure_code,
+            "reconciled_at": reconciled_at,
+        }
+    )
+    if task_error:
+        workflow_metadata["workflow_run_error"] = task_error
+    if completed_at:
+        workflow_metadata["finished_at"] = completed_at
+    metadata[WORKFLOW_METADATA_KEY] = workflow_metadata
+    return metadata
+
+
+def _dict_or_empty(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
 
 
 class ShadowBacktestJobTool:

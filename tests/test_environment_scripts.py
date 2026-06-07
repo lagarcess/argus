@@ -235,10 +235,12 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
         in env_example
     )
     assert "ARGUS_WORKFLOW_PROOF_PLAN=" in env_example
+    assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300" in env_example
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
     assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
     assert "ARGUS_WORKFLOW_PROOF_PLAN" in env_contract
+    assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS" in env_contract
     assert "ARGUS_MARKET_DATA_PROVIDER_MODE" in env_contract
     assert "ENABLE_MARKET_DATA_CACHE" in env_contract
     assert "ALPACA_API_KEY" in env_contract
@@ -253,6 +255,10 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ARGUS_STRUCTURED_FALLBACK_MODEL" in env_contract
     assert "ARGUS_CONTEXT_MODEL" in env_contract
     assert "ARGUS_CONTEXT_FALLBACK_MODEL" in env_contract
+    assert (
+        "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS "
+        '"${ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS:-300}"'
+    ) in _source(".github/render-env-sync.sh")
     assert all(service["type"] != "workflow" for service in render_config["services"])
 
 

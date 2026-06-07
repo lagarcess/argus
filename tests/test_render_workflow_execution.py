@@ -456,7 +456,7 @@ def test_backtest_workflow_json_safe_normalizes_postgres_scalars() -> None:
 def test_workflow_task_registration_includes_proof_and_real_backtest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    tasks: dict[str, object] = {}
+    tasks: dict[str, dict[str, object]] = {}
 
     class FakeRetry:
         def __init__(self, **kwargs: object) -> None:
@@ -469,7 +469,7 @@ def test_workflow_task_registration_includes_proof_and_real_backtest(
         def task(self, fn: object | None = None, **kwargs: object):
             def decorate(inner: object) -> object:
                 name = str(kwargs.get("name") or getattr(inner, "__name__", "task"))
-                tasks[name] = inner
+                tasks[name] = {"fn": inner, "kwargs": dict(kwargs)}
                 return inner
 
             if fn is not None:
@@ -488,3 +488,5 @@ def test_workflow_task_registration_includes_proof_and_real_backtest(
     importlib.import_module("workflows.main")
 
     assert {"workflow_proof", "run_backtest_job"}.issubset(tasks)
+    assert tasks["workflow_proof"]["kwargs"]["timeout_seconds"] == 60
+    assert tasks["run_backtest_job"]["kwargs"]["timeout_seconds"] >= 300
