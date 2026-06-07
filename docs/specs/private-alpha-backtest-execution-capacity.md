@@ -274,19 +274,91 @@ Current interpretation:
   1 running per user, 2 queued per user, 5 running globally, and 10 queued
   globally.
 
+### Automated Render Internet Benchmark Pass
+
+The deployed internet benchmark harness lives at
+`scripts/benchmarks/render_internet_benchmark.py`.
+
+Default command:
+
+```bash
+poetry run python scripts/benchmarks/render_internet_benchmark.py
+```
+
+Default output:
+
+- `temp/benchmarks/render-internet/latest.json`
+- `temp/benchmarks/render-internet/latest.md`
+- timestamped JSON/Markdown files in the same directory
+
+The harness uses the real deployed app/API URLs, authenticates a real canary or
+developer account, creates a conversation, streams the confirmation turn,
+streams the `run_backtest` action, requires an async `backtest_job`, polls the
+durable job endpoint to terminal status, verifies persisted messages and
+Supabase job/run/route-receipt rows when service-role credentials are available,
+and fails if the completed result does not preserve the established
+`llm_explain_stage` result-readout voice.
+
+Live internet benchmark run:
+
+```text
+Generated: 2026-06-07T21:26:27.293879+00:00
+API URL: https://argus-ohr5.onrender.com
+App URL: https://argus-app-suz5.onrender.com
+Prompt: equal-weight AAPL/MSFT buy-and-hold, Jan 1 2025 through Jun 5 2026
+Artifact: temp/benchmarks/render-internet/latest.json
+```
+
+| Area | Live Finding |
+| --- | ---: |
+| Total wall time including warmup | 257.0 s |
+| Warmup total | 133.9 s |
+| Post-warmup benchmark path | 123.2 s |
+| Login | 0.9 s |
+| Conversation create | 0.6 s |
+| Confirmation stream | 45.4 s |
+| Run-action stream | 2.4 s |
+| Job poll until terminal | 71.8 s |
+| Render task duration | 70.8 s |
+| Supabase job queued -> started | 16.5 s |
+| Supabase job started -> finished | 54.4 s |
+| Supabase job queued -> finished | 70.9 s |
+| Confirmation events | 5 |
+| Run events | 6 |
+| Result readout source | `llm_explain_stage` |
+| Result readout fallback used | `false` |
+
+Current interpretation:
+
+- The workflow-backed internet path now works end to end on the deployed branch:
+  browser/API -> Supabase Auth -> chat confirmation -> durable backtest job ->
+  Render Workflow -> Supabase `backtest_runs` -> hydrated result/readout.
+- Voice parity held for this canary: the persisted result readout came from the
+  LLM/schema-grounded explain stage, not the deterministic fallback path.
+- The remaining private-alpha UX pain is latency, not correctness for this one
+  case. Cold warmup was the largest chunk, and the workflow task itself took
+  about 71 seconds for a simple AAPL/MSFT buy-and-hold run.
+- The job row shows about 16.5 seconds from queued to workflow-started and about
+  54.4 seconds from workflow-started to finished. That likely includes workflow
+  dependency/import overhead, provider fetch, engine execution, result-card
+  build, LLM result readout, and Supabase persistence, but the current live
+  harness does not yet split those internals.
+- This is not a load test. It is a single sequential live run meant to prove the
+  deployed architecture and capture the first internet timing baseline.
+
 Still unmeasured:
 
-- Real Render Workflow task cold start, import time, wall time, CPU, and peak
-  RSS on `standard` workflow compute.
+- Real Render Workflow CPU and peak RSS on `standard` workflow compute.
+- Workflow-internal split between dependency import, provider fetch, engine
+  execution, chart/result-card build, LLM readout generation, and Supabase
+  persistence.
 - Live Alpaca/Kraken provider fetch latency, failure/retry shape, and provider
-  request identifiers.
+  request identifiers as separate timing dimensions.
 - Supabase job creation, run insert, job status update, cache lookup/write, and
-  Realtime delivery latency.
-- Workflow dispatch latency through the Render API and task-run queue.
+  Realtime delivery latency as separate timing dimensions.
 - Concurrent workflow execution with 5 global jobs and queued-job drain time.
 - Currency-pair 720-candle RSI/moving-average cases.
-- LLM interpretation and LLM result-summary latency; this infra harness does not
-  exercise Argus voice or result prose generation.
+- LLM interpretation and LLM result-summary latency as isolated sub-metrics.
 
 Caveats:
 
@@ -296,9 +368,9 @@ Caveats:
   Supabase write performance.
 - The local machine has more CPU and memory headroom than Render Free/Starter
   API instances and likely differs from Render Workflow `standard` task CPU.
-- The harness patches result readout generation to avoid changing or measuring
-  Argus voice during this infrastructure slice. The next slice remains the
-  Argus voice parity gate.
+- The local harness patches result readout generation; the internet harness does
+  not. Treat local compute results and live voice/runtime results as two
+  complementary measurements, not substitutes for each other.
 
 ## Product Truth
 
@@ -1241,7 +1313,7 @@ parity gate above.
 
 ## Benchmark Plan
 
-The automated harness now runs a local version of this matrix:
+The automated local harness runs a local version of this matrix:
 
 ```bash
 poetry run python scripts/benchmarks/backtest_infra_benchmark.py
@@ -1249,8 +1321,18 @@ poetry run python scripts/benchmarks/backtest_infra_benchmark.py
 
 It measures API import footprint separately from workflow import and workflow
 execution footprint. The default local run uses synthetic market data and fake
-persistence. Production-like measurements should run the same command on Render
-Workflow compute and, when intentionally opted in, live provider/Supabase paths.
+persistence.
+
+The deployed internet harness runs the live golden path through Render,
+Supabase, OpenRouter, and Render Workflows:
+
+```bash
+poetry run python scripts/benchmarks/render_internet_benchmark.py
+```
+
+It measures end-to-end internet timing, strict async-job behavior, persisted
+rows, and Argus result-readout voice parity. It intentionally defaults to one
+sequential canary run; concurrency/load tests should be explicit separate runs.
 
 Suggested execution cases:
 
@@ -1269,9 +1351,11 @@ Suggested execution cases:
 | K | 1 | latest feasible 720-candle window | 4h | currency_pair | moving average or MACD crossover |
 | L | 5 concurrent jobs | mixed A-I | mixed | mixed | queue/backpressure smoke |
 
-The first automated local pass covers A, B, C, E, F, H, I, and L. Cases D, G,
-J, K, true concurrent workflow execution, live provider latency, and real
-Supabase persistence remain to be measured.
+The first automated local pass covers A, B, C, E, F, H, I, and L. The first live
+internet pass covers the AAPL/MSFT golden-path buy-and-hold case with real
+Supabase persistence, live provider behavior, workflow dispatch, and LLM result
+readout. Cases D, G, J, K, true concurrent workflow execution, and isolated
+provider/Supabase/LLM sub-timings remain to be measured.
 
 Currency-pair intraday windows must respect Kraken's latest 720-candle limit.
 For example, a 4-hour currency-pair test is roughly a 120-day maximum window,
