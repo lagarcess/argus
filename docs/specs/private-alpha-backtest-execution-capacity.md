@@ -361,72 +361,94 @@ Still unmeasured:
 
 ### Final Operational Canary / Release Readiness
 
-Status: **not release-ready** as of `2026-06-08T05:10:04Z`.
+Status: **release-ready for the controlled private-alpha canary path** as of
+`2026-06-08T09:28:20Z`.
 
-The already-deployed Render services were intentionally checked without running
-another deploy:
+This does not mean Argus is broadly production-complete. It means the scoped
+milestone architecture is now proven over the internet for the default
+private-alpha canary: deployed browser/API -> Supabase Auth -> chat
+confirmation -> async durable job -> Render Workflow -> Supabase run/message
+persistence -> hydrated result card and LLM/schema-grounded result readout.
 
-| Service | Expected | Observed |
+The Render services were aligned to one branch commit before the final canary:
+
+| Service | Observed Commit / Version | Deploy Evidence |
 | --- | --- | --- |
-| `argus-api` live deploy | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` |
-| `argus-app` live deploy | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` |
-| `argus-backtests` ready workflow version | `5fcd51b` | `5fcd51b` |
+| `argus-api` live deploy | `6e43e675fca58ff0f00092e93147ecd98ed978e2` | `dep-d8j8d4lckfvc73chqsfg`, `live` |
+| `argus-app` live deploy | `6e43e675fca58ff0f00092e93147ecd98ed978e2` | `dep-d8j8elt8nd3s73e9uqcg`, `live` |
+| `argus-backtests` ready workflow version | `6e43e67` | `wfv-d8j8ghk8aovs73929a50`, `ready` |
 
-Warmup with `--expect-mode real-workflow` passed. The free Render services
-needed cold-start retries before all readiness probes responded:
+Warmup with `--expect-mode real-workflow` passed:
 
 | Check | Evidence |
 | --- | --- |
-| API health | responded after 3 timed-out attempts |
+| API health | responded |
 | Product readiness | responded after 1 timed-out attempt |
-| Frontend | responded after 1 timed-out attempt |
+| Frontend | responded |
 | API workflow mode | matched `real-workflow` |
 
-The final canary used the default private-alpha prompt and developer credentials:
+The final canary used the default private-alpha prompt and developer
+credentials:
 
 | Field | Value |
 | --- | --- |
-| Conversation | `5db6c99c-d645-4d9c-b33f-ed46b45aecdf` |
-| Backtest job | `adc46740-8d54-42d2-9f3a-d6b319219e7b` |
-| Backtest run | `49636c8c-97d3-446f-a010-6e149edf3447` |
-| Workflow run | `trn-08d4gd8j4sflckfvc73cdvotg` |
+| Conversation | `59d7346e-f842-49a8-aab6-11a02050b0b1` |
+| Backtest job | `2533decd-084f-4db7-a46e-85d241accada` |
+| Backtest run | `886de11a-a538-4419-b074-24b496120227` |
+| Workflow run | `trn-08d4gd8j8iv1kh4rs73dettkg` |
 | Job status | `succeeded` |
 | Persisted messages | 2 assistant, 2 user |
-| Route receipts | 4 |
+| Route receipts | 2 interpretation, 2 name suggestion, 1 result summary |
 | `backtest_runs` rows | 1 |
 
-The release blocker is result-readout provenance:
+Hard voice/readout gates passed:
 
 | Gate | Expected | Observed |
 | --- | --- | --- |
-| Result readout source | `llm_explain_stage` | `deterministic_fallback` |
-| Result readout fallback used | `false` | `true` |
-| Failure mode | none | `llm_unavailable_or_rejected` |
+| Result readout source | `llm_explain_stage` | `llm_explain_stage` |
+| Result readout fallback used | `false` | `false` |
+| Result summary route receipt | present | present |
+| Visible result card | completed/hydrated | completed/hydrated in browser canary |
+| Visible Quick take | LLM/schema-grounded readout | present below completed card |
 
-The backtest execution path itself completed, but the canary must stay strict:
-a successful run with deterministic result prose is not release-ready because it
-can regress Argus voice even when metrics are correct. Do not mark this milestone
-ready until a settled internet canary passes with `result_readout_source` equal
-to `llm_explain_stage` and `result_readout_fallback_used=false`.
-
-Workflow timing evidence for the blocked canary:
+Workflow timing evidence for the passing canary:
 
 | Phase | Duration |
 | --- | ---: |
-| Job queued -> started | 8.592 s |
-| Job started -> finished | 56.260 s |
-| Workflow task total | 56.862 s |
-| Dependency/tool load | 14.228 s |
-| Backtest tool run total | 34.285 s |
-| Provider fetch total | 0.605 s |
-| Engine compute total | 34.179 s |
-| Result readout total | 7.420 s |
+| Workflow task total | 55.215 s |
+| Dependency/tool load | 14.160 s |
+| Backtest tool run total | 33.190 s |
+| Provider fetch total | 0.630 s |
+| Engine compute total | 33.078 s |
+| Result readout total | 6.689 s |
+
+The final passing canary was preceded by two release-blocking failures that are
+now fixed and covered by focused regression tests:
+
+| Blocker | Root Cause | Resolution |
+| --- | --- | --- |
+| Chat stream crashed after dispatching async workflow jobs | The API cached a Postgres checkpointer/workflow in one event loop and reused it inside a worker thread event loop. | `c4a93c4` builds an isolated workflow/checkpointer inside the worker runtime loop. |
+| Workflow job succeeded but visible result readout fell back to deterministic prose | The Quick take validator rejected otherwise grounded LLM output when the model returned a supported next-experiment label instead of the internal kind id. | `6e43e67` accepts supported next-step labels and keeps unsupported values rejected. |
+| `result_summary` route receipt was logged but not persisted | The sync result-readout wrapper spawned a thread without copying contextvars, losing route-receipt capture context. | `6e43e67` copies context into the result-readout thread. |
 
 Security state did not block this canary. Checkpoint table RLS remains enabled,
 forced RLS remains disabled, and `public`/`anon`/`authenticated` have no
 checkpoint table privileges. Supabase security advisors no longer report the
 checkpoint-table RLS issue; the remaining advisor is the already-tracked
 `function_search_path_mutable` warning for `public.set_updated_at`.
+
+Remaining non-blocking debt for this private-alpha checkpoint:
+
+- This canary samples one default AAPL/MSFT buy-and-hold path, not every
+  supported strategy, retry path, failure path, locale, or follow-up.
+- Latency is still high enough to optimize later; correctness and durability
+  were the priority for this milestone.
+- Render Workflow CPU and peak RSS still need platform-level measurement or
+  deeper Render telemetry.
+- Broader Argus voice/presentation parity remains a follow-up audit before
+  broader exposure, especially result follow-ups, retry/recovery copy, and
+  non-happy-path job states.
+- `public.set_updated_at` should get a separate database hygiene/security pass.
 
 ### Workflow-Internal Timing Metadata Contract
 
