@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any
 
 import pytest
@@ -61,6 +62,61 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import state as api_state
 
     monkeypatch.setattr(api_state, "supabase_gateway", None)
+
+
+@pytest.mark.asyncio
+async def test_threaded_runtime_event_source_does_not_block_api_event_loop() -> None:
+    from argus.api.chat.runtime_worker import threaded_runtime_event_source
+
+    async def _blocking_runtime_events():
+        yield {"type": "stage_start", "stage": "interpret"}
+        time.sleep(0.05)
+        yield {"type": "final", "payload": {"stage_outcome": "await_approval"}}
+
+    runtime_events = threaded_runtime_event_source(_blocking_runtime_events)
+
+    first_event = await asyncio.wait_for(anext(runtime_events), timeout=1)
+    assert first_event == {"type": "stage_start", "stage": "interpret"}
+
+    async def _event_loop_tick() -> bool:
+        await asyncio.sleep(0.01)
+        return True
+
+    next_runtime_event = asyncio.create_task(anext(runtime_events))
+    tick = asyncio.create_task(_event_loop_tick())
+
+    assert await asyncio.wait_for(tick, timeout=1) is True
+    assert not next_runtime_event.done()
+    assert await asyncio.wait_for(next_runtime_event, timeout=1) == {
+        "type": "final",
+        "payload": {"stage_outcome": "await_approval"},
+    }
+    await runtime_events.aclose()
+
+
+def test_runtime_worker_auto_mode_is_reserved_for_prod_like_streams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat.runtime_worker import runtime_worker_enabled
+
+    monkeypatch.delenv("ARGUS_RUNTIME_STREAM_WORKER", raising=False)
+    monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("ARGUS_CHECKPOINTER_MODE", "memory")
+
+    assert runtime_worker_enabled() is False
+
+    monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "supabase")
+    assert runtime_worker_enabled() is True
+
+    monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("ARGUS_CHECKPOINTER_MODE", "postgres")
+    assert runtime_worker_enabled() is True
+
+    monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "false")
+    assert runtime_worker_enabled() is False
+
+    monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "true")
+    assert runtime_worker_enabled() is True
 
 
 def test_internal_agent_runtime_turn_is_not_exposed_by_launch_api() -> None:

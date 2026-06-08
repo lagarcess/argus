@@ -51,6 +51,10 @@ from argus.api.chat.recovery import (
 )
 from argus.api.chat.retry import retry_last_turn_metadata
 from argus.api.chat.route_receipts import persist_route_receipts
+from argus.api.chat.runtime_worker import (
+    runtime_worker_enabled,
+    threaded_runtime_event_source,
+)
 from argus.api.chat.strategies import save_strategy_from_run
 from argus.api.chat.streaming import (
     runtime_result_card,
@@ -846,22 +850,29 @@ async def chat_stream(
             )
         )
         try:
-            runtime_events = stream_agent_turn_events(
-                workflow=workflow,
-                user=runtime_user,
-                thread_id=conversation.id,
-                message=request_message,
-                recent_thread_history=recent_thread_history,
-                context_hints=[
-                    item.model_dump(mode="python") for item in mention_provenance
-                ],
-                action_context=action_context,
-                fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
-                fallback_selected_thread_metadata=(
-                    runtime_fallback.selected_thread_metadata
-                ),
-                fallback_artifact_references=runtime_fallback.artifact_references,
-                fallback_confirmation_payload=runtime_fallback.confirmation_payload,
+            def runtime_event_source() -> AsyncIterator[dict[str, Any]]:
+                return stream_agent_turn_events(
+                    workflow=workflow,
+                    user=runtime_user,
+                    thread_id=conversation.id,
+                    message=request_message,
+                    recent_thread_history=recent_thread_history,
+                    context_hints=[
+                        item.model_dump(mode="python") for item in mention_provenance
+                    ],
+                    action_context=action_context,
+                    fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
+                    fallback_selected_thread_metadata=(
+                        runtime_fallback.selected_thread_metadata
+                    ),
+                    fallback_artifact_references=runtime_fallback.artifact_references,
+                    fallback_confirmation_payload=runtime_fallback.confirmation_payload,
+                )
+
+            runtime_events = (
+                threaded_runtime_event_source(runtime_event_source)
+                if runtime_worker_enabled()
+                else runtime_event_source()
             )
             final_seen = False
             async for runtime_event in _runtime_events_with_keepalive(runtime_events):
