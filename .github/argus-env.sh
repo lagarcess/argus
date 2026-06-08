@@ -9,7 +9,9 @@ ARGUS_PRIVATE_LAUNCH_API_SERVICE_ID="srv-d78tanmuk2gs73e17nn0"
 ARGUS_RENDER_BACKTESTS_WORKFLOW_ID="wfl-d8hpsmuq1p3s73duv3q0"
 ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"
 ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT="argus-backtests/run_backtest_job"
-ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="pip install poetry && poetry config virtualenvs.create false && poetry install --only main,workflows --no-interaction"
+ARGUS_RENDER_POETRY_VERSION="2.1.3"
+ARGUS_RENDER_API_BUILD_COMMAND="poetry config virtualenvs.create false && poetry install --only main --no-interaction"
+ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="poetry config virtualenvs.create false && poetry install --only main,workflows --no-interaction"
 ARGUS_RENDER_WORKFLOW_START_COMMAND="poetry run python workflows/main.py"
 
 ARGUS_QA_REQUIRED_ENV=(
@@ -33,6 +35,7 @@ ARGUS_QA_REQUIRED_ENV=(
 
 ARGUS_RENDER_API_ENV=(
   APP_ENV
+  POETRY_VERSION
   ARGUS_PERSISTENCE_MODE
   ARGUS_DEV_MEMORY_FALLBACK
   ARGUS_MARKET_DATA_PROVIDER_MODE
@@ -97,6 +100,7 @@ ARGUS_RENDER_WORKFLOW_PROOF_ENV=(
   ARGUS_WORKFLOW_DATABASE_URL
   ARGUS_RENDER_WORKFLOW_PROOF_TASK
   ARGUS_WORKFLOW_PROOF_PLAN
+  POETRY_VERSION
   ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS
   ARGUS_MARKET_DATA_PROVIDER_MODE
   ENABLE_MARKET_DATA_CACHE

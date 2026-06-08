@@ -105,6 +105,7 @@ def test_render_blueprint_uses_current_env_contract_names_only() -> None:
 
     for key in (
         "ARGUS_PERSISTENCE_MODE",
+        "POETRY_VERSION",
         "ARGUS_DEV_MEMORY_FALLBACK",
         "ARGUS_MARKET_DATA_PROVIDER_MODE",
         "ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS",
@@ -160,6 +161,25 @@ def test_render_workflow_task_slug_is_single_current_default() -> None:
     assert 'or "argus-backtests/workflow_proof"' in trigger_proof
     assert "argus-render-workflow-proof" not in env_example
     assert "argus-render-workflow-proof" not in trigger_proof
+
+
+def test_render_python_builds_use_managed_poetry() -> None:
+    render_yaml = _source("render.yaml")
+    env_contract = ENV_CONTRACT.read_text()
+    env_example = _source(".env.example")
+
+    assert 'ARGUS_RENDER_POETRY_VERSION="2.1.3"' in env_contract
+    assert "POETRY_VERSION=2.1.3" in env_example
+    assert "pip install poetry" not in render_yaml
+    assert "pip install poetry" not in env_contract
+    assert (
+        'ARGUS_RENDER_API_BUILD_COMMAND="poetry config virtualenvs.create false '
+        "&& poetry install --only main --no-interaction\""
+    ) in env_contract
+    assert (
+        'ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="poetry config virtualenvs.create false '
+        "&& poetry install --only main,workflows --no-interaction\""
+    ) in env_contract
 
 
 def test_env_example_declares_render_api_key_once() -> None:
@@ -235,12 +255,14 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
         in env_example
     )
     assert "ARGUS_WORKFLOW_PROOF_PLAN=" in env_example
+    assert "POETRY_VERSION=2.1.3" in env_example
     assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300" in env_example
     assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=20" in env_example
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
     assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
     assert "ARGUS_WORKFLOW_PROOF_PLAN" in env_contract
+    assert "POETRY_VERSION" in env_contract
     assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS" in env_contract
     assert "ARGUS_MARKET_DATA_PROVIDER_MODE" in env_contract
     assert "ENABLE_MARKET_DATA_CACHE" in env_contract
@@ -279,6 +301,7 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert 'source "$SCRIPT_DIR/argus-env.sh"' in source
     assert "ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT" in source
     assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in env_contract
+    assert "ARGUS_RENDER_API_BUILD_COMMAND" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_START_COMMAND" in env_contract
     assert "/v1/services/${service_id}/env-vars/${key}" in source
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in source
@@ -332,6 +355,7 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     )
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ENABLE_MARKET_DATA_CACHE' in source
     assert 'put_render_env "$WORKFLOW_SERVICE_ID" ALPACA_PAPER_TRADING' in source
+    assert 'put_render_env "$WORKFLOW_SERVICE_ID" POETRY_VERSION' in source
     assert "workflow-runtime" in source
     assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
