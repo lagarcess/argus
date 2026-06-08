@@ -109,8 +109,7 @@ def _filter_history_conversations_by_message_state(
     return [
         row
         for row in conversations
-        if row.get("id") is not None
-        and str(row["id"]) in conversation_ids_with_messages
+        if row.get("id") is not None and str(row["id"]) in conversation_ids_with_messages
     ]
 
 
@@ -142,9 +141,7 @@ class SupabaseGateway:
                 "Supabase mode requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
             )
         auth_key = (
-            os.getenv("SUPABASE_ANON_KEY")
-            or os.getenv("SUPABASE_ANON_PUBLIC_KEY")
-            or key
+            os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_PUBLIC_KEY") or key
         )
         return cls(
             client=create_client(url, key, options=_supabase_client_options()),
@@ -242,11 +239,7 @@ class SupabaseGateway:
             raise RuntimeError("Unable to resolve mock auth user.")
 
         existing = (
-            self.client.table("profiles")
-            .select("*")
-            .eq("id", user_id)
-            .limit(1)
-            .execute()
+            self.client.table("profiles").select("*").eq("id", user_id).limit(1).execute()
         )
         existing_row = _row_one(existing)
         if existing_row is not None:
@@ -408,14 +401,26 @@ class SupabaseGateway:
         return self.get_conversation(user_id=user_id, conversation_id=conversation_id)
 
     def soft_delete_conversation(self, *, user_id: str, conversation_id: str) -> bool:
+        now = _now_iso()
         result = (
             self.client.table("conversations")
-            .update({"deleted_at": _now_iso(), "updated_at": _now_iso()})
+            .update({"deleted_at": now, "updated_at": now})
             .eq("id", conversation_id)
             .eq("user_id", user_id)
             .execute()
         )
         return bool(result.data)
+
+    def soft_delete_all_conversations(self, *, user_id: str) -> int:
+        now = _now_iso()
+        result = (
+            self.client.table("conversations")
+            .update({"deleted_at": now, "updated_at": now})
+            .eq("user_id", user_id)
+            .is_("deleted_at", "null")
+            .execute()
+        )
+        return len(result.data or [])
 
     def list_messages(
         self, *, user_id: str, conversation_id: str, limit: int | None
@@ -468,6 +473,217 @@ class SupabaseGateway:
         payload["user_id"] = user_id
         created = self.client.table("backtest_runs").insert(payload).execute()
         return BacktestRun.model_validate(_row_one(created))
+
+    def create_backtest_job(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str,
+        payload_hash: str,
+        launch_payload: dict[str, Any],
+        request_message_id: str | None = None,
+        confirmation_message_id: str | None = None,
+        idempotency_key: str | None = None,
+        execution_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        clean_idempotency_key = (
+            idempotency_key.strip()
+            if isinstance(idempotency_key, str) and idempotency_key.strip()
+            else None
+        )
+        if clean_idempotency_key is not None:
+            existing = (
+                self.client.table("backtest_jobs")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("idempotency_key", clean_idempotency_key)
+                .limit(1)
+                .execute()
+            )
+            existing_row = _row_one(existing)
+            if existing_row is not None:
+                return dict(existing_row)
+
+        payload = {
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "request_message_id": request_message_id,
+            "confirmation_message_id": confirmation_message_id,
+            "idempotency_key": clean_idempotency_key,
+            "payload_hash": payload_hash,
+            "launch_payload": launch_payload,
+            "status": "queued",
+            "priority": "normal",
+            "attempts": 0,
+            "max_attempts": 1,
+            "execution_metadata": execution_metadata or {},
+        }
+        created = self.client.table("backtest_jobs").insert(payload).execute()
+        return dict(_row_one(created) or {})
+
+    def get_backtest_job(self, *, user_id: str, job_id: str) -> dict[str, Any] | None:
+        result = (
+            self.client.table("backtest_jobs")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .limit(1)
+            .execute()
+        )
+        row = _row_one(result)
+        return dict(row) if row is not None else None
+
+    def count_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> int:
+        query = self.client.table("backtest_jobs").select("id").eq("status", status)
+        if user_id is not None:
+            query = query.eq("user_id", user_id)
+        result = query.limit(max(1, limit)).execute()
+        return len(result.data or [])
+
+    def list_backtest_jobs(
+        self,
+        *,
+        status: str,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        query = (
+            self.client.table("backtest_jobs")
+            .select("*")
+            .eq("status", status)
+            .order("created_at", desc=True)
+        )
+        if user_id is not None:
+            query = query.eq("user_id", user_id)
+        result = query.limit(max(1, limit)).execute()
+        return [dict(row) for row in result.data or []]
+
+    def merge_backtest_job_execution_metadata(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Backtest job not found or not owned by user.")
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata)
+        updated = (
+            self.client.table("backtest_jobs")
+            .update({"execution_metadata": metadata, "updated_at": _now_iso()})
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .execute()
+        )
+        return dict(_row_one(updated) or {})
+
+    def link_backtest_job_result(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        result_run_id: str,
+        execution_metadata: dict[str, Any] | None = None,
+        mark_succeeded: bool = False,
+    ) -> dict[str, Any]:
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Backtest job not found or not owned by user.")
+        if existing.get("result_run_id"):
+            return existing
+
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata or {})
+        payload: dict[str, Any] = {
+            "result_run_id": result_run_id,
+            "execution_metadata": metadata,
+            "updated_at": _now_iso(),
+        }
+        if mark_succeeded:
+            payload["status"] = "succeeded"
+            payload["finished_at"] = _now_iso()
+
+        updated = (
+            self.client.table("backtest_jobs")
+            .update(payload)
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .execute()
+        )
+        return dict(_row_one(updated) or {})
+
+    def mark_backtest_job_running(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        execution_metadata: dict[str, Any] | None = None,
+        started_at: str | None = None,
+    ) -> dict[str, Any]:
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Backtest job not found or not owned by user.")
+
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata or {})
+        payload = {
+            "status": "running",
+            "started_at": started_at or existing.get("started_at") or _now_iso(),
+            "attempts": int(existing.get("attempts") or 0) + 1,
+            "execution_metadata": metadata,
+            "updated_at": _now_iso(),
+        }
+        updated = (
+            self.client.table("backtest_jobs")
+            .update(payload)
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .execute()
+        )
+        return dict(_row_one(updated) or {})
+
+    def mark_backtest_job_failed(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        failure_code: str,
+        failure_detail: str,
+        retryable: bool,
+        execution_metadata: dict[str, Any] | None = None,
+        finished_at: str | None = None,
+    ) -> dict[str, Any]:
+        existing = self.get_backtest_job(user_id=user_id, job_id=job_id)
+        if existing is None:
+            raise ValueError("Backtest job not found or not owned by user.")
+
+        metadata = dict(existing.get("execution_metadata") or {})
+        metadata.update(execution_metadata or {})
+        payload = {
+            "status": "failed",
+            "finished_at": finished_at or _now_iso(),
+            "failure_code": failure_code,
+            "failure_detail": failure_detail,
+            "retryable": retryable,
+            "execution_metadata": metadata,
+            "updated_at": _now_iso(),
+        }
+        updated = (
+            self.client.table("backtest_jobs")
+            .update(payload)
+            .eq("user_id", user_id)
+            .eq("id", job_id)
+            .execute()
+        )
+        return dict(_row_one(updated) or {})
 
     def create_context_packet(
         self,

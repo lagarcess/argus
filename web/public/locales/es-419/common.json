@@ -21,6 +21,7 @@
     "error_occurred": "Ha ocurrido un error",
     "save": "Guardar",
     "cancel": "Cancelar",
+    "done": "Listo",
     "search": "Buscar",
     "archive": "Archivar",
     "archived": "Archivado",
@@ -195,6 +196,29 @@
     "saved": "Guardada",
     "saving": "Guardando",
     "simulation_complete": "Simulación completa",
+    "backtest_job": {
+      "queued_title": "Backtest en cola",
+      "queued_status": "En cola",
+      "queued_body": "Argus ya tiene la solicitud y empezará pronto.",
+      "queued_detail": "Puedes salir de este chat y volver; el progreso queda guardado.",
+      "running_title": "Backtest en ejecución",
+      "running_status": "Ejecutando",
+      "running_body": "Argus está calculando el resultado en segundo plano.",
+      "running_detail": "Puedes salir de este chat y volver; el progreso queda guardado.",
+      "succeeded_title": "Backtest terminado",
+      "succeeded_status": "Resultado listo",
+      "succeeded_body": "El resultado está listo. Argus está cargando la tarjeta guardada.",
+      "succeeded_detail": "El resultado completado reemplazará esta tarjeta de progreso.",
+      "failed_title": "El backtest no pudo terminar",
+      "failed_status": "No se pudo ejecutar",
+      "failed_body": "La ejecución se detuvo antes de que Argus pudiera guardar un resultado. Ajusta la idea si hace falta e inténtalo otra vez.",
+      "failed_retryable_body": "La ejecución se detuvo antes de que Argus pudiera guardar un resultado. Puedes reintentar esta idea desde la confirmación más reciente.",
+      "failed_detail": "La conversación está guardada y este estado seguirá aquí.",
+      "expired_title": "Backtest no completado",
+      "expired_status": "No completado",
+      "expired_body": "Esta ejecución no se completó. Inicia un backtest nuevo cuando quieras.",
+      "expired_detail": "Argus no seguirá mostrando un estado de ejecución para este trabajo."
+    },
     "result_card": {
       "ending_value": "Valor final",
       "total_return": "Rendimiento total",
@@ -339,7 +363,23 @@
       "default_user": "Usuario",
       "edit_display_name": "Editar nombre para mostrar",
       "delete_account": "Eliminar cuenta",
-      "title": "Perfil"
+      "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
+      "display_name_save_error": "No pudimos guardar ese nombre todavía.",
+      "language_save_error": "No pudimos actualizar el idioma todavía.",
+      "close": "Cerrar perfil",
+      "title": "Perfil",
+      "request_deletion": {
+        "title": "Solicitar eliminación de cuenta",
+        "body": "Soporte gestiona la eliminación de cuentas durante la alfa privada. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
+        "contact_support": "Contactar soporte",
+        "submitting": "Enviando...",
+        "success": "Solicitud enviada. Te contactaremos por correo electrónico.",
+        "error": "No pudimos enviar esa solicitud todavía.",
+        "email_fallback": "Enviar correo a soporte",
+        "email_subject": "Solicitud de eliminación de cuenta de Argus",
+        "email_body": "Ayúdame a solicitar la eliminación de mi cuenta de Argus{{account_hint}}.",
+        "close": "Cerrar solicitud de eliminación"
+      }
     },
     "subscription": {
       "title": "Suscripción",
@@ -368,6 +408,15 @@
       "chat_item": "Chat",
       "strategy_item": "Estrategia",
       "delete_all_conversations": "Eliminar todas las conversaciones",
+      "delete_all_confirm": {
+        "title": "¿Eliminar todas las conversaciones?",
+        "description": "Esto mueve todas las conversaciones activas y archivadas a Borrados recientemente. Puedes restaurarlas antes de que se eliminen permanentemente.",
+        "confirm": "Eliminar todas las conversaciones"
+      },
+      "delete_all_success_one": "Se movió {{count}} conversación a Borrados recientemente.",
+      "delete_all_success_other": "Se movieron {{count}} conversaciones a Borrados recientemente.",
+      "delete_all_empty": "No hay conversaciones para eliminar.",
+      "delete_all_error": "No se pudieron eliminar las conversaciones. Inténtalo de nuevo.",
       "security": "Seguridad"
     },
     "help": {

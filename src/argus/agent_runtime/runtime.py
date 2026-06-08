@@ -3,8 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
-from argus.agent_runtime.graph.workflow import WorkflowNode, WorkflowState
-from argus.agent_runtime.stages.clarify import OFFLINE_CLARIFICATION_FALLBACK
+from argus.agent_runtime.clarification_contract import OFFLINE_CLARIFICATION_FALLBACK
 from argus.agent_runtime.stages.compose import (
     compose_response_intent,
     should_prefer_composed_intent,
@@ -19,14 +18,13 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
+from argus.agent_runtime.workflow_contract import (
+    TOKEN_STREAM_NODES,
+    WORKFLOW_NODE_NAMES,
+)
 
 MAX_RECENT_THREAD_HISTORY = 6
-TOKEN_STREAM_NODES = {
-    WorkflowNode.CLARIFY.value,
-    WorkflowNode.EXPLAIN.value,
-    WorkflowNode.NEXT_STEP.value,
-}
-WORKFLOW_NODE_NAMES = {node.value for node in WorkflowNode}
+WorkflowState = dict[str, Any]
 
 
 def build_workflow_input(
@@ -251,6 +249,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "pending_strategy",
         "optional_parameter_choices",
         "confirmation_payload",
+        "backtest_job",
         "next_actions",
         "failure_classification",
         "final_response_payload",

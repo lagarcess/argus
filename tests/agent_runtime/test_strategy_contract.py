@@ -3,6 +3,7 @@ from datetime import date
 from argus.agent_runtime.run_field_contract import (
     current_message_date_range,
     current_message_dca_cadence,
+    current_message_execution_context_tokens,
 )
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import (
@@ -141,9 +142,7 @@ def test_calendar_year_contract_preserves_multi_year_language() -> None:
     assert current_message_date_range(
         "how did apple perform over 2024 and 2025?",
         today=date(2026, 5, 3),
-    ) == (
-        {"start": "2024-01-01", "end": "2025-12-31"}
-    )
+    ) == ({"start": "2024-01-01", "end": "2025-12-31"})
 
 
 def test_resolve_date_range_accepts_current_year_so_far() -> None:
@@ -179,6 +178,16 @@ def test_current_message_dca_cadence_uses_capability_aliases() -> None:
     assert current_message_dca_cadence("comprar 100 de BTC cada mes en 2024") == (
         "monthly"
     )
+
+
+def test_indicator_context_tokens_exclude_indicator_names_from_asset_grounding() -> None:
+    tokens = current_message_execution_context_tokens(
+        "Quiero GOOG con RSI desde 2025",
+        strategy_type="indicator_threshold",
+    )
+
+    assert "rsi" in tokens
+    assert "goog" not in tokens
 
 
 def test_active_context_asset_mentions_need_requested_field_context() -> None:

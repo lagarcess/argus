@@ -1785,6 +1785,60 @@ async def test_explain_stage_async_accepts_natural_benchmark_gap_wording(
 
 
 @pytest.mark.asyncio
+async def test_explain_stage_async_accepts_supported_next_experiment_labels(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "lagged_benchmark",
+            "takeaway": "AAPL and MSFT lagged SPY by 13.3 percentage points in this historical test.",
+            "tested_bullet": "Tested AAPL and MSFT buy and hold over the confirmed window.",
+            "meaning_bullet": "The result is grounded in the completed backtest run.",
+            "next_check_bullet": "Next check: change the date range.",
+            "assumption_bullet": None,
+            "caveat_bullet": "Historical simulation only.",
+            "next_experiment_option_kinds": ["change the date range"],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="why", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "asset_universe": ["AAPL", "MSFT"],
+            "date_range": {"start": "2025-01-01", "end": "2026-06-05"},
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {"total_return": 0.128, "benchmark_return": 0.261},
+        "explanation_context": {"benchmark_symbol": "SPY"},
+    }
+
+    result = await explain_stage_async(state=state)
+    response = result.stage_patch["assistant_response"]
+
+    assert "lagged SPY by 13.3 percentage points" in response
+    assert "change the date range" in response
+    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
+    assert result.stage_patch["assistant_response_fallback_used"] is False
+
+
+@pytest.mark.asyncio
 async def test_explain_stage_async_rejects_signed_benchmark_delta_copy(
     monkeypatch,
 ) -> None:
@@ -1838,6 +1892,73 @@ async def test_explain_stage_async_rejects_signed_benchmark_delta_copy(
 
     assert "-5.3" not in response
     assert "lagged by 5.3 percentage points" in response
+    assert (
+        result.stage_patch["assistant_response_failure_mode"]
+        == "quick_take_draft_rejected"
+    )
+
+
+@pytest.mark.asyncio
+async def test_result_readout_preserves_route_receipt_capture_inside_running_loop(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import result_readout as result_readout_module
+    from argus.agent_runtime.stages import explain as explain_module
+    from argus.llm import openrouter
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        openrouter.record_openrouter_route_receipt(
+            task="result_summary",
+            model_name="unit-test-model",
+            mode="json_schema",
+            schema_name="QuickTakeDraft",
+            latency_ms=7,
+            outcome="succeeded",
+        )
+        return {
+            "relative_performance_claim": "beat_benchmark",
+            "takeaway": "AAPL beat QQQ by 8.1 percentage points in this historical test.",
+            "tested_bullet": "Tested AAPL buy and hold over the confirmed window.",
+            "meaning_bullet": "The result is grounded in the completed backtest run.",
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Historical simulation only.",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_comparison",
+                "benchmark_symbol",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+
+    token = openrouter.begin_openrouter_route_receipt_capture()
+    try:
+        readout = result_readout_module.result_readout_with_metadata_from_backtest_payload(
+            request={
+                "strategy_type": "buy_and_hold",
+                "symbols": ["AAPL"],
+                "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+            },
+            envelope={"total_return": 0.35, "benchmark_return": 0.269},
+            result_card={"benchmark_symbol": "QQQ"},
+            explanation_context={"benchmark_symbol": "QQQ"},
+            language="en",
+        )
+    finally:
+        receipts = openrouter.end_openrouter_route_receipt_capture(token)
+
+    assert readout.source == "llm_explain_stage"
+    assert readout.fallback_used is False
+    assert [receipt.task for receipt in receipts] == ["result_summary"]
 
 
 @pytest.mark.asyncio

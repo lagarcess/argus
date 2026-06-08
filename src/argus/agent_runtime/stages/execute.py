@@ -52,6 +52,26 @@ def execute_stage(
         records.append(record)
 
         if envelope.get("success"):
+            async_job = _async_backtest_job_payload(envelope.get("payload"))
+            if async_job is not None:
+                return StageResult(
+                    outcome="ready_to_respond",
+                    stage_patch={
+                        "tool_call_records": records,
+                        "failure_classification": None,
+                        "assistant_response": _async_backtest_job_message(async_job),
+                        "backtest_job": async_job,
+                        "final_response_payload": {"backtest_job": async_job},
+                        "artifact_references": [
+                            ArtifactReference(
+                                artifact_kind="backtest_job",
+                                artifact_id=str(async_job["id"]),
+                                artifact_status=str(async_job.get("status") or ""),
+                                metadata=async_job,
+                            ).model_dump(mode="python")
+                        ],
+                    },
+                )
             return StageResult(
                 outcome="execution_succeeded",
                 stage_patch={
@@ -335,6 +355,8 @@ def _tool_name(tool: Any) -> str:
 def _final_response_payload(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {"result": payload}
+    if isinstance(payload.get("backtest_job"), dict):
+        return {"backtest_job": dict(payload["backtest_job"])}
     if {"envelope", "result_card", "explanation_context"}.intersection(payload):
         return {
             "result": payload.get("envelope"),
@@ -342,6 +364,32 @@ def _final_response_payload(payload: Any) -> dict[str, Any]:
             "explanation_context": payload.get("explanation_context"),
         }
     return {"result": payload}
+
+
+def _async_backtest_job_payload(payload: Any) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    job = payload.get("backtest_job")
+    if not isinstance(job, dict):
+        return None
+    job_id = _as_optional_str(job.get("id"))
+    conversation_id = _as_optional_str(job.get("conversation_id"))
+    status = _as_optional_str(job.get("status"))
+    if not job_id or not conversation_id or not status:
+        return None
+    return dict(job)
+
+
+def _async_backtest_job_message(job: dict[str, Any]) -> str:
+    status = _as_optional_str(job.get("status")) or "queued"
+    if status == "succeeded":
+        return "The backtest finished. I am loading the result card now."
+    if status in {"failed", "canceled", "expired"}:
+        return "The backtest could not finish. I will show the saved status here."
+    return (
+        "I started the backtest. You can leave this chat and come back; "
+        "I will show the result here as soon as it is ready."
+    )
 
 
 def _failed_action_reference_patch(

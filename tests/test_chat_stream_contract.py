@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
+from contextlib import asynccontextmanager
 from typing import Any
 
 import pytest
@@ -61,6 +63,144 @@ def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
     from argus.api import state as api_state
 
     monkeypatch.setattr(api_state, "supabase_gateway", None)
+
+
+@pytest.mark.asyncio
+async def test_threaded_runtime_event_source_does_not_block_api_event_loop() -> None:
+    from argus.api.chat.runtime_worker import threaded_runtime_event_source
+
+    async def _blocking_runtime_events():
+        yield {"type": "stage_start", "stage": "interpret"}
+        time.sleep(0.05)
+        yield {"type": "final", "payload": {"stage_outcome": "await_approval"}}
+
+    runtime_events = threaded_runtime_event_source(_blocking_runtime_events)
+
+    first_event = await asyncio.wait_for(anext(runtime_events), timeout=1)
+    assert first_event == {"type": "stage_start", "stage": "interpret"}
+
+    async def _event_loop_tick() -> bool:
+        await asyncio.sleep(0.01)
+        return True
+
+    next_runtime_event = asyncio.create_task(anext(runtime_events))
+    tick = asyncio.create_task(_event_loop_tick())
+
+    assert await asyncio.wait_for(tick, timeout=1) is True
+    assert not next_runtime_event.done()
+    assert await asyncio.wait_for(next_runtime_event, timeout=1) == {
+        "type": "final",
+        "payload": {"stage_outcome": "await_approval"},
+    }
+    await runtime_events.aclose()
+
+
+@pytest.mark.asyncio
+async def test_threaded_runtime_event_source_cancels_worker_on_close() -> None:
+    from threading import Event
+
+    from argus.api.chat.runtime_worker import threaded_runtime_event_source
+
+    worker_closed = Event()
+
+    async def _long_running_runtime_events():
+        try:
+            yield {"type": "stage_start", "stage": "interpret"}
+            await asyncio.Event().wait()
+        finally:
+            worker_closed.set()
+
+    runtime_events = threaded_runtime_event_source(_long_running_runtime_events)
+
+    assert await asyncio.wait_for(anext(runtime_events), timeout=1) == {
+        "type": "stage_start",
+        "stage": "interpret",
+    }
+
+    await runtime_events.aclose()
+
+    assert await asyncio.to_thread(worker_closed.wait, 1)
+
+
+def test_runtime_worker_auto_mode_is_reserved_for_prod_like_streams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat.runtime_worker import runtime_worker_enabled
+
+    monkeypatch.delenv("ARGUS_RUNTIME_STREAM_WORKER", raising=False)
+    monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("ARGUS_CHECKPOINTER_MODE", "memory")
+
+    assert runtime_worker_enabled() is False
+
+    monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "supabase")
+    assert runtime_worker_enabled() is True
+
+    monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("ARGUS_CHECKPOINTER_MODE", "postgres")
+    assert runtime_worker_enabled() is True
+
+    monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "false")
+    assert runtime_worker_enabled() is False
+
+    monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "true")
+    assert runtime_worker_enabled() is True
+
+
+def test_chat_stream_worker_mode_uses_isolated_runtime_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    workflows_seen: list[str] = []
+
+    async def _fake_stream_agent_turn_events(**kwargs: Any):
+        workflows_seen.append(kwargs["workflow"])
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Ready.",
+            },
+        }
+
+    @asynccontextmanager
+    async def _isolated_workflow():
+        yield "worker_loop_workflow"
+
+    monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: True)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "get_agent_runtime_workflow",
+        lambda request: "main_loop_workflow",
+    )
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "isolated_agent_runtime_workflow",
+        _isolated_workflow,
+        raising=False,
+    )
+
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Explain Apple",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert workflows_seen == ["worker_loop_workflow"]
 
 
 def test_internal_agent_runtime_turn_is_not_exposed_by_launch_api() -> None:

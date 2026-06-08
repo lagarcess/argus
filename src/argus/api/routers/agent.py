@@ -12,15 +12,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
-from argus.agent_runtime.confirmation_artifacts import (
-    confirmation_artifact_reference,
-    confirmation_id_from_payload,
-)
 from argus.agent_runtime.resolution import mention_to_provenance
-from argus.agent_runtime.result_followups import (
-    compose_private_alpha_save_response,
-    fallback_private_alpha_save_response,
-)
 from argus.agent_runtime.runtime import stream_agent_turn_events
 from argus.agent_runtime.state.models import UserState
 from argus.api import state as api_state
@@ -38,13 +30,16 @@ from argus.api.chat.artifacts import (
     result_followup_metadata_from_run,
     saved_strategy_metadata,
 )
-from argus.api.chat.breakdown import result_breakdown_message
-from argus.api.chat.confirmation import runtime_confirmation_card
+from argus.api.chat.backtest_jobs import (
+    BacktestJobShadowContext,
+    link_shadow_backtest_job_result,
+    reset_backtest_job_shadow_context,
+    set_backtest_job_shadow_context,
+)
 from argus.api.chat.onboarding import (
     parse_onboarding_control_message,
     persist_onboarding_update,
 )
-from argus.api.chat.persistence import persist_runtime_backtest_run
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -54,12 +49,12 @@ from argus.api.chat.recovery import (
     pending_strategy_metadata_fallback_context,
     runtime_checkpoint_values,
 )
-from argus.api.chat.result_actions import (
-    missing_refine_strategy_action_turn,
-    refine_strategy_action_turn,
-)
 from argus.api.chat.retry import retry_last_turn_metadata
 from argus.api.chat.route_receipts import persist_route_receipts
+from argus.api.chat.runtime_worker import (
+    runtime_worker_enabled,
+    threaded_runtime_event_source,
+)
 from argus.api.chat.strategies import save_strategy_from_run
 from argus.api.chat.streaming import (
     runtime_result_card,
@@ -171,6 +166,13 @@ def _strategies_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _clean_optional_header(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
 def _confirmation_artifact_id_from_runtime_result(
     runtime_result: dict[str, Any],
 ) -> str | None:
@@ -189,11 +191,37 @@ def _confirmation_artifact_id_from_runtime_result(
 
 
 def _confirmation_id_for_runtime_card(runtime_result: dict[str, Any]) -> str:
+    from argus.agent_runtime.confirmation_artifacts import confirmation_id_from_payload
+
     payload = runtime_result.get("confirmation_payload")
     fallback = _confirmation_artifact_id_from_runtime_result(runtime_result)
     if isinstance(payload, dict):
         return confirmation_id_from_payload(payload, fallback=fallback)
     return fallback or api_state.store.new_id()
+
+
+async def compose_private_alpha_save_response(**kwargs: Any) -> str | None:
+    from argus.agent_runtime.result_followups import (
+        compose_private_alpha_save_response as _compose_private_alpha_save_response,
+    )
+
+    return await _compose_private_alpha_save_response(**kwargs)
+
+
+def fallback_private_alpha_save_response() -> str:
+    from argus.agent_runtime.result_followups import (
+        fallback_private_alpha_save_response as _fallback_private_alpha_save_response,
+    )
+
+    return _fallback_private_alpha_save_response()
+
+
+def result_breakdown_message(run: BacktestRun | None) -> str:
+    from argus.api.chat.breakdown import (
+        result_breakdown_message as _result_breakdown_message,
+    )
+
+    return _result_breakdown_message(run)
 
 
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
@@ -211,7 +239,7 @@ async def chat_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     user: User = Depends(current_user),  # noqa: B008
 ) -> StreamingResponse:
-    del idempotency_key
+    clean_idempotency_key = _clean_optional_header(idempotency_key)
     headers = {
         "X-Request-Id": request.state.request_id,
         "X-RateLimit-Limit": "200",
@@ -372,6 +400,7 @@ async def chat_stream(
         for index, mention in enumerate(payload.mentions)
     ]
     cancel_confirmation_action = is_cancel_confirmation_action(payload)
+    request_message_record = None
     if onboarding_goal is None and not cancel_confirmation_action:
         user_metadata: dict[str, Any] = {
             "agent_runtime_turn": {
@@ -390,7 +419,7 @@ async def chat_stream(
             ]
         if payload.action is not None:
             user_metadata["chat_action"] = payload.action.model_dump(mode="python")
-        create_message(
+        request_message_record = create_message(
             user_id=user.id,
             conversation_id=conversation.id,
             role="user",
@@ -750,6 +779,11 @@ async def chat_stream(
             return
 
         if payload.action is not None and payload.action.type == "refine_strategy":
+            from argus.api.chat.result_actions import (
+                missing_refine_strategy_action_turn,
+                refine_strategy_action_turn,
+            )
+
             run = run_for_result_action(
                 payload=payload,
                 user=user,
@@ -802,23 +836,50 @@ async def chat_stream(
         receipt_metadata: dict[str, Any] = {}
 
         receipt_token = begin_openrouter_route_receipt_capture()
-        try:
-            runtime_events = stream_agent_turn_events(
-                workflow=workflow,
-                user=runtime_user,
-                thread_id=conversation.id,
-                message=request_message,
-                recent_thread_history=recent_thread_history,
-                context_hints=[
-                    item.model_dump(mode="python") for item in mention_provenance
-                ],
-                action_context=action_context,
-                fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
-                fallback_selected_thread_metadata=(
-                    runtime_fallback.selected_thread_metadata
+        shadow_context_token = set_backtest_job_shadow_context(
+            BacktestJobShadowContext(
+                user_id=user.id,
+                conversation_id=conversation.id,
+                request_message_id=(
+                    request_message_record.id if request_message_record else None
                 ),
-                fallback_artifact_references=runtime_fallback.artifact_references,
-                fallback_confirmation_payload=runtime_fallback.confirmation_payload,
+                confirmation_message_id=runtime_fallback.confirmation_message_id,
+                idempotency_key=clean_idempotency_key,
+                request_id=request.state.request_id,
+                chat_action=action_context,
+            )
+        )
+        try:
+            def runtime_event_source(
+                active_workflow: Any,
+            ) -> AsyncIterator[dict[str, Any]]:
+                return stream_agent_turn_events(
+                    workflow=active_workflow,
+                    user=runtime_user,
+                    thread_id=conversation.id,
+                    message=request_message,
+                    recent_thread_history=recent_thread_history,
+                    context_hints=[
+                        item.model_dump(mode="python") for item in mention_provenance
+                    ],
+                    action_context=action_context,
+                    fallback_latest_task_snapshot=runtime_fallback.latest_task_snapshot,
+                    fallback_selected_thread_metadata=(
+                        runtime_fallback.selected_thread_metadata
+                    ),
+                    fallback_artifact_references=runtime_fallback.artifact_references,
+                    fallback_confirmation_payload=runtime_fallback.confirmation_payload,
+                )
+
+            async def isolated_runtime_event_source() -> AsyncIterator[dict[str, Any]]:
+                async with api_state.isolated_agent_runtime_workflow() as active_workflow:
+                    async for event in runtime_event_source(active_workflow):
+                        yield event
+
+            runtime_events = (
+                threaded_runtime_event_source(isolated_runtime_event_source)
+                if runtime_worker_enabled()
+                else runtime_event_source(workflow)
             )
             final_seen = False
             async for runtime_event in _runtime_events_with_keepalive(runtime_events):
@@ -842,6 +903,8 @@ async def chat_stream(
                 runtime_result = dict(runtime_event.get("payload") or {})
                 stage_status = runtime_stage_status(runtime_result)
                 assistant_text = runtime_result_message(runtime_result)
+                from argus.api.chat.confirmation import runtime_confirmation_card
+
                 confirmation_card = runtime_confirmation_card(
                     runtime_result,
                     confirmation_id=_confirmation_id_for_runtime_card(runtime_result),
@@ -856,9 +919,22 @@ async def chat_stream(
                     runtime_result.pop("assistant_prompt", None)
                 result_card = runtime_result_card(runtime_result)
                 envelope = runtime_result_envelope(runtime_result)
+                backtest_job = None
+                raw_backtest_job = runtime_result.get("backtest_job")
+                if isinstance(raw_backtest_job, dict):
+                    backtest_job = dict(raw_backtest_job)
+                final_response_payload = runtime_result.get("final_response_payload")
+                if (
+                    backtest_job is None
+                    and isinstance(final_response_payload, dict)
+                    and isinstance(final_response_payload.get("backtest_job"), dict)
+                ):
+                    backtest_job = dict(final_response_payload["backtest_job"])
                 run = None
 
                 if result_card is not None:
+                    from argus.api.chat.persistence import persist_runtime_backtest_run
+
                     run = persist_runtime_backtest_run(
                         user=user,
                         conversation=conversation,
@@ -901,6 +977,10 @@ async def chat_stream(
                 if confirmation_card is not None:
                     metadata["confirmation_card"] = confirmation_card
                     if isinstance(runtime_result.get("confirmation_payload"), dict):
+                        from argus.agent_runtime.confirmation_artifacts import (
+                            confirmation_artifact_reference,
+                        )
+
                         metadata["confirmation_payload"] = runtime_result[
                             "confirmation_payload"
                         ]
@@ -928,6 +1008,10 @@ async def chat_stream(
                     runtime_result["confirmation"] = confirmation_card
                 if result_card is not None:
                     metadata["result_card"] = result_card
+                if backtest_job is not None:
+                    metadata["backtest_job"] = backtest_job
+                    metadata["backtest_job_id"] = backtest_job.get("id")
+                    runtime_result["backtest_job"] = backtest_job
                 latest_failed_action_reference = runtime_result.get(
                     "latest_failed_action_reference"
                 )
@@ -941,6 +1025,12 @@ async def chat_stream(
                     if isinstance(failed_action_metadata, dict):
                         metadata["failed_action"] = dict(failed_action_metadata)
                 if run is not None:
+                    link_shadow_backtest_job_result(
+                        user_id=user.id,
+                        run_id=run.id,
+                        gateway=api_state.supabase_gateway,
+                        dev_memory_fallback_enabled=dev_memory_fallback_enabled(),
+                    )
                     receipt_run_id = run.id
                     result_card = run.conversation_result_card
                     metadata["result_card"] = result_card
@@ -1016,8 +1106,7 @@ async def chat_stream(
                 conversation_id=conversation.id,
             )
             assistant_text = (
-                "Something went wrong. Your conversation is saved. "
-                "Please try again."
+                "Something went wrong. Your conversation is saved. " "Please try again."
             )
             failure_metadata: dict[str, Any] = {
                 "conversation_mode": "recovery",
@@ -1052,6 +1141,7 @@ async def chat_stream(
             yield sse_done()
             return
         finally:
+            reset_backtest_job_shadow_context(shadow_context_token)
             persist_route_receipts(
                 receipts=end_openrouter_route_receipt_capture(receipt_token),
                 user_id=user.id,

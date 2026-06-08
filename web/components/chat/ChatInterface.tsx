@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   createConversation,
   deleteConversation,
+  getBacktestJob,
   getBacktestRun,
   getMe,
   getConversationMessages,
@@ -42,6 +43,7 @@ import {
   type ConversationResultCard,
   type HistoryItem,
   type BacktestRun,
+  type BacktestJobResponse,
   type PrimaryGoal,
   type SearchItem,
 } from "@/lib/argus-api";
@@ -75,7 +77,17 @@ import { writeClipboardText } from "@/lib/clipboard";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
+import {
+  hydrateResultActions,
+  hydrateResultActionsForRun,
+} from "@/lib/chat-result-actions";
 import { appendOrReplacePendingAssistantMessage } from "@/lib/chat-send-state";
+import {
+  applyBacktestJobUpdate,
+  backtestJobFromFinalPayload,
+  backtestJobMessageFromApi,
+  pendingBacktestJobIds,
+} from "@/lib/chat-backtest-jobs";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
@@ -277,14 +289,6 @@ function consumeInputAction(action: ChatActionOption, actions: ChatActionOption[
   return [];
 }
 
-function resultActionRequiresRunContext(action: ChatActionOption) {
-  return (
-    action.type === "show_breakdown" ||
-    action.type === "save_strategy" ||
-    action.type === "refine_strategy"
-  );
-}
-
 function consumeConfirmationActionOnMessages(
   messages: Message[],
   action: ChatActionOption | undefined,
@@ -294,10 +298,6 @@ function consumeConfirmationActionOnMessages(
     return messages;
   }
   return applyConfirmationActionEffects(messages, [effect]);
-}
-
-function hasResultActionContext(runId: string | undefined, conversationId: string | undefined) {
-  return Boolean(runId && conversationId);
 }
 
 function historyItemBelongsToConversation(
@@ -314,43 +314,6 @@ function isMissingConversationLoadError(error: unknown) {
   const status = "status" in error ? Number(error.status) : null;
   const code = "code" in error && typeof error.code === "string" ? error.code : null;
   return status === 403 || status === 404 || code === "not_found";
-}
-
-function hydrateResultActions(
-  actions: ChatActionOption[],
-  context: {
-    runId?: string;
-    strategyId?: string | null;
-    conversationId?: string;
-    strategyName?: string;
-    symbols?: string[];
-    template?: string;
-    assetClass?: AssetClass;
-  },
-) {
-  return actions
-    .filter(
-      (action) =>
-        !resultActionRequiresRunContext(action) ||
-        hasResultActionContext(context.runId, context.conversationId),
-    )
-    .map((action) => ({
-      id: action.id || action.type || action.label,
-      label: action.label,
-      type: action.type,
-      presentation: "result" as const,
-      payload: {
-        ...(action.payload ?? {}),
-        run_id: context.runId ?? "",
-        strategy_id: context.strategyId ?? null,
-        conversation_id: context.conversationId,
-        strategy_name: context.strategyName,
-        symbols: context.symbols ?? [],
-        ...(context.template !== undefined ? { template: context.template } : {}),
-        ...(context.assetClass ? { asset_class: context.assetClass } : {}),
-      },
-      value: action.value,
-    }));
 }
 
 function stringOrNull(value: unknown) {
@@ -581,6 +544,10 @@ function hydrateMessagesFromApi(items: ApiMessage[]): HydratedMessages {
         savedStrategyId,
       };
     }
+    const backtestJobMessage = backtestJobMessageFromApi(m);
+    if (backtestJobMessage) {
+      return backtestJobMessage;
+    }
     if (m.role !== "user" && confirmation && Array.isArray(confirmation.rows)) {
       return {
         id: m.id,
@@ -698,6 +665,23 @@ export default function ChatInterface() {
   const chatOptionsRef = useRef<HTMLDivElement>(null);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const pendingBacktestJobKey = useMemo(
+    () => pendingBacktestJobIds(messages).join("|"),
+    [messages],
+  );
+
+  const applyDurableBacktestJobResponse = useCallback(
+    (response: BacktestJobResponse) => {
+      setMessages((prev) =>
+        normalizeRetryActionHistory(
+          normalizeConfirmationHistory(
+            applyBacktestJobUpdate(prev, response),
+          ),
+        ),
+      );
+    },
+    [],
+  );
 
   // ── Toast helper ───────────────────────────────────────────────────────────
 
@@ -735,17 +719,6 @@ export default function ChatInterface() {
     }
     return merged;
   };
-
-  const hydrateResultActionsForRun = (actions: ChatActionOption[], run: BacktestRun): ChatActionOption[] =>
-    hydrateResultActions(actions, {
-      runId: run.id,
-      strategyId: run.strategy_id ?? null,
-      conversationId: run.conversation_id ?? undefined,
-      strategyName: run.conversation_result_card.title,
-      symbols: run.symbols,
-      template: String(run.config_snapshot?.template ?? ""),
-      assetClass: run.asset_class,
-    });
 
   const loadHistoryPage = useCallback(async (nextCursor?: string | null, append = false) => {
     const { items, next_cursor } = await listHistory({
@@ -993,6 +966,49 @@ export default function ChatInterface() {
     }
   }, [messages.length, streamStatus]);
 
+  useEffect(() => {
+    if (!pendingBacktestJobKey) {
+      return;
+    }
+    let cancelled = false;
+    const timers: number[] = [];
+    const jobIds = pendingBacktestJobKey.split("|").filter(Boolean);
+
+    const pollJob = async (jobId: string, attempt = 0) => {
+      try {
+        const response = await getBacktestJob(jobId);
+        if (cancelled) {
+          return;
+        }
+        applyDurableBacktestJobResponse(response);
+        const shouldContinue =
+          response.job.status === "queued" ||
+          response.job.status === "running" ||
+          (response.job.status === "succeeded" && !response.run);
+        if (shouldContinue && attempt < 45) {
+          timers.push(window.setTimeout(() => {
+            void pollJob(jobId, attempt + 1);
+          }, 2000));
+        }
+      } catch {
+        if (!cancelled && attempt < 5) {
+          timers.push(window.setTimeout(() => {
+            void pollJob(jobId, attempt + 1);
+          }, 3000));
+        }
+      }
+    };
+
+    jobIds.forEach((jobId) => {
+      void pollJob(jobId);
+    });
+
+    return () => {
+      cancelled = true;
+      timers.forEach(window.clearTimeout);
+    };
+  }, [applyDurableBacktestJobResponse, pendingBacktestJobKey]);
+
   // ── Load existing conversation ─────────────────────────────────────────────
 
   const loadConversation = async (convId: string) => {
@@ -1092,6 +1108,13 @@ export default function ChatInterface() {
     );
     refreshHistory();
     if (removedConversationId !== conversationId) return;
+    resetToEmptyChatSurface();
+  }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
+
+  const handleAllConversationsDeleted = useCallback(() => {
+    setHistoryItems([]);
+    refreshHistory();
+    if (conversationId === null) return;
     resetToEmptyChatSurface();
   }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
 
@@ -1285,6 +1308,7 @@ export default function ChatInterface() {
         ].filter((retryAction): retryAction is ChatActionOption => Boolean(retryAction));
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const savedStrategyId = savedStrategyIdFromFinalPayload(finalPayload);
+        const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
         if (action?.type === "save_strategy" && savedStrategyId) {
           setMessages((prev) =>
             markResultCardSaved(
@@ -1338,6 +1362,31 @@ export default function ChatInterface() {
                         savedStrategyId: card.savedStrategyId,
                       }
                     : m,
+                ),
+              ),
+            ),
+          );
+        } else if (finalBacktestJob) {
+          setInputActions([]);
+          setMessages((prev) =>
+            normalizeRetryActionHistory(
+              normalizeConfirmationHistory(
+                applyBacktestJobUpdate(
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          kind: "backtest_job",
+                          content: finalText || m.content || undefined,
+                          backtestJob: finalBacktestJob,
+                          artifactId: finalBacktestJob.id,
+                          artifactType: "backtest_job",
+                          artifactStatus: finalBacktestJob.status,
+                          actions: undefined,
+                        }
+                      : m,
+                  ),
+                  { job: finalBacktestJob, run: null },
                 ),
               ),
             ),
@@ -1857,6 +1906,8 @@ export default function ChatInterface() {
         }}
         onHistoryMutated={refreshHistory}
         onConversationRemoved={handleConversationRemoved}
+        onAllConversationsDeleted={handleAllConversationsDeleted}
+        onToast={showToast}
         onLogout={() => {
           void handleLogout();
         }}

@@ -23,6 +23,7 @@ def utcnow() -> datetime:
 class AlphaStore:
     users: dict[str, User] = field(default_factory=dict)
     conversations: dict[str, Conversation] = field(default_factory=dict)
+    conversation_owners: dict[str, str] = field(default_factory=dict)
     messages: dict[str, list[Message]] = field(default_factory=dict)
     strategies: dict[str, Strategy] = field(default_factory=dict)
     collections: dict[str, Collection] = field(default_factory=dict)
@@ -35,6 +36,7 @@ class AlphaStore:
     def reset(self) -> None:
         self.users.clear()
         self.conversations.clear()
+        self.conversation_owners.clear()
         self.messages.clear()
         self.strategies.clear()
         self.collections.clear()

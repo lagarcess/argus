@@ -403,7 +403,9 @@ Unknown failures default to `failed`, `failed_internal` semantics,
 - Jobs are idempotent by user and payload/idempotency key.
 - The UI must hydrate queued/running/succeeded/failed/canceled/expired state
   from durable rows, not frontend-invented state.
-- Supabase Realtime is the selected private-alpha job-status transport.
+- The current private-alpha UI hydrates status through the API polling endpoint;
+  Supabase Realtime remains the selected target transport once the workflow path
+  is stable enough to add subscriptions.
 - API SSE remains request-scoped and should not be used as a long-lived stream
   for workflow-duration jobs.
 
@@ -471,7 +473,8 @@ Tracks resource consumption for quotas and limits.
 
 # 15. feedback
 
-Stores user-submitted bug reports and feature requests.
+Stores user-submitted bug reports, feature requests, general feedback, and
+private-alpha support requests such as account deletion requests.
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -482,7 +485,7 @@ Stores user-submitted bug reports and feature requests.
 - `created_at`: `timestamptz`
 
 ### Enums
-- **type**: `bug`, `feature`, `general`
+- **type**: `bug`, `feature`, `general`, `account_deletion_request`
 ---
 
 # 16. Soft Delete & Archive Rules

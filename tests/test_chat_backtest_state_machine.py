@@ -208,6 +208,46 @@ def _result_runtime_result() -> dict[str, Any]:
     }
 
 
+def _async_backtest_job_runtime_result() -> dict[str, Any]:
+    return {
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": (
+            "I started the backtest. You can leave this chat and come back; "
+            "I will show the result here as soon as it is ready."
+        ),
+        "final_response_payload": {
+            "backtest_job": {
+                "id": "job-async-1",
+                "conversation_id": "conversation-1",
+                "request_message_id": "request-message-1",
+                "confirmation_message_id": "confirmation-message-1",
+                "status": "queued",
+                "result_run_id": None,
+                "failure_code": None,
+                "failure_detail": None,
+                "retryable": False,
+                "queued_at": "2026-06-06T12:00:00Z",
+                "started_at": None,
+                "finished_at": None,
+                "created_at": "2026-06-06T12:00:00Z",
+                "updated_at": "2026-06-06T12:00:00Z",
+            }
+        },
+        "artifact_references": [
+            {
+                "artifact_kind": "backtest_job",
+                "artifact_id": "job-async-1",
+                "artifact_status": "queued",
+                "metadata": {
+                    "id": "job-async-1",
+                    "conversation_id": "conversation-1",
+                    "status": "queued",
+                },
+            }
+        ],
+    }
+
+
 @pytest.mark.parametrize("benchmark_symbol", ["QQQ", "IWM"])
 def test_runtime_backtest_run_persists_explicit_benchmark_from_envelope(
     benchmark_symbol: str,
@@ -525,6 +565,41 @@ def test_chat_stream_persists_pending_strategy_metadata(
     assert assistant["metadata"]["pending_strategy"]["requested_field"] == (
         "asset_universe"
     )
+
+
+def test_chat_stream_persists_async_backtest_job_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _stream_events_from_runtime(lambda **_: _async_backtest_job_runtime_result()),
+    )
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Run backtest",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    final = _stream_payloads(response.text, "final")[0]["payload"]
+    assert final["backtest_job"]["id"] == "job-async-1"
+    messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages").json()[
+        "items"
+    ]
+    assistant = messages[-1]
+    assert assistant["role"] == "assistant"
+    assert assistant["metadata"]["backtest_job"]["id"] == "job-async-1"
+    assert assistant["metadata"]["backtest_job"]["status"] == "queued"
+    assert assistant["metadata"]["backtest_job_id"] == "job-async-1"
 
 
 def test_confirmation_action_requires_pending_confirmation(

@@ -5,6 +5,7 @@ import inspect
 from typing import Protocol
 
 from argus.agent_runtime.capabilities.contract import CapabilityContract
+from argus.agent_runtime.clarification_contract import OFFLINE_CLARIFICATION_FALLBACK
 from argus.agent_runtime.llm_clarifier import ClarificationRequest
 from argus.agent_runtime.stages.compose import (
     compose_response_intent,
@@ -19,9 +20,6 @@ from argus.agent_runtime.state.models import (
 )
 
 OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
-OFFLINE_CLARIFICATION_FALLBACK = (
-    "I could not generate the clarifying question right now. Please try again."
-)
 
 
 class StructuredClarificationGenerator(Protocol):

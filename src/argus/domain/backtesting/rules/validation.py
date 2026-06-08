@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pandas as pd
-
-from argus.domain.indicator_execution import indicator_warmup_from_ref
-from argus.domain.indicators import IndicatorExecutionSpec, executable_indicator_spec
+from argus.domain.indicators import (
+    IndicatorExecutionSpec,
+    executable_indicator_spec,
+    indicator_warmup_from_ref,
+)
 
 from .models import SUPPORTED_COMBINATORS, SUPPORTED_OPERATORS, RuleSpec, SeriesRef
 
+if TYPE_CHECKING:
+    from pandas import DataFrame
+else:
+    DataFrame = Any
 
-def validate_rule_spec(rule_spec: RuleSpec | None, data: pd.DataFrame | None = None) -> None:
+
+def validate_rule_spec(rule_spec: RuleSpec | None, data: DataFrame | None = None) -> None:
     if not isinstance(rule_spec, dict):
         raise ValueError("missing_rule_group")
 
@@ -41,7 +47,7 @@ def required_warmup_bars(rule_spec: RuleSpec | None) -> int:
     return max_warmup
 
 
-def _validate_rule_shape(rule_spec: RuleSpec, data: pd.DataFrame | None) -> None:
+def _validate_rule_shape(rule_spec: RuleSpec, data: DataFrame | None) -> None:
     for group_name in ("entry", "exit"):
         group = rule_spec.get(group_name)
         if not isinstance(group, dict) or not group.get("conditions"):
@@ -66,7 +72,7 @@ def indicator_warmup_bars(ref: SeriesRef) -> int:
     return indicator_warmup_from_ref(spec, ref)
 
 
-def _validate_series_ref(value: Any, data: pd.DataFrame | None) -> int:
+def _validate_series_ref(value: Any, data: DataFrame | None) -> int:
     if isinstance(value, int | float):
         return 0
     if not isinstance(value, dict) or "kind" not in value:

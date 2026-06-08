@@ -8,12 +8,14 @@ services:
     region: virginia
     plan: free
     autoDeployTrigger: off
-    buildCommand: pip install poetry && poetry config virtualenvs.create false && poetry install --only main --no-interaction
+    buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
     startCommand: poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: APP_ENV
         value: production
+      - key: POETRY_VERSION
+        value: "2.1.3"
       - key: ARGUS_PERSISTENCE_MODE
         value: supabase
       - key: ARGUS_DEV_MEMORY_FALLBACK
@@ -34,6 +36,24 @@ services:
         value: https://argus-app-suz5.onrender.com
       - key: ARGUS_STRATEGIES_ENABLED
         value: "false"
+      - key: ARGUS_BACKTEST_JOBS_SHADOW_ENABLED
+        value: "false"
+      - key: ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED
+        value: "false"
+      - key: ARGUS_BACKTEST_WORKFLOW_TASK
+        value: argus-backtests/workflow_proof
+      - key: ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED
+        value: "false"
+      - key: ARGUS_BACKTEST_REAL_WORKFLOW_TASK
+        value: argus-backtests/run_backtest_job
+      - key: ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT
+        value: "1"
+      - key: ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT
+        value: "2"
+      - key: ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT
+        value: "5"
+      - key: ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT
+        value: "10"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKET_BUDGET_SECONDS
@@ -56,6 +76,8 @@ services:
         sync: false
       - key: SUPABASE_JWT_SECRET
         sync: false
+      - key: RENDER_API_KEY
+        sync: false
       - key: OPENROUTER_API_KEY
         sync: false
       - key: ARGUS_UTILITY_MODEL
@@ -66,6 +88,8 @@ services:
         value: deepseek/deepseek-v4-flash
       - key: ARGUS_CHAT_FALLBACK_MODEL
         value: qwen/qwen3.5-9b
+      - key: ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS
+        value: "20"
       - key: ARGUS_STRUCTURED_MODEL
         value: mistralai/mistral-small-2603
       - key: ARGUS_STRUCTURED_FALLBACK_MODEL

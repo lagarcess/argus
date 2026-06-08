@@ -211,7 +211,8 @@ The backend should coordinate systems, not become monolithic business chaos.
 
 ## Backtest Job Status
 
-**Chosen Alpha Transport:** Supabase Realtime on durable job rows
+**Private-Alpha Transport:** API polling on durable job rows now; Supabase
+Realtime is the selected target once the first workflow-backed path is stable.
 
 **Use for:**
 

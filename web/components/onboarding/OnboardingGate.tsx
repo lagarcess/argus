@@ -6,7 +6,11 @@ import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { getMe, patchMe, ApiUser } from "@/lib/argus-api";
 import { DevModeBadge } from "@/components/ui/DevModeBadge";
-import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
+import {
+  ENABLED_LANGUAGES,
+  localeForLanguage,
+  normalizeEnabledLanguage,
+} from "@/lib/language-features";
 import { privateAlphaOnboardingEnabled } from "@/lib/private-alpha-flags";
 
 const GOAL_IDS = [
@@ -110,6 +114,7 @@ export function OnboardingGate({
     try {
       const response = await patchMe({
         language: normalizeEnabledLanguage(selectedLanguage),
+        locale: localeForLanguage(selectedLanguage),
         onboarding: {
           stage: "primary_goal_selection",
           language_confirmed: true,

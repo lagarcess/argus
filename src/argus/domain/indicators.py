@@ -436,6 +436,68 @@ def normalize_indicator_parameters(
     }
 
 
+def indicator_parameters_from_ref(
+    spec: IndicatorExecutionSpec,
+    ref: dict[str, Any],
+) -> dict[str, int | float | str]:
+    raw = dict(spec.default_parameters)
+    if "period" in ref:
+        raw["period" if spec.key in {"rsi", "sma", "ema"} else "length"] = ref["period"]
+    raw.update(ref.get("parameters") if isinstance(ref.get("parameters"), dict) else {})
+
+    normalized: dict[str, int | float | str] = {}
+    for parameter in spec.parameter_schema:
+        raw_value = raw.get(parameter.key)
+        if raw_value is None and parameter.key == "indicator_period":
+            raw_value = raw.get("period", parameter.default)
+        if raw_value is None:
+            raw_value = parameter.default
+        value = _coerce_indicator_ref_parameter(raw_value, parameter.value_type)
+        if parameter.min_value is not None and float(value) < float(parameter.min_value):
+            raise ValueError("invalid_indicator_parameter")
+        if parameter.max_value is not None and float(value) > float(parameter.max_value):
+            raise ValueError("invalid_indicator_parameter")
+        normalized[parameter.key] = value
+
+    if spec.key in {"rsi", "sma", "ema"}:
+        period = int(
+            float(
+                normalized.get(
+                    "indicator_period",
+                    raw.get("period", spec.default_period),
+                )
+            )
+        )
+        normalized["period"] = period
+    if spec.key == "macd":
+        fast = int(float(normalized["fast"]))
+        slow = int(float(normalized["slow"]))
+        signal = int(float(normalized["signal"]))
+        if fast >= slow:
+            raise ValueError("invalid_indicator_parameter")
+        normalized.update({"fast": fast, "slow": slow, "signal": signal})
+    if spec.key == "bbands":
+        normalized["length"] = int(float(normalized["length"]))
+        normalized["std"] = float(normalized["std"])
+
+    return normalized
+
+
+def indicator_warmup_from_ref(
+    spec: IndicatorExecutionSpec,
+    ref: dict[str, Any],
+) -> int:
+    parameters = indicator_parameters_from_ref(spec, ref)
+    if spec.key == "macd":
+        return max(
+            int(spec.warmup_bars),
+            int(parameters["slow"]) + int(parameters["signal"]),
+        )
+    if spec.key == "bbands":
+        return max(int(spec.warmup_bars), int(parameters["length"]))
+    return max(int(spec.warmup_bars), int(parameters.get("period", spec.default_period)))
+
+
 def indicator_assumption_lines(parameters: dict[str, Any]) -> list[str]:
     spec = executable_indicator_spec(str(parameters.get("indicator") or "rsi"))
     if spec is None:
@@ -484,6 +546,15 @@ def _validate_period(spec: IndicatorExecutionSpec, period: int | float) -> None:
 def _validate_threshold(spec: IndicatorExecutionSpec, threshold: float) -> None:
     if threshold < spec.threshold_min or threshold > spec.threshold_max:
         raise ValueError("indicator_threshold_out_of_bounds")
+
+
+def _coerce_indicator_ref_parameter(value: object, value_type: str) -> int | float | str:
+    if value_type == "string":
+        return str(value)
+    if value_type == "integer":
+        return int(float(value))
+    numeric = float(value)
+    return int(numeric) if numeric.is_integer() else numeric
 
 
 def _format_number(value: float | int) -> str:

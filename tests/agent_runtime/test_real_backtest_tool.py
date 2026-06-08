@@ -38,6 +38,11 @@ def test_real_backtest_tool_returns_success_payload(
                 "strategy_type": "buy_and_hold",
                 "assumptions": ["Starting capital: $10,000."],
             },
+            timings_ms={
+                "provider_fetch_total": 12.345,
+                "engine_compute_total": 45.678,
+                "chart_result_build_total": 7.89,
+            },
         )
 
     monkeypatch.setattr(
@@ -69,6 +74,11 @@ def test_real_backtest_tool_returns_success_payload(
     assert result["payload"]["envelope"]["execution_status"] == "succeeded"
     assert result["payload"]["result_card"]["title"] == "TSLA Buy and Hold"
     assert result["payload"]["explanation_context"]["strategy_type"] == "buy_and_hold"
+    assert result["execution_metadata"]["timings_ms"] == {
+        "provider_fetch_total": 12.345,
+        "engine_compute_total": 45.678,
+        "chart_result_build_total": 7.89,
+    }
     assert result["error_type"] is None
 
 
@@ -97,6 +107,7 @@ def test_real_backtest_tool_maps_blocked_unsupported_failure(
                 failure_category="unsupported_capability",
                 failure_reason="unsupported_indicator_threshold",
             ),
+            timings_ms={"provider_fetch_total": 5.5},
         )
 
     monkeypatch.setattr(
@@ -126,6 +137,7 @@ def test_real_backtest_tool_maps_blocked_unsupported_failure(
     assert result["error_type"] == "unsupported_capability"
     assert result["error_message"] != "unsupported_indicator_threshold"
     assert "not executable" in result["error_message"]
+    assert result["execution_metadata"]["timings_ms"] == {"provider_fetch_total": 5.5}
     assert result["retryable"] is False
     assert result["capability_context"]["execution_status"] == "blocked_unsupported"
     assert "failure_reason" not in result["capability_context"]

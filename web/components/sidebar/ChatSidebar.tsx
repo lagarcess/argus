@@ -19,7 +19,11 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import SidebarNavButton from "./SidebarNavButton";
 import ProfileMenu from "./ProfileMenu";
 import RecentChatActions from "./RecentChatActions";
-import { patchConversation, deleteConversation as apiDeleteConversation } from "@/lib/argus-api";
+import {
+  deleteAllConversations,
+  patchConversation,
+  deleteConversation as apiDeleteConversation,
+} from "@/lib/argus-api";
 
 import type { HistoryItem, SearchItem } from "@/lib/argus-api";
 
@@ -64,6 +68,10 @@ export type ChatSidebarProps = {
   onHistoryMutated?: () => void;
   /** Callback when archive/delete removes a chat from the active recents surface */
   onConversationRemoved?: (conversationId: string) => void;
+  /** Callback when every non-deleted conversation is moved to Recently Deleted */
+  onAllConversationsDeleted?: () => void;
+  /** User-facing toast presenter owned by the chat shell */
+  onToast?: (message: string) => void;
   /** Logout handler */
   onLogout: () => void;
   /** Feedback handler */
@@ -146,6 +154,8 @@ export default function ChatSidebar({
   onOpenSearch,
   onHistoryMutated,
   onConversationRemoved,
+  onAllConversationsDeleted,
+  onToast,
   onLogout,
   onFeedback,
   onOpenSidebarPreference,
@@ -158,6 +168,8 @@ export default function ChatSidebar({
   const [renameError, setRenameError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
+  const [isDeletingAllConversations, setIsDeletingAllConversations] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileButtonRef = useRef<HTMLElement | null>(null);
   const recentsScrollRef = useRef<HTMLDivElement>(null);
@@ -262,6 +274,47 @@ export default function ChatSidebar({
       setPendingDeleteId(null);
     }
   }, [isDeleting, onConversationRemoved, onHistoryMutated, pendingDeleteId]);
+
+  const handleRequestDeleteAllConversations = useCallback(() => {
+    setIsProfileMenuOpen(false);
+    setIsDeleteAllDialogOpen(true);
+  }, []);
+
+  const handleConfirmDeleteAllConversations = useCallback(async () => {
+    if (isDeletingAllConversations) return;
+    setIsDeletingAllConversations(true);
+    try {
+      const response = await deleteAllConversations();
+      setIsDeleteAllDialogOpen(false);
+      if (response.deleted_count > 0) {
+        onAllConversationsDeleted?.();
+        onToast?.(t("settings.data.delete_all_success", {
+          count: response.deleted_count,
+          defaultValue_one: "Moved {{count}} conversation to Recently Deleted.",
+          defaultValue_other: "Moved {{count}} conversations to Recently Deleted.",
+        }));
+      } else {
+        onHistoryMutated?.();
+        onToast?.(t(
+          "settings.data.delete_all_empty",
+          "No conversations to delete.",
+        ));
+      }
+    } catch {
+      onToast?.(t(
+        "settings.data.delete_all_error",
+        "Couldn’t delete conversations. Try again.",
+      ));
+    } finally {
+      setIsDeletingAllConversations(false);
+    }
+  }, [
+    isDeletingAllConversations,
+    onAllConversationsDeleted,
+    onHistoryMutated,
+    onToast,
+    t,
+  ]);
 
   const handleStartRename = useCallback((id: string) => {
     const item = chatItems.find((i) => i.id === id);
@@ -556,6 +609,27 @@ export default function ChatSidebar({
         }}
         onConfirm={() => void handleConfirmDelete()}
       />
+      <ConfirmDialog
+        isOpen={isDeleteAllDialogOpen}
+        title={t(
+          "settings.data.delete_all_confirm.title",
+          "Delete all conversations?",
+        )}
+        description={t(
+          "settings.data.delete_all_confirm.description",
+          "This moves all active and archived conversations to Recently Deleted. You can restore them before permanent removal.",
+        )}
+        confirmLabel={t(
+          "settings.data.delete_all_confirm.confirm",
+          "Delete all conversations",
+        )}
+        cancelLabel={t("common.cancel", "Cancel")}
+        isBusy={isDeletingAllConversations}
+        onCancel={() => {
+          if (!isDeletingAllConversations) setIsDeleteAllDialogOpen(false);
+        }}
+        onConfirm={() => void handleConfirmDeleteAllConversations()}
+      />
 
       {/* Footer: Profile menu trigger */}
       <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">
@@ -564,6 +638,7 @@ export default function ChatSidebar({
           onClose={() => setIsProfileMenuOpen(false)}
           onLogout={onLogout}
           onFeedback={onFeedback}
+          onDeleteAllConversations={handleRequestDeleteAllConversations}
           onOpenSidebarPreference={onOpenSidebarPreference}
           anchorRef={profileButtonRef}
           sidebarCollapsed={!isOpen}

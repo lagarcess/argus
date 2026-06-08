@@ -15,7 +15,8 @@ This runbook is for the first trusted-user internet tests on Render.
    Stop if Render proposes duplicate services.
 4. Confirm both services still have manual deploys enabled.
 5. Manually deploy `argus-api`, then `argus-app`.
-6. Export local ops and canary secrets:
+6. Export local ops and canary secrets, or keep these in the root `.env` file
+   and let the scripts load them:
 
 ```bash
 export ARGUS_OPS_TOKEN="..."
@@ -25,13 +26,23 @@ export ARGUS_CANARY_SUPABASE_URL="https://lgdhvepyrzbnscqssgqq.supabase.co"
 export ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY="..."
 ```
 
-7. Run the product warmup script:
+7. Confirm the API is in the safe default tester mode. This mode does not
+   create shadow workflow jobs, does not dispatch proof jobs, and does not expose
+   a Render API key to `argus-api`:
 
 ```bash
-.github/warmup-render.sh
+.github/render-env-sync.sh api-safe-off
 ```
 
-8. Run the golden-path canary:
+Restart `argus-api` after changing Render env values.
+
+8. Run the product warmup script and verify the API stayed in safe mode:
+
+```bash
+.github/warmup-render.sh --expect-mode safe-off
+```
+
+9. Run the golden-path canary:
 
 ```bash
 .github/canary-render.sh
@@ -42,6 +53,29 @@ not invite testers yet. Check Render service status and redeploy only if the
 service is stuck. If warmup passes but the canary fails, treat it as an Argus
 product-path regression and inspect API logs, Supabase messages, backtest runs,
 and route receipts for the canary conversation id.
+
+## Backtest Workflow Modes
+
+The permanent Render Workflow service is `argus-backtests`. It owns multiple
+tasks:
+
+- `argus-backtests/workflow_proof`: proof/canary task for API -> Render Workflow
+  -> Supabase lifecycle validation.
+- `argus-backtests/run_backtest_job`: real backtest execution task.
+
+Use explicit API modes instead of editing individual flags by hand:
+
+```bash
+.github/render-env-sync.sh api-safe-off
+.github/render-env-sync.sh api-proof-shadow-on
+.github/render-env-sync.sh api-real-workflow-on
+```
+
+`api-safe-off` is the default private-alpha tester mode until the frontend can
+render durable async job state. `api-proof-shadow-on` is only for proof dispatch
+validation. `api-real-workflow-on` is only for the async backtest product slice
+where `Run backtest` creates a durable real job and the UI reads
+queued/running/succeeded/failed state from Supabase.
 
 ## Render Environment Ownership
 

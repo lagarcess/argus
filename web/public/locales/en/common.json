@@ -21,6 +21,7 @@
     "error_occurred": "An error occurred",
     "save": "Save",
     "cancel": "Cancel",
+    "done": "Done",
     "search": "Search",
     "archive": "Archive",
     "archived": "Archived",
@@ -195,6 +196,29 @@
     "saved": "Saved",
     "saving": "Saving",
     "simulation_complete": "Simulation Complete",
+    "backtest_job": {
+      "queued_title": "Backtest queued",
+      "queued_status": "Queued",
+      "queued_body": "Argus has the request and will start shortly.",
+      "queued_detail": "You can leave this chat and come back; progress is saved.",
+      "running_title": "Backtest running",
+      "running_status": "Running",
+      "running_body": "Argus is calculating the result in the background.",
+      "running_detail": "You can leave this chat and come back; progress is saved.",
+      "succeeded_title": "Backtest finished",
+      "succeeded_status": "Result ready",
+      "succeeded_body": "The result is ready. Argus is loading the saved card.",
+      "succeeded_detail": "The completed result will replace this progress card.",
+      "failed_title": "Backtest could not finish",
+      "failed_status": "Could not run",
+      "failed_body": "The run stopped before Argus could save a result. Adjust the idea if needed and try again.",
+      "failed_retryable_body": "The run stopped before Argus could save a result. You can retry this idea from the latest confirmation.",
+      "failed_detail": "The conversation is saved, and this status will stay here.",
+      "expired_title": "Backtest not completed",
+      "expired_status": "Not completed",
+      "expired_body": "This run did not complete. Start a fresh backtest when you are ready.",
+      "expired_detail": "Argus will not keep showing a running state for this job."
+    },
     "result_card": {
       "ending_value": "Ending value",
       "total_return": "Total return",
@@ -339,7 +363,23 @@
       "default_user": "User",
       "edit_display_name": "Edit display name",
       "delete_account": "Delete account",
-      "title": "Profile"
+      "delete_account_note": "Request permanent deletion of your Argus account. Support will follow up by email.",
+      "display_name_save_error": "Could not save that name yet.",
+      "language_save_error": "Could not update language yet.",
+      "close": "Close profile",
+      "title": "Profile",
+      "request_deletion": {
+        "title": "Request account deletion",
+        "body": "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+        "contact_support": "Contact support",
+        "submitting": "Sending...",
+        "success": "Request sent. We'll follow up by email.",
+        "error": "We could not submit that request yet.",
+        "email_fallback": "Email support",
+        "email_subject": "Argus account deletion request",
+        "email_body": "Please help me request deletion for my Argus account{{account_hint}}.",
+        "close": "Close deletion request"
+      }
     },
     "subscription": {
       "title": "Subscription",
@@ -368,6 +408,15 @@
       "chat_item": "Chat",
       "strategy_item": "Strategy",
       "delete_all_conversations": "Delete all conversations",
+      "delete_all_confirm": {
+        "title": "Delete all conversations?",
+        "description": "This moves all active and archived conversations to Recently Deleted. You can restore them before permanent removal.",
+        "confirm": "Delete all conversations"
+      },
+      "delete_all_success_one": "Moved {{count}} conversation to Recently Deleted.",
+      "delete_all_success_other": "Moved {{count}} conversations to Recently Deleted.",
+      "delete_all_empty": "No conversations to delete.",
+      "delete_all_error": "Couldn’t delete conversations. Try again.",
       "security": "Security"
     },
     "help": {

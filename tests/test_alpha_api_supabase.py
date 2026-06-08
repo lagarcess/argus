@@ -392,6 +392,33 @@ def test_patch_me_supabase_merges_onboarding_and_persists(mock_gateway):
     mock_gateway.update_user.assert_called_once()
 
 
+def test_feedback_accepts_account_deletion_request_and_enriches_context(mock_gateway):
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "type": "account_deletion_request",
+            "message": "Private alpha account deletion requested.",
+            "context": {"source": "profile_modal"},
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {"success": True}
+    mock_gateway.create_feedback.assert_called_once()
+    call = mock_gateway.create_feedback.call_args.kwargs
+    assert call["feedback_type"] == "account_deletion_request"
+    assert call["user_id"] == "00000000-0000-0000-0000-000000000001"
+    assert call["message"] == "Private alpha account deletion requested."
+    context = call["context"]
+    assert context["source"] == "profile_modal"
+    assert context["account_email"] == "developer@argus.local"
+    assert context["profile_language"] == "en"
+    assert context["request_user_id"] == "00000000-0000-0000-0000-000000000001"
+    assert isinstance(context["requested_at"], str)
+
+
 def test_create_conversation_uses_dev_memory_fallback_when_supabase_fails(
     mock_gateway,
     monkeypatch,
@@ -434,6 +461,23 @@ def test_deleted_conversation_messages_supabase_return_not_found(mock_gateway):
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
     mock_gateway.list_messages.assert_not_called()
+
+
+def test_delete_all_conversations_supabase_delegates_with_user_ownership(
+    mock_gateway,
+):
+    mock_gateway.soft_delete_all_conversations.return_value = 3
+
+    response = client.delete(
+        "/api/v1/conversations",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "deleted_count": 3}
+    mock_gateway.soft_delete_all_conversations.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001"
+    )
 
 
 def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock_gateway):

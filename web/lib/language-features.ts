@@ -1,4 +1,5 @@
 export type ArgusLanguage = "en" | "es-419";
+export type ArgusLocale = "en-US" | "es-419";
 
 export type ArgusLanguageOption = {
   code: ArgusLanguage;
@@ -27,4 +28,12 @@ export function normalizeEnabledLanguage(language?: string | null): ArgusLanguag
     return "es-419";
   }
   return "en";
+}
+
+export function localeForLanguage(language?: string | null): ArgusLocale {
+  return normalizeEnabledLanguage(language) === "es-419" ? "es-419" : "en-US";
+}
+
+export function languageDisplayAbbreviation(language?: string | null): "en" | "es" {
+  return normalizeEnabledLanguage(language) === "es-419" ? "es" : "en";
 }

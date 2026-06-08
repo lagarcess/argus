@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from .compiler import compile_rule_signals
 from .describe import describe_condition, describe_rule_spec
 from .intent_normalizer import (
     ExplicitSignalRuleIntent,
@@ -8,7 +7,6 @@ from .intent_normalizer import (
 )
 from .models import Condition, ConditionGroup, RuleSpec, SeriesRef
 from .normalization import canonicalize_rule_spec
-from .series import resolve_series
 from .signals import (
     rule_spec_from_moving_average_crossover_rules,
     rule_spec_from_signal_rule,
@@ -32,3 +30,15 @@ __all__ = [
     "rule_spec_from_signal_rule",
     "validate_rule_spec",
 ]
+
+
+def compile_rule_signals(*args, **kwargs):
+    from .compiler import compile_rule_signals as _compile_rule_signals
+
+    return _compile_rule_signals(*args, **kwargs)
+
+
+def resolve_series(*args, **kwargs):
+    from .series import resolve_series as _resolve_series
+
+    return _resolve_series(*args, **kwargs)

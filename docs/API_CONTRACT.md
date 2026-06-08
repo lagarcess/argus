@@ -570,11 +570,23 @@ references it through `result_run_id`.
 ```json
 {
   "id": "uuid",
+  "user_id": "uuid",
   "conversation_id": "uuid",
   "request_message_id": "uuid",
   "confirmation_message_id": "uuid",
-  "status": "running",
+  "idempotency_key": "uuid-or-client-key",
   "payload_hash": "sha256:...",
+  "launch_payload": {
+    "strategy": {},
+    "config": {}
+  },
+  "status": "running",
+  "priority": "normal",
+  "attempts": 1,
+  "max_attempts": 1,
+  "queued_at": "timestamp",
+  "started_at": "timestamp",
+  "finished_at": null,
   "result_run_id": null,
   "failure_code": null,
   "failure_detail": null,
@@ -592,12 +604,13 @@ references it through `result_run_id`.
 
 **Job contract:**
 - Supabase is the source of truth for job lifecycle state.
-- Supabase Realtime is the selected private-alpha status transport for job row
-  changes.
+- The private-alpha UI currently polls the job status endpoint; Supabase Realtime
+  remains the selected target transport for job row changes once subscriptions
+  are wired.
 - API SSE remains request-scoped for chat turn stages and must not be treated as
   the long-running backtest status channel.
 - The frontend must hydrate queued/running/succeeded/failed/canceled/expired
-  state from durable job rows after refresh or missed realtime events.
+  state from durable job rows after refresh or missed status updates.
 - `backtest_jobs.status` tracks lifecycle; `failure_code`, `failure_detail`,
   `retryable`, and `execution_metadata` explain failures and retries.
 
@@ -1014,6 +1027,20 @@ Create new chat thread.
 }
 ```
 
+## `DELETE /conversations`
+
+Soft delete all non-deleted conversations owned by the authenticated user,
+including active and archived conversations. Already-deleted conversations are
+ignored so repeated calls are safe and return `deleted_count: 0`.
+
+**Response:**
+```json
+{
+  "success": true,
+  "deleted_count": 3
+}
+```
+
 ## `PATCH /conversations/{id}`
 
 Rename, pin, archive, or restore a soft-deleted conversation.
@@ -1241,6 +1268,30 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
 }
 ```
 
+When chat execution is accepted as an asynchronous durable job instead of a
+completed in-stream run, the final payload includes `backtest_job` and omits
+`run` until the workflow writes the canonical result:
+
+```json
+{
+  "type": "final",
+  "payload": {
+    "stage_outcome": "ready_to_respond",
+    "assistant_response": "I started the backtest. I will show the result here as soon as it is ready.",
+    "backtest_job": {
+      "id": "uuid",
+      "conversation_id": "uuid",
+      "status": "queued",
+      "result_run_id": null,
+      "failure_code": null,
+      "failure_detail": null,
+      "retryable": false
+    },
+    "message_id": "uuid"
+  }
+}
+```
+
 When a pending strategy exists for `await_user_reply`, `ready_for_confirmation`,
 or `await_approval`, the final payload may include:
 
@@ -1440,6 +1491,14 @@ instead of executing heavy backtests synchronously inside the API process. This
 direct endpoint remains a contract for direct/manual execution paths until the
 job API surface is formalized.
 
+Current private-alpha hardening supports shadow job creation, proof workflow
+dispatch, and default-off real workflow execution behind flags while preserving
+the existing in-process result response. The proof task remains a separate smoke
+check for the API -> Render Workflow -> Supabase lifecycle boundary. When
+`ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=true`, dispatch uses the distinct
+`run_backtest_job` task so the workflow can execute the real backtest, persist a
+canonical `backtest_runs` row, and own the durable job's `result_run_id` link.
+
 **Request: Saved Strategy**
 ```json
 {
@@ -1516,6 +1575,108 @@ job API surface is formalized.
   }
 }
 ```
+
+## `GET /backtest-jobs/{id}`
+
+Return one user-owned durable async backtest job and, once available, the
+canonical immutable run linked by `result_run_id`.
+
+This endpoint is the current private-alpha polling transport for durable job
+state and will remain the recovery fallback if Supabase Realtime is later added.
+Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
+with the current chat turn instead of staying open for workflow-duration
+execution.
+
+For completed workflow-backed jobs, `result_readout` is backend-generated
+Markdown using the same async explain-stage ownership as in-stream backtest
+results. The frontend renders this field when present; it must not synthesize a
+Quick take from result-card metrics. `result_readout_source` and
+`result_readout_fallback_used` expose whether the normal LLM/schema-grounded
+path produced the readout or whether Argus intentionally fell back to the
+deterministic safety renderer.
+
+**Response: queued/running**
+```json
+{
+  "job": {
+    "id": "uuid",
+    "conversation_id": "uuid",
+    "request_message_id": "uuid",
+    "confirmation_message_id": "uuid",
+    "status": "running",
+    "result_run_id": null,
+    "failure_code": null,
+    "failure_detail": null,
+    "retryable": false,
+    "queued_at": "timestamp",
+    "started_at": "timestamp",
+    "finished_at": null,
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  },
+  "run": null,
+  "result_readout": null,
+  "result_readout_source": null,
+  "result_readout_fallback_used": null,
+  "result_readout_failure_mode": null
+}
+```
+
+**Response: succeeded**
+```json
+{
+  "job": {
+    "id": "uuid",
+    "conversation_id": "uuid",
+    "request_message_id": "uuid",
+    "confirmation_message_id": "uuid",
+    "status": "succeeded",
+    "result_run_id": "uuid",
+    "failure_code": null,
+    "failure_detail": null,
+    "retryable": false,
+    "queued_at": "timestamp",
+    "started_at": "timestamp",
+    "finished_at": "timestamp",
+    "created_at": "timestamp",
+    "updated_at": "timestamp"
+  },
+  "run": {
+    "id": "uuid",
+    "status": "completed",
+    "conversation_result_card": {}
+  },
+  "result_readout": "**Quick take**\n\nThe strategy returned 12.4% while SPY returned 10.1% over the same period; it beat the benchmark.\n\n- Tested: AAPL buy and hold over January 1, 2024 to June 5, 2026.\n- Keep in mind: This is a return comparison, not causal attribution.",
+  "result_readout_source": "llm_explain_stage",
+  "result_readout_fallback_used": false,
+  "result_readout_failure_mode": null
+}
+```
+
+**Response: failed/canceled/expired**
+```json
+{
+  "job": {
+    "id": "uuid",
+    "conversation_id": "uuid",
+    "status": "failed",
+    "result_run_id": null,
+    "failure_code": "market_data_unavailable",
+    "failure_detail": "market_data_issue",
+    "retryable": true,
+    "finished_at": "timestamp"
+  },
+  "run": null,
+  "result_readout": null,
+  "result_readout_source": null,
+  "result_readout_fallback_used": null,
+  "result_readout_failure_mode": null
+}
+```
+
+**Error rules:**
+- `404 Not Found`: job is missing or not owned by the authenticated user.
+- `500 Server Error`: durable persistence is unavailable in a non-dev path.
 
 ## `GET /backtests/{id}`
 
@@ -1647,6 +1808,12 @@ Search is limited to:
 - `bug`
 - `feature`
 - `general`
+- `account_deletion_request`
+
+For `account_deletion_request`, clients send a one-click support request from
+the account surface. The backend enriches `context` with authenticated account
+metadata such as account email, profile language, request user id, and request
+timestamp before persistence. The frontend must not render the internal user id.
 
 ---
 

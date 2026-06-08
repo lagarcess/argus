@@ -592,18 +592,20 @@ describe("Argus Alpha frontend contract", () => {
 
   test("result actions carry canonical run and conversation context", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const resultActions = readFileSync(join(root, "lib/chat-result-actions.ts"), "utf-8");
 
     expect(chat).toContain("hydrateResultActions");
-    expect(chat).toContain("runId: run.id");
-    expect(chat).toContain("strategyId: run.strategy_id ?? null");
-    expect(chat).toContain("conversationId: run.conversation_id ?? undefined");
+    expect(resultActions).toContain("hydrateResultActions");
+    expect(resultActions).toContain("runId: run.id");
+    expect(resultActions).toContain("strategyId: run.strategy_id ?? null");
+    expect(resultActions).toContain("conversationId: run.conversation_id ?? undefined");
     expect(chat).toContain("metadata.result_conversation_id");
     expect(chat).toContain("resultActionContextFromMetadata(metadata, card)");
     expect(chat).toContain("assetClassOrUndefined(factBank?.asset_class)");
     expect(chat).not.toContain('template: "",\n        assetClass: "equity"');
-    expect(chat).toContain("resultActionRequiresRunContext");
-    expect(chat).toContain("hasResultActionContext(context.runId, context.conversationId)");
-    expect(chat).toContain("presentation: \"result\"");
+    expect(resultActions).toContain("resultActionRequiresRunContext");
+    expect(resultActions).toContain("hasResultActionContext(context.runId, context.conversationId)");
+    expect(resultActions).toContain("presentation: \"result\"");
   });
 
   test("artifact actions stay attached to historical cards", () => {
@@ -902,6 +904,69 @@ describe("Argus Alpha frontend contract", () => {
     expect(profileMenu).toContain("createPortal(menu, document.body)");
     expect(sidebar).toContain("isPointerInsideSidebarRef");
     expect(sidebar).toContain("if (isProfileMenuOpen) return");
+  });
+
+  test("profile modal uses gated language shortcuts and deletion support request", () => {
+    const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+    const languageFeatures = readFileSync(join(root, "lib/language-features.ts"), "utf-8");
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+
+    expect(languageFeatures).toContain("languageDisplayAbbreviation");
+    expect(languageFeatures).toContain("localeForLanguage");
+    expect(profileMenu).toContain("ENABLED_LANGUAGES");
+    expect(profileMenu).toContain("languageDisplayAbbreviation");
+    expect(profileMenu).toContain("localeForLanguage");
+    expect(profileMenu).toContain("postFeedback");
+    expect(profileMenu).toContain('type: "account_deletion_request"');
+    expect(profileMenu).toContain('source: "profile_modal"');
+    expect(profileMenu).toContain("argus-profile-language-trigger");
+    expect(profileMenu).toContain("absolute right-0 top-full");
+    expect(profileMenu).toContain("settings.profile.request_deletion.title");
+    expect(profileMenu).toContain("settings.profile.language_save_error");
+    expect(profileMenu).not.toContain("overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]");
+    expect(profileMenu).not.toContain('profile?.language ?? "en"');
+    expect(api).toContain('"account_deletion_request"');
+    expect(en).toContain("Request account deletion");
+    expect(en).toContain("Request permanent deletion of your Argus account. Support will follow up by email.");
+    expect(en).toContain("Support handles account deletion during private alpha.");
+    expect(en).toContain("Request sent. We'll follow up by email.");
+    expect(es).toContain("Solicitar eliminación de cuenta");
+    expect(es).toContain("Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.");
+    expect(es).toContain("Soporte gestiona la eliminación de cuentas durante la alfa privada.");
+    expect(es).toContain("Solicitud enviada. Te contactaremos por correo electrónico.");
+  });
+
+  test("profile menu delete all conversations is recoverable and outcome-aware", () => {
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
+    const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+
+    expect(api).toContain("export async function deleteAllConversations");
+    expect(api).toContain("deleted_count: number");
+    expect(profileMenu).toContain("onDeleteAllConversations?: () => void");
+    expect(profileMenu).toContain("onDeleteAllConversations?.()");
+    expect(profileMenu).toContain("hover:bg-[#d66d75]/10");
+    expect(profileMenu).not.toContain("cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-[#d66d75]/40");
+    expect(sidebar).toContain("deleteAllConversations");
+    expect(sidebar).toContain("isDeleteAllDialogOpen");
+    expect(sidebar).toContain("settings.data.delete_all_confirm.title");
+    expect(sidebar).toContain("response.deleted_count");
+    expect(sidebar).toContain("onAllConversationsDeleted?.()");
+    expect(sidebar).toContain("settings.data.delete_all_success");
+    expect(sidebar).toContain("settings.data.delete_all_empty");
+    expect(sidebar).toContain("settings.data.delete_all_error");
+    expect(chat).toContain("handleAllConversationsDeleted");
+    expect(chat).toContain("resetToEmptyChatSurface();");
+    expect(chat).toContain("onToast={showToast}");
+    expect(en).toContain("delete_all_success_one");
+    expect(en).toContain("Moved {{count}} conversation to Recently Deleted.");
+    expect(es).toContain("delete_all_success_one");
+    expect(es).toContain("Se movió {{count}} conversación a Borrados recientemente.");
   });
 
   test("interactive controls expose pointer cursor affordance globally", () => {

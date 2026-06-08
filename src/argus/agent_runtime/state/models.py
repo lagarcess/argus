@@ -254,6 +254,7 @@ class ToolCallRecord(BaseModel):
 
 class FinalResponsePayload(BaseModel):
     result: dict[str, Any] | None = None
+    backtest_job: dict[str, Any] | None = None
     error: str | None = None
     summary: str | None = None
     result_card: dict[str, Any] | None = None

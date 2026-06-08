@@ -120,6 +120,328 @@ def test_context_packet_and_route_receipt_persistence_payloads_are_explicit():
     assert receipt_row["context_packet_ids"] == ["packet-1"]
 
 
+class _BacktestJobClient:
+    def __init__(self, existing_jobs: list[dict[str, Any]] | None = None) -> None:
+        self.existing_jobs = existing_jobs or []
+        self.inserted_jobs: list[dict[str, Any]] = []
+        self.updated_jobs: list[dict[str, Any]] = []
+
+    def table(self, table_name: str):
+        assert table_name == "backtest_jobs"
+        return _BacktestJobTable(self)
+
+
+class _BacktestJobTable:
+    def __init__(self, client: _BacktestJobClient) -> None:
+        self.client = client
+        self.operation: str | None = None
+        self.payload: dict[str, Any] | None = None
+        self.filters: dict[str, object] = {}
+        self.limit_count: int | None = None
+
+    def select(self, _columns: str):
+        self.operation = "select"
+        return self
+
+    def insert(self, payload: dict[str, Any]):
+        self.operation = "insert"
+        self.payload = payload
+        return self
+
+    def update(self, payload: dict[str, Any]):
+        self.operation = "update"
+        self.payload = payload
+        return self
+
+    def eq(self, key: str, value: object):
+        self.filters[key] = value
+        return self
+
+    def limit(self, count: int):
+        self.limit_count = count
+        return self
+
+    def order(self, _column: str, *, desc: bool = False):
+        return self
+
+    def execute(self):
+        if self.operation == "select":
+            rows = [
+                row
+                for row in self.client.existing_jobs
+                if all(row.get(key) == value for key, value in self.filters.items())
+            ]
+            if self.limit_count is not None:
+                rows = rows[: self.limit_count]
+            return SimpleNamespace(data=rows)
+        if self.operation == "insert" and self.payload is not None:
+            self.client.inserted_jobs.append(self.payload)
+            return SimpleNamespace(data=[{"id": "job-1", **self.payload}])
+        if self.operation == "update" and self.payload is not None:
+            matches = [
+                row
+                for row in self.client.existing_jobs
+                if all(row.get(key) == value for key, value in self.filters.items())
+            ]
+            updated = {**matches[0], **self.payload} if matches else dict(self.payload)
+            self.client.updated_jobs.append(updated)
+            return SimpleNamespace(data=[updated])
+        return SimpleNamespace(data=[])
+
+
+def test_create_backtest_job_inserts_queued_shadow_payload() -> None:
+    client = _BacktestJobClient()
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.create_backtest_job(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        request_message_id="message-1",
+        confirmation_message_id=None,
+        idempotency_key="idem-1",
+        payload_hash="sha256:abc",
+        launch_payload={
+            "schema_version": "backtest_job_launch/v1",
+            "source": "chat_runtime",
+            "request": {"symbol": "AAPL"},
+        },
+        execution_metadata={"shadow_mode": True, "source": "api_chat"},
+    )
+
+    assert row["id"] == "job-1"
+    assert client.inserted_jobs == [
+        {
+            "user_id": "user-1",
+            "conversation_id": "conversation-1",
+            "request_message_id": "message-1",
+            "confirmation_message_id": None,
+            "idempotency_key": "idem-1",
+            "payload_hash": "sha256:abc",
+            "launch_payload": {
+                "schema_version": "backtest_job_launch/v1",
+                "source": "chat_runtime",
+                "request": {"symbol": "AAPL"},
+            },
+            "status": "queued",
+            "priority": "normal",
+            "attempts": 0,
+            "max_attempts": 1,
+            "execution_metadata": {"shadow_mode": True, "source": "api_chat"},
+        }
+    ]
+
+
+def test_create_backtest_job_reuses_existing_idempotency_key() -> None:
+    existing_job = {
+        "id": "job-existing",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "idempotency_key": "idem-1",
+        "payload_hash": "sha256:existing",
+        "launch_payload": {},
+        "status": "queued",
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.create_backtest_job(
+        user_id="user-1",
+        conversation_id="conversation-1",
+        idempotency_key=" idem-1 ",
+        payload_hash="sha256:new",
+        launch_payload={"request": {"symbol": "MSFT"}},
+    )
+
+    assert row == existing_job
+    assert client.inserted_jobs == []
+
+
+def test_count_backtest_jobs_filters_status_user_and_limit() -> None:
+    client = _BacktestJobClient(
+        existing_jobs=[
+            {"id": "job-1", "user_id": "user-1", "status": "queued"},
+            {"id": "job-2", "user_id": "user-1", "status": "queued"},
+            {"id": "job-3", "user_id": "user-2", "status": "queued"},
+            {"id": "job-4", "user_id": "user-1", "status": "running"},
+        ]
+    )
+    gateway = SupabaseGateway(client=client)
+
+    assert (
+        gateway.count_backtest_jobs(
+            status="queued",
+            user_id="user-1",
+            limit=1,
+        )
+        == 1
+    )
+    assert gateway.count_backtest_jobs(status="queued", limit=10) == 3
+
+
+def test_list_backtest_jobs_filters_status_user_and_limit() -> None:
+    client = _BacktestJobClient(
+        existing_jobs=[
+            {"id": "job-1", "user_id": "user-1", "status": "running"},
+            {"id": "job-2", "user_id": "user-1", "status": "running"},
+            {"id": "job-3", "user_id": "user-2", "status": "running"},
+            {"id": "job-4", "user_id": "user-1", "status": "queued"},
+        ]
+    )
+    gateway = SupabaseGateway(client=client)
+
+    rows = gateway.list_backtest_jobs(
+        status="running",
+        user_id="user-1",
+        limit=1,
+    )
+
+    assert rows == [{"id": "job-1", "user_id": "user-1", "status": "running"}]
+
+
+def test_merge_backtest_job_execution_metadata_preserves_existing_fields() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.merge_backtest_job_execution_metadata(
+        user_id="user-1",
+        job_id="job-1",
+        execution_metadata={"workflow_dispatch": {"task_run_id": "task-run-1"}},
+    )
+
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "workflow_dispatch": {"task_run_id": "task-run-1"},
+    }
+    assert client.updated_jobs[0]["execution_metadata"] == row["execution_metadata"]
+
+
+def test_link_backtest_job_result_marks_succeeded_when_api_owns_shadow_lifecycle() -> (
+    None
+):
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "queued",
+        "result_run_id": None,
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.link_backtest_job_result(
+        user_id="user-1",
+        job_id="job-1",
+        result_run_id="run-1",
+        execution_metadata={
+            "api_in_process_result": {"result_run_id": "run-1"},
+        },
+        mark_succeeded=True,
+    )
+
+    assert row["status"] == "succeeded"
+    assert row["result_run_id"] == "run-1"
+    assert row["finished_at"]
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "api_in_process_result": {"result_run_id": "run-1"},
+    }
+
+
+def test_link_backtest_job_result_does_not_overwrite_existing_result() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "succeeded",
+        "result_run_id": "run-existing",
+        "execution_metadata": {},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.link_backtest_job_result(
+        user_id="user-1",
+        job_id="job-1",
+        result_run_id="run-new",
+    )
+
+    assert row == existing_job
+    assert client.updated_jobs == []
+
+
+def test_mark_backtest_job_running_filters_by_user_and_increments_attempts() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "queued",
+        "attempts": 0,
+        "started_at": None,
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.mark_backtest_job_running(
+        user_id="user-1",
+        job_id="job-1",
+        execution_metadata={"workflow_backtest": {"workflow_run_id": "task-run-1"}},
+    )
+
+    assert row["status"] == "running"
+    assert row["attempts"] == 1
+    assert row["started_at"]
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "workflow_backtest": {"workflow_run_id": "task-run-1"},
+    }
+    assert client.updated_jobs[0]["user_id"] == "user-1"
+    assert client.updated_jobs[0]["id"] == "job-1"
+
+
+def test_mark_backtest_job_failed_filters_by_user_and_sets_failure_metadata() -> None:
+    existing_job = {
+        "id": "job-1",
+        "user_id": "user-1",
+        "conversation_id": "conversation-1",
+        "status": "running",
+        "failure_code": None,
+        "failure_detail": None,
+        "retryable": False,
+        "execution_metadata": {"shadow_mode": True},
+    }
+    client = _BacktestJobClient(existing_jobs=[existing_job])
+    gateway = SupabaseGateway(client=client)
+
+    row = gateway.mark_backtest_job_failed(
+        user_id="user-1",
+        job_id="job-1",
+        failure_code="upstream_dependency_error",
+        failure_detail="market_data_issue",
+        retryable=True,
+        execution_metadata={"workflow_backtest": {"failure_category": "market_data"}},
+    )
+
+    assert row["status"] == "failed"
+    assert row["failure_code"] == "upstream_dependency_error"
+    assert row["failure_detail"] == "market_data_issue"
+    assert row["retryable"] is True
+    assert row["finished_at"]
+    assert row["execution_metadata"] == {
+        "shadow_mode": True,
+        "workflow_backtest": {"failure_category": "market_data"},
+    }
+    assert client.updated_jobs[0]["user_id"] == "user-1"
+    assert client.updated_jobs[0]["id"] == "job-1"
+
+
 class _MockAuthAdmin:
     def get_user_by_email(self, _email: str) -> object:
         raise RuntimeError("fall back to profile lookup")
@@ -323,7 +645,9 @@ class _HistoryTable:
     def in_(self, key: str, values: list[object]):
         expected = {str(value) for value in values}
         self.rows = [
-            row for row in self.rows if row.get(key) is not None and str(row[key]) in expected
+            row
+            for row in self.rows
+            if row.get(key) is not None and str(row[key]) in expected
         ]
         return self
 
@@ -357,9 +681,7 @@ class _HistoryNotFilter:
 
     def is_(self, key: str, value: object):
         if value == "null":
-            self.query.rows = [
-                row for row in self.query.rows if row.get(key) is not None
-            ]
+            self.query.rows = [row for row in self.query.rows if row.get(key) is not None]
         return self.query
 
 
@@ -383,8 +705,7 @@ def test_gateway_history_filters_runs_by_parent_conversation_state() -> None:
         "run-orphan",
     }
     assert {
-        row["id"]
-        for row in gateway.list_history_rows(user_id="user-1", limit=1)["runs"]
+        row["id"] for row in gateway.list_history_rows(user_id="user-1", limit=1)["runs"]
     } == {"run-active"}
     assert {row["id"] for row in archived_rows["runs"]} == {"run-archived"}
     assert {row["id"] for row in deleted_rows["runs"]} == {"run-deleted"}
