@@ -148,6 +148,29 @@ paths:
           description: Global keyword search across chats, strategies, collections, and runs.
   /api/v1/feedback:
     post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - message
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - bug
+                    - feature
+                    - general
+                    - account_deletion_request
+                message:
+                  type: string
+                  minLength: 1
+                context:
+                  type: object
+                  additionalProperties: true
       responses:
         "200":
           description: Feedback accepted.

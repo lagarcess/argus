@@ -366,7 +366,7 @@ class DiscoveryResponse(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    type: Literal["bug", "feature", "general"]
+    type: Literal["bug", "feature", "general", "account_deletion_request"]
     message: str = Field(min_length=1)
     context: dict[str, Any] = Field(default_factory=dict)
 

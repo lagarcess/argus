@@ -25,7 +25,13 @@ import {
   Edit2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { getMe, patchMe, type ApiUser } from "@/lib/argus-api";
+import { getMe, patchMe, postFeedback, type ApiUser } from "@/lib/argus-api";
+import {
+  ENABLED_LANGUAGES,
+  languageDisplayAbbreviation,
+  localeForLanguage,
+  normalizeEnabledLanguage,
+} from "@/lib/language-features";
 
 import AppearanceModal from "@/components/settings/AppearanceModal";
 import LanguageModal from "@/components/settings/LanguageModal";
@@ -57,6 +63,28 @@ type ActiveModal =
 
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
 
+type DeleteRequestState = "idle" | "submitting" | "success" | "error";
+
+const SUPPORT_EMAIL =
+  process.env.NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL ?? "support@argus.local";
+
+function profileHandle(profile: ApiUser | null) {
+  const explicitUsername = profile?.username?.trim().replace(/^@+/, "");
+  if (explicitUsername) return `@${explicitUsername}`;
+
+  const emailLocalPart = profile?.email?.split("@")[0]?.trim();
+  return emailLocalPart ? `@${emailLocalPart}` : null;
+}
+
+function profileInitial(profile: ApiUser | null) {
+  const source =
+    profile?.display_name?.trim() ||
+    profile?.username?.trim() ||
+    profile?.email?.trim() ||
+    "A";
+  return source.charAt(0).toUpperCase();
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProfileMenu({
@@ -69,18 +97,29 @@ export default function ProfileMenu({
   anchorRef,
   sidebarCollapsed = false,
 }: ProfileMenuProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
+  const languagePickerRef = useRef<HTMLDivElement>(null);
   const [activeSubmenu, setActiveSubmenu] = useState<SubMenu>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [profile, setProfile] = useState<ApiUser | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
+  const [isSavingLanguage, setIsSavingLanguage] = useState(false);
+  const [languageError, setLanguageError] = useState<string | null>(null);
+  const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
+  const [deleteRequestState, setDeleteRequestState] =
+    useState<DeleteRequestState>("idle");
   const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch profile on open
   useEffect(() => {
     if (isOpen) {
+      setNameError(null);
+      setLanguageError(null);
       getMe()
         .then(({ user }) => setProfile(user))
         .catch(() => null);
@@ -120,6 +159,39 @@ export default function ProfileMenu({
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!activeModal) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (isLanguagePickerOpen) {
+        setIsLanguagePickerOpen(false);
+        return;
+      }
+      if (isDeleteRequestOpen) {
+        if (deleteRequestState !== "submitting") setIsDeleteRequestOpen(false);
+        return;
+      }
+      setActiveModal(null);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [
+    activeModal,
+    deleteRequestState,
+    isDeleteRequestOpen,
+    isLanguagePickerOpen,
+  ]);
+
+  useEffect(() => {
+    if (!isLanguagePickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (languagePickerRef.current?.contains(e.target as Node)) return;
+      setIsLanguagePickerOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [isLanguagePickerOpen]);
 
   // Submenu hover with delay and guard
   const [canOpenSubmenu, setCanOpenSubmenu] = useState(false);
@@ -173,6 +245,7 @@ export default function ProfileMenu({
   // Profile name editing
   const handleStartEditName = useCallback(() => {
     setNameValue(profile?.display_name ?? "");
+    setNameError(null);
     setEditingName(true);
   }, [profile]);
 
@@ -182,14 +255,122 @@ export default function ProfileMenu({
       setEditingName(false);
       return;
     }
+    setIsSavingName(true);
+    setNameError(null);
     try {
       const { user } = await patchMe({ display_name: trimmed });
       setProfile(user);
+      setEditingName(false);
     } catch (err) {
       console.error("Failed to update display name", err);
+      setNameError(
+        t(
+          "settings.profile.display_name_save_error",
+          "Could not save that name yet.",
+        ),
+      );
+    } finally {
+      setIsSavingName(false);
     }
-    setEditingName(false);
-  }, [nameValue, profile]);
+  }, [nameValue, profile, t]);
+
+  const currentLanguage = normalizeEnabledLanguage(
+    profile?.language ?? i18n.language,
+  );
+  const currentLanguageAbbreviation =
+    languageDisplayAbbreviation(currentLanguage);
+  const handleLanguageSelect = useCallback(
+    async (code: string) => {
+      const nextLanguage = normalizeEnabledLanguage(code);
+      const previousLanguage = normalizeEnabledLanguage(
+        profile?.language ?? i18n.language,
+      );
+      if (isSavingLanguage) return;
+
+      setIsSavingLanguage(true);
+      setLanguageError(null);
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              language: nextLanguage,
+              locale: localeForLanguage(nextLanguage),
+            }
+          : current,
+      );
+      await i18n.changeLanguage(nextLanguage);
+
+      try {
+        const { user } = await patchMe({
+          language: nextLanguage,
+          locale: localeForLanguage(nextLanguage),
+        });
+        setProfile(user);
+        setIsLanguagePickerOpen(false);
+      } catch (err) {
+        console.error("Failed to update language", err);
+        await i18n.changeLanguage(previousLanguage);
+        setProfile((current) =>
+          current
+            ? {
+                ...current,
+                language: previousLanguage,
+                locale: localeForLanguage(previousLanguage),
+              }
+            : current,
+        );
+        setLanguageError(
+          t(
+            "settings.profile.language_save_error",
+            "Could not update language yet.",
+          ),
+        );
+      } finally {
+        setIsSavingLanguage(false);
+      }
+    },
+    [i18n, isSavingLanguage, profile, t],
+  );
+
+  const handleOpenDeleteRequest = useCallback(() => {
+    setDeleteRequestState("idle");
+    setIsDeleteRequestOpen(true);
+  }, []);
+
+  const handleSubmitDeleteRequest = useCallback(async () => {
+    if (deleteRequestState === "submitting" || deleteRequestState === "success") {
+      return;
+    }
+    setDeleteRequestState("submitting");
+    try {
+      await postFeedback({
+        type: "account_deletion_request",
+        message: "Private alpha account deletion requested.",
+        context: {
+          source: "profile_modal",
+          profile_language: currentLanguage,
+        },
+      });
+      setDeleteRequestState("success");
+    } catch (err) {
+      console.error("Failed to submit account deletion request", err);
+      setDeleteRequestState("error");
+    }
+  }, [currentLanguage, deleteRequestState]);
+
+  const accountHint = profile?.email ? ` (${profile.email})` : "";
+  const supportMailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+    t(
+      "settings.profile.request_deletion.email_subject",
+      "Argus account deletion request",
+    ),
+  )}&body=${encodeURIComponent(
+    t(
+      "settings.profile.request_deletion.email_body",
+      "Please help me request deletion for my Argus account{{account_hint}}.",
+      { account_hint: accountHint },
+    ),
+  )}`;
 
   if (!isOpen && !activeModal) return null;
 
@@ -208,108 +389,324 @@ export default function ProfileMenu({
   }
   if (activeModal === "profile") {
     return (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
-        <button className="absolute inset-0" onClick={() => setActiveModal(null)} aria-label="Close profile" />
-        <div className="relative w-full max-w-sm overflow-hidden rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]">
-          {/* Header */}
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[16px] font-medium text-black dark:text-white">
-              {t("settings.profile.title", "Profile")}
-            </h2>
-            <button
-              onClick={() => setActiveModal(null)}
-              className="rounded-full p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              <X className="h-4 w-4 text-black/50 dark:text-white/50" />
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {/* Avatar + Name */}
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#191c1f] text-[16px] font-bold text-white dark:bg-white/10">
-                {(profile?.display_name ?? profile?.email ?? "A").charAt(0).toUpperCase()}
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col">
-                {/* Display Name — editable */}
-                {editingName ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={nameValue}
-                      onChange={(e) => setNameValue(e.target.value.slice(0, 60))}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") void handleSaveName();
-                        if (e.key === "Escape") setEditingName(false);
-                      }}
-                      className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-2 py-1 text-[14px] font-medium outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
-                      maxLength={60}
-                      placeholder={t("settings.profile.display_name", "Display name")}
-                    />
-                    <button
-                      onClick={() => void handleSaveName()}
-                      className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                      title={t("common.save", "Save")}
-                    >
-                      <Check className="h-3.5 w-3.5 text-[#5ba897]" />
-                    </button>
-                    <button
-                      onClick={() => setEditingName(false)}
-                      className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
-                      title={t("common.cancel", "Cancel")}
-                    >
-                      <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="group flex items-center gap-1.5">
-                    <span className="font-display truncate text-[15px] font-medium text-black dark:text-white">
-                      {profile?.display_name ?? t("settings.profile.default_user", "User")}
-                    </span>
-                    <button
-                      onClick={handleStartEditName}
-                      className="rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
-                      title={t("settings.profile.edit_display_name", "Edit display name")}
-                    >
-                      <Edit2 className="h-3 w-3 text-black/40 dark:text-white/40" />
-                    </button>
-                  </div>
-                )}
-                {/* Username */}
-                {profile?.username && (
-                  <span className="text-[13px] text-black/40 dark:text-white/40">
-                    @{profile.username}
-                  </span>
-                )}
-                <span className="text-[13px] text-black/40 dark:text-white/40">
-                  {profile?.email ?? ""}
-                </span>
-              </div>
+      <>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
+          <button
+            className="absolute inset-0"
+            onClick={() => setActiveModal(null)}
+            aria-label={t("settings.profile.close", "Close profile")}
+          />
+          <div
+            className="relative w-full max-w-sm overflow-hidden rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="argus-profile-modal-title"
+          >
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-between">
+              <h2
+                id="argus-profile-modal-title"
+                className="font-display text-[16px] font-medium text-black dark:text-white"
+              >
+                {t("settings.profile.title", "Profile")}
+              </h2>
+              <button
+                onClick={() => setActiveModal(null)}
+                className="rounded-full p-1.5 hover:bg-black/5 dark:hover:bg-white/10"
+                aria-label={t("settings.profile.close", "Close profile")}
+              >
+                <X className="h-4 w-4 text-black/50 dark:text-white/50" />
+              </button>
             </div>
+
+            <div className="flex flex-col gap-3">
+              {/* Avatar + Name */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#191c1f] text-[16px] font-bold text-white dark:bg-white/10">
+                  {profileInitial(profile)}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  {/* Display Name - editable */}
+                  {editingName ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={nameValue}
+                        onChange={(e) =>
+                          setNameValue(e.target.value.slice(0, 60))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void handleSaveName();
+                          if (e.key === "Escape") setEditingName(false);
+                        }}
+                        disabled={isSavingName}
+                        className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-2 py-1 text-[14px] font-medium outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/30"
+                        maxLength={60}
+                        placeholder={t(
+                          "settings.profile.display_name",
+                          "Display name",
+                        )}
+                      />
+                      <button
+                        onClick={() => void handleSaveName()}
+                        disabled={isSavingName}
+                        className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                        title={t("common.save", "Save")}
+                        aria-label={t("common.save", "Save")}
+                      >
+                        <Check
+                          className={`h-3.5 w-3.5 text-[#5ba897] ${
+                            isSavingName ? "opacity-40" : ""
+                          }`}
+                        />
+                      </button>
+                      <button
+                        onClick={() => setEditingName(false)}
+                        disabled={isSavingName}
+                        className="rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                        title={t("common.cancel", "Cancel")}
+                        aria-label={t("common.cancel", "Cancel")}
+                      >
+                        <X className="h-3.5 w-3.5 text-black/40 dark:text-white/40" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="group flex items-center gap-1.5">
+                      <span className="font-display truncate text-[15px] font-medium text-black dark:text-white">
+                        {profile?.display_name ??
+                          t("settings.profile.default_user", "User")}
+                      </span>
+                      <button
+                        onClick={handleStartEditName}
+                        className="rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
+                        title={t(
+                          "settings.profile.edit_display_name",
+                          "Edit display name",
+                        )}
+                        aria-label={t(
+                          "settings.profile.edit_display_name",
+                          "Edit display name",
+                        )}
+                      >
+                        <Edit2 className="h-3 w-3 text-black/40 dark:text-white/40" />
+                      </button>
+                    </div>
+                  )}
+                  {nameError && (
+                    <span className="mt-1 text-[12px] text-[#d66d75]">
+                      {nameError}
+                    </span>
+                  )}
+                  {/* Username */}
+                  {profileHandle(profile) && (
+                    <span className="text-[13px] text-black/40 dark:text-white/40">
+                      {profileHandle(profile)}
+                    </span>
+                  )}
+                  <span className="text-[13px] text-black/40 dark:text-white/40">
+                    {profile?.email ?? ""}
+                  </span>
+                </div>
+              </div>
 
             {/* Info */}
             <div className="mt-2 flex flex-col gap-2 text-[13px]">
-              <div className="flex justify-between">
+              <div
+                ref={languagePickerRef}
+                className="relative flex items-center justify-between py-1"
+              >
                 <span className="text-black/50 dark:text-white/50">
                   {t("settings.app.language", "Language")}
                 </span>
-                <span className="text-black dark:text-white">{profile?.language ?? "en"}</span>
+                <button
+                  id="argus-profile-language-trigger"
+                  type="button"
+                  onClick={() => setIsLanguagePickerOpen((open) => !open)}
+                  className="-mr-1 rounded-md px-1.5 py-0.5 text-black outline-none transition-colors hover:bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-black/20 dark:text-white dark:hover:bg-white/[0.06] dark:focus-visible:ring-white/20"
+                  aria-haspopup="listbox"
+                  aria-expanded={isLanguagePickerOpen}
+                  aria-controls="argus-profile-language-picker"
+                  aria-label={t("settings.app.language", "App language")}
+                >
+                  {currentLanguageAbbreviation}
+                </button>
+                {isLanguagePickerOpen && (
+                  <div
+                    id="argus-profile-language-picker"
+                    role="listbox"
+                    aria-labelledby="argus-profile-language-trigger"
+                    className="absolute right-0 top-full z-30 mt-1 min-w-[136px] rounded-[10px] border border-black/10 bg-white py-1 shadow-[0_12px_28px_rgba(0,0,0,0.12)] dark:border-white/10 dark:bg-[#23262a]"
+                  >
+                    {ENABLED_LANGUAGES.map((entry) => {
+                      const entryLanguage = normalizeEnabledLanguage(entry.code);
+                      const selected = entryLanguage === currentLanguage;
+                      return (
+                        <button
+                          key={entry.code}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => void handleLanguageSelect(entry.code)}
+                          disabled={isSavingLanguage}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] text-black transition-colors hover:bg-black/5 disabled:cursor-wait disabled:opacity-60 dark:text-white dark:hover:bg-white/5"
+                        >
+                          <span>{entry.name}</span>
+                          {selected ? (
+                            <Check className="h-3.5 w-3.5 text-black dark:text-white" />
+                          ) : (
+                            <span className="text-black/35 dark:text-white/35">
+                              {languageDisplayAbbreviation(entryLanguage)}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+              {languageError && (
+                <span className="text-[12px] text-[#d66d75]">
+                  {languageError}
+                </span>
+              )}
             </div>
 
             {/* Danger zone */}
             <div className="mt-4 border-t border-black/5 pt-3 dark:border-white/5">
               <button
-                disabled
-                className="cursor-not-allowed text-[13px] text-[#d66d75]/40"
+                type="button"
+                onClick={handleOpenDeleteRequest}
+                className="text-[13px] text-[#d66d75]/55 transition-colors hover:text-[#d66d75] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d66d75]/25"
               >
                 {t("settings.profile.delete_account", "Delete account")}
               </button>
+              <p className="mt-1 max-w-[290px] text-[12px] leading-snug text-black/35 dark:text-white/35">
+                {t(
+                  "settings.profile.delete_account_note",
+                  "Request permanent deletion of your Argus account. Support will follow up by email.",
+                )}
+              </p>
             </div>
           </div>
         </div>
       </div>
+      {isDeleteRequestOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/25 p-4 backdrop-blur-sm dark:bg-black/60">
+          <button
+            className="absolute inset-0"
+            onClick={() => {
+              if (deleteRequestState !== "submitting") {
+                setIsDeleteRequestOpen(false);
+              }
+            }}
+            aria-label={t(
+              "settings.profile.request_deletion.close",
+              "Close deletion request",
+            )}
+          />
+          <div
+            className="relative w-full max-w-sm rounded-[18px] border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-[#1b1d20]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="argus-delete-request-title"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3
+                id="argus-delete-request-title"
+                className="font-display text-[16px] font-medium text-black dark:text-white"
+              >
+                {t(
+                  "settings.profile.request_deletion.title",
+                  "Request account deletion",
+                )}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsDeleteRequestOpen(false)}
+                disabled={deleteRequestState === "submitting"}
+                className="rounded-full p-1.5 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/10"
+                aria-label={t(
+                  "settings.profile.request_deletion.close",
+                  "Close deletion request",
+                )}
+              >
+                <X className="h-4 w-4 text-black/50 dark:text-white/50" />
+              </button>
+            </div>
+
+            {deleteRequestState === "success" ? (
+              <>
+                <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
+                  {t(
+                    "settings.profile.request_deletion.success",
+                    "Request sent. We'll follow up by email.",
+                  )}
+                </p>
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleteRequestOpen(false)}
+                    className="rounded-md bg-black px-3 py-2 text-[13px] font-medium text-white hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85"
+                  >
+                    {t("common.done", "Done")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
+                  {t(
+                    "settings.profile.request_deletion.body",
+                    "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+                  )}
+                </p>
+                {deleteRequestState === "error" && (
+                  <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
+                    {t(
+                      "settings.profile.request_deletion.error",
+                      "We could not submit that request yet.",
+                    )}{" "}
+                    <a className="underline" href={supportMailto}>
+                      {t(
+                        "settings.profile.request_deletion.email_fallback",
+                        "Email support",
+                      )}
+                    </a>
+                  </p>
+                )}
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleteRequestOpen(false)}
+                    disabled={deleteRequestState === "submitting"}
+                    className="rounded-md px-3 py-2 text-[13px] font-medium text-black/55 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:text-white/55 dark:hover:bg-white/10"
+                  >
+                    {t("common.cancel", "Cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmitDeleteRequest()}
+                    disabled={deleteRequestState === "submitting"}
+                    className="rounded-md bg-[#d66d75]/12 px-3 py-2 text-[13px] font-medium text-[#b94c55] hover:bg-[#d66d75]/18 disabled:cursor-wait disabled:opacity-60 dark:text-[#e7a2a8]"
+                  >
+                    {deleteRequestState === "submitting"
+                      ? t(
+                          "settings.profile.request_deletion.submitting",
+                          "Sending...",
+                        )
+                      : t(
+                          "settings.profile.request_deletion.contact_support",
+                          "Contact support",
+                        )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 

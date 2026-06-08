@@ -21,6 +21,7 @@
     "error_occurred": "An error occurred",
     "save": "Save",
     "cancel": "Cancel",
+    "done": "Done",
     "search": "Search",
     "archive": "Archive",
     "archived": "Archived",
@@ -362,7 +363,23 @@
       "default_user": "User",
       "edit_display_name": "Edit display name",
       "delete_account": "Delete account",
-      "title": "Profile"
+      "delete_account_note": "Request permanent deletion of your Argus account. Support will follow up by email.",
+      "display_name_save_error": "Could not save that name yet.",
+      "language_save_error": "Could not update language yet.",
+      "close": "Close profile",
+      "title": "Profile",
+      "request_deletion": {
+        "title": "Request account deletion",
+        "body": "Support handles account deletion during private alpha. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+        "contact_support": "Contact support",
+        "submitting": "Sending...",
+        "success": "Request sent. We'll follow up by email.",
+        "error": "We could not submit that request yet.",
+        "email_fallback": "Email support",
+        "email_subject": "Argus account deletion request",
+        "email_body": "Please help me request deletion for my Argus account{{account_hint}}.",
+        "close": "Close deletion request"
+      }
     },
     "subscription": {
       "title": "Subscription",

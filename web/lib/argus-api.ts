@@ -5,7 +5,7 @@ import type {
   ChatMention,
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
-import { normalizeEnabledLanguage } from "./language-features";
+import { normalizeEnabledLanguage, type ArgusLocale } from "./language-features";
 import {
   displayResultActionLabel,
   displayResultBenchmarkNote,
@@ -480,7 +480,7 @@ async function persistBrowserSession(payload: AuthResponsePayload) {
 
 export type ProfilePatch = {
   language?: "en" | "es-419";
-  locale?: string;
+  locale?: ArgusLocale;
   theme?: string;
   display_name?: string;
   onboarding?: Partial<{
@@ -925,7 +925,7 @@ export async function searchDiscovery(
 }
 
 export async function postFeedback(payload: {
-  type: "bug" | "feature" | "general";
+  type: "bug" | "feature" | "general" | "account_deletion_request";
   message: string;
   context?: Record<string, unknown>;
 }) {

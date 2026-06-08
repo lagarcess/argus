@@ -21,6 +21,7 @@
     "error_occurred": "Ha ocurrido un error",
     "save": "Guardar",
     "cancel": "Cancelar",
+    "done": "Listo",
     "search": "Buscar",
     "archive": "Archivar",
     "archived": "Archivado",
@@ -362,7 +363,23 @@
       "default_user": "Usuario",
       "edit_display_name": "Editar nombre para mostrar",
       "delete_account": "Eliminar cuenta",
-      "title": "Perfil"
+      "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
+      "display_name_save_error": "No pudimos guardar ese nombre todavía.",
+      "language_save_error": "No pudimos actualizar el idioma todavía.",
+      "close": "Cerrar perfil",
+      "title": "Perfil",
+      "request_deletion": {
+        "title": "Solicitar eliminación de cuenta",
+        "body": "Soporte gestiona la eliminación de cuentas durante la alfa privada. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
+        "contact_support": "Contactar soporte",
+        "submitting": "Enviando...",
+        "success": "Solicitud enviada. Te contactaremos por correo electrónico.",
+        "error": "No pudimos enviar esa solicitud todavía.",
+        "email_fallback": "Enviar correo a soporte",
+        "email_subject": "Solicitud de eliminación de cuenta de Argus",
+        "email_body": "Ayúdame a solicitar la eliminación de mi cuenta de Argus{{account_hint}}.",
+        "close": "Cerrar solicitud de eliminación"
+      }
     },
     "subscription": {
       "title": "Suscripción",

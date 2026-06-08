@@ -4,7 +4,11 @@ import { useMemo, useState } from "react";
 import { Check, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { patchMe } from "@/lib/argus-api";
-import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
+import {
+  ENABLED_LANGUAGES,
+  localeForLanguage,
+  normalizeEnabledLanguage,
+} from "@/lib/language-features";
 
 type LanguageModalProps = {
   onClose: () => void;
@@ -30,10 +34,14 @@ export default function LanguageModal({ onClose }: LanguageModalProps) {
   );
 
   const handleSelect = async (code: string) => {
-    await i18n.changeLanguage(code);
+    const nextLanguage = normalizeEnabledLanguage(code);
+    await i18n.changeLanguage(nextLanguage);
     onClose();
     try {
-      await patchMe({ language: normalizeEnabledLanguage(code) });
+      await patchMe({
+        language: nextLanguage,
+        locale: localeForLanguage(nextLanguage),
+      });
     } catch {
       // Silently ignore if not logged in
     }

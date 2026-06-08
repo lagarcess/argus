@@ -1808,6 +1808,12 @@ Search is limited to:
 - `bug`
 - `feature`
 - `general`
+- `account_deletion_request`
+
+For `account_deletion_request`, clients send a one-click support request from
+the account surface. The backend enriches `context` with authenticated account
+metadata such as account email, profile language, request user id, and request
+timestamp before persistence. The frontend must not render the internal user id.
 
 ---
 

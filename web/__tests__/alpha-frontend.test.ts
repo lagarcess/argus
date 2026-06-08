@@ -906,6 +906,38 @@ describe("Argus Alpha frontend contract", () => {
     expect(sidebar).toContain("if (isProfileMenuOpen) return");
   });
 
+  test("profile modal uses gated language shortcuts and deletion support request", () => {
+    const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+    const languageFeatures = readFileSync(join(root, "lib/language-features.ts"), "utf-8");
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+
+    expect(languageFeatures).toContain("languageDisplayAbbreviation");
+    expect(languageFeatures).toContain("localeForLanguage");
+    expect(profileMenu).toContain("ENABLED_LANGUAGES");
+    expect(profileMenu).toContain("languageDisplayAbbreviation");
+    expect(profileMenu).toContain("localeForLanguage");
+    expect(profileMenu).toContain("postFeedback");
+    expect(profileMenu).toContain('type: "account_deletion_request"');
+    expect(profileMenu).toContain('source: "profile_modal"');
+    expect(profileMenu).toContain("argus-profile-language-trigger");
+    expect(profileMenu).toContain("absolute right-0 top-full");
+    expect(profileMenu).toContain("settings.profile.request_deletion.title");
+    expect(profileMenu).toContain("settings.profile.language_save_error");
+    expect(profileMenu).not.toContain("overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]");
+    expect(profileMenu).not.toContain('profile?.language ?? "en"');
+    expect(api).toContain('"account_deletion_request"');
+    expect(en).toContain("Request account deletion");
+    expect(en).toContain("Request permanent deletion of your Argus account. Support will follow up by email.");
+    expect(en).toContain("Support handles account deletion during private alpha.");
+    expect(en).toContain("Request sent. We'll follow up by email.");
+    expect(es).toContain("Solicitar eliminación de cuenta");
+    expect(es).toContain("Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.");
+    expect(es).toContain("Soporte gestiona la eliminación de cuentas durante la alfa privada.");
+    expect(es).toContain("Solicitud enviada. Te contactaremos por correo electrónico.");
+  });
+
   test("profile menu delete all conversations is recoverable and outcome-aware", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");

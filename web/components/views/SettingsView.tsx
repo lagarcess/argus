@@ -33,7 +33,11 @@ import {
   type HistoryItem,
   type ApiUser,
 } from "@/lib/argus-api";
-import { ENABLED_LANGUAGES, normalizeEnabledLanguage } from "@/lib/language-features";
+import {
+  ENABLED_LANGUAGES,
+  localeForLanguage,
+  normalizeEnabledLanguage,
+} from "@/lib/language-features";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
 
 type SettingsViewProps = {
@@ -115,12 +119,16 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
   }, []);
 
   const setLanguage = async (nextLanguage: string) => {
-    await i18n.changeLanguage(nextLanguage);
+    const normalizedLanguage = normalizeEnabledLanguage(nextLanguage);
+    await i18n.changeLanguage(normalizedLanguage);
     setIsLanguageModalOpen(false);
     setSearchQuery("");
 
     try {
-      await patchMe({ language: normalizeEnabledLanguage(nextLanguage) });
+      await patchMe({
+        language: normalizedLanguage,
+        locale: localeForLanguage(normalizedLanguage),
+      });
     } catch {
       // Silently ignore if not logged in
     }
