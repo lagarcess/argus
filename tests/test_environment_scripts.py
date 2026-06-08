@@ -177,6 +177,10 @@ def test_render_python_builds_use_managed_poetry() -> None:
         "&& poetry install --only main --no-interaction\""
     ) in env_contract
     assert (
+        'ARGUS_RENDER_API_START_COMMAND="poetry run uvicorn argus.api.main:app '
+        "--host 0.0.0.0 --port \\$PORT\""
+    ) in env_contract
+    assert (
         'ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="poetry config virtualenvs.create false '
         "&& poetry install --only main,workflows --no-interaction\""
     ) in env_contract
@@ -302,6 +306,7 @@ def test_render_env_sync_uses_shared_contract_and_single_var_updates() -> None:
     assert "ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT" in source
     assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in env_contract
     assert "ARGUS_RENDER_API_BUILD_COMMAND" in env_contract
+    assert "ARGUS_RENDER_API_START_COMMAND" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_START_COMMAND" in env_contract
     assert "/v1/services/${service_id}/env-vars/${key}" in source
     assert "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED true" in source
@@ -359,6 +364,19 @@ def test_render_env_sync_can_release_workflow_after_env_updates() -> None:
     assert "workflow-runtime" in source
     assert "https://api.render.com/v1/workflows/${WORKFLOW_SERVICE_ID}" in source
     assert "render_workflow_json" in source
+
+
+def test_render_env_sync_can_sync_api_runtime_config() -> None:
+    source = _source(".github/render-env-sync.sh")
+
+    assert ".github/render-env-sync.sh api-runtime" in source
+    api_runtime_block = source.split("sync_api_runtime() {", maxsplit=1)[1].split(
+        "sync_workflow_proof() {", maxsplit=1
+    )[0]
+    assert 'render services update "$API_SERVICE_ID"' in api_runtime_block
+    assert '--build-command "$ARGUS_RENDER_API_BUILD_COMMAND"' in api_runtime_block
+    assert '--start-command "$ARGUS_RENDER_API_START_COMMAND"' in api_runtime_block
+    assert 'put_render_env "$API_SERVICE_ID" POETRY_VERSION' in api_runtime_block
     assert ".buildConfig + {buildCommand: $build_command}" in source
     assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in source
     assert "ARGUS_RENDER_WORKFLOW_START_COMMAND" in source

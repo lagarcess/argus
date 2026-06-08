@@ -21,6 +21,7 @@ Usage:
   .github/render-env-sync.sh api-safe-off
   .github/render-env-sync.sh api-proof-shadow-on
   .github/render-env-sync.sh api-real-workflow-on
+  .github/render-env-sync.sh api-runtime
   .github/render-env-sync.sh workflow-proof
   .github/render-env-sync.sh workflow-release [commit]
   .github/render-env-sync.sh workflow-runtime
@@ -30,6 +31,7 @@ Commands:
   api-safe-off            Disable API job dispatch/execution and blank its Render key.
   api-proof-shadow-on     Enable proof-only shadow dispatch to workflow_proof.
   api-real-workflow-on    Enable real async dispatch to run_backtest_job.
+  api-runtime             Sync argus-api build/start commands and Poetry pin.
   workflow-proof          Sync workflow DB/task/provider env vars on argus-backtests.
   workflow-release        Release argus-backtests so env/build changes reach new runs.
   workflow-runtime        Sync workflow build/start commands on argus-backtests.
@@ -191,6 +193,19 @@ sync_api_safe_off() {
   delete_render_env "$API_SERVICE_ID" RENDER_API_KEY
 }
 
+sync_api_runtime() {
+  require_local_env RENDER_API_KEY
+  render services update "$API_SERVICE_ID" \
+    --build-command "$ARGUS_RENDER_API_BUILD_COMMAND" \
+    --start-command "$ARGUS_RENDER_API_START_COMMAND" \
+    --health-check-path /health \
+    --confirm \
+    --output json \
+    >/dev/null
+  echo "synced ${API_SERVICE_ID}:api-runtime"
+  put_render_env "$API_SERVICE_ID" POETRY_VERSION "$ARGUS_RENDER_POETRY_VERSION"
+}
+
 sync_workflow_proof() {
   require_local_env RENDER_API_KEY
   require_local_env ALPACA_API_KEY
@@ -289,6 +304,9 @@ case "$command" in
     ;;
   api-real-workflow-on)
     sync_api_real_workflow_on
+    ;;
+  api-runtime)
+    sync_api_runtime
     ;;
   api-dispatch-on)
     echo "api-dispatch-on is an alias for api-proof-shadow-on"

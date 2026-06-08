@@ -11,6 +11,7 @@ ARGUS_BACKTEST_WORKFLOW_TASK_DEFAULT="argus-backtests/workflow_proof"
 ARGUS_BACKTEST_REAL_WORKFLOW_TASK_DEFAULT="argus-backtests/run_backtest_job"
 ARGUS_RENDER_POETRY_VERSION="2.1.3"
 ARGUS_RENDER_API_BUILD_COMMAND="poetry config virtualenvs.create false && poetry install --only main --no-interaction"
+ARGUS_RENDER_API_START_COMMAND="poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port \$PORT"
 ARGUS_RENDER_WORKFLOW_BUILD_COMMAND="poetry config virtualenvs.create false && poetry install --only main,workflows --no-interaction"
 ARGUS_RENDER_WORKFLOW_START_COMMAND="poetry run python workflows/main.py"
 
