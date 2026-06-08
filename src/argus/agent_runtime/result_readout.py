@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
+from contextvars import copy_context
 from dataclasses import dataclass
 from threading import Thread
 from typing import Any, TypeVar
@@ -169,9 +170,11 @@ def _run_coroutine_sync(coroutine: Coroutine[Any, Any, T]) -> T:
     result_box: dict[str, T] = {}
     error_box: dict[str, BaseException] = {}
 
+    context = copy_context()
+
     def runner() -> None:
         try:
-            result_box["value"] = asyncio.run(coroutine)
+            result_box["value"] = context.run(lambda: asyncio.run(coroutine))
         except BaseException as exc:  # pragma: no cover - re-raised in caller thread
             error_box["error"] = exc
 

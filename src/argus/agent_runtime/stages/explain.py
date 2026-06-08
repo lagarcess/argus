@@ -600,13 +600,18 @@ def _next_check_kinds_are_supported(
 ) -> bool:
     if not isinstance(allowed_next_experiments, list):
         return not draft.next_experiment_option_kinds
-    by_kind = {
-        str(option.get("kind") or "")
+    supported_values = {
+        value
         for option in allowed_next_experiments
         if isinstance(option, dict)
+        for value in (
+            str(option.get("kind") or "").strip(),
+            str(option.get("label") or "").strip(),
+        )
+        if value
     }
     return all(
-        str(kind_value or "").strip() in by_kind
+        str(kind_value or "").strip() in supported_values
         for kind_value in draft.next_experiment_option_kinds
     )
 
