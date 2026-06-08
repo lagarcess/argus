@@ -387,5 +387,10 @@ class SuccessResponse(BaseModel):
     success: bool
 
 
+class BulkConversationDeleteResponse(BaseModel):
+    success: bool
+    deleted_count: int
+
+
 class StarterPromptsResponse(BaseModel):
     prompts: list[str]

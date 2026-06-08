@@ -401,14 +401,26 @@ class SupabaseGateway:
         return self.get_conversation(user_id=user_id, conversation_id=conversation_id)
 
     def soft_delete_conversation(self, *, user_id: str, conversation_id: str) -> bool:
+        now = _now_iso()
         result = (
             self.client.table("conversations")
-            .update({"deleted_at": _now_iso(), "updated_at": _now_iso()})
+            .update({"deleted_at": now, "updated_at": now})
             .eq("id", conversation_id)
             .eq("user_id", user_id)
             .execute()
         )
         return bool(result.data)
+
+    def soft_delete_all_conversations(self, *, user_id: str) -> int:
+        now = _now_iso()
+        result = (
+            self.client.table("conversations")
+            .update({"deleted_at": now, "updated_at": now})
+            .eq("user_id", user_id)
+            .is_("deleted_at", "null")
+            .execute()
+        )
+        return len(result.data or [])
 
     def list_messages(
         self, *, user_id: str, conversation_id: str, limit: int | None

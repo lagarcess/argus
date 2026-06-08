@@ -436,6 +436,23 @@ def test_deleted_conversation_messages_supabase_return_not_found(mock_gateway):
     mock_gateway.list_messages.assert_not_called()
 
 
+def test_delete_all_conversations_supabase_delegates_with_user_ownership(
+    mock_gateway,
+):
+    mock_gateway.soft_delete_all_conversations.return_value = 3
+
+    response = client.delete(
+        "/api/v1/conversations",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "deleted_count": 3}
+    mock_gateway.soft_delete_all_conversations.assert_called_once_with(
+        user_id="00000000-0000-0000-0000-000000000001"
+    )
+
+
 def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(mock_gateway):
     mock_gateway.create_backtest_run.side_effect = lambda *, user_id, run: run
 

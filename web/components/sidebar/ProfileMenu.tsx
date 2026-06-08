@@ -39,6 +39,7 @@ type ProfileMenuProps = {
   onClose: () => void;
   onLogout: () => void;
   onFeedback?: (type: "bug" | "feature" | "general") => void;
+  onDeleteAllConversations?: () => void;
   onOpenSidebarPreference?: () => void;
   /** Anchor position */
   anchorRef: React.RefObject<HTMLElement | null>;
@@ -63,6 +64,7 @@ export default function ProfileMenu({
   onClose,
   onLogout,
   onFeedback,
+  onDeleteAllConversations,
   onOpenSidebarPreference,
   anchorRef,
   sidebarCollapsed = false,
@@ -161,6 +163,12 @@ export default function ProfileMenu({
     },
     [onClose],
   );
+
+  const handleDeleteAllConversations = useCallback(() => {
+    setActiveSubmenu(null);
+    onClose();
+    onDeleteAllConversations?.();
+  }, [onClose, onDeleteAllConversations]);
 
   // Profile name editing
   const handleStartEditName = useCallback(() => {
@@ -369,8 +377,8 @@ export default function ProfileMenu({
               {t("settings.data.recently_deleted", "Recently Deleted")}
             </button>
             <button
-              disabled
-              className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-[#d66d75]/40"
+              onClick={handleDeleteAllConversations}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 dark:text-[#e0a1a7] dark:hover:bg-[#d66d75]/10"
             >
               <Trash2 className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">

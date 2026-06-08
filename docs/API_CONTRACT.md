@@ -1027,6 +1027,20 @@ Create new chat thread.
 }
 ```
 
+## `DELETE /conversations`
+
+Soft delete all non-deleted conversations owned by the authenticated user,
+including active and archived conversations. Already-deleted conversations are
+ignored so repeated calls are safe and return `deleted_count: 0`.
+
+**Response:**
+```json
+{
+  "success": true,
+  "deleted_count": 3
+}
+```
+
 ## `PATCH /conversations/{id}`
 
 Rename, pin, archive, or restore a soft-deleted conversation.

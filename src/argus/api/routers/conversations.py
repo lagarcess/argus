@@ -10,6 +10,7 @@ from argus.api.dependencies import current_user, dev_memory_fallback_enabled, pr
 from argus.api.message_store import memory_conversation
 from argus.api.pagination import decode_cursor, encode_cursor, invalid_cursor_problem
 from argus.api.schemas import (
+    BulkConversationDeleteResponse,
     Conversation,
     ConversationCreate,
     ConversationPatch,
@@ -23,6 +24,18 @@ from argus.api.schemas import (
 from argus.domain.store import utcnow
 
 router = APIRouter(prefix="/api/v1", tags=["conversations"])
+
+
+def _memory_conversation_owned_by(
+    conversation_id: str,
+    user_id: str,
+    *,
+    allow_unowned: bool,
+) -> bool:
+    owner_id = api_state.store.conversation_owners.get(conversation_id)
+    if owner_id is None:
+        return allow_unowned
+    return owner_id == user_id
 
 
 @router.post("/conversations", response_model=ConversationResponse)
@@ -52,12 +65,14 @@ def create_conversation(
                 title=title,
                 title_source=title_source,
                 language=language,
+                user_id=user.id,
             )
     else:
         conversation = memory_conversation(
             title=title,
             title_source=title_source,
             language=language,
+            user_id=user.id,
         )
     return ConversationResponse(conversation=conversation)
 
@@ -81,6 +96,12 @@ def list_conversations(
     else:
         items = []
         for conversation in api_state.store.conversations.values():
+            if not _memory_conversation_owned_by(
+                conversation.id,
+                user.id,
+                allow_unowned=True,
+            ):
+                continue
             if deleted:
                 if conversation.deleted_at is None:
                     continue
@@ -122,6 +143,33 @@ def list_conversations(
     return PaginatedConversations(items=page_items, next_cursor=next_cursor)
 
 
+@router.delete("/conversations", response_model=BulkConversationDeleteResponse)
+def delete_all_conversations(
+    user: User = Depends(current_user),  # noqa: B008
+) -> BulkConversationDeleteResponse:
+    if api_state.supabase_gateway is not None:
+        deleted_count = api_state.supabase_gateway.soft_delete_all_conversations(
+            user_id=user.id,
+        )
+    else:
+        now = utcnow()
+        deleted_count = 0
+        for conversation_id, conversation in list(api_state.store.conversations.items()):
+            if not _memory_conversation_owned_by(
+                conversation_id,
+                user.id,
+                allow_unowned=False,
+            ):
+                continue
+            if conversation.deleted_at is not None:
+                continue
+            api_state.store.conversations[conversation_id] = conversation.model_copy(
+                update={"deleted_at": now, "updated_at": now},
+            )
+            deleted_count += 1
+    return BulkConversationDeleteResponse(success=True, deleted_count=deleted_count)
+
+
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
 def patch_conversation(
     conversation_id: str,
@@ -137,7 +185,11 @@ def patch_conversation(
         if api_state.supabase_gateway
         else api_state.store.conversations.get(conversation_id)
     )
-    if not conversation:
+    if not conversation or not _memory_conversation_owned_by(
+        conversation_id,
+        user.id,
+        allow_unowned=True,
+    ):
         raise problem(
             request,
             status_code=404,
@@ -185,7 +237,11 @@ def delete_conversation(
         if api_state.supabase_gateway
         else api_state.store.conversations.get(conversation_id)
     )
-    if not conversation:
+    if not conversation or not _memory_conversation_owned_by(
+        conversation_id,
+        user.id,
+        allow_unowned=True,
+    ):
         raise problem(
             request,
             status_code=404,
@@ -221,7 +277,15 @@ def list_messages(
         if api_state.supabase_gateway
         else api_state.store.conversations.get(conversation_id)
     )
-    if not conversation or conversation.deleted_at is not None:
+    if (
+        not conversation
+        or conversation.deleted_at is not None
+        or not _memory_conversation_owned_by(
+            conversation_id,
+            user.id,
+            allow_unowned=True,
+        )
+    ):
         raise problem(
             request,
             status_code=404,
@@ -255,6 +319,12 @@ def list_messages(
 
     if items is None:
         conversation = api_state.store.conversations.get(conversation_id)
+        if conversation is not None and not _memory_conversation_owned_by(
+            conversation_id,
+            user.id,
+            allow_unowned=True,
+        ):
+            conversation = None
         if conversation is not None and conversation.deleted_at is not None:
             raise problem(
                 request,

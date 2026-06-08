@@ -594,6 +594,12 @@ export async function deleteConversation(conversationId: string) {
   });
 }
 
+export async function deleteAllConversations() {
+  return apiFetch<{ success: boolean; deleted_count: number }>("/conversations", {
+    method: "DELETE",
+  });
+}
+
 // ─── History ──────────────────────────────────────────────────────────────────
 
 export async function listHistory(params: { limit?: number; cursor?: string; archived?: boolean; deleted?: boolean } = {}) {

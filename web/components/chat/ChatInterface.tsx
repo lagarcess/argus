@@ -1111,6 +1111,13 @@ export default function ChatInterface() {
     resetToEmptyChatSurface();
   }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
 
+  const handleAllConversationsDeleted = useCallback(() => {
+    setHistoryItems([]);
+    refreshHistory();
+    if (conversationId === null) return;
+    resetToEmptyChatSurface();
+  }, [conversationId, refreshHistory, resetToEmptyChatSurface]);
+
   const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
     setCurrentView("chat");
@@ -1899,6 +1906,8 @@ export default function ChatInterface() {
         }}
         onHistoryMutated={refreshHistory}
         onConversationRemoved={handleConversationRemoved}
+        onAllConversationsDeleted={handleAllConversationsDeleted}
+        onToast={showToast}
         onLogout={() => {
           void handleLogout();
         }}

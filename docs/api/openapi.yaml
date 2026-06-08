@@ -44,6 +44,10 @@ paths:
       responses:
         "200":
           description: Created conversation.
+    delete:
+      responses:
+        "200":
+          description: Soft-deleted all non-deleted conversations for the user.
   /api/v1/conversations/{id}:
     patch:
       responses:

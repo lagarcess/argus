@@ -17,6 +17,7 @@ def memory_conversation(
     title: str,
     title_source: str,
     language: str | None,
+    user_id: str | None = None,
 ) -> Conversation:
     now = utcnow()
     conversation = Conversation(
@@ -28,6 +29,8 @@ def memory_conversation(
         updated_at=now,
     )
     api_state.store.conversations[conversation.id] = conversation
+    if user_id is not None:
+        api_state.store.conversation_owners[conversation.id] = user_id
     api_state.store.messages[conversation.id] = []
     return conversation
 

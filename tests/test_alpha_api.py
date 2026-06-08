@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 import pytest
 from argus.api.main import app
-from argus.api.message_store import memory_message
+from argus.api.message_store import memory_conversation, memory_message
 from argus.domain.market_data.assets import ResolvedAsset
 from fastapi.testclient import TestClient
 
@@ -527,6 +527,96 @@ def test_deleted_conversation_restore_moves_chat_back_to_recents() -> None:
         client.get(f"/api/v1/conversations/{conversation['id']}/messages").status_code
         == 200
     )
+
+
+def test_delete_all_conversations_soft_deletes_active_and_archived_chats() -> None:
+    client = _client()
+
+    active = client.post("/api/v1/conversations", json={"title": "Active idea"}).json()[
+        "conversation"
+    ]
+    archived = client.post(
+        "/api/v1/conversations", json={"title": "Archived idea"}
+    ).json()["conversation"]
+    already_deleted = client.post(
+        "/api/v1/conversations", json={"title": "Deleted idea"}
+    ).json()["conversation"]
+    for conversation in (active, archived, already_deleted):
+        memory_message(
+            conversation_id=conversation["id"],
+            role="user",
+            content=f"Remember {conversation['title']}",
+        )
+
+    assert (
+        client.patch(
+            f"/api/v1/conversations/{archived['id']}",
+            json={"archived": True},
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/v1/conversations/{already_deleted['id']}").status_code == 200
+
+    response = client.delete("/api/v1/conversations")
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "deleted_count": 2}
+    assert client.delete("/api/v1/conversations").json()["deleted_count"] == 0
+    default_chat_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history").json()["items"]
+        if item["type"] == "chat"
+    }
+    deleted_chat_ids = {
+        item["id"]
+        for item in client.get("/api/v1/history?deleted=true").json()["items"]
+        if item["type"] == "chat"
+    }
+    deleted_archived_chat_ids = {
+        item["id"]
+        for item in client.get(
+            "/api/v1/history?deleted=true&archived=true"
+        ).json()["items"]
+        if item["type"] == "chat"
+    }
+
+    assert active["id"] not in default_chat_ids
+    assert archived["id"] not in default_chat_ids
+    assert active["id"] in deleted_chat_ids
+    assert already_deleted["id"] in deleted_chat_ids
+    assert archived["id"] in deleted_archived_chat_ids
+
+
+def test_delete_all_conversations_memory_fallback_skips_other_users_chats() -> None:
+    from argus.api import state as api_state
+
+    client = _client()
+    owned = client.post("/api/v1/conversations", json={"title": "Mine"}).json()[
+        "conversation"
+    ]
+    other = memory_conversation(
+        title="Not mine",
+        title_source="system_default",
+        language="en",
+        user_id="other-user-id",
+    )
+    memory_message(
+        conversation_id=owned["id"],
+        role="user",
+        content="Remember my idea",
+    )
+    memory_message(
+        conversation_id=other.id,
+        role="user",
+        content="Keep the other user's idea",
+    )
+
+    response = client.delete("/api/v1/conversations")
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "deleted_count": 1}
+    assert api_state.store.conversations[owned["id"]].deleted_at is not None
+    assert api_state.store.conversations[other.id].deleted_at is None
 
 
 def test_history_can_return_archived_chats_without_deleted_chats() -> None:

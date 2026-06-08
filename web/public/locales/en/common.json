@@ -391,6 +391,15 @@
       "chat_item": "Chat",
       "strategy_item": "Strategy",
       "delete_all_conversations": "Delete all conversations",
+      "delete_all_confirm": {
+        "title": "Delete all conversations?",
+        "description": "This moves all active and archived conversations to Recently Deleted. You can restore them before permanent removal.",
+        "confirm": "Delete all conversations"
+      },
+      "delete_all_success_one": "Moved {{count}} conversation to Recently Deleted.",
+      "delete_all_success_other": "Moved {{count}} conversations to Recently Deleted.",
+      "delete_all_empty": "No conversations to delete.",
+      "delete_all_error": "Couldn’t delete conversations. Try again.",
       "security": "Security"
     },
     "help": {

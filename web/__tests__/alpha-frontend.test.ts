@@ -906,6 +906,37 @@ describe("Argus Alpha frontend contract", () => {
     expect(sidebar).toContain("if (isProfileMenuOpen) return");
   });
 
+  test("profile menu delete all conversations is recoverable and outcome-aware", () => {
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
+    const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+
+    expect(api).toContain("export async function deleteAllConversations");
+    expect(api).toContain("deleted_count: number");
+    expect(profileMenu).toContain("onDeleteAllConversations?: () => void");
+    expect(profileMenu).toContain("onDeleteAllConversations?.()");
+    expect(profileMenu).toContain("hover:bg-[#d66d75]/10");
+    expect(profileMenu).not.toContain("cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] text-[#d66d75]/40");
+    expect(sidebar).toContain("deleteAllConversations");
+    expect(sidebar).toContain("isDeleteAllDialogOpen");
+    expect(sidebar).toContain("settings.data.delete_all_confirm.title");
+    expect(sidebar).toContain("response.deleted_count");
+    expect(sidebar).toContain("onAllConversationsDeleted?.()");
+    expect(sidebar).toContain("settings.data.delete_all_success");
+    expect(sidebar).toContain("settings.data.delete_all_empty");
+    expect(sidebar).toContain("settings.data.delete_all_error");
+    expect(chat).toContain("handleAllConversationsDeleted");
+    expect(chat).toContain("resetToEmptyChatSurface();");
+    expect(chat).toContain("onToast={showToast}");
+    expect(en).toContain("delete_all_success_one");
+    expect(en).toContain("Moved {{count}} conversation to Recently Deleted.");
+    expect(es).toContain("delete_all_success_one");
+    expect(es).toContain("Se movió {{count}} conversación a Borrados recientemente.");
+  });
+
   test("interactive controls expose pointer cursor affordance globally", () => {
     const globals = readFileSync(join(root, "app/globals.css"), "utf-8");
 

@@ -391,6 +391,15 @@
       "chat_item": "Chat",
       "strategy_item": "Estrategia",
       "delete_all_conversations": "Eliminar todas las conversaciones",
+      "delete_all_confirm": {
+        "title": "¿Eliminar todas las conversaciones?",
+        "description": "Esto mueve todas las conversaciones activas y archivadas a Borrados recientemente. Puedes restaurarlas antes de que se eliminen permanentemente.",
+        "confirm": "Eliminar todas las conversaciones"
+      },
+      "delete_all_success_one": "Se movió {{count}} conversación a Borrados recientemente.",
+      "delete_all_success_other": "Se movieron {{count}} conversaciones a Borrados recientemente.",
+      "delete_all_empty": "No hay conversaciones para eliminar.",
+      "delete_all_error": "No se pudieron eliminar las conversaciones. Inténtalo de nuevo.",
       "security": "Seguridad"
     },
     "help": {
