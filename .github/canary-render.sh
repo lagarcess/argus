@@ -304,12 +304,6 @@ if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
       -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
       "${SUPABASE_URL}/rest/v1/backtest_runs?select=id&conversation_id=eq.${CONVERSATION_ID}&limit=1"
   )"
-  RECEIPT_ROWS="$(
-    curl -fsS \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      "${SUPABASE_URL}/rest/v1/route_receipts?select=id&conversation_id=eq.${CONVERSATION_ID}&limit=1"
-  )"
   JOB_ROWS="[]"
   if [ -n "$BACKTEST_JOB_ID" ]; then
     JOB_ROWS="$(
@@ -319,7 +313,27 @@ if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
         "${SUPABASE_URL}/rest/v1/backtest_jobs?select=id,status,result_run_id,execution_metadata&id=eq.${BACKTEST_JOB_ID}&limit=1"
     )"
   fi
-  python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" "$BACKTEST_JOB_ID" <<'PY'
+  RESULT_RUN_ID="$(
+    python3 - "$JOB_ROWS" "$BACKTEST_JOB_ID" <<'PY'
+import json
+import sys
+
+job_rows = json.loads(sys.argv[1])
+job_id = sys.argv[2]
+if job_id and job_rows:
+    print(str(job_rows[0].get("result_run_id") or "").strip())
+PY
+  )"
+  RECEIPT_ROWS="[]"
+  if [ -n "$RESULT_RUN_ID" ]; then
+    RECEIPT_ROWS="$(
+      curl -fsS \
+        -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+        -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+        "${SUPABASE_URL}/rest/v1/route_receipts?select=id&conversation_id=eq.${CONVERSATION_ID}&run_id=eq.${RESULT_RUN_ID}&task=eq.result_summary&limit=1"
+    )"
+  fi
+  python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" "$BACKTEST_JOB_ID" "$RESULT_RUN_ID" <<'PY'
 import json
 import sys
 
@@ -327,16 +341,18 @@ backtest_rows = json.loads(sys.argv[1])
 receipt_rows = json.loads(sys.argv[2])
 job_rows = json.loads(sys.argv[3])
 job_id = sys.argv[4]
+expected_result_run_id = sys.argv[5]
 if not backtest_rows:
     raise SystemExit("Supabase verifier did not find canary backtest_run")
-if not receipt_rows:
-    raise SystemExit("Supabase verifier did not find canary route_receipts")
 if job_id and not job_rows:
     raise SystemExit("Supabase verifier did not find canary backtest_job")
 if job_id:
     job = job_rows[0]
-    if not job.get("result_run_id"):
+    result_run_id = str(job.get("result_run_id") or "").strip()
+    if not result_run_id:
         raise SystemExit("Supabase verifier found canary backtest_job without result_run_id")
+    if result_run_id != expected_result_run_id:
+        raise SystemExit("Supabase verifier result_run_id changed during verification")
     execution_metadata = job.get("execution_metadata")
     if not isinstance(execution_metadata, dict):
         raise SystemExit("Supabase verifier found canary backtest_job without execution_metadata")
@@ -351,6 +367,10 @@ if job_id:
         raise SystemExit(
             "Supabase verifier found non-LLM result readout voice: "
             f"source={source!r} fallback_used={fallback_used!r}"
+        )
+    if not receipt_rows:
+        raise SystemExit(
+            "Supabase verifier did not find canary result_summary route_receipts"
         )
 PY
 else

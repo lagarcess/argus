@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from argus.agent_runtime.response_style import (
@@ -46,6 +47,13 @@ QuickTakeEmphasis = Literal[
 RESULT_READOUT_SOURCE_LLM = "llm_explain_stage"
 RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK = "deterministic_fallback"
 RESULT_READOUT_FAILURE_LLM_UNAVAILABLE = "llm_unavailable_or_rejected"
+RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED = "quick_take_draft_rejected"
+
+
+@dataclass(frozen=True)
+class _LLMExplanationResult:
+    text: str | None
+    failure_mode: str | None = None
 
 
 class QuickTakeDraft(BaseModel):
@@ -189,17 +197,18 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
             failure_mode=RESULT_READOUT_FAILURE_LLM_UNAVAILABLE,
         )
 
-    llm_text = await _llm_explanation(
+    llm_result = await _llm_explanation(
         state=state,
         fallback_text=fallback_text,
         language=language,
     )
-    if llm_text is None:
+    if llm_result.text is None:
         return _with_response_source(
             fallback,
             source=RESULT_READOUT_SOURCE_DETERMINISTIC_FALLBACK,
             fallback_used=True,
-            failure_mode=RESULT_READOUT_FAILURE_LLM_UNAVAILABLE,
+            failure_mode=llm_result.failure_mode
+            or RESULT_READOUT_FAILURE_LLM_UNAVAILABLE,
         )
     return StageResult(
         outcome=fallback.outcome,
@@ -207,7 +216,7 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
             **fallback.stage_patch,
             "assistant_response": with_response_heading(
                 heading="Quick take",
-                body=llm_text,
+                body=llm_result.text,
             ),
             "assistant_response_source": RESULT_READOUT_SOURCE_LLM,
             "assistant_response_fallback_used": False,
@@ -241,7 +250,7 @@ async def _llm_explanation(
     state: RunState,
     fallback_text: str,
     language: str,
-) -> str | None:
+) -> _LLMExplanationResult:
     strategy = _strategy_payload(state)
     result_payload = _result_payload(state)
     explanation_context = _explanation_context(state)
@@ -333,7 +342,7 @@ async def _llm_explanation(
                 explanation_context
             ),
         )
-        return _render_quick_take_draft(
+        rendered = _render_quick_take_draft(
             draft=draft,
             fallback_text=fallback_text,
             fact_bank=fact_bank,
@@ -341,11 +350,20 @@ async def _llm_explanation(
             allowed_next_experiments=allowed_next_experiments,
             relative_performance_truth=relative_performance_truth,
         )
+        if rendered is None:
+            return _LLMExplanationResult(
+                text=None,
+                failure_mode=RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED,
+            )
+        return _LLMExplanationResult(text=rendered)
     except Exception as exc:
         # The OpenRouter helper records per-model route receipts. This local fallback
         # only preserves a recoverable answer when every configured model fails.
         _ = exc
-        return None
+        return _LLMExplanationResult(
+            text=None,
+            failure_mode=RESULT_READOUT_FAILURE_LLM_UNAVAILABLE,
+        )
 
 
 def _context_packet_ids_from_explanation_context(

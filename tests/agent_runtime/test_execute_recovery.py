@@ -1838,6 +1838,10 @@ async def test_explain_stage_async_rejects_signed_benchmark_delta_copy(
 
     assert "-5.3" not in response
     assert "lagged by 5.3 percentage points" in response
+    assert (
+        result.stage_patch["assistant_response_failure_mode"]
+        == "quick_take_draft_rejected"
+    )
 
 
 @pytest.mark.asyncio

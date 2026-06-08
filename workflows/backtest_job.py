@@ -13,6 +13,7 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from argus.agent_runtime.result_readout import ResultReadout
+    from argus.llm.openrouter import OpenRouterRouteReceipt
 
 try:
     from workflows.proof import require_database_url, utcnow_iso
@@ -76,6 +77,18 @@ class BacktestJobGateway(Protocol):
         execution_metadata: dict[str, Any],
     ) -> dict[str, Any]:
         """Merge non-lifecycle execution metadata onto an existing job."""
+
+    def create_route_receipt(
+        self,
+        *,
+        user_id: str | None,
+        receipt: dict[str, Any],
+        conversation_id: str | None = None,
+        run_id: str | None = None,
+        message_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Persist LLM route telemetry produced during workflow execution."""
 
 
 class BacktestTool(Protocol):
@@ -185,7 +198,7 @@ def run_backtest_job(
             dict(explanation_context) if isinstance(explanation_context, dict) else {}
         )
         phase_started = time.perf_counter()
-        result_readout = _safe_result_readout(
+        result_readout, result_readout_receipts = _safe_result_readout_with_receipts(
             request=request,
             envelope=envelope,
             result_card=result_card,
@@ -218,6 +231,17 @@ def run_backtest_job(
         created = gateway.create_backtest_run(user_id=user_id, run=run)
         timings.record_elapsed("backtest_run_persist", phase_started)
         result_run_id = _created_run_id(created, fallback=run.id)
+        phase_started = time.perf_counter()
+        _persist_result_readout_route_receipts(
+            gateway,
+            receipts=result_readout_receipts,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            result_run_id=result_run_id,
+            job_id=job_id,
+            workflow_run_id=workflow_run_id,
+        )
+        timings.record_elapsed("result_readout_receipts_persist", phase_started)
         finished_at = utcnow_iso()
         succeeded_metadata = _merge_workflow_metadata(
             running,
@@ -304,6 +328,67 @@ def _safe_result_readout(
         )
     except Exception:
         return unavailable_result_readout()
+
+
+def _safe_result_readout_with_receipts(
+    *,
+    request: dict[str, Any],
+    envelope: dict[str, Any],
+    result_card: dict[str, Any],
+    explanation_context: dict[str, Any],
+) -> tuple["ResultReadout", list["OpenRouterRouteReceipt"]]:
+    from argus.llm.openrouter import (
+        begin_openrouter_route_receipt_capture,
+        end_openrouter_route_receipt_capture,
+    )
+
+    token = begin_openrouter_route_receipt_capture()
+    try:
+        result_readout = _safe_result_readout(
+            request=request,
+            envelope=envelope,
+            result_card=result_card,
+            explanation_context=explanation_context,
+        )
+    finally:
+        receipts = end_openrouter_route_receipt_capture(token)
+    return result_readout, receipts
+
+
+def _persist_result_readout_route_receipts(
+    gateway: BacktestJobGateway,
+    *,
+    receipts: list["OpenRouterRouteReceipt"],
+    user_id: str,
+    conversation_id: str,
+    result_run_id: str,
+    job_id: str,
+    workflow_run_id: str | None,
+) -> None:
+    if not receipts:
+        return
+    metadata = {
+        "job_id": job_id,
+        "workflow_run_id": workflow_run_id,
+        "source": "render_workflow",
+    }
+    for receipt in receipts:
+        try:
+            gateway.create_route_receipt(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                run_id=result_run_id,
+                metadata=metadata,
+                receipt=receipt.as_dict(),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Backtest workflow route receipt persistence failed",
+                error=str(exc),
+                job_id=job_id,
+                workflow_run_id=workflow_run_id,
+                llm_task=receipt.task,
+            )
 
 
 def _result_readout_metadata(result_readout: "ResultReadout") -> dict[str, Any]:
@@ -738,6 +823,96 @@ class PostgresBacktestJobGateway:
                         ),
                         "chart": Jsonb(payload.get("chart")),
                         "trades": Jsonb(payload.get("trades") or []),
+                    },
+                )
+                row = cur.fetchone()
+        return _json_safe(row)
+
+    def create_route_receipt(
+        self,
+        *,
+        user_id: str | None,
+        receipt: dict[str, Any],
+        conversation_id: str | None = None,
+        run_id: str | None = None,
+        message_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        from psycopg.types.json import Jsonb
+
+        context_packet_ids = [
+            str(packet_id)
+            for packet_id in receipt.get("context_packet_ids") or []
+            if str(packet_id or "").strip()
+        ]
+        token_usage = receipt.get("token_usage")
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.route_receipts (
+                      user_id,
+                      conversation_id,
+                      run_id,
+                      message_id,
+                      task,
+                      tier,
+                      model,
+                      fallback_model,
+                      mode,
+                      schema_name,
+                      latency_ms,
+                      outcome,
+                      failure_mode,
+                      fallback_used,
+                      token_usage,
+                      context_packet_ids,
+                      metadata,
+                      created_at
+                    )
+                    values (
+                      %(user_id)s,
+                      %(conversation_id)s,
+                      %(run_id)s,
+                      %(message_id)s,
+                      %(task)s,
+                      %(tier)s,
+                      %(model)s,
+                      %(fallback_model)s,
+                      %(mode)s,
+                      %(schema_name)s,
+                      %(latency_ms)s,
+                      %(outcome)s,
+                      %(failure_mode)s,
+                      %(fallback_used)s,
+                      %(token_usage)s,
+                      %(context_packet_ids)s,
+                      %(metadata)s,
+                      %(created_at)s
+                    )
+                    returning *
+                    """,
+                    {
+                        "user_id": user_id,
+                        "conversation_id": conversation_id,
+                        "run_id": run_id,
+                        "message_id": message_id,
+                        "task": receipt["task"],
+                        "tier": receipt["tier"],
+                        "model": receipt.get("model"),
+                        "fallback_model": receipt.get("fallback_model"),
+                        "mode": receipt["mode"],
+                        "schema_name": receipt.get("schema_name"),
+                        "latency_ms": int(receipt.get("latency_ms") or 0),
+                        "outcome": receipt["outcome"],
+                        "failure_mode": receipt.get("failure_mode"),
+                        "fallback_used": bool(receipt.get("fallback_used")),
+                        "token_usage": Jsonb(token_usage)
+                        if token_usage is not None
+                        else None,
+                        "context_packet_ids": context_packet_ids,
+                        "metadata": Jsonb(metadata or {}),
+                        "created_at": receipt.get("created_at") or utcnow_iso(),
                     },
                 )
                 row = cur.fetchone()

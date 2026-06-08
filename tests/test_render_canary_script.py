@@ -53,6 +53,15 @@ def test_canary_fails_async_jobs_that_use_result_readout_fallback() -> None:
     assert 'workflow_metadata = execution_metadata.get("workflow_backtest")' in source
 
 
+def test_canary_requires_result_summary_route_receipt_for_completed_run() -> None:
+    source = _source(".github/canary-render.sh")
+
+    assert "task=eq.result_summary" in source
+    assert "run_id=eq.${RESULT_RUN_ID}" in source
+    assert "did not find canary result_summary route_receipts" in source
+    assert 'result_run_id = str(job.get("result_run_id") or "").strip()' in source
+
+
 def test_canary_uses_confirmation_card_run_action_payload() -> None:
     source = _source(".github/canary-render.sh")
 
@@ -66,6 +75,9 @@ def test_canary_passes_json_arguments_after_python_stdin_marker() -> None:
     source = _source(".github/canary-render.sh")
 
     assert 'python3 - "$MESSAGES_JSON" <<' in source
-    assert 'python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" "$BACKTEST_JOB_ID" <<' in source
+    assert (
+        'python3 - "$BACKTEST_ROWS" "$RECEIPT_ROWS" "$JOB_ROWS" '
+        '"$BACKTEST_JOB_ID" "$RESULT_RUN_ID" <<' in source
+    )
     assert 'python3 - <<\'PY\' "$MESSAGES_JSON"' not in source
     assert 'python3 - <<\'PY\' "$BACKTEST_ROWS" "$RECEIPT_ROWS"' not in source

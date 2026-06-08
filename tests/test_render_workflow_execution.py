@@ -15,6 +15,7 @@ class FakeBacktestJobGateway:
         self.transitions: list[str] = []
         self.created_runs: list[dict[str, object]] = []
         self.failed_updates: list[dict[str, object]] = []
+        self.route_receipts: list[dict[str, object]] = []
 
     def fetch_job(self, job_id: str) -> dict[str, object] | None:
         if self.row["id"] != job_id:
@@ -108,6 +109,27 @@ class FakeBacktestJobGateway:
             }
         )
         return dict(self.row)
+
+    def create_route_receipt(
+        self,
+        *,
+        user_id: str | None,
+        receipt: dict[str, object],
+        conversation_id: str | None = None,
+        run_id: str | None = None,
+        message_id: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        row = {
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "run_id": run_id,
+            "message_id": message_id,
+            "metadata": metadata or {},
+            **receipt,
+        }
+        self.route_receipts.append(row)
+        return row
 
 
 class FakeBacktestTool:
@@ -355,6 +377,81 @@ def test_run_backtest_job_persists_backend_result_readout(
     assert metadata["result_readout"] == readout
     assert metadata["result_readout_source"] == "llm_explain_stage"
     assert metadata["result_readout_fallback_used"] is False
+
+
+def test_run_backtest_job_persists_result_summary_route_receipts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime.result_readout import ResultReadout
+    from argus.llm.openrouter import (
+        clear_openrouter_route_receipts,
+        record_openrouter_route_receipt,
+    )
+
+    from workflows import backtest_job as workflow_module
+    from workflows.backtest_job import REAL_BACKTEST_JOB_KIND, run_backtest_job
+
+    clear_openrouter_route_receipts()
+
+    def fake_result_readout(**_: object) -> ResultReadout:
+        record_openrouter_route_receipt(
+            task="result_summary",
+            model_name="unit-test-model",
+            mode="json_schema",
+            schema_name="QuickTakeDraft",
+            latency_ms=42,
+            outcome="succeeded",
+            context_packet_ids=["packet-1"],
+        )
+        return ResultReadout(
+            text="**Quick take**\n\nAAPL beat SPY in this test.",
+            source="llm_explain_stage",
+            fallback_used=False,
+        )
+
+    monkeypatch.setattr(
+        workflow_module,
+        "result_readout_with_metadata_from_backtest_payload",
+        fake_result_readout,
+    )
+    job = _job_row(
+        launch_payload={
+            "kind": REAL_BACKTEST_JOB_KIND,
+            "schema_version": "backtest_job_launch/v1",
+            "request": _request_payload(),
+        }
+    )
+    gateway = FakeBacktestJobGateway(job)
+
+    result = run_backtest_job(
+        gateway,
+        job_id=str(job["id"]),
+        backtest_tool=FakeBacktestTool(_successful_tool_result()),
+        workflow_run_id="local-run",
+        run_id_factory=lambda: "run-workflow",
+    )
+
+    assert result["status"] == "succeeded"
+    assert len(gateway.route_receipts) == 1
+    receipt = gateway.route_receipts[0]
+    assert receipt["user_id"] == "user-1"
+    assert receipt["conversation_id"] == "conversation-1"
+    assert receipt["run_id"] == "run-workflow"
+    assert receipt["metadata"] == {
+        "job_id": job["id"],
+        "workflow_run_id": "local-run",
+        "source": "render_workflow",
+    }
+    assert receipt["task"] == "result_summary"
+    assert receipt["tier"] == "chat"
+    assert receipt["model"] == "unit-test-model"
+    assert receipt["mode"] == "json_schema"
+    assert receipt["schema_name"] == "QuickTakeDraft"
+    assert receipt["latency_ms"] == 42
+    assert receipt["outcome"] == "succeeded"
+    assert receipt["failure_mode"] is None
+    assert receipt["fallback_used"] is False
+    assert receipt["context_packet_ids"] == ["packet-1"]
 
 
 def test_run_backtest_job_uses_mainline_llm_quick_take_path(
