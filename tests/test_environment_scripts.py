@@ -373,9 +373,10 @@ def test_render_env_sync_can_sync_api_runtime_config() -> None:
     api_runtime_block = source.split("sync_api_runtime() {", maxsplit=1)[1].split(
         "sync_workflow_proof() {", maxsplit=1
     )[0]
-    assert 'render services update "$API_SERVICE_ID"' in api_runtime_block
-    assert '--build-command "$ARGUS_RENDER_API_BUILD_COMMAND"' in api_runtime_block
-    assert '--start-command "$ARGUS_RENDER_API_START_COMMAND"' in api_runtime_block
+    assert "https://api.render.com/v1/services/${API_SERVICE_ID}" in api_runtime_block
+    assert "envSpecificDetails" in api_runtime_block
+    assert "buildCommand: $build_command" in api_runtime_block
+    assert "startCommand: $start_command" in api_runtime_block
     assert 'put_render_env "$API_SERVICE_ID" POETRY_VERSION' in api_runtime_block
     assert ".buildConfig + {buildCommand: $build_command}" in source
     assert "ARGUS_RENDER_WORKFLOW_BUILD_COMMAND" in source

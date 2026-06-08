@@ -195,12 +195,30 @@ sync_api_safe_off() {
 
 sync_api_runtime() {
   require_local_env RENDER_API_KEY
-  render services update "$API_SERVICE_ID" \
-    --build-command "$ARGUS_RENDER_API_BUILD_COMMAND" \
-    --start-command "$ARGUS_RENDER_API_START_COMMAND" \
-    --health-check-path /health \
-    --confirm \
-    --output json \
+  local update_payload
+
+  update_payload="$(
+    jq -nc \
+      --arg build_command "$ARGUS_RENDER_API_BUILD_COMMAND" \
+      --arg start_command "$ARGUS_RENDER_API_START_COMMAND" \
+      '{
+        serviceDetails: {
+          envSpecificDetails: {
+            buildCommand: $build_command,
+            startCommand: $start_command
+          },
+          healthCheckPath: "/health"
+        }
+      }'
+  )"
+
+  curl -fsS \
+    --request PATCH \
+    --url "https://api.render.com/v1/services/${API_SERVICE_ID}" \
+    --header "Authorization: Bearer ${RENDER_API_KEY}" \
+    --header "Accept: application/json" \
+    --header "Content-Type: application/json" \
+    --data "$update_payload" \
     >/dev/null
   echo "synced ${API_SERVICE_ID}:api-runtime"
   put_render_env "$API_SERVICE_ID" POETRY_VERSION "$ARGUS_RENDER_POETRY_VERSION"
