@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import traceback
 from collections.abc import Callable, Mapping
+from contextlib import ExitStack, contextmanager
 from datetime import date, datetime
 from math import isfinite
 from typing import TYPE_CHECKING, Any, Protocol
@@ -671,19 +672,43 @@ def _json_safe(value: Any) -> Any:
 class PostgresBacktestJobGateway:
     def __init__(self, database_url: str) -> None:
         self.database_url = database_url
+        self._conn: Any | None = None
+        self._exit_stack: ExitStack | None = None
 
     @classmethod
     def from_env(cls) -> PostgresBacktestJobGateway:
         return cls(require_database_url())
 
+    def __enter__(self) -> PostgresBacktestJobGateway:
+        if self._exit_stack is not None:
+            return self
+        exit_stack = ExitStack()
+        self._conn = exit_stack.enter_context(self._connect())
+        self._exit_stack = exit_stack
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        if self._exit_stack is not None:
+            self._exit_stack.__exit__(*exc_info)
+        self._conn = None
+        self._exit_stack = None
+
     def _connect(self) -> Any:
         import psycopg
         from psycopg.rows import dict_row
 
-        return psycopg.connect(self.database_url, row_factory=dict_row)
+        return psycopg.connect(self.database_url, autocommit=True, row_factory=dict_row)
+
+    @contextmanager
+    def _connection(self) -> Any:
+        if self._conn is not None:
+            yield self._conn
+            return
+        with self._connect() as conn:
+            yield conn
 
     def fetch_job(self, job_id: str) -> dict[str, Any] | None:
-        with self._connect() as conn:
+        with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -707,7 +732,7 @@ class PostgresBacktestJobGateway:
     ) -> dict[str, Any]:
         from psycopg.types.json import Jsonb
 
-        with self._connect() as conn:
+        with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -746,7 +771,7 @@ class PostgresBacktestJobGateway:
     ) -> dict[str, Any]:
         from psycopg.types.json import Jsonb
 
-        with self._connect() as conn:
+        with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -773,7 +798,7 @@ class PostgresBacktestJobGateway:
         from psycopg.types.json import Jsonb
 
         payload = run.model_dump(mode="json")
-        with self._connect() as conn:
+        with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -846,7 +871,7 @@ class PostgresBacktestJobGateway:
             if str(packet_id or "").strip()
         ]
         token_usage = receipt.get("token_usage")
-        with self._connect() as conn:
+        with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -931,7 +956,7 @@ class PostgresBacktestJobGateway:
 
         status = "succeeded" if mark_succeeded else None
         finished_at = utcnow_iso() if mark_succeeded else None
-        with self._connect() as conn:
+        with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -973,7 +998,7 @@ class PostgresBacktestJobGateway:
     ) -> dict[str, Any]:
         from psycopg.types.json import Jsonb
 
-        with self._connect() as conn:
+        with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """

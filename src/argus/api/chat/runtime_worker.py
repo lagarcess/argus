@@ -5,6 +5,7 @@ import os
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
+from threading import Event
 from typing import Any
 
 from loguru import logger
@@ -39,6 +40,9 @@ async def _threaded_runtime_event_source(
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[_QueueItem] = asyncio.Queue()
     context = copy_context()
+    worker_loop_ready = Event()
+    worker_loop_box: dict[str, asyncio.AbstractEventLoop] = {}
+    worker_task_box: dict[str, asyncio.Task[None]] = {}
 
     def send(kind: str, payload: RuntimeEvent | Exception | None = None) -> None:
         loop.call_soon_threadsafe(queue.put_nowait, (kind, payload))
@@ -48,12 +52,27 @@ async def _threaded_runtime_event_source(
             async for event in runtime_event_factory():
                 send("event", event)
 
+        worker_loop = asyncio.new_event_loop()
+        worker_loop_box["loop"] = worker_loop
+        asyncio.set_event_loop(worker_loop)
+
         try:
-            context.run(lambda: asyncio.run(consume()))
+            def run_in_context() -> None:
+                worker_task = worker_loop.create_task(consume())
+                worker_task_box["task"] = worker_task
+                worker_loop_ready.set()
+                worker_loop.run_until_complete(worker_task)
+
+            context.run(run_in_context)
+        except asyncio.CancelledError:
+            logger.debug("Threaded chat runtime event source canceled")
         except Exception as exc:
             logger.exception("Threaded chat runtime event source failed")
             send("error", exc)
         finally:
+            worker_loop_ready.set()
+            worker_loop.close()
+            asyncio.set_event_loop(None)
             send("done")
 
     future = _runtime_executor().submit(run_runtime)
@@ -71,6 +90,17 @@ async def _threaded_runtime_event_source(
             if kind == "done":
                 return
     finally:
+        if not future.done():
+            if not worker_loop_ready.is_set():
+                await asyncio.to_thread(worker_loop_ready.wait, 0.25)
+            worker_loop = worker_loop_box.get("loop")
+            worker_task = worker_task_box.get("task")
+            if (
+                worker_loop is not None
+                and worker_task is not None
+                and not worker_loop.is_closed()
+            ):
+                worker_loop.call_soon_threadsafe(worker_task.cancel)
         future.cancel()
 
 

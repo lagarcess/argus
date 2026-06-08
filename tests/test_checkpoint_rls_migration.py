@@ -22,6 +22,7 @@ def test_checkpoint_rls_migration_enables_rls_on_all_checkpoint_tables() -> None
     sql = _migration_sql()
 
     for table in CHECKPOINT_TABLES:
+        assert f"create table if not exists public.{table}" in sql
         assert f"alter table public.{table} enable row level security;" in sql
 
 

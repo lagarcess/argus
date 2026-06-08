@@ -62,11 +62,12 @@ def workflow_proof(job_id: str, nonce: str) -> dict[str, object]:
 )
 def run_backtest_job(job_id: str, nonce: str | None = None) -> dict[str, object]:
     del nonce
-    return run_backtest_job_workflow(
-        PostgresBacktestJobGateway.from_env(),
-        job_id=job_id,
-        workflow_run_id=os.getenv("RENDER_TASK_RUN_ID"),
-    )
+    with PostgresBacktestJobGateway.from_env() as gateway:
+        return run_backtest_job_workflow(
+            gateway,
+            job_id=job_id,
+            workflow_run_id=os.getenv("RENDER_TASK_RUN_ID"),
+        )
 
 
 if __name__ == "__main__":

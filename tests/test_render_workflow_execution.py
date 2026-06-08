@@ -248,6 +248,62 @@ def test_run_backtest_job_rejects_proof_payloads() -> None:
     assert gateway.transitions == []
 
 
+def test_postgres_backtest_job_gateway_reuses_connection_in_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workflows.backtest_job import PostgresBacktestJobGateway
+
+    connect_calls = 0
+
+    class FakeCursor:
+        def __init__(self) -> None:
+            self.query = ""
+
+        def __enter__(self) -> FakeCursor:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def execute(self, query: str, params: object = None) -> None:
+            del params
+            self.query = query
+
+        def fetchone(self) -> dict[str, object]:
+            if "select *" in self.query.lower():
+                return {"id": "job-1", "execution_metadata": {}}
+            return {"id": "job-1", "execution_metadata": {"kept": True}}
+
+    class FakeConnection:
+        def __enter__(self) -> FakeConnection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+    def fake_connect(self: PostgresBacktestJobGateway) -> FakeConnection:
+        del self
+        nonlocal connect_calls
+        connect_calls += 1
+        return FakeConnection()
+
+    monkeypatch.setattr(PostgresBacktestJobGateway, "_connect", fake_connect)
+    gateway = PostgresBacktestJobGateway("postgres://example")
+
+    with gateway:
+        assert gateway.fetch_job("job-1") == {"id": "job-1", "execution_metadata": {}}
+        assert gateway.merge_backtest_job_execution_metadata(
+            user_id="user-1",
+            job_id="job-1",
+            execution_metadata={"kept": True},
+        ) == {"id": "job-1", "execution_metadata": {"kept": True}}
+
+    assert connect_calls == 1
+
+
 def test_run_backtest_job_marks_queued_job_running_then_succeeded_with_result_run() -> (
     None
 ):

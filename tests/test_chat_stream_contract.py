@@ -95,6 +95,33 @@ async def test_threaded_runtime_event_source_does_not_block_api_event_loop() -> 
     await runtime_events.aclose()
 
 
+@pytest.mark.asyncio
+async def test_threaded_runtime_event_source_cancels_worker_on_close() -> None:
+    from threading import Event
+
+    from argus.api.chat.runtime_worker import threaded_runtime_event_source
+
+    worker_closed = Event()
+
+    async def _long_running_runtime_events():
+        try:
+            yield {"type": "stage_start", "stage": "interpret"}
+            await asyncio.Event().wait()
+        finally:
+            worker_closed.set()
+
+    runtime_events = threaded_runtime_event_source(_long_running_runtime_events)
+
+    assert await asyncio.wait_for(anext(runtime_events), timeout=1) == {
+        "type": "stage_start",
+        "stage": "interpret",
+    }
+
+    await runtime_events.aclose()
+
+    assert await asyncio.to_thread(worker_closed.wait, 1)
+
+
 def test_runtime_worker_auto_mode_is_reserved_for_prod_like_streams(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
