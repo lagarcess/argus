@@ -359,6 +359,75 @@ Still unmeasured:
 - Currency-pair 720-candle RSI/moving-average cases.
 - LLM interpretation and LLM result-summary latency as isolated sub-metrics.
 
+### Final Operational Canary / Release Readiness
+
+Status: **not release-ready** as of `2026-06-08T05:10:04Z`.
+
+The already-deployed Render services were intentionally checked without running
+another deploy:
+
+| Service | Expected | Observed |
+| --- | --- | --- |
+| `argus-api` live deploy | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` |
+| `argus-app` live deploy | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` | `5fcd51b03750a407782c37adcfcb6ca6dfeedc53` |
+| `argus-backtests` ready workflow version | `5fcd51b` | `5fcd51b` |
+
+Warmup with `--expect-mode real-workflow` passed. The free Render services
+needed cold-start retries before all readiness probes responded:
+
+| Check | Evidence |
+| --- | --- |
+| API health | responded after 3 timed-out attempts |
+| Product readiness | responded after 1 timed-out attempt |
+| Frontend | responded after 1 timed-out attempt |
+| API workflow mode | matched `real-workflow` |
+
+The final canary used the default private-alpha prompt and developer credentials:
+
+| Field | Value |
+| --- | --- |
+| Conversation | `5db6c99c-d645-4d9c-b33f-ed46b45aecdf` |
+| Backtest job | `adc46740-8d54-42d2-9f3a-d6b319219e7b` |
+| Backtest run | `49636c8c-97d3-446f-a010-6e149edf3447` |
+| Workflow run | `trn-08d4gd8j4sflckfvc73cdvotg` |
+| Job status | `succeeded` |
+| Persisted messages | 2 assistant, 2 user |
+| Route receipts | 4 |
+| `backtest_runs` rows | 1 |
+
+The release blocker is result-readout provenance:
+
+| Gate | Expected | Observed |
+| --- | --- | --- |
+| Result readout source | `llm_explain_stage` | `deterministic_fallback` |
+| Result readout fallback used | `false` | `true` |
+| Failure mode | none | `llm_unavailable_or_rejected` |
+
+The backtest execution path itself completed, but the canary must stay strict:
+a successful run with deterministic result prose is not release-ready because it
+can regress Argus voice even when metrics are correct. Do not mark this milestone
+ready until a settled internet canary passes with `result_readout_source` equal
+to `llm_explain_stage` and `result_readout_fallback_used=false`.
+
+Workflow timing evidence for the blocked canary:
+
+| Phase | Duration |
+| --- | ---: |
+| Job queued -> started | 8.592 s |
+| Job started -> finished | 56.260 s |
+| Workflow task total | 56.862 s |
+| Dependency/tool load | 14.228 s |
+| Backtest tool run total | 34.285 s |
+| Provider fetch total | 0.605 s |
+| Engine compute total | 34.179 s |
+| Result readout total | 7.420 s |
+
+Security state did not block this canary. Checkpoint table RLS remains enabled,
+forced RLS remains disabled, and `public`/`anon`/`authenticated` have no
+checkpoint table privileges. Supabase security advisors no longer report the
+checkpoint-table RLS issue; the remaining advisor is the already-tracked
+`function_search_path_mutable` warning for `public.set_updated_at`.
+
 ### Workflow-Internal Timing Metadata Contract
 
 Completed and failed real workflow backtest jobs may now persist timing evidence
