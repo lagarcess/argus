@@ -212,6 +212,39 @@ def test_openrouter_factory_applies_task_token_budget(
     ]
 
 
+def test_result_summary_timeout_budget_is_safe_for_render_workflows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeChatOpenRouter.calls.clear()
+    FakeChatOpenRouter.structured_response = None
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/model")
+    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+
+    model = openrouter.build_openrouter_model("result_summary")
+
+    assert model is not None
+    assert FakeChatOpenRouter.calls[-1]["timeout"] == 20
+    assert openrouter.openrouter_task_timeout_seconds("result_summary") == 20
+
+
+def test_openrouter_task_timeout_budget_can_be_overridden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeChatOpenRouter.calls.clear()
+    FakeChatOpenRouter.structured_response = None
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/model")
+    monkeypatch.setenv("ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS", "27")
+    monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
+
+    model = openrouter.build_openrouter_model("result_summary")
+
+    assert model is not None
+    assert FakeChatOpenRouter.calls[-1]["timeout"] == 27
+    assert openrouter.openrouter_task_timeout_seconds("result_summary") == 27
+
+
 def test_openrouter_model_routing_uses_task_specific_tiers(monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_UTILITY_MODEL", "utility/primary")
     monkeypatch.setenv("ARGUS_UTILITY_FALLBACK_MODEL", "utility/fallback")

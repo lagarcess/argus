@@ -86,6 +86,8 @@ services:
         value: deepseek/deepseek-v4-flash
       - key: ARGUS_CHAT_FALLBACK_MODEL
         value: qwen/qwen3.5-9b
+      - key: ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS
+        value: "20"
       - key: ARGUS_STRUCTURED_MODEL
         value: mistralai/mistral-small-2603
       - key: ARGUS_STRUCTURED_FALLBACK_MODEL

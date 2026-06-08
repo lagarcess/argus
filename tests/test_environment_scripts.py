@@ -236,6 +236,7 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     )
     assert "ARGUS_WORKFLOW_PROOF_PLAN=" in env_example
     assert "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS=300" in env_example
+    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS=20" in env_example
     assert "ARGUS_RENDER_WORKFLOW_PROOF_ENV=(" in env_contract
     assert "ARGUS_WORKFLOW_DATABASE_URL" in env_contract
     assert "ARGUS_RENDER_WORKFLOW_PROOF_TASK" in env_contract
@@ -251,6 +252,7 @@ def test_workflow_proof_env_contract_is_documented_but_not_blueprinted() -> None
     assert "ARGUS_UTILITY_FALLBACK_MODEL" in env_contract
     assert "ARGUS_CHAT_MODEL" in env_contract
     assert "ARGUS_CHAT_FALLBACK_MODEL" in env_contract
+    assert "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS" in env_contract
     assert "ARGUS_STRUCTURED_MODEL" in env_contract
     assert "ARGUS_STRUCTURED_FALLBACK_MODEL" in env_contract
     assert "ARGUS_CONTEXT_MODEL" in env_contract
@@ -305,6 +307,11 @@ def test_render_env_sync_pushes_workflow_llm_readout_env() -> None:
     ):
         assert f"require_local_env {key}" in workflow_block
         assert f'put_render_env "$WORKFLOW_SERVICE_ID" {key} "${key}"' in workflow_block
+    assert (
+        'put_render_env "$WORKFLOW_SERVICE_ID" '
+        'ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS '
+        '"${ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS:-20}"'
+    ) in workflow_block
     assert "ARGUS_WORKFLOW_DATABASE_URL" in source
     assert "require_local_env ALPACA_API_KEY" in source
     assert "require_local_env ALPACA_SECRET_KEY" in source

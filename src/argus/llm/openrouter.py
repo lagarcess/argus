@@ -87,7 +87,7 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "clarification": OpenRouterProfile("clarification", temperature=0, max_tokens=360),
     "chat_composer": OpenRouterProfile("chat_composer", temperature=0.2, max_tokens=1200),
     "result_summary": OpenRouterProfile(
-        "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=10
+        "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=20
     ),
     "result_breakdown": OpenRouterProfile(
         "result_breakdown",
@@ -233,7 +233,7 @@ def build_openrouter_model(
         logger.warning("OpenRouter unavailable; missing API key", llm_task=task)
         return None
 
-    profile = OPENROUTER_PROFILES[task]
+    profile = openrouter_profile_for_task(task)
     resolved_model = resolve_openrouter_model(model_name, task=task)
     if not resolved_model:
         logger.warning("OpenRouter unavailable; no model configured", llm_task=task)
@@ -250,7 +250,44 @@ def build_openrouter_model(
 
 
 def openrouter_task_timeout_seconds(task: OpenRouterTask) -> float:
-    return float(OPENROUTER_PROFILES[task].timeout_seconds)
+    return float(openrouter_profile_for_task(task).timeout_seconds)
+
+
+def openrouter_profile_for_task(task: OpenRouterTask) -> OpenRouterProfile:
+    profile = OPENROUTER_PROFILES[task]
+    timeout_override = _task_timeout_override_seconds(task)
+    if timeout_override is None:
+        return profile
+    return OpenRouterProfile(
+        task=profile.task,
+        temperature=profile.temperature,
+        max_tokens=profile.max_tokens,
+        timeout_seconds=timeout_override,
+        max_retries=profile.max_retries,
+    )
+
+
+def _task_timeout_override_seconds(task: OpenRouterTask) -> int | None:
+    raw_value = os.getenv(f"ARGUS_OPENROUTER_{task.upper()}_TIMEOUT_SECONDS", "")
+    if not raw_value.strip():
+        return None
+    try:
+        timeout_seconds = int(raw_value)
+    except ValueError:
+        logger.warning(
+            "Ignoring invalid OpenRouter task timeout override",
+            llm_task=task,
+            timeout_env_value=raw_value,
+        )
+        return None
+    if timeout_seconds <= 0:
+        logger.warning(
+            "Ignoring non-positive OpenRouter task timeout override",
+            llm_task=task,
+            timeout_env_value=raw_value,
+        )
+        return None
+    return timeout_seconds
 
 
 def record_openrouter_route_receipt(
@@ -407,7 +444,7 @@ async def invoke_openrouter_json_schema(
         )
         return None
 
-    profile = OPENROUTER_PROFILES[task]
+    profile = openrouter_profile_for_task(task)
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
@@ -508,7 +545,7 @@ async def invoke_openrouter_chat_completion(
         )
         return None
 
-    profile = OPENROUTER_PROFILES[task]
+    profile = openrouter_profile_for_task(task)
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
@@ -622,7 +659,7 @@ def invoke_openrouter_json_schema_sync(
         )
         return None
 
-    profile = OPENROUTER_PROFILES[task]
+    profile = openrouter_profile_for_task(task)
     last_exc: Exception | None = None
     for index, candidate_model in enumerate(candidate_models):
         attempt_started_at = time.perf_counter()
@@ -910,7 +947,7 @@ def log_openrouter_failure(
     exc: Exception,
     message: str,
 ) -> None:
-    profile = OPENROUTER_PROFILES[task]
+    profile = openrouter_profile_for_task(task)
     resolved_model = resolve_openrouter_model(model_name, task=task)
     error_type = type(exc).__name__
     logger.warning(
