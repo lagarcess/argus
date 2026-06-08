@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from contextlib import asynccontextmanager
 from typing import Any
 
 import pytest
@@ -117,6 +118,62 @@ def test_runtime_worker_auto_mode_is_reserved_for_prod_like_streams(
 
     monkeypatch.setenv("ARGUS_RUNTIME_STREAM_WORKER", "true")
     assert runtime_worker_enabled() is True
+
+
+def test_chat_stream_worker_mode_uses_isolated_runtime_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent as agent_router
+
+    workflows_seen: list[str] = []
+
+    async def _fake_stream_agent_turn_events(**kwargs: Any):
+        workflows_seen.append(kwargs["workflow"])
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Ready.",
+            },
+        }
+
+    @asynccontextmanager
+    async def _isolated_workflow():
+        yield "worker_loop_workflow"
+
+    monkeypatch.setattr(agent_router, "runtime_worker_enabled", lambda: True)
+    monkeypatch.setattr(
+        agent_router,
+        "stream_agent_turn_events",
+        _fake_stream_agent_turn_events,
+    )
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "get_agent_runtime_workflow",
+        lambda request: "main_loop_workflow",
+    )
+    monkeypatch.setattr(
+        agent_router.api_state,
+        "isolated_agent_runtime_workflow",
+        _isolated_workflow,
+        raising=False,
+    )
+
+    client = _client()
+    conversation = _conversation(client)
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "message": "Explain Apple",
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert workflows_seen == ["worker_loop_workflow"]
 
 
 def test_internal_agent_runtime_turn_is_not_exposed_by_launch_api() -> None:

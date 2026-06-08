@@ -850,9 +850,11 @@ async def chat_stream(
             )
         )
         try:
-            def runtime_event_source() -> AsyncIterator[dict[str, Any]]:
+            def runtime_event_source(
+                active_workflow: Any,
+            ) -> AsyncIterator[dict[str, Any]]:
                 return stream_agent_turn_events(
-                    workflow=workflow,
+                    workflow=active_workflow,
                     user=runtime_user,
                     thread_id=conversation.id,
                     message=request_message,
@@ -869,10 +871,15 @@ async def chat_stream(
                     fallback_confirmation_payload=runtime_fallback.confirmation_payload,
                 )
 
+            async def isolated_runtime_event_source() -> AsyncIterator[dict[str, Any]]:
+                async with api_state.isolated_agent_runtime_workflow() as active_workflow:
+                    async for event in runtime_event_source(active_workflow):
+                        yield event
+
             runtime_events = (
-                threaded_runtime_event_source(runtime_event_source)
+                threaded_runtime_event_source(isolated_runtime_event_source)
                 if runtime_worker_enabled()
-                else runtime_event_source()
+                else runtime_event_source(workflow)
             )
             final_seen = False
             async for runtime_event in _runtime_events_with_keepalive(runtime_events):

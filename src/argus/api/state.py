@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from dotenv import load_dotenv
@@ -111,6 +113,23 @@ def get_agent_runtime_workflow(request: Request | None = None):
         workflow = build_agent_runtime_workflow(checkpointer=checkpointer)
         target_app.state.agent_runtime_workflow = workflow
     return workflow
+
+
+@asynccontextmanager
+async def isolated_agent_runtime_workflow() -> AsyncIterator[Any]:
+    if CHECKPOINTER_MODE == "postgres":
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+
+        async with AsyncPostgresSaver.from_conn_string(
+            DATABASE_URL,
+            serde=build_agent_runtime_checkpoint_serde(),
+        ) as checkpointer:
+            await checkpointer.setup()
+            yield build_agent_runtime_workflow(checkpointer=checkpointer)
+        return
+
+    checkpointer = build_agent_runtime_checkpointer()
+    yield build_agent_runtime_workflow(checkpointer=checkpointer)
 
 
 def reset_agent_runtime_workflow(app: FastAPI) -> None:
