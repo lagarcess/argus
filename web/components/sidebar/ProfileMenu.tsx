@@ -775,7 +775,7 @@ export default function ProfileMenu({
             </button>
             <button
               onClick={handleDeleteAllConversations}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 dark:text-[#e0a1a7] dark:hover:bg-[#d66d75]/10"
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 dark:hover:bg-[#d66d75]/10"
             >
               <Trash2 className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">
