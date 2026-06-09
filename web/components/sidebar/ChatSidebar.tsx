@@ -533,7 +533,7 @@ export default function ChatSidebar({
                           {hasConversationAttention && (
                             <span
                               aria-hidden="true"
-                              className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#70a38d] shadow-[0_0_0_3px_rgba(112,163,141,0.16)] dark:bg-[#9bc6b4] dark:shadow-[0_0_0_3px_rgba(155,198,180,0.16)]"
+                              className="absolute left-4 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-[#f4f4f4] bg-[#70a38d] dark:border-[#191c1f] dark:bg-[#9bc6b4]"
                             />
                           )}
                           <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />

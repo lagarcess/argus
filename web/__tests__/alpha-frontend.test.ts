@@ -568,7 +568,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(input).toContain("disabled?: boolean");
     expect(input).toContain("if (disabled) return;");
     expect(input).toContain("contentEditable={!disabled}");
-    expect(input).toContain("disabled={composerIsEmpty || disabled}");
+    expect(input).toContain("const sendButtonDisabled = composerIsEmpty || disabled;");
+    expect(input).toContain("disabled={sendButtonDisabled}");
   });
 
   test("chat restores jump-to-latest affordance without forced reading jumps", () => {

@@ -25,7 +25,7 @@ export function DevModeBadge() {
   if (!isMockAuth) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[200] animate-in fade-in slide-in-from-bottom-4 duration-1000 flex flex-col items-end gap-3">
+    <div className="fixed top-4 right-4 z-[200] flex flex-col items-end gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
       <button
         onClick={handleResetOnboarding}
         className="flex items-center gap-2 rounded-full border border-black/5 bg-white/80 px-4 py-2 text-[12px] font-medium text-black/60 backdrop-blur-md transition-all hover:bg-white hover:text-black dark:border-white/5 dark:bg-[#191c1f]/80 dark:text-white/60 dark:hover:bg-[#191c1f] dark:hover:text-white"

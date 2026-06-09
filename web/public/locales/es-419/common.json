@@ -116,6 +116,7 @@
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
     "input_placeholder": "Describe una idea de inversión...",
     "followup_placeholder": "Haz una pregunta de seguimiento...",
+    "message_empty": "El mensaje está vacío",
     "disclaimer": "Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",

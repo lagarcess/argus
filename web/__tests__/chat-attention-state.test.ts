@@ -41,5 +41,6 @@ describe("chat conversation attention state", () => {
     expect(chat).toContain("attentionConversationIds={attentionConversationIds}");
     expect(sidebar).toContain("attentionConversationIds?: ReadonlySet<string>");
     expect(sidebar).toContain("data-has-attention");
+    expect(sidebar).not.toContain("shadow-[0_0_0_3px");
   });
 });

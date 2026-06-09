@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, AtSign } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { searchDiscovery, type DiscoveryItem } from "@/lib/argus-api";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { chatExploratorySuggestionsEnabled } from "@/lib/private-alpha-flags";
 import {
   composerMentions,
@@ -63,6 +64,10 @@ export default function ChatInput({
     discoveryItems,
     discoveryQuery,
   );
+  const sendButtonDisabled = composerIsEmpty || disabled;
+  const sendDisabledReason = composerIsEmpty
+    ? t("chat.message_empty", "Message is empty")
+    : undefined;
 
   useEffect(() => {
     setIsMounted(true);
@@ -369,16 +374,37 @@ export default function ChatInput({
       </div>
 
       <div className="shrink-0 p-2">
-        <button
-          type="submit"
-          data-testid="chat-send"
-          disabled={composerIsEmpty || disabled}
-          className="rounded-full bg-black p-2.5 text-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
-        >
-          <ArrowUp className="h-5 w-5 stroke-[2.5]" />
-        </button>
+        {sendDisabledReason ? (
+          <Tooltip content={sendDisabledReason} side="top" delay={150}>
+            <span
+              data-testid="chat-send-disabled-tooltip"
+              aria-disabled="true"
+              aria-label={sendDisabledReason}
+              tabIndex={0}
+              onClick={(event) => event.stopPropagation()}
+              className="inline-flex rounded-full"
+            >
+              <SendButton disabled={sendButtonDisabled} />
+            </span>
+          </Tooltip>
+        ) : (
+          <SendButton disabled={sendButtonDisabled} />
+        )}
       </div>
     </form>
+  );
+}
+
+function SendButton({ disabled }: { disabled: boolean }) {
+  return (
+    <button
+      type="submit"
+      data-testid="chat-send"
+      disabled={disabled}
+      className="rounded-full bg-black p-2.5 text-white transition-opacity hover:opacity-85 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
+    >
+      <ArrowUp className="h-5 w-5 stroke-[2.5]" />
+    </button>
   );
 }
 

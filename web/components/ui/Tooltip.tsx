@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 
 type TooltipProps = {
@@ -29,6 +29,7 @@ export function Tooltip({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const triggerRef = useRef<HTMLElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const tooltipId = useId();
 
   const showTooltip = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -82,10 +83,17 @@ export function Tooltip({
     React.HTMLAttributes<HTMLElement> & React.RefAttributes<HTMLElement>
   >;
   const childProps = child.props;
+  const tooltipDescribedBy = [
+    childProps["aria-describedby"],
+    isVisible ? tooltipId : null,
+  ]
+    .filter(Boolean)
+    .join(" ") || undefined;
 
   // Use cloneElement to attach refs and events to children.
   const trigger = React.cloneElement(child, {
     ref: triggerRef,
+    "aria-describedby": tooltipDescribedBy,
     style: { ...childProps.style, cursor: "pointer" },
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
       childProps.onMouseEnter?.(e);
@@ -121,6 +129,8 @@ export function Tooltip({
       {trigger}
       {isVisible && typeof document !== "undefined" && createPortal(
         <div
+          id={tooltipId}
+          role="tooltip"
           ref={tooltipRef}
           style={{
             position: "fixed",
@@ -130,7 +140,7 @@ export function Tooltip({
           }}
           className={`pointer-events-none ${alignmentClass} ${sideClass} animate-in fade-in zoom-in-95 duration-200`}
         >
-          <div className="rounded-[8px] border border-black/5 bg-white/95 px-2.5 py-1 text-[12px] font-medium text-black shadow-[0_4px_16px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-[#1f2225]/95 dark:text-white">
+          <div className="rounded-[8px] border border-black/10 bg-white/95 px-2.5 py-1 text-[12px] font-medium text-black backdrop-blur-md dark:border-white/10 dark:bg-[#1f2225]/95 dark:text-white">
             {content}
           </div>
         </div>,
