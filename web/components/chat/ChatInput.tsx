@@ -373,7 +373,7 @@ export default function ChatInput({
         )}
       </div>
 
-      <div className="shrink-0 p-2">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center">
         {sendDisabledReason ? (
           <Tooltip content={sendDisabledReason} side="top" delay={150}>
             <span
@@ -382,7 +382,7 @@ export default function ChatInput({
               aria-label={sendDisabledReason}
               tabIndex={0}
               onClick={(event) => event.stopPropagation()}
-              className="inline-flex rounded-full"
+              className="inline-flex h-10 w-10 rounded-full"
             >
               <SendButton disabled={sendButtonDisabled} />
             </span>
@@ -401,7 +401,7 @@ function SendButton({ disabled }: { disabled: boolean }) {
       type="submit"
       data-testid="chat-send"
       disabled={disabled}
-      className="rounded-full bg-black p-2.5 text-white transition-opacity hover:opacity-85 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black text-white transition-opacity hover:opacity-85 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
     >
       <ArrowUp className="h-5 w-5 stroke-[2.5]" />
     </button>

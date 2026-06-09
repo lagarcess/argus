@@ -15,11 +15,14 @@ describe("chat input send tooltip", () => {
     expect(input).toContain("chat.message_empty");
     expect(input).toContain("Tooltip content={sendDisabledReason}");
     expect(input).toContain('data-testid="chat-send-disabled-tooltip"');
+    expect(input).toContain('className="flex h-14 w-14 shrink-0 items-center justify-center"');
+    expect(input).toContain('className="inline-flex h-10 w-10 rounded-full"');
     expect(input).toContain('aria-disabled="true"');
     expect(input).toContain("tabIndex={0}");
     expect(input).toContain("event.stopPropagation()");
     expect(input).toContain("disabled={sendButtonDisabled}");
     expect(input).toContain("disabled:pointer-events-none");
+    expect(input).toContain("inline-flex h-10 w-10 items-center justify-center");
     expect(en).toContain('"message_empty": "Message is empty"');
     expect(es).toContain('"message_empty": "El mensaje está vacío"');
   });
