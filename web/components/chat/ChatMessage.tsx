@@ -230,7 +230,10 @@ export default function ChatMessage({
             </div>
           ) : message.kind === "backtest_job" && message.backtestJob ? (
             <div className="w-full max-w-[min(100%,660px)]">
-              <BacktestJobCard job={message.backtestJob} />
+              <BacktestJobCard
+                job={message.backtestJob}
+                canRetry={Boolean(retryAction)}
+              />
             </div>
           ) : message.kind === "strategy_confirmation" && message.confirmation ? (
             <div className="w-full max-w-[min(100%,660px)]">
