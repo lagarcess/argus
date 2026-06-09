@@ -432,8 +432,6 @@ From the private-alpha execution milestone:
 
 New debt or smells from this milestone inventory:
 
-- current share action exposes an internal conversation id instead of a real
-  public excerpt artifact;
 - streaming/error behavior needs a stronger contract before broader provider
   streaming changes;
 - public excerpt implementation is intentionally design-only in this milestone;
@@ -455,6 +453,9 @@ Addressed in this branch:
   bounded mention provenance for backend validation. Repeated discovery queries
   are deduplicated in the browser session, while provider-universe caching stays
   server-side for now.
+- the header menu no longer exposes "copy conversation link" as a pseudo-share
+  action; real public conversation excerpts stay design-only until their
+  privacy and revocation model is implemented.
 - Quick take no longer renders supported next experiments as visible next-check
   prose, and Explain result rejects "Quick take" headings while using a deeper
   Setup / How to read it / Risk and assumptions / Useful next check fallback.

@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
-  Copy,
   Edit2,
   MoreVertical,
   Pin,
@@ -73,7 +72,6 @@ import {
   conversationLoadFailureMessage,
   shouldShowConversationDisclaimer,
 } from "@/lib/chat-conversation-load-state";
-import { writeClipboardText } from "@/lib/clipboard";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { hydrateTextMessageFromApi } from "@/lib/chat-message-hydration";
 import { normalizeRetryActionHistory } from "@/lib/chat-retry-action-history";
@@ -1777,16 +1775,6 @@ export default function ChatInterface() {
     [conversationId, historyItems],
   );
 
-  const handleCopyConversationLink = async () => {
-    if (!conversationId) return;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const copied = await writeClipboardText(
-      `${origin}/chat?conversation=${conversationId}`,
-    );
-    showToast(t(copied ? 'chat.copy_success' : 'chat.copy_failed'));
-    closeChatOptions();
-  };
-
   const handleStartHeaderRename = () => {
     if (!conversationId) return;
     setHeaderRenameValue(
@@ -2000,15 +1988,6 @@ export default function ChatInterface() {
                     <div className="mx-auto my-3 h-1.5 w-12 rounded-full bg-black/10 dark:bg-white/10 md:hidden" />
                     {!isRenamingHeaderChat ? (
                       <div className="py-1">
-                        <button
-                          type="button"
-                          disabled={!conversationId}
-                          onClick={() => { void handleCopyConversationLink(); }}
-                          className="flex w-full items-center gap-4 px-6 py-4 text-left text-[16px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 md:px-5 md:py-3 md:text-[15px]"
-                        >
-                          <Copy className="h-[18px] w-[18px] text-black/60 dark:text-white/60 md:h-4 md:w-4" />
-                          {t('chat.copy_conversation_link', 'Copy conversation link')}
-                        </button>
                         <button
                           type="button"
                           disabled={!conversationId}

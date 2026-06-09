@@ -87,10 +87,11 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain('aria-label="Chat options"');
     expect(chat).toContain("MoreVertical");
-    expect(chat).toContain("chat.copy_conversation_link");
     expect(chat).toContain("chat.rename_chat");
     expect(chat).toContain("chat.pin_chat");
     expect(chat).toContain("chat.unpin_chat");
+    expect(chat).not.toContain("chat.copy_conversation_link");
+    expect(chat).not.toContain("handleCopyConversationLink");
     expect(chat).not.toContain("chat.add_to_collection");
     expect(chat).not.toContain('aria-label="Archived chats"');
   });
