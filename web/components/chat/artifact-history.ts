@@ -20,6 +20,7 @@ const CONFIRMATION_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>
   "adjust_assumptions",
   "cancel_confirmation",
 ]);
+const IN_PROGRESS_RUN_STATUS_LABELS = new Set(["Running", "Request sent"]);
 
 export function confirmationActionStatusLabel(
   actionOrType: ChatActionOption | NonNullable<ChatActionOption["type"]> | undefined,
@@ -45,7 +46,7 @@ function completedRunConfirmationStatusLabel(message: Message, index: number, la
   if (
     index < lastResultIndex &&
     message.confirmation?.confirmation_state === "superseded" &&
-    message.confirmation.statusLabel === "Running"
+    IN_PROGRESS_RUN_STATUS_LABELS.has(message.confirmation.statusLabel)
   ) {
     return "Run complete";
   }
