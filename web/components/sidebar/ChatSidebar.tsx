@@ -32,6 +32,7 @@ import type { HistoryItem, SearchItem } from "@/lib/argus-api";
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
 type View = "chat" | "strategies" | "settings";
+const EMPTY_ATTENTION_IDS = new Set<string>();
 
 export type ChatSidebarProps = {
   /** Whether the sidebar is expanded or collapsed */
@@ -53,6 +54,8 @@ export type ChatSidebarProps = {
   onToggleRecents: () => void;
   /** History items for the Recents list */
   historyItems: HistoryItem[];
+  /** Session-local conversations with completed Argus turns the user has not opened yet */
+  attentionConversationIds?: ReadonlySet<string>;
   /** Whether more history pages are available */
   historyNextCursor: string | null;
   /** Whether a history page load is in progress */
@@ -145,6 +148,7 @@ export default function ChatSidebar({
   isRecentsExpanded,
   onToggleRecents,
   historyItems,
+  attentionConversationIds = EMPTY_ATTENTION_IDS,
   historyNextCursor,
   isLoadingMoreHistory,
   onNewChat,
@@ -490,6 +494,8 @@ export default function ChatSidebar({
                       {group.items.map((item) => {
                         const itemConversationId = historyConversationId(item);
                         const isActiveConversation = conversationId === itemConversationId;
+                        const hasConversationAttention =
+                          !isActiveConversation && attentionConversationIds.has(itemConversationId);
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
 
@@ -500,6 +506,7 @@ export default function ChatSidebar({
                             tabIndex={0}
                             aria-current={isActiveConversation ? "page" : undefined}
                             data-active-conversation={isActiveConversation ? "true" : undefined}
+                            data-has-attention={hasConversationAttention ? "true" : undefined}
                             data-conversation-id={itemConversationId}
                             onClick={(e) => {
                               // Only navigate if click was on this element or its text children,
@@ -518,9 +525,17 @@ export default function ChatSidebar({
                             className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 ${
                               isActiveConversation
                                 ? "bg-black/5 dark:bg-white/5"
+                                : hasConversationAttention
+                                  ? "bg-[#7da0ca]/10 hover:bg-[#7da0ca]/14 dark:bg-[#7da0ca]/12 dark:hover:bg-[#7da0ca]/16"
                                 : "hover:bg-black/5 dark:hover:bg-white/5"
                             }`}
                           >
+                          {hasConversationAttention && (
+                            <span
+                              aria-hidden="true"
+                              className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#70a38d] shadow-[0_0_0_3px_rgba(112,163,141,0.16)] dark:bg-[#9bc6b4] dark:shadow-[0_0_0_3px_rgba(155,198,180,0.16)]"
+                            />
+                          )}
                           <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
                           <div className="min-w-0 flex-1 pl-3 pr-10">
                             {renamingId === item.id ? (

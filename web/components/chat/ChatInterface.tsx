@@ -93,6 +93,10 @@ import {
   isConfirmationAction,
   visibleComposerActions,
 } from "@/lib/chat-action-ownership";
+import {
+  attentionAfterConversationOpen,
+  attentionAfterTurnSettled,
+} from "@/lib/chat-attention-state";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
@@ -595,6 +599,9 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputActions, setInputActions] = useState<ChatActionOption[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [attentionConversationIds, setAttentionConversationIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [currentView, setCurrentView] = useState<View>("chat");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -630,6 +637,8 @@ export default function ChatInterface() {
   const shouldAutoScrollRef = useRef(true);
   const chatOptionsRef = useRef<HTMLDivElement>(null);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
+  const activeConversationIdRef = useRef<string | null>(null);
+  const currentViewRef = useRef<View>("chat");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const pendingBacktestJobKey = useMemo(
     () => pendingBacktestJobIds(messages).join("|"),
@@ -655,6 +664,31 @@ export default function ChatInterface() {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const clearConversationAttention = useCallback((nextConversationId?: string | null) => {
+    setAttentionConversationIds((prev) =>
+      attentionAfterConversationOpen(prev, nextConversationId),
+    );
+  }, []);
+
+  const markConversationAttentionIfOutOfFocus = useCallback(
+    (settledConversationId?: string | null) => {
+      const focusedConversationId =
+        currentViewRef.current === "chat" ? activeConversationIdRef.current : null;
+      setAttentionConversationIds((prev) =>
+        attentionAfterTurnSettled(prev, settledConversationId, focusedConversationId),
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    activeConversationIdRef.current = conversationId;
+    currentViewRef.current = currentView;
+    if (currentView === "chat") {
+      clearConversationAttention(conversationId);
+    }
+  }, [clearConversationAttention, conversationId, currentView]);
 
   const resetToEmptyChatSurface = useCallback(() => {
     const clearedRoute = clearActiveConversationPointer();
@@ -1262,6 +1296,7 @@ export default function ChatInterface() {
               : m,
           ),
         );
+        markConversationAttentionIfOutOfFocus(targetConversationId);
       }
       if (event.event === "final") {
         setStreamStatus(null);
@@ -1401,6 +1436,7 @@ export default function ChatInterface() {
         setStreamStatus(null);
         setIsStreamingResponse(false);
         schedulePostTurnHistoryRefresh(targetConversationId);
+        markConversationAttentionIfOutOfFocus(targetConversationId);
       }
     };
 
@@ -1450,6 +1486,7 @@ export default function ChatInterface() {
             : m,
         ),
       );
+      markConversationAttentionIfOutOfFocus(targetConversationId);
     }
   };
 
@@ -1515,12 +1552,14 @@ export default function ChatInterface() {
                 : m,
             ),
           );
+          markConversationAttentionIfOutOfFocus(targetConversationId);
         }
         if (event.event === "done") {
           setStreamStatus(null);
           setIsStreamingResponse(false);
           setShowOnboardingGoalCards(false);
           schedulePostTurnHistoryRefresh(targetConversationId);
+          markConversationAttentionIfOutOfFocus(targetConversationId);
         }
       });
       await patchMe({
@@ -1542,6 +1581,7 @@ export default function ChatInterface() {
             : m,
         ),
       );
+      markConversationAttentionIfOutOfFocus(targetConversationId);
     }
   };
 
@@ -1595,9 +1635,11 @@ export default function ChatInterface() {
         }
         if (event.event === "error") {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
+          markConversationAttentionIfOutOfFocus(targetConversationId);
         }
         if (event.event === "done") {
           schedulePostTurnHistoryRefresh(targetConversationId);
+          markConversationAttentionIfOutOfFocus(targetConversationId);
         }
       }, []);
     } catch (err: unknown) {
@@ -1606,6 +1648,7 @@ export default function ChatInterface() {
           ? err.message
           : t('chat.error_generic');
           showToast(message);
+      markConversationAttentionIfOutOfFocus(targetConversationId);
     }
     finally {
       setMessages((prev) => markResultCardSaving(prev, runId, false));
@@ -1655,9 +1698,11 @@ export default function ChatInterface() {
         }
         if (event.event === "error") {
           showToast(chatStreamErrorText(event.data.detail, t('chat.error_generic')));
+          markConversationAttentionIfOutOfFocus(targetConversationId);
         }
         if (event.event === "done") {
           schedulePostTurnHistoryRefresh(targetConversationId);
+          markConversationAttentionIfOutOfFocus(targetConversationId);
         }
       }, []);
     } catch (err: unknown) {
@@ -1666,6 +1711,7 @@ export default function ChatInterface() {
           ? err.message
           : t('chat.error_generic');
       showToast(message);
+      markConversationAttentionIfOutOfFocus(targetConversationId);
     } finally {
       setIsStreamingResponse(false);
       setStreamStatus(null);
@@ -1853,6 +1899,7 @@ export default function ChatInterface() {
         isRecentsExpanded={isRecentsExpanded}
         onToggleRecents={() => setIsRecentsExpanded((expanded) => !expanded)}
         historyItems={historyItems}
+        attentionConversationIds={attentionConversationIds}
         historyNextCursor={historyNextCursor}
         isLoadingMoreHistory={isLoadingMoreHistory}
         onNewChat={() => {
