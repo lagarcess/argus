@@ -126,6 +126,9 @@ describe("chat composer display helpers", () => {
     expect(input).toContain('e.key === "Escape"');
     expect(input).toContain("insertDiscoveryItem(activeDiscoveryItem)");
     expect(input).toContain("discoveryEnterAction({");
+    expect(input).toContain('aria-haspopup="listbox"');
+    expect(input).toContain("aria-expanded={isMentionButtonHidden ? undefined : isDiscoveryOpen}");
+    expect(input).toContain('aria-controls={!isMentionButtonHidden && isDiscoveryOpen ? "chat-discovery-listbox" : undefined}');
   });
 
   test("chat input distinguishes discovery loading, empty, and unavailable states", () => {
@@ -153,9 +156,19 @@ describe("chat composer display helpers", () => {
   test("hides the mention shortcut when a literal mention marker is visible", () => {
     expect(shouldHideMentionButton(false, "")).toBe(false);
     expect(shouldHideMentionButton(false, "Test AAPL")).toBe(false);
-    expect(shouldHideMentionButton(true, "")).toBe(true);
+    expect(shouldHideMentionButton(true, "")).toBe(false);
     expect(shouldHideMentionButton(false, "@")).toBe(true);
     expect(shouldHideMentionButton(false, "Buy @apple")).toBe(true);
+  });
+
+  test("mention button opens discovery without inserting a literal marker", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    const openDiscovery = input.slice(
+      input.indexOf("const openDiscovery = () => {"),
+      input.indexOf("const insertDiscoveryItem ="),
+    );
+
+    expect(openDiscovery).not.toContain('insertTextAtOffset(current, cursor, "@")');
   });
 
   test("places contenteditable focus before restoring the composer caret", () => {
