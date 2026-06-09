@@ -397,7 +397,6 @@ From the private-alpha execution milestone:
 - Supabase migration history has older drift;
 - Render Workflow CPU/peak RSS need platform-level measurement;
 - async failure taxonomy is coarse;
-- retired `src/argus/api/chat_service.py` still imports heavy helpers;
 - currency-pair benchmark normalization has a known correctness test failure in
   broader recovery work;
 - large mixed-concern runtime files should be refactored only when a cohesive
@@ -432,6 +431,8 @@ Addressed in this branch:
 - Quick take no longer renders supported next experiments as visible next-check
   prose, and Explain result rejects "Quick take" headings while using a deeper
   Setup / How to read it / Risk and assumptions / Useful next check fallback.
+- retired `src/argus/api/chat_service.py` has been deleted, and static guards now
+  fail if launch code or tests import the old facade.
 
 ## Hard Gates
 

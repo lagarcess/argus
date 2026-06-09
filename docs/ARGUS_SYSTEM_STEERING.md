@@ -28,7 +28,8 @@ Known state on `codex/context-intelligence-routing`:
 - Tier 4 can synthesize from run facts plus attached context-packet fields; completed runs without attached packets still fall back to run-fact-only explanations.
 - The OpenRouter signal-repair regression for partial moving-average crossover ideas is green after routing underfilled structured interpretations through focused repair.
 - Deterministic run facts, result fact banks, result cards, reload metadata, confirmation artifacts, and action payloads exist.
-- `chat_service.py` is now mostly a compatibility facade over split `api/chat/*` modules and should not be the import path for new code.
+- `chat_service.py` has been retired; split `api/chat/*` modules are the only
+  supported chat helper import paths.
 - Several files mix too many responsibilities and should be modularized to reduce brittleness before or during private-launch hardening.
 
 The system is directionally coherent, but not private-launch ready until runtime integrity, semantic flexibility, route observability, reload trust, and context-packet boundaries are tightened.
@@ -307,17 +308,18 @@ Implementation dependency order:
 
 Current state:
 
-- `chat_service.py` remains as a compatibility facade.
+- `chat_service.py` is retired and should not be restored.
 - Launch router code should import focused runtime/chat modules directly.
 - Tests should import focused modules for helpers that now live outside the
-  facade.
+  retired facade.
 - `ARGUS_*` model-tier config is the active runtime contract; legacy model
   aliases should not be used by launch-path code, tests, or docs.
 - Some helpers appear obsolete or compatibility-only.
 
 Production risks:
 
-- New work may keep targeting the facade instead of actual module ownership.
+- New work may restore or target the retired facade instead of actual module
+  ownership.
 - Compatibility aliases can hide stale code and duplicate behavior.
 - Tests anchored to old paths make cleanup harder.
 - Old config naming can confuse model-tier operations.
@@ -334,9 +336,9 @@ LLM-owned responsibilities:
 
 Immediate priorities:
 
-1. Stop new code from importing `chat_service.py`.
-2. Rewire tests to focused modules.
-3. Remove underscored compatibility aliases after imports move.
+1. Keep `chat_service.py` deleted.
+2. Keep tests pointed at focused modules.
+3. Remove underscored compatibility aliases from focused modules when touched.
 4. Make `ARGUS_*` primary in docs and tests.
 5. Delete obsolete helpers after usage is proven absent.
 
@@ -551,22 +553,22 @@ Target responsibilities:
 - `next_experiments.py`: structured next-experiment option generation.
 - LLM/fallback layers phrase next experiments for users.
 
-### `src/argus/api/chat_service.py`
+### Retired `src/argus/api/chat_service.py`
 
-Classification: delete or replace compatibility path.
+Classification: retired compatibility path.
 
 Why:
 
-- It is now mostly a re-export facade over split `api/chat/*` modules.
-- It still carries underscored compatibility aliases.
-- Tests and router imports still point to it, encouraging new work to target the wrong path.
+- It was mostly a re-export facade over split `api/chat/*` modules.
+- It carried underscored compatibility aliases and heavyweight imports.
+- Keeping it available encouraged new work to target the wrong path.
 
 Target state:
 
-- No new code imports `chat_service.py`.
+- The file stays deleted.
+- No new code imports `argus.api.chat_service`.
 - Tests import focused modules.
-- Underscored aliases are removed after imports move.
-- The file is either deleted or reduced to a short temporary compatibility shim with an explicit removal note.
+- Static guard tests fail if launch code or tests import the retired facade.
 
 ### Split Later Candidates
 
@@ -824,7 +826,7 @@ Exact strings belong only to protocol, static UI, and safety fallback. Evals sho
 6. Saved result actions and reload recovery work after refresh.
 7. Next experiments are structured options, not only canned prose.
 8. FRED/Alpaca context packets are defined before implementation.
-9. `chat_service.py` is no longer the path for new code.
+9. `chat_service.py` remains deleted.
 10. Docs/env examples use `ARGUS_*` as primary config.
 11. All critical failures preserve conversation state and give the user a recoverable next step.
 12. Tier 4 contextual explanations remain grounded in engine facts and structured context packets, with no unsupported causal claims.
@@ -864,7 +866,7 @@ These may become valuable later. They are not prerequisites for proving the priv
 - Do not let context packets alter simulation truth.
 - Do not let refreshed context rewrite completed explanations.
 - Do not silently mislabel provider metadata.
-- Do not route new code through `chat_service.py`.
+- Do not restore or route new code through `chat_service.py`.
 - Do not refactor for architecture purity without reducing launch risk.
 - Do not expand strategy breadth before fixing messy-human interpretation.
 - Do not let users dead-end on unsupported requests; redirect to nearby testable ideas.
