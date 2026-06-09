@@ -110,6 +110,7 @@ describe("chat composer display helpers", () => {
     expect(input).toContain('role="listbox"');
     expect(input).toContain('role="option"');
     expect(input).toContain('aria-autocomplete="list"');
+    expect(input).toContain("cursor-text items-center rounded-[32px]");
     expect(input).toContain("isMentionButtonHidden ? \"invisible pointer-events-none\"");
     expect(input).toContain('aria-controls={isDiscoveryOpen ? "chat-discovery-listbox" : undefined}');
     expect(input).toContain("aria-activedescendant={isDiscoveryOpen ? activeDiscoveryOptionId : undefined}");

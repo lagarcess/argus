@@ -314,7 +314,7 @@ export default function ChatInput({
     <form
       onSubmit={handleSubmit}
       onClick={handleContainerClick}
-      className="relative flex min-h-[64px] w-full cursor-text items-end rounded-[32px] border border-black/5 bg-white transition-all focus-within:ring-2 focus-within:ring-black/20 dark:border-white/5 dark:bg-[#1f2227] dark:focus-within:ring-white/20"
+      className="relative flex min-h-[64px] w-full cursor-text items-center rounded-[32px] border border-black/5 bg-white transition-all focus-within:ring-2 focus-within:ring-black/20 dark:border-white/5 dark:bg-[#1f2227] dark:focus-within:ring-white/20"
     >
       {isDiscoveryOpen && (
         <div
