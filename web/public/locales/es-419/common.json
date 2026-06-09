@@ -262,8 +262,14 @@
     },
     "discovery": {
       "prompt": "Menciona un activo o indicador",
-      "searching": "Resultados de búsqueda",
+      "results": "Resultados de búsqueda",
+      "searching": "Buscando activos compatibles...",
+      "loading": "Revisando símbolos, nombres de compañías, cripto, pares de divisas e indicadores.",
       "empty": "Escribe después de @ para buscar activos e indicadores compatibles.",
+      "no_results_title": "No hay coincidencias compatibles",
+      "no_results": "No encontramos un activo o indicador compatible para \"{{query}}\". Prueba con el ticker o el nombre oficial de la compañía.",
+      "unavailable_title": "La búsqueda está tardando más de lo esperado",
+      "unavailable": "Prueba con el ticker directamente, o sigue escribiendo. Argus todavía puede razonar sobre tu mensaje.",
       "sections": {
         "assets": "Activos populares",
         "indicators": "Indicadores ejecutables",

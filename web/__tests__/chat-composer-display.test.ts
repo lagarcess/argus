@@ -128,6 +128,16 @@ describe("chat composer display helpers", () => {
     expect(input).toContain("discoveryEnterAction({");
   });
 
+  test("chat input distinguishes discovery loading, empty, and unavailable states", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+
+    expect(input).toContain("const [discoveryStatus, setDiscoveryStatus]");
+    expect(input).toContain("discoveryPanelDisplay({");
+    expect(input).toContain("aria-busy={discoveryPanel.busy}");
+    expect(input).toContain("Promise.allSettled");
+    expect(input).not.toContain("searchDiscovery(\"assets\", query, DISCOVERY_SEARCH_LIMIT).catch(() => ({ items: [] }))");
+  });
+
   test("discovery enter behavior does not trap send when no result is active", () => {
     expect(
       discoveryEnterAction({ hasActiveItem: true, hasComposerContent: true }),

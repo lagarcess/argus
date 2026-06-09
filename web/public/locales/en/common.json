@@ -262,8 +262,14 @@
     },
     "discovery": {
       "prompt": "Mention an asset or indicator",
-      "searching": "Search results",
+      "results": "Search results",
+      "searching": "Searching supported assets...",
+      "loading": "Checking symbols, company names, crypto, currency pairs, and indicators.",
       "empty": "Type after @ to search supported assets and indicators.",
+      "no_results_title": "No supported matches",
+      "no_results": "No supported asset or indicator matched \"{{query}}\". Try a ticker or official company name.",
+      "unavailable_title": "Discovery is taking longer than expected",
+      "unavailable": "Try the ticker directly, or keep typing. Argus can still reason about your message.",
       "sections": {
         "assets": "Popular assets",
         "indicators": "Runnable indicators",
