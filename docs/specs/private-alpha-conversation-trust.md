@@ -497,17 +497,11 @@ cd web && bun run build
 ## Current Checkpoint Evidence
 
 Latest verified code checkpoint before this documentation sync:
-`595013f6e6d96fa7c282d29d74ab6e6fba7ebf16`.
+`3870c7a3a1cd31a9b1ed3b4b440da63b66ebeb59`.
 
 Local verification on 2026-06-09:
 
 ```text
-cd web && bun test
-# 173 passed
-
-cd web && bun run build
-# passed
-
 poetry run ruff check src tests workflows scripts
 # passed
 
@@ -515,35 +509,56 @@ poetry run pytest \
   tests/test_environment_scripts.py \
   tests/test_api_import_boundary.py \
   tests/test_render_canary_script.py \
-  tests/test_legacy_orchestrator_retirement.py \
+  tests/test_render_runtime_compatibility.py \
+  tests/test_private_launch_hardening.py \
+  tests/test_checkpoint_rls_migration.py \
+  tests/test_ci_workflow.py \
   -q --no-cov
-# 44 passed
+# 50 passed
 
-poetry run pytest \
-  tests/test_chat_backtest_state_machine.py::test_chat_stream_passes_and_persists_composer_mention_provenance \
-  tests/test_chat_backtest_state_machine.py::test_chat_stream_preserves_selected_stock_asset_class_from_mentions \
-  tests/agent_runtime/test_interpret_stage.py::test_selected_asset_mention_provenance_keeps_equity_symbol_binding \
-  tests/agent_runtime/test_resolution_context.py::test_user_mention_asset_resolution_does_not_guess_company_alias_from_fuzzy_symbol \
-  -q --no-cov
-# 4 passed
+cd web && bun test
+# 178 passed
+
+cd web && bun run build
+# passed
 ```
 
 GitHub Actions:
 
 ```text
-CI / codex/private-alpha-conversation-trust / 595013f
-# completed successfully
+CI / codex/private-alpha-conversation-trust / 3870c7a
+# completed successfully on run 27224014816
 ```
 
 Browser QA:
 
 ```text
-Local `@` composer flow:
-- clicking the mention affordance inserts one `@` marker;
-- typing `AAP` returns provider-backed AAPL discovery;
-- selecting AAPL creates a canonical composer token with
-  `asset:equity:AAPL`, symbol `AAPL`, and provider `alpaca`;
-- the mention lane remains optically centered with the send button.
+Local chat browser pass on 2026-06-09:
+- composer geometry remained centered: contenteditable caret lane, mention
+  button, send button, and form all shared the same vertical center;
+- focusing the disabled send wrapper displayed the localized "Message is empty"
+  tooltip;
+- clicking the mention affordance opened the keyboardable discovery listbox;
+- typing `AAP` returned AAPL from the local synthetic provider catalog;
+- selecting AAPL created a canonical composer token with
+  `asset:equity:AAPL`, symbol `AAPL`, asset class `equity`, and provider
+  `synthetic_unit_fixture`;
+- local starter prompt -> confirmation card rendered a polished ready-to-run
+  card with card-scoped actions and assistant turn controls;
+- running the local backtest moved the confirmation card to Running, then Run
+  complete, and rendered the result card, Quick take, Explain result, and
+  Refine idea actions;
+- the dev-only result-card playground still renders complete result-card
+  fixture states across light/dark examples.
+
+Local caveats:
+- `synthetic_unit_fixture` intentionally exposes only a tiny provider-shaped
+  catalog; full Alpaca/Kraken provider discovery requires QA/live provider
+  mode or a recorded provider fixture.
+- local backtests complete too quickly to visually hold durable queued/running
+  workflow job states without a QA-only forced state. Durable job hydration,
+  polling, and failed/succeeded transitions are covered by frontend contract
+  tests and remain validated by the manual internet canary path.
 ```
 
 ## Operating Model
