@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW_PATH = ROOT / ".github" / "workflows" / "deploy.yml"
+WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _workflow() -> dict:
@@ -15,6 +15,7 @@ def _workflow() -> dict:
 def test_ci_runs_on_main_and_codex_pushes_without_deploying() -> None:
     workflow = _workflow()
 
+    assert not (ROOT / ".github" / "workflows" / "deploy.yml").exists()
     assert workflow["name"] == "CI"
     assert workflow["on"]["push"]["branches"] == ["main", "codex/**"]
     assert workflow["on"]["pull_request"]["branches"] == ["main"]
