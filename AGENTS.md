@@ -69,6 +69,43 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
+# 🧭 Current Milestone: Private Alpha Conversation Trust
+
+When working on `codex/private-alpha-conversation-trust`, use
+`docs/specs/private-alpha-conversation-trust.md` as the milestone source of
+truth. This milestone hardens the current private-alpha chat/backtest loop; it
+does not implement the Perplexity Research Lab thesis yet.
+
+Milestone guardrails:
+
+- Re-enable fast CI and local verification without automatic production deploys.
+- Unify confirmation, queued/running job, result, and assistant-turn actions as
+  one coherent artifact lifecycle.
+- Keep feedback/retry/more-menu actions structured and turn-scoped; do not use
+  prose matching to infer retry behavior.
+- Add out-of-focus chat attention state without inventing backend facts in the
+  frontend.
+- Treat Quick take, Explain result, and Try next as distinct result surfaces:
+  Quick take is the first-glance result readout, Explain result is the deeper
+  fact-grounded breakdown action, and Try next must come from supported next
+  experiments rather than generic advice or duplicated Quick take prose.
+- Do not restore "copy conversation link" or "share conversation id" as a
+  pseudo-share action. Until the public excerpt feature exists, the header menu
+  should expose only real owner actions such as rename, pin, and delete.
+- When public conversation excerpts are implemented, they must be immutable,
+  sanitized snapshots behind owner-only create/revoke and an unguessable public
+  slug. Do not expose source conversation ids, route receipts, provider/model
+  metadata, retry payloads, or direct anon table access.
+- Keep Perplexity/Research Lab work as design-only unless a later milestone
+  explicitly starts that implementation. The preserved thesis lives in
+  `docs/specs/research-lab-thesis.md`.
+
+Never let UI polish violate the runtime principles below: the frontend renders
+backend-provided artifacts, LangGraph remains the only chat brain, and
+deterministic result prose must not become the normal happy-path Argus voice.
+
+---
+
 # 🧭 Argus Philosophy & Runtime Principles
 
 Argus is chat-first, AI-first, and trust-first. The assistant should help a normal person move from a rough investing idea to a clear historical test with as little friction as possible, while being honest about assumptions, limitations, and supported execution.
@@ -94,6 +131,7 @@ These principles come from the recent modular monolith / LangGraph migration pla
 - **Canonical SSE is data-only**: Production chat streaming should emit canonical `data: {"type": ...}` frames: `stage_start`, `token`, `stage_outcome`, `final`, then `[DONE]`. Legacy named `event:` parsing may be tolerated by the frontend during migration, but new backend paths should not depend on it.
 - **Thin FastAPI routers**: API routes perform auth, quota checks, request validation, transport, persistence, and error shaping. They must not become a second conversational orchestrator.
 - **Frontend renders, it does not invent**: The web app renders backend-provided stages, cards, actions, and persisted metadata. It should not fake progress states, reconstruct strategies from text, or infer hidden run context.
+- **Composer mentions are provenance, not shortcuts around validation**: The `@` tool must use provider-backed asset discovery and the supported indicator catalog, not a tiny static menu. Selected mentions help bound ambiguous references for the backend, but normal LLM interpretation and backend validation still own executable meaning. Browser-session discovery caching is acceptable; durable Supabase discovery/market-data caches require explicit schema, freshness, and invalidation design.
 - **No Alpha RAG/vector overreach**: Do not add embeddings, pgvector, semantic memory, or agentic RAG for the launch chat/backtest loop. Use provider catalogs, structured state, run metadata, saved strategies, and text search until a concrete Beta need exists.
 - **Provider details stay internal**: Users should hear capability truth ("I can test BTC over that period" or "that data range is not available for this instrument"), not vendor-specific implementation details unless the product explicitly decides otherwise.
 
@@ -399,6 +437,9 @@ Pattern:
 - Anti-patterns: dense PDF tone, metric dumps, generic lists, jargon
 - Deterministic facts ground LLM language
 - No raw enums or internal field names in user-facing text
+- Result readouts must preserve surface ownership: Quick take should not render
+  supported next experiments as visible "Try next" copy, while Explain result
+  must not reuse Quick take / Quick Breakdown headings.
 
 Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
 

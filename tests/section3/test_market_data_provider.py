@@ -188,10 +188,13 @@ def test_synthetic_unit_fixture_is_explicitly_opted_in(
 
     apple = assets.resolve_asset("Apple")
     nvidia = assets.search_assets("nvidia")[0]
+    eurusd = assets.search_assets("eur")[0]
 
     assert apple.canonical_symbol == "AAPL"
     assert apple.asset_class == "equity"
     assert nvidia.canonical_symbol == "NVDA"
+    assert eurusd.canonical_symbol == "EURUSD"
+    assert eurusd.asset_class == "currency_pair"
 
 
 def test_recorded_provider_fixture_uses_provider_shaped_payloads(

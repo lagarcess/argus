@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +50,13 @@ def test_legacy_state_module_is_retired() -> None:
     )
 
     assert not retired_path.exists()
+
+
+def test_chat_service_facade_is_retired() -> None:
+    retired_path = ROOT / "src/argus/api/chat_service.py"
+
+    assert not retired_path.exists()
+    assert importlib.util.find_spec("argus.api.chat_service") is None
 
 
 def test_agent_router_does_not_route_new_code_through_chat_service_facade() -> None:

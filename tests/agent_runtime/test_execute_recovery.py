@@ -1466,7 +1466,7 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
 
 
 @pytest.mark.asyncio
-async def test_explain_stage_async_limits_llm_next_checks_to_supported_contract(
+async def test_explain_stage_async_validates_next_checks_without_rendering_them(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime.stages import explain as explain_module
@@ -1520,7 +1520,10 @@ async def test_explain_stage_async_limits_llm_next_checks_to_supported_contract(
     result = await explain_stage_async(state=state)
 
     assert result.stage_patch["assistant_response"].startswith("**Quick take**")
-    assert "adjust the signal periods" in result.stage_patch["assistant_response"]
+    assert "adjust the signal periods" not in result.stage_patch["assistant_response"]
+    assert "Next check" not in result.stage_patch["assistant_response"]
+    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
+    assert result.stage_patch["assistant_response_fallback_used"] is False
     messages = captured["messages"]
     assert isinstance(messages, list)
     system_prompt = messages[0]["content"]
@@ -1833,7 +1836,8 @@ async def test_explain_stage_async_accepts_supported_next_experiment_labels(
     response = result.stage_patch["assistant_response"]
 
     assert "lagged SPY by 13.3 percentage points" in response
-    assert "change the date range" in response
+    assert "change the date range" not in response
+    assert "Next check" not in response
     assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
     assert result.stage_patch["assistant_response_fallback_used"] is False
 

@@ -2318,7 +2318,7 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
         {
             "sections": [
                 {
-                    "heading": "Quick Take",
+                    "heading": "Reading the run",
                     "parts": [
                         {
                             "kind": "text",
@@ -2374,6 +2374,56 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
     assert "**Test:** AAPL DCA Accumulation, March 1, 2024 to October 31, 2024." in text
     assert "SPY benchmark return +5.5%" in text
     assert "Beat by 7.0 percentage points" in text
+
+
+def test_result_breakdown_rejects_quick_take_headings(monkeypatch) -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
+            "sections": [
+                {
+                    "heading": "Quick Take",
+                    "parts": [
+                        {"kind": "fact", "fact_id": "title"},
+                        {"kind": "fact", "fact_id": "symbols"},
+                        {"kind": "fact", "fact_id": "date_range"},
+                        {"kind": "fact", "fact_id": "total_return"},
+                        {"kind": "fact", "fact_id": "benchmark_symbol"},
+                        {"kind": "fact", "fact_id": "benchmark_return"},
+                        {"kind": "fact", "fact_id": "benchmark_comparison"},
+                        {"kind": "fact", "fact_id": "max_drawdown"},
+                        {"kind": "fact", "fact_id": "assumptions"},
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                }
+            ]
+        }
+    )
+
+    text = chat_service.llm_result_breakdown_message(
+        {
+            "title": "AAPL Buy and Hold",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "date_range": "past year",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 39.5,
+                        "benchmark_return_pct": 25.6,
+                        "delta_vs_benchmark_pct": 13.9,
+                        "max_drawdown_pct": -13.8,
+                    }
+                }
+            },
+            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
+        },
+        invoke_json_schema_func=fake_schema,
+    )
+
+    assert text is None
 
 
 def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> None:
@@ -2587,6 +2637,7 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     assert "**How to read it.**" in text
     assert "**Risk and assumptions.**" in text
     assert "**Useful next check.**" in text
+    assert "Try next:" not in text
     assert "- Tested:" not in text
     assert "- Result:" not in text
     assert "- Risk:" not in text
@@ -2597,10 +2648,65 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     assert "+39.5%" in text
     assert "SPY" in text
     assert "-13.8%" in text
-    assert "supported RSI threshold" in text
-    assert "compare against buy-and-hold" not in text
-    assert "not a prediction" in text.lower()
-    assert "trading recommendation" in text.lower()
+
+
+def test_result_breakdown_metadata_records_deterministic_fallback(
+    monkeypatch,
+) -> None:
+    from argus.api.chat.breakdown import result_breakdown_message_with_metadata
+    from argus.api.schemas import BacktestRun
+    from argus.domain.store import utcnow
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    run = BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 39.5,
+                    "benchmark_return_pct": 25.6,
+                    "delta_vs_benchmark_pct": 13.9,
+                    "max_drawdown_pct": -13.8,
+                }
+            },
+            "by_symbol": {},
+        },
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "benchmark_symbol": "SPY",
+        },
+        conversation_result_card={
+            "title": "AAPL Buy and Hold",
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return (%)",
+                    "value": "+39.5%",
+                }
+            ],
+            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+    message = result_breakdown_message_with_metadata(run)
+
+    assert message.source == "deterministic_fallback"
+    assert message.fallback_used is True
+    assert message.failure_mode == "llm_unavailable_or_contract_rejected"
+    assert "**Setup.**" in message.text
 
 
 @pytest.mark.asyncio

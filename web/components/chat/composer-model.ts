@@ -39,6 +39,7 @@ export function composerMentions(segments: ComposerSegment[]): ChatMention[] {
         symbol: token.symbol ?? null,
         description: token.description ?? null,
         insert_text: token.insert_text,
+        provider: token.provider ?? null,
         support_status: token.support_status,
       };
       if (token.type === "asset") {
@@ -85,7 +86,9 @@ export function rangeForDiscoveryItem(
   const queryStart = mention.start + 1;
   const suffix = text.slice(queryStart);
   const boundary = suffix.search(/[.,;!?()[\]{}]/);
-  const query = (boundary < 0 ? suffix : suffix.slice(0, boundary)).trimStart();
+  const rawQuery = boundary < 0 ? suffix : suffix.slice(0, boundary);
+  const leadingWhitespaceLength = rawQuery.length - rawQuery.trimStart().length;
+  const query = rawQuery.trimStart();
   const normalizedQuery = normalizeSearchText(query);
   const candidates = [
     item.description,
@@ -106,7 +109,7 @@ export function rangeForDiscoveryItem(
     ) {
       return {
         start: mention.start,
-        end: mention.start + 1 + candidate.length,
+        end: mention.start + 1 + leadingWhitespaceLength + candidate.length,
         query: query.slice(0, candidate.length),
       };
     }
@@ -115,7 +118,7 @@ export function rangeForDiscoveryItem(
   const firstPhrase = query.match(/^[\w-]+/u)?.[0] ?? query;
   return {
     start: mention.start,
-    end: mention.start + 1 + firstPhrase.length,
+    end: mention.start + 1 + leadingWhitespaceLength + firstPhrase.length,
     query: firstPhrase,
   };
 }
@@ -137,8 +140,9 @@ export function replaceRangeWithToken(
   range: { start: number; end: number; query?: string },
   token: DiscoveryItem,
 ): ComposerSegment[] {
-  const before = rawComposerText(segments).at(range.start - 1) ?? "";
-  const after = rawComposerText(segments).at(range.end) ?? "";
+  const rawText = rawComposerText(segments);
+  const before = range.start > 0 ? rawText.at(range.start - 1) ?? "" : "";
+  const after = rawText.at(range.end) ?? "";
   const replacement: ComposerSegment[] = [{ type: "token", token }];
   if (after && !/\s|[.,;!?)]/.test(after)) {
     replacement.push({ type: "text", text: " " });

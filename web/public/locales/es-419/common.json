@@ -116,6 +116,8 @@
     "welcome": "Bienvenido a Argus. Cuéntame una idea de inversión en lenguaje sencillo y te ayudaré a probarla con supuestos seguros de Alpha.",
     "input_placeholder": "Describe una idea de inversión...",
     "followup_placeholder": "Haz una pregunta de seguimiento...",
+    "message_empty": "El mensaje está vacío",
+    "send_message": "Enviar mensaje",
     "disclaimer": "Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.",
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
@@ -171,11 +173,11 @@
       "yesterday": "Ayer",
       "last_7_days": "Últimos 7 días",
       "last_30_days": "Últimos 30 días",
-      "earlier": "Anterior"
+      "earlier": "Anterior",
+      "new_activity": "Actividad nueva"
     },
     "no_recent_activity": "Sin actividad reciente aún. Tus estrategias y chats aparecerán aquí.",
     "new_chat": "Nuevo chat",
-    "copy_conversation_link": "Copiar enlace de conversación",
     "rename_chat": "Renombrar chat",
     "pin_chat": "Anclar chat",
     "unpin_chat": "Desanclar chat",

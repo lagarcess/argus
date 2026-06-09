@@ -1111,7 +1111,7 @@ Soft delete conversation.
   private alpha, `save_strategy` must also respect server-side Strategies
   gating (for example `ARGUS_STRATEGIES_ENABLED=false`) and must not create a
   hidden saved-strategy object when the Strategies surface is disabled.
-- `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose.
+- `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
 
 ### Conversation Artifact Continuity Contract
 
@@ -1170,6 +1170,7 @@ actions and to ordinary user text.
       "asset_class": "crypto",
       "description": "Crypto",
       "insert_text": "BTC",
+      "provider": "kraken",
       "support_status": "supported"
     }
   ],
@@ -1183,7 +1184,9 @@ bypass LLM interpretation, or create hidden execution state. Asset mentions
 should include durable `asset_class` (`equity`, `crypto`, or `currency_pair`)
 and IDs shaped as `asset:{asset_class}:{symbol}` so selected ambiguous symbols
 preserve the user's chosen asset identity. Backend resolution still validates
-extracted candidates after interpretation.
+extracted candidates after interpretation. `provider` is optional machine
+provenance for resolver/debugging continuity; it must not be rendered as
+assistant-facing copy or used to bypass execution validation.
 
 **Required Header:**
 - `Idempotency-Key`: `uuid` (Highly recommended to prevent double-submits)

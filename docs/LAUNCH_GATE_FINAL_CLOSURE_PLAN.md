@@ -125,7 +125,7 @@ Final runtime closure tasks:
 
 - Decide `/internal/agent-runtime/turn`: remove it, gate it, or explicitly mark it test-only.
 - Keep one authoritative launch runtime path.
-- Keep `chat_service.py` compatibility-only or retire it.
+- Keep `chat_service.py` retired.
 - Prevent new production imports from `argus.api.chat_service`.
 - Thin `src/argus/api/routers/agent.py` only where it directly reduces launch-loop brittleness or duplicate-runtime risk.
 - Keep router ownership limited to auth, request validation, transport/SSE shape, persistence boundary, and error shaping.
@@ -234,8 +234,8 @@ If CI is unavailable or not run, the closure report must say so plainly.
 - [ ] Title fallback/failure is observable internally.
 - [ ] One authoritative launch runtime path is documented and guarded.
 - [ ] `/internal/agent-runtime/turn` is removed, gated, or explicitly test-only.
-- [ ] `chat_service.py` is compatibility-only or retired.
-- [ ] No new production code imports `argus.api.chat_service`.
+- [x] `chat_service.py` is retired.
+- [x] No new production code imports `argus.api.chat_service`.
 - [ ] Browser transcript matrix is complete.
 - [ ] CI proof exists, or local-only caveat is explicit.
 - [ ] Replayability remains intact from persisted run facts plus attached context packet references.

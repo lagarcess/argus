@@ -807,6 +807,7 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
                     "asset_class": "equity",
                     "description": "Stock",
                     "insert_text": "CVX",
+                    "provider": "alpaca",
                     "support_status": "supported",
                 }
             ],
@@ -823,6 +824,7 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
         f"/api/v1/conversations/{conversation['id']}/messages"
     ).json()["items"][0]
     assert user_message["metadata"]["mentions"][0]["asset_class"] == "equity"
+    assert user_message["metadata"]["mentions"][0]["provider"] == "alpaca"
     assert (
         user_message["metadata"]["resolution_provenance"][0]["asset_class"] == "equity"
     )
@@ -832,6 +834,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.chat.breakdown import (
+        ResultBreakdownMessage,
         fallback_result_breakdown_message,
         result_breakdown_context,
     )
@@ -853,8 +856,13 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     )
     monkeypatch.setattr(
         agent_router,
-        "result_breakdown_message",
-        lambda run: fallback_result_breakdown_message(result_breakdown_context(run)),
+        "result_breakdown_message_with_metadata",
+        lambda run: ResultBreakdownMessage(
+            text=fallback_result_breakdown_message(result_breakdown_context(run)),
+            source="deterministic_fallback",
+            fallback_used=True,
+            failure_mode="test_forced_fallback",
+        ),
     )
     client = _client()
     conversation = _conversation(client)
@@ -902,10 +910,11 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assert "event: result" not in second.text
     breakdown = _stream_payloads(second.text, "token")[0]["text"]
     assert "### Quick Breakdown" not in breakdown
-    assert "**What was tested.**" in breakdown
-    assert "**What moved the result.**" in breakdown
-    assert "**Risks and assumptions.**" in breakdown
-    assert "**Try next.**" in breakdown
+    assert "**Setup.**" in breakdown
+    assert "**How to read it.**" in breakdown
+    assert "**Risk and assumptions.**" in breakdown
+    assert "**Useful next check.**" in breakdown
+    assert "Try next:" not in breakdown
     assert "- Result:" not in breakdown
     assert "- Next step:" not in breakdown
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
@@ -913,6 +922,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assistant = messages.json()["items"][-1]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
+    assert assistant["metadata"]["result_breakdown_source"] == "deterministic_fallback"
+    assert assistant["metadata"]["result_breakdown_fallback_used"] is True
+    assert assistant["metadata"]["result_breakdown_failure_mode"] == "test_forced_fallback"
     assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
     assert assistant["metadata"]["result_fact_bank"]["symbols"] == ["AAPL"]
     assert "result_card" not in assistant["metadata"]
@@ -928,7 +940,7 @@ def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
 
     assert action_block.index(
         'yield sse_data({"type": "stage_start", "stage": "explain"})'
-    ) < action_block.index("assistant_text = result_breakdown_message(run)")
+    ) < action_block.index("breakdown_message = result_breakdown_message_with_metadata(run)")
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:
@@ -1387,6 +1399,58 @@ def test_discovery_endpoints_return_assets_and_indicators(
     assert indicators.json()["items"][0]["support_status"] == "supported"
 
 
+def test_discovery_indicators_show_only_supported_indicators(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import discovery as discovery_router
+
+    monkeypatch.setattr(
+        discovery_router,
+        "search_indicators",
+        lambda q, limit=12: [
+            IndicatorInfo("rsi", "RSI", "Relative Strength Index", "executable"),
+            IndicatorInfo("atr", "ATR", "Average true range", "draft_only"),
+        ],
+    )
+    client = _client()
+
+    response = client.get("/api/v1/discovery/indicators?q=r&limit=5")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["symbol"] for item in items] == ["rsi"]
+    assert all(item["support_status"] == "supported" for item in items)
+
+
+def test_discovery_assets_preserve_provider_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import discovery as discovery_router
+
+    monkeypatch.setattr(
+        discovery_router,
+        "search_assets",
+        lambda q, limit=12: [
+            ResolvedAsset(
+                canonical_symbol="BTC",
+                asset_class="crypto",
+                name="Bitcoin",
+                raw_symbol=q,
+                provider="kraken",
+            )
+        ],
+    )
+    client = _client()
+
+    response = client.get("/api/v1/discovery/assets?q=btc&limit=5")
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["symbol"] == "BTC"
+    assert item["asset_class"] == "crypto"
+    assert item["provider"] == "kraken"
+
+
 def test_discovery_assets_display_currency_pair_label(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1411,4 +1475,5 @@ def test_discovery_assets_display_currency_pair_label(
     assert response.status_code == 200
     item = response.json()["items"][0]
     assert item["description"] == "Currency Pair"
+    assert item["provider"] == "kraken"
     assert "currency_pair" not in item["description"]

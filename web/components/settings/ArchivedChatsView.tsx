@@ -13,13 +13,14 @@ import { listConversations, patchConversation, type Conversation } from "@/lib/a
 
 type ArchivedChatsViewProps = {
   onClose: () => void;
+  onRestored?: () => void;
 };
 
 /**
  * Centered blur modal showing archived conversations with restore functionality.
  * Extracted from SettingsView for reuse in ProfileMenu > Data submenu.
  */
-export default function ArchivedChatsView({ onClose }: ArchivedChatsViewProps) {
+export default function ArchivedChatsView({ onClose, onRestored }: ArchivedChatsViewProps) {
   const { t } = useTranslation();
   const [archivedChats, setArchivedChats] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +35,7 @@ export default function ArchivedChatsView({ onClose }: ArchivedChatsViewProps) {
     try {
       await patchConversation(id, { archived: false });
       setArchivedChats((prev) => prev.filter((c) => c.id !== id));
+      onRestored?.();
     } catch (err) {
       console.error("Failed to unarchive", err);
     }

@@ -330,6 +330,7 @@ class ChatMentionPayload(BaseModel):
     asset_class: AssetClass | None = None
     description: str | None = None
     insert_text: str
+    provider: str | None = None
     support_status: Literal["supported", "draft_only", "unavailable"] = "supported"
 
 

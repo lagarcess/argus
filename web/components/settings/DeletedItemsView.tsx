@@ -21,9 +21,10 @@ import {
 
 type DeletedItemsViewProps = {
   onClose: () => void;
+  onRestored?: () => void;
 };
 
-export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
+export default function DeletedItemsView({ onClose, onRestored }: DeletedItemsViewProps) {
   const { t } = useTranslation();
   const [deletedItems, setDeletedItems] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +43,7 @@ export default function DeletedItemsView({ onClose }: DeletedItemsViewProps) {
         await patchStrategy(item.id, { deleted_at: null });
       }
       setDeletedItems((prev) => prev.filter((i) => i.id !== item.id));
+      onRestored?.();
     } catch (err) {
       console.error("Failed to restore", err);
     }

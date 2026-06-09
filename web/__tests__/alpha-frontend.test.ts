@@ -87,10 +87,11 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain('aria-label="Chat options"');
     expect(chat).toContain("MoreVertical");
-    expect(chat).toContain("chat.copy_conversation_link");
     expect(chat).toContain("chat.rename_chat");
     expect(chat).toContain("chat.pin_chat");
     expect(chat).toContain("chat.unpin_chat");
+    expect(chat).not.toContain("chat.copy_conversation_link");
+    expect(chat).not.toContain("handleCopyConversationLink");
     expect(chat).not.toContain("chat.add_to_collection");
     expect(chat).not.toContain('aria-label="Archived chats"');
   });
@@ -182,10 +183,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("action.labelKey ? t(action.labelKey, action.label) : action.label");
     expect(message).toContain("const retryAction = message.actions?.find");
     expect(message).toContain("message.actions?.find(isRetryAction)");
-    expect(message).toContain("const shouldShowTextFooter =");
-    expect(message).toContain("message.kind === \"text\" && (isLatest || Boolean(retryAction))");
-    expect(message).toContain("{shouldShowTextFooter &&");
-    expect(message).toContain("Boolean(retryAction) || rating || showOptions");
+    expect(message).toContain("const footerMessageActions =");
+    expect(message).toContain("!actionHasCardScopedOwnership(action)");
+    expect(message).toContain("const shouldShowAssistantFooter =");
+    expect(message).toContain("!isUser && !isStreaming");
+    expect(message).toContain("{shouldShowAssistantFooter &&");
+    expect(message).toContain("isLatest || rating || showOptions || Boolean(retryAction)");
+    expect(message).toContain("group-hover:opacity-100");
+    expect(message).toContain("focus-within:opacity-100");
     expect(message).toContain("<RotateCcw");
     expect(message.indexOf("<ThumbsDown")).toBeLessThan(message.indexOf("<RotateCcw"));
     expect(message.indexOf("<RotateCcw")).toBeLessThan(message.indexOf("<MoreHorizontal"));
@@ -193,7 +198,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).not.toContain("const scheduleOptionsClose = () =>");
     expect(message).not.toContain("onMouseLeave={scheduleOptionsClose}");
     expect(message).toContain("aria-expanded={showOptions}");
-    expect(message).toContain('rating || showOptions ? "opacity-100"');
+    expect(message).toContain("isLatest || rating || showOptions || Boolean(retryAction)");
     expect(message).toContain("onBlur={(event) =>");
     expect(message).toContain("setShowOptions(false)");
     expect(chat).toContain("const finalRetryActions = [");
@@ -283,11 +288,13 @@ describe("Argus Alpha frontend contract", () => {
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const ownership = readFileSync(join(root, "lib/chat-action-ownership.ts"), "utf-8");
 
     expect(api).toContain('event: "final"');
     expect(chat).toContain('kind: "strategy_confirmation"');
     expect(chat).toContain('latestAi?.kind === "strategy_confirmation"');
-    expect(chat).toContain("isCardScopedAction");
+    expect(ownership).toContain("isCardScopedAction");
+    expect(chat).toContain("from \"@/lib/chat-action-ownership\"");
     expect(chat).toContain("hasActiveArtifactActionSet(messages)");
     expect(chat).toContain("visibleComposerActions(inputActions)");
     expect(chat).not.toContain("setInputActions(confirmation.actions ?? [])");
@@ -350,7 +357,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(artifactHistory).toContain("function isTerminalConfirmation");
     expect(card).toContain('confirmation.confirmation_state === "superseded"');
     expect(card).toContain('confirmation.confirmation_state === "cancelled"');
-    expect(card).toContain('isCancelled ? "Draft canceled" : "Updated"');
+    expect(card).toContain("function confirmationDisplayState");
+    expect(card).toContain('statusLabel: rawLabel || "Draft canceled"');
+    expect(card).toContain('confirmation.confirmation_state === "superseded" ? "Updated" : "Ready"');
   });
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {
@@ -560,7 +569,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(input).toContain("disabled?: boolean");
     expect(input).toContain("if (disabled) return;");
     expect(input).toContain("contentEditable={!disabled}");
-    expect(input).toContain("disabled={composerIsEmpty || disabled}");
+    expect(input).toContain("const sendButtonDisabled = composerIsEmpty || disabled;");
+    expect(input).toContain("disabled={sendButtonDisabled}");
   });
 
   test("chat restores jump-to-latest affordance without forced reading jumps", () => {

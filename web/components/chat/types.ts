@@ -70,6 +70,7 @@ export type ChatMention = {
   asset_class?: AssetClass | null;
   description?: string | null;
   insert_text: string;
+  provider?: string | null;
   support_status?: "supported" | "draft_only" | "unavailable";
 };
 
