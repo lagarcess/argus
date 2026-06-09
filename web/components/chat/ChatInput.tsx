@@ -466,7 +466,7 @@ export default function ChatInput({
               setDiscoveryItems([]);
             }
           }}
-          className="min-h-[34px] flex-1 whitespace-pre-wrap break-words border-none bg-transparent p-0 text-[16px] font-medium leading-[1.45] tracking-tight text-black outline-none dark:text-white"
+          className="min-h-[1.45em] flex-1 whitespace-pre-wrap break-words border-none bg-transparent p-0 text-[16px] font-medium leading-[1.45] tracking-tight text-black outline-none dark:text-white"
         />
 
         {isMounted && animState === "idle" && composerIsEmpty && !isFocused && (
