@@ -30,6 +30,12 @@ def display_asset_class(asset_class: str) -> str:
     return labels.get(asset_class, asset_class.replace("_", " ").title())
 
 
+def discovery_asset_provider(asset_class: str) -> str:
+    if asset_class == "currency_pair":
+        return "kraken"
+    return "alpaca"
+
+
 def discovery_support_status(status: str | None) -> str:
     return _INDICATOR_SUPPORT_STATUS.get((status or "").strip().lower(), "draft_only")
 
@@ -63,7 +69,7 @@ def discovery_assets(
                 asset_class=asset.asset_class,
                 description=display_asset_class(asset.asset_class),
                 insert_text=asset.canonical_symbol,
-                provider="alpaca",
+                provider=discovery_asset_provider(asset.asset_class),
                 support_status="supported",
             )
             for asset in assets
@@ -100,4 +106,5 @@ def discovery_indicators(
 
 
 _display_asset_class = display_asset_class
+_discovery_asset_provider = discovery_asset_provider
 _discovery_support_status = discovery_support_status

@@ -91,6 +91,9 @@ of the conversation surface with that quality bar.
      delay or stale list state.
    - The `@` composer feature should become a real, flexible Argus context tool
      instead of a static preview, within the existing supported context types.
+     Asset selections must come from provider-backed discovery so the selected
+     mention can bound the user's intended symbol/asset class before the backend
+     resolver validates it.
 
 6. **Result explanation cleanup**
    - Clarify the product distinction between Quick take, Explain result, and
@@ -214,9 +217,16 @@ Included:
 - restore-from-archive/recently-deleted list refresh;
 - `@` composer context tool upgrade.
 
-The `@` feature should stay within current Alpha capabilities. It may surface
-assets, indicators, prior runs, or conversation context only when those are
-already supported by the codebase and contract.
+The `@` feature should stay within current Alpha capabilities. In this milestone
+it surfaces provider-backed asset discovery and the existing indicator catalog
+only. It must not pretend a tiny static list is the available universe.
+Selected mentions remain composer provenance: they help bound ambiguous user
+references, but they do not bypass LLM interpretation or backend validation.
+
+Latency for this slice uses the existing server-side provider catalog cache in
+the market-data layer plus bounded `/discovery/*` queries. Supabase-backed
+discovery or market-data caching is deferred to a dedicated latency/freshness
+slice because it needs schema ownership, invalidation, and market-clock policy.
 
 ### Slice 6: Result Explanation Cleanup
 
@@ -303,9 +313,22 @@ New debt or smells from this milestone inventory:
   public excerpt artifact;
 - streaming/error behavior needs a stronger contract before broader provider
   streaming changes;
-- `@` composer feature is underpowered relative to its apparent intent;
 - Quick take, Explain result, and Try next overlap enough to confuse product
   hierarchy.
+
+Addressed in this branch:
+
+- confirmation, job, result, and assistant-turn actions now share one artifact
+  action ownership model for the current chat surface;
+- inactive completed turns now create a local side-panel attention marker that
+  clears when the user opens the conversation;
+- the empty composer send button now has a localized, theme-aware tooltip and
+  a stable, optically centered control slot;
+- restoring archived or recently deleted chats now notifies the owning history
+  surface to refresh visible recents;
+- the `@` composer affordance now behaves as a keyboardable, provider-backed
+  listbox for asset and indicator discovery, with selected assets preserved as
+  bounded mention provenance for backend validation.
 
 ## Hard Gates
 

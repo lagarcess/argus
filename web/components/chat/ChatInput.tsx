@@ -30,6 +30,8 @@ export type DiscoverySection = {
   items: DiscoveryItem[];
 };
 
+export const DISCOVERY_SEARCH_LIMIT = 20;
+
 const EMPTY_CHAT_PROMPTS: string[] = [];
 
 export default function ChatInput({
@@ -45,6 +47,7 @@ export default function ChatInput({
   const [discoveryQuery, setDiscoveryQuery] = useState("");
   const [discoveryItems, setDiscoveryItems] = useState<DiscoveryItem[]>([]);
   const [isDiscoveryOpen, setIsDiscoveryOpen] = useState(false);
+  const [activeDiscoveryItemId, setActiveDiscoveryItemId] = useState<string | null>(null);
   const [animState, setAnimState] = useState<"idle" | "typing" | "waiting" | "exiting">("idle");
   const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
@@ -60,10 +63,19 @@ export default function ChatInput({
   }, [t]);
   const prompts = chatExploratorySuggestionsEnabled ? localizedPrompts : EMPTY_CHAT_PROMPTS;
   const inputPlaceholder = placeholder ?? t("chat.input_placeholder");
-  const discoverySections = discoverySectionsForDisplay(
-    discoveryItems,
-    discoveryQuery,
+  const discoverySections = useMemo(
+    () => discoverySectionsForDisplay(discoveryItems, discoveryQuery),
+    [discoveryItems, discoveryQuery],
   );
+  const visibleDiscoveryItems = useMemo(
+    () => discoverySections.flatMap((section) => section.items),
+    [discoverySections],
+  );
+  const activeDiscoveryItem =
+    visibleDiscoveryItems.find((item) => item.id === activeDiscoveryItemId) ?? null;
+  const activeDiscoveryOptionId = activeDiscoveryItem
+    ? discoveryOptionDomId(activeDiscoveryItem.id)
+    : undefined;
   const sendButtonDisabled = composerIsEmpty || disabled;
   const sendDisabledReason = composerIsEmpty
     ? t("chat.message_empty", "Message is empty")
@@ -134,16 +146,26 @@ export default function ChatInput({
   useEffect(() => {
     if (!isDiscoveryOpen) return;
     const query = discoveryQuery.trim();
-    if (!query) return;
+    if (!query) {
+      setDiscoveryItems([]);
+      return;
+    }
 
     let cancelled = false;
     const timer = setTimeout(() => {
       Promise.all([
-        searchDiscovery("assets", query, 5).catch(() => ({ items: [] })),
-        searchDiscovery("indicators", query, 5).catch(() => ({ items: [] })),
+        searchDiscovery("assets", query, DISCOVERY_SEARCH_LIMIT).catch(() => ({ items: [] })),
+        searchDiscovery("indicators", query, DISCOVERY_SEARCH_LIMIT).catch(() => ({ items: [] })),
       ]).then(([assets, indicators]) => {
         if (cancelled) return;
-        setDiscoveryItems(mergeDiscoveryItems(assets.items, indicators.items, query, 8));
+        setDiscoveryItems(
+          mergeDiscoveryItems(
+            assets.items,
+            indicators.items,
+            query,
+            DISCOVERY_SEARCH_LIMIT,
+          ),
+        );
       });
     }, 180);
 
@@ -152,6 +174,27 @@ export default function ChatInput({
       clearTimeout(timer);
     };
   }, [discoveryQuery, isDiscoveryOpen]);
+
+  useEffect(() => {
+    if (!isDiscoveryOpen) {
+      setActiveDiscoveryItemId(null);
+      return;
+    }
+
+    setActiveDiscoveryItemId((current) => {
+      if (current && visibleDiscoveryItems.some((item) => item.id === current)) {
+        return current;
+      }
+      return visibleDiscoveryItems[0]?.id ?? null;
+    });
+  }, [isDiscoveryOpen, visibleDiscoveryItems]);
+
+  useEffect(() => {
+    if (!isDiscoveryOpen || !activeDiscoveryItemId) return;
+    document
+      .getElementById(discoveryOptionDomId(activeDiscoveryItemId))
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeDiscoveryItemId, isDiscoveryOpen]);
 
   useLayoutEffect(() => {
     writeSegmentsToEditor(editorRef.current, segments);
@@ -174,13 +217,21 @@ export default function ChatInput({
       setIsDiscoveryOpen(true);
       setDiscoveryQuery(mention.query);
       if (!mention.query.trim()) {
-        setDiscoveryItems(DEFAULT_DISCOVERY_ITEMS);
+        setDiscoveryItems([]);
       }
     } else if (isDiscoveryOpen && !rawComposerText(current).includes("@")) {
       activeMentionOffsetRef.current = null;
       setIsDiscoveryOpen(false);
       setDiscoveryItems([]);
+      setActiveDiscoveryItemId(null);
     }
+  };
+
+  const closeDiscovery = () => {
+    activeMentionOffsetRef.current = null;
+    setIsDiscoveryOpen(false);
+    setDiscoveryItems([]);
+    setActiveDiscoveryItemId(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -193,6 +244,7 @@ export default function ChatInput({
       setSegments([{ type: "text", text: "" }]);
       setComposerHasContent(false);
       setIsDiscoveryOpen(false);
+      setActiveDiscoveryItemId(null);
     }
   };
 
@@ -211,10 +263,10 @@ export default function ChatInput({
       pendingCaretOffsetRef.current = cursor + 1;
       activeMentionOffsetRef.current = cursor + 1;
       setSegments(next);
-      setDiscoveryItems(DEFAULT_DISCOVERY_ITEMS);
+      setDiscoveryItems([]);
     } else if (!mention.query.trim()) {
       activeMentionOffsetRef.current = cursor;
-      setDiscoveryItems(DEFAULT_DISCOVERY_ITEMS);
+      setDiscoveryItems([]);
     }
 
     setIsDiscoveryOpen(true);
@@ -241,6 +293,7 @@ export default function ChatInput({
     activeMentionOffsetRef.current = null;
     setIsDiscoveryOpen(false);
     setDiscoveryItems([]);
+    setActiveDiscoveryItemId(null);
   };
 
   const handleEditorInput = () => {
@@ -257,7 +310,12 @@ export default function ChatInput({
       className="relative flex min-h-[64px] w-full cursor-text items-end rounded-[32px] border border-black/5 bg-white transition-all focus-within:ring-2 focus-within:ring-black/20 dark:border-white/5 dark:bg-[#1f2227] dark:focus-within:ring-white/20"
     >
       {isDiscoveryOpen && (
-        <div className="absolute bottom-full left-0 z-30 mb-2 w-full overflow-hidden rounded-[20px] border border-black/10 bg-white dark:border-white/10 dark:bg-[#1f2227]">
+        <div
+          id="chat-discovery-listbox"
+          role="listbox"
+          aria-label={t("chat.discovery.prompt", "Mention an asset or indicator")}
+          className="absolute bottom-full left-0 z-30 mb-2 w-full overflow-hidden rounded-[20px] border border-black/10 bg-white dark:border-white/10 dark:bg-[#1f2227]"
+        >
           <div className="border-b border-black/5 px-4 py-2 text-[12px] font-medium text-black/45 dark:border-white/5 dark:text-white/45">
             {discoveryQuery.trim()
               ? t("chat.discovery.searching", "Search results")
@@ -273,9 +331,18 @@ export default function ChatInput({
                   {section.items.map((item) => (
                     <button
                       key={item.id}
+                      id={discoveryOptionDomId(item.id)}
                       type="button"
+                      role="option"
+                      aria-selected={item.id === activeDiscoveryItemId}
+                      data-active-discovery-option={item.id === activeDiscoveryItemId ? "true" : undefined}
+                      onMouseEnter={() => setActiveDiscoveryItemId(item.id)}
                       onClick={() => insertDiscoveryItem(item)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-black/5 dark:hover:bg-white/5"
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+                        item.id === activeDiscoveryItemId
+                          ? "bg-black/5 dark:bg-white/5"
+                          : "hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-[14px] font-medium text-black dark:text-white">
@@ -307,8 +374,12 @@ export default function ChatInput({
       <button
         type="button"
         onClick={openDiscovery}
-        className="absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white"
-        aria-label="Find asset or indicator"
+        className={`absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white ${
+          isDiscoveryOpen ? "opacity-0 pointer-events-none" : ""
+        }`}
+        aria-hidden={isDiscoveryOpen}
+        tabIndex={isDiscoveryOpen ? -1 : 0}
+        aria-label={t("chat.discovery.prompt", "Mention an asset or indicator")}
       >
         <AtSign className="h-4 w-4" />
       </button>
@@ -317,9 +388,14 @@ export default function ChatInput({
         <div
           ref={editorRef}
           data-testid="chat-input"
-          role="textbox"
+          role="combobox"
           aria-disabled={disabled}
           aria-label={inputPlaceholder}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-expanded={isDiscoveryOpen}
+          aria-controls={isDiscoveryOpen ? "chat-discovery-listbox" : undefined}
+          aria-activedescendant={isDiscoveryOpen ? activeDiscoveryOptionId : undefined}
           contentEditable={!disabled}
           suppressContentEditableWarning
           onFocus={() => setIsFocused(true)}
@@ -330,6 +406,34 @@ export default function ChatInput({
             document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
           }}
           onKeyDown={(e) => {
+            if (isDiscoveryOpen) {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeDiscovery();
+                return;
+              }
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setActiveDiscoveryItemId((current) =>
+                  nextDiscoveryItemId(visibleDiscoveryItems, current, 1),
+                );
+                return;
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setActiveDiscoveryItemId((current) =>
+                  nextDiscoveryItemId(visibleDiscoveryItems, current, -1),
+                );
+                return;
+              }
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (activeDiscoveryItem) {
+                  insertDiscoveryItem(activeDiscoveryItem);
+                }
+                return;
+              }
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               editorRef.current?.closest("form")?.requestSubmit();
@@ -348,7 +452,7 @@ export default function ChatInput({
             } else if (e.key === "@" && !e.ctrlKey && !e.metaKey && !e.altKey) {
               setIsDiscoveryOpen(true);
               setDiscoveryQuery("");
-              setDiscoveryItems(DEFAULT_DISCOVERY_ITEMS);
+              setDiscoveryItems([]);
             }
           }}
           className="min-h-[34px] flex-1 whitespace-pre-wrap break-words border-none bg-transparent p-0 text-[16px] font-medium leading-[1.45] tracking-tight text-black outline-none dark:text-white"
@@ -421,7 +525,7 @@ function rankDiscoveryItem(item: DiscoveryItem, query: string) {
   return item.type === "asset" ? 4 : 5;
 }
 
-function mergeDiscoveryItems(
+export function mergeDiscoveryItems(
   assets: DiscoveryItem[],
   indicators: DiscoveryItem[],
   query: string,
@@ -491,6 +595,23 @@ export function discoverySectionsForDisplay(
     },
   ];
   return sections.filter((section) => section.items.length > 0);
+}
+
+export function discoveryOptionDomId(id: string) {
+  const safeId = id.replace(/[^A-Za-z0-9_-]+/g, "-");
+  return `chat-discovery-option-${safeId}`;
+}
+
+export function nextDiscoveryItemId(
+  items: DiscoveryItem[],
+  currentId: string | null,
+  direction: 1 | -1,
+) {
+  if (items.length === 0) return null;
+  const currentIndex = items.findIndex((item) => item.id === currentId);
+  if (currentIndex < 0) return items[0].id;
+  const nextIndex = (currentIndex + direction + items.length) % items.length;
+  return items[nextIndex]?.id ?? items[0].id;
 }
 
 function discoverySectionLabelKey(label: string) {
@@ -729,90 +850,3 @@ function setCaretTextOffset(root: HTMLDivElement | null, targetOffset: number) {
   selection.addRange(range);
   root.focus();
 }
-
-const DEFAULT_DISCOVERY_ITEMS: DiscoveryItem[] = [
-  {
-    id: "asset:equity:GOOG",
-    type: "asset",
-    label: "GOOG",
-    symbol: "GOOG",
-    asset_class: "equity",
-    description: "Alphabet Class C",
-    insert_text: "GOOG",
-    provider: "alpaca",
-    support_status: "supported",
-  },
-  {
-    id: "asset:equity:AAPL",
-    type: "asset",
-    label: "AAPL",
-    symbol: "AAPL",
-    asset_class: "equity",
-    description: "Apple",
-    insert_text: "AAPL",
-    provider: "alpaca",
-    support_status: "supported",
-  },
-  {
-    id: "asset:equity:NVDA",
-    type: "asset",
-    label: "NVDA",
-    symbol: "NVDA",
-    asset_class: "equity",
-    description: "Nvidia",
-    insert_text: "NVDA",
-    provider: "alpaca",
-    support_status: "supported",
-  },
-  {
-    id: "asset:crypto:BTC",
-    type: "asset",
-    label: "BTC",
-    symbol: "BTC",
-    asset_class: "crypto",
-    description: "Bitcoin",
-    insert_text: "BTC",
-    provider: "alpaca",
-    support_status: "supported",
-  },
-  {
-    id: "indicator:sma",
-    type: "indicator",
-    label: "SMA",
-    symbol: "sma",
-    description: "Simple moving average",
-    insert_text: "SMA",
-    provider: "pandas-ta-classic",
-    support_status: "supported",
-  },
-  {
-    id: "indicator:rsi",
-    type: "indicator",
-    label: "RSI",
-    symbol: "rsi",
-    description: "Relative Strength Index",
-    insert_text: "RSI",
-    provider: "pandas-ta-classic",
-    support_status: "supported",
-  },
-  {
-    id: "indicator:macd",
-    type: "indicator",
-    label: "MACD",
-    symbol: "macd",
-    description: "Moving Average Convergence Divergence",
-    insert_text: "MACD",
-    provider: "pandas-ta-classic",
-    support_status: "supported",
-  },
-  {
-    id: "indicator:atr",
-    type: "indicator",
-    label: "ATR",
-    symbol: "atr",
-    description: "Average true range",
-    insert_text: "ATR",
-    provider: "pandas-ta-classic",
-    support_status: "draft_only",
-  },
-];

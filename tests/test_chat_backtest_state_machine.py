@@ -1411,4 +1411,5 @@ def test_discovery_assets_display_currency_pair_label(
     assert response.status_code == 200
     item = response.json()["items"][0]
     assert item["description"] == "Currency Pair"
+    assert item["provider"] == "kraken"
     assert "currency_pair" not in item["description"]
