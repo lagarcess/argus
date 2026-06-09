@@ -2319,6 +2319,7 @@ export default function ChatInterface() {
             onLogout={() => {
               void handleLogout();
             }}
+            onHistoryMutated={refreshHistory}
             onFeedback={(type, context) => {
               setFeedbackState({
                 isOpen: true,

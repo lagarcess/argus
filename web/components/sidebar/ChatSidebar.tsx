@@ -654,6 +654,7 @@ export default function ChatSidebar({
           onLogout={onLogout}
           onFeedback={onFeedback}
           onDeleteAllConversations={handleRequestDeleteAllConversations}
+          onHistoryMutated={onHistoryMutated}
           onOpenSidebarPreference={onOpenSidebarPreference}
           anchorRef={profileButtonRef}
           sidebarCollapsed={!isOpen}

@@ -44,6 +44,7 @@ type SettingsViewProps = {
   onClose: () => void;
   onLogout: () => void;
   onFeedback?: (type: "bug" | "feature" | "general", context: Record<string, unknown>) => void;
+  onHistoryMutated?: () => void;
 };
 
 type SubView = "main" | "archived" | "deleted";
@@ -64,7 +65,12 @@ function deletedItemTypeLabel(
   return t("settings.data.chat_item", "Chat");
 }
 
-export default function SettingsView({ onClose, onLogout, onFeedback }: SettingsViewProps) {
+export default function SettingsView({
+  onClose,
+  onLogout,
+  onFeedback,
+  onHistoryMutated,
+}: SettingsViewProps) {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const showSubscriptionSection =
@@ -149,6 +155,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
     try {
       await patchConversation(id, { archived: false });
       setArchivedChats((prev) => prev.filter((c) => c.id !== id));
+      onHistoryMutated?.();
     } catch (err) {
       console.error("Failed to unarchive", err);
     }
@@ -164,6 +171,7 @@ export default function SettingsView({ onClose, onLogout, onFeedback }: Settings
         await patchStrategy(item.id, { deleted_at: null });
       }
       setDeletedItems((prev) => prev.filter((i) => i.id !== item.id));
+      onHistoryMutated?.();
     } catch (err) {
       console.error("Failed to restore", err);
     }

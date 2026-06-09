@@ -46,6 +46,7 @@ type ProfileMenuProps = {
   onLogout: () => void;
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   onDeleteAllConversations?: () => void;
+  onHistoryMutated?: () => void;
   onOpenSidebarPreference?: () => void;
   /** Anchor position */
   anchorRef: React.RefObject<HTMLElement | null>;
@@ -93,6 +94,7 @@ export default function ProfileMenu({
   onLogout,
   onFeedback,
   onDeleteAllConversations,
+  onHistoryMutated,
   onOpenSidebarPreference,
   anchorRef,
   sidebarCollapsed = false,
@@ -382,10 +384,20 @@ export default function ProfileMenu({
     return <LanguageModal onClose={() => setActiveModal(null)} />;
   }
   if (activeModal === "archived") {
-    return <ArchivedChatsView onClose={() => setActiveModal(null)} />;
+    return (
+      <ArchivedChatsView
+        onClose={() => setActiveModal(null)}
+        onRestored={onHistoryMutated}
+      />
+    );
   }
   if (activeModal === "deleted") {
-    return <DeletedItemsView onClose={() => setActiveModal(null)} />;
+    return (
+      <DeletedItemsView
+        onClose={() => setActiveModal(null)}
+        onRestored={onHistoryMutated}
+      />
+    );
   }
   if (activeModal === "profile") {
     return (
