@@ -110,11 +110,12 @@ describe("chat composer display helpers", () => {
     expect(input).toContain('role="listbox"');
     expect(input).toContain('role="option"');
     expect(input).toContain('aria-autocomplete="list"');
-    expect(input).toContain("isMentionButtonHidden ? \"opacity-0 pointer-events-none\"");
+    expect(input).toContain("isMentionButtonHidden ? \"invisible pointer-events-none\"");
     expect(input).toContain('aria-controls={isDiscoveryOpen ? "chat-discovery-listbox" : undefined}');
     expect(input).toContain("aria-activedescendant={isDiscoveryOpen ? activeDiscoveryOptionId : undefined}");
     expect(input).toContain("aria-selected={item.id === activeDiscoveryItemId}");
     expect(input).toContain('data-active-discovery-option={item.id === activeDiscoveryItemId ? "true" : undefined}');
+    expect(input).toContain("onMouseDown={(event) => event.preventDefault()}");
     expect(input).toContain('e.key === "ArrowDown"');
     expect(input).toContain('e.key === "ArrowUp"');
     expect(input).toContain('e.key === "Escape"');
@@ -127,5 +128,14 @@ describe("chat composer display helpers", () => {
     expect(shouldHideMentionButton(true, "")).toBe(true);
     expect(shouldHideMentionButton(false, "@")).toBe(true);
     expect(shouldHideMentionButton(false, "Buy @apple")).toBe(true);
+  });
+
+  test("places contenteditable focus before restoring the composer caret", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+    const caretHelper = input.slice(input.indexOf("function setCaretTextOffset"));
+
+    expect(caretHelper.indexOf("root.focus();")).toBeLessThan(
+      caretHelper.indexOf("selection.removeAllRanges();"),
+    );
   });
 });

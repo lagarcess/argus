@@ -137,8 +137,9 @@ export function replaceRangeWithToken(
   range: { start: number; end: number; query?: string },
   token: DiscoveryItem,
 ): ComposerSegment[] {
-  const before = rawComposerText(segments).at(range.start - 1) ?? "";
-  const after = rawComposerText(segments).at(range.end) ?? "";
+  const rawText = rawComposerText(segments);
+  const before = range.start > 0 ? rawText.at(range.start - 1) ?? "" : "";
+  const after = rawText.at(range.end) ?? "";
   const replacement: ComposerSegment[] = [{ type: "token", token }];
   if (after && !/\s|[.,;!?)]/.test(after)) {
     replacement.push({ type: "text", text: " " });

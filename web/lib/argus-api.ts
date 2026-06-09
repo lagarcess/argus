@@ -301,6 +301,8 @@ export type DiscoveryItem = {
   support_status: "supported" | "draft_only" | "unavailable";
 };
 
+type DiscoveryResponsePayload = { items: DiscoveryItem[] };
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const API_BASE = (() => {
@@ -314,6 +316,50 @@ const API_BASE = (() => {
 })();
 
 export type ApiLanguage = "en" | "es-419";
+
+const DISCOVERY_SEARCH_CACHE_TTL_MS = 30_000;
+const DISCOVERY_SEARCH_CACHE_MAX_ENTRIES = 80;
+const discoverySearchCache = new Map<
+  string,
+  { expiresAt: number; promise: Promise<DiscoveryResponsePayload> }
+>();
+
+function discoverySearchCacheKey(
+  kind: "assets" | "indicators",
+  query: string,
+  limit: number,
+) {
+  return `${kind}:${limit}:${query.trim().toLowerCase()}`;
+}
+
+function cachedDiscoverySearch(
+  key: string,
+  now: number,
+): Promise<DiscoveryResponsePayload> | null {
+  const cached = discoverySearchCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= now) {
+    discoverySearchCache.delete(key);
+    return null;
+  }
+  discoverySearchCache.delete(key);
+  discoverySearchCache.set(key, cached);
+  return cached.promise;
+}
+
+function rememberDiscoverySearch(
+  key: string,
+  promise: Promise<DiscoveryResponsePayload>,
+  expiresAt: number,
+) {
+  discoverySearchCache.delete(key);
+  discoverySearchCache.set(key, { expiresAt, promise });
+  while (discoverySearchCache.size > DISCOVERY_SEARCH_CACHE_MAX_ENTRIES) {
+    const oldestKey = discoverySearchCache.keys().next().value;
+    if (!oldestKey) break;
+    discoverySearchCache.delete(oldestKey);
+  }
+}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -918,10 +964,26 @@ export async function searchDiscovery(
   query: string,
   limit = 8,
 ) {
+  const cacheKey = discoverySearchCacheKey(kind, query, limit);
+  const now = Date.now();
+  const cached = cachedDiscoverySearch(cacheKey, now);
+  if (cached) return cached;
+
   const searchParams = new URLSearchParams({ q: query, limit: String(limit) });
-  return apiFetch<{ items: DiscoveryItem[] }>(
+  const promise = apiFetch<DiscoveryResponsePayload>(
     `/discovery/${kind}?${searchParams.toString()}`,
+  ).catch((error) => {
+    if (discoverySearchCache.get(cacheKey)?.promise === promise) {
+      discoverySearchCache.delete(cacheKey);
+    }
+    throw error;
+  });
+  rememberDiscoverySearch(
+    cacheKey,
+    promise,
+    now + DISCOVERY_SEARCH_CACHE_TTL_MS,
   );
+  return promise;
 }
 
 export async function postFeedback(payload: {

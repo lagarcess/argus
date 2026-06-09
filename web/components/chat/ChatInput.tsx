@@ -205,7 +205,7 @@ export default function ChatInput({
     if (pendingCaretOffsetRef.current === null) return;
     const offset = pendingCaretOffsetRef.current;
     pendingCaretOffsetRef.current = null;
-    requestAnimationFrame(() => setCaretTextOffset(editorRef.current, offset));
+    setCaretTextOffset(editorRef.current, offset);
   }, [segments]);
 
   const readCurrentSegments = () => {
@@ -380,9 +380,13 @@ export default function ChatInput({
 
       <button
         type="button"
-        onClick={openDiscovery}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={(event) => {
+          event.stopPropagation();
+          openDiscovery();
+        }}
         className={`absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white ${
-          isMentionButtonHidden ? "opacity-0 pointer-events-none" : ""
+          isMentionButtonHidden ? "invisible pointer-events-none" : ""
         }`}
         aria-hidden={isMentionButtonHidden}
         tabIndex={isMentionButtonHidden ? -1 : 0}
@@ -808,6 +812,7 @@ function containsNode(parent: Node, child: Node) {
 
 function setCaretTextOffset(root: HTMLDivElement | null, targetOffset: number) {
   if (!root) return;
+  root.focus();
   const selection = window.getSelection();
   if (!selection) return;
   const range = document.createRange();
@@ -859,5 +864,4 @@ function setCaretTextOffset(root: HTMLDivElement | null, targetOffset: number) {
   }
   selection.removeAllRanges();
   selection.addRange(range);
-  root.focus();
 }

@@ -229,10 +229,11 @@ only. It must not pretend a tiny static list is the available universe.
 Selected mentions remain composer provenance: they help bound ambiguous user
 references, but they do not bypass LLM interpretation or backend validation.
 
-Latency for this slice uses the existing server-side provider catalog cache in
-the market-data layer plus bounded `/discovery/*` queries. Supabase-backed
-discovery or market-data caching is deferred to a dedicated latency/freshness
-slice because it needs schema ownership, invalidation, and market-clock policy.
+Latency for this slice uses a two-layer lightweight cache: a bounded browser
+session cache for repeated `/discovery/*` queries and the existing server-side
+provider catalog cache in the market-data layer. Supabase-backed discovery or
+market-data caching is deferred to a dedicated latency/freshness slice because
+it needs schema ownership, invalidation, and market-clock policy.
 
 ### Slice 6: Result Explanation Cleanup
 
@@ -469,7 +470,9 @@ Addressed in this branch:
   surface to refresh visible recents;
 - the `@` composer affordance now behaves as a keyboardable, provider-backed
   listbox for asset and indicator discovery, with selected assets preserved as
-  bounded mention provenance for backend validation.
+  bounded mention provenance for backend validation. Repeated discovery queries
+  are deduplicated in the browser session, while provider-universe caching stays
+  server-side for now.
 - Quick take no longer renders supported next experiments as visible next-check
   prose, and Explain result rejects "Quick take" headings while using a deeper
   Setup / How to read it / Risk and assumptions / Useful next check fallback.

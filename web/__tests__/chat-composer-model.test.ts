@@ -64,6 +64,20 @@ describe("chat composer model", () => {
     ]);
   });
 
+  test("replacing a leading @ query does not insert a leading spacer", () => {
+    const next = replaceRangeWithToken(
+      [{ type: "text", text: "@google" }],
+      { start: 0, end: "@google".length, query: "google" },
+      goog,
+    );
+
+    expect(next).toEqual([
+      { type: "token", token: goog },
+      { type: "text", text: " " },
+    ]);
+    expect(serializeComposerSegments(next)).toBe("GOOG");
+  });
+
   test("composer mentions preserve canonical metadata for chat request context", () => {
     const segments: ComposerSegment[] = [
       { type: "text", text: "Buy " },
