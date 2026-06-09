@@ -69,6 +69,34 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
+# 🧭 Current Milestone: Private Alpha Conversation Trust
+
+When working on `codex/private-alpha-conversation-trust`, use
+`docs/specs/private-alpha-conversation-trust.md` as the milestone source of
+truth. This milestone hardens the current private-alpha chat/backtest loop; it
+does not implement the Perplexity Research Lab thesis yet.
+
+Milestone guardrails:
+
+- Re-enable fast CI and local verification without automatic production deploys.
+- Unify confirmation, queued/running job, result, and assistant-turn actions as
+  one coherent artifact lifecycle.
+- Keep feedback/retry/more-menu actions structured and turn-scoped; do not use
+  prose matching to infer retry behavior.
+- Add out-of-focus chat attention state without inventing backend facts in the
+  frontend.
+- Treat Quick take, Explain result, and Try next as distinct result surfaces.
+- Do not replace "share conversation id" with public sharing until the public
+  excerpt privacy/revocation design is explicit.
+- Keep Perplexity/Research Lab work as design-only unless a later milestone
+  explicitly starts that implementation.
+
+Never let UI polish violate the runtime principles below: the frontend renders
+backend-provided artifacts, LangGraph remains the only chat brain, and
+deterministic result prose must not become the normal happy-path Argus voice.
+
+---
+
 # 🧭 Argus Philosophy & Runtime Principles
 
 Argus is chat-first, AI-first, and trust-first. The assistant should help a normal person move from a rough investing idea to a clear historical test with as little friction as possible, while being honest about assumptions, limitations, and supported execution.
