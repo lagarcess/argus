@@ -14,6 +14,7 @@ import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 
 type ChatMessageProps = {
   message: Message;
@@ -173,11 +174,14 @@ export default function ChatMessage({
   const actionLabel = (action: ChatActionOption) =>
     action.labelKey ? t(action.labelKey, action.label) : action.label;
   const retryAction = message.actions?.find(isRetryAction);
-  const visibleMessageActions = (message.actions ?? []).filter(
-    (action) => !isRetryAction(action),
+  const footerMessageActions = (message.actions ?? []).filter(
+    (action) => !isRetryAction(action) && !actionHasCardScopedOwnership(action),
   );
-  const shouldShowTextFooter =
-    message.kind === "text" && (isLatest || Boolean(retryAction));
+  const shouldShowAssistantFooter = !isUser && !isStreaming;
+  const footerVisibilityClass =
+    isLatest || rating || showOptions || Boolean(retryAction)
+      ? "opacity-100"
+      : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
 
   if (isUser && message.kind === "action") {
@@ -242,11 +246,11 @@ export default function ChatMessage({
             </div>
           )}
 
-          {shouldShowTextFooter && (
+          {shouldShowAssistantFooter && (
             <div className="flex items-start justify-between gap-4 mt-2">
-              {visibleMessageActions.length > 0 ? (
+              {footerMessageActions.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {visibleMessageActions.map((action) => (
+                  {footerMessageActions.map((action) => (
                     <button
                       key={action.id ?? action.type ?? action.label}
                       type="button"
@@ -261,46 +265,44 @@ export default function ChatMessage({
                 <div />
               )}
 
-              {/* Feedback Icon Row (Right-aligned) - Progressive Disclosure: Hide while streaming */}
-              {!isStreaming && (
-                <div
-                  className={`relative flex items-center gap-1.5 transition-opacity shrink-0 ${Boolean(retryAction) || rating || showOptions ? "opacity-100" : "opacity-50 hover:opacity-100"}`}
-                  ref={optionsRef}
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                      setShowOptions(false);
-                    }
-                  }}
-                >
-                  <Tooltip content={t('chat.good_response')} side="top" delay={150}>
+              <div
+                className={`relative flex shrink-0 items-center gap-1.5 transition-opacity ${footerVisibilityClass}`}
+                ref={optionsRef}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setShowOptions(false);
+                  }
+                }}
+              >
+                <Tooltip content={t('chat.good_response')} side="top" delay={150}>
+                  <button
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? selectedFeedbackClass : idleFeedbackClass }`}
+                    aria-label={t('chat.good_response')}
+                    onClick={() => handleRating("positive")}
+                  >
+                    <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? selectedFeedbackIconClass : ""}`} />
+                  </button>
+                </Tooltip>
+                <Tooltip content={t('chat.poor_response')} side="top" delay={150}>
+                  <button
+                    className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? selectedFeedbackClass : idleFeedbackClass }`}
+                    aria-label={t('chat.poor_response')}
+                    onClick={() => handleRating("negative")}
+                  >
+                    <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
+                  </button>
+                </Tooltip>
+                {retryAction && (
+                  <Tooltip content={actionLabel(retryAction)} side="top" delay={150}>
                     <button
-                      className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "positive" ? selectedFeedbackClass : idleFeedbackClass }`}
-                      aria-label={t('chat.good_response')}
-                      onClick={() => handleRating("positive")}
+                      className={`p-1.5 rounded-full transition-all duration-200 ${idleFeedbackClass}`}
+                      aria-label={actionLabel(retryAction)}
+                      onClick={() => onAction?.(retryAction)}
                     >
-                      <ThumbsUp className={`w-3.5 h-3.5 ${rating === "positive" ? selectedFeedbackIconClass : ""}`} />
+                      <RotateCcw className="w-3.5 h-3.5" />
                     </button>
                   </Tooltip>
-                  <Tooltip content={t('chat.poor_response')} side="top" delay={150}>
-                    <button
-                      className={`p-1.5 rounded-full transition-all duration-200 group/thumb ${ rating === "negative" ? selectedFeedbackClass : idleFeedbackClass }`}
-                      aria-label={t('chat.poor_response')}
-                      onClick={() => handleRating("negative")}
-                    >
-                      <ThumbsDown className={`w-3.5 h-3.5 ${rating === "negative" ? selectedFeedbackIconClass : ""}`} />
-                    </button>
-                  </Tooltip>
-                  {retryAction && (
-                    <Tooltip content={actionLabel(retryAction)} side="top" delay={150}>
-                      <button
-                        className={`p-1.5 rounded-full transition-all duration-200 ${idleFeedbackClass}`}
-                        aria-label={actionLabel(retryAction)}
-                        onClick={() => onAction?.(retryAction)}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                    </Tooltip>
-                  )}
+                )}
                 <Tooltip content={t('chat.more_actions')} side="top" delay={150}>
                   <button
                     onClick={toggleOptions}
@@ -345,8 +347,7 @@ export default function ChatMessage({
                     </button>
                   </div>
                 )}
-                </div>
-              )}
+              </div>
             </div>
           )}
         </div>
