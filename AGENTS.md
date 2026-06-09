@@ -91,6 +91,10 @@ Milestone guardrails:
   experiments rather than generic advice or duplicated Quick take prose.
 - Do not replace "share conversation id" with public sharing until the public
   excerpt privacy/revocation design is explicit.
+- When public conversation excerpts are implemented, they must be immutable,
+  sanitized snapshots behind owner-only create/revoke and an unguessable public
+  slug. Do not expose source conversation ids, route receipts, provider/model
+  metadata, retry payloads, or direct anon table access.
 - Keep Perplexity/Research Lab work as design-only unless a later milestone
   explicitly starts that implementation.
 

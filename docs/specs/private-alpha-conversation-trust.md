@@ -256,17 +256,112 @@ Hard guardrails:
 Goal: replace "share conversation id" with a real public excerpt plan before
 implementation.
 
-Required design answers:
+Status: design-only for this milestone. Do not expose unauthenticated sharing in
+this branch.
 
-- data model for public excerpts;
-- owner-only creation/deletion/revocation;
-- turn selection UX;
-- unauthenticated route constraints;
-- redaction rules and private metadata exclusion;
-- static/read-only rendering contract;
-- canary/security checks.
+Target product behavior:
 
-Implementation waits until these answers are explicit.
+1. The top-right conversation menu offers **Share excerpt**, not "copy
+   conversation id", once the feature is implemented.
+2. The user enters excerpt selection mode and selects an ordered subset of turns
+   from the current conversation. Non-contiguous turns are allowed but always
+   rendered in original conversation order. The first implementation should cap
+   excerpts at 20 turns.
+3. Argus shows a preview of the read-only excerpt before creation.
+4. Creating the excerpt snapshots the selected turns into a self-contained public
+   artifact and returns a high-entropy public URL.
+5. The public URL is unauthenticated and read-only. Anyone with the link can view
+   the selected turns until the owner revokes the excerpt.
+
+Data model:
+
+- Add `public.conversation_excerpts`.
+- Columns:
+  - `id uuid primary key`;
+  - `slug text unique not null`, generated from at least 128 bits of entropy;
+  - `owner_user_id uuid not null`;
+  - `source_conversation_id uuid not null`;
+  - `title text`;
+  - `status text not null check (status in ('active', 'revoked'))`;
+  - `turn_count integer not null`;
+  - `snapshot jsonb not null`;
+  - `created_at timestamptz not null`;
+  - `updated_at timestamptz not null`;
+  - `revoked_at timestamptz`;
+  - `expires_at timestamptz`.
+- Use one immutable `snapshot` payload instead of a live join into messages. The
+  public page renders the snapshot only, so later private conversation changes do
+  not leak accidentally.
+- `expires_at` is optional and can stay null for owner-revocable links. If the
+  privacy posture changes later, a default expiration policy can be added without
+  changing the public route shape.
+
+Snapshot contract:
+
+- Include only display-safe turn data:
+  - role;
+  - localized visible text;
+  - display timestamp if needed;
+  - selected confirmation/job/result card render payloads;
+  - chart/display payloads already safe for frontend rendering.
+- Exclude:
+  - source conversation id in the public response;
+  - user id, email, profile data, auth metadata;
+  - message ids unless replaced with excerpt-local ids;
+  - route receipts, OpenRouter/provider metadata, prompts, model names, token
+    usage, job launch payloads, raw run config snapshots, feedback records,
+    hidden retry payloads, and any backend-only provenance.
+- Disallow sharing nonterminal queued/running job cards in the first
+  implementation. Terminal result and failed-job artifacts may be shared if their
+  public payload is already sanitized.
+
+API contract:
+
+- Authenticated owner endpoints:
+  - `POST /api/v1/conversations/{conversation_id}/excerpts`
+  - `GET /api/v1/conversation-excerpts`
+  - `DELETE /api/v1/conversation-excerpts/{excerpt_id}` or a revoke `PATCH`.
+- Public endpoint:
+  - `GET /api/v1/public/conversation-excerpts/{slug}`
+- The public endpoint returns sanitized snapshot data only. It must not require
+  Supabase Auth, must not reveal whether a private conversation exists, and must
+  return `404` or `410` for revoked/expired excerpts.
+- Do not grant direct `anon` table privileges for the excerpt table. Prefer the
+  FastAPI public endpoint as the public read boundary so the database table can
+  keep strict RLS and the API can enforce response redaction/rate limits.
+
+Ownership and security:
+
+- Creation validates that the authenticated user owns the source conversation and
+  every selected turn.
+- Revocation is owner-only and immediate.
+- Account deletion or source-conversation hard deletion revokes or deletes owned
+  excerpts.
+- RLS stays enabled. Authenticated users can list/create/revoke only their own
+  excerpts. `anon` and `public` roles get no direct table grants.
+- Slugs are unguessable and never derived from `conversation_id`.
+- Public excerpt reads are rate-limited and cacheable only for active sanitized
+  snapshots.
+
+Frontend rendering:
+
+- The public page should use read-only variants of existing chat message,
+  confirmation, job/result, and breakdown components where possible.
+- Hide all mutation affordances: composer, sidebar, thumbs, retry, more menus,
+  save strategy, refine, and feedback.
+- Show only minimal context: Argus branding, excerpt title, selected turns, and
+  education/not-financial-advice footer.
+
+Verification requirements before implementation can be merge-ready:
+
+- backend tests for owner-only create/revoke and foreign conversation rejection;
+- public response redaction tests proving internal ids/metadata are excluded;
+- RLS/grant test proving no direct `anon`/`public` table access;
+- frontend test for selection mode, preview, generated link, and revoked-link
+  handling;
+- manual browser smoke on a local fixture conversation;
+- no live public-link canary until the founder explicitly approves creating a
+  durable public artifact.
 
 ## Research Lab Thesis For Next Milestone
 
