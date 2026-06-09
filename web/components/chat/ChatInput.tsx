@@ -348,7 +348,7 @@ export default function ChatInput({
     <form
       onSubmit={handleSubmit}
       onClick={handleContainerClick}
-      className="relative flex min-h-[64px] w-full cursor-text items-center rounded-[32px] border border-black/5 bg-white transition-all focus-within:ring-2 focus-within:ring-black/20 dark:border-white/5 dark:bg-[#1f2227] dark:focus-within:ring-white/20"
+      className="group relative flex min-h-[64px] w-full cursor-text items-center rounded-[32px] border border-black/5 bg-white transition-all focus-within:ring-2 focus-within:ring-black/20 dark:border-white/5 dark:bg-[#1f2227] dark:focus-within:ring-white/20"
     >
       {isDiscoveryOpen && (
         <div
@@ -516,7 +516,7 @@ export default function ChatInput({
         />
 
         {isMounted && animState === "idle" && composerIsEmpty && !isFocused && (
-          <div className="pointer-events-none absolute inset-y-0 left-14 flex items-center text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500">
+          <div className="pointer-events-none absolute inset-y-0 left-14 flex items-center text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 transition-opacity group-focus-within:invisible group-focus-within:opacity-0 dark:text-gray-500">
             {inputPlaceholder}
           </div>
         )}
@@ -524,7 +524,7 @@ export default function ChatInput({
         {isMounted && animState !== "idle" && composerIsEmpty && (
           <div
             key={`${currentPromptIndex}-${animState === "exiting"}`}
-            className={`pointer-events-none absolute inset-y-0 left-14 flex max-w-[calc(100%-4rem)] items-center overflow-hidden whitespace-nowrap text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500 ${animState === "exiting" ? "animate-argus-swoosh-up" : ""}`}
+            className={`pointer-events-none absolute inset-y-0 left-14 flex max-w-[calc(100%-4rem)] items-center overflow-hidden whitespace-nowrap text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 transition-opacity group-focus-within:invisible group-focus-within:opacity-0 dark:text-gray-500 ${animState === "exiting" ? "animate-argus-swoosh-up" : ""}`}
           >
             {typedText}
             {animState === "typing" && (

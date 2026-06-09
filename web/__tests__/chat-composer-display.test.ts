@@ -166,4 +166,12 @@ describe("chat composer display helpers", () => {
       caretHelper.indexOf("selection.removeAllRanges();"),
     );
   });
+
+  test("hides empty composer placeholder through focus-within CSS", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+
+    expect(input).toContain("group relative flex min-h-[64px]");
+    expect(input).toContain("group-focus-within:opacity-0");
+    expect(input).toContain("group-focus-within:invisible");
+  });
 });
