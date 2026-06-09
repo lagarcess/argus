@@ -174,6 +174,8 @@ def _result_breakdown_llm_messages(
                 "steps: runnable ideas must come from runnable_next_tests, while "
                 "draft-only or future ideas must be clearly labeled that way. Promote "
                 "discovery by naming one or two runnable next experiments, but do not "
+                "label any section Quick Take or Quick Breakdown; this action is the "
+                "deeper Explain result surface, not the first-glance readout. "
                 "invent causes, trades, prices, support, missing metrics, unsupported "
                 "strategy mechanics, predictions, investment advice, advisory language, "
                 "profitable-trade claims, or custom benchmark support. Avoid phrases like "
@@ -662,7 +664,10 @@ def _required_result_breakdown_fact_ids(fact_bank: dict[str, str]) -> set[str]:
 
 
 def _clean_result_breakdown_heading(value: str) -> str:
-    return str(value or "").strip().lstrip("#").strip()
+    heading = str(value or "").strip().lstrip("#").strip()
+    if heading.casefold() in {"quick take", "quick breakdown"}:
+        return ""
+    return heading
 
 
 def _result_breakdown_starting_capital(context: dict[str, Any]) -> str:
@@ -763,17 +768,26 @@ def fallback_result_breakdown_message(context: dict[str, Any]) -> str:
     if execution_summary:
         performance_lines.append(execution_summary)
 
+    next_check_text = _strip_try_next_label(fact_bank["runnable_next_tests"])
     return (
         "Here's the deeper read on the completed run.\n\n"
-        f"**What was tested.** {' '.join(setup_lines)}\n\n"
-        f"**What moved the result.** {' '.join(performance_lines)}\n\n"
-        f"**Risks and assumptions.** Max drawdown was {drawdown_text}, the largest "
+        f"**Setup.** {' '.join(setup_lines)}\n\n"
+        f"**How to read it.** {' '.join(performance_lines)}\n\n"
+        f"**Risk and assumptions.** Max drawdown was {drawdown_text}, the largest "
         "peak-to-trough decline captured by the simulation. The run used "
         f"{assumption_text or 'the stored run settings'}.\n\n"
-        f"**Try next.** {_ensure_sentence(fact_bank['runnable_next_tests'])}\n\n"
+        f"**Useful next check.** {_ensure_sentence(next_check_text)}\n\n"
         "Use this as historical simulation evidence, not a prediction or trading "
         "recommendation."
     )
+
+
+def _strip_try_next_label(value: str) -> str:
+    text = str(value or "").strip()
+    prefix = "try next:"
+    if text.casefold().startswith(prefix):
+        return text[len(prefix) :].strip()
+    return text
 
 
 def _result_breakdown_metric(

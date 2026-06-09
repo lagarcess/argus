@@ -2318,7 +2318,7 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
         {
             "sections": [
                 {
-                    "heading": "Quick Take",
+                    "heading": "Reading the run",
                     "parts": [
                         {
                             "kind": "text",
@@ -2374,6 +2374,56 @@ def test_result_breakdown_rejects_malformed_generated_connective_text(
     assert "**Test:** AAPL DCA Accumulation, March 1, 2024 to October 31, 2024." in text
     assert "SPY benchmark return +5.5%" in text
     assert "Beat by 7.0 percentage points" in text
+
+
+def test_result_breakdown_rejects_quick_take_headings(monkeypatch) -> None:
+    from argus.api.chat import breakdown as chat_service
+
+    del monkeypatch
+    fake_schema = FakeBreakdownSchemaClient(
+        {
+            "sections": [
+                {
+                    "heading": "Quick Take",
+                    "parts": [
+                        {"kind": "fact", "fact_id": "title"},
+                        {"kind": "fact", "fact_id": "symbols"},
+                        {"kind": "fact", "fact_id": "date_range"},
+                        {"kind": "fact", "fact_id": "total_return"},
+                        {"kind": "fact", "fact_id": "benchmark_symbol"},
+                        {"kind": "fact", "fact_id": "benchmark_return"},
+                        {"kind": "fact", "fact_id": "benchmark_comparison"},
+                        {"kind": "fact", "fact_id": "max_drawdown"},
+                        {"kind": "fact", "fact_id": "assumptions"},
+                        {"kind": "fact", "fact_id": "caveat"},
+                    ],
+                }
+            ]
+        }
+    )
+
+    text = chat_service.llm_result_breakdown_message(
+        {
+            "title": "AAPL Buy and Hold",
+            "symbols": ["AAPL"],
+            "benchmark_symbol": "SPY",
+            "date_range": "past year",
+            "raw_metrics": {
+                "aggregate": {
+                    "performance": {
+                        "total_return_pct": 39.5,
+                        "benchmark_return_pct": 25.6,
+                        "delta_vs_benchmark_pct": 13.9,
+                        "max_drawdown_pct": -13.8,
+                    }
+                }
+            },
+            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
+        },
+        invoke_json_schema_func=fake_schema,
+    )
+
+    assert text is None
 
 
 def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> None:
@@ -2587,6 +2637,7 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     assert "**How to read it.**" in text
     assert "**Risk and assumptions.**" in text
     assert "**Useful next check.**" in text
+    assert "Try next:" not in text
     assert "- Tested:" not in text
     assert "- Result:" not in text
     assert "- Risk:" not in text

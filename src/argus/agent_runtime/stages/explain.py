@@ -84,8 +84,9 @@ class QuickTakeDraft(BaseModel):
     next_check_bullet: str | None = Field(
         default=None,
         description=(
-            "Optional user-visible next-check bullet. It must correspond to an "
-            "allowed_next_experiments kind when one is supplied."
+            "Optional structured next-check metadata. It must correspond to an "
+            "allowed_next_experiments kind when one is supplied. The runtime "
+            "does not render this field inside the Quick take."
         ),
     )
     assumption_bullet: str | None = Field(
@@ -315,6 +316,9 @@ async def _llm_explanation(
                 "supplied fact_bank facts for metrics, symbols, dates, assumptions, "
                 "and next-test labels. The result card answers what happened; your "
                 "job is to explain what matters without duplicating every metric. "
+                "Do not turn the Quick Take into a Try next section; supported "
+                "next experiments are validated here but presented through follow-up "
+                "actions and deeper explanation surfaces. "
                 "Benchmark returns belong only to benchmark_contract.benchmark_symbol. "
                 "Return structured fields so the runtime can validate fact usage; "
                 "do not invent facts or supported next experiment kinds."
@@ -508,7 +512,6 @@ def _render_quick_take_draft(
     for bullet in (
         response.tested_bullet,
         response.meaning_bullet,
-        response.next_check_bullet,
         response.assumption_bullet,
         response.caveat_bullet,
     ):
@@ -539,7 +542,6 @@ def _quick_take_mentions_required_visible_facts(
             draft.takeaway,
             draft.tested_bullet,
             draft.meaning_bullet or "",
-            draft.next_check_bullet or "",
             draft.assumption_bullet or "",
             draft.caveat_bullet or "",
         )

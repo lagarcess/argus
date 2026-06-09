@@ -85,7 +85,10 @@ Milestone guardrails:
   prose matching to infer retry behavior.
 - Add out-of-focus chat attention state without inventing backend facts in the
   frontend.
-- Treat Quick take, Explain result, and Try next as distinct result surfaces.
+- Treat Quick take, Explain result, and Try next as distinct result surfaces:
+  Quick take is the first-glance result readout, Explain result is the deeper
+  fact-grounded breakdown action, and Try next must come from supported next
+  experiments rather than generic advice or duplicated Quick take prose.
 - Do not replace "share conversation id" with public sharing until the public
   excerpt privacy/revocation design is explicit.
 - Keep Perplexity/Research Lab work as design-only unless a later milestone
@@ -427,6 +430,9 @@ Pattern:
 - Anti-patterns: dense PDF tone, metric dumps, generic lists, jargon
 - Deterministic facts ground LLM language
 - No raw enums or internal field names in user-facing text
+- Result readouts must preserve surface ownership: Quick take should not render
+  supported next experiments as visible "Try next" copy, while Explain result
+  must not reuse Quick take / Quick Breakdown headings.
 
 Example: ARGUS_RESPONSE_STYLE_CONTRACT in src/argus/agent_runtime/response_style.py
 

@@ -235,7 +235,10 @@ Goal: make Quick take, Explain result, and Try next complementary.
 Working distinction:
 
 - **Quick take:** concise, first-glance interpretation attached to the result.
+  It may validate supported next experiments for provenance, but it should not
+  render them as a visible "Try next" section.
 - **Explain result:** deeper, fact-grounded breakdown when the user asks.
+  It must not reuse "Quick take" or "Quick breakdown" as section framing.
 - **Try next:** supported next experiment, not generic advice and not a buried
   afterthought.
 
@@ -245,6 +248,8 @@ Hard guardrails:
 - no deterministic happy-path prose expansion;
 - no frontend-generated result explanation;
 - result-readout source/fallback metadata remains observable.
+- fallback copy remains explicitly marked by provenance and follows the same
+  surface ownership rules when the LLM path is unavailable.
 
 ### Slice 7: Public Conversation Excerpt Design
 
@@ -329,6 +334,9 @@ Addressed in this branch:
 - the `@` composer affordance now behaves as a keyboardable, provider-backed
   listbox for asset and indicator discovery, with selected assets preserved as
   bounded mention provenance for backend validation.
+- Quick take no longer renders supported next experiments as visible next-check
+  prose, and Explain result rejects "Quick take" headings while using a deeper
+  Setup / How to read it / Risk and assumptions / Useful next check fallback.
 
 ## Hard Gates
 
