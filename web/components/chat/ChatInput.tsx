@@ -373,7 +373,7 @@ export default function ChatInput({
         )}
       </div>
 
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center">
+      <div className="flex h-14 w-14 shrink-0 self-center items-center justify-center">
         {sendDisabledReason ? (
           <Tooltip content={sendDisabledReason} side="top" delay={150}>
             <span

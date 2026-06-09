@@ -15,7 +15,7 @@ describe("chat input send tooltip", () => {
     expect(input).toContain("chat.message_empty");
     expect(input).toContain("Tooltip content={sendDisabledReason}");
     expect(input).toContain('data-testid="chat-send-disabled-tooltip"');
-    expect(input).toContain('className="flex h-14 w-14 shrink-0 items-center justify-center"');
+    expect(input).toContain('className="flex h-14 w-14 shrink-0 self-center items-center justify-center"');
     expect(input).toContain('className="inline-flex h-10 w-10 rounded-full"');
     expect(input).toContain('aria-disabled="true"');
     expect(input).toContain("tabIndex={0}");
