@@ -69,4 +69,19 @@ describe("chat turn artifact UX", () => {
     expect(message).toContain("focus-within:opacity-100");
     expect(message).not.toContain("const shouldShowTextFooter =");
   });
+
+  test("stream error handling settles confirmation artifacts and clears stale composer actions", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const errorStart = chat.indexOf('if (event.event === "error")');
+    const errorEnd = chat.indexOf('if (event.event === "final")', errorStart);
+    const errorBlock = chat.slice(errorStart, errorEnd);
+
+    expect(errorStart).toBeGreaterThan(-1);
+    expect(errorBlock).toContain("setInputActions([])");
+    expect(errorBlock).toContain("settleOpenConfirmationsAfterStreamError(");
+    expect(errorBlock).not.toContain("settleOpenConfirmationsAfterTextFinal(");
+  });
 });

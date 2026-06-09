@@ -361,6 +361,16 @@ export function settleOpenConfirmationsAfterTextFinal(
   );
 }
 
+export function settleOpenConfirmationsAfterStreamError(
+  messages: Message[],
+  action: ChatActionOption | undefined,
+): Message[] {
+  if (!confirmationActionEffectFromAction(action)) {
+    return messages;
+  }
+  return supersedeOpenConfirmations(messages, "Could not run");
+}
+
 function closeConfirmationForAction(
   message: Message,
   effect: ConfirmationActionEffect,

@@ -1388,6 +1388,58 @@ def test_discovery_endpoints_return_assets_and_indicators(
     assert indicators.json()["items"][0]["support_status"] == "supported"
 
 
+def test_discovery_indicators_show_only_supported_indicators(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import discovery as discovery_router
+
+    monkeypatch.setattr(
+        discovery_router,
+        "search_indicators",
+        lambda q, limit=12: [
+            IndicatorInfo("rsi", "RSI", "Relative Strength Index", "executable"),
+            IndicatorInfo("atr", "ATR", "Average true range", "draft_only"),
+        ],
+    )
+    client = _client()
+
+    response = client.get("/api/v1/discovery/indicators?q=r&limit=5")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["symbol"] for item in items] == ["rsi"]
+    assert all(item["support_status"] == "supported" for item in items)
+
+
+def test_discovery_assets_preserve_provider_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import discovery as discovery_router
+
+    monkeypatch.setattr(
+        discovery_router,
+        "search_assets",
+        lambda q, limit=12: [
+            ResolvedAsset(
+                canonical_symbol="BTC",
+                asset_class="crypto",
+                name="Bitcoin",
+                raw_symbol=q,
+                provider="kraken",
+            )
+        ],
+    )
+    client = _client()
+
+    response = client.get("/api/v1/discovery/assets?q=btc&limit=5")
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["symbol"] == "BTC"
+    assert item["asset_class"] == "crypto"
+    assert item["provider"] == "kraken"
+
+
 def test_discovery_assets_display_currency_pair_label(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

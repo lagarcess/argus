@@ -24,6 +24,7 @@ class ResolvedAsset:
     asset_class: AssetClass
     name: str
     raw_symbol: str
+    provider: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ SYNTHETIC_UNIT_ASSETS: dict[str, tuple[AssetClass, str, str]] = {
     "AMZN": ("equity", "Amazon.com Inc.", "AMZN"),
     "BTC": ("crypto", "Bitcoin", "BTC/USD"),
     "ETH": ("crypto", "Ethereum", "ETH/USD"),
+    "EURUSD": ("currency_pair", "EUR/USD", "EURUSD"),
     "GOOG": ("equity", "Alphabet Inc. Class C", "GOOG"),
     "GOOGL": ("equity", "Alphabet Inc. Class A", "GOOGL"),
     "META": ("equity", "Meta Platforms Inc.", "META"),
@@ -189,6 +191,7 @@ def _load_assets_from_alpaca() -> dict[str, ResolvedAsset]:
             asset_class=asset_class,
             name=raw_name,
             raw_symbol=raw_symbol,
+            provider="alpaca",
         )
         _add_aliases(aliases, resolved, canonical=canonical)
 
@@ -237,6 +240,7 @@ def _load_kraken_asset_pairs(pairs: dict[str, object]) -> dict[str, ResolvedAsse
             asset_class=asset_class,
             name=name,
             raw_symbol=raw_symbol,
+            provider="kraken",
         )
         _add_aliases(aliases, resolved, canonical=canonical)
         aliases[_normalize_symbol(altname)] = resolved
@@ -259,6 +263,7 @@ def _load_synthetic_unit_assets() -> dict[str, ResolvedAsset]:
             asset_class=asset_class,
             name=name,
             raw_symbol=raw_symbol,
+            provider="synthetic_unit_fixture",
         )
         _add_aliases(aliases, resolved, canonical=symbol)
         aliases[name.lower().strip()] = resolved
@@ -317,6 +322,7 @@ def _load_alpaca_asset_rows(rows: list[object]) -> dict[str, ResolvedAsset]:
             asset_class=asset_class,
             name=raw_name,
             raw_symbol=raw_symbol,
+            provider=str(row.get("provider") or "recorded_provider_fixture"),
         )
         _add_aliases(aliases, resolved, canonical=canonical)
         name_alias = raw_name.lower().strip()

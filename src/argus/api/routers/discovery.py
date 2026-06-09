@@ -30,7 +30,10 @@ def display_asset_class(asset_class: str) -> str:
     return labels.get(asset_class, asset_class.replace("_", " ").title())
 
 
-def discovery_asset_provider(asset_class: str) -> str:
+def discovery_asset_provider(asset_class: str, provider: str | None = None) -> str:
+    normalized_provider = (provider or "").strip().lower()
+    if normalized_provider and normalized_provider != "unknown":
+        return normalized_provider
     if asset_class == "currency_pair":
         return "kraken"
     return "alpaca"
@@ -69,7 +72,7 @@ def discovery_assets(
                 asset_class=asset.asset_class,
                 description=display_asset_class(asset.asset_class),
                 insert_text=asset.canonical_symbol,
-                provider=discovery_asset_provider(asset.asset_class),
+                provider=discovery_asset_provider(asset.asset_class, asset.provider),
                 support_status="supported",
             )
             for asset in assets
@@ -87,7 +90,13 @@ def discovery_indicators(
     query = q.strip()
     if not query:
         return DiscoveryResponse(items=[])
-    indicators = search_indicators(query, limit=limit)
+    indicators = [
+        indicator
+        for indicator in search_indicators(query, limit=limit)
+        if discovery_support_status(indicator.support_status) == "supported"
+    ]
+    # TODO(private-alpha-discovery): decide whether unsupported indicators should
+    # appear as research/draft mentions once the research-lab flow exists.
     return DiscoveryResponse(
         items=[
             DiscoveryItem(

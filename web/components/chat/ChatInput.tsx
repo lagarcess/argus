@@ -470,7 +470,7 @@ export default function ChatInput({
         />
 
         {isMounted && animState === "idle" && composerIsEmpty && !isFocused && (
-          <div className="pointer-events-none absolute left-14 top-2 text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500">
+          <div className="pointer-events-none absolute inset-y-0 left-14 flex items-center text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500">
             {inputPlaceholder}
           </div>
         )}
@@ -478,7 +478,7 @@ export default function ChatInput({
         {isMounted && animState !== "idle" && composerIsEmpty && (
           <div
             key={`${currentPromptIndex}-${animState === "exiting"}`}
-            className={`pointer-events-none absolute left-14 top-2 flex max-w-[calc(100%-4rem)] items-center overflow-hidden whitespace-nowrap text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500 ${animState === "exiting" ? "animate-argus-swoosh-up" : ""}`}
+            className={`pointer-events-none absolute inset-y-0 left-14 flex max-w-[calc(100%-4rem)] items-center overflow-hidden whitespace-nowrap text-[16px] font-medium leading-[1.45] tracking-tight text-gray-400 dark:text-gray-500 ${animState === "exiting" ? "animate-argus-swoosh-up" : ""}`}
           >
             {typedText}
             {animState === "typing" && (
@@ -545,9 +545,9 @@ export function mergeDiscoveryItems(
   const sortedAssets = [...assets].sort(
     (a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query),
   );
-  const sortedIndicators = [...indicators].sort(
-    (a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query),
-  );
+  const sortedIndicators = indicators
+    .filter((item) => isSupportedDiscoveryItem(item))
+    .sort((a, b) => rankDiscoveryItem(a, query) - rankDiscoveryItem(b, query));
   const merged: DiscoveryItem[] = [];
   const seen = new Set<string>();
 
@@ -581,7 +581,9 @@ export function discoverySectionsForDisplay(
   items: DiscoveryItem[],
   query: string,
 ): DiscoverySection[] {
-  const visibleItems = items.filter((item) => item.id && item.label);
+  const visibleItems = items.filter(
+    (item) => item.id && item.label && isSupportedDiscoveryItem(item),
+  );
   if (visibleItems.length === 0) return [];
   if (query.trim()) {
     return [{ label: "Search results", items: visibleItems }];
@@ -596,12 +598,6 @@ export function discoverySectionsForDisplay(
       label: "Runnable indicators",
       items: visibleItems.filter(
         (item) => item.type === "indicator" && item.support_status === "supported",
-      ),
-    },
-    {
-      label: "Draft-only indicators",
-      items: visibleItems.filter(
-        (item) => item.type === "indicator" && item.support_status !== "supported",
       ),
     },
   ];
@@ -632,7 +628,6 @@ export function nextDiscoveryItemId(
 function discoverySectionLabelKey(label: string) {
   if (label === "Popular assets") return "chat.discovery.sections.assets";
   if (label === "Runnable indicators") return "chat.discovery.sections.indicators";
-  if (label === "Draft-only indicators") return "chat.discovery.sections.draft";
   return "chat.discovery.sections.results";
 }
 
@@ -641,6 +636,10 @@ function discoveryBadgeLabel(item: DiscoveryItem) {
   if (item.support_status === "supported") return "runnable";
   if (item.support_status === "unavailable") return "unavailable";
   return "draft";
+}
+
+function isSupportedDiscoveryItem(item: DiscoveryItem) {
+  return item.type !== "indicator" || item.support_status === "supported";
 }
 
 function writeSegmentsToEditor(root: HTMLDivElement | null, segments: ComposerSegment[]) {

@@ -522,12 +522,8 @@ export default function ChatSidebar({
                                 onOpenItem(item);
                               }
                             }}
-                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 ${
-                              isActiveConversation
-                                ? "bg-black/5 dark:bg-white/5"
-                                : hasConversationAttention
-                                  ? "bg-[#7da0ca]/10 hover:bg-[#7da0ca]/14 dark:bg-[#7da0ca]/12 dark:hover:bg-[#7da0ca]/16"
-                                : "hover:bg-black/5 dark:hover:bg-white/5"
+                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 hover:bg-black/5 dark:hover:bg-white/5 ${
+                              isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
                             }`}
                           >
                           {hasConversationAttention && (
@@ -570,7 +566,11 @@ export default function ChatSidebar({
                                 <span className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white">
                                   {item.title}
                                 </span>
-                                <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
+                                <span className={`mt-0.5 block truncate text-[12px] ${
+                                  hasConversationAttention
+                                    ? "text-black/60 dark:text-white/60"
+                                    : "text-black/40 dark:text-white/40"
+                                }`}>
                                   {item.subtitle}
                                 </span>
                               </>

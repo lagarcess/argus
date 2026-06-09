@@ -60,7 +60,10 @@ describe("chat composer display helpers", () => {
 
     expect(sections).toHaveLength(1);
     expect(sections[0].label).toBe("Search results");
-    expect(sections[0].items).toHaveLength(3);
+    expect(sections[0].items.map((item) => item.id)).toEqual([
+      "asset:AAPL",
+      "indicator:rsi",
+    ]);
   });
 
   test("cycles keyboard focus through visible discovery items", () => {

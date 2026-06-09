@@ -23,6 +23,8 @@ describe("chat input send tooltip", () => {
     expect(input).toContain("disabled={sendButtonDisabled}");
     expect(input).toContain("disabled:pointer-events-none");
     expect(input).toContain("inline-flex h-10 w-10 items-center justify-center");
+    expect(input).toContain("absolute inset-y-0 left-14 flex items-center");
+    expect(input).not.toContain("absolute left-14 top-2");
     expect(en).toContain('"message_empty": "Message is empty"');
     expect(es).toContain('"message_empty": "El mensaje está vacío"');
   });

@@ -95,6 +95,7 @@ import {
   attentionAfterConversationOpen,
   attentionAfterTurnSettled,
 } from "@/lib/chat-attention-state";
+import { sidebarOpenAfterTransientNavigation } from "@/lib/sidebar-mode-state";
 import SettingsView from "../views/SettingsView";
 import StrategiesView from "../views/StrategiesView";
 import ChatInput from "./ChatInput";
@@ -112,6 +113,7 @@ import {
   isBreakdownActionMetadata,
   normalizeConfirmationHistory,
   resultActionRunId,
+  settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "./artifact-history";
 
@@ -852,6 +854,15 @@ export default function ChatInterface() {
     setIsSidebarOpen((open) => !open);
   };
 
+  const closeTransientSidebar = useCallback(() => {
+    setIsSidebarOpen((currentOpen) =>
+      sidebarOpenAfterTransientNavigation({
+        currentOpen,
+        mode: sidebarMode,
+      }),
+    );
+  }, [sidebarMode]);
+
   // ── Init conversation ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -1010,7 +1021,7 @@ export default function ChatInterface() {
   // ── Load existing conversation ─────────────────────────────────────────────
 
   const loadConversation = async (convId: string) => {
-    setIsSidebarOpen(false);
+    closeTransientSidebar();
     closeChatOptions();
     setCurrentView("chat");
     rememberActiveConversationId(convId);
@@ -1060,7 +1071,7 @@ export default function ChatInterface() {
       // Fall through to the chat surface if the run is unavailable.
     }
     setCurrentView("chat");
-    setIsSidebarOpen(false);
+    closeTransientSidebar();
   };
 
   const openHistoryItem = (item: HistoryItem | SearchItem) => {
@@ -1070,7 +1081,7 @@ export default function ChatInterface() {
     }
     if (strategiesEnabled && item.type === "strategy") {
       setCurrentView("strategies");
-      setIsSidebarOpen(false);
+      closeTransientSidebar();
       return;
     }
     if (item.type === "run") {
@@ -1078,14 +1089,14 @@ export default function ChatInterface() {
       return;
     }
     setCurrentView("chat");
-    setIsSidebarOpen(false);
+    closeTransientSidebar();
   };
 
   // ── Start new chat ─────────────────────────────────────────────────────────
 
   const startNewChat = useCallback(async () => {
     resetToEmptyChatSurface();
-    setIsSidebarOpen(false);
+    closeTransientSidebar();
     try {
       const me = await getMe();
       const stage = me.user.onboarding.stage;
@@ -1098,7 +1109,7 @@ export default function ChatInterface() {
     }
     void refreshHistory();
     return null;
-  }, [refreshHistory, resetToEmptyChatSurface]);
+  }, [closeTransientSidebar, refreshHistory, resetToEmptyChatSurface]);
 
   const handleConversationRemoved = useCallback((removedConversationId: string) => {
     setHistoryItems((prev) =>
@@ -1119,7 +1130,7 @@ export default function ChatInterface() {
   const handleTriggerPrompt = async (_type: 'strategy', customPrompt?: string) => {
     // 1. Switch view
     setCurrentView("chat");
-    setIsSidebarOpen(false);
+    closeTransientSidebar();
 
     // 2. Start new chat
     await startNewChat();
@@ -1198,7 +1209,7 @@ export default function ChatInterface() {
       setConversationId(targetConversationId);
     }
 
-    setIsSidebarOpen(false);
+    closeTransientSidebar();
     shouldAutoScrollRef.current = true;
     const renderUserMessage = options?.renderUserMessage ?? !isRetryAction(action);
 
@@ -1280,18 +1291,23 @@ export default function ChatInterface() {
         setStreamStatus(null);
         setIsStreamingResponse(false);
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  id: persistedErrorMessageId || m.id,
-                  content: chatStreamErrorText(
-                    event.data.detail,
-                    t('chat.error_backtest'),
-                  ),
-                  actions: visibleRetryAction ? [visibleRetryAction] : m.actions,
-                }
-              : m,
+          normalizeRetryActionHistory(
+            settleOpenConfirmationsAfterStreamError(
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      id: persistedErrorMessageId || m.id,
+                      content: chatStreamErrorText(
+                        event.data.detail,
+                        t('chat.error_backtest'),
+                      ),
+                      actions: visibleRetryAction ? [visibleRetryAction] : m.actions,
+                    }
+                  : m,
+              ),
+              action,
+            ),
           ),
         );
         markConversationAttentionIfOutOfFocus(targetConversationId);
@@ -1524,7 +1540,7 @@ export default function ChatInterface() {
     });
     setStreamStatus(t("chat.status.understanding"));
     setIsStreamingResponse(true);
-    setIsSidebarOpen(false);
+    closeTransientSidebar();
 
     try {
       await streamChatMessage(targetConversationId, hiddenMessage, i18n.language, (event) => {
@@ -1892,11 +1908,11 @@ export default function ChatInterface() {
         isLoadingMoreHistory={isLoadingMoreHistory}
         onNewChat={() => {
           void startNewChat();
-          setIsSidebarOpen(false);
+          closeTransientSidebar();
         }}
         onNavigate={(view) => {
           setCurrentView(view);
-          setIsSidebarOpen(false);
+          closeTransientSidebar();
         }}
         onOpenItem={openHistoryItem}
         onLoadMoreHistory={loadMoreHistory}

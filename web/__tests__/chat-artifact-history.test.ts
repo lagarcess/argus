@@ -4,6 +4,7 @@ import {
   applyConfirmationActionEffects,
   confirmationActionEffectsFromApi,
   normalizeConfirmationHistory,
+  settleOpenConfirmationsAfterStreamError,
   settleOpenConfirmationsAfterTextFinal,
 } from "../components/chat/artifact-history";
 import type { ChatActionOption, Message } from "../components/chat/types";
@@ -104,6 +105,29 @@ describe("chat artifact history", () => {
     expect(message.confirmation?.statusLabel).toBe("Draft canceled");
     expect(message.confirmation?.actions).toEqual([]);
     expect(message.actions).toEqual([]);
+  });
+
+  test("stream errors settle running confirmation cards as failed", () => {
+    const action: ChatActionOption = {
+      type: "run_backtest",
+      label: "Run backtest",
+      presentation: "confirmation",
+      payload: { confirmation_id: "confirm-aapl" },
+    };
+    const [running] = applyConfirmationActionEffects([confirmationMessage()], [
+      {
+        type: "run_backtest",
+        confirmationId: "confirm-aapl",
+        statusLabel: "Running",
+      },
+    ]);
+
+    const [settled] = settleOpenConfirmationsAfterStreamError([running], action);
+
+    expect(settled.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled.confirmation?.statusLabel).toBe("Could not run");
+    expect(settled.confirmation?.actions).toEqual([]);
+    expect(settled.actions).toEqual([]);
   });
 
   test("cancel action tombstones hide action transcript noise on reload", () => {
