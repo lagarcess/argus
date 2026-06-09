@@ -42,6 +42,7 @@ export default function ChatInput({
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
   const [composerHasContent, setComposerHasContent] = useState(false);
+  const [composerRawText, setComposerRawText] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [typedText, setTypedText] = useState("");
   const [discoveryQuery, setDiscoveryQuery] = useState("");
@@ -80,6 +81,7 @@ export default function ChatInput({
   const sendDisabledReason = composerIsEmpty
     ? t("chat.message_empty", "Message is empty")
     : undefined;
+  const isMentionButtonHidden = shouldHideMentionButton(isDiscoveryOpen, composerRawText);
 
   useEffect(() => {
     setIsMounted(true);
@@ -199,6 +201,7 @@ export default function ChatInput({
   useLayoutEffect(() => {
     writeSegmentsToEditor(editorRef.current, segments);
     setComposerHasContent(!isComposerEmpty(segments));
+    setComposerRawText(rawComposerText(segments));
     if (pendingCaretOffsetRef.current === null) return;
     const offset = pendingCaretOffsetRef.current;
     pendingCaretOffsetRef.current = null;
@@ -243,6 +246,7 @@ export default function ChatInput({
       onSend(message, composerMentions(current));
       setSegments([{ type: "text", text: "" }]);
       setComposerHasContent(false);
+      setComposerRawText("");
       setIsDiscoveryOpen(false);
       setActiveDiscoveryItemId(null);
     }
@@ -263,6 +267,7 @@ export default function ChatInput({
       pendingCaretOffsetRef.current = cursor + 1;
       activeMentionOffsetRef.current = cursor + 1;
       setSegments(next);
+      setComposerRawText(rawComposerText(next));
       setDiscoveryItems([]);
     } else if (!mention.query.trim()) {
       activeMentionOffsetRef.current = cursor;
@@ -290,6 +295,7 @@ export default function ChatInput({
           ? tokenEnd + 1
           : tokenEnd;
     setSegments(next);
+    setComposerRawText(rawComposerText(next));
     activeMentionOffsetRef.current = null;
     setIsDiscoveryOpen(false);
     setDiscoveryItems([]);
@@ -300,6 +306,7 @@ export default function ChatInput({
     const current = readCurrentSegments();
     const cursor = getCaretTextOffset(editorRef.current);
     setComposerHasContent(!isComposerEmpty(current));
+    setComposerRawText(rawComposerText(current));
     updateDiscoveryState(current, cursor);
   };
 
@@ -375,10 +382,10 @@ export default function ChatInput({
         type="button"
         onClick={openDiscovery}
         className={`absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/45 dark:hover:bg-white/5 dark:hover:text-white ${
-          isDiscoveryOpen ? "opacity-0 pointer-events-none" : ""
+          isMentionButtonHidden ? "opacity-0 pointer-events-none" : ""
         }`}
-        aria-hidden={isDiscoveryOpen}
-        tabIndex={isDiscoveryOpen ? -1 : 0}
+        aria-hidden={isMentionButtonHidden}
+        tabIndex={isMentionButtonHidden ? -1 : 0}
         aria-label={t("chat.discovery.prompt", "Mention an asset or indicator")}
       >
         <AtSign className="h-4 w-4" />
@@ -600,6 +607,10 @@ export function discoverySectionsForDisplay(
 export function discoveryOptionDomId(id: string) {
   const safeId = id.replace(/[^A-Za-z0-9_-]+/g, "-");
   return `chat-discovery-option-${safeId}`;
+}
+
+export function shouldHideMentionButton(isDiscoveryOpen: boolean, rawText: string) {
+  return isDiscoveryOpen || rawText.includes("@");
 }
 
 export function nextDiscoveryItemId(

@@ -9,6 +9,7 @@ import {
   discoverySectionsForDisplay,
   mergeDiscoveryItems,
   nextDiscoveryItemId,
+  shouldHideMentionButton,
 } from "../components/chat/ChatInput";
 import type { DiscoveryItem } from "../lib/argus-api";
 
@@ -109,7 +110,7 @@ describe("chat composer display helpers", () => {
     expect(input).toContain('role="listbox"');
     expect(input).toContain('role="option"');
     expect(input).toContain('aria-autocomplete="list"');
-    expect(input).toContain("isDiscoveryOpen ? \"opacity-0 pointer-events-none\"");
+    expect(input).toContain("isMentionButtonHidden ? \"opacity-0 pointer-events-none\"");
     expect(input).toContain('aria-controls={isDiscoveryOpen ? "chat-discovery-listbox" : undefined}');
     expect(input).toContain("aria-activedescendant={isDiscoveryOpen ? activeDiscoveryOptionId : undefined}");
     expect(input).toContain("aria-selected={item.id === activeDiscoveryItemId}");
@@ -118,5 +119,13 @@ describe("chat composer display helpers", () => {
     expect(input).toContain('e.key === "ArrowUp"');
     expect(input).toContain('e.key === "Escape"');
     expect(input).toContain("insertDiscoveryItem(activeDiscoveryItem)");
+  });
+
+  test("hides the mention shortcut when a literal mention marker is visible", () => {
+    expect(shouldHideMentionButton(false, "")).toBe(false);
+    expect(shouldHideMentionButton(false, "Test AAPL")).toBe(false);
+    expect(shouldHideMentionButton(true, "")).toBe(true);
+    expect(shouldHideMentionButton(false, "@")).toBe(true);
+    expect(shouldHideMentionButton(false, "Buy @apple")).toBe(true);
   });
 });
