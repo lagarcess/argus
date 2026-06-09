@@ -432,16 +432,13 @@ From the private-alpha execution milestone:
 
 New debt or smells from this milestone inventory:
 
-- confirmation card presentation lags behind job/result card quality;
-- assistant turn actions are not consistent across text, confirmation, job, and
-  result turns;
-- inactive chat completion is not clearly surfaced in the side panel;
 - current share action exposes an internal conversation id instead of a real
   public excerpt artifact;
 - streaming/error behavior needs a stronger contract before broader provider
   streaming changes;
-- Quick take, Explain result, and Try next overlap enough to confuse product
-  hierarchy.
+- public excerpt implementation is intentionally design-only in this milestone;
+- Research Lab / Perplexity work is intentionally design-only and must not be
+  implemented before canon docs are updated.
 
 Addressed in this branch:
 
