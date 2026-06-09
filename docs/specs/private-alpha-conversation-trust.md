@@ -110,6 +110,12 @@ of the conversation surface with that quality bar.
      `docs/DATA_MODEL.md`, `.agent/designs/argus/DESIGN.md`, and `AGENTS.md`
      aligned when this milestone introduces durable concepts or agent rules.
 
+9. **Streaming/output-control inventory**
+   - Confirm whether the current chat path already streams canonical SSE tokens.
+   - Do not add a second stream protocol or frontend-invented progress path.
+   - Capture the remaining output-control work as route-by-route quality and
+     acceptance coverage.
+
 ### Conditional Scope
 
 **Public conversation excerpts** are included only as a design/spec slice unless
@@ -362,6 +368,42 @@ Verification requirements before implementation can be merge-ready:
 - manual browser smoke on a local fixture conversation;
 - no live public-link canary until the founder explicitly approves creating a
   durable public artifact.
+
+### Slice 8: Streaming Output Control Inventory
+
+Goal: clarify what is already true before adding streaming complexity.
+
+Current state:
+
+- Backend chat streaming already uses canonical data-only SSE frames:
+  `stage_start`, `token`, `stage_outcome`, `final`, then `[DONE]`.
+- The frontend parser accepts canonical data-only frames and still tolerates
+  legacy named `event:` frames during migration.
+- The chat UI appends `token` content into the active assistant message and hides
+  final-turn controls while the stream is active.
+- The parser treats backend `error` frames as terminal, preserving specific
+  backend error copy instead of overwriting it with a generic interrupted-stream
+  message.
+
+Known limitations:
+
+- Some backend routes still emit completed text as one `token` because the source
+  path is deterministic or already-composed prose.
+- Provider/model streaming quality is route-dependent. The LLM interpreter,
+  clarification, result explanation, and deterministic artifact-action paths do
+  not all have the same token cadence.
+- The current acceptance harness includes a narrow streaming polish case, but it
+  is not yet a broad guard for every strategy, retry, or failure path.
+
+SOTA direction:
+
+- Keep the SSE contract; do not introduce a second frontend stream mechanism.
+- Improve route-by-route token cadence only where it improves perceived latency
+  without weakening result provenance.
+- Expand the Argus-owned acceptance harness with human-approved transcripts once
+  a streaming behavior is intentionally accepted.
+- Add an optional LLM-as-judge layer later; do not make it a hard local dev gate
+  for this milestone.
 
 ## Research Lab Thesis For Next Milestone
 
