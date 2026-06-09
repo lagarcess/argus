@@ -437,6 +437,11 @@ New debt or smells from this milestone inventory:
 - public excerpt implementation is intentionally design-only in this milestone;
 - Research Lab / Perplexity work is intentionally design-only and must not be
   implemented before canon docs are updated.
+- docs hygiene needs a focused pass after this milestone lands: classify docs as
+  canonical, active milestone/spec, or historical/archive; move stale launch
+  closure plans such as `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` out of the
+  active-docs path or mark them clearly as historical so future agents do not
+  treat old plans as current source of truth.
 
 Addressed in this branch:
 
