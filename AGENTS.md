@@ -89,8 +89,9 @@ Milestone guardrails:
   Quick take is the first-glance result readout, Explain result is the deeper
   fact-grounded breakdown action, and Try next must come from supported next
   experiments rather than generic advice or duplicated Quick take prose.
-- Do not replace "share conversation id" with public sharing until the public
-  excerpt privacy/revocation design is explicit.
+- Do not restore "copy conversation link" or "share conversation id" as a
+  pseudo-share action. Until the public excerpt feature exists, the header menu
+  should expose only real owner actions such as rename, pin, and delete.
 - When public conversation excerpts are implemented, they must be immutable,
   sanitized snapshots behind owner-only create/revoke and an unguessable public
   slug. Do not expose source conversation ids, route receipts, provider/model

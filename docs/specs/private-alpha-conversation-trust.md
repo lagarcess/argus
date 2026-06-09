@@ -1,6 +1,6 @@
 # Private Alpha Conversation Trust
 
-Status: Working draft
+Status: Branch checkpoint; founder review pending
 Date: 2026-06-09
 Audience: Founder, engineering agents, product/architecture review
 
@@ -492,6 +492,58 @@ cd web && bun test
 
 cd web && bun run build
 # passed
+```
+
+## Current Checkpoint Evidence
+
+Latest verified code checkpoint before this documentation sync:
+`595013f6e6d96fa7c282d29d74ab6e6fba7ebf16`.
+
+Local verification on 2026-06-09:
+
+```text
+cd web && bun test
+# 173 passed
+
+cd web && bun run build
+# passed
+
+poetry run ruff check src tests workflows scripts
+# passed
+
+poetry run pytest \
+  tests/test_environment_scripts.py \
+  tests/test_api_import_boundary.py \
+  tests/test_render_canary_script.py \
+  tests/test_legacy_orchestrator_retirement.py \
+  -q --no-cov
+# 44 passed
+
+poetry run pytest \
+  tests/test_chat_backtest_state_machine.py::test_chat_stream_passes_and_persists_composer_mention_provenance \
+  tests/test_chat_backtest_state_machine.py::test_chat_stream_preserves_selected_stock_asset_class_from_mentions \
+  tests/agent_runtime/test_interpret_stage.py::test_selected_asset_mention_provenance_keeps_equity_symbol_binding \
+  tests/agent_runtime/test_resolution_context.py::test_user_mention_asset_resolution_does_not_guess_company_alias_from_fuzzy_symbol \
+  -q --no-cov
+# 4 passed
+```
+
+GitHub Actions:
+
+```text
+CI / codex/private-alpha-conversation-trust / 595013f
+# completed successfully
+```
+
+Browser QA:
+
+```text
+Local `@` composer flow:
+- clicking the mention affordance inserts one `@` marker;
+- typing `AAP` returns provider-backed AAPL discovery;
+- selecting AAPL creates a canonical composer token with
+  `asset:equity:AAPL`, symbol `AAPL`, and provider `alpaca`;
+- the mention lane remains optically centered with the send button.
 ```
 
 ## Operating Model
