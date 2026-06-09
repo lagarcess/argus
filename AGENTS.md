@@ -96,7 +96,8 @@ Milestone guardrails:
   slug. Do not expose source conversation ids, route receipts, provider/model
   metadata, retry payloads, or direct anon table access.
 - Keep Perplexity/Research Lab work as design-only unless a later milestone
-  explicitly starts that implementation.
+  explicitly starts that implementation. The preserved thesis lives in
+  `docs/specs/research-lab-thesis.md`.
 
 Never let UI polish violate the runtime principles below: the frontend renders
 backend-provided artifacts, LangGraph remains the only chat brain, and

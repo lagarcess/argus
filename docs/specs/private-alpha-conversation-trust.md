@@ -408,27 +408,12 @@ SOTA direction:
 
 ## Research Lab Thesis For Next Milestone
 
-The larger product direction is strong and should be preserved separately:
+The larger product direction is strong and is preserved in
+`docs/specs/research-lab-thesis.md`.
 
-Argus becomes a simplified research lab where users can educate themselves,
-observe markets, form hypotheses, test supported ideas, explain outcomes,
-compare alternatives, refine experiments, monitor changes, and share artifacts.
-
-Perplexity Agent API is a candidate research provider because it supports
-multi-provider access, tool use, model fallback chains, streaming, source
-results/citations, presets, and finance/web/people/fetch-url tools.
-
-The first Research Lab slice should be **Research-to-Test Bridge**:
-
-1. user asks a broad finance question;
-2. Argus performs cited research through Perplexity;
-3. Argus extracts only supported, testable hypotheses;
-4. Argus presents pre-baked confirmation cards for ideas it can actually test;
-5. current workflow-backed backtesting executes the selected idea;
-6. Argus explains and suggests supported next experiments.
-
-Research Lab must update canon docs before implementation because it broadens
-Argus from "strategy builder chat" to "durable investing thinking workspace".
+This milestone does not implement Perplexity or Research Lab behavior. Any
+future implementation must first update canon docs because it broadens Argus
+from "strategy builder chat" to "durable investing thinking workspace".
 
 ## Existing Debt Carried Forward
 
