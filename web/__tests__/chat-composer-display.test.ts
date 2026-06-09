@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import {
   DISCOVERY_SEARCH_LIMIT,
+  discoveryEnterAction,
   discoveryOptionDomId,
   discoverySectionsForDisplay,
   mergeDiscoveryItems,
@@ -124,6 +125,19 @@ describe("chat composer display helpers", () => {
     expect(input).toContain('e.key === "ArrowUp"');
     expect(input).toContain('e.key === "Escape"');
     expect(input).toContain("insertDiscoveryItem(activeDiscoveryItem)");
+    expect(input).toContain("discoveryEnterAction({");
+  });
+
+  test("discovery enter behavior does not trap send when no result is active", () => {
+    expect(
+      discoveryEnterAction({ hasActiveItem: true, hasComposerContent: true }),
+    ).toBe("insert");
+    expect(
+      discoveryEnterAction({ hasActiveItem: false, hasComposerContent: true }),
+    ).toBe("submit");
+    expect(
+      discoveryEnterAction({ hasActiveItem: false, hasComposerContent: false }),
+    ).toBe("close");
   });
 
   test("hides the mention shortcut when a literal mention marker is visible", () => {

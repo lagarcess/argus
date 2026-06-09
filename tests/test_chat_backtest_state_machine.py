@@ -807,6 +807,7 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
                     "asset_class": "equity",
                     "description": "Stock",
                     "insert_text": "CVX",
+                    "provider": "alpaca",
                     "support_status": "supported",
                 }
             ],
@@ -823,6 +824,7 @@ def test_chat_stream_preserves_selected_stock_asset_class_from_mentions(
         f"/api/v1/conversations/{conversation['id']}/messages"
     ).json()["items"][0]
     assert user_message["metadata"]["mentions"][0]["asset_class"] == "equity"
+    assert user_message["metadata"]["mentions"][0]["provider"] == "alpaca"
     assert (
         user_message["metadata"]["resolution_provenance"][0]["asset_class"] == "equity"
     )
@@ -832,6 +834,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.chat.breakdown import (
+        ResultBreakdownMessage,
         fallback_result_breakdown_message,
         result_breakdown_context,
     )
@@ -853,8 +856,13 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     )
     monkeypatch.setattr(
         agent_router,
-        "result_breakdown_message",
-        lambda run: fallback_result_breakdown_message(result_breakdown_context(run)),
+        "result_breakdown_message_with_metadata",
+        lambda run: ResultBreakdownMessage(
+            text=fallback_result_breakdown_message(result_breakdown_context(run)),
+            source="deterministic_fallback",
+            fallback_used=True,
+            failure_mode="test_forced_fallback",
+        ),
     )
     client = _client()
     conversation = _conversation(client)
@@ -914,6 +922,9 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     assistant = messages.json()["items"][-1]
     assert assistant["metadata"]["chat_action"]["type"] == "show_breakdown"
     assert assistant["metadata"]["result_run_id"] == run_id
+    assert assistant["metadata"]["result_breakdown_source"] == "deterministic_fallback"
+    assert assistant["metadata"]["result_breakdown_fallback_used"] is True
+    assert assistant["metadata"]["result_breakdown_failure_mode"] == "test_forced_fallback"
     assert assistant["metadata"]["result_fact_bank"]["run_id"] == run_id
     assert assistant["metadata"]["result_fact_bank"]["symbols"] == ["AAPL"]
     assert "result_card" not in assistant["metadata"]
@@ -929,7 +940,7 @@ def test_breakdown_action_emits_working_stage_before_generating_text() -> None:
 
     assert action_block.index(
         'yield sse_data({"type": "stage_start", "stage": "explain"})'
-    ) < action_block.index("assistant_text = result_breakdown_message(run)")
+    ) < action_block.index("breakdown_message = result_breakdown_message_with_metadata(run)")
 
 
 def test_result_action_with_run_from_another_conversation_does_not_fallback() -> None:

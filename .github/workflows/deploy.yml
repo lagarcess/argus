@@ -63,6 +63,11 @@ jobs:
             tests/test_private_launch_hardening.py \
             tests/test_checkpoint_rls_migration.py \
             tests/test_ci_workflow.py \
+            tests/test_legacy_orchestrator_retirement.py \
+            tests/test_chat_backtest_state_machine.py \
+            tests/test_openrouter_policy.py \
+            tests/agent_runtime/test_execute_recovery.py \
+            tests/section3/test_market_data_provider.py \
             -q --no-cov
 
   frontend-checks:
@@ -75,7 +80,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.14"
 
       - name: Install frontend dependencies
         run: cd web && bun install --frozen-lockfile

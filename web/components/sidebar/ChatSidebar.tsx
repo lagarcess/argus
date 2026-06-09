@@ -496,6 +496,10 @@ export default function ChatSidebar({
                         const isActiveConversation = conversationId === itemConversationId;
                         const hasConversationAttention =
                           !isActiveConversation && attentionConversationIds.has(itemConversationId);
+                        const attentionLabel = t("chat.history.new_activity", "New activity");
+                        const rowAriaLabel = hasConversationAttention
+                          ? `${item.title}. ${attentionLabel}.`
+                          : item.title;
                         const conversationActionItem =
                           item.id === itemConversationId ? item : { ...item, id: itemConversationId };
 
@@ -504,6 +508,7 @@ export default function ChatSidebar({
                             key={`chat:${item.id}`}
                             role="button"
                             tabIndex={0}
+                            aria-label={rowAriaLabel}
                             aria-current={isActiveConversation ? "page" : undefined}
                             data-active-conversation={isActiveConversation ? "true" : undefined}
                             data-has-attention={hasConversationAttention ? "true" : undefined}
@@ -531,6 +536,9 @@ export default function ChatSidebar({
                               aria-hidden="true"
                               className="absolute left-4 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-[#f4f4f4] bg-[#70a38d] dark:border-[#191c1f] dark:bg-[#9bc6b4]"
                             />
+                          )}
+                          {hasConversationAttention && (
+                            <span className="sr-only">{attentionLabel}</span>
                           )}
                           <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center" />
                           <div className="min-w-0 flex-1 pl-3 pr-10">

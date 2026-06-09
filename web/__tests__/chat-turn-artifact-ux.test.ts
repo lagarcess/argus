@@ -15,9 +15,9 @@ describe("chat turn artifact UX", () => {
     const actions: ChatActionOption[] = [
       { type: "run_backtest", label: "Run backtest", presentation: "confirmation" },
       { type: "show_breakdown", label: "Explain result", presentation: "result" },
-      { type: "retry_failed_action", label: "Try again", presentation: "inline" },
+      { type: "retry_failed_action", label: "Try again" },
       { type: "save_strategy", label: "Save", presentation: "result" },
-      { type: "send_message", label: "Ask follow-up", presentation: "inline" },
+      { id: "ask-follow-up", label: "Ask follow-up" },
     ];
 
     expect(actions.filter(actionHasCardScopedOwnership).map((action) => action.label)).toEqual([

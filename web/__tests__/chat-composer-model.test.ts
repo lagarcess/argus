@@ -59,6 +59,7 @@ describe("chat composer model", () => {
         asset_class: "equity",
         description: "Alphabet Class C",
         insert_text: "GOOG",
+        provider: "alpaca",
         support_status: "supported",
       },
     ]);
@@ -96,6 +97,7 @@ describe("chat composer model", () => {
         asset_class: "equity",
         description: "Alphabet Class C",
         insert_text: "GOOG",
+        provider: "alpaca",
         support_status: "supported",
       },
       {
@@ -105,6 +107,7 @@ describe("chat composer model", () => {
         symbol: "rsi",
         description: "Relative Strength Index",
         insert_text: "RSI",
+        provider: "pandas-ta-classic",
         support_status: "supported",
       },
     ]);
@@ -150,6 +153,14 @@ describe("chat composer model", () => {
     const next = replaceRangeWithToken(segments, range!, goog);
 
     expect(serializeComposerSegments(next)).toBe("Buy GOOG over the last year");
+  });
+
+  test("selecting a result after whitespace after @ preserves surrounding text", () => {
+    const segments: ComposerSegment[] = [{ type: "text", text: "Buy @ apple now" }];
+    const range = rangeForDiscoveryItem(segments, "Buy @ apple".length, goog);
+    const next = replaceRangeWithToken(segments, range!, goog);
+
+    expect(serializeComposerSegments(next)).toBe("Buy GOOG now");
   });
 
   test("deletes the token before the cursor without corrupting surrounding text", () => {

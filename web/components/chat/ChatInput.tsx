@@ -81,6 +81,7 @@ export default function ChatInput({
   const sendDisabledReason = composerIsEmpty
     ? t("chat.message_empty", "Message is empty")
     : undefined;
+  const sendButtonLabel = t("chat.send_message", "Send message");
   const isMentionButtonHidden = shouldHideMentionButton(isDiscoveryOpen, composerRawText);
 
   useEffect(() => {
@@ -439,8 +440,17 @@ export default function ChatInput({
               }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (activeDiscoveryItem) {
+                const action = discoveryEnterAction({
+                  hasActiveItem: Boolean(activeDiscoveryItem),
+                  hasComposerContent: composerHasContent,
+                });
+                if (action === "insert" && activeDiscoveryItem) {
                   insertDiscoveryItem(activeDiscoveryItem);
+                } else if (action === "submit") {
+                  closeDiscovery();
+                  editorRef.current?.closest("form")?.requestSubmit();
+                } else {
+                  closeDiscovery();
                 }
                 return;
               }
@@ -497,26 +507,27 @@ export default function ChatInput({
               aria-label={sendDisabledReason}
               tabIndex={0}
               onClick={(event) => event.stopPropagation()}
-              className="inline-flex h-10 w-10 rounded-full"
+              className="inline-flex h-11 w-11 rounded-full"
             >
-              <SendButton disabled={sendButtonDisabled} />
+              <SendButton disabled={sendButtonDisabled} ariaLabel={sendButtonLabel} />
             </span>
           </Tooltip>
         ) : (
-          <SendButton disabled={sendButtonDisabled} />
+          <SendButton disabled={sendButtonDisabled} ariaLabel={sendButtonLabel} />
         )}
       </div>
     </form>
   );
 }
 
-function SendButton({ disabled }: { disabled: boolean }) {
+function SendButton({ disabled, ariaLabel }: { disabled: boolean; ariaLabel: string }) {
   return (
     <button
       type="submit"
       data-testid="chat-send"
       disabled={disabled}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black text-white transition-opacity hover:opacity-85 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
+      aria-label={ariaLabel}
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black text-white transition-opacity hover:opacity-85 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
     >
       <ArrowUp className="h-5 w-5 stroke-[2.5]" />
     </button>
@@ -611,6 +622,17 @@ export function discoveryOptionDomId(id: string) {
 
 export function shouldHideMentionButton(isDiscoveryOpen: boolean, rawText: string) {
   return isDiscoveryOpen || rawText.includes("@");
+}
+
+export function discoveryEnterAction({
+  hasActiveItem,
+  hasComposerContent,
+}: {
+  hasActiveItem: boolean;
+  hasComposerContent: boolean;
+}): "insert" | "submit" | "close" {
+  if (hasActiveItem) return "insert";
+  return hasComposerContent ? "submit" : "close";
 }
 
 export function nextDiscoveryItemId(

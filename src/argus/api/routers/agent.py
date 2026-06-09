@@ -224,6 +224,14 @@ def result_breakdown_message(run: BacktestRun | None) -> str:
     return _result_breakdown_message(run)
 
 
+def result_breakdown_message_with_metadata(run: BacktestRun | None) -> Any:
+    from argus.api.chat.breakdown import (
+        result_breakdown_message_with_metadata as _result_breakdown_message_with_metadata,
+    )
+
+    return _result_breakdown_message_with_metadata(run)
+
+
 @router.get("/api/v1/chat/starter-prompts", response_model=StarterPromptsResponse)
 def list_starter_prompts(
     user: User = Depends(current_user),  # noqa: B008
@@ -732,13 +740,18 @@ async def chat_stream(
             yield sse_data({"type": "stage_start", "stage": "explain"})
             receipt_token = begin_openrouter_route_receipt_capture()
             try:
-                assistant_text = result_breakdown_message(run)
+                breakdown_message = result_breakdown_message_with_metadata(run)
+                assistant_text = breakdown_message.text
             finally:
                 route_receipts = end_openrouter_route_receipt_capture(receipt_token)
             metadata = {
                 "conversation_mode": "result_review",
                 "chat_action": payload.action.model_dump(mode="python"),
+                "result_breakdown_source": breakdown_message.source,
+                "result_breakdown_fallback_used": breakdown_message.fallback_used,
             }
+            if breakdown_message.failure_mode is not None:
+                metadata["result_breakdown_failure_mode"] = breakdown_message.failure_mode
             if run is not None:
                 metadata["latest_run_id"] = run.id
                 metadata["result_run_id"] = run.id

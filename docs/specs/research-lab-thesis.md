@@ -1,7 +1,7 @@
 # Argus Research Lab Thesis
 
-**Status:** Draft design spec for the next milestone.  
-**Branch:** `codex/private-alpha-conversation-trust`  
+**Status:** Draft design spec for the next milestone.
+**Branch:** `codex/private-alpha-conversation-trust`
 **Last updated:** June 9, 2026
 
 This is not an implementation plan for the current conversation-trust milestone.
@@ -221,4 +221,3 @@ The first implementation PR is not acceptable unless:
   used only when Argus needs deterministic macro data?
 - Does a memo-style product surface add value, or does chat plus saved research
   artifacts cover the need?
-

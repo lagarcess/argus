@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
@@ -41,6 +42,18 @@ class ResultBreakdownDraft(BaseModel):
 
 
 RESULT_BREAKDOWN_LLM_TIMEOUT_SECONDS = 6.0
+
+
+@dataclass(frozen=True)
+class ResultBreakdownMessage:
+    text: str
+    source: Literal[
+        "llm_breakdown_stage",
+        "deterministic_fallback",
+        "missing_result",
+    ]
+    fallback_used: bool
+    failure_mode: str | None = None
 
 
 def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
@@ -857,12 +870,33 @@ def _format_result_breakdown_date_range(value: Any) -> str:
 
 
 def result_breakdown_message(run: BacktestRun | None) -> str:
+    return result_breakdown_message_with_metadata(run).text
+
+
+def result_breakdown_message_with_metadata(
+    run: BacktestRun | None,
+) -> ResultBreakdownMessage:
     if run is None:
-        return (
-            "I could not find the latest completed result for this conversation. "
-            "Run the backtest again and I can break down the metrics from that result."
+        return ResultBreakdownMessage(
+            text=(
+                "I could not find the latest completed result for this conversation. "
+                "Run the backtest again and I can break down the metrics from that result."
+            ),
+            source="missing_result",
+            fallback_used=True,
+            failure_mode="missing_result",
         )
     context = result_breakdown_context(run)
-    return llm_result_breakdown_message(context) or fallback_result_breakdown_message(
-        context
+    llm_text = llm_result_breakdown_message(context)
+    if llm_text:
+        return ResultBreakdownMessage(
+            text=llm_text,
+            source="llm_breakdown_stage",
+            fallback_used=False,
+        )
+    return ResultBreakdownMessage(
+        text=fallback_result_breakdown_message(context),
+        source="deterministic_fallback",
+        fallback_used=True,
+        failure_mode="llm_unavailable_or_contract_rejected",
     )

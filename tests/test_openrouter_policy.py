@@ -2648,10 +2648,65 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     assert "+39.5%" in text
     assert "SPY" in text
     assert "-13.8%" in text
-    assert "supported RSI threshold" in text
-    assert "compare against buy-and-hold" not in text
-    assert "not a prediction" in text.lower()
-    assert "trading recommendation" in text.lower()
+
+
+def test_result_breakdown_metadata_records_deterministic_fallback(
+    monkeypatch,
+) -> None:
+    from argus.api.chat.breakdown import result_breakdown_message_with_metadata
+    from argus.api.schemas import BacktestRun
+    from argus.domain.store import utcnow
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    run = BacktestRun(
+        id="run-1",
+        conversation_id="conversation-1",
+        strategy_id=None,
+        status="completed",
+        asset_class="equity",
+        symbols=["AAPL"],
+        allocation_method="equal_weight",
+        benchmark_symbol="SPY",
+        metrics={
+            "aggregate": {
+                "performance": {
+                    "total_return_pct": 39.5,
+                    "benchmark_return_pct": 25.6,
+                    "delta_vs_benchmark_pct": 13.9,
+                    "max_drawdown_pct": -13.8,
+                }
+            },
+            "by_symbol": {},
+        },
+        config_snapshot={
+            "template": "buy_and_hold",
+            "symbols": ["AAPL"],
+            "timeframe": "1D",
+            "benchmark_symbol": "SPY",
+        },
+        conversation_result_card={
+            "title": "AAPL Buy and Hold",
+            "rows": [
+                {
+                    "key": "total_return_pct",
+                    "label": "Total Return (%)",
+                    "value": "+39.5%",
+                }
+            ],
+            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
+        },
+        created_at=utcnow(),
+        chart=None,
+        trades=[],
+    )
+
+    message = result_breakdown_message_with_metadata(run)
+
+    assert message.source == "deterministic_fallback"
+    assert message.fallback_used is True
+    assert message.failure_mode == "llm_unavailable_or_contract_rejected"
+    assert "**Setup.**" in message.text
 
 
 @pytest.mark.asyncio

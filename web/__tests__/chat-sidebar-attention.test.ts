@@ -18,6 +18,9 @@ describe("chat sidebar attention styling", () => {
     expect(rowClassBlock).toContain("isActiveConversation");
     expect(rowClassBlock).not.toContain("bg-[#7da0ca]");
     expect(sidebar).toContain('data-has-attention={hasConversationAttention ? "true" : undefined}');
+    expect(sidebar).toContain("const attentionLabel = t(\"chat.history.new_activity\", \"New activity\")");
+    expect(sidebar).toContain("aria-label={rowAriaLabel}");
+    expect(sidebar).toContain('<span className="sr-only">{attentionLabel}</span>');
     expect(sidebar).toContain("bg-[#70a38d]");
     expect(sidebar).toContain('hasConversationAttention\n                                    ? "text-black/60 dark:text-white/60"');
   });

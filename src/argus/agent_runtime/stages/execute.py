@@ -1039,7 +1039,13 @@ def _resolve_benchmark_symbol(
     if asset_class == "crypto":
         return "BTC"
     if asset_class == "currency_pair":
-        return symbol.strip().upper()
+        try:
+            asset = resolve_asset(symbol)
+        except Exception:
+            asset = None
+        if asset is not None and asset.asset_class == "currency_pair":
+            return str(getattr(asset, "canonical_symbol", symbol)).strip().upper()
+        return _compact_benchmark_symbol(symbol)
     try:
         asset = resolve_asset(symbol)
     except Exception:
@@ -1050,6 +1056,10 @@ def _resolve_benchmark_symbol(
         if asset.asset_class == "currency_pair":
             return str(getattr(asset, "canonical_symbol", symbol)).strip().upper()
     return "SPY"
+
+
+def _compact_benchmark_symbol(symbol: str) -> str:
+    return symbol.strip().upper().replace("/", "").replace("-", "").replace(" ", "")
 
 
 def _resolve_optional_value(

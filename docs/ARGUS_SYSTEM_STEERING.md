@@ -1,7 +1,7 @@
 # Argus System Steering Map
 
 **Status:** Pre-private-launch steering reference
-**Branch assessed:** `codex/context-intelligence-routing`
+**Branch assessed:** `codex/private-alpha-conversation-trust`
 **Created:** 2026-05-19
 **Purpose:** Preserve the architectural direction from the runtime, brittleness, and modularity audits before future hardening work begins.
 
@@ -17,7 +17,7 @@ user idea -> interpretation -> validation -> confirmation card -> run -> persist
 
 Argus is currently a chat-first, simulation-grounded investing experimentation system with a working but still brittle runtime path.
 
-Known state on `codex/context-intelligence-routing`:
+Known state on the private-alpha conversation trust branch:
 
 - Tiered OpenRouter routing exists through `ARGUS_*` model-tier environment variables.
 - OpenRouter tier configuration is `ARGUS_*` only; legacy model aliases are no
