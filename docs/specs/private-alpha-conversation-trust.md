@@ -434,6 +434,24 @@ New debt or smells from this milestone inventory:
 
 - streaming/error behavior needs a stronger contract before broader provider
   streaming changes;
+- composer `@` discovery now uses provider-backed symbols and official provider
+  names, and live QA showed the picker does find canonical assets once the
+  provider catalog is warm. The product gap is latency and feedback: first/cold
+  searches can take long enough that users reasonably think discovery failed,
+  and the dropdown does not clearly distinguish loading, empty, and unavailable
+  states. A second-layer search improvement is still needed for common brand
+  names, colloquial aliases, and semantic user terms. Scope needs clarification
+  before work starts: decide whether the durable source of truth is a curated
+  alias table, a Supabase-backed provider/alias catalog, embeddings, or a
+  hybrid. Do not add one-off hardcoded aliases in launch-path code without a
+  broader alias/search policy.
+- confirmation-card and async job-card status presentation can drift. The
+  confirmation artifact may show a running state while the durable job card
+  shows queued/running/succeeded from the workflow lifecycle. Scope needs
+  clarification before work starts: decide whether the confirmation card should
+  remain a ready/submitted artifact, whether the job card should exclusively own
+  execution status, or whether both should render from one shared status view
+  model.
 - public excerpt implementation is intentionally design-only in this milestone;
 - Research Lab / Perplexity work is intentionally design-only and must not be
   implemented before canon docs are updated.
