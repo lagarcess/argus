@@ -24,7 +24,7 @@ main
   -> codex/private-alpha-next
        -> codex/<focused-high-leverage-slice>
        -> codex/<focused-low-risk-debt-slice>
-       -> codex/<external-agent-slice>
+       -> jules/<focused-low-risk-debt-slice>
 ```
 
 Rules:
@@ -34,6 +34,10 @@ Rules:
 - Worker branches start from `codex/private-alpha-next`.
 - Workers do not push directly to `main`.
 - External async agents do not push directly to `codex/private-alpha-next`.
+- Jules branches use the `jules/**` branch namespace and open PRs targeting
+  `codex/private-alpha-next`.
+- CI runs on pushes to `jules/**` and on PRs targeting
+  `codex/private-alpha-next` so Jules can self-correct before Codex review.
 - Codex reviews worker diffs before they are merged or cherry-picked into the
   integration branch.
 - Every slice ends with tests run, browser QA notes when relevant, known
@@ -93,7 +97,8 @@ Codex should own or closely supervise these:
 
 ## Low-Risk Work Suitable For External Async Agents
 
-External agents may work on these only within focused branches:
+External async agent `Jules` may work on these only within focused
+`jules/**` branches:
 
 - Docs classification proposals: canon, active plan, historical evidence,
   archive candidate.

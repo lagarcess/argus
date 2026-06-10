@@ -2,9 +2,9 @@ name: CI
 
 "on":
   push:
-    branches: [main, "codex/**"]
+    branches: [main, "codex/**", "jules/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "codex/private-alpha-next"]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:

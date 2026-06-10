@@ -81,8 +81,10 @@ Integration guardrails:
 
 - Worker branches start from `codex/private-alpha-next`, not directly from
   `main`, unless the task is an urgent hotfix.
-- External async agents must work on focused branches and must not push directly
-  to `main` or to the integration branch.
+- External async agent Jules must work on focused `jules/**` branches and must
+  not push directly to `main` or to the integration branch.
+- Jules PRs should target `codex/private-alpha-next`; CI is configured to run on
+  `jules/**` pushes and on PRs targeting the integration branch.
 - Codex reviews worker diffs before merging or cherry-picking them into the
   integration branch.
 - Production deploys remain manual and founder-directed.
