@@ -13,17 +13,17 @@
 | `web/components/chat/CollectionPicker.tsx` | unused exported function/component/type | Flagged by knip as unused file. Checked via ripgrep; only referenced in tests. Collections are feature flagged off. | high | Remove component file | Low risk |
 | `web/components/views/CollectionsView.tsx` | unused exported function/component/type | Flagged by knip as unused file. Checked via ripgrep; only referenced in tests. Collections are feature flagged off. | high | Remove component file | Low risk |
 | `web/components/chat/artifact-history.ts:confirmationActionStatusLabel` | unused exported function/component/type | Flagged by knip as unused export. Only used internally or in tests. | high | Remove export keyword | Low risk |
-| `web/components/chat/artifact-history.ts:isSaveActionMetadata` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
+| `web/components/chat/artifact-history.ts:isSaveActionMetadata` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove export keyword | Low risk |
 | `web/components/chat/artifact-history.ts:supersedeOpenConfirmations` | test-only fixture / exported helper | Flagged by knip as unused export but ripgrep shows it's used internally in the same file. | medium | Remove export keyword | Low risk |
 | `web/components/chat/card-formatting.ts:periodWithoutParentheses` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
-| `web/lib/argus-api.ts:normalizeApiLanguage` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
+| `web/lib/argus-api.ts:normalizeApiLanguage` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove export keyword | Low risk |
 | `web/lib/argus-api.ts:getStarterPrompts` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
 | `web/lib/argus-api.ts:listCollections`, `createCollection`, `patchCollection`, `deleteCollection`, `attachStrategyToCollection` | unused exported function/component/type | Flagged by knip as unused exports. Collections are feature flagged off. | high | Remove API helpers | Low risk |
-| `web/lib/chat-action-ownership.ts:isCardScopedAction` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
-| `web/lib/chat-action-ownership.ts:visibleInputActions` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
-| `web/lib/chat-backtest-jobs.ts:backtestJobFromMetadata` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
+| `web/lib/chat-action-ownership.ts:isCardScopedAction` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove export keyword | Low risk |
+| `web/lib/chat-action-ownership.ts:visibleInputActions` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove export keyword | Low risk |
+| `web/lib/chat-backtest-jobs.ts:backtestJobFromMetadata` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove export keyword | Low risk |
 | `web/lib/chat-backtest-jobs.ts:isTerminalBacktestJobStatus` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
-| `web/lib/chat-conversation-routing.ts:actionConversationId` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove function | Low risk |
+| `web/lib/chat-conversation-routing.ts:actionConversationId` | unused exported function/component/type | Flagged by knip as unused export. | high | Remove export keyword | Low risk |
 
 ### Verification Checklist & Risks
 
