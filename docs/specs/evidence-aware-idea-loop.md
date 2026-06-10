@@ -891,7 +891,10 @@ not fully settled, the remaining ambiguity is called out immediately.
   **Answer:** Message metadata first. This is an implementation tactic, not the
   user experience. Users still see polished evidence, candidate, and result
   surfaces. Create concrete evidence/candidate tables only when reload, audit,
-  sharing, monitoring, or analytics prove metadata is insufficient.
+  sharing, monitoring, or analytics prove metadata is insufficient. The v1 SOTA
+  tradeoff is speed with discipline: store a compact, typed JSON metadata
+  envelope on the assistant message, validate its shape in code, and index or
+  extract later only after a real query/reload/analytics need appears.
 
 - **D4. What citation fields are required for reload, audit, monitoring, and
   future sharing?**
@@ -1231,6 +1234,34 @@ Perplexity Agent API supports:
 Argus should turn these into a small number of product presets instead of
 exposing raw API knobs to users.
 
+### Evidence Search Configuration
+
+Use explicit, config-driven names so implementation agents do not invent a new
+contract:
+
+- `PERPLEXITY_API_KEY`: secret backend key, already expected in local env.
+- `NEXT_PUBLIC_EVIDENCE_SEARCH_ENABLED=false`: frontend gate for the composer
+  `Search` control.
+- `ARGUS_EVIDENCE_SEARCH_ENABLED=false`: backend gate for evidence-search
+  execution.
+- `ARGUS_EVIDENCE_SEARCH_TIMEOUT_SECONDS=25`: first-pass chat-turn timeout.
+- `ARGUS_EVIDENCE_SEARCH_CONTEXT_SIZE=low`: default web-search context size for
+  light evidence.
+- `ARGUS_EVIDENCE_SEARCH_MAX_OUTPUT_TOKENS=1200`: bound answer/candidate
+  verbosity.
+- `ARGUS_EVIDENCE_SEARCH_MAX_CANDIDATES=3`: never show more than three
+  candidate chips in v1.
+- `ARGUS_EVIDENCE_SEARCH_MODELS=openai/gpt-5.4-nano,google/gemini-3.1-flash-lite,perplexity/sonar,nvidia/nemotron-3-super-120b-a12b,xai/grok-4.3`:
+  ordered Perplexity Agent API model fallback chain.
+- `ARGUS_EVIDENCE_SEARCH_HOURLY_LIMIT=5` and
+  `ARGUS_EVIDENCE_SEARCH_DAILY_LIMIT=20`: initial private-alpha per-user
+  limits.
+
+These defaults are intentionally modest. If Search latency or reasoning quality
+is weak, adjust prompts and Perplexity parameters first, then revisit model
+choice. Do not add OpenRouter web-search fallback or Tavily until Perplexity
+failure becomes a repeated blocker.
+
 ### Suggested Perplexity Preset Roadmap
 
 Official Perplexity docs support a staged roadmap because presets already bundle
@@ -1258,14 +1289,14 @@ Docs reviewed for this roadmap:
 
 1. **Argus Search v1: light evidence**
    - Product control: `Search`.
-   - Backend shape: dynamic `fast-search` for quick current facts, or explicit
-     `web_search` with `search_context_size="low"` plus `finance_search` for
-     public-equity/ETF data.
+   - Backend shape: explicit Perplexity Agent API request using the configured
+     `models` fallback chain, `web_search` with `search_context_size="low"`,
+     and `finance_search` for public-equity/ETF data.
    - Tool scope: `web_search`, `finance_search`.
-   - Availability shape: Perplexity `models` fallback chain with up to five
-     current supported models, verified at implementation time. Start with the
-     user's preferred cross-provider reasoning chain if the models are still
-     available and cost/latency are acceptable.
+   - Availability shape: Perplexity `models` fallback chain:
+     `openai/gpt-5.4-nano`, `google/gemini-3.1-flash-lite`,
+     `perplexity/sonar`, `nvidia/nemotron-3-super-120b-a12b`,
+     `xai/grok-4.3`.
    - Use when: user asks a broad market/company/ETF question, recent context,
      or wants citations before turning the idea into a candidate experiment.
    - Output: compact cited context and one to three executable candidate
@@ -1290,8 +1321,10 @@ Docs reviewed for this roadmap:
    - Use when: user deliberately asks for slower, source-rich research.
 
 4. **Frozen configs only when needed**
-   - Dynamic presets should be the default early because Perplexity keeps the
-     same rough cost/latency band while improving quality.
+   - The explicit v1 model chain is the default because Argus wants predictable
+     fallback behavior and cross-provider redundancy.
+   - Dynamic presets remain useful for experimentation because Perplexity keeps
+     the same rough cost/latency band while improving quality.
    - Use frozen configurations only for eval reproducibility, regulatory/change
      control, or when preset drift starts affecting Argus behavior.
 
@@ -1355,9 +1388,7 @@ Docs reviewed for this roadmap:
 These are intentionally not decided yet:
 
 - exact environment variable names, timeouts, and implementation types for the
-  Perplexity preset roadmap;
-- exact Perplexity model fallback chain after checking current supported models,
-  cost, and latency at implementation time;
+  deeper Perplexity milestones beyond Search v1;
 - exact schema for research artifacts, if message metadata proves insufficient;
 - whether deep research later runs inline or through Render Workflows;
 - which later milestone should revisit public sharing after privacy and
