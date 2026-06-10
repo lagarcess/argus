@@ -142,6 +142,36 @@ the user-facing experience should feel like natural pacing:
 - "This is broader; I can do a deeper pass if you want."
 - "I will remember this idea and tell you when something relevant changes."
 
+## Decision Algorithm
+
+Use this filter to keep the milestone small and fast:
+
+1. Question every requirement against the real user goal.
+2. Remove or defer anything that does not help the next private-alpha learning
+   loop.
+3. Simplify or optimize the requirements that remain.
+4. Accelerate cycle time with the smallest observable slice.
+5. Automate only the signals that protect learning speed or trust.
+
+The practical test:
+
+> Does this help a user move from curiosity to a supported test, a clearer
+> explanation, or a remembered idea faster?
+
+If not, defer it. If it leaks unsupported capability, remove it from the
+user-facing surface.
+
+### Default Decision Bias
+
+- Prefer one strong loop over many half-supported surfaces.
+- Prefer direct test speed over research ceremony.
+- Prefer executable candidate experiments over broad strategy breadth.
+- Prefer short cited context over report-like answers.
+- Prefer message/job/run metadata before new durable tables, unless reload or
+  audit breaks.
+- Prefer hiding unsupported inventory over showing users what Argus cannot run.
+- Prefer explicit user consent before slow/deep research.
+
 ## Evidence Lanes
 
 ### Lane 1: Direct Test
@@ -304,17 +334,22 @@ The evidence-aware loop does not require the engine to become a professional
 quant platform. It requires the engine to cover the simple experiment types that
 normal people naturally ask for after learning or researching.
 
-The engine roadmap should prioritize understandable tests:
+The engine roadmap should prioritize understandable tests that strengthen the
+evidence-to-experiment loop:
 
 - compare asset A vs asset B;
 - compare an asset, ETF, basket, or crypto against a benchmark;
 - test recurring buys over a date window;
 - test buy-and-hold windows;
-- test simple signal ideas only when the rule is explainable;
 - test selected baskets or proxies such as "semiconductors" through supported
   ETFs or selected tickers;
 - later, test event or regime windows such as inflation periods, rate cuts,
   recessions, earnings windows, or Bitcoin halvings.
+
+Signal/indicator strategies are not the near-term product wedge. Keep them as
+advanced executable tests only when they already work and the user explicitly
+asks for a rule-based idea. Do not surface a discoverable indicator if Argus
+cannot execute it.
 
 This changes the engine's role from "run any strategy the user imagines" to
 "maintain a library of honest, understandable experiment types." When evidence
@@ -343,8 +378,9 @@ proves the concrete objects are too rigid.
 - Direct tests should not show research ceremony.
 - Evidence-backed prompts should show compact source context and candidate
   experiment cards.
-- Unsupported candidates can be shown as "not testable yet" only if that helps
-  the user understand Argus's boundary; they must never look runnable.
+- Unsupported ideas can be explained as boundaries in prose, but should not
+  render as candidate experiment cards or buttons. If a card exists, it should
+  point to a supported next step.
 - Avoid a new dashboard in the first milestone.
 - Hide internal labels such as `evidence_depth`, `candidate_experiment`, or
   `capability_status` from the primary user experience.
@@ -640,7 +676,8 @@ Question IDs are stable handles for future discussion and implementation plans:
   lacks event windows, baskets/proxies, or comparison primitives?
 - **C4.** How should Argus handle ideas that are meaningful but not currently
   testable?
-- **C5.** Should unsupported candidates be shown as educational boundaries or hidden?
+- **C5.** How should unsupported ideas be explained, hidden, or mapped to
+  supported alternatives without making them look runnable?
 - **C6.** How should Argus represent proxy tests, for example "luxury stocks" requiring
   selected tickers or ETFs?
 - **C7.** What is the line between a supported experiment and a misleading proxy?
@@ -774,8 +811,11 @@ research-provider quality questions remain open until tested with users.
 - **C2a. Current asset and indicator support:** current launch requests support
   `equity`, `crypto`, and `currency_pair`, with same-asset-class runs only and
   a max of five symbols per run. Executable indicators are RSI, SMA, EMA, MACD,
-  and Bollinger Bands; ATR, VWAP, OBV, and stochastic are catalog/discovery
-  items but not executable strategy triggers yet.
+  and Bollinger Bands. ATR, VWAP, OBV, and stochastic currently exist as
+  catalog/discovery inventory but are not executable strategy triggers. Product
+  decision: hide non-executable indicators from user-facing discovery until they
+  either become executable or are removed. Showing draft-only indicator inventory
+  is not aligned with Argus principles.
 - **C2b. Current provider and benchmark defaults:** Alpaca is primary for equity
   and crypto availability; Kraken complements crypto and currency-pair coverage.
   Alpha benchmark defaults are `SPY` for equities, `BTC` for crypto, and the
@@ -784,13 +824,21 @@ research-provider quality questions remain open until tested with users.
   personalized portfolio advice, real-money trading, unsupported indicators,
   broad sectors without explicit tickers/ETFs, event-window questions, complex
   baskets/proxies, macro-causal claims, and deep research claims are outside the
-  current execution contract.
+  current execution contract. Cohesive expansions that fit the proposed vision:
+  comparison primitives, explicit ETF/ticker proxy mapping, selected baskets
+  within one asset class, and later event/regime windows. Remove or defer:
+  personalized advice, real-money trading, broad unsupported indicator exposure,
+  and mixed-asset execution until benchmark/allocation complexity is designed.
 - **C4. Current failure shape:** meaningful-but-not-testable ideas should be
   handled as clarified or blocked product-language boundaries, not hidden engine
   failures. The backend already distinguishes invalid, unsupported, provider,
   and data-availability failures.
-- **C5. Unsupported candidates:** unsupported ideas may be shown as educational
-  boundaries or alternatives, but they must not appear as runnable actions.
+- **C5. Unsupported candidates:** users can ask anything, especially once Argus
+  can send research agents outward. The LLM brain may map a broad thesis to
+  capability-adjacent candidates, but deterministic capability code must filter
+  the result. Unsupported ideas may be explained as educational boundaries or
+  transformed into clearly labeled supported proxies, but they must not appear
+  as runnable candidate actions.
 - **C6. Proxy tests:** proxy tests are not first-class yet. Today they must be
   explicit selected tickers/ETFs that pass the same asset-class, symbol, date,
   timeframe, and benchmark validation as any other run.
@@ -898,18 +946,76 @@ research-provider quality questions remain open until tested with users.
   artifact metadata, a durable job row if async work was used, a linked
   `backtest_run` if executed, and enough route metadata to audit the path.
 
+## Unanswered Requirements After The Algorithm
+
+The full question list remains useful as a reference, but the next milestone
+should only resolve the requirements below. Everything else is deferred until
+user behavior proves the loop is worth expanding.
+
+### Decisions Needed For The First Evidence-Aware Slice
+
+| IDs | Requirement | Paths | Current bias |
+| --- | --- | --- | --- |
+| **P1, P2** | Define the first delightful moment. | A: quick educational clarity. B: one good test candidate. C: completed backtest result. | **B -> C.** The wedge is "Argus helped me decide what to test," then the result closes the loop. |
+| **L2, L3, L4** | Decide how much research UX to expose. | A: invisible lane. B: visible "quick context/deeper look" choices. C: mode picker. | **A with tiny B.** Keep lanes invisible, ask only before slower/deeper work. |
+| **C2, C3, C6, C7** | Pick the first capability expansion. | A: more indicators. B: comparisons/proxies. C: mixed-asset portfolios. | **B.** Comparisons and explicit proxies map naturally from broad consumer questions without pretending to be advice. |
+| **E1, E2, E3, E7** | Define the minimum evidence packet. | A: no citations. B: compact cited context. C: full research note. | **B.** Short context plus citations only for external/current factual claims. |
+| **D1, D3, D4, D7, D8** | Choose persistence shape. | A: message metadata only. B: concrete evidence/candidate objects. C: generic artifact table. | **A first, B when reload/audit breaks.** Avoid schema sprawl until the loop proves useful. |
+| **UX2, UX3, UX4, UX5** | Design candidate/result surfaces. | A: reuse confirmation cards. B: new research cards. C: dashboard/list. | **A.** Reuse the artifact lifecycle; unsupported content stays prose, not cards. |
+| **T1, T2, T4** | Set research-to-test advice boundary. | A: broad disclaimers. B: strict non-advice wording and banned recommendation language. C: legal review before any test. | **B.** Ship with disciplined language; get legal review before public scale or monitoring. |
+| **CP1, CP2, CP3, CP4** | Set cost/latency knobs. | A: direct only. B: light evidence inline with budget. C: deep async research. | **B first.** Deep research is explicit and later. |
+| **EV1, EV2, EV4, EV7** | Define acceptance harness. | A: manual smoke. B: 10-20 deterministic golden prompts. C: LLM judge. | **B.** Add LLM judge later after human-approved examples exist. |
+| **O1, O2, O3, O4, O5** | Add operational guardrails. | A: no new ops. B: flags + route receipts + canary. C: analytics/event platform. | **B.** Feature flag the lane and make failures inspectable before PostHog. |
+
+### Explicitly Deferred Or Removed For This Milestone
+
+- **Non-executable indicator discovery:** hide from user-facing discovery. Either
+  implement execution later or remove the inventory.
+- **Mixed-asset backtests:** defer until benchmark/allocation semantics are
+  designed.
+- **Personalized portfolio advice and real-money trading:** remove from product
+  scope.
+- **Public sharing:** defer until privacy, revocation, and sanitization are
+  designed.
+- **Daily briefs/inbox:** defer until users prove they return to ideas.
+- **Deep research by default:** defer. Users must explicitly choose slower/deeper
+  work.
+- **New durable research schema:** defer until message/job/run metadata proves
+  insufficient.
+- **LLM-as-judge:** defer until Argus has human-approved examples of good voice
+  and candidate quality.
+- **Vector/embedding semantic search:** defer until provider-backed discovery or
+  text search fails a concrete user workflow.
+
+### Clarified Ambiguities
+
+- "Unsupported candidate" no longer means a visible disabled card by default.
+  It means a prose boundary or a supported alternative. Runnable-looking cards
+  are only for supported next steps.
+- "Signal strategy" is not the core research-lab wedge. It remains an advanced
+  executable path when explicitly requested.
+- "Research Lab" is not a new dashboard or mode in the next milestone. It is a
+  better chat loop: evidence-aware answer, supported candidate, confirmation,
+  backtest, result, refinement.
+- Perplexity does not own Argus voice or final result prose. It supplies cited
+  context. Argus owns interpretation, capability mapping, execution, and result
+  explanation.
+- The next implementation should prove one loop, not build the whole ladder.
+
 ## Current Non-Decisions
 
 These are intentionally not decided yet:
 
 - exact Perplexity model chain;
 - exact Perplexity tool configuration;
-- exact schema for research artifacts;
-- whether deep research runs inline or through Render Workflows;
-- whether public sharing belongs in the next milestone;
+- exact schema for research artifacts, if message metadata proves insufficient;
+- whether deep research later runs inline or through Render Workflows;
+- which later milestone should revisit public sharing after privacy and
+  revocation design exists;
 - whether pg_jsonschema is worth adding now;
 - whether a cache belongs in Supabase only or also in another service;
-- whether PostHog is needed before private-alpha research tests.
+- when PostHog becomes worth adding after route receipts and canaries are
+  insufficient.
 
 ## Guardrails
 
@@ -931,11 +1037,11 @@ These are intentionally not decided yet:
 The next refinement should answer enough of the open questions to define
 Milestone 1 and Milestone 2 precisely, while preserving the loop thesis:
 
-1. the first eligible strategy templates;
-2. the evidence-depth UX;
-3. the candidate experiment contract;
-4. the minimum citation contract;
-5. the smallest durable idea/continuity object;
-6. the first return/habit hypothesis, without implementing full monitoring;
-7. the first private-alpha product test script;
-8. the feature flags and success metrics.
+1. evidence-depth contract with direct-test bypass preserved;
+2. candidate experiment contract for comparison/proxy-first tests;
+3. minimum citation contract for short cited context;
+4. message-metadata-first persistence plan;
+5. unsupported-boundary copy and capability filtering;
+6. private-alpha test script focused on broad question -> candidate -> run;
+7. feature flags, route receipts, and canary requirements;
+8. golden prompt harness for direct tests plus first evidence-aware examples.
