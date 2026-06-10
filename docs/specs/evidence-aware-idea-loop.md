@@ -622,13 +622,9 @@ education/research product or clearer conversion actions.
 If users want alerts and monitoring, move the inbox milestone earlier, but only
 after trust and non-advice boundaries are designed.
 
-## Questions We Need To Answer
+## Questions, Answers, And Open Decisions
 
-These are the alignment questions that should shape the first implementation
-plan. The most important questions are loop questions: what makes the user
-return, what helps them make progress, and what should Argus remember.
-
-Question IDs are stable handles for future discussion and implementation plans:
+These are stable handles for future discussion and implementation plans:
 
 - `P` = Product
 - `L` = Lane / flow
@@ -642,347 +638,521 @@ Question IDs are stable handles for future discussion and implementation plans:
 - `EV` = Evaluation
 - `O` = Operations
 
-The raw questions below are intentionally retained for traceability. Current
-answers and remaining unknowns live in the **Decision Ledger After The
-Algorithm** section.
+Each question keeps its current answer directly underneath it. If a question is
+not fully settled, the remaining ambiguity is called out immediately.
 
 ### Product Questions
 
-- **P1.** What makes a broader consumer feel safe asking a naive finance
-  question?
-- **P2.** What is the minimum delightful moment: learning something, getting a good
-  test suggestion, seeing a result, or returning to a remembered idea?
-- **P3.** Should the first evidence-aware loop optimize for curious beginners,
+- **P1. What makes a broader consumer feel safe asking a naive finance
+  question?**
+
+  **Answer:** A simple, non-judgmental chat surface; plain-language responses;
+  explicit assumptions; no advice-y language; and supported actions that do not
+  make users feel they need to know finance jargon before participating.
+
+- **P2. What is the minimum delightful moment: learning something, getting a
+  good test suggestion, seeing a result, or returning to a remembered idea?**
+
+  **Answer:** The first delightful moment is not merely "Argus ran a backtest."
+  It is "Argus helped me decide what to test, then closed the loop with a
+  result." A complete result means the user got what they needed through any
+  flexible lane: direct test, education, light evidence, or later deeper
+  research.
+
+- **P3. Should the first evidence-aware loop optimize for curious beginners,
   enthusiasts, or finance-literate private-alpha users while still preserving
-  consumer simplicity?
-- **P4.** Should Argus name this surface at all, or should the loop simply feel like
-  better chat?
-- **P5.** What should Argus never optimize for, even if it increases engagement?
+  consumer simplicity?**
+
+  **Answer:** Optimize for broader consumer simplicity while letting
+  finance-literate users move quickly. The first loop should not fork Argus into
+  an expert mode. It should keep direct tests fast and make broad questions
+  approachable.
+
+- **P4. Should Argus name this surface at all, or should the loop simply feel
+  like better chat?**
+
+  **Answer:** Do not name a new surface yet. The first version should feel like
+  better chat, not a new dashboard or mode. The durable Research Lab thesis can
+  remain a strategic direction until the loop earns a visible product label.
+
+- **P5. What should Argus never optimize for, even if it increases engagement?**
+
+  **Answer:** Do not optimize for advice, hype, trading-terminal complexity,
+  generic market-news consumption, provider plumbing, addictive notifications,
+  or broad chatbot behavior that does not help users understand and test ideas.
 
 ### Lane Questions
 
-- **L1.** How much of lane selection should be invisible and automatic?
-- **L2.** When should Argus ask the user before spending more time on research?
-- **L3.** What user-facing words feel simple: "quick context", "deeper look",
-  "test this", "remember this"?
-- **L4.** When should an education answer offer a test without making learning feel
-  transactional?
-- **L5.** How does a user bypass research and go straight to testing?
+- **L1. How much of lane selection should be invisible and automatic?**
+
+  **Answer:** Mostly invisible. The chat brain stays LangGraph; normal language
+  reaches LLM interpretation first, then deterministic validation/capability
+  checks. Do not add regex gates, a second chat orchestrator, or visible internal
+  lanes.
+
+- **L2. When should Argus ask the user before spending more time on research?**
+
+  **Answer:** Direct executable tests stay direct. Argus should ask or expose a
+  visible control only when the user wants external/current evidence, broader
+  research, or a slower/deeper pass.
+
+- **L3. What user-facing words feel simple: "quick context", "deeper look",
+  "test this", "remember this"?**
+
+  **Answer:** For the first slice, prefer one polished composer control:
+  **Search**. It is clear enough for users, maps cleanly to cited evidence, and
+  avoids forcing an "instant vs expert" model onto Argus. "Deep research" is a
+  later explicit mode/preset once users prove they want slower source-rich work.
+
+- **L4. When should an education answer offer a test without making learning
+  feel transactional?**
+
+  **Answer:** Offer a test only when the concept naturally maps to a supported
+  historical experiment. The offer should feel like "want to see this in
+  history?" rather than "now run a backtest."
+
+- **L5. How does a user bypass research and go straight to testing?**
+
+  **Answer:** By asking for a direct test as they do today. The evidence loop
+  must not require Perplexity/research when the user already gives a ticker,
+  strategy, dates, and assumptions.
 
 ### Capability Questions
 
-- **C1.** Which strategy templates are eligible for candidate experiments first:
+- **C1. Which strategy templates are eligible for candidate experiments first:
   buy-and-hold, recurring buys/DCA, signal/indicator strategies, or all current
-  supported templates?
-- **C2.** Which simple experiment types should the backtesting engine support next to
-  make research-derived ideas useful?
-- **C3.** Which natural consumer prompts are currently impossible because the engine
-  lacks event windows, baskets/proxies, or comparison primitives?
-- **C4.** How should Argus handle ideas that are meaningful but not currently
-  testable?
-- **C5.** How should unsupported ideas be explained, hidden, or mapped to
-  supported alternatives without making them look runnable?
-- **C6.** How should Argus represent proxy tests, for example "luxury stocks" requiring
-  selected tickers or ETFs?
-- **C7.** What is the line between a supported experiment and a misleading proxy?
+  supported templates?**
+
+  **Answer:** Candidate experiments start with executable launch strategy types:
+  `buy_and_hold`, `dca_accumulation`, `indicator_threshold`, and
+  `signal_strategy`. Broader template names should not be advertised as runnable
+  unless the capability contract maps them into one of these executable paths.
+
+- **C2. Which simple experiment types should the backtesting engine support next
+  to make research-derived ideas useful?**
+
+  **Answer:** Preserve everything Argus already does: single ticker vs
+  benchmark, equal-weight multi-symbol sets vs benchmark, buy-and-hold, DCA,
+  indicator-threshold, and signal-strategy runs. The next expansion should
+  enrich comparison/proxy work without regressing those paths: stock vs ETF, ETF
+  vs ETF, selected basket vs benchmark, and thesis-to-explicit-proxy candidates.
+  DCA cadence supports daily, weekly, biweekly, monthly, and quarterly.
+
+- **C2a. Which asset and indicator universe should users see?**
+
+  **Answer:** Current launch requests support `equity`, `crypto`, and
+  `currency_pair`, with same-asset-class runs only and max five symbols per run.
+  Executable indicators are RSI, SMA, EMA, MACD, and Bollinger Bands. ATR, VWAP,
+  OBV, and stochastic currently exist as catalog/discovery inventory but are not
+  executable strategy triggers. Hide non-executable indicators from user-facing
+  discovery until they either become executable or are removed.
+
+- **C2b. What provider and benchmark defaults are already canonical?**
+
+  **Answer:** Alpaca is primary for equity and crypto availability; Kraken
+  complements crypto and currency-pair coverage. Alpha benchmark defaults are
+  `SPY` for equities, `BTC` for crypto, and the tested pair itself for currency
+  pairs.
+
+- **C3. Which natural consumer prompts are currently impossible because the
+  engine lacks event windows, baskets/proxies, or comparison primitives?**
+
+  **Answer:** Mixed asset-class runs, personalized portfolio advice, real-money
+  trading, unsupported indicators, broad sectors without explicit tickers/ETFs,
+  event-window questions, complex baskets/proxies, macro-causal claims, and deep
+  research claims are outside the current execution contract. Cohesive
+  expansions that fit the proposed vision are comparison primitives, explicit
+  ETF/ticker proxy mapping, selected baskets within one asset class, and later
+  event/regime windows.
+
+- **C4. How should Argus handle ideas that are meaningful but not currently
+  testable?**
+
+  **Answer:** Explain the boundary in product language or map to a supported
+  adjacent experiment. Do not hide engine failures and do not create
+  runnable-looking cards for unsupported work.
+
+- **C5. How should unsupported ideas be explained, hidden, or mapped to
+  supported alternatives without making them look runnable?**
+
+  **Answer:** The LLM brain may map a broad thesis to capability-adjacent
+  candidates, but deterministic capability code must filter the result.
+  Unsupported ideas may become educational prose or clearly labeled supported
+  proxies, not runnable candidate actions.
+
+- **C6. How should Argus represent proxy tests, for example "luxury stocks"
+  requiring selected tickers or ETFs?**
+
+  **Answer:** Proxy tests must name the selected instruments, explain that they
+  are proxies, and pass the same asset-class, symbol, date, timeframe, and
+  benchmark validation as any other run. For v1, prefer transparent ETF/ticker
+  proxies over opaque baskets.
+
+- **C7. What is the line between a supported experiment and a misleading
+  proxy?**
+
+  **Answer:** A proxy is supportable only when Argus names the instruments,
+  states the assumption plainly, avoids causal claims, keeps the action inside
+  current engine constraints, and lets the user edit or reject the proxy before
+  running it.
 
 ### Evidence And Source Questions
 
-- **E1.** Which Perplexity tools are reliable enough for stocks, ETFs, crypto, currency
-  pairs, macro, sectors, and companies?
-- **E2.** What is the shortest evidence payload that increases trust without making the
-  chat feel like a report?
-- **E3.** When does a citation help a beginner, and when does it create clutter?
-- **E4.** Should Argus use domain allowlists for some question types?
-- **E5.** How should Argus show source freshness in plain language?
-- **E6.** How should Argus handle conflicting sources?
-- **E7.** What claims require citations, and what claims can be labeled as
-  assumptions?
+- **E1. Which Perplexity tools are reliable enough for stocks, ETFs, crypto,
+  currency pairs, macro, sectors, and companies?**
+
+  **Answer:** First slice should prefer `web_search` and `finance_search` for
+  market/company/ETF questions and use `fetch_url` only when Argus needs a known
+  source. People search is not a general "search anyone" feature for Argus; it
+  should only be considered when the person is finance-relevant to the user's
+  thesis, such as an executive, policymaker, fund manager, analyst, or named
+  source connected to a market claim.
+
+- **E2. What is the shortest evidence payload that increases trust without
+  making the chat feel like a report?**
+
+  **Answer:** Compact context only: two to four cited bullets or a short
+  paragraph, followed by one to three executable candidate experiments. The goal
+  is to form a testable idea, not produce a research memo.
+
+- **E3. When does a citation help a beginner, and when does it create clutter?**
+
+  **Answer:** Citations help when Argus makes current/external factual claims.
+  They create clutter when attached to engine-generated metrics, obvious product
+  assumptions, or every sentence. Keep citations compact and scannable.
+
+- **E4. Should Argus use domain allowlists for some question types?**
+
+  **Answer:** Open. Use Perplexity source controls later if quality issues show
+  up. Do not overfit the first slice around a heavy source-governance system.
+
+- **E5. How should Argus show source freshness in plain language?**
+
+  **Answer:** Open. Likely show simple labels such as "as of today", "recent
+  source", or source dates, but avoid provider mechanics.
+
+- **E6. How should Argus handle conflicting sources?**
+
+  **Answer:** Open. The likely v1 behavior is to state uncertainty and avoid
+  creating a confident runnable candidate from disputed facts unless the test is
+  explicitly framed as a proxy or hypothesis.
+
+- **E7. What claims require citations, and what claims can be labeled as
+  assumptions?**
+
+  **Answer:** Engine-generated simulation metrics do not need external citations
+  because they come from `backtest_runs`. Current market, company, macro, news,
+  person, or sector claims need source grounding. Proxy mappings and test
+  simplifications should be labeled as assumptions.
 
 ### Data Questions
 
-- **D1.** What is the smallest durable "idea object" that creates continuity?
-- **D2.** What should Argus remember that feels useful, not creepy or noisy?
-- **D3.** Do we store research artifacts as concrete tables or message metadata first?
-- **D4.** What citation fields are required for reload, audit, monitoring, and future
-  sharing?
-- **D5.** How long should research source snapshots live?
-- **D6.** Do source snippets create copyright or privacy risk?
-- **D7.** How should an idea object link to multiple runs and refinements?
-- **D8.** Should research artifacts be immutable snapshots or regenerable drafts?
+- **D1. What is the smallest durable "idea object" that creates continuity?**
+
+  **Answer:** For the first slice, avoid a new table. The smallest durable unit
+  is an assistant message with structured metadata that includes the evidence
+  packet, candidate experiment, selected proxy if any, capability result, and
+  linked job/run IDs when executed.
+
+- **D2. What should Argus remember that feels useful, not creepy or noisy?**
+
+  **Answer:** Open. Bias toward remembering user-owned ideas, candidate
+  experiments, runs, refinements, and explicit saved/monitored topics. Do not
+  infer sensitive preferences or create hidden profiles.
+
+- **D3. Do we store research artifacts as concrete tables or message metadata
+  first?**
+
+  **Answer:** Message metadata first. This is an implementation tactic, not the
+  user experience. Users still see polished evidence, candidate, and result
+  surfaces. Create concrete evidence/candidate tables only when reload, audit,
+  sharing, monitoring, or analytics prove metadata is insufficient.
+
+- **D4. What citation fields are required for reload, audit, monitoring, and
+  future sharing?**
+
+  **Answer:** First slice should store enough to reload and audit: source title,
+  URL, domain, retrieved timestamp, cited claim or snippet summary, provider/tool
+  metadata, and a stable source ID. Future public sharing may require a stricter
+  sanitized snapshot.
+
+- **D5. How long should research source snapshots live?**
+
+  **Answer:** Open. Keep first-slice snapshots tied to conversation evidence,
+  not a broad reusable research cache. Expiration policy should be decided with
+  caching and monitoring.
+
+- **D6. Do source snippets create copyright or privacy risk?**
+
+  **Answer:** Open. Store compact summaries and source references first; avoid
+  long copied snippets until a copyright/privacy review is done.
+
+- **D7. How should an idea object link to multiple runs and refinements?**
+
+  **Answer:** Today, runs link through conversation/message/job metadata and
+  `backtest_runs`. A future idea object should link to messages, candidate
+  experiments, jobs, runs, and refinements rather than reconstructing state from
+  frontend prose.
+
+- **D8. Should research artifacts be immutable snapshots or regenerable drafts?**
+
+  **Answer:** Evidence that justifies a candidate, monitoring alert, or shared
+  artifact should be immutable snapshot truth. Drafts can be regenerable until
+  they are used to create a runnable candidate or public/shareable artifact.
 
 ### UX Questions
 
-- **UX1.** How can Argus hide complexity while preserving trust?
-- **UX2.** What does a candidate experiment card look like compared with a confirmation
-  card?
-- **UX3.** How do we avoid clutter when showing evidence, citations, candidates, and
-  backtest results in one chat?
-- **UX4.** Should "Try next" show as chips, cards, or a dedicated follow-up section?
-- **UX5.** How do we make unsupported boundaries feel helpful rather than frustrating?
-- **UX6.** How should Spanish-language users experience citations and source language?
+- **UX1. How can Argus hide complexity while preserving trust?**
+
+  **Answer:** Show product-level controls and assumptions, not provider
+  mechanics. The user sees Search, candidate cards, confirmation cards, result
+  cards, and clear boundaries; the system hides tools, models, and routing.
+
+- **UX2. What does a candidate experiment card look like compared with a
+  confirmation card?**
+
+  **Answer:** Reuse the confirmation/artifact lifecycle. Candidate cards should
+  feel like polished Argus cards with clear assumptions and edit/run actions,
+  not a separate research-card system.
+
+- **UX3. How do we avoid clutter when showing evidence, citations, candidates,
+  and backtest results in one chat?**
+
+  **Answer:** Keep evidence compact, show only executable candidates as cards,
+  and let the result card remain the dominant artifact after execution. Avoid
+  stacking research memo, candidate, confirmation, queue, result, and breakdown
+  as competing surfaces.
+
+- **UX4. Should "Try next" show as chips, cards, or a dedicated follow-up
+  section?**
+
+  **Answer:** For now, keep Try next as supported follow-up actions attached to
+  result context. Do not let Try next duplicate Quick Take or become generic
+  advice.
+
+- **UX5. How do we make unsupported boundaries feel helpful rather than
+  frustrating?**
+
+  **Answer:** Use product-language boundaries plus supported alternatives.
+  Example shape: "I cannot test that exact causal claim, but I can compare these
+  explicit proxies historically."
+
+- **UX6. How should Spanish-language users experience citations and source
+  language?**
+
+  **Answer:** Static UI supports English and Spanish Latin America (`en`,
+  `en-US`, `es-419`). AI responses should respect the user's language
+  preference. Citation source language behavior is still open.
 
 ### Retention Questions
 
-- **R1.** What makes a user come back tomorrow?
-- **R2.** What is the user expected to do after a brief: read, test, refine, save,
-  ignore, or mute?
-- **R3.** How often is helpful: daily, weekly, event-triggered, or user-triggered?
-- **R4.** What kinds of changes are meaningful enough to interrupt someone?
-- **R5.** How does Argus avoid becoming a news feed?
-- **R6.** What does progress look like for a beginner learning finance?
-- **R7.** How should Argus let users pause, mute, or retire an idea?
+- **R1. What makes a user come back tomorrow?**
+
+  **Answer:** Open. Current thesis: users return when Argus remembers an idea and
+  helps them continue it, retest it, or notice relevant changes without becoming
+  a generic news feed.
+
+- **R2. What is the user expected to do after a brief: read, test, refine, save,
+  ignore, or mute?**
+
+  **Answer:** Open. Bias toward read -> test/refine/save, with ignore/mute as
+  trust-preserving controls.
+
+- **R3. How often is helpful: daily, weekly, event-triggered, or user-triggered?**
+
+  **Answer:** Open. Monitoring and inbox are deferred until users prove they
+  return to ideas.
+
+- **R4. What kinds of changes are meaningful enough to interrupt someone?**
+
+  **Answer:** Open. Likely only changes tied to explicit saved ideas, source
+  updates, or enough new data to retest.
+
+- **R5. How does Argus avoid becoming a news feed?**
+
+  **Answer:** Only notify around user-owned ideas and explicit saved hypotheses.
+  Do not ship generic daily market news as the retention mechanic.
+
+- **R6. What does progress look like for a beginner learning finance?**
+
+  **Answer:** Open. Likely progress is repeated conversion from naive question to
+  understandable concept, supported test, result, and refinement.
+
+- **R7. How should Argus let users pause, mute, or retire an idea?**
+
+  **Answer:** Open. Must be designed before monitoring/inbox.
 
 ### Trust And Compliance Questions
 
-- **T1.** What exact no-advice language belongs on research cards versus result cards?
-- **T2.** Should Argus avoid words like "recommend", "should buy", and "best" in all
-  research-to-test surfaces?
-- **T3.** What logs or artifacts must exist to audit a disputed answer?
-- **T4.** When does a cited answer become too close to personalized advice?
-- **T5.** What additional review is needed before public sharing or monitoring?
+- **T1. What exact no-advice language belongs on research cards versus result
+  cards?**
+
+  **Answer:** Research and result cards should preserve the current educational
+  boundary: historical context, assumptions, and no financial advice. Exact copy
+  is still implementation-level work.
+
+- **T2. Should Argus avoid words like "recommend", "should buy", and "best" in
+  all research-to-test surfaces?**
+
+  **Answer:** Yes. Argus can suggest supported historical tests and explain
+  tradeoffs; it should not recommend investments.
+
+- **T3. What logs or artifacts must exist to audit a disputed answer?**
+
+  **Answer:** Persisted messages, structured metadata, `backtest_jobs`,
+  `backtest_runs`, route receipts, workflow run IDs, result readout provenance,
+  failure codes, timing metadata, fallback flags, evidence source IDs, and
+  provider/tool metadata.
+
+- **T4. When does a cited answer become too close to personalized advice?**
+
+  **Answer:** When Argus tells the user what to buy/sell/hold, ranks choices as
+  best for them, or turns evidence into a personalized recommendation. It should
+  frame historical tests, assumptions, and tradeoffs instead.
+
+- **T5. What additional review is needed before public sharing or monitoring?**
+
+  **Answer:** Public excerpts require separate privacy/revocation/auth and
+  sanitization design. Monitoring requires non-advice copy, mute/retire controls,
+  and review of what kinds of changes are allowed to interrupt a user.
 
 ### Cost And Performance Questions
 
-- **CP1.** What is the acceptable cost per `light` evidence turn?
-- **CP2.** What is the acceptable cost per `deep` research turn?
-- **CP3.** What latency is acceptable before we need async jobs?
-- **CP4.** What quotas should apply per user/day in private alpha?
-- **CP5.** Which provider calls can be cached safely without stale or misleading
-  output?
-- **CP6.** What telemetry is enough before adding PostHog or a custom event pipeline?
+- **CP1. What is the acceptable cost per `light` evidence turn?**
+
+  **Answer:** Do not let cost define the product prematurely. Founder controls
+  cost for now. First pass should optimize for value and learning while keeping
+  depth controlled by explicit product choices.
+
+- **CP2. What is the acceptable cost per `deep` research turn?**
+
+  **Answer:** Deep research is deferred and must be explicitly user-chosen. Cost
+  can become a monetization/control surface later.
+
+- **CP3. What latency is acceptable before we need async jobs?**
+
+  **Answer:** Latency should be acceptable in the first pass; optimize later.
+  Long-running or variable-latency work should cross a durable job boundary if
+  it cannot reliably complete inside the chat turn.
+
+- **CP4. What quotas should apply per user/day in private alpha?**
+
+  **Answer:** Open. Start with feature flags and conservative defaults once the
+  first slice exists; do not overbuild quota systems before usage patterns exist.
+
+- **CP5. Which provider calls can be cached safely without stale or misleading
+  output?**
+
+  **Answer:** Cache aggressively where safe and explicit. Market-data/provider
+  catalog caches are acceptable with keys, freshness, and invalidation. Research
+  cache policy is not designed yet; first slice should avoid broad reuse of
+  source claims until freshness semantics are clear.
+
+- **CP6. What telemetry is enough before adding PostHog or a custom event
+  pipeline?**
+
+  **Answer:** Route receipts, service logs, Supabase rows, workflow metadata,
+  and canary output are enough for the next stage. Product analytics can be
+  added later when the loop is clearer.
 
 ### Evaluation Questions
 
-- **EV1.** What are the first 20 golden prompts?
-- **EV2.** What constitutes a good candidate experiment?
-- **EV3.** How do we measure whether the user felt less intimidated?
-- **EV4.** How do we test that citations support claims without overbuilding an eval
-  framework?
-- **EV5.** When should we introduce LLM-as-judge?
-- **EV6.** Should OpenAI be the future independent judge provider?
-- **EV7.** What acceptance gate proves the feature did not regress direct backtests?
+- **EV1. What are the first 20 golden prompts?**
+
+  **Answer:** Open. They should include direct backtests, broad
+  evidence-to-candidate prompts, education-to-test prompts, unsupported boundary
+  prompts, Spanish prompts, provider failure/fallback cases, and at least one
+  proxy-comparison prompt.
+
+- **EV2. What constitutes a good candidate experiment?**
+
+  **Answer:** It is executable by the capability contract, uses supported
+  assets/indicators/dates, preserves user intent, states assumptions clearly,
+  avoids unsupported causality, and produces a runnable confirmation card.
+
+- **EV3. How do we measure whether the user felt less intimidated?**
+
+  **Answer:** Open. Likely through session notes and private-alpha interviews
+  before instrumentation. Do not add a telemetry lab before PMF signal.
+
+- **EV4. How do we test that citations support claims without overbuilding an
+  eval framework?**
+
+  **Answer:** Start with deterministic golden prompts and canaries that inspect
+  structured metadata: cited claims, source count, supported candidate shape,
+  direct-test preservation, and route receipts. Evaluate external tools only if
+  they speed development without workflow drag.
+
+- **EV5. When should we introduce LLM-as-judge?**
+
+  **Answer:** Later, after Argus has human-approved examples of good voice and
+  candidate quality.
+
+- **EV6. Should OpenAI be the future independent judge provider?**
+
+  **Answer:** Likely yes for a later optional eval path because it separates the
+  evaluator from the OpenRouter runtime path. Do not make it a milestone hard
+  gate yet.
+
+- **EV7. What acceptance gate proves the feature did not regress direct
+  backtests?**
+
+  **Answer:** Acceptance must include at least one direct backtest canary, one
+  async workflow-backed result, persisted messages/jobs/runs, and result readout
+  provenance that proves the normal Argus result path was used.
 
 ### Operational Questions
 
-- **O1.** Which feature flags gate the lanes?
-- **O2.** How does the canary test direct mode, light evidence mode, and provider
-  fallback?
-- **O3.** What route receipts are required to debug research failures?
-- **O4.** How do we distinguish provider outage from unsupported idea?
-- **O5.** What must be visible in Supabase after a successful evidence-backed test?
+- **O1. Which feature flags gate the lanes?**
 
-## Codebase-Derived Answers So Far
+  **Answer:** Existing flags gate strategies, collections, exploratory
+  suggestions, onboarding, context packets, and backtest workflow modes.
+  Dedicated evidence/research flags do not exist yet and should be added before
+  enabling research lanes.
 
-This section only answers questions that can be answered confidently from the
-current codebase and canon docs. Product desirability, market fit, and
-research-provider quality questions remain open until tested with users.
+- **O2. How does the canary test direct mode, light evidence mode, and provider
+  fallback?**
 
-### Product Answers
+  **Answer:** Current Render canary covers the direct chat/backtest loop and
+  async workflow result path. It does not yet cover light evidence mode, deep
+  evidence mode, or evidence-provider fallback.
 
-- **P3. Current baseline:** canon docs preserve both truths: private alpha users
-  can be finance-literate, but the Alpha product direction is broader consumer
-  simplicity. The first evidence-aware loop should not fork the product into an
-  expert mode. It should keep direct tests fast while making broad questions
-  approachable.
-- **P5. Current guardrail:** Argus should not optimize for engagement at the cost
-  of advice boundaries, trust, clarity, or simplicity. It should not become a
-  generic market-news feed, a trading terminal, or a provider wrapper.
+- **O3. What route receipts are required to debug research failures?**
 
-### Lane Answers
+  **Answer:** Request ID, lane/depth, provider/tool/model, latency, cache hit or
+  miss if applicable, citations/source IDs when present, fallback reason,
+  surfaced user message, and linked conversation/message/job/run IDs.
 
-- **L1. Current runtime constraint:** lane selection should be mostly invisible.
-  The chat brain is still LangGraph; normal language reaches LLM interpretation
-  first, then deterministic validation/capability checks. Do not add regex gates
-  or a second chat orchestrator for research lanes.
-- **L2. Current spending rule:** direct executable tests should stay direct.
-  Argus should ask or visibly choose only when a request implies a slower,
-  deeper, or more expensive research path.
-- **L5. Current bypass:** the direct backtest loop already exists. The evidence
-  loop must not require Perplexity/research for users who already know the
-  ticker, strategy, dates, and assumptions they want to test.
+- **O4. How do we distinguish provider outage from unsupported idea?**
 
-### Capability Answers
+  **Answer:** Unsupported ideas should resolve to capability/failure codes.
+  Provider outages should resolve to provider or upstream failure codes. These
+  need different user copy and retry behavior.
 
-- **C1. First eligible templates:** current executable launch strategy types are
-  `buy_and_hold`, `dca_accumulation`, `indicator_threshold`, and
-  `signal_strategy`. Candidate experiments should start here. Older or broader
-  API strategy-template names should not be advertised as runnable unless the
-  capability contract maps them into one of these executable paths.
-- **C2. Current supported experiment families:** the engine supports buy-and-hold,
-  recurring buys/DCA, indicator-threshold entries/exits, and signal-strategy
-  rules. DCA cadence supports daily, weekly, biweekly, monthly, and quarterly.
-- **C2a. Current asset and indicator support:** current launch requests support
-  `equity`, `crypto`, and `currency_pair`, with same-asset-class runs only and
-  a max of five symbols per run. Executable indicators are RSI, SMA, EMA, MACD,
-  and Bollinger Bands. ATR, VWAP, OBV, and stochastic currently exist as
-  catalog/discovery inventory but are not executable strategy triggers. Product
-  decision: hide non-executable indicators from user-facing discovery until they
-  either become executable or are removed. Showing draft-only indicator inventory
-  is not aligned with Argus principles.
-- **C2b. Current provider and benchmark defaults:** Alpaca is primary for equity
-  and crypto availability; Kraken complements crypto and currency-pair coverage.
-  Alpha benchmark defaults are `SPY` for equities, `BTC` for crypto, and the
-  tested pair itself for currency pairs.
-- **C3. Currently impossible or fragile prompt classes:** mixed asset-class runs,
-  personalized portfolio advice, real-money trading, unsupported indicators,
-  broad sectors without explicit tickers/ETFs, event-window questions, complex
-  baskets/proxies, macro-causal claims, and deep research claims are outside the
-  current execution contract. Cohesive expansions that fit the proposed vision:
-  comparison primitives, explicit ETF/ticker proxy mapping, selected baskets
-  within one asset class, and later event/regime windows. Remove or defer:
-  personalized advice, real-money trading, broad unsupported indicator exposure,
-  and mixed-asset execution until benchmark/allocation complexity is designed.
-- **C4. Current failure shape:** meaningful-but-not-testable ideas should be
-  handled as clarified or blocked product-language boundaries, not hidden engine
-  failures. The backend already distinguishes invalid, unsupported, provider,
-  and data-availability failures.
-- **C5. Unsupported candidates:** users can ask anything, especially once Argus
-  can send research agents outward. The LLM brain may map a broad thesis to
-  capability-adjacent candidates, but deterministic capability code must filter
-  the result. Unsupported ideas may be explained as educational boundaries or
-  transformed into clearly labeled supported proxies, but they must not appear
-  as runnable candidate actions.
-- **C6. Proxy tests:** proxy tests are not first-class yet. Today they must be
-  explicit selected tickers/ETFs that pass the same asset-class, symbol, date,
-  timeframe, and benchmark validation as any other run.
-- **C7. Supported vs misleading proxy:** a proxy becomes supportable only when
-  Argus names the chosen instruments, states that they are a proxy, and keeps
-  the runnable action inside current engine constraints.
+- **O5. What must be visible in Supabase after a successful evidence-backed
+  test?**
 
-### Evidence And Source Answers
-
-- **E7. Current citation boundary:** engine-generated simulation metrics do not
-  need external citations because they come from `backtest_runs`. Current market,
-  company, macro, news, or sector claims do need source grounding once the
-  evidence loop exists. Assumptions should be labeled as assumptions, not cited
-  as facts.
-
-### Data Answers
-
-- **D1. Existing durable atoms:** Argus already has conversations, messages,
-  `backtest_jobs`, `backtest_runs`, feedback, profiles, allowlist rows, and
-  optional strategies/collections. There is no durable research/idea table yet.
-- **D3. Current schema implication:** storing research artifacts as new concrete
-  tables would be a new data-model decision. The safest first slice is to avoid
-  schema sprawl until the minimum idea/evidence object is designed.
-- **D7. Existing link path:** today, runs link through conversation/message/job
-  metadata and `backtest_runs`. A future idea object should link to messages,
-  candidate experiments, jobs, runs, and refinements rather than reconstructing
-  state from frontend prose.
-- **D8. Current immutability pattern:** `backtest_runs` are canonical immutable
-  result truth. Evidence snapshots that justify a candidate or monitoring alert
-  should likely follow snapshot semantics; drafts can be regenerable until they
-  are used to create a runnable candidate or shared artifact.
-
-### UX Answers
-
-- **UX2. Current UI pattern:** candidate experiment cards should reuse the
-  confirmation/job/result artifact lifecycle instead of creating a separate
-  card system. The frontend should render backend-provided artifacts and actions.
-- **UX6. Current language support:** canon docs and UI code support English and
-  Spanish Latin America (`en`, `en-US`, `es-419`). Static UI strings need
-  translations; AI responses should respect the user's language preference.
-  Citation source language behavior is still open.
-
-### Trust And Compliance Answers
-
-- **T1. Current baseline:** result surfaces already use educational/no-advice
-  language. Research cards need their own exact copy, but should preserve the
-  same boundary: educational context, historical simulation, and no financial
-  advice.
-- **T2. Current guardrail:** research-to-test surfaces should avoid telling users
-  what they "should buy", what is "best", or what Argus "recommends" as an
-  investment. It can suggest supported historical tests and explain tradeoffs.
-- **T3. Existing audit artifacts:** relevant existing audit artifacts include
-  persisted messages, structured metadata, `backtest_jobs`, `backtest_runs`,
-  route receipts, workflow run IDs, result readout provenance, failure codes,
-  timing metadata, and fallback flags.
-- **T5. Current public-sharing boundary:** public excerpts require a separate
-  privacy/revocation/auth/sanitization design. Do not expose source conversation
-  IDs, route receipts, provider metadata, retry payloads, or direct anon table
-  access.
-
-### Cost And Performance Answers
-
-- **CP3. Current async boundary:** long-running or variable-latency work should
-  cross the durable job boundary. Backtests now have `backtest_jobs` and Render
-  workflow execution; evidence/deep research should use a similar boundary if it
-  cannot reliably complete inside the chat turn.
-- **CP5. Current cache boundary:** market-data/provider catalog caches are
-  acceptable when they have explicit keys, freshness, and invalidation. Cached
-  data is not source-of-truth; Supabase remains durable truth for product
-  records. Research/evidence caches are not designed yet.
-- **CP6. Current telemetry baseline:** before PostHog, route receipts, service
-  logs, Supabase rows, workflow metadata, and canary output are enough for
-  private-alpha debugging. Product analytics can be added later once the product
-  loop is clearer.
-
-### Evaluation Answers
-
-- **EV2. Candidate quality floor:** a good candidate experiment must be
-  executable by the capability contract, use supported assets/indicators/dates,
-  preserve user intent, state assumptions clearly, avoid unsupported causality,
-  and produce a runnable confirmation card.
-- **EV7. Direct-backtest regression gate:** the evidence loop must preserve the
-  existing direct backtest path. Acceptance should include at least one direct
-  backtest canary, one async workflow-backed result, persisted messages/jobs/runs,
-  and result readout provenance that proves the normal Argus result path was used.
-
-### Operational Answers
-
-- **O1. Current flags:** existing feature flags gate strategies, collections,
-  exploratory suggestions, onboarding, context packets, and backtest workflow
-  modes. Dedicated evidence/research flags do not exist yet; future work should
-  add explicit backend and frontend gates before enabling research lanes.
-- **O2. Current canary coverage:** the existing Render canary covers the direct
-  chat/backtest loop and async workflow result path. It does not yet cover light
-  evidence mode, deep evidence mode, or evidence-provider fallback.
-- **O3. Required debug receipts:** research failures should include request ID,
-  lane/depth, provider/tool/model, latency, cache hit/miss if applicable,
-  citations/source IDs when present, fallback reason, surfaced user message,
-  and linked conversation/message/job/run IDs.
-- **O4. Provider outage vs unsupported idea:** unsupported ideas should resolve
-  to capability/failure codes; provider outages should resolve to provider or
-  upstream failure codes. These need different user copy and retry behavior.
-- **O5. Current Supabase visibility:** a successful evidence-backed test should
-  at minimum leave persisted conversation/message records, any future evidence
-  artifact metadata, a durable job row if async work was used, a linked
-  `backtest_run` if executed, and enough route metadata to audit the path.
-
-## Decision Ledger After The Algorithm
-
-The full question list remains useful as a reference, but the next milestone
-should only resolve the requirements below. Each row keeps the answer next to
-the requirement so future agents can see what is settled and what still needs
-design or implementation detail.
-
-### First Evidence-Aware Slice Decisions
-
-| IDs | Requirement | Answer / current decision | Still open |
-| --- | --- | --- | --- |
-| **P1, P2** | Define the first delightful moment. | **Answered.** The first delightful moment is not "Argus ran a backtest." It is "Argus helped me decide what to test, then closed the loop with a result." A complete result means the user got what they needed through any flexible lane: direct test, education, light evidence, or later deeper research. | Exact private-alpha interview wording and success threshold. |
-| **L2, L3, L4** | Decide how much research UX to expose. | **Partially answered.** Do not force research. Keep direct tests direct. Add an explicit, polished composer affordance such as a globe/Search control or "Deep research" control so users can choose when they want research and Argus can protect resources. | Final control design, labels, defaults, and whether the first launch exposes one `Search` control or two levels: `Search` and `Deep research`. |
-| **C2, C3, C6, C7** | Pick the first capability expansion. | **Partially answered.** Move cautiously toward comparisons and explicit proxies because they fit broad consumer questions and Argus's evidence loop. Use vectorbt's power for richer comparisons only when the output is simple and trustworthy. Possible examples: sector ETF vs ETF, selected basket vs benchmark, broad thesis mapped to explicit tickers/ETFs, or "winners inside a supported set" when the set is transparent. | Exact v1 experiment types, how Argus chooses proxies, how many instruments are allowed, and what chart/storytelling surface is simple enough for Alpha. |
-| **E1, E2, E3, E7** | Define the minimum evidence packet. | **Partially answered.** Use Perplexity as a configurable evidence provider, not Argus's voice. Start with reasonable presets rather than raw user-visible knobs. Let users control depth through simple product language while Argus controls cost and complexity internally. | Exact preset mapping, source count, citation rendering, recency/domain filters, and whether finance-specific tools are enabled in the first slice. |
-| **D1, D3, D4, D7, D8** | Choose persistence shape. | **Needs clarification.** "Message metadata first" is an implementation tactic, not the user experience. The user should still see polished evidence, candidate, and result surfaces. Internally, the first slice can store the evidence packet, candidate experiment summary, source IDs, selected proxy, and capability result inside assistant message/job/run metadata instead of creating new first-class tables immediately. This avoids schema drag until the loop proves value. | Whether reload/audit/sharing needs force a concrete `evidence_packet` or `candidate_experiment` table earlier. |
-| **UX2, UX3, UX4, UX5** | Design candidate/result surfaces. | **Answered.** Reuse the confirmation/artifact lifecycle. Candidate experiments should feel like polished Argus cards. Unsupported content stays prose, not cards. Quick Take, Explain result, and Try next remain distinct. | Exact card copy and interaction details during implementation. |
-| **T1, T2, T4** | Set research-to-test advice boundary. | **Answered.** Use strict non-advice language. Avoid "recommend", "should buy", and "best" in research-to-test surfaces. Argus can suggest supported historical tests, not investments. | Exact copy, especially for Spanish, and later legal review before broader exposure. |
-| **CP1, CP2, CP3, CP4** | Set cost/latency knobs. | **Partially answered.** Cost is founder-controlled for now; do not let premature cost anxiety weaken the loop. Focus on creating a cohesive, attractive experience that gets users to value quickly. Latency should be acceptable in the first pass, then optimized. Cache aggressively where safe once data freshness rules are clear. | Initial request timeouts, depth limits, caching policy, and private-alpha quotas. |
-| **EV1, EV2, EV4, EV7** | Define acceptance harness. | **Partially answered.** The harness should accelerate development and learning while catching regressions before production. Start with deterministic golden prompts and canaries. Evaluate whether LangSmith, LangFuse, DeepEval, or similar tooling buys speed without workflow drag. | Tool choice, first golden prompt set, and whether any external eval service is worth adding before PMF signal. |
-| **O1, O2, O3, O4, O5** | Add operational guardrails. | **Answered directionally.** Build sequentially and release slices as they are ready: flags, route receipts, canaries, provider failure taxonomy, and Supabase visibility. Keep ops lean and useful. | Exact implementation sequence and field names. |
+  **Answer:** Persisted conversation/message records, evidence metadata, durable
+  job row if async work was used, linked `backtest_run` if executed, and enough
+  route metadata to audit the path.
 
 ### Perplexity Control Surface Notes
 
 The product should expose simple controls while the backend maps them to
 Perplexity parameters and presets:
 
-- **No visible control / automatic:** direct tests and simple conceptual answers.
-- **Search:** a quick cited pass for current facts or broad evidence. Candidate
+- **No visible control:** direct tests and simple conceptual answers stay fast.
+- **Search:** first visible composer control. Use it for current facts, broad
+  evidence, citations, and research-backed candidate experiments. Candidate
   backend shape: `fast-search` or a low/medium `web_search` budget.
-- **Deeper research:** explicit user-chosen slower pass. Candidate backend shape:
+- **Deeper research:** deferred explicit slower pass. Candidate backend shape:
   `pro-search` or `deep-research`, higher `max_steps`, larger search context,
   and `fetch_url` for important sources.
+
+External AI apps often separate speed, reasoning, and web-search controls. That
+is useful inspiration, but Argus should not copy a generic "instant vs expert"
+mode switch. Argus's first control should be product-specific: **Search** means
+"ground this with outside evidence before helping me test or understand it."
 
 Perplexity Agent API supports:
 
@@ -1063,6 +1233,8 @@ These are intentionally not decided yet:
 - Do not add public sharing before privacy, revocation, and artifact sanitation
   are designed.
 - Do not make provider/model names user-facing unless they are source metadata.
+- Preserve existing benchmark comparison behavior: single ticker vs benchmark
+  and equal-weight multi-symbol sets vs benchmark must not regress.
 
 ## Next Spec Step
 
@@ -1078,10 +1250,8 @@ Milestone 1 and Milestone 2 precisely, while preserving the loop thesis:
 7. feature flags, route receipts, and canary requirements;
 8. golden prompt harness for direct tests plus first evidence-aware examples.
 
-The next natural product-design discussion should focus on the two still-fuzzy
-areas that shape implementation:
+The next natural product-design discussion should focus on the still-fuzzy area
+that shapes implementation:
 
-1. the chat-composer research control: no button, one `Search` button, or
-   `Search` plus `Deep research`;
-2. the first comparison/proxy experiment shape: ETF-vs-ETF, explicit basket vs
+1. the first comparison/proxy experiment shape: ETF-vs-ETF, explicit basket vs
    benchmark, or supported-set winner/loser scan.
