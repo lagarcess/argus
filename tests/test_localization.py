@@ -33,10 +33,10 @@ def test_build_result_card_localization():
     # Test English
     card_en = build_result_card(config, metrics, language="en")
     assert card_en["status_label"] == "Simulation Complete"
-    assert any(row["label"] == "Total Return (%)" for row in card_en["rows"])
+    assert any(row["label"] == "Total return" for row in card_en["rows"])
 
     # Test Spanish
     card_es = build_result_card(config, metrics, language="es-419")
     assert card_es["status_label"] == "Simulación Completa"
-    assert any(row["label"] == "Retorno Total (%)" for row in card_es["rows"])
+    assert any(row["label"] == "Retorno total" for row in card_es["rows"])
     assert "al" in card_es["date_range"]["display"]

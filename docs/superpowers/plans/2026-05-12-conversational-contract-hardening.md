@@ -1,5 +1,8 @@
 # Conversational Contract Hardening Implementation Plan
 
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Harden Argus's existing draft -> refine -> confirm -> run -> result loop so normal follow-ups patch the current conversational artifact, structured action chips behave as structured operations, and execution never skips required confirmation.
