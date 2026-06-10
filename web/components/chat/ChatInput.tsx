@@ -73,8 +73,8 @@ export default function ChatInput({
   const prompts = chatExploratorySuggestionsEnabled ? localizedPrompts : EMPTY_CHAT_PROMPTS;
   const inputPlaceholder = placeholder ?? t("chat.input_placeholder");
   const discoverySections = useMemo(
-    () => discoverySectionsForDisplay(discoveryItems, discoveryQuery),
-    [discoveryItems, discoveryQuery],
+    () => discoverySectionsForDisplay(discoveryItems, discoveryQuery, t),
+    [discoveryItems, discoveryQuery, t],
   );
   const visibleDiscoveryItems = useMemo(
     () => discoverySections.flatMap((section) => section.items),
@@ -433,11 +433,11 @@ export default function ChatInput({
                           {item.label}
                         </span>
                         <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
-                          {displayDiscoveryDescription(item)}
+                          {t(`chat.discovery.descriptions.${item.type === 'asset' ? 'asset' : (item.description?.trim().toLowerCase() === 'currency_pair' ? 'currency_pair' : 'indicator')}`, displayDiscoveryDescription(item))}
                         </span>
                       </span>
                       <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
-                        {discoveryBadgeLabel(item)}
+                        {t(`chat.discovery.badges.${discoveryBadgeLabel(item)}`, discoveryBadgeLabel(item))}
                       </span>
                     </button>
                   ))}
@@ -677,22 +677,23 @@ export function mergeDiscoveryItems(
 export function discoverySectionsForDisplay(
   items: DiscoveryItem[],
   query: string,
+  t: any,
 ): DiscoverySection[] {
   const visibleItems = items.filter(
     (item) => item.id && item.label && isSupportedDiscoveryItem(item),
   );
   if (visibleItems.length === 0) return [];
   if (query.trim()) {
-    return [{ label: "Search results", items: visibleItems }];
+    return [{ label: t("chat.discovery.sections.results", "Search results"), items: visibleItems }];
   }
 
   const sections: DiscoverySection[] = [
     {
-      label: "Popular assets",
+      label: t("chat.discovery.sections.assets", "Popular assets"),
       items: visibleItems.filter((item) => item.type === "asset"),
     },
     {
-      label: "Runnable indicators",
+      label: t("chat.discovery.sections.indicators", "Runnable indicators"),
       items: visibleItems.filter(
         (item) => item.type === "indicator" && item.support_status === "supported",
       ),

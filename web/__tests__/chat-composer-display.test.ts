@@ -51,13 +51,13 @@ const defaults: DiscoveryItem[] = [
 
 describe("chat composer display helpers", () => {
   test("keeps empty @ discovery as an invitation to provider search", () => {
-    const sections = discoverySectionsForDisplay([], "");
+    const sections = discoverySectionsForDisplay([], "", (k, f) => f);
 
     expect(sections).toEqual([]);
   });
 
   test("keeps typed @ searches in one result section", () => {
-    const sections = discoverySectionsForDisplay(defaults, "aa");
+    const sections = discoverySectionsForDisplay(defaults, "aa", (k, f) => f);
 
     expect(sections).toHaveLength(1);
     expect(sections[0].label).toBe("Search results");

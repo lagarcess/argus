@@ -271,10 +271,20 @@
       "unavailable_title": "La búsqueda está tardando más de lo esperado",
       "unavailable": "Prueba con el ticker directamente, o sigue escribiendo. Argus todavía puede razonar sobre tu mensaje.",
       "sections": {
+        "results": "Resultados de búsqueda",
         "assets": "Activos populares",
-        "indicators": "Indicadores ejecutables",
-        "draft": "Indicadores solo borrador",
-        "results": "Resultados de búsqueda"
+        "indicators": "Indicadores ejecutables"
+      },
+      "badges": {
+        "asset": "activo",
+        "runnable": "ejecutable",
+        "unavailable": "no disponible",
+        "draft": "borrador"
+      },
+      "descriptions": {
+        "asset": "Activo",
+        "indicator": "Indicador",
+        "currency_pair": "Par de divisas"
       }
     },
     "status": {
@@ -294,6 +304,17 @@
       "intent_onboarding_prompt": "Personalizando tu experiencia...",
       "intent_education": "Pensando...",
       "intent_unsupported_request": "Pensando..."
+    },
+    "confirmation": {
+      "status": {
+        "draft_canceled": "Borrador cancelado",
+        "running": "Ejecutando",
+        "run_complete": "Ejecución completada",
+        "could_not_run": "No se pudo ejecutar",
+        "updated": "Actualizado",
+        "ready": "Listo"
+      },
+      "selected_asset": "Activo seleccionado"
     }
   },
   "strategies": {
