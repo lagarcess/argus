@@ -58,7 +58,7 @@ The findings are grouped by category:
 | File / Area | Representative examples | Classification | Risk | Owner | Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `web/components/chat/artifact-history.ts` | `const IN_PROGRESS_RUN_STATUS_LABELS = new Set(["Running", "Request sent"]);` | Status check | High | Jules-safe | Refactor to use proper status code enums instead of English string matching. |
-| `web/lib/backtest-job-card-copy.ts` | `statusLabelFallback: "Could not run"` | Fallback | Low | Jules-safe | Rely on localization JSON files. |
+| `web/lib/backtest-job-card-copy.ts` | `statusLabelFallback: "Queued"`, `"Running"`, `"Result ready"`, `"Could not run"`, `"Not completed"` | Fallback | Low | Jules-safe | Rely on localization JSON files. |
 
 ### Test fixtures/snapshots
 
