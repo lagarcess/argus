@@ -1,5 +1,7 @@
 # Phase 5 Streaming, Persistence, And UI Orchestration Plan
 
+NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 **Summary**
 - Target artifact path for execution: `docs/superpowers/plans/2026-05-06-agent-runtime-phase-5-streaming-persistence.md`.
 - Work stays on `fix/argus-runtime-sot`; current checkout is already on that branch.

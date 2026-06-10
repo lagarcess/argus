@@ -56,6 +56,49 @@
 | `.agent/.jules/README.md` | unclear/needs owner decision | Active instructions. | Clarify if .jules instructions are "canon". |  |
 | `.agent/ownership/README.md` | unclear/needs owner decision | Active ownership rules. | Clarify if ownership docs are "canon". |  |
 
+
+## Banner Applied Summary
+
+### Files receiving 'Historical' banner:
+- `docs/ARGUS_SYSTEM_STEERING.md` -> AGENTS.md, docs/specs/private-alpha-next-integration.md
+- `docs/PRIVATE_LAUNCH_RUNBOOK.md` -> docs/specs/private-alpha-conversation-trust.md
+- `docs/PRODUCTION_READINESS_AUDIT.md` -> docs/specs/private-alpha-conversation-trust.md
+- `docs/specs/agent-architecture.md` -> docs/ARCHITECTURE.md
+- `docs/superpowers/plans/2026-04-29-conversational-backtest-agent-runtime.md`
+- `docs/superpowers/plans/2026-05-06-agent-runtime-phase-1-remediation.md`
+- `docs/superpowers/plans/2026-05-06-agent-runtime-phase-2-retire-legacy-orchestrator.md`
+- `docs/superpowers/plans/2026-05-06-agent-runtime-phase-3-4-nlu-collapse.md`
+- `docs/superpowers/plans/2026-05-06-agent-runtime-phase-5-streaming-persistence.md`
+- `docs/superpowers/plans/2026-05-06-agent-runtime-phase-6-structural-hygiene.md`
+- `docs/superpowers/plans/2026-05-06-streaming-persistence-ui-orchestration.md`
+- `docs/superpowers/plans/2026-05-12-conversational-contract-hardening.md`
+- `docs/superpowers/plans/2026-06-03-conversation-artifact-continuity.md`
+- `docs/superpowers/plans/2026-06-04-private-alpha-reliability-hardening.md`
+- `docs/superpowers/plans/2026-06-06-async-backtest-job-state.md`
+- `docs/superpowers/plans/2026-06-06-render-workflow-proof.md`
+- `docs/superpowers/specs/2026-05-13-artifact-centered-runtime-rebuild-scope.md`
+- `docs/superpowers/specs/2026-05-13-artifact-runtime-production-readiness-second-pass.md`
+- `docs/superpowers/specs/2026-05-15-artifact-runtime-milestone-checkpoint.md`
+- `docs/superpowers/specs/2026-05-17-sidebar-revamp-runtime-parity-qa.md`
+
+### Files receiving 'Superseded' banner:
+- `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` -> docs/specs/private-alpha-conversation-trust.md
+
+### Files intentionally skipped (unclear/needs owner decision):
+- `docs/specs/private-alpha-backtest-execution-capacity.md`
+- `docs/CONVERSATIONAL_RUNTIME.md`
+- `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md`
+- `docs/superpowers/specs/2026-06-03-chat-disclaimer-design.md`
+- `.agent/rules/git-workflow.md`
+- `.agent/rules/testing.md`
+- `.agent/rules/workspace.md`
+- `.agent/rules/performance.md`
+- `.agent/rules/coding-standards.md`
+- `.agent/workflows/*.md`
+- `.agent/.jules/realignment.md`
+- `.agent/.jules/README.md`
+- `.agent/ownership/README.md`
+
 ## Out of scope observations
 
 *   Multiple detailed references and templates exist under `.agent/skills/` which were intentionally excluded from this inventory to keep it focused on high-level workflows and product documentation.

@@ -1,5 +1,7 @@
 # Artifact Runtime Milestone Checkpoint
 
+NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 **Date:** 2026-05-15
 **Branch:** `codex/artifact-runtime-rebuild`
 **Parent spec:** [2026-05-13 Artifact Runtime Production Readiness Second Pass](./2026-05-13-artifact-runtime-production-readiness-second-pass.md)

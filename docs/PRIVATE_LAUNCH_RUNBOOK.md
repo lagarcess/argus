@@ -1,5 +1,7 @@
 # Private Launch Runbook
 
+NOTE: Historical context. This document is retained as implementation evidence. For current private-alpha direction, see docs/specs/private-alpha-conversation-trust.md.
+
 This runbook is for the first trusted-user internet tests on Render.
 
 ## Launch URLs

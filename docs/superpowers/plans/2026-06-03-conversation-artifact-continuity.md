@@ -1,5 +1,7 @@
 # Conversation Artifact Continuity Implementation Plan
 
+NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make messy post-artifact chat behavior production-ready by anchoring confirmation actions, result follow-ups, retries, and refinement turns to canonical artifact state before applying user edits as typed patches.

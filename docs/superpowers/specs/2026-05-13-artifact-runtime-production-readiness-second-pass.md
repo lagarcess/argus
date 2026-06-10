@@ -1,5 +1,7 @@
 # Artifact Runtime Production Readiness Second Pass
 
+NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 **Date:** 2026-05-13
 **Status:** Draft for user review
 **Branch:** `codex/artifact-runtime-rebuild`

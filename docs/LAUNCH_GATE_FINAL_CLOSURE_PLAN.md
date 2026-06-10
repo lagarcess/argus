@@ -1,5 +1,7 @@
 # Launch Gate Final Closure Plan
 
+WARNING: Superseded. This document is not the current execution source of truth. Use docs/specs/private-alpha-conversation-trust.md instead.
+
 > Historical plan. This document records an earlier launch-closure checklist and
 > should not be treated as the current milestone source of truth. For the active
 > private-alpha conversation trust work, use

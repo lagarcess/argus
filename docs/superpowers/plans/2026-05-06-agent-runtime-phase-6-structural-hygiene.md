@@ -1,5 +1,7 @@
 # Agent Runtime Phase 6 Structural Hygiene Implementation Plan
 
+NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Decompose `src/argus/api/main.py` into focused routers and shared dependencies, then delete or finish purging legacy runtime artifacts so the LangGraph runtime is the only active chat/backtest path.

@@ -1,5 +1,7 @@
 # Conversational Backtest Agent Architecture
 
+NOTE: Historical context. This document is retained as implementation evidence. For current private-alpha direction, see docs/ARCHITECTURE.md.
+
 **Status:** Proposed
 **Date:** 2026-04-29
 **Scope:** Conversational backtest agent runtime for Argus
