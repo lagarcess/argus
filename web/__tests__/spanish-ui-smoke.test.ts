@@ -23,6 +23,14 @@ describe("Spanish UI Smoke Harness", () => {
     "chat.backtest_job.failed_status",
     "chat.backtest_job.expired_title",
     "chat.backtest_job.expired_status",
+    "chat.confirmation.status.ready_to_run",
+    "chat.confirmation.status.running",
+    "chat.confirmation.status.run_complete",
+    "chat.confirmation.status.could_not_run",
+    "chat.confirmation.rows.assets",
+    "chat.confirmation.rows.period",
+    "chat.confirmation.actions.run_backtest",
+    "chat.confirmation.actions.change_dates",
     "settings.title",
     "settings.profile.title",
     "settings.profile.delete_account",
@@ -74,6 +82,31 @@ describe("Spanish UI Smoke Harness", () => {
 
     const backtestSource = fs.readFileSync(path.join(webRoot, "lib/backtest-job-card-copy.ts"), "utf-8");
     expect(backtestSource).toContain("chat.backtest_job.queued_title");
+
+    const confirmationSource = fs.readFileSync(
+      path.join(webRoot, "components/chat/confirmation-display.ts"),
+      "utf-8",
+    );
+    expect(confirmationSource).toContain("chat.confirmation.status.ready_to_run");
+    expect(confirmationSource).toContain("chat.confirmation.rows.assets");
+    expect(confirmationSource).toContain("chat.confirmation.actions.run_backtest");
+  });
+
+  test("Confirmation cards do not use translated display labels as state", () => {
+    const cardSource = fs.readFileSync(
+      path.join(webRoot, "components/chat/StrategyConfirmationCard.tsx"),
+      "utf-8",
+    );
+    const historySource = fs.readFileSync(
+      path.join(webRoot, "components/chat/artifact-history.ts"),
+      "utf-8",
+    );
+    const jobSource = fs.readFileSync(path.join(webRoot, "lib/chat-backtest-jobs.ts"), "utf-8");
+
+    expect(cardSource).not.toContain("row.label.toLowerCase()");
+    expect(cardSource).not.toContain('normalizedLabel === "running"');
+    expect(historySource).not.toContain('new Set(["Running", "Request sent"])');
+    expect(jobSource).not.toContain('new Set(["Running", "Request sent"])');
   });
 
   test("Spanish feature flag enables es-419", () => {

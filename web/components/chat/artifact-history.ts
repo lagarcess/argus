@@ -1,9 +1,16 @@
 import type { ApiMessage } from "@/lib/argus-api";
-import type { ChatActionOption, Message } from "./types";
+import type { ChatActionOption, Message, StrategyConfirmationStatus } from "./types";
+import {
+  confirmationActionStatus,
+  confirmationStatusFromPayload,
+  confirmationStatusFromValue,
+  confirmationStatusLabel,
+} from "./confirmation-display";
 
 export type ConfirmationActionEffect = {
   type: NonNullable<ChatActionOption["type"]>;
   confirmationId?: string;
+  status?: StrategyConfirmationStatus;
   statusLabel: string;
 };
 
@@ -20,37 +27,40 @@ const CONFIRMATION_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>
   "adjust_assumptions",
   "cancel_confirmation",
 ]);
-const IN_PROGRESS_RUN_STATUS_LABELS = new Set(["Running", "Request sent"]);
+const IN_PROGRESS_RUN_STATUSES = new Set<StrategyConfirmationStatus>([
+  "running",
+  "request_sent",
+]);
 
 export function confirmationActionStatusLabel(
   actionOrType: ChatActionOption | NonNullable<ChatActionOption["type"]> | undefined,
 ) {
-  const type = typeof actionOrType === "string" ? actionOrType : actionOrType?.type;
-  if (type === "cancel_confirmation") {
-    return "Draft canceled";
-  }
-  if (type === "run_backtest") {
-    return "Running";
-  }
-  if (
-    type === "change_dates" ||
-    type === "change_asset" ||
-    type === "adjust_assumptions"
-  ) {
-    return "Editing";
-  }
-  return "Updated";
+  return confirmationStatusLabel(confirmationActionStatus(actionOrType));
 }
 
-function completedRunConfirmationStatusLabel(message: Message, index: number, lastResultIndex: number) {
+function completedRunConfirmationStatus(
+  message: Message,
+  index: number,
+  lastResultIndex: number,
+): StrategyConfirmationStatus {
+  const status = message.confirmation
+    ? confirmationStatusFromPayload(message.confirmation)
+    : null;
   if (
     index < lastResultIndex &&
     message.confirmation?.confirmation_state === "superseded" &&
-    IN_PROGRESS_RUN_STATUS_LABELS.has(message.confirmation.statusLabel)
+    status &&
+    IN_PROGRESS_RUN_STATUSES.has(status)
   ) {
-    return "Run complete";
+    return "run_complete";
   }
-  return message.confirmation?.statusLabel ?? (index < lastResultIndex ? "Run complete" : "Updated");
+  return status ?? (index < lastResultIndex ? "run_complete" : "updated");
+}
+
+function completedRunConfirmationStatusLabel(message: Message, index: number, lastResultIndex: number) {
+  return confirmationStatusLabel(
+    completedRunConfirmationStatus(message, index, lastResultIndex),
+  );
 }
 
 export function confirmationActionEffectFromAction(
@@ -62,6 +72,7 @@ export function confirmationActionEffectFromAction(
   return {
     type: action.type,
     confirmationId: confirmationIdFromAction(action),
+    status: confirmationActionStatus(action),
     statusLabel: confirmationActionStatusLabel(action),
   };
 }
@@ -274,6 +285,7 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
         ...message,
         confirmation: {
           ...message.confirmation,
+          status: completedRunConfirmationStatus(message, index, lastResultIndex),
           statusLabel: completedRunConfirmationStatusLabel(message, index, lastResultIndex),
           actions: [],
         },
@@ -295,24 +307,26 @@ export function normalizeConfirmationHistory(messages: Message[]): Message[] {
     }
     return supersedePriorConfirmations(
       message,
-      index < lastResultIndex ? "Run complete" : "Updated",
+      index < lastResultIndex ? "run_complete" : "updated",
     );
   });
 }
 
 export function supersedePriorConfirmations(
   message: Message,
-  statusLabel = "Updated",
+  status: StrategyConfirmationStatus | string = "updated",
 ): Message {
   if (message.kind !== "strategy_confirmation" || !message.confirmation) {
     return message;
   }
+  const resolvedStatus = confirmationStatusFromValue(status) ?? "updated";
   return {
     ...message,
     confirmation: {
       ...message.confirmation,
       confirmation_state: "superseded",
-      statusLabel,
+      status: resolvedStatus,
+      statusLabel: confirmationStatusLabel(resolvedStatus),
       actions: [],
     },
     actions: [],
@@ -321,7 +335,7 @@ export function supersedePriorConfirmations(
 
 export function supersedeOpenConfirmations(
   messages: Message[],
-  statusLabel = "Updated",
+  status: StrategyConfirmationStatus | string = "updated",
 ): Message[] {
   const lastResultIndex = messages.reduce(
     (latest, message, index) =>
@@ -330,7 +344,7 @@ export function supersedeOpenConfirmations(
   );
   return messages.map((message, index) =>
     message.kind === "strategy_confirmation" && index > lastResultIndex
-      ? supersedePriorConfirmations(message, statusLabel)
+      ? supersedePriorConfirmations(message, status)
       : message,
   );
 }
@@ -358,7 +372,7 @@ export function settleOpenConfirmationsAfterTextFinal(
 
   return supersedeOpenConfirmations(
     messages,
-    confirmationTextFinalStatusLabel(action, hasFailedActionFinal),
+    confirmationTextFinalStatus(action, hasFailedActionFinal),
   );
 }
 
@@ -369,7 +383,7 @@ export function settleOpenConfirmationsAfterStreamError(
   if (!confirmationActionEffectFromAction(action)) {
     return messages;
   }
-  return supersedeOpenConfirmations(messages, "Could not run");
+  return supersedeOpenConfirmations(messages, "could_not_run");
 }
 
 function closeConfirmationForAction(
@@ -379,13 +393,15 @@ function closeConfirmationForAction(
   if (message.kind !== "strategy_confirmation" || !message.confirmation) {
     return message;
   }
+  const status = effect.status ?? confirmationActionStatus(effect.type);
   return {
     ...message,
     confirmation: {
       ...message.confirmation,
       confirmation_state:
         effect.type === "cancel_confirmation" ? "cancelled" : "superseded",
-      statusLabel: effect.statusLabel,
+      status,
+      statusLabel: effect.statusLabel || confirmationStatusLabel(status),
       actions: [],
     },
     actions: [],
@@ -441,14 +457,14 @@ function chatActionFromMetadata(
   return chatAction as ChatActionOption;
 }
 
-function confirmationTextFinalStatusLabel(
+function confirmationTextFinalStatus(
   action: ChatActionOption | undefined,
   hasFailedAction: boolean,
 ) {
   if (hasFailedAction) {
-    return "Could not run";
+    return "could_not_run";
   }
-  return confirmationActionStatusLabel(action);
+  return confirmationActionStatus(action);
 }
 
 function isFailedActionRetry(action: ChatActionOption | undefined) {

@@ -306,7 +306,36 @@
       "intent_unsupported_request": "Thinking..."
     },
     "confirmation": {
-      "selected_asset": "Selected asset"
+      "selected_asset": "Selected asset",
+      "status": {
+        "ready_to_run": "Ready to run",
+        "needs_change": "Needs change",
+        "running": "Running",
+        "request_sent": "Request sent",
+        "run_complete": "Run complete",
+        "could_not_run": "Could not run",
+        "not_completed": "Not completed",
+        "editing": "Editing",
+        "draft_canceled": "Draft canceled",
+        "updated": "Updated"
+      },
+      "rows": {
+        "strategy": "Strategy",
+        "assets": "Assets",
+        "period": "Period",
+        "cadence": "Cadence",
+        "buy_rule": "Buy rule",
+        "exit_rule": "Exit rule",
+        "starting_capital": "Starting capital",
+        "contribution": "Contribution"
+      },
+      "actions": {
+        "run_backtest": "Run backtest",
+        "change_dates": "Change dates",
+        "change_asset": "Change asset",
+        "adjust_assumptions": "Adjust assumptions",
+        "cancel": "Cancel"
+      }
     }
   },
   "strategies": {

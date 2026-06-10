@@ -355,11 +355,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("from \"./artifact-history\"");
     expect(artifactHistory).toContain("supersedePriorConfirmations");
     expect(artifactHistory).toContain("function isTerminalConfirmation");
-    expect(card).toContain('confirmation.confirmation_state === "superseded"');
-    expect(card).toContain('confirmation.confirmation_state === "cancelled"');
+    expect(card).toContain("confirmationStatusFromPayload");
+    expect(card).toContain("confirmationStatusLabelKey");
+    expect(card).toContain("confirmationRowKey(row)");
     expect(card).toContain("function confirmationDisplayState");
-    expect(card).toContain('statusLabel: rawLabel || "Draft canceled"');
-    expect(card).toContain('confirmation.confirmation_state === "superseded" ? "Updated" : "Ready"');
+    expect(card).not.toContain("row.label.toLowerCase()");
+    expect(card).not.toContain('normalizedLabel === "running"');
     expect(card).toContain('t("chat.confirmation.selected_asset", "Selected asset")');
   });
 
@@ -372,7 +373,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("settleOpenConfirmationsAfterTextFinal");
     expect(artifactHistory).toContain("supersedeOpenConfirmations");
-    expect(artifactHistory).toContain("Could not run");
+    expect(artifactHistory).toContain("could_not_run");
+    expect(artifactHistory).toContain("confirmationStatusLabel");
     expect(artifactHistory).toContain('artifactType === "failed_action"');
     expect(chat).toContain("finalStageOutcome");
     expect(chat).toContain('finalStageOutcome === "await_user_reply"');
@@ -395,6 +397,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(types).toContain('"action"');
     expect(chat).toContain('kind: action?.type ? "action" : "text"');
+    expect(chat).toContain("chatActionRequestFromAction");
+    expect(chat).toContain("labelKey: action.labelKey");
     expect(chat).toContain("selectedAction: action");
     expect(chat).toContain("metadata.chat_action");
     expect(message).toContain('message.kind === "action"');

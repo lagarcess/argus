@@ -306,7 +306,36 @@
       "intent_unsupported_request": "Pensando..."
     },
     "confirmation": {
-      "selected_asset": "Activo seleccionado"
+      "selected_asset": "Activo seleccionado",
+      "status": {
+        "ready_to_run": "Listo para ejecutar",
+        "needs_change": "Necesita ajuste",
+        "running": "Ejecutando",
+        "request_sent": "Solicitud enviada",
+        "run_complete": "Ejecución completa",
+        "could_not_run": "No se pudo ejecutar",
+        "not_completed": "No completado",
+        "editing": "Editando",
+        "draft_canceled": "Borrador cancelado",
+        "updated": "Actualizado"
+      },
+      "rows": {
+        "strategy": "Estrategia",
+        "assets": "Activos",
+        "period": "Periodo",
+        "cadence": "Frecuencia",
+        "buy_rule": "Regla de compra",
+        "exit_rule": "Regla de salida",
+        "starting_capital": "Capital inicial",
+        "contribution": "Aporte"
+      },
+      "actions": {
+        "run_backtest": "Ejecutar backtest",
+        "change_dates": "Cambiar fechas",
+        "change_asset": "Cambiar activo",
+        "adjust_assumptions": "Ajustar supuestos",
+        "cancel": "Cancelar"
+      }
     }
   },
   "strategies": {

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
@@ -316,8 +316,11 @@ ChatActionType = Literal[
 
 
 class ChatActionPayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
     type: ChatActionType
     label: str | None = None
+    label_key: str | None = Field(default=None, alias="labelKey")
     payload: dict[str, Any] = Field(default_factory=dict)
     presentation: Literal["confirmation", "result"] | None = None
 

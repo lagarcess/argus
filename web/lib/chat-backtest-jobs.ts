@@ -8,6 +8,11 @@ import {
 } from "./argus-api";
 import { hydrateResultActionsForRun } from "./chat-result-actions";
 import type { Message } from "@/components/chat/types";
+import {
+  confirmationStatusFromPayload,
+  confirmationStatusLabel,
+} from "@/components/chat/confirmation-display";
+import type { StrategyConfirmationStatus } from "@/components/chat/types";
 
 const ACTIVE_JOB_STATUSES = new Set<BacktestJobStatus>([
   "queued",
@@ -20,7 +25,10 @@ const TERMINAL_UNSUCCESSFUL_JOB_STATUSES = new Set<BacktestJobStatus>([
   "canceled",
   "expired",
 ]);
-const IN_PROGRESS_CONFIRMATION_LABELS = new Set(["Running", "Request sent"]);
+const IN_PROGRESS_CONFIRMATION_STATUSES = new Set<StrategyConfirmationStatus>([
+  "running",
+  "request_sent",
+]);
 
 export function backtestJobMessageFromApi(message: ApiMessage): Message | null {
   if (message.role === "user") {
@@ -126,8 +134,8 @@ function settleConfirmationLabelsForJob(
   messages: Message[],
   job: BacktestJob,
 ): Message[] {
-  const statusLabel = confirmationStatusLabelForJob(job.status);
-  if (!statusLabel) {
+  const status = confirmationStatusForJob(job.status);
+  if (!status) {
     return messages;
   }
   return messages.map((message) => {
@@ -136,7 +144,9 @@ function settleConfirmationLabelsForJob(
     }
     if (
       message.confirmation.confirmation_state !== "superseded" ||
-      !IN_PROGRESS_CONFIRMATION_LABELS.has(message.confirmation.statusLabel)
+      !IN_PROGRESS_CONFIRMATION_STATUSES.has(
+        confirmationStatusFromPayload(message.confirmation),
+      )
     ) {
       return message;
     }
@@ -144,21 +154,24 @@ function settleConfirmationLabelsForJob(
       ...message,
       confirmation: {
         ...message.confirmation,
-        statusLabel,
+        status,
+        statusLabel: confirmationStatusLabel(status),
       },
     };
   });
 }
 
-function confirmationStatusLabelForJob(status: BacktestJobStatus): string | null {
+function confirmationStatusForJob(
+  status: BacktestJobStatus,
+): StrategyConfirmationStatus | null {
   if (status === "queued" || status === "running") {
-    return "Request sent";
+    return "request_sent";
   }
   if (status === "failed") {
-    return "Could not run";
+    return "could_not_run";
   }
   if (status === "canceled" || status === "expired") {
-    return "Not completed";
+    return "not_completed";
   }
   return null;
 }
