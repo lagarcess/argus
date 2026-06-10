@@ -31,7 +31,7 @@ This inventory examines the largest files across the Argus repository (`src/**/*
 
 ## Verification
 - **Files changed:** `docs/maintenance/large-file-modularity-inventory.md` created.
-- **Checks run:** File line counts and structural sampling executed. `git diff --check` to be verified.
-- **CI Status:** Pending push.
-- **Risks:** This inventory is report-only and poses zero risk to production behavior.
+- **Checks run:** File line counts verified with `wc -l`; structural sampling executed.
+- **CI Status:** Report-only inventory; rerun focused tests when converting any candidate into an extraction.
+- **Risks:** This inventory does not change runtime behavior, but incorrect ownership assumptions could steer future refactors into risky areas. Treat every extraction seam as a hypothesis that needs focused tests before code changes.
 - **Follow-up recommendations:** Focus initial extraction efforts on pure text/date normalization functions inside the `agent_runtime` files to reduce noise, and consider splitting out the SSE parser from `web/lib/argus-api.ts`.
