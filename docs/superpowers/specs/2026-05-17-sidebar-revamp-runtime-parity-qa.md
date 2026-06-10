@@ -1,5 +1,8 @@
 # Sidebar Revamp Runtime Parity QA
 
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 **Date:** 2026-05-17
 **Branch:** `web/feat/sidebar-revamp`
 **Runtime baseline:** `codex/artifact-runtime-rebuild`
