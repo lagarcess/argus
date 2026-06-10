@@ -271,30 +271,43 @@
       "unavailable_title": "Discovery is taking longer than expected",
       "unavailable": "Try the ticker directly, or keep typing. Argus can still reason about your message.",
       "sections": {
+        "results": "Search results",
         "assets": "Popular assets",
-        "indicators": "Runnable indicators",
-        "draft": "Draft-only indicators",
-        "results": "Search results"
+        "indicators": "Runnable indicators"
+      },
+      "badges": {
+        "asset": "asset",
+        "runnable": "runnable",
+        "unavailable": "unavailable",
+        "draft": "draft"
+      },
+      "descriptions": {
+        "asset": "Asset",
+        "indicator": "Indicator",
+        "currency_pair": "Currency Pair"
       }
     },
-      "status": {
-        "understanding": "Thinking...",
-        "interpret": "Understanding your idea...",
-        "clarify": "I have a question...",
-        "confirm": "Here's what I found...",
-        "execute": "Running backtest...",
-        "explain": "Reviewing results...",
-        "next_step": "What's next...",
-        "extracting_strategy": "Extracting strategy",
-        "running_backtest": "Running backtest",
-        "calculating_metrics": "Calculating metrics",
-        "running": "Running simulation",
-        "preparing": "Preparing results",
-        "intent_run_backtest": "Designing your strategy...",
-        "intent_onboarding_prompt": "Personalizing your experience...",
-        "intent_education": "Thinking...",
-        "intent_unsupported_request": "Thinking..."
-      }
+    "status": {
+      "understanding": "Thinking...",
+      "interpret": "Understanding your idea...",
+      "clarify": "I have a question...",
+      "confirm": "Here's what I found...",
+      "execute": "Running backtest...",
+      "explain": "Reviewing results...",
+      "next_step": "What's next...",
+      "extracting_strategy": "Extracting strategy",
+      "running_backtest": "Running backtest",
+      "calculating_metrics": "Calculating metrics",
+      "running": "Running simulation",
+      "preparing": "Preparing results",
+      "intent_run_backtest": "Designing your strategy...",
+      "intent_onboarding_prompt": "Personalizing your experience...",
+      "intent_education": "Thinking...",
+      "intent_unsupported_request": "Thinking..."
+    },
+    "confirmation": {
+      "selected_asset": "Selected asset"
+    }
   },
   "strategies": {
     "empty_state": "Strategies you save from chat will appear here.",

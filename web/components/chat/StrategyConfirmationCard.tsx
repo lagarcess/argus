@@ -8,6 +8,7 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { type ChatActionOption, type StrategyConfirmationPayload } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 
@@ -31,6 +32,7 @@ const confirmationToneClasses = {
 };
 
 export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
+  const { t } = useTranslation();
   const primaryRows = confirmation.rows.slice(0, 3);
   const detailRows = confirmation.rows.slice(3);
   const displayState = confirmationDisplayState(confirmation);
@@ -64,7 +66,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
               <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8d969e]">
                 {row.label}
               </dt>
-              <ConfirmationValue row={row} />
+              <ConfirmationValue row={row} t={t} />
             </div>
           ))}
         </dl>
@@ -117,11 +119,13 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
 
 function ConfirmationValue({
   row,
+  t,
 }: {
   row: StrategyConfirmationPayload["rows"][number];
+  t: any;
 }) {
   if (row.label.toLowerCase() === "assets") {
-    return <AssetList symbols={splitSymbolList(row.value)} />;
+    return <AssetList symbols={splitSymbolList(row.value)} t={t} />;
   }
   if (row.label.toLowerCase() === "period") {
     const period = splitPeriodDisplay(row.value);
@@ -143,11 +147,11 @@ function ConfirmationValue({
   );
 }
 
-function AssetList({ symbols }: { symbols: string[] }) {
+function AssetList({ symbols, t }: { symbols: string[]; t: any }) {
   if (symbols.length === 0) {
     return (
       <dd className="mt-1 text-[15px] font-semibold leading-snug tracking-tight text-[#191c1f] dark:text-white">
-        Selected asset
+        {t("chat.confirmation.selected_asset", "Selected asset")}
       </dd>
     );
   }

@@ -433,11 +433,11 @@ export default function ChatInput({
                           {item.label}
                         </span>
                         <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
-                          {displayDiscoveryDescription(item)}
+                          {discoveryDescriptionLabel(item, t)}
                         </span>
                       </span>
                       <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
-                        {discoveryBadgeLabel(item)}
+                        {t(`chat.discovery.badges.${discoveryBadgeLabel(item)}`, discoveryBadgeLabel(item))}
                       </span>
                     </button>
                   ))}
@@ -789,6 +789,20 @@ function displayDiscoveryDescription(item: DiscoveryItem) {
   if (!description) return item.type === "asset" ? "Asset" : "Indicator";
   if (description.toLowerCase() === "currency_pair") return "Currency Pair";
   return description.replaceAll("_", " ");
+}
+
+function discoveryDescriptionLabel(item: DiscoveryItem, t: any) {
+  const description = displayDiscoveryDescription(item);
+  if (description === "Asset") {
+    return t("chat.discovery.descriptions.asset", description);
+  }
+  if (description === "Indicator") {
+    return t("chat.discovery.descriptions.indicator", description);
+  }
+  if (description === "Currency Pair") {
+    return t("chat.discovery.descriptions.currency_pair", description);
+  }
+  return description;
 }
 
 function tokenClassName(type: DiscoveryItem["type"]) {
