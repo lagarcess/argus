@@ -123,6 +123,23 @@ export function rangeForDiscoveryItem(
   };
 }
 
+export function rangeForButtonDiscoveryQuery(
+  rawText: string,
+  anchorOffset: number,
+  cursorOffset: number,
+): TextRange | null {
+  if (cursorOffset < anchorOffset) return null;
+
+  const query = rawText.slice(anchorOffset, cursorOffset);
+  if (/[.,;!?()[\]{}\n]/.test(query)) return null;
+
+  return {
+    start: anchorOffset,
+    end: cursorOffset,
+    query: query.trimStart(),
+  };
+}
+
 export function insertTextAtOffset(
   segments: ComposerSegment[],
   offset: number,

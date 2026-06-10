@@ -434,19 +434,42 @@ New debt or smells from this milestone inventory:
 
 - streaming/error behavior needs a stronger contract before broader provider
   streaming changes;
+- composer `@` discovery now uses provider-backed symbols and official provider
+  names, and live QA showed the picker does find canonical assets once the
+  provider catalog is warm. This branch now distinguishes loading, empty, and
+  unavailable discovery states so the picker no longer looks silently broken.
+  Remaining product gap: second-layer search for common brand names, colloquial
+  aliases, and semantic user terms. Scope needs clarification before work
+  starts: decide whether the durable source of truth is a curated alias table, a
+  Supabase-backed provider/alias catalog, embeddings, or a hybrid. Do not add
+  one-off hardcoded aliases in launch-path code without a broader alias/search
+  policy.
+- confirmation-card and async job-card status ownership has an initial
+  frontend boundary: once a durable job exists, the confirmation card settles to
+  submitted/terminal labels while the job/result cards own execution progress.
+  Remaining product gap: keep this lifecycle covered when new job states,
+  locales, or failure categories are added.
+- async failed job cards no longer promise retry unless the assistant turn has
+  an actual structured retry action. Remaining product gap: if a future backend
+  wants direct async-job retry, it must persist a recoverable action payload
+  rather than relying on `backtest_job.retryable` alone.
 - public excerpt implementation is intentionally design-only in this milestone;
 - Research Lab / Perplexity work is intentionally design-only and must not be
   implemented before canon docs are updated.
-- docs hygiene needs a focused pass after this milestone lands: classify docs as
-  canonical, active milestone/spec, or historical/archive; move stale launch
-  closure plans such as `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` out of the
-  active-docs path or mark them clearly as historical so future agents do not
-  treat old plans as current source of truth.
+- docs hygiene still needs a future archive/move pass after this milestone
+  lands. This branch added AGENTS taxonomy and marked
+  `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` as historical; remaining work is to
+  physically reorganize or archive stale plans once the team is ready for a
+  broader docs cleanup.
 
 Addressed in this branch:
 
 - confirmation, job, result, and assistant-turn actions now share one artifact
   action ownership model for the current chat surface;
+- confirmation status now yields to durable job/result lifecycle ownership:
+  queued/running jobs settle superseded confirmations to "Request sent",
+  succeeded jobs settle them to "Run complete", and failed/canceled/expired jobs
+  settle them to terminal labels.
 - inactive completed turns now create a local side-panel attention marker that
   clears when the user opens the conversation;
 - the empty composer send button now has a localized, theme-aware tooltip and
@@ -457,7 +480,16 @@ Addressed in this branch:
   listbox for asset and indicator discovery, with selected assets preserved as
   bounded mention provenance for backend validation. Repeated discovery queries
   are deduplicated in the browser session, while provider-universe caching stays
-  server-side for now.
+  server-side for now. The picker now exposes loading, no-match, and unavailable
+  states instead of collapsing slow or failed discovery into an ambiguous empty
+  panel.
+- async failed job-card copy now uses a pure, tested copy policy and only shows
+  retry-specific copy when both the job is retryable and the turn has an actual
+  retry action.
+- docs hygiene now has an AGENTS taxonomy for canon docs, active milestone/spec
+  docs, and historical plans. `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is
+  explicitly marked historical, while future physical archive/move cleanup stays
+  separate.
 - the header menu no longer exposes "copy conversation link" as a pseudo-share
   action; real public conversation excerpts stay design-only until their
   privacy and revocation model is implemented.
@@ -501,50 +533,69 @@ cd web && bun run build
 
 ## Current Checkpoint Evidence
 
-Latest verified code checkpoint before this documentation sync:
-`3870c7a3a1cd31a9b1ed3b4b440da63b66ebeb59`.
+Latest verified code checkpoint before this final PR documentation sync:
+`316929834944775b459069c4f46309c10e8cfc16`.
 
-Local verification on 2026-06-09:
+Private-alpha UX trust follow-up verification on 2026-06-09:
 
 ```text
-poetry run ruff check src tests workflows scripts
-# passed
+cd web && bun test \
+  __tests__/backtest-job-card-copy.test.ts \
+  __tests__/chat-turn-artifact-ux.test.ts \
+  __tests__/chat-backtest-jobs.test.ts \
+  __tests__/chat-retry-actions.test.ts \
+  __tests__/chat-message-hydration.test.ts \
+  __tests__/chat-retry-action-history.test.ts
+# 38 passed
 
-poetry run pytest \
-  tests/test_environment_scripts.py \
-  tests/test_api_import_boundary.py \
-  tests/test_render_canary_script.py \
-  tests/test_render_runtime_compatibility.py \
-  tests/test_private_launch_hardening.py \
-  tests/test_checkpoint_rls_migration.py \
-  tests/test_ci_workflow.py \
-  -q --no-cov
-# 50 passed
+cd web && bun test \
+  __tests__/chat-attention-state.test.ts \
+  __tests__/chat-sidebar-attention.test.ts \
+  __tests__/sidebar-mode-state.test.ts \
+  __tests__/chat-input-send-tooltip.test.ts \
+  __tests__/dev-mode-badge-placement.test.ts \
+  __tests__/chat-composer-display.test.ts
+# 17 passed
 
-cd web && bun test
-# 178 passed
+cd web && bun test \
+  __tests__/chat-composer-display.test.ts \
+  __tests__/chat-composer-model.test.ts \
+  __tests__/chat-discovery-panel.test.ts \
+  __tests__/chat-input-send-tooltip.test.ts \
+  __tests__/backtest-job-card-copy.test.ts \
+  __tests__/chat-turn-artifact-ux.test.ts \
+  __tests__/chat-backtest-jobs.test.ts
+# 49 passed
 
 cd web && bun run build
 # passed
+
+git diff --check
+# passed
 ```
 
-GitHub Actions:
+Code review:
 
 ```text
-CI / codex/private-alpha-conversation-trust / 3870c7a
-# completed successfully on run 27224014816
+superpowers:requesting-code-review checkpoint on retry/status slice
+# no Critical or Important findings
 ```
 
 Browser QA:
 
 ```text
-Local chat browser pass on 2026-06-09:
+Local chat browser pass on 2026-06-09 for this follow-up branch:
 - composer geometry remained centered: contenteditable caret lane, mention
   button, send button, and form all shared the same vertical center;
 - focusing the disabled send wrapper displayed the localized "Message is empty"
   tooltip;
-- clicking the mention affordance opened the keyboardable discovery listbox;
-- typing `AAP` returned AAPL from the local synthetic provider catalog;
+- clicking the mention affordance opened the keyboardable discovery listbox
+  without inserting a literal `@` marker;
+- clicking the mention affordance again closed the listbox without changing the
+  composer text;
+- button-open search for `aap`, manual typed `@aap`, and the hybrid
+  button-open -> typed `@aap` path all returned AAPL from the local synthetic
+  provider catalog;
 - selecting AAPL created a canonical composer token with
   `asset:equity:AAPL`, symbol `AAPL`, asset class `equity`, and provider
   `synthetic_unit_fixture`;

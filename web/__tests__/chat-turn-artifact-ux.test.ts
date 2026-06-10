@@ -70,6 +70,21 @@ describe("chat turn artifact UX", () => {
     expect(message).not.toContain("const shouldShowTextFooter =");
   });
 
+  test("async job cards only promise retry when the turn has a retry action", () => {
+    const card = readFileSync(
+      join(root, "components/chat/BacktestJobCard.tsx"),
+      "utf-8",
+    );
+    const message = readFileSync(
+      join(root, "components/chat/ChatMessage.tsx"),
+      "utf-8",
+    );
+
+    expect(card).toContain("canRetry?: boolean");
+    expect(card).toContain("backtestJobCardCopy(job, { canRetry })");
+    expect(message).toContain("canRetry={Boolean(retryAction)}");
+  });
+
   test("stream error handling settles confirmation artifacts and clears stale composer actions", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),

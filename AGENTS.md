@@ -71,7 +71,9 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 # 🧭 Current Milestone: Private Alpha Conversation Trust
 
-When working on `codex/private-alpha-conversation-trust`, use
+When working on private-alpha conversation trust branches, including
+`codex/private-alpha-conversation-trust` and follow-up branches such as
+`codex/private-alpha-ux-trust-followups`, use
 `docs/specs/private-alpha-conversation-trust.md` as the milestone source of
 truth. This milestone hardens the current private-alpha chat/backtest loop; it
 does not implement the Perplexity Research Lab thesis yet.
@@ -376,6 +378,18 @@ NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED=false
 - **Design System**: [`.agent/designs/argus/DESIGN.md`](./.agent/designs/argus/DESIGN.md)
 - **OpenAPI Spec**: [`docs/api/openapi.yaml`](./docs/api/openapi.yaml)
 - **Scheduled Framework**: [`.agent/.jules/README.md`](./.agent/.jules/README.md)
+
+### Documentation Classes
+
+- **Canon docs**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
+  `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`, and
+  `.agent/designs/argus/DESIGN.md`. These define intended Alpha direction.
+- **Active milestone/spec docs**: files under `docs/specs/` that explicitly
+  name the current branch or milestone. Use them for scoped execution details
+  after reading canon docs.
+- **Historical plans**: older closure plans and `docs/superpowers/plans/*`
+  files are evidence and context, not current source of truth unless an active
+  milestone doc points back to them.
 
 ### 🛡️ Developer Identity: Mock Auth Mode
 To bypass the Supabase auth wall in fast Dev Mode, set the following frontend

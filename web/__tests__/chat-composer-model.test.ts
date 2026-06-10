@@ -6,6 +6,8 @@ import {
   findMentionAtOffset,
   insertTextAtOffset,
   isComposerEmpty,
+  rangeForButtonDiscoveryQuery,
+  rawComposerText,
   replaceRangeWithToken,
   rangeForDiscoveryItem,
   serializeComposerSegments,
@@ -153,6 +155,25 @@ describe("chat composer model", () => {
     const next = replaceRangeWithToken(segments, range!, goog);
 
     expect(serializeComposerSegments(next)).toBe("Buy GOOG over the last year");
+  });
+
+  test("button-open discovery replaces only the typed query range", () => {
+    const segments: ComposerSegment[] = [{ type: "text", text: "Buy google when it dips" }];
+    const range = rangeForButtonDiscoveryQuery(
+      rawComposerText(segments),
+      "Buy ".length,
+      "Buy google".length,
+    );
+    const next = replaceRangeWithToken(segments, range!, goog);
+
+    expect(range).toEqual({ start: 4, end: 10, query: "google" });
+    expect(serializeComposerSegments(next)).toBe("Buy GOOG when it dips");
+  });
+
+  test("button-open discovery range closes when the cursor leaves the query", () => {
+    expect(rangeForButtonDiscoveryQuery("Buy apple", "Buy apple".length, "Buy ".length)).toBeNull();
+    expect(rangeForButtonDiscoveryQuery("Buy apple.", "Buy ".length, "Buy apple.".length)).toBeNull();
+    expect(rangeForButtonDiscoveryQuery("Buy apple\nnow", "Buy ".length, "Buy apple\n".length)).toBeNull();
   });
 
   test("selecting a result after whitespace after @ preserves surrounding text", () => {

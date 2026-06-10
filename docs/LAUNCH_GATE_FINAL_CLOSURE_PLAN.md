@@ -1,5 +1,12 @@
 # Launch Gate Final Closure Plan
 
+> Historical plan. This document records an earlier launch-closure checklist and
+> should not be treated as the current milestone source of truth. For the active
+> private-alpha conversation trust work, use
+> `docs/specs/private-alpha-conversation-trust.md`. For canonical product,
+> architecture, API, data-model, and design rules, use the canon docs listed in
+> `AGENTS.md`.
+
 This is the final launch-closure execution plan for Argus before private-user validation. It is not a new architecture plan and does not replace `docs/ARGUS_SYSTEM_STEERING.md`.
 
 The steering layer is production-steerable. The remaining work is to close product-contract leaks, prove the browser loop, and make runtime behavior operationally consistent.

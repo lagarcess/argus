@@ -234,6 +234,126 @@ describe("chat backtest jobs", () => {
     expect(completedMessages[1].kind).toBe("strategy_result");
   });
 
+  test("queued durable job clears stale running confirmation status", () => {
+    const confirmationMessage: Message = supersedePriorConfirmations(
+      {
+        id: "confirmation-message-1",
+        role: "ai",
+        kind: "strategy_confirmation",
+        confirmation: {
+          confirmation_id: "confirmation-1",
+          confirmation_state: "active",
+          title: "AAPL buy and hold",
+          statusLabel: "Ready to run",
+          summary: "Ready to test AAPL.",
+          rows: [],
+          actions: [],
+        },
+        actions: [],
+      },
+      "Running",
+    );
+
+    const [settledConfirmation, activeJob] = applyBacktestJobUpdate(
+      [confirmationMessage, queuedJobMessage()],
+      {
+        job: job({ status: "queued" }),
+        run: null,
+      },
+    );
+
+    expect(settledConfirmation.confirmation?.statusLabel).toBe("Request sent");
+    expect(activeJob.kind).toBe("backtest_job");
+    expect(activeJob.backtestJob?.status).toBe("queued");
+  });
+
+  test("failed durable job settles request-sent confirmation status", () => {
+    const confirmationMessage: Message = supersedePriorConfirmations(
+      {
+        id: "confirmation-message-1",
+        role: "ai",
+        kind: "strategy_confirmation",
+        confirmation: {
+          confirmation_id: "confirmation-1",
+          confirmation_state: "active",
+          title: "AAPL buy and hold",
+          statusLabel: "Ready to run",
+          summary: "Ready to test AAPL.",
+          rows: [],
+          actions: [],
+        },
+        actions: [],
+      },
+      "Running",
+    );
+    const queuedMessages = applyBacktestJobUpdate(
+      [confirmationMessage, queuedJobMessage()],
+      {
+        job: job({ status: "queued" }),
+        run: null,
+      },
+    );
+    const [settledConfirmation, failedJob] = applyBacktestJobUpdate(
+      queuedMessages,
+      {
+        job: job({
+          status: "failed",
+          failure_code: "market_data_unavailable",
+          failure_detail: "market_data_issue",
+          retryable: true,
+          finished_at: "2026-06-06T12:00:04Z",
+        }),
+        run: null,
+      },
+    );
+
+    expect(settledConfirmation.confirmation?.statusLabel).toBe("Could not run");
+    expect(failedJob.kind).toBe("backtest_job");
+    expect(failedJob.backtestJob?.status).toBe("failed");
+  });
+
+  test("expired durable job settles request-sent confirmation status", () => {
+    const confirmationMessage: Message = supersedePriorConfirmations(
+      {
+        id: "confirmation-message-1",
+        role: "ai",
+        kind: "strategy_confirmation",
+        confirmation: {
+          confirmation_id: "confirmation-1",
+          confirmation_state: "active",
+          title: "AAPL buy and hold",
+          statusLabel: "Ready to run",
+          summary: "Ready to test AAPL.",
+          rows: [],
+          actions: [],
+        },
+        actions: [],
+      },
+      "Running",
+    );
+    const queuedMessages = applyBacktestJobUpdate(
+      [confirmationMessage, queuedJobMessage()],
+      {
+        job: job({ status: "running" }),
+        run: null,
+      },
+    );
+    const [settledConfirmation, expiredJob] = applyBacktestJobUpdate(
+      queuedMessages,
+      {
+        job: job({
+          status: "expired",
+          finished_at: "2026-06-06T12:00:04Z",
+        }),
+        run: null,
+      },
+    );
+
+    expect(settledConfirmation.confirmation?.statusLabel).toBe("Not completed");
+    expect(expiredJob.kind).toBe("backtest_job");
+    expect(expiredJob.backtestJob?.status).toBe("expired");
+  });
+
   test("job card locale copy does not expose implementation plumbing", () => {
     const localeFiles = [
       readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),

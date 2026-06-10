@@ -7,9 +7,14 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { BacktestJob } from "@/lib/argus-api";
+import {
+  backtestJobCardCopy,
+  type BacktestJobCardIcon,
+} from "@/lib/backtest-job-card-copy";
 
 type BacktestJobCardProps = {
   job: BacktestJob;
+  canRetry?: boolean;
 };
 
 const toneClasses = {
@@ -23,20 +28,35 @@ const toneClasses = {
     "border-[#70a38d]/25 bg-[#70a38d]/8 text-[#4f806d] dark:border-[#70a38d]/30 dark:bg-[#70a38d]/12 dark:text-[#9bc6b4]",
 };
 
-export default function BacktestJobCard({ job }: BacktestJobCardProps) {
+const statusIcons = {
+  alert: AlertTriangle,
+  check: CheckCircle2,
+  clock: Clock3,
+  loader: Loader2,
+  x: XCircle,
+} satisfies Record<BacktestJobCardIcon, typeof AlertTriangle>;
+
+export default function BacktestJobCard({
+  job,
+  canRetry = false,
+}: BacktestJobCardProps) {
   const { t } = useTranslation();
-  const copy = backtestJobCopy(job, t);
-  const StatusIcon = copy.icon;
+  const copy = backtestJobCardCopy(job, { canRetry });
+  const StatusIcon = statusIcons[copy.icon];
+  const title = t(copy.titleKey, copy.titleFallback);
+  const body = t(copy.bodyKey, copy.bodyFallback);
+  const detail = t(copy.detailKey, copy.detailFallback);
+  const statusLabel = t(copy.statusLabelKey, copy.statusLabelFallback);
 
   return (
     <section className="argus-card-reveal w-full overflow-hidden rounded-[20px] border border-black/12 bg-white text-[#191c1f] dark:border-white/12 dark:bg-[#1d2023] dark:text-white">
       <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
         <div className="min-w-0">
           <p className="font-display text-[18px] font-medium leading-tight tracking-[-0.18px]">
-            {copy.title}
+            {title}
           </p>
           <p className="mt-1.5 text-[13px] leading-snug tracking-[0.16px] text-[#505a63] dark:text-[#8d969e]">
-            {copy.body}
+            {body}
           </p>
         </div>
         <span
@@ -45,102 +65,13 @@ export default function BacktestJobCard({ job }: BacktestJobCardProps) {
           <StatusIcon
             className={`h-3.5 w-3.5 ${job.status === "running" ? "animate-spin" : ""}`}
           />
-          {copy.statusLabel}
+          {statusLabel}
         </span>
       </div>
 
       <div className="border-t border-black/8 px-4 py-3 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] dark:border-white/8 sm:px-5">
-        {copy.detail}
+        {detail}
       </div>
     </section>
   );
-}
-
-function backtestJobCopy(
-  job: BacktestJob,
-  t: ReturnType<typeof useTranslation>["t"],
-) {
-  if (job.status === "failed") {
-    return {
-      body: job.retryable
-        ? t(
-            "chat.backtest_job.failed_retryable_body",
-            "The run stopped before Argus could save a result. You can retry this idea from the latest confirmation.",
-          )
-        : t(
-            "chat.backtest_job.failed_body",
-            "The run stopped before Argus could save a result. Adjust the idea if needed and try again.",
-          ),
-      detail: t(
-        "chat.backtest_job.failed_detail",
-        "The conversation is saved, and this status will stay here.",
-      ),
-      icon: AlertTriangle,
-      statusLabel: t("chat.backtest_job.failed_status", "Could not run"),
-      title: t("chat.backtest_job.failed_title", "Backtest could not finish"),
-      tone: "failed" as const,
-    };
-  }
-  if (job.status === "canceled" || job.status === "expired") {
-    return {
-      body: t(
-        "chat.backtest_job.expired_body",
-        "This run did not complete. Start a fresh backtest when you are ready.",
-      ),
-      detail: t(
-        "chat.backtest_job.expired_detail",
-        "Argus will not keep showing a running state for this job.",
-      ),
-      icon: XCircle,
-      statusLabel: t("chat.backtest_job.expired_status", "Not completed"),
-      title: t("chat.backtest_job.expired_title", "Backtest not completed"),
-      tone: "neutral" as const,
-    };
-  }
-  if (job.status === "succeeded") {
-    return {
-      body: t(
-        "chat.backtest_job.succeeded_body",
-        "The result is ready. Argus is loading the saved card.",
-      ),
-      detail: t(
-        "chat.backtest_job.succeeded_detail",
-        "The completed result will replace this progress card.",
-      ),
-      icon: CheckCircle2,
-      statusLabel: t("chat.backtest_job.succeeded_status", "Result ready"),
-      title: t("chat.backtest_job.succeeded_title", "Backtest finished"),
-      tone: "success" as const,
-    };
-  }
-  if (job.status === "running") {
-    return {
-      body: t(
-        "chat.backtest_job.running_body",
-        "Argus is calculating the result in the background.",
-      ),
-      detail: t(
-        "chat.backtest_job.running_detail",
-        "You can leave this chat and come back; progress is saved.",
-      ),
-      icon: Loader2,
-      statusLabel: t("chat.backtest_job.running_status", "Running"),
-      title: t("chat.backtest_job.running_title", "Backtest running"),
-      tone: "active" as const,
-    };
-  }
-  return {
-    body: t(
-      "chat.backtest_job.queued_body",
-      "Argus has the request and will start shortly.",
-    ),
-    detail: t(
-      "chat.backtest_job.queued_detail",
-      "You can leave this chat and come back; progress is saved.",
-    ),
-    icon: Clock3,
-    statusLabel: t("chat.backtest_job.queued_status", "Queued"),
-    title: t("chat.backtest_job.queued_title", "Backtest queued"),
-    tone: "active" as const,
-  };
 }

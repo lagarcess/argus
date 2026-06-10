@@ -20,6 +20,7 @@ const TERMINAL_UNSUCCESSFUL_JOB_STATUSES = new Set<BacktestJobStatus>([
   "canceled",
   "expired",
 ]);
+const IN_PROGRESS_CONFIRMATION_LABELS = new Set(["Running", "Request sent"]);
 
 export function backtestJobMessageFromApi(message: ApiMessage): Message | null {
   if (message.role === "user") {
@@ -135,7 +136,7 @@ function settleConfirmationLabelsForJob(
     }
     if (
       message.confirmation.confirmation_state !== "superseded" ||
-      message.confirmation.statusLabel !== "Running"
+      !IN_PROGRESS_CONFIRMATION_LABELS.has(message.confirmation.statusLabel)
     ) {
       return message;
     }
@@ -150,6 +151,9 @@ function settleConfirmationLabelsForJob(
 }
 
 function confirmationStatusLabelForJob(status: BacktestJobStatus): string | null {
+  if (status === "queued" || status === "running") {
+    return "Request sent";
+  }
   if (status === "failed") {
     return "Could not run";
   }
