@@ -4,7 +4,7 @@ name: CI
   push:
     branches: [main, "codex/**", "jules/**"]
   pull_request:
-    branches: [main, "codex/private-alpha-next"]
+    branches: [main, "codex/private-alpha-next", "codex/private-alpha-next-jules-intake"]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:

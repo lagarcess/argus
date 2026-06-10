@@ -83,8 +83,11 @@ Integration guardrails:
   `main`, unless the task is an urgent hotfix.
 - External async agent Jules must work on focused `jules/**` branches and must
   not push directly to `main` or to the integration branch.
-- Jules PRs should target `codex/private-alpha-next`; CI is configured to run on
-  `jules/**` pushes and on PRs targeting the integration branch.
+- Jules PRs should target `codex/private-alpha-next-jules-intake`; CI is
+  configured to run on `jules/**` pushes and on PRs targeting the intake branch.
+- Keep `codex/private-alpha-next-jules-intake` downstream of
+  `codex/private-alpha-next`; merge/fast-forward the main integration branch
+  down into the Jules intake branch when high-leverage integration work lands.
 - Codex reviews worker diffs before merging or cherry-picking them into the
   integration branch.
 - Production deploys remain manual and founder-directed.

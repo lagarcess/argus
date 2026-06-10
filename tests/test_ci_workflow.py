@@ -21,6 +21,7 @@ def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
     assert workflow["on"]["pull_request"]["branches"] == [
         "main",
         "codex/private-alpha-next",
+        "codex/private-alpha-next-jules-intake",
     ]
     assert "deploy" not in workflow["jobs"]
 

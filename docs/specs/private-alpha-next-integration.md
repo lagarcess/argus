@@ -24,22 +24,31 @@ main
   -> codex/private-alpha-next
        -> codex/<focused-high-leverage-slice>
        -> codex/<focused-low-risk-debt-slice>
-       -> jules/<focused-low-risk-debt-slice>
+       -> codex/private-alpha-next-jules-intake
+            -> jules/<focused-low-risk-debt-slice>
 ```
 
 Rules:
 
 - `main` remains the clean release checkpoint.
 - `codex/private-alpha-next` is the only integration staging branch.
-- Worker branches start from `codex/private-alpha-next`.
+- `codex/private-alpha-next-jules-intake` is a downstream quarantine lane for
+  low-risk Jules work. It is not the source of truth.
+- Codex worker branches start from `codex/private-alpha-next`.
+- Jules worker branches start from `codex/private-alpha-next-jules-intake`.
 - Workers do not push directly to `main`.
 - External async agents do not push directly to `codex/private-alpha-next`.
 - Jules branches use the `jules/**` branch namespace and open PRs targeting
-  `codex/private-alpha-next`.
+  `codex/private-alpha-next-jules-intake`.
 - CI runs on pushes to `jules/**` and on PRs targeting
-  `codex/private-alpha-next` so Jules can self-correct before Codex review.
+  `codex/private-alpha-next-jules-intake` so Jules can self-correct before
+  Codex review.
 - Codex reviews worker diffs before they are merged or cherry-picked into the
   integration branch.
+- High-leverage work lands in `codex/private-alpha-next` first. Periodically
+  merge or fast-forward `codex/private-alpha-next` down into
+  `codex/private-alpha-next-jules-intake` so Jules does not work from stale
+  context.
 - Every slice ends with tests run, browser QA notes when relevant, known
   caveats, and a conventional commit.
 - No production deploy happens from this branch unless the founder explicitly
