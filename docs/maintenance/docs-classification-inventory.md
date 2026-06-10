@@ -3,10 +3,10 @@
 ## Summary
 
 *   **Canon:** 6
-*   **Active Spec:** 2
-*   **Historical Evidence:** 13
+*   **Active Spec:** 3
+*   **Historical Evidence:** 20
 *   **Archive Candidate:** 1
-*   **Unclear/Needs Owner Decision:** 11
+*   **Unclear/Needs Owner Decision:** 13
 
 ## Inventory
 
@@ -20,7 +20,7 @@
 | `.agent/designs/argus/DESIGN.md` | canon | Explicitly listed as canon design source of truth. | None | Current |
 | `docs/specs/private-alpha-conversation-trust.md` | active spec | Marked as merged and deployed checkpoint, explicitly names current private-alpha direction. | None | Current |
 | `docs/specs/private-alpha-next-integration.md` | active spec | Marked as "Active integration staging baseline" and "working source of truth for the next integration branch". | None | Current |
-| `docs/specs/research-lab-thesis.md` | historical evidence | Listed as "Draft design spec for the next milestone" and explicitly "not an implementation plan for the current conversation-trust milestone". The prompt says to mark as active spec *if* clearly marked design-only/future direction, but as it's for the *next* milestone and says "not an implementation plan for the current... milestone", it sits closer to historical/future evidence of direction rather than *current* active spec. *Self-correction:* The prompt actually says: `docs/specs/research-lab-thesis.md if it is clearly marked design-only/future direction` should be **active spec**. I will classify it as active spec based on instructions. | Review | Future direction |
+| `docs/specs/research-lab-thesis.md` | active spec | Listed as a draft design spec for the next milestone and explicitly not an implementation plan for the current conversation-trust milestone. Classified as active spec because it is clearly marked as design-only/future direction. | Review | Future direction |
 | `docs/specs/private-alpha-backtest-execution-capacity.md` | unclear/needs owner decision | Draft from 2026-06-05, frames architecture questions before scaling. Not clearly an active spec for the current milestone, nor pure historical evidence. | Determine if this is an active spec or historical. |  |
 | `docs/specs/agent-architecture.md` | historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Add historical banner. | Stale date. |
 | `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or archive candidate. |  |
