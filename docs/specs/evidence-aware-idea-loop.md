@@ -242,7 +242,8 @@ Behavior:
 - Argus performs deeper cited research with explicit time/cost expectations;
 - may run asynchronously if latency is high;
 - produces a thesis summary and candidate experiments;
-- stores a durable research artifact;
+- stores a durable research artifact later; in the first implementation this can
+  still be message metadata if that is enough to reload and audit the turn;
 - defers monitoring, shareable pages, and dashboards until later milestones.
 
 Evidence depth: `deep`
@@ -359,7 +360,9 @@ proxy only when the proxy is not misleading.
 
 ### Data
 
-First-class future objects may include:
+First-class future objects may include the concepts below. They are not first
+slice table requirements; start with message/job/run metadata unless reload,
+audit, sharing, monitoring, or analytics prove a concrete schema is needed.
 
 - `evidence_packet`: cited external context used for one assistant turn;
 - `research_source`: normalized source/citation metadata;
@@ -961,31 +964,33 @@ not fully settled, the remaining ambiguity is called out immediately.
 
   **Answer:** Static UI supports English and Spanish Latin America (`en`,
   `en-US`, `es-419`). AI responses should respect the user's language
-  preference. Citation source language behavior is still open.
+  preference. V1 should not translate source titles or quoted source metadata
+  unless the provider returns translated metadata; Argus can summarize the cited
+  claim in the user's language.
 
 ### Retention Questions
 
 - **R1. What makes a user come back tomorrow?**
 
-  **Answer:** Open. Current thesis: users return when Argus remembers an idea and
-  helps them continue it, retest it, or notice relevant changes without becoming
-  a generic news feed.
+  **Answer:** Deferred beyond the first evidence slice. Current thesis: users
+  return when Argus remembers an idea and helps them continue it, retest it, or
+  notice relevant changes without becoming a generic news feed.
 
 - **R2. What is the user expected to do after a brief: read, test, refine, save,
   ignore, or mute?**
 
-  **Answer:** Open. Bias toward read -> test/refine/save, with ignore/mute as
-  trust-preserving controls.
+  **Answer:** Deferred until briefs/inbox exist. Bias toward read ->
+  test/refine/save, with ignore/mute as trust-preserving controls.
 
 - **R3. How often is helpful: daily, weekly, event-triggered, or user-triggered?**
 
-  **Answer:** Open. Monitoring and inbox are deferred until users prove they
-  return to ideas.
+  **Answer:** Deferred. Monitoring and inbox should not be built until users
+  prove they return to ideas.
 
 - **R4. What kinds of changes are meaningful enough to interrupt someone?**
 
-  **Answer:** Open. Likely only changes tied to explicit saved ideas, source
-  updates, or enough new data to retest.
+  **Answer:** Deferred until monitoring is designed. Likely only changes tied to
+  explicit saved ideas, source updates, or enough new data to retest.
 
 - **R5. How does Argus avoid becoming a news feed?**
 
@@ -994,12 +999,13 @@ not fully settled, the remaining ambiguity is called out immediately.
 
 - **R6. What does progress look like for a beginner learning finance?**
 
-  **Answer:** Open. Likely progress is repeated conversion from naive question to
-  understandable concept, supported test, result, and refinement.
+  **Answer:** Deferred as a retention/learning design question. Likely progress
+  is repeated conversion from naive question to understandable concept,
+  supported test, result, and refinement.
 
 - **R7. How should Argus let users pause, mute, or retire an idea?**
 
-  **Answer:** Open. Must be designed before monitoring/inbox.
+  **Answer:** Deferred. Must be designed before monitoring/inbox.
 
 ### Trust And Compliance Questions
 
@@ -1205,6 +1211,10 @@ exposing raw API knobs to users.
 Official Perplexity docs support a staged roadmap because presets already bundle
 model, search configuration, max steps, system prompt, and tools, while allowing
 parameter overrides when Argus needs tighter control.
+
+Implementation agents must re-check the current official Perplexity docs before
+coding against these APIs. The links below anchor product direction; they are
+not a frozen API schema.
 
 Docs reviewed for this roadmap:
 
