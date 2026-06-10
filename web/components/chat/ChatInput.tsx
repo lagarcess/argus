@@ -178,10 +178,10 @@ export default function ChatInput({
       ]).then(([assetsResult, indicatorsResult]) => {
         if (cancelled) return;
         const assets =
-          assetsResult.status === "fulfilled" ? assetsResult.value.items : [];
+          assetsResult.status === "fulfilled" ? assetsResult.value?.items ?? [] : [];
         const indicators =
           indicatorsResult.status === "fulfilled"
-            ? indicatorsResult.value.items
+            ? indicatorsResult.value?.items ?? []
             : [];
         const merged = mergeDiscoveryItems(
           assets,
@@ -366,7 +366,7 @@ export default function ChatInput({
     pendingCaretOffsetRef.current =
       rawText.slice(mention.end).trim().length > 0
         ? rawComposerText(next).length
-        : rawComposerText(next).at(tokenEnd) === " "
+        : rawComposerText(next)[tokenEnd] === " "
           ? tokenEnd + 1
           : tokenEnd;
     setSegments(next);
