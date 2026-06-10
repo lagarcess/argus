@@ -101,8 +101,12 @@ Codex should own or closely supervise these:
 4. **Research Lab product spec**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring belong in a dedicated spec before code.
-   - This branch may refine that spec, but it must not implement the Research
-     Lab without explicit approval.
+   - The active refined draft is
+     `docs/specs/evidence-aware-idea-loop.md`. It supersedes the narrower
+     "research first" framing by defining direct test, education, light
+     evidence, deep research, and monitoring lanes.
+   - This branch may refine that spec, but it must not implement the
+     evidence-aware idea loop without explicit approval.
 
 ## Low-Risk Work Suitable For External Async Agents
 
