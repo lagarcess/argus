@@ -384,6 +384,10 @@ proves the concrete objects are too rigid.
 - Unsupported ideas can be explained as boundaries in prose, but should not
   render as candidate experiment cards or buttons. If a card exists, it should
   point to a supported next step.
+- Research-backed candidate suggestions should behave like clean, pre-baked
+  prompt chips: clicking one sends a user turn in natural language, then the
+  normal Argus interpretation -> confirmation card path runs. Do not create a
+  hidden frontend shortcut that bypasses the chat brain or capability checks.
 - Avoid a new dashboard in the first milestone.
 - Hide internal labels such as `evidence_depth`, `candidate_experiment`, or
   `capability_status` from the primary user experience.
@@ -706,6 +710,10 @@ not fully settled, the remaining ambiguity is called out immediately.
   **Search**. It is clear enough for users, maps cleanly to cited evidence, and
   avoids forcing an "instant vs expert" model onto Argus. "Deep research" is a
   later explicit mode/preset once users prove they want slower source-rich work.
+  The control should teach itself through progressive disclosure: concise
+  tooltip copy, accessible label, and first-use empty-state/examples. It should
+  not require an onboarding modal for users to understand that Search means
+  "use outside evidence before helping me understand or test this."
 
 - **L4. When should an education answer offer a test without making learning
   feel transactional?**
@@ -811,7 +819,10 @@ not fully settled, the remaining ambiguity is called out immediately.
   source. People search is not a general "search anyone" feature for Argus; it
   should only be considered when the person is finance-relevant to the user's
   thesis, such as an executive, policymaker, fund manager, analyst, or named
-  source connected to a market claim.
+  source connected to a market claim. Perplexity's Agent API can return
+  searched/fetched result items and financial result items before the final
+  assistant text; Argus should use those structured outputs as source truth
+  rather than trusting model-authored URLs inside prose.
 
 - **E2. What is the shortest evidence payload that increases trust without
   making the chat feel like a report?**
@@ -887,8 +898,13 @@ not fully settled, the remaining ambiguity is called out immediately.
 
   **Answer:** First slice should store enough to reload and audit: source title,
   URL, domain, retrieved timestamp, Argus-authored cited-claim summary,
-  provider/tool metadata, and a stable source ID. Future public sharing may
-  require a stricter sanitized snapshot.
+  provider/tool metadata, and a stable source ID. Provider response metadata
+  should be normalized from actual Perplexity outputs where available: response
+  id, model or preset used, tool type, query, result id, result URL, title,
+  source, published date, last-updated date, finance result category/ticker when
+  present, token usage, and tool invocation counts. Do not persist full fetched
+  page content or long snippets as normal conversation memory. Future public
+  sharing may require a stricter sanitized snapshot.
 
 - **D5. How long should research source snapshots live?**
 
@@ -1163,7 +1179,13 @@ not fully settled, the remaining ambiguity is called out immediately.
 
   **Answer:** Unsupported ideas should resolve to capability/failure codes.
   Provider outages should resolve to provider or upstream failure codes. These
-  need different user copy and retry behavior.
+  need different user copy and retry behavior. The first implementation should
+  rely on Perplexity's built-in model fallback chain for evidence/research
+  availability, record which model/preset actually answered, and fail
+  gracefully if the chain exhausts. Do not add Tavily or OpenRouter web-search
+  fallback in the first slice unless Perplexity failure becomes a repeated
+  blocker. If evidence fails, Argus can continue conceptually or offer a direct
+  supported test, but it must not fabricate citations.
 
 - **O5. What must be visible in Supabase after a successful evidence-backed
   test?**
@@ -1189,6 +1211,9 @@ External AI apps often separate speed, reasoning, and web-search controls. That
 is useful inspiration, but Argus should not copy a generic "instant vs expert"
 mode switch. Argus's first control should be product-specific: **Search** means
 "ground this with outside evidence before helping me test or understand it."
+Recommended first tooltip/accessibility copy: "Search current sources before
+answering." Empty-state examples should show the behavior through concrete
+prompts instead of explaining the architecture.
 
 Perplexity Agent API supports:
 
@@ -1237,6 +1262,10 @@ Docs reviewed for this roadmap:
      `web_search` with `search_context_size="low"` plus `finance_search` for
      public-equity/ETF data.
    - Tool scope: `web_search`, `finance_search`.
+   - Availability shape: Perplexity `models` fallback chain with up to five
+     current supported models, verified at implementation time. Start with the
+     user's preferred cross-provider reasoning chain if the models are still
+     available and cost/latency are acceptable.
    - Use when: user asks a broad market/company/ETF question, recent context,
      or wants citations before turning the idea into a candidate experiment.
    - Output: compact cited context and one to three executable candidate
@@ -1314,6 +1343,12 @@ Docs reviewed for this roadmap:
 - Evidence cache and Argus memory are different. Provider/catalog caches can be
   reused when freshness is explicit; evidence claims should be freshly retrieved
   by default while their conversation-specific citations remain durable.
+- Research-backed candidate chips are not execution shortcuts. They send a
+  normal user turn, then Argus re-enters the existing interpretation and
+  confirmation-card lifecycle.
+- Perplexity model fallback is an availability/reasoning aid for evidence work,
+  not a replacement for OpenRouter-owned Argus voice or backtest result
+  explanation.
 
 ## Current Non-Decisions
 
@@ -1321,6 +1356,8 @@ These are intentionally not decided yet:
 
 - exact environment variable names, timeouts, and implementation types for the
   Perplexity preset roadmap;
+- exact Perplexity model fallback chain after checking current supported models,
+  cost, and latency at implementation time;
 - exact schema for research artifacts, if message metadata proves insufficient;
 - whether deep research later runs inline or through Render Workflows;
 - which later milestone should revisit public sharing after privacy and
