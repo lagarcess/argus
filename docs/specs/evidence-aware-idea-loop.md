@@ -95,6 +95,34 @@ The practical private-alpha promise is:
 > show what happened historically, and preserve the reasoning so your thinking
 > compounds over time.
 
+## Consumer Simplicity Standard
+
+The user must not feel the machinery behind this spec.
+
+Argus targets broader consumers who may be financially curious but unfamiliar
+with finance language, market structure, backtesting terminology, or strategy
+design. The product must bridge that literacy gap with simplicity, elegance,
+intuition, and speed.
+
+The user should experience:
+
+```text
+ask naturally -> learn quickly -> test simply -> understand clearly -> come back later
+```
+
+The user should not experience:
+
+- choosing internal lanes;
+- configuring research depth by default;
+- reading provider/tool explanations;
+- being forced through research before a direct test;
+- navigating a dashboard or terminal before the chat has earned it;
+- reviewing raw strategy JSON;
+- feeling like Argus turned learning into homework.
+
+Complexity can exist internally if it keeps the experience simple. It should
+not leak into the primary chat unless the user explicitly asks for more depth.
+
 ## Core Product Principle
 
 Argus should support multiple entry speeds into the same durable idea loop.
@@ -104,6 +132,15 @@ Users who already know what to test should stay on the fast path. Users who
 need education or grounding should get help forming a testable idea. Users who
 ask for deeper research should be able to spend more time and cost deliberately,
 without slowing down the direct-test experience.
+
+The internal product architecture can use lanes and evidence-depth labels, but
+the user-facing experience should feel like natural pacing:
+
+- "I can test that now."
+- "Here is the simple version."
+- "I found a little context and two ways to test it."
+- "This is broader; I can do a deeper pass if you want."
+- "I will remember this idea and tell you when something relevant changes."
 
 ## Evidence Lanes
 
@@ -191,11 +228,25 @@ Example:
 Behavior:
 
 - deferred until the first evidence-to-experiment loop proves demand;
-- likely uses scheduled jobs, saved ideas, source updates, and inbox-style
-  notifications;
+- should be tied to user-owned ideas, not generic market news;
+- likely uses scheduled jobs, saved ideas, source updates, updated market data,
+  and inbox-style notifications;
 - must remain educational and non-advisory.
 
 Evidence depth: `monitor`
+
+Retention promise:
+
+> Argus remembers what I am exploring and tells me when something relevant
+> changes.
+
+Potential future notifications:
+
+- "Your semiconductor vs gold idea has new evidence this week."
+- "The ETF you used as a proxy changed meaningfully."
+- "This saved idea may be worth retesting with updated data."
+- "A source related to your thesis changed; want a quick update?"
+- "Your recurring-buy idea now has another month of data."
 
 ## Unified Loop Contract
 
@@ -219,6 +270,11 @@ user input
 The product must not fork into separate "research mode" and "backtest mode"
 brains. The chat runtime remains one coherent Argus experience.
 
+This is a loop, not a straight line. A user may enter through education,
+testing, light evidence, or deep research; after a result they may ask a new
+question, refine the test, save the idea, ignore the update, or return later.
+Argus should preserve continuity without forcing a rigid wizard.
+
 ## Architecture Implications
 
 ### Runtime
@@ -241,6 +297,30 @@ brains. The chat runtime remains one coherent Argus experience.
   series are needed.
 - No provider decides whether a backtest is executable except Argus capability
   code.
+
+### Backtesting Engine
+
+The evidence-aware loop does not require the engine to become a professional
+quant platform. It requires the engine to cover the simple experiment types that
+normal people naturally ask for after learning or researching.
+
+The engine roadmap should prioritize understandable tests:
+
+- compare asset A vs asset B;
+- compare an asset, ETF, basket, or crypto against a benchmark;
+- test recurring buys over a date window;
+- test buy-and-hold windows;
+- test simple signal ideas only when the rule is explainable;
+- test selected baskets or proxies such as "semiconductors" through supported
+  ETFs or selected tickers;
+- later, test event or regime windows such as inflation periods, rate cuts,
+  recessions, earnings windows, or Bitcoin halvings.
+
+This changes the engine's role from "run any strategy the user imagines" to
+"maintain a library of honest, understandable experiment types." When evidence
+suggests an idea, Argus must know whether it can express that idea as a fair
+historical test. If it cannot, Argus should explain the gap and offer a simpler
+proxy only when the proxy is not misleading.
 
 ### Data
 
@@ -266,6 +346,11 @@ proves the concrete objects are too rigid.
 - Unsupported candidates can be shown as "not testable yet" only if that helps
   the user understand Argus's boundary; they must never look runnable.
 - Avoid a new dashboard in the first milestone.
+- Hide internal labels such as `evidence_depth`, `candidate_experiment`, or
+  `capability_status` from the primary user experience.
+- Prefer one clear next action over many technically correct options.
+- Let users ask for depth, but default to the shortest useful answer that
+  preserves trust.
 
 ### Cost And Latency
 
@@ -405,18 +490,21 @@ Learning question:
 
 Goal:
 
-- Keep selected ideas alive over time.
+- Build retention by keeping selected ideas alive over time.
 
 Scope:
 
 - scheduled or user-triggered updates;
 - inbox-style notifications;
+- only updates tied to user-owned ideas;
+- no generic news feed;
 - educational framing;
 - no brokerage or personalized recommendation behavior.
 
 Learning question:
 
-- Does recurring relevance drive retention?
+- Does recurring relevance drive retention without becoming noisy or
+  intimidating?
 
 ### Milestone 8: Shareable Artifacts
 
@@ -471,6 +559,9 @@ For each prompt, observe:
 - Users ask follow-up/refinement questions after the result.
 - Users say Argus helped them frame the idea, not merely calculate it.
 - Users return to prior ideas.
+- Users describe Argus as easy, approachable, or clarifying rather than
+  technical.
+- Users understand what Argus can and cannot test.
 
 ### Failure Signals
 
@@ -479,6 +570,8 @@ For each prompt, observe:
 - Candidate experiments feel generic or obvious.
 - Users compare Argus to ChatGPT/Perplexity instead of seeing a unique loop.
 - The product repeatedly suggests tests Argus cannot support.
+- Users feel the flow is too much work.
+- Users feel briefs or updates are generic market noise.
 
 ### Pivot Implications
 
@@ -496,35 +589,40 @@ after trust and non-advice boundaries are designed.
 ## Questions We Need To Answer
 
 These are the alignment questions that should shape the first implementation
-plan.
+plan. The most important questions are loop questions: what makes the user
+return, what helps them make progress, and what should Argus remember.
 
 ### Product Questions
 
-- Is the primary wedge "help me decide what to test" or "help me understand
-  finance concepts"?
-- Which user segment should the first evidence-aware loop optimize for:
-  beginner, enthusiast, or finance-literate alpha tester?
-- Should Argus proactively suggest research when a prompt is broad, or ask
-  before spending time and tokens?
-- What should Argus call this product surface: idea lab, research lab,
-  experiment notebook, or no named mode at all?
-- What is the minimum user delight moment that proves this is worth building?
+- What makes a broader consumer feel safe asking a naive finance question?
+- What is the minimum delightful moment: learning something, getting a good
+  test suggestion, seeing a result, or returning to a remembered idea?
+- Should the first evidence-aware loop optimize for curious beginners,
+  enthusiasts, or finance-literate private-alpha users while still preserving
+  consumer simplicity?
+- Should Argus name this surface at all, or should the loop simply feel like
+  better chat?
+- What should Argus never optimize for, even if it increases engagement?
 
 ### Lane Questions
 
-- Should evidence depth be implicit, explicit, or both?
-- What exact wording should let users choose between quick evidence and deep
-  research?
-- When should education answers offer a "turn this into a test" action?
-- Can users force direct test mode if Argus thinks research would help?
-- Should deep research be synchronous, async, or both depending on expected
-  latency?
+- How much of lane selection should be invisible and automatic?
+- When should Argus ask the user before spending more time on research?
+- What user-facing words feel simple: "quick context", "deeper look",
+  "test this", "remember this"?
+- When should an education answer offer a test without making learning feel
+  transactional?
+- How does a user bypass research and go straight to testing?
 
 ### Capability Questions
 
 - Which strategy templates are eligible for candidate experiments first:
   buy-and-hold, recurring buys/DCA, signal/indicator strategies, or all current
   supported templates?
+- Which simple experiment types should the backtesting engine support next to
+  make research-derived ideas useful?
+- Which natural consumer prompts are currently impossible because the engine
+  lacks event windows, baskets/proxies, or comparison primitives?
 - How should Argus handle ideas that are meaningful but not currently testable?
 - Should unsupported candidates be shown as educational boundaries or hidden?
 - How should Argus represent proxy tests, for example "luxury stocks" requiring
@@ -535,17 +633,21 @@ plan.
 
 - Which Perplexity tools are reliable enough for stocks, ETFs, crypto, currency
   pairs, macro, sectors, and companies?
-- What source count is enough for `light` evidence?
-- What source count is enough for `deep` research?
+- What is the shortest evidence payload that increases trust without making the
+  chat feel like a report?
+- When does a citation help a beginner, and when does it create clutter?
 - Should Argus use domain allowlists for some question types?
-- How should Argus show source freshness?
+- How should Argus show source freshness in plain language?
 - How should Argus handle conflicting sources?
 - What claims require citations, and what claims can be labeled as assumptions?
 
 ### Data Questions
 
+- What is the smallest durable "idea object" that creates continuity?
+- What should Argus remember that feels useful, not creepy or noisy?
 - Do we store research artifacts as concrete tables or message metadata first?
-- What citation fields are required for reload, audit, and future sharing?
+- What citation fields are required for reload, audit, monitoring, and future
+  sharing?
 - How long should research source snapshots live?
 - Do source snippets create copyright or privacy risk?
 - How should an idea object link to multiple runs and refinements?
@@ -553,6 +655,7 @@ plan.
 
 ### UX Questions
 
+- How can Argus hide complexity while preserving trust?
 - What does a candidate experiment card look like compared with a confirmation
   card?
 - How do we avoid clutter when showing evidence, citations, candidates, and
@@ -560,6 +663,17 @@ plan.
 - Should "Try next" show as chips, cards, or a dedicated follow-up section?
 - How do we make unsupported boundaries feel helpful rather than frustrating?
 - How should Spanish-language users experience citations and source language?
+
+### Retention Questions
+
+- What makes a user come back tomorrow?
+- What is the user expected to do after a brief: read, test, refine, save,
+  ignore, or mute?
+- How often is helpful: daily, weekly, event-triggered, or user-triggered?
+- What kinds of changes are meaningful enough to interrupt someone?
+- How does Argus avoid becoming a news feed?
+- What does progress look like for a beginner learning finance?
+- How should Argus let users pause, mute, or retire an idea?
 
 ### Trust And Compliance Questions
 
@@ -583,6 +697,7 @@ plan.
 
 - What are the first 20 golden prompts?
 - What constitutes a good candidate experiment?
+- How do we measure whether the user felt less intimidated?
 - How do we test that citations support claims without overbuilding an eval
   framework?
 - When should we introduce LLM-as-judge?
@@ -613,11 +728,14 @@ These are intentionally not decided yet:
 
 ## Guardrails
 
+- Keep the user-facing experience simple, elegant, intuitive, and fast.
+- Hide internal architecture from the user.
 - Do not force research before direct backtests.
 - Do not implement a second chat brain.
 - Do not add regex NLU gates before interpretation.
 - Do not let Perplexity produce final backtest result prose.
 - Do not show unsupported ideas as runnable actions.
+- Do not turn daily briefs into a generic news feed.
 - Do not add vector search/RAG until a specific retrieval failure is proven.
 - Do not add public sharing before privacy, revocation, and artifact sanitation
   are designed.
@@ -626,11 +744,13 @@ These are intentionally not decided yet:
 ## Next Spec Step
 
 The next refinement should answer enough of the open questions to define
-Milestone 1 and Milestone 2 precisely:
+Milestone 1 and Milestone 2 precisely, while preserving the loop thesis:
 
 1. the first eligible strategy templates;
 2. the evidence-depth UX;
 3. the candidate experiment contract;
 4. the minimum citation contract;
-5. the first private-alpha product test script;
-6. the feature flags and success metrics.
+5. the smallest durable idea/continuity object;
+6. the first return/habit hypothesis, without implementing full monitoring;
+7. the first private-alpha product test script;
+8. the feature flags and success metrics.
