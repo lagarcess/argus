@@ -7,7 +7,7 @@ This inventory examines the largest files across the Argus repository (`src/**/*
 - **Top largest files:** `src/argus/agent_runtime/llm_interpreter.py` (6.8k lines), `src/argus/agent_runtime/stages/interpret.py` (5.2k lines), `web/components/chat/ChatInterface.tsx` (2.3k lines).
 - **Highest mixed-concern smell:** `web/components/chat/ChatInterface.tsx` (mixes routing, API parsing, local UI state, result card transformations, and view layout).
 - **Safest extraction candidates:** `src/argus/agent_runtime/llm_interpreter.py` (splitting out Audit Pydantic models and pure text-grounding utilities) and `web/lib/argus-api.ts` (splitting out chat stream parsing from standard REST fetchers).
-- **Avoid touching:** The `agent_runtime` stages (like `interpret.py`, `execute.py`, `confirm.py`) handle delicate orchestration logic with specific prompt dependencies. Large-scale refactoring without extensive test coverage carries high risk.
+- Avoid touching: The agent_runtime stages (like interpret.py, execute.py, confirm.py, explain.py) handle delicate orchestration logic with specific prompt dependencies. Large-scale refactoring without extensive test coverage carries high risk.
 
 ## Inventory
 
