@@ -69,14 +69,36 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 ---
 
-# 🧭 Current Milestone: Private Alpha Conversation Trust
+# 🧭 Current Milestone: Private Alpha Next Integration
+
+When working from `codex/private-alpha-next`, use
+`docs/specs/private-alpha-next-integration.md` as the active integration
+staging source of truth. That doc records what conversation-trust work is
+already closed, what remains high leverage, and what low-risk debt is safe for
+external async agents.
+
+Integration guardrails:
+
+- Worker branches start from `codex/private-alpha-next`, not directly from
+  `main`, unless the task is an urgent hotfix.
+- External async agents must work on focused branches and must not push directly
+  to `main` or to the integration branch.
+- Codex reviews worker diffs before merging or cherry-picking them into the
+  integration branch.
+- Production deploys remain manual and founder-directed.
+- Perplexity Research Lab remains design-only until a later approved
+  implementation milestone.
+
+---
+
+# 🧭 Completed Checkpoint: Private Alpha Conversation Trust
 
 When working on private-alpha conversation trust branches, including
 `codex/private-alpha-conversation-trust` and follow-up branches such as
 `codex/private-alpha-ux-trust-followups`, use
 `docs/specs/private-alpha-conversation-trust.md` as the milestone source of
-truth. This milestone hardens the current private-alpha chat/backtest loop; it
-does not implement the Perplexity Research Lab thesis yet.
+truth for historical context. This milestone hardened the current private-alpha
+chat/backtest loop; it does not implement the Perplexity Research Lab thesis.
 
 Milestone guardrails:
 
