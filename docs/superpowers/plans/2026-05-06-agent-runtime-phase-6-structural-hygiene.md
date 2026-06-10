@@ -1,6 +1,7 @@
 # Agent Runtime Phase 6 Structural Hygiene Implementation Plan
 
-NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

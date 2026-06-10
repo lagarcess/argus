@@ -1,6 +1,7 @@
 # Argus System Steering Map
 
-NOTE: Historical context. This document is retained as implementation evidence. For current private-alpha direction, see AGENTS.md and docs/specs/private-alpha-next-integration.md.
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence. For current private-alpha direction, see AGENTS.md and docs/specs/private-alpha-next-integration.md.
 
 **Status:** Pre-private-launch steering reference
 **Branch assessed:** `codex/private-alpha-conversation-trust`

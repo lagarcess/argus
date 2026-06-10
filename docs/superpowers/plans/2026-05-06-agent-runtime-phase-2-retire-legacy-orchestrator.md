@@ -1,6 +1,7 @@
 # Agent Runtime Phase 2 Retire Legacy Orchestrator Implementation Plan
 
-NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Do not dispatch subagents unless the user explicitly requests parallel agent work. Steps use checkbox (`- [ ]`) syntax for tracking.
 

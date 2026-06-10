@@ -1,6 +1,7 @@
 # Artifact Runtime Milestone Checkpoint
 
-NOTE: Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
 
 **Date:** 2026-05-15
 **Branch:** `codex/artifact-runtime-rebuild`
