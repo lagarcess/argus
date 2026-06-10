@@ -533,8 +533,8 @@ cd web && bun run build
 
 ## Current Checkpoint Evidence
 
-Latest verified code checkpoint before this documentation sync:
-`f8d2648c7ba8b4f8fb2400efc4f726c8288f047f`.
+Latest verified code checkpoint before this final PR documentation sync:
+`316929834944775b459069c4f46309c10e8cfc16`.
 
 Private-alpha UX trust follow-up verification on 2026-06-09:
 
@@ -556,6 +556,16 @@ cd web && bun test \
   __tests__/dev-mode-badge-placement.test.ts \
   __tests__/chat-composer-display.test.ts
 # 17 passed
+
+cd web && bun test \
+  __tests__/chat-composer-display.test.ts \
+  __tests__/chat-composer-model.test.ts \
+  __tests__/chat-discovery-panel.test.ts \
+  __tests__/chat-input-send-tooltip.test.ts \
+  __tests__/backtest-job-card-copy.test.ts \
+  __tests__/chat-turn-artifact-ux.test.ts \
+  __tests__/chat-backtest-jobs.test.ts
+# 49 passed
 
 cd web && bun run build
 # passed
@@ -579,8 +589,13 @@ Local chat browser pass on 2026-06-09 for this follow-up branch:
   button, send button, and form all shared the same vertical center;
 - focusing the disabled send wrapper displayed the localized "Message is empty"
   tooltip;
-- clicking the mention affordance opened the keyboardable discovery listbox;
-- typing `AAP` returned AAPL from the local synthetic provider catalog;
+- clicking the mention affordance opened the keyboardable discovery listbox
+  without inserting a literal `@` marker;
+- clicking the mention affordance again closed the listbox without changing the
+  composer text;
+- button-open search for `aap`, manual typed `@aap`, and the hybrid
+  button-open -> typed `@aap` path all returned AAPL from the local synthetic
+  provider catalog;
 - selecting AAPL created a canonical composer token with
   `asset:equity:AAPL`, symbol `AAPL`, asset class `equity`, and provider
   `synthetic_unit_fixture`;
