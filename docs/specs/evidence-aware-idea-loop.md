@@ -642,6 +642,10 @@ Question IDs are stable handles for future discussion and implementation plans:
 - `EV` = Evaluation
 - `O` = Operations
 
+The raw questions below are intentionally retained for traceability. Current
+answers and remaining unknowns live in the **Decision Ledger After The
+Algorithm** section.
+
 ### Product Questions
 
 - **P1.** What makes a broader consumer feel safe asking a naive finance
@@ -946,26 +950,55 @@ research-provider quality questions remain open until tested with users.
   artifact metadata, a durable job row if async work was used, a linked
   `backtest_run` if executed, and enough route metadata to audit the path.
 
-## Unanswered Requirements After The Algorithm
+## Decision Ledger After The Algorithm
 
 The full question list remains useful as a reference, but the next milestone
-should only resolve the requirements below. Everything else is deferred until
-user behavior proves the loop is worth expanding.
+should only resolve the requirements below. Each row keeps the answer next to
+the requirement so future agents can see what is settled and what still needs
+design or implementation detail.
 
-### Decisions Needed For The First Evidence-Aware Slice
+### First Evidence-Aware Slice Decisions
 
-| IDs | Requirement | Paths | Current bias |
+| IDs | Requirement | Answer / current decision | Still open |
 | --- | --- | --- | --- |
-| **P1, P2** | Define the first delightful moment. | A: quick educational clarity. B: one good test candidate. C: completed backtest result. | **B -> C.** The wedge is "Argus helped me decide what to test," then the result closes the loop. |
-| **L2, L3, L4** | Decide how much research UX to expose. | A: invisible lane. B: visible "quick context/deeper look" choices. C: mode picker. | **A with tiny B.** Keep lanes invisible, ask only before slower/deeper work. |
-| **C2, C3, C6, C7** | Pick the first capability expansion. | A: more indicators. B: comparisons/proxies. C: mixed-asset portfolios. | **B.** Comparisons and explicit proxies map naturally from broad consumer questions without pretending to be advice. |
-| **E1, E2, E3, E7** | Define the minimum evidence packet. | A: no citations. B: compact cited context. C: full research note. | **B.** Short context plus citations only for external/current factual claims. |
-| **D1, D3, D4, D7, D8** | Choose persistence shape. | A: message metadata only. B: concrete evidence/candidate objects. C: generic artifact table. | **A first, B when reload/audit breaks.** Avoid schema sprawl until the loop proves useful. |
-| **UX2, UX3, UX4, UX5** | Design candidate/result surfaces. | A: reuse confirmation cards. B: new research cards. C: dashboard/list. | **A.** Reuse the artifact lifecycle; unsupported content stays prose, not cards. |
-| **T1, T2, T4** | Set research-to-test advice boundary. | A: broad disclaimers. B: strict non-advice wording and banned recommendation language. C: legal review before any test. | **B.** Ship with disciplined language; get legal review before public scale or monitoring. |
-| **CP1, CP2, CP3, CP4** | Set cost/latency knobs. | A: direct only. B: light evidence inline with budget. C: deep async research. | **B first.** Deep research is explicit and later. |
-| **EV1, EV2, EV4, EV7** | Define acceptance harness. | A: manual smoke. B: 10-20 deterministic golden prompts. C: LLM judge. | **B.** Add LLM judge later after human-approved examples exist. |
-| **O1, O2, O3, O4, O5** | Add operational guardrails. | A: no new ops. B: flags + route receipts + canary. C: analytics/event platform. | **B.** Feature flag the lane and make failures inspectable before PostHog. |
+| **P1, P2** | Define the first delightful moment. | **Answered.** The first delightful moment is not "Argus ran a backtest." It is "Argus helped me decide what to test, then closed the loop with a result." A complete result means the user got what they needed through any flexible lane: direct test, education, light evidence, or later deeper research. | Exact private-alpha interview wording and success threshold. |
+| **L2, L3, L4** | Decide how much research UX to expose. | **Partially answered.** Do not force research. Keep direct tests direct. Add an explicit, polished composer affordance such as a globe/Search control or "Deep research" control so users can choose when they want research and Argus can protect resources. | Final control design, labels, defaults, and whether the first launch exposes one `Search` control or two levels: `Search` and `Deep research`. |
+| **C2, C3, C6, C7** | Pick the first capability expansion. | **Partially answered.** Move cautiously toward comparisons and explicit proxies because they fit broad consumer questions and Argus's evidence loop. Use vectorbt's power for richer comparisons only when the output is simple and trustworthy. Possible examples: sector ETF vs ETF, selected basket vs benchmark, broad thesis mapped to explicit tickers/ETFs, or "winners inside a supported set" when the set is transparent. | Exact v1 experiment types, how Argus chooses proxies, how many instruments are allowed, and what chart/storytelling surface is simple enough for Alpha. |
+| **E1, E2, E3, E7** | Define the minimum evidence packet. | **Partially answered.** Use Perplexity as a configurable evidence provider, not Argus's voice. Start with reasonable presets rather than raw user-visible knobs. Let users control depth through simple product language while Argus controls cost and complexity internally. | Exact preset mapping, source count, citation rendering, recency/domain filters, and whether finance-specific tools are enabled in the first slice. |
+| **D1, D3, D4, D7, D8** | Choose persistence shape. | **Needs clarification.** "Message metadata first" is an implementation tactic, not the user experience. The user should still see polished evidence, candidate, and result surfaces. Internally, the first slice can store the evidence packet, candidate experiment summary, source IDs, selected proxy, and capability result inside assistant message/job/run metadata instead of creating new first-class tables immediately. This avoids schema drag until the loop proves value. | Whether reload/audit/sharing needs force a concrete `evidence_packet` or `candidate_experiment` table earlier. |
+| **UX2, UX3, UX4, UX5** | Design candidate/result surfaces. | **Answered.** Reuse the confirmation/artifact lifecycle. Candidate experiments should feel like polished Argus cards. Unsupported content stays prose, not cards. Quick Take, Explain result, and Try next remain distinct. | Exact card copy and interaction details during implementation. |
+| **T1, T2, T4** | Set research-to-test advice boundary. | **Answered.** Use strict non-advice language. Avoid "recommend", "should buy", and "best" in research-to-test surfaces. Argus can suggest supported historical tests, not investments. | Exact copy, especially for Spanish, and later legal review before broader exposure. |
+| **CP1, CP2, CP3, CP4** | Set cost/latency knobs. | **Partially answered.** Cost is founder-controlled for now; do not let premature cost anxiety weaken the loop. Focus on creating a cohesive, attractive experience that gets users to value quickly. Latency should be acceptable in the first pass, then optimized. Cache aggressively where safe once data freshness rules are clear. | Initial request timeouts, depth limits, caching policy, and private-alpha quotas. |
+| **EV1, EV2, EV4, EV7** | Define acceptance harness. | **Partially answered.** The harness should accelerate development and learning while catching regressions before production. Start with deterministic golden prompts and canaries. Evaluate whether LangSmith, LangFuse, DeepEval, or similar tooling buys speed without workflow drag. | Tool choice, first golden prompt set, and whether any external eval service is worth adding before PMF signal. |
+| **O1, O2, O3, O4, O5** | Add operational guardrails. | **Answered directionally.** Build sequentially and release slices as they are ready: flags, route receipts, canaries, provider failure taxonomy, and Supabase visibility. Keep ops lean and useful. | Exact implementation sequence and field names. |
+
+### Perplexity Control Surface Notes
+
+The product should expose simple controls while the backend maps them to
+Perplexity parameters and presets:
+
+- **No visible control / automatic:** direct tests and simple conceptual answers.
+- **Search:** a quick cited pass for current facts or broad evidence. Candidate
+  backend shape: `fast-search` or a low/medium `web_search` budget.
+- **Deeper research:** explicit user-chosen slower pass. Candidate backend shape:
+  `pro-search` or `deep-research`, higher `max_steps`, larger search context,
+  and `fetch_url` for important sources.
+
+Perplexity Agent API supports:
+
+- presets such as `fast-search`, `pro-search`, `deep-research`, and
+  `advanced-deep-research`;
+- model/tool overrides, `max_steps`, `max_output_tokens`, reasoning controls,
+  and tool selection;
+- `web_search` with `search_context_size`, domain/date/recency/location filters,
+  and explicit token budgets;
+- `fetch_url` for known URLs, bounded by `max_urls`;
+- `finance_search` for structured public-equity and ETF data, including quotes,
+  financials, earnings, peers, analyst coverage, ownership, corporate actions,
+  and ETF/index constituents.
+
+Argus should turn these into a small number of product presets instead of
+exposing raw API knobs to users.
 
 ### Explicitly Deferred Or Removed For This Milestone
 
@@ -1006,8 +1039,7 @@ user behavior proves the loop is worth expanding.
 
 These are intentionally not decided yet:
 
-- exact Perplexity model chain;
-- exact Perplexity tool configuration;
+- exact Perplexity preset/model/tool mapping behind the product controls;
 - exact schema for research artifacts, if message metadata proves insufficient;
 - whether deep research later runs inline or through Render Workflows;
 - which later milestone should revisit public sharing after privacy and
@@ -1045,3 +1077,11 @@ Milestone 1 and Milestone 2 precisely, while preserving the loop thesis:
 6. private-alpha test script focused on broad question -> candidate -> run;
 7. feature flags, route receipts, and canary requirements;
 8. golden prompt harness for direct tests plus first evidence-aware examples.
+
+The next natural product-design discussion should focus on the two still-fuzzy
+areas that shape implementation:
+
+1. the chat-composer research control: no button, one `Search` button, or
+   `Search` plus `Deep research`;
+2. the first comparison/proxy experiment shape: ETF-vs-ETF, explicit basket vs
+   benchmark, or supported-set winner/loser scan.
