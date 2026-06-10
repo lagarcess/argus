@@ -864,9 +864,12 @@ not fully settled, the remaining ambiguity is called out immediately.
 
 - **D2. What should Argus remember that feels useful, not creepy or noisy?**
 
-  **Answer:** Open. Bias toward remembering user-owned ideas, candidate
-  experiments, runs, refinements, and explicit saved/monitored topics. Do not
-  infer sensitive preferences or create hidden profiles.
+  **Answer:** Memory is the long-term product moat, but v1 should only remember
+  where the product loop is cohesive. Store conversation-scoped memory around
+  user-owned ideas, evidence packets, candidate experiments, runs, refinements,
+  and explicit saved/monitored topics. Do not introduce hidden personalization,
+  inferred sensitive preferences, or broad user profiling before the idea loop
+  proves value.
 
 - **D3. Do we store research artifacts as concrete tables or message metadata
   first?**
@@ -880,20 +883,28 @@ not fully settled, the remaining ambiguity is called out immediately.
   future sharing?**
 
   **Answer:** First slice should store enough to reload and audit: source title,
-  URL, domain, retrieved timestamp, cited claim or snippet summary, provider/tool
-  metadata, and a stable source ID. Future public sharing may require a stricter
-  sanitized snapshot.
+  URL, domain, retrieved timestamp, Argus-authored cited-claim summary,
+  provider/tool metadata, and a stable source ID. Future public sharing may
+  require a stricter sanitized snapshot.
 
 - **D5. How long should research source snapshots live?**
 
-  **Answer:** Open. Keep first-slice snapshots tied to conversation evidence,
-  not a broad reusable research cache. Expiration policy should be decided with
-  caching and monitoring.
+  **Answer:** Citation references and compact source snapshots should persist
+  with the conversation so old chats can reload with the same grounded links and
+  context. This is closer to modern AI chat citation behavior: the link/source
+  reference remains attached to the answer unless the conversation is deleted.
+  V1 snapshots are conversation memory, not a broad reusable evidence cache.
+  Revisit independent retention only for monitoring, public sharing, or a later
+  reusable research cache.
 
 - **D6. Do source snippets create copyright or privacy risk?**
 
-  **Answer:** Open. Store compact summaries and source references first; avoid
-  long copied snippets until a copyright/privacy review is done.
+  **Answer:** Persistent citation links are not the problem; they should remain
+  attached to the chat. The risk is storing long verbatim external excerpts or
+  full fetched page contents in Argus-owned tables. First slice should store
+  source metadata, links, retrieved timestamps, and Argus-authored compact claim
+  summaries. Avoid long copied snippets until copyright, privacy, and public
+  sharing rules are reviewed.
 
 - **D7. How should an idea object link to multiple runs and refinements?**
 
@@ -1057,9 +1068,11 @@ not fully settled, the remaining ambiguity is called out immediately.
   output?**
 
   **Answer:** Cache aggressively where safe and explicit. Market-data/provider
-  catalog caches are acceptable with keys, freshness, and invalidation. Research
-  cache policy is not designed yet; first slice should avoid broad reuse of
-  source claims until freshness semantics are clear.
+  catalog caches are acceptable with keys, freshness, and invalidation. Evidence
+  retrieval should be fresh by default because source claims can age or become
+  misleading. Argus should still persist conversation-scoped source metadata and
+  claim summaries so the chat can continue naturally. That is memory, not a
+  global stale evidence cache.
 
 - **CP6. What telemetry is enough before adding PostHog or a custom event
   pipeline?**
@@ -1086,8 +1099,11 @@ not fully settled, the remaining ambiguity is called out immediately.
 
 - **EV3. How do we measure whether the user felt less intimidated?**
 
-  **Answer:** Open. Likely through session notes and private-alpha interviews
-  before instrumentation. Do not add a telemetry lab before PMF signal.
+  **Answer:** Start with session notes, private-alpha interviews, and a small
+  set of observed loop-completion signals before adding analytics complexity.
+  A later lightweight in-product micro-question can ask whether a specific
+  action helped, similar to short contextual feedback prompts in modern chat
+  products. Do not add a telemetry lab before the core product loop exists.
 
 - **EV4. How do we test that citations support claims without overbuilding an
   eval framework?**
@@ -1280,6 +1296,14 @@ Docs reviewed for this roadmap:
   context. Argus owns interpretation, capability mapping, execution, and result
   explanation.
 - The next implementation should prove one loop, not build the whole ladder.
+- Persistent citations and copied source text are different. Argus should keep
+  citations, source metadata, and compact claim summaries with the conversation;
+  it should not persist long verbatim source excerpts as normal product memory.
+- Conversation memory and personalization are different. V1 memory means
+  durable context around this idea loop, not a hidden profile of the user.
+- Evidence cache and Argus memory are different. Provider/catalog caches can be
+  reused when freshness is explicit; evidence claims should be freshly retrieved
+  by default while their conversation-specific citations remain durable.
 
 ## Current Non-Decisions
 
@@ -1292,7 +1316,8 @@ These are intentionally not decided yet:
 - which later milestone should revisit public sharing after privacy and
   revocation design exists;
 - whether pg_jsonschema is worth adding now;
-- whether a cache belongs in Supabase only or also in another service;
+- whether a future reusable research cache belongs in Supabase only or also in
+  another service, after repeated-evidence workflows prove the need;
 - when PostHog becomes worth adding after route receipts and canaries are
   insufficient.
 
