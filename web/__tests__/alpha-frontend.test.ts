@@ -358,8 +358,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain('confirmation.confirmation_state === "superseded"');
     expect(card).toContain('confirmation.confirmation_state === "cancelled"');
     expect(card).toContain("function confirmationDisplayState");
-    expect(card).toContain('t("chat.confirmation.status.draft_canceled", "Draft canceled")');
-    expect(card).toContain('confirmation.confirmation_state === "superseded" ? t("chat.confirmation.status.updated", "Updated") : t("chat.confirmation.status.ready", "Ready")');
+    expect(card).toContain('statusLabel: rawLabel || "Draft canceled"');
+    expect(card).toContain('confirmation.confirmation_state === "superseded" ? "Updated" : "Ready"');
+    expect(card).toContain('t("chat.confirmation.selected_asset", "Selected asset")');
   });
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {

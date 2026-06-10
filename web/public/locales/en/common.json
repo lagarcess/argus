@@ -306,14 +306,6 @@
       "intent_unsupported_request": "Thinking..."
     },
     "confirmation": {
-      "status": {
-        "draft_canceled": "Draft canceled",
-        "running": "Running",
-        "run_complete": "Run complete",
-        "could_not_run": "Could not run",
-        "updated": "Updated",
-        "ready": "Ready"
-      },
       "selected_asset": "Selected asset"
     }
   },

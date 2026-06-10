@@ -35,7 +35,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
   const { t } = useTranslation();
   const primaryRows = confirmation.rows.slice(0, 3);
   const detailRows = confirmation.rows.slice(3);
-  const displayState = confirmationDisplayState(confirmation, t);
+  const displayState = confirmationDisplayState(confirmation);
   const activeActions =
     confirmation.confirmation_state === "active" || !confirmation.confirmation_state
       ? confirmation.actions ?? []
@@ -169,14 +169,14 @@ function AssetList({ symbols, t }: { symbols: string[]; t: any }) {
   );
 }
 
-function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: any) {
+function confirmationDisplayState(confirmation: StrategyConfirmationPayload) {
   const rawLabel = confirmation.statusLabel?.trim();
   const normalizedLabel = rawLabel?.toLowerCase() ?? "";
   if (confirmation.confirmation_state === "cancelled") {
     return {
       icon: CircleSlash2,
       isSpinning: false,
-      statusLabel: rawLabel || t("chat.confirmation.status.draft_canceled", "Draft canceled"),
+      statusLabel: rawLabel || "Draft canceled",
       tone: "neutral" as const,
     };
   }
@@ -184,9 +184,7 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
     return {
       icon: Loader2,
       isSpinning: true,
-      statusLabel: rawLabel
-        ? t(`chat.confirmation.status.${rawLabel.toLowerCase().replace(/ /g, '_')}`, rawLabel)
-        : rawLabel,
+      statusLabel: rawLabel,
       tone: "active" as const,
     };
   }
@@ -194,9 +192,7 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
     return {
       icon: CheckCircle2,
       isSpinning: false,
-      statusLabel: rawLabel
-        ? t(`chat.confirmation.status.${rawLabel.toLowerCase().replace(/ /g, '_')}`, rawLabel)
-        : rawLabel,
+      statusLabel: rawLabel,
       tone: "success" as const,
     };
   }
@@ -204,9 +200,7 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
     return {
       icon: CircleSlash2,
       isSpinning: false,
-      statusLabel: rawLabel
-        ? t(`chat.confirmation.status.${rawLabel.toLowerCase().replace(/ /g, '_')}`, rawLabel)
-        : rawLabel,
+      statusLabel: rawLabel,
       tone: "failed" as const,
     };
   }
@@ -215,7 +209,7 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
     isSpinning: false,
     statusLabel:
       rawLabel ||
-      (confirmation.confirmation_state === "superseded" ? t("chat.confirmation.status.updated", "Updated") : t("chat.confirmation.status.ready", "Ready")),
+      (confirmation.confirmation_state === "superseded" ? "Updated" : "Ready"),
     tone: confirmation.confirmation_state === "active" ? "active" as const : "neutral" as const,
   };
 }

@@ -273,11 +273,11 @@
       "sections": {
         "results": "Resultados de búsqueda",
         "assets": "Activos populares",
-        "indicators": "Indicadores ejecutables"
+        "indicators": "Indicadores compatibles"
       },
       "badges": {
         "asset": "activo",
-        "runnable": "ejecutable",
+        "runnable": "compatible",
         "unavailable": "no disponible",
         "draft": "borrador"
       },
@@ -306,14 +306,6 @@
       "intent_unsupported_request": "Pensando..."
     },
     "confirmation": {
-      "status": {
-        "draft_canceled": "Borrador cancelado",
-        "running": "Ejecutando",
-        "run_complete": "Ejecución completada",
-        "could_not_run": "No se pudo ejecutar",
-        "updated": "Actualizado",
-        "ready": "Listo"
-      },
       "selected_asset": "Activo seleccionado"
     }
   },

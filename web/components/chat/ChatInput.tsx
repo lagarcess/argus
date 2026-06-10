@@ -73,8 +73,8 @@ export default function ChatInput({
   const prompts = chatExploratorySuggestionsEnabled ? localizedPrompts : EMPTY_CHAT_PROMPTS;
   const inputPlaceholder = placeholder ?? t("chat.input_placeholder");
   const discoverySections = useMemo(
-    () => discoverySectionsForDisplay(discoveryItems, discoveryQuery, t),
-    [discoveryItems, discoveryQuery, t],
+    () => discoverySectionsForDisplay(discoveryItems, discoveryQuery),
+    [discoveryItems, discoveryQuery],
   );
   const visibleDiscoveryItems = useMemo(
     () => discoverySections.flatMap((section) => section.items),
@@ -433,7 +433,7 @@ export default function ChatInput({
                           {item.label}
                         </span>
                         <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
-                          {t(`chat.discovery.descriptions.${item.type === 'asset' ? 'asset' : (item.description?.trim().toLowerCase() === 'currency_pair' ? 'currency_pair' : 'indicator')}`, displayDiscoveryDescription(item))}
+                          {discoveryDescriptionLabel(item, t)}
                         </span>
                       </span>
                       <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
@@ -677,23 +677,22 @@ export function mergeDiscoveryItems(
 export function discoverySectionsForDisplay(
   items: DiscoveryItem[],
   query: string,
-  t: any,
 ): DiscoverySection[] {
   const visibleItems = items.filter(
     (item) => item.id && item.label && isSupportedDiscoveryItem(item),
   );
   if (visibleItems.length === 0) return [];
   if (query.trim()) {
-    return [{ label: t("chat.discovery.sections.results", "Search results"), items: visibleItems }];
+    return [{ label: "Search results", items: visibleItems }];
   }
 
   const sections: DiscoverySection[] = [
     {
-      label: t("chat.discovery.sections.assets", "Popular assets"),
+      label: "Popular assets",
       items: visibleItems.filter((item) => item.type === "asset"),
     },
     {
-      label: t("chat.discovery.sections.indicators", "Runnable indicators"),
+      label: "Runnable indicators",
       items: visibleItems.filter(
         (item) => item.type === "indicator" && item.support_status === "supported",
       ),
@@ -790,6 +789,20 @@ function displayDiscoveryDescription(item: DiscoveryItem) {
   if (!description) return item.type === "asset" ? "Asset" : "Indicator";
   if (description.toLowerCase() === "currency_pair") return "Currency Pair";
   return description.replaceAll("_", " ");
+}
+
+function discoveryDescriptionLabel(item: DiscoveryItem, t: any) {
+  const description = displayDiscoveryDescription(item);
+  if (description === "Asset") {
+    return t("chat.discovery.descriptions.asset", description);
+  }
+  if (description === "Indicator") {
+    return t("chat.discovery.descriptions.indicator", description);
+  }
+  if (description === "Currency Pair") {
+    return t("chat.discovery.descriptions.currency_pair", description);
+  }
+  return description;
 }
 
 function tokenClassName(type: DiscoveryItem["type"]) {
