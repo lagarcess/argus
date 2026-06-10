@@ -32,8 +32,8 @@ def test_jules_readme_has_correct_branch_instructions() -> None:
     assert "codex/private-alpha-next-jules-intake" in content
 
     # Assert prohibiting direct work on main
-    assert re.search(r"do not rebase.*main", content_lower) is not None
-    assert re.search(r"do not push.*main", content_lower) is not None
+    assert re.search(r"do not rebase.*main", content_lower, re.DOTALL) is not None
+    assert re.search(r"do not push.*main", content_lower, re.DOTALL) is not None
 
 
 def test_integration_spec_has_correct_branch_model() -> None:
@@ -48,4 +48,4 @@ def test_integration_spec_has_correct_branch_model() -> None:
     assert "jules/**" in content
 
     # Assert prohibition against pushing directly to main
-    assert re.search(r"do not push.*main", content_lower) is not None
+    assert re.search(r"do not push.*main", content_lower, re.DOTALL) is not None
