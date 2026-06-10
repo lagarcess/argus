@@ -736,7 +736,9 @@ not fully settled, the remaining ambiguity is called out immediately.
   indicator-threshold, and signal-strategy runs. The next expansion should
   enrich comparison/proxy work without regressing those paths: stock vs ETF, ETF
   vs ETF, selected basket vs benchmark, and thesis-to-explicit-proxy candidates.
-  DCA cadence supports daily, weekly, biweekly, monthly, and quarterly.
+  DCA cadence supports daily, weekly, biweekly, monthly, and quarterly. Locked
+  v1 scope: ETF/stock/basket vs benchmark and ETF vs ETF. Defer winner/loser
+  scans because they are more advice-adjacent and need stronger boundaries.
 
 - **C2a. Which asset and indicator universe should users see?**
 
@@ -823,19 +825,25 @@ not fully settled, the remaining ambiguity is called out immediately.
 
 - **E4. Should Argus use domain allowlists for some question types?**
 
-  **Answer:** Open. Use Perplexity source controls later if quality issues show
-  up. Do not overfit the first slice around a heavy source-governance system.
+  **Answer:** Do not ship a heavy source-governance system in v1. Perplexity
+  supports domain/date/recency/location filters on `web_search`, so Argus can
+  add source controls later if quality issues show up. The first slice should
+  record the domains/sources used and keep provider knobs internal.
 
 - **E5. How should Argus show source freshness in plain language?**
 
-  **Answer:** Open. Likely show simple labels such as "as of today", "recent
-  source", or source dates, but avoid provider mechanics.
+  **Answer:** Do not add noisy freshness labels to every citation. Modern AI
+  answers usually cite factual claims inline and expose source metadata when the
+  user inspects the citation. If the user explicitly asks for recent news or a
+  time-bounded search, Argus should pass the right Perplexity recency/date
+  filters and mention the time boundary in the answer.
 
 - **E6. How should Argus handle conflicting sources?**
 
-  **Answer:** Open. The likely v1 behavior is to state uncertainty and avoid
-  creating a confident runnable candidate from disputed facts unless the test is
-  explicitly framed as a proxy or hypothesis.
+  **Answer:** State uncertainty, avoid unsupported causality, and avoid creating
+  a confident runnable candidate from disputed facts unless the test is framed
+  as a proxy or hypothesis. The route receipt should preserve enough source
+  metadata to debug why Argus chose that boundary.
 
 - **E7. What claims require citations, and what claims can be labeled as
   assumptions?**
@@ -1037,8 +1045,13 @@ not fully settled, the remaining ambiguity is called out immediately.
 
 - **CP4. What quotas should apply per user/day in private alpha?**
 
-  **Answer:** Open. Start with feature flags and conservative defaults once the
-  first slice exists; do not overbuild quota systems before usage patterns exist.
+  **Answer:** Mirror Argus's existing usage-counter style instead of adding a
+  new quota system. Initial private-alpha defaults should be conservative but
+  value-preserving: `Search` light-evidence turns capped per user by hour/day,
+  with global backpressure for concurrent evidence jobs if they become async.
+  Proposed starting point: 5 Search turns/hour/user, 20 Search turns/day/user,
+  2 in-flight evidence jobs/user, and 10 in-flight evidence jobs globally.
+  These should be feature-flagged and environment-configurable.
 
 - **CP5. Which provider calls can be cached safely without stale or misleading
   output?**
@@ -1059,10 +1072,11 @@ not fully settled, the remaining ambiguity is called out immediately.
 
 - **EV1. What are the first 20 golden prompts?**
 
-  **Answer:** Open. They should include direct backtests, broad
-  evidence-to-candidate prompts, education-to-test prompts, unsupported boundary
-  prompts, Spanish prompts, provider failure/fallback cases, and at least one
-  proxy-comparison prompt.
+  **Answer:** Use an LLM/Jules to draft messy human-style prompts, then have
+  Argus/code review curate them. Do not rely only on clean synthetic prompts.
+  The set should include direct backtests, broad evidence-to-candidate prompts,
+  education-to-test prompts, unsupported boundary prompts, Spanish prompts,
+  provider failure/fallback cases, and at least one proxy-comparison prompt.
 
 - **EV2. What constitutes a good candidate experiment?**
 
@@ -1170,6 +1184,68 @@ Perplexity Agent API supports:
 Argus should turn these into a small number of product presets instead of
 exposing raw API knobs to users.
 
+### Suggested Perplexity Preset Roadmap
+
+Official Perplexity docs support a staged roadmap because presets already bundle
+model, search configuration, max steps, system prompt, and tools, while allowing
+parameter overrides when Argus needs tighter control.
+
+Docs reviewed for this roadmap:
+
+- Perplexity Agent API presets:
+  `https://docs.perplexity.ai/docs/agent-api/presets`
+- Perplexity Agent API web search:
+  `https://docs.perplexity.ai/docs/agent-api/tools/web-search`
+- Perplexity Agent API finance search:
+  `https://docs.perplexity.ai/docs/agent-api/tools/finance-search`
+- Perplexity Agent API fetch URL:
+  `https://docs.perplexity.ai/docs/agent-api/tools/fetch-url-content`
+- Perplexity Agent API people search:
+  `https://docs.perplexity.ai/docs/agent-api/tools/people-search`
+- Perplexity Agent API model fallback:
+  `https://docs.perplexity.ai/docs/agent-api/model-fallback`
+
+1. **Argus Search v1: light evidence**
+   - Product control: `Search`.
+   - Backend shape: dynamic `fast-search` for quick current facts, or explicit
+     `web_search` with `search_context_size="low"` plus `finance_search` for
+     public-equity/ETF data.
+   - Tool scope: `web_search`, `finance_search`.
+   - Use when: user asks a broad market/company/ETF question, recent context,
+     or wants citations before turning the idea into a candidate experiment.
+   - Output: compact cited context and one to three executable candidate
+     experiments.
+
+2. **Argus Search v1.5: bounded richer evidence**
+   - Product control: still `Search`; no new UI mode yet.
+   - Backend shape: dynamic `pro-search` or explicit `web_search` with
+     `search_context_size="medium"` when the first pass needs more source
+     coverage.
+   - Tool scope: `web_search`, `finance_search`, `fetch_url` only for known URLs
+     or important cited sources.
+   - Use when: cross-company/ETF context, sector proxy selection, or a source
+     needs direct reading.
+
+3. **Argus Deep Research later**
+   - Product control: explicit `Deep research` or monetized higher-depth choice.
+   - Backend shape: `deep-research`, higher `max_steps`, larger search context,
+     and bounded `fetch_url`.
+   - Tool scope: `web_search`, `finance_search`, `fetch_url`; `people_search`
+     only for finance-relevant professionals tied to the user's thesis.
+   - Use when: user deliberately asks for slower, source-rich research.
+
+4. **Frozen configs only when needed**
+   - Dynamic presets should be the default early because Perplexity keeps the
+     same rough cost/latency band while improving quality.
+   - Use frozen configurations only for eval reproducibility, regulatory/change
+     control, or when preset drift starts affecting Argus behavior.
+
+5. **Future monetization/control path**
+   - Free/basic: direct tests plus limited `Search` turns.
+   - Paid/pro: higher Search quotas, richer `pro-search` budget, and more
+     source coverage.
+   - Deep: explicit deep-research runs with higher limits and async execution.
+
 ### Explicitly Deferred Or Removed For This Milestone
 
 - **Non-executable indicator discovery:** hide from user-facing discovery. Either
@@ -1209,7 +1285,8 @@ exposing raw API knobs to users.
 
 These are intentionally not decided yet:
 
-- exact Perplexity preset/model/tool mapping behind the product controls;
+- exact environment variable names, timeouts, and implementation types for the
+  Perplexity preset roadmap;
 - exact schema for research artifacts, if message metadata proves insufficient;
 - whether deep research later runs inline or through Render Workflows;
 - which later milestone should revisit public sharing after privacy and
@@ -1238,8 +1315,8 @@ These are intentionally not decided yet:
 
 ## Next Spec Step
 
-The next refinement should answer enough of the open questions to define
-Milestone 1 and Milestone 2 precisely, while preserving the loop thesis:
+The next step is an implementation plan for Milestone 1 and Milestone 2 using
+the locked decisions above, while preserving the loop thesis:
 
 1. evidence-depth contract with direct-test bypass preserved;
 2. candidate experiment contract for comparison/proxy-first tests;
@@ -1250,8 +1327,9 @@ Milestone 1 and Milestone 2 precisely, while preserving the loop thesis:
 7. feature flags, route receipts, and canary requirements;
 8. golden prompt harness for direct tests plus first evidence-aware examples.
 
-The next natural product-design discussion should focus on the still-fuzzy area
-that shapes implementation:
+The next natural product-design discussion should focus on card copy and
+interaction details for the locked v1 comparison/proxy scope:
 
-1. the first comparison/proxy experiment shape: ETF-vs-ETF, explicit basket vs
-   benchmark, or supported-set winner/loser scan.
+1. stock, ETF, or explicit basket vs benchmark;
+2. ETF vs ETF;
+3. no winner/loser scans in v1.
