@@ -109,6 +109,9 @@
 - `.agent/.jules/realignment.md`
 - `.agent/.jules/README.md`
 - `.agent/ownership/README.md`
+- `.agent/handoffs/HANDOFF_PACKET_TEMPLATE.md`
+- `.agent/handoffs/SECTION3_OWNERSHIP_CHECKLIST.md`
+- `.agent/handoffs/SECTION4_OWNERSHIP_CHECKLIST.md`
 
 ## Out of scope observations
 
