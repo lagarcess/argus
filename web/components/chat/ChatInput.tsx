@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { TFunction } from "i18next";
 import { ArrowUp, AtSign } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { searchDiscovery, type DiscoveryItem } from "@/lib/argus-api";
@@ -51,6 +52,7 @@ export default function ChatInput({
   const [typedText, setTypedText] = useState("");
   const [discoveryQuery, setDiscoveryQuery] = useState("");
   const [discoveryItems, setDiscoveryItems] = useState<DiscoveryItem[]>([]);
+  const [discoveryItemsQuery, setDiscoveryItemsQuery] = useState<string | null>(null);
   const [discoveryStatus, setDiscoveryStatus] =
     useState<DiscoverySearchStatus>("idle");
   const [isDiscoveryOpen, setIsDiscoveryOpen] = useState(false);
@@ -80,13 +82,21 @@ export default function ChatInput({
     () => discoverySections.flatMap((section) => section.items),
     [discoverySections],
   );
+  const discoveryItemsAreFresh = discoveryResultsAreFresh(
+    discoveryItemsQuery,
+    discoveryQuery,
+  );
+  const selectableDiscoveryItems = useMemo(
+    () => selectableDiscoveryItemsForQuery(visibleDiscoveryItems, discoveryItemsAreFresh),
+    [discoveryItemsAreFresh, visibleDiscoveryItems],
+  );
   const discoveryPanel = discoveryPanelDisplay({
     itemCount: visibleDiscoveryItems.length,
     query: discoveryQuery,
     status: discoveryStatus,
   });
   const activeDiscoveryItem =
-    visibleDiscoveryItems.find((item) => item.id === activeDiscoveryItemId) ?? null;
+    selectableDiscoveryItems.find((item) => item.id === activeDiscoveryItemId) ?? null;
   const activeDiscoveryOptionId = activeDiscoveryItem
     ? discoveryOptionDomId(activeDiscoveryItem.id)
     : undefined;
@@ -164,6 +174,7 @@ export default function ChatInput({
     const query = discoveryQuery.trim();
     if (!query) {
       setDiscoveryItems([]);
+      setDiscoveryItemsQuery(null);
       setDiscoveryStatus("idle");
       return;
     }
@@ -193,6 +204,7 @@ export default function ChatInput({
           indicatorsResult.status === "rejected";
 
         setDiscoveryItems(merged);
+        setDiscoveryItemsQuery(query);
         setDiscoveryStatus(
           merged.length > 0 ? "ready" : didSearchFail ? "error" : "empty",
         );
@@ -206,18 +218,18 @@ export default function ChatInput({
   }, [discoveryQuery, isDiscoveryOpen]);
 
   useEffect(() => {
-    if (!isDiscoveryOpen) {
+    if (!isDiscoveryOpen || !discoveryItemsAreFresh) {
       setActiveDiscoveryItemId(null);
       return;
     }
 
     setActiveDiscoveryItemId((current) => {
-      if (current && visibleDiscoveryItems.some((item) => item.id === current)) {
+      if (current && selectableDiscoveryItems.some((item) => item.id === current)) {
         return current;
       }
-      return visibleDiscoveryItems[0]?.id ?? null;
+      return selectableDiscoveryItems[0]?.id ?? null;
     });
-  }, [isDiscoveryOpen, visibleDiscoveryItems]);
+  }, [discoveryItemsAreFresh, isDiscoveryOpen, selectableDiscoveryItems]);
 
   useEffect(() => {
     if (!isDiscoveryOpen || !activeDiscoveryItemId) return;
@@ -254,6 +266,7 @@ export default function ChatInput({
       setDiscoveryQuery(mention.query);
       if (!mention.query.trim()) {
         setDiscoveryItems([]);
+        setDiscoveryItemsQuery(null);
         setDiscoveryStatus("idle");
       }
       return;
@@ -271,6 +284,7 @@ export default function ChatInput({
       setDiscoveryQuery(range.query);
       if (!range.query.trim()) {
         setDiscoveryItems([]);
+        setDiscoveryItemsQuery(null);
         setDiscoveryStatus("idle");
       }
       return;
@@ -280,6 +294,7 @@ export default function ChatInput({
       activeMentionOffsetRef.current = null;
       setIsDiscoveryOpen(false);
       setDiscoveryItems([]);
+      setDiscoveryItemsQuery(null);
       setDiscoveryStatus("idle");
       setActiveDiscoveryItemId(null);
     }
@@ -291,6 +306,7 @@ export default function ChatInput({
     buttonDiscoveryQueryEndOffsetRef.current = null;
     setIsDiscoveryOpen(false);
     setDiscoveryItems([]);
+    setDiscoveryItemsQuery(null);
     setDiscoveryStatus("idle");
     setActiveDiscoveryItemId(null);
   };
@@ -329,6 +345,7 @@ export default function ChatInput({
       buttonDiscoveryAnchorOffsetRef.current = cursor;
       buttonDiscoveryQueryEndOffsetRef.current = cursor;
       setDiscoveryItems([]);
+      setDiscoveryItemsQuery(null);
       setDiscoveryStatus("idle");
     } else {
       buttonDiscoveryAnchorOffsetRef.current = null;
@@ -336,6 +353,7 @@ export default function ChatInput({
       activeMentionOffsetRef.current = cursor;
       if (!mention.query.trim()) {
         setDiscoveryItems([]);
+        setDiscoveryItemsQuery(null);
         setDiscoveryStatus("idle");
       }
     }
@@ -375,6 +393,7 @@ export default function ChatInput({
     buttonDiscoveryQueryEndOffsetRef.current = null;
     setIsDiscoveryOpen(false);
     setDiscoveryItems([]);
+    setDiscoveryItemsQuery(null);
     setDiscoveryStatus("idle");
     setActiveDiscoveryItemId(null);
   };
@@ -411,35 +430,47 @@ export default function ChatInput({
                   <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/35 dark:text-white/35">
                     {t(discoverySectionLabelKey(section.label), section.label)}
                   </div>
-                  {section.items.map((item) => (
-                    <button
-                      key={item.id}
-                      id={discoveryOptionDomId(item.id)}
-                      type="button"
-                      role="option"
-                      aria-selected={item.id === activeDiscoveryItemId}
-                      data-active-discovery-option={item.id === activeDiscoveryItemId ? "true" : undefined}
-                      onMouseEnter={() => setActiveDiscoveryItemId(item.id)}
-                      onClick={() => insertDiscoveryItem(item)}
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
-                        item.id === activeDiscoveryItemId
-                          ? "bg-black/5 dark:bg-white/5"
-                          : "hover:bg-black/5 dark:hover:bg-white/5"
-                      }`}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-[14px] font-medium text-black dark:text-white">
-                          {item.label}
+                  {section.items.map((item) => {
+                    const itemSelectable = discoveryItemsAreFresh;
+                    const isActive = itemSelectable && item.id === activeDiscoveryItemId;
+                    return (
+                      <button
+                        key={item.id}
+                        id={discoveryOptionDomId(item.id)}
+                        type="button"
+                        role="option"
+                        aria-disabled={!itemSelectable}
+                        aria-selected={isActive}
+                        disabled={!itemSelectable}
+                        data-active-discovery-option={isActive ? "true" : undefined}
+                        onMouseEnter={() => {
+                          if (itemSelectable) setActiveDiscoveryItemId(item.id);
+                        }}
+                        onClick={() => {
+                          if (itemSelectable) insertDiscoveryItem(item);
+                        }}
+                        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+                          isActive
+                            ? "bg-black/5 dark:bg-white/5"
+                            : itemSelectable
+                              ? "hover:bg-black/5 dark:hover:bg-white/5"
+                              : "cursor-wait opacity-60"
+                        }`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-[14px] font-medium text-black dark:text-white">
+                            {item.label}
+                          </span>
+                          <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
+                            {discoveryDescriptionLabel(item, t)}
+                          </span>
                         </span>
-                        <span className="block truncate text-[12px] text-black/45 dark:text-white/45">
-                          {discoveryDescriptionLabel(item, t)}
+                        <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
+                          {t(`chat.discovery.badges.${discoveryBadgeLabel(item)}`, discoveryBadgeLabel(item))}
                         </span>
-                      </span>
-                      <span className="shrink-0 rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-black/50 dark:bg-white/[0.06] dark:text-white/50">
-                        {t(`chat.discovery.badges.${discoveryBadgeLabel(item)}`, discoveryBadgeLabel(item))}
-                      </span>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -508,14 +539,14 @@ export default function ChatInput({
               if (e.key === "ArrowDown") {
                 e.preventDefault();
                 setActiveDiscoveryItemId((current) =>
-                  nextDiscoveryItemId(visibleDiscoveryItems, current, 1),
+                  nextDiscoveryItemId(selectableDiscoveryItems, current, 1),
                 );
                 return;
               }
               if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setActiveDiscoveryItemId((current) =>
-                  nextDiscoveryItemId(visibleDiscoveryItems, current, -1),
+                  nextDiscoveryItemId(selectableDiscoveryItems, current, -1),
                 );
                 return;
               }
@@ -558,6 +589,7 @@ export default function ChatInput({
               setIsDiscoveryOpen(true);
               setDiscoveryQuery("");
               setDiscoveryItems([]);
+              setDiscoveryItemsQuery(null);
               setDiscoveryStatus("idle");
             }
           }}
@@ -747,6 +779,25 @@ export function nextDiscoveryItemId(
   return items[nextIndex]?.id ?? items[0].id;
 }
 
+export function discoveryResultsAreFresh(
+  itemsQuery: string | null,
+  activeQuery: string,
+) {
+  if (itemsQuery === null) return false;
+  return normalizeDiscoveryFreshnessQuery(itemsQuery) === normalizeDiscoveryFreshnessQuery(activeQuery);
+}
+
+export function selectableDiscoveryItemsForQuery(
+  items: DiscoveryItem[],
+  itemsAreFresh: boolean,
+) {
+  return itemsAreFresh ? items : [];
+}
+
+function normalizeDiscoveryFreshnessQuery(value: string) {
+  return value.trim().toLowerCase();
+}
+
 function discoverySectionLabelKey(label: string) {
   if (label === "Popular assets") return "chat.discovery.sections.assets";
   if (label === "Runnable indicators") return "chat.discovery.sections.indicators";
@@ -805,7 +856,7 @@ function displayDiscoveryDescription(item: DiscoveryItem) {
   return description.replaceAll("_", " ");
 }
 
-function discoveryDescriptionLabel(item: DiscoveryItem, t: any) {
+function discoveryDescriptionLabel(item: DiscoveryItem, t: TFunction) {
   const description = displayDiscoveryDescription(item);
   if (description === "Asset") {
     return t("chat.discovery.descriptions.asset", description);

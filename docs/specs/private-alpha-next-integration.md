@@ -68,37 +68,40 @@ Do not reopen these as debt unless a new bug is reproduced:
   list smell.
 - The old static `@` preview was replaced with provider-backed discovery plus
   the supported indicator catalog.
+- Asset discovery quality is closed for this batch: provider and indicator
+  search results rank exact ticker/alias matches first, common crypto/currency
+  aliases replace the full typed phrase, repeated browser-session discovery
+  queries use the local cache, and stale visible results cannot be selected
+  while a newer query is loading.
 - The misleading "share conversation id" pseudo-action was removed.
+- Status/action parity is closed for this batch: confirmation, queued/running,
+  terminal job, result-card, feedback, retry, and more-menu surfaces now follow
+  one artifact lifecycle, internal Copy ID is hidden, and terminal job actions
+  remain scoped to the durable artifact instead of transcript prose.
+- Result voice cleanup is closed for this batch: Quick take and Explain result
+  remain distinct, Explain result uses the deeper fact-grounded breakdown
+  surface, visible Try next result actions are removed, and normal follow-up
+  guidance stays with the LLM chat brain.
+- Local live QA proof was captured on 2026-06-11 in QA mode with real Supabase
+  auth and API persistence: a GOOG buy-and-hold conversation rendered the
+  confirmation card, completed result card, Quick take, and Explain result;
+  no visible Try next, Quick Breakdown, Copy ID, or console/API regression was
+  observed.
 - `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is marked historical.
 
 ## Remaining High-Leverage Work
 
 Codex should own or closely supervise these:
 
-1. **Asset discovery quality**
-   - Make `@` discovery feel faster and more reliable.
-   - Improve matching across ticker, company name, common names, crypto pairs,
-     currency pairs, and supported indicators.
-   - Keep selected mentions as provenance only; they help bound user intent but
-     do not bypass LLM interpretation or backend validation.
-   - Do not add embeddings or pgvector for Alpha without a separate approved
-     design.
-   - Supabase-backed discovery or market-data caching needs explicit schema,
-     freshness, invalidation, and market-clock policy before implementation.
+1. **Pre-merge internet readiness**
+   - Preview the integration branch over the Render staging target before the
+     PR to `main`.
+   - Warm the frontend/API pair, run the remote canary flow, and capture enough
+     proof to compare behavior against local QA.
+   - Do not change Render service topology, environment variable names, or
+     production deploy behavior as part of this pass.
 
-2. **Status/action parity audit**
-   - Audit confirmation, queued/running, succeeded, failed, canceled, expired,
-     retry, feedback, and more-menu surfaces as one artifact lifecycle.
-   - Preserve structured retry metadata; never infer retry behavior from prose.
-   - Verify local and live workflow timing paths where behavior differs.
-
-3. **Argus result voice cleanup**
-   - Reduce Quick take / Explain result / Try next overlap.
-   - Do not introduce deterministic happy-path prose as a substitute for the
-     LLM result readout path.
-   - Keep fallback language observable through metadata and route receipts.
-
-4. **Research Lab product spec**
+2. **Research Lab product spec**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring belong in a dedicated spec before code.
    - The active refined draft is

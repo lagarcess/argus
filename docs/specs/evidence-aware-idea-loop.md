@@ -1,9 +1,9 @@
 # Evidence-Aware Idea Loop
 
-**Status:** Draft active product spec  
-**Date:** 2026-06-10  
-**Branch:** `codex/private-alpha-next`  
-**Audience:** Founder, Codex, future implementation agents, reviewers  
+**Status:** Draft active product spec
+**Date:** 2026-06-10
+**Branch:** `codex/private-alpha-next`
+**Audience:** Founder, Codex, future implementation agents, reviewers
 
 ## Purpose
 
@@ -25,7 +25,8 @@ private-alpha system can:
 - interpret natural-language investing ideas;
 - produce confirmation cards;
 - run workflow-backed historical backtests;
-- render result cards with Quick take, Explain result, and Try next surfaces;
+- render result cards with Quick take and Explain result surfaces while normal
+  typed follow-ups remain available through the chat brain;
 - persist conversations, messages, jobs, and runs in Supabase;
 - preserve a manual deployment and canary workflow for production trust.
 
@@ -997,8 +998,12 @@ not fully settled, the remaining ambiguity is called out immediately.
 - **UX4. Should "Try next" show as chips, cards, or a dedicated follow-up
   section?**
 
-  **Answer:** For now, keep Try next as supported follow-up actions attached to
-  result context. Do not let Try next duplicate Quick Take or become generic
+  **Answer:** The current private-alpha branch does not expose visible Try next
+  chips, cards, or dedicated result sections. It keeps normal typed follow-ups
+  and the result-card Refine idea action while Milestone 4 defines whether
+  supported next experiments should return as chips, cards, or another approved
+  surface. If restored, they must stay grounded in the prior result and
+  capability contract, and must not duplicate Quick take or become generic
   advice.
 
 - **UX5. How do we make unsupported boundaries feel helpful rather than

@@ -7,9 +7,11 @@ import {
   DISCOVERY_SEARCH_LIMIT,
   discoveryEnterAction,
   discoveryOptionDomId,
+  discoveryResultsAreFresh,
   discoverySectionsForDisplay,
   mergeDiscoveryItems,
   nextDiscoveryItemId,
+  selectableDiscoveryItemsForQuery,
   shouldHideMentionButton,
 } from "../components/chat/ChatInput";
 import type { DiscoveryItem } from "../lib/argus-api";
@@ -158,8 +160,9 @@ describe("chat composer display helpers", () => {
     expect(input).toContain("isMentionButtonHidden ? \"invisible pointer-events-none\"");
     expect(input).toContain('aria-controls={isDiscoveryOpen ? "chat-discovery-listbox" : undefined}');
     expect(input).toContain("aria-activedescendant={isDiscoveryOpen ? activeDiscoveryOptionId : undefined}");
-    expect(input).toContain("aria-selected={item.id === activeDiscoveryItemId}");
-    expect(input).toContain('data-active-discovery-option={item.id === activeDiscoveryItemId ? "true" : undefined}');
+    expect(input).toContain("aria-selected={isActive}");
+    expect(input).toContain("disabled={!itemSelectable}");
+    expect(input).toContain('data-active-discovery-option={isActive ? "true" : undefined}');
     expect(input).toContain("onMouseDown={(event) => event.preventDefault()}");
     expect(input).toContain('e.key === "ArrowDown"');
     expect(input).toContain('e.key === "ArrowUp"');
@@ -186,6 +189,24 @@ describe("chat composer display helpers", () => {
 
     expect(input).toContain('setDiscoveryStatus("loading")');
     expect(input).not.toContain('setDiscoveryItems([]);\n    setDiscoveryStatus("loading")');
+  });
+
+  test("stale discovery results stay visible but cannot be selected", () => {
+    const visibleItems = discoverySectionsForDisplay(defaults, "tesla")
+      .flatMap((section) => section.items);
+
+    expect(visibleItems.map((item) => item.id)).toEqual(["asset:AAPL", "indicator:rsi"]);
+    expect(discoveryResultsAreFresh(" apple ", "APPLE")).toBe(true);
+    expect(discoveryResultsAreFresh("apple", "tesla")).toBe(false);
+    expect(selectableDiscoveryItemsForQuery(visibleItems, false)).toEqual([]);
+    expect(
+      discoveryEnterAction({
+        hasActiveItem: selectableDiscoveryItemsForQuery(visibleItems, false).length > 0,
+        hasComposerContent: true,
+      }),
+    ).toBe("submit");
+    expect(selectableDiscoveryItemsForQuery(visibleItems, true).map((item) => item.id))
+      .toEqual(["asset:AAPL", "indicator:rsi"]);
   });
 
   test("discovery enter behavior does not trap send when no result is active", () => {
