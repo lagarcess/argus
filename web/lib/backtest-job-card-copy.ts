@@ -1,6 +1,7 @@
 import type { BacktestJob } from "./argus-api";
+import type { ArtifactStatusTone } from "./artifact-status-tones";
 
-export type BacktestJobCardTone = "active" | "failed" | "neutral" | "success";
+export type BacktestJobCardTone = ArtifactStatusTone;
 export type BacktestJobCardIcon =
   | "alert"
   | "check"
@@ -45,7 +46,7 @@ export function backtestJobCardCopy(
       statusLabelKey: "chat.backtest_job.failed_status",
       titleFallback: "Backtest could not finish",
       titleKey: "chat.backtest_job.failed_title",
-      tone: "failed",
+      tone: "danger",
     };
   }
   if (job.status === "canceled" || job.status === "expired") {
@@ -73,7 +74,7 @@ export function backtestJobCardCopy(
       statusLabelKey: "chat.backtest_job.succeeded_status",
       titleFallback: "Backtest finished",
       titleKey: "chat.backtest_job.succeeded_title",
-      tone: "success",
+      tone: "neutral",
     };
   }
   if (job.status === "running") {
@@ -87,7 +88,7 @@ export function backtestJobCardCopy(
       statusLabelKey: "chat.backtest_job.running_status",
       titleFallback: "Backtest running",
       titleKey: "chat.backtest_job.running_title",
-      tone: "active",
+      tone: "info",
     };
   }
   return {
@@ -100,6 +101,6 @@ export function backtestJobCardCopy(
     statusLabelKey: "chat.backtest_job.queued_status",
     titleFallback: "Backtest queued",
     titleKey: "chat.backtest_job.queued_title",
-    tone: "active",
+    tone: "info",
   };
 }

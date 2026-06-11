@@ -9,6 +9,11 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import {
+  artifactLifecycleTone,
+  artifactStatusToneClassName,
+  type ArtifactStatusTone,
+} from "@/lib/artifact-status-tones";
 import { type ChatActionOption, type StrategyConfirmationPayload } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
 import {
@@ -27,17 +32,6 @@ type StrategyConfirmationCardProps = {
 
 const actionClassName =
   "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[12px] font-medium tracking-tight text-black/76 transition-colors hover:border-black/18 hover:bg-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/76 dark:hover:border-white/18 dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/22";
-
-const confirmationToneClasses = {
-  active:
-    "border-[#7da0ca]/25 bg-[#7da0ca]/8 text-[#4f6f95] dark:border-[#7da0ca]/30 dark:bg-[#7da0ca]/12 dark:text-[#a7bdd7]",
-  failed:
-    "border-[#d66d75]/25 bg-[#d66d75]/8 text-[#96505a] dark:border-[#d66d75]/30 dark:bg-[#d66d75]/12 dark:text-[#e0a1a7]",
-  neutral:
-    "border-black/10 bg-black/[0.03] text-black/70 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70",
-  success:
-    "border-[#70a38d]/25 bg-[#70a38d]/8 text-[#4f806d] dark:border-[#70a38d]/30 dark:bg-[#70a38d]/12 dark:text-[#9bc6b4]",
-};
 
 export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
   const { t } = useTranslation();
@@ -61,7 +55,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
             {confirmation.summary}
           </p>
         </div>
-        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${confirmationToneClasses[displayState.tone]}`}>
+        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName(displayState.tone)}`}>
           <StatusIcon className={`h-3.5 w-3.5 ${displayState.isSpinning ? "animate-spin" : ""}`} />
           {displayState.statusLabel}
         </span>
@@ -184,22 +178,24 @@ function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: 
     confirmation.statusLabel?.trim() || confirmationStatusLabel(status),
   );
   if (status === "running") {
-    return { icon: Loader2, isSpinning: true, statusLabel, tone: "active" as const };
+    return { icon: Loader2, isSpinning: true, statusLabel, tone: artifactLifecycleTone(status) };
   }
   if (status === "run_complete") {
-    return { icon: CheckCircle2, isSpinning: false, statusLabel, tone: "success" as const };
+    return { icon: CheckCircle2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
   }
   if (status === "could_not_run") {
-    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: "failed" as const };
+    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
   }
   if (status === "draft_canceled") {
-    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: "neutral" as const };
+    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: artifactLifecycleTone(status) };
   }
+  const tone: ArtifactStatusTone =
+    confirmation.confirmation_state === "active" ? "info" : artifactLifecycleTone(status);
   return {
     icon: CheckCircle2,
     isSpinning: false,
     statusLabel,
-    tone: confirmation.confirmation_state === "active" ? "active" as const : "neutral" as const,
+    tone,
   };
 }
 

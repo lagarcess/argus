@@ -41,7 +41,8 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
 
-    expect(card).toContain("confirmationToneClasses");
+    expect(card).toContain("artifactStatusToneClassName");
+    expect(card).not.toContain("const confirmationToneClasses");
     expect(card).toContain("confirmationDisplayState");
     expect(card).toContain("font-display text-[18px]");
     expect(card).toContain("text-[#505a63] dark:text-[#8d969e]");
@@ -91,7 +92,20 @@ describe("chat turn artifact UX", () => {
 
     expect(card).toContain("canRetry?: boolean");
     expect(card).toContain("backtestJobCardCopy(job, { canRetry })");
+    expect(card).toContain("artifactStatusToneClassName(copy.tone)");
+    expect(card).not.toContain("const toneClasses");
     expect(message).toContain("canRetry={Boolean(retryAction)}");
+  });
+
+  test("result card keeps lifecycle completion neutral and saved state explicit", () => {
+    const card = readFileSync(
+      join(root, "components/chat/StrategyResultCard.tsx"),
+      "utf-8",
+    );
+
+    expect(card).toContain('artifactStatusToneClassName("neutral")');
+    expect(card).toContain('artifactStatusToneClassName("success")');
+    expect(card).toContain("view.hero.tone === \"positive\"");
   });
 
   test("assistant more menu hides internal message ids", () => {
