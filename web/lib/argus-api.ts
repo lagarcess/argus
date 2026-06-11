@@ -455,7 +455,6 @@ async function apiFetch<T>(
     }
   }
 
-  console.log(`[argus-api] Fetching ${API_BASE}${path}`, options);
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...authHeaders, ...(options?.headers || {}) },
     credentials: "include",
