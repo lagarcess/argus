@@ -273,6 +273,21 @@ def test_asset_search_does_not_promote_close_symbol_typos_as_provider_truth(
     assert assets.search_assets("aapq") == []
 
 
+def test_asset_search_supports_provider_backed_crypto_name_pair_aliases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assets.clear_asset_cache()
+    monkeypatch.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "synthetic_unit_fixture")
+
+    bitcoin_usd = assets.search_assets("bitcoin usd")
+    bitcoin_dollar = assets.search_assets("bitcoin dollar")
+    btc_usd = assets.search_assets("btc usd")
+
+    assert bitcoin_usd[0].canonical_symbol == "BTC"
+    assert bitcoin_dollar[0].canonical_symbol == "BTC"
+    assert btc_usd[0].canonical_symbol == "BTC"
+
+
 def test_resolve_asset_accepts_unique_provider_name_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

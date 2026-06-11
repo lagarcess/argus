@@ -169,7 +169,6 @@ export default function ChatInput({
     }
 
     let cancelled = false;
-    setDiscoveryItems([]);
     setDiscoveryStatus("loading");
     const timer = setTimeout(() => {
       Promise.allSettled([
@@ -620,17 +619,26 @@ function SendButton({ disabled, ariaLabel }: { disabled: boolean; ariaLabel: str
   );
 }
 
+function normalizeDiscoverySearchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 function rankDiscoveryItem(item: DiscoveryItem, query: string) {
-  const normalized = query.trim().toLowerCase();
-  const symbol = (item.symbol ?? "").toLowerCase();
-  const label = item.label.toLowerCase();
-  const exact = symbol === normalized || label === normalized;
-  const prefix = symbol.startsWith(normalized) || label.startsWith(normalized);
+  const normalized = normalizeDiscoverySearchText(query);
+  const symbol = normalizeDiscoverySearchText(item.symbol ?? "");
+  const label = normalizeDiscoverySearchText(item.label);
+  const description = normalizeDiscoverySearchText(item.description ?? "");
+  const values = [symbol, label, description].filter(Boolean);
+  const exact = values.some((value) => value === normalized);
+  const prefix = values.some((value) => value.startsWith(normalized));
+  const contained = values.some((value) => value.includes(normalized));
   if (exact && item.type === "indicator") return 0;
   if (exact) return 1;
   if (prefix && item.type === "asset") return 2;
   if (prefix) return 3;
-  return item.type === "asset" ? 4 : 5;
+  if (contained && item.type === "asset") return 4;
+  if (contained) return 5;
+  return item.type === "asset" ? 6 : 7;
 }
 
 export function mergeDiscoveryItems(
@@ -662,7 +670,13 @@ export function mergeDiscoveryItems(
   ) {
     const indicator = sortedIndicators[index];
     const asset = sortedAssets[index];
-    if (indicator && rankDiscoveryItem(indicator, query) <= 1) {
+    const indicatorRank = indicator
+      ? rankDiscoveryItem(indicator, query)
+      : Number.POSITIVE_INFINITY;
+    const assetRank = asset
+      ? rankDiscoveryItem(asset, query)
+      : Number.POSITIVE_INFINITY;
+    if (indicator && indicatorRank < assetRank) {
       push(indicator);
       push(asset);
     } else {

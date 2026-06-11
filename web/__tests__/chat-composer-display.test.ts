@@ -105,6 +105,46 @@ describe("chat composer display helpers", () => {
     expect(merged).toHaveLength(DISCOVERY_SEARCH_LIMIT);
   });
 
+  test("prioritizes a runnable indicator when the query matches its full name", () => {
+    const assetResults: DiscoveryItem[] = [
+      {
+        id: "asset:equity:RELX",
+        type: "asset",
+        label: "RELX · Relx PLC",
+        symbol: "RELX",
+        asset_class: "equity",
+        description: "Stock",
+        insert_text: "RELX",
+        provider: "alpaca",
+        support_status: "supported",
+      },
+    ];
+    const indicatorResults: DiscoveryItem[] = [
+      {
+        id: "indicator:rsi",
+        type: "indicator",
+        label: "RSI",
+        symbol: "rsi",
+        description: "Relative Strength Index",
+        insert_text: "RSI",
+        provider: "pandas-ta-classic",
+        support_status: "supported",
+      },
+    ];
+
+    const merged = mergeDiscoveryItems(
+      assetResults,
+      indicatorResults,
+      "relative strength",
+      DISCOVERY_SEARCH_LIMIT,
+    );
+
+    expect(merged.map((item) => item.id)).toEqual([
+      "indicator:rsi",
+      "asset:equity:RELX",
+    ]);
+  });
+
   test("chat input exposes the discovery picker as a keyboardable listbox", () => {
     const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
 
@@ -139,6 +179,13 @@ describe("chat composer display helpers", () => {
     expect(input).toContain("aria-busy={discoveryPanel.busy}");
     expect(input).toContain("Promise.allSettled");
     expect(input).not.toContain("searchDiscovery(\"assets\", query, DISCOVERY_SEARCH_LIMIT).catch(() => ({ items: [] }))");
+  });
+
+  test("chat input preserves visible discovery results while a follow-up query loads", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+
+    expect(input).toContain('setDiscoveryStatus("loading")');
+    expect(input).not.toContain('setDiscoveryItems([]);\n    setDiscoveryStatus("loading")');
   });
 
   test("discovery enter behavior does not trap send when no result is active", () => {
