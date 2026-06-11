@@ -1,17 +1,17 @@
 # i18n Key Consistency Audit
 
-**Date:** 2026-06-09
+**Date:** 2026-06-11
 **Auditor:** Jules
 
 ## Summary
 An audit of the English (`en`) and Spanish Latin America (`es-419`) locale key consistencies was performed.
 
-* **Total keys checked:** 375 keys (approx.)
-* **Missing in Spanish:** 1
+* **Total keys checked:** 446 keys
+* **Missing in Spanish:** 0
 * **Missing in English:** 0
 * **Placeholders with drift:** 0
 * **Invalid JSON files:** 0
-* **Fixed keys:** 1
+* **Fixed keys:** 0
 
 ## Files Inspected
 - `web/public/locales/en/common.json`
@@ -20,7 +20,7 @@ An audit of the English (`en`) and Spanish Latin America (`es-419`) locale key c
 ## Missing Keys by Locale
 
 **Spanish (`es-419`)**
-* `settings.dev.reset_onboarding` (Missing. It was present in English but missing in Spanish.)
+* None.
 
 **English (`en`)**
 * None.
@@ -29,17 +29,16 @@ An audit of the English (`en`) and Spanish Latin America (`es-419`) locale key c
 No placeholder drift was detected between the two locales. All keys containing placeholders (like `{{count}}`, `{{account_hint}}`) match perfectly in structure and order between English and Spanish.
 
 ## Mechanical Fixes Applied
-- Added `settings.dev.reset_onboarding` to `es-419` with the translation `"Restablecer onboarding (dev)"`.
-- The `web/public/locales/es-419/common.json` file was also automatically formatted to align exactly with the English structure for better maintainability (e.g., fixed indentation on `status` block).
+- None needed in this run.
 
 ## Items Needing Owner/Product Review
-There were no ambiguous missing keys or non-trivial missing translations that needed to be deferred. All missing keys were strictly mechanical and fixed.
+- None.
 
 ## Verification Checks Run
 - JSON structure validation on `en/common.json` and `es-419/common.json`.
-- Missing keys check script (comparing flattened object keys).
-- Placeholder drift detection script.
+- Missing keys check script (comparing flattened object keys) via `spanish-ui-smoke.test.ts`.
+- Placeholder drift detection script via `spanish-ui-smoke.test.ts`.
 
 ## Follow-up Recommendations
-- **Automated formatting:** Consider adding an automated step to `bun run lint` or Husky hooks that normalizes JSON key order in `es-419/common.json` to match `en/common.json`. This would prevent minor key ordering drift and make diffs cleaner in the future.
-- **Continuous Missing Key Checks:** Consider using a tool like `eslint-plugin-i18next` or a dedicated i18n key consistency script to fail CI builds if keys get out of sync.
+- **Automated tests:** A static locale parity guard test has now been integrated into `web/__tests__/spanish-ui-smoke.test.ts`. It compares flattened locale keys and checks for placeholder drift between the two files.
+- **Continuous Missing Key Checks:** With the `spanish-ui-smoke.test.ts` update, this is now built into the CI pipeline.

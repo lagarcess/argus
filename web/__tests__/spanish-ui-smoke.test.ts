@@ -49,6 +49,49 @@ describe("Spanish UI Smoke Harness", () => {
     return JSON.parse(fs.readFileSync(localePath, "utf-8"));
   }
 
+  function flattenKeys(obj: Record<string, unknown>, prefix = ""): Record<string, string> {
+    return Object.keys(obj).reduce((acc: Record<string, string>, k: string) => {
+      const pre = prefix.length ? prefix + "." : "";
+      const keyPath = pre + k;
+      const value = obj[k];
+
+      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        const nestedValue = value as Record<string, unknown>;
+        if (Object.keys(nestedValue).length === 0) {
+          acc[keyPath] = "{}";
+        } else {
+          Object.assign(acc, flattenKeys(nestedValue, keyPath));
+        }
+      } else if (Array.isArray(value)) {
+        if (value.length === 0) {
+          acc[keyPath] = "[]";
+        } else {
+          value.forEach((item: unknown, index: number) => {
+            const itemPath = keyPath + "[" + index + "]";
+            if (typeof item === "object" && item !== null && !Array.isArray(item)) {
+              const nestedItem = item as Record<string, unknown>;
+              if (Object.keys(nestedItem).length === 0) {
+                acc[itemPath] = "{}";
+              } else {
+                Object.assign(acc, flattenKeys(nestedItem, itemPath));
+              }
+            } else {
+              acc[itemPath] = String(item);
+            }
+          });
+        }
+      } else {
+        acc[keyPath] = String(value);
+      }
+      return acc;
+    }, {});
+  }
+
+  function extractPlaceholders(text: string): string[] {
+    const matches = text.match(/{{[^}]+}}/g);
+    return matches ? matches.sort() : [];
+  }
+
   function valueAtPath(source: unknown, keyPath: string): unknown {
     return keyPath.split(".").reduce<unknown>((current, segment) => {
       if (!current || typeof current !== "object") return undefined;
@@ -107,6 +150,32 @@ describe("Spanish UI Smoke Harness", () => {
     expect(cardSource).not.toContain('normalizedLabel === "running"');
     expect(historySource).not.toContain('new Set(["Running", "Request sent"])');
     expect(jobSource).not.toContain('new Set(["Running", "Request sent"])');
+  });
+
+  test("English and Spanish locales should have identical keys", () => {
+    const en = flattenKeys(readLocale(enLocalePath));
+    const es = flattenKeys(readLocale(esLocalePath));
+
+    const enKeys = Object.keys(en);
+    const esKeys = Object.keys(es);
+
+    const missingInEs = enKeys.filter((key) => !esKeys.includes(key));
+    const missingInEn = esKeys.filter((key) => !enKeys.includes(key));
+
+    expect(missingInEs).toEqual([]);
+    expect(missingInEn).toEqual([]);
+  });
+
+  test("Matching keys should have identical placeholders", () => {
+    const en = flattenKeys(readLocale(enLocalePath));
+    const es = flattenKeys(readLocale(esLocalePath));
+
+    for (const key of Object.keys(en)) {
+      expect(Object.prototype.hasOwnProperty.call(es, key)).toBe(true);
+      const enPlaceholders = extractPlaceholders(en[key]);
+      const esPlaceholders = extractPlaceholders(es[key]);
+      expect({ key, placeholders: esPlaceholders }).toEqual({ key, placeholders: enPlaceholders });
+    }
   });
 
   test("Spanish feature flag enables es-419", () => {
