@@ -68,9 +68,9 @@ poetry config virtualenvs.in-project true
 # 6. INSTALL PYTHON DEPENDENCIES
 # ============================================================================
 echo "🔵 [Setup] Installing Python dependencies via Poetry..."
-poetry install --no-interaction
+poetry install --with dev,workflows --no-interaction
 # poetry sync requires Poetry 2.x; skip gracefully if unavailable
-poetry sync 2>/dev/null || echo "⚠️ [Setup] poetry sync skipped (requires Poetry 2.x)"
+poetry sync --with dev,workflows --no-interaction 2>/dev/null || echo "⚠️ [Setup] poetry sync skipped (requires Poetry 2.x)"
 
 # ============================================================================
 # 7. VALIDATE PYTHON PACKAGE IMPORTS
@@ -83,7 +83,7 @@ poetry run python -c "import argus; print('[Setup] argus package is importable')
 # ============================================================================
 echo "🔵 [Setup] Installing frontend dependencies via Bun..."
 cd web
-bun install
+bun install --frozen-lockfile
 cd ..
 
 # ============================================================================
@@ -91,7 +91,7 @@ cd ..
 # ============================================================================
 echo "🔵 [Setup] Validating Next.js frontend setup..."
 cd web
-bun exec next telemetry disable || true  # Disable telemetry silently
+bun run --silent next telemetry disable >/dev/null 2>&1 || true  # Disable telemetry silently
 cd ..
 echo "🟢 [Setup] Next.js frontend is ready"
 

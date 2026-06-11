@@ -94,7 +94,9 @@ def test_confirmation_card_is_not_ready_without_validated_launch_payload() -> No
     )
 
     assert card is not None
+    assert card["status"] == "needs_change"
     assert card["statusLabel"] == "Needs change"
+    assert all("labelKey" in action for action in card["actions"])
     assert [action["type"] for action in card["actions"]] == [
         "change_dates",
         "change_asset",
@@ -137,6 +139,7 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
                         "id": "change-asset",
                         "type": "change_asset",
                         "label": "Change asset",
+                        "labelKey": "chat.confirmation.actions.change_asset",
                         "presentation": "confirmation",
                         "payload": {},
                     }
@@ -152,6 +155,7 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
             "action": {
                 "type": "change_asset",
                 "label": "Change asset",
+                "labelKey": "chat.confirmation.actions.change_asset",
                 "presentation": "confirmation",
                 "payload": {},
             },
@@ -171,6 +175,10 @@ def test_change_asset_action_uses_structured_runtime_context() -> None:
     user_message = messages[-2]
     assistant_message = messages[-1]
     assert user_message["metadata"]["chat_action"]["type"] == "change_asset"
+    assert (
+        user_message["metadata"]["chat_action"]["labelKey"]
+        == "chat.confirmation.actions.change_asset"
+    )
     assert assistant_message["metadata"]["pending_strategy"]["requested_field"] == (
         "asset_universe"
     )

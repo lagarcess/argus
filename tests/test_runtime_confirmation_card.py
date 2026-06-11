@@ -41,8 +41,18 @@ def test_runtime_confirmation_card_uses_recurring_contribution_for_dca() -> None
     )
 
     assert card is not None
-    assert {"label": "Cadence", "value": "Monthly"} in card["rows"]
-    assert {"label": "Contribution", "value": "$500"} in card["rows"]
+    assert any(
+        row["key"] == "cadence"
+        and row["labelKey"] == "chat.confirmation.rows.cadence"
+        and row["value"] == "Monthly"
+        for row in card["rows"]
+    )
+    assert any(
+        row["key"] == "contribution"
+        and row["labelKey"] == "chat.confirmation.rows.contribution"
+        and row["value"] == "$500"
+        for row in card["rows"]
+    )
     assert "$500 recurring contribution" in card["assumptions"]
     assert "Daily data" in card["assumptions"]
     assert "1D bars" not in card["assumptions"]
@@ -108,7 +118,12 @@ def test_runtime_confirmation_card_uses_starting_capital_for_buy_and_hold() -> N
     )
 
     assert card is not None
-    assert {"label": "Starting capital", "value": "$100,000"} in card["rows"]
+    assert any(
+        row["key"] == "starting_capital"
+        and row["labelKey"] == "chat.confirmation.rows.starting_capital"
+        and row["value"] == "$100,000"
+        for row in card["rows"]
+    )
     assert "$100,000 starting capital" in card["assumptions"]
     assert "$10,000 starting capital" not in card["assumptions"]
 
@@ -214,14 +229,20 @@ def test_runtime_confirmation_card_displays_latest_complete_data_assumption() ->
     )
 
     assert card is not None
+    assert card["status"] == "ready_to_run"
     assert card["statusLabel"] == "Ready to run"
-    assert {"label": "Period", "value": "January 1, 2026 - June 2, 2026"} in card[
-        "rows"
-    ]
+    assert any(
+        row["key"] == "period"
+        and row["labelKey"] == "chat.confirmation.rows.period"
+        and row["value"] == "January 1, 2026 - June 2, 2026"
+        for row in card["rows"]
+    )
     assert "Through Jun 2" in card["assumptions"]
 
 
-def test_runtime_confirmation_card_ignores_stale_latest_complete_data_assumption() -> None:
+def test_runtime_confirmation_card_ignores_stale_latest_complete_data_assumption() -> (
+    None
+):
     card = runtime_confirmation_card(
         {
             "stage_outcome": "await_approval",
@@ -273,9 +294,12 @@ def test_runtime_confirmation_card_ignores_stale_latest_complete_data_assumption
     )
 
     assert card is not None
-    assert {"label": "Period", "value": "January 1, 2026 - June 1, 2026"} in card[
-        "rows"
-    ]
+    assert any(
+        row["key"] == "period"
+        and row["labelKey"] == "chat.confirmation.rows.period"
+        and row["value"] == "January 1, 2026 - June 1, 2026"
+        for row in card["rows"]
+    )
     assert "Through Jun 2" not in card["assumptions"]
 
 
@@ -324,6 +348,7 @@ def test_runtime_confirmation_card_uses_visible_benchmark_when_payload_is_stale(
     )
 
     assert card is not None
+    assert card["status"] == "needs_change"
     assert card["statusLabel"] == "Needs change"
     assert "Benchmark: QQQ" in card["assumptions"]
     assert "Benchmark: SPY" not in card["assumptions"]

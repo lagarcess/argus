@@ -13,6 +13,7 @@ import {
   serializeComposerSegments,
   type ComposerSegment,
 } from "../components/chat/composer-model";
+import type { DiscoveryItem } from "../lib/argus-api";
 
 const goog = {
   id: "asset:equity:GOOG",
@@ -34,6 +35,30 @@ const rsi = {
   description: "Relative Strength Index",
   insert_text: "RSI",
   provider: "pandas-ta-classic",
+  support_status: "supported" as const,
+};
+
+const btc = {
+  id: "asset:crypto:BTC",
+  type: "asset" as const,
+  label: "BTC · Bitcoin",
+  symbol: "BTC",
+  asset_class: "crypto" as const,
+  description: "Crypto",
+  insert_text: "BTC",
+  provider: "kraken",
+  support_status: "supported" as const,
+};
+
+const eurusd = {
+  id: "asset:currency_pair:EURUSD",
+  type: "asset" as const,
+  label: "EURUSD · EUR/USD",
+  symbol: "EURUSD",
+  asset_class: "currency_pair" as const,
+  description: "Currency Pair",
+  insert_text: "EURUSD",
+  provider: "kraken",
   support_status: "supported" as const,
 };
 
@@ -146,6 +171,48 @@ describe("chat composer model", () => {
     const next = replaceRangeWithToken(segments, range!, rsi);
 
     expect(serializeComposerSegments(next)).toBe("Buy RSI drops below 30");
+  });
+
+  test("selecting a crypto pair alias replaces the full multi-word discovery phrase", () => {
+    const segments: ComposerSegment[] = [
+      { type: "text", text: "Buy @bitcoin usd over the last year" },
+    ];
+    const range = rangeForDiscoveryItem(segments, "Buy @bitcoin usd".length, btc);
+    const next = replaceRangeWithToken(segments, range!, btc);
+
+    expect(serializeComposerSegments(next)).toBe("Buy BTC over the last year");
+  });
+
+  test("selecting a currency pair slash alias replaces the full discovery phrase", () => {
+    const segments: ComposerSegment[] = [
+      { type: "text", text: "Compare @eur/usd against cash" },
+    ];
+    const range = rangeForDiscoveryItem(segments, "Compare @eur/usd".length, eurusd);
+    const next = replaceRangeWithToken(segments, range!, eurusd);
+
+    expect(serializeComposerSegments(next)).toBe("Compare EURUSD against cash");
+  });
+
+  test("malformed discovery payloads do not crash range matching", () => {
+    const malformed = {
+      id: "asset:crypto:ETH",
+      type: "asset",
+      label: null,
+      symbol: null,
+      asset_class: "crypto",
+      description: null,
+      insert_text: undefined,
+      provider: "kraken",
+      support_status: "supported",
+    } as unknown as DiscoveryItem;
+
+    const range = rangeForDiscoveryItem(
+      [{ type: "text", text: "Buy @ethereum now" }],
+      "Buy @ethereum".length,
+      malformed,
+    );
+
+    expect(range).toEqual({ start: 4, end: "Buy @ethereum".length, query: "ethereum" });
   });
 
   test("clicking a result after a partial search offset still replaces the full typed asset word", () => {

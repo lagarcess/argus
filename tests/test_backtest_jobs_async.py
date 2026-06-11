@@ -423,6 +423,62 @@ def test_terminal_render_task_timeout_reconciles_running_job() -> None:
     assert metadata["workflow_backtest"]["workflow_run_error"] == "task timed out"
 
 
+def test_terminal_render_task_cancellation_reconciles_as_non_retryable() -> None:
+    from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
+
+    gateway = _TimedOutJobGateway()
+    task_client = _FakeTerminalTaskRunClient(
+        {
+            "id": "trn-timeout-1",
+            "status": "canceled",
+            "error": "canceled by operator",
+            "completedAt": "2026-06-06T12:01:10Z",
+        }
+    )
+
+    reconciled = reconcile_terminal_render_task_run(
+        gateway=gateway,
+        user_id="user-1",
+        job=gateway.get_backtest_job(user_id="user-1", job_id="job-timeout-1"),
+        task_run_client=task_client,
+    )
+
+    assert reconciled["status"] == "failed"
+    assert reconciled["failure_code"] == "workflow_task_canceled"
+    assert reconciled["retryable"] is False
+    assert gateway.failed_updates[0]["failure_detail"] == (
+        "Backtest execution was canceled before finishing."
+    )
+
+
+def test_terminal_render_task_expiration_reconciles_as_retryable() -> None:
+    from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
+
+    gateway = _TimedOutJobGateway()
+    task_client = _FakeTerminalTaskRunClient(
+        {
+            "id": "trn-timeout-1",
+            "status": "expired",
+            "error": "task expired",
+            "completedAt": "2026-06-06T12:01:10Z",
+        }
+    )
+
+    reconciled = reconcile_terminal_render_task_run(
+        gateway=gateway,
+        user_id="user-1",
+        job=gateway.get_backtest_job(user_id="user-1", job_id="job-timeout-1"),
+        task_run_client=task_client,
+    )
+
+    assert reconciled["status"] == "failed"
+    assert reconciled["failure_code"] == "workflow_task_expired"
+    assert reconciled["retryable"] is True
+    assert gateway.failed_updates[0]["failure_detail"] == (
+        "Backtest execution expired before finishing."
+    )
+
+
 def test_terminal_render_task_reconciliation_ignores_malformed_metadata() -> None:
     from argus.api.chat.backtest_jobs import reconcile_terminal_render_task_run
 

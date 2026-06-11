@@ -139,6 +139,16 @@ type HydratedMessages = {
   inputActions: ChatActionOption[];
 };
 
+function chatActionRequestFromAction(action: ChatActionOption): ChatActionRequest {
+  return {
+    type: action.type as NonNullable<ChatActionOption["type"]>,
+    label: action.label,
+    labelKey: action.labelKey,
+    payload: action.payload,
+    presentation: action.presentation,
+  };
+}
+
 function readActiveConversationRouteState(): ActiveConversationRouteState {
   if (typeof window === "undefined") {
     return {
@@ -220,10 +230,8 @@ function latestInputActions(messages: Message[]) {
   ) {
     return [];
   }
-  return (latestAi?.actions ?? []).filter(
-    (action) =>
-      action.type !== "save_strategy" &&
-      action.artifactType !== "failed_action",
+  return visibleComposerActions(latestAi?.actions ?? []).filter(
+    (action) => action.artifactType !== "failed_action",
   );
 }
 
@@ -1257,12 +1265,7 @@ export default function ChatInterface() {
     setIsStreamingResponse(true);
 
     const streamInput: string | ChatActionRequest = action?.type
-      ? {
-          type: action.type,
-          label: action.label,
-          payload: action.payload,
-          presentation: action.presentation,
-        }
+      ? chatActionRequestFromAction(action)
       : trimmed;
 
     const handleStreamEvent = (event: ChatStreamEvent) => {
@@ -1624,6 +1627,7 @@ export default function ChatInterface() {
     const streamInput: ChatActionRequest = {
       type: "save_strategy",
       label: action.label,
+      labelKey: action.labelKey,
       payload: action.payload,
       presentation: action.presentation,
     };
@@ -1696,6 +1700,7 @@ export default function ChatInterface() {
     const streamInput: ChatActionRequest = {
       type: "cancel_confirmation",
       label: action.label,
+      labelKey: action.labelKey,
       payload: action.payload,
       presentation: action.presentation,
     };

@@ -129,6 +129,23 @@ describe("chat backtest jobs", () => {
     ]);
   });
 
+  test("pending job ids keep queued running and succeeded-without-run pollable", () => {
+    const messages: Message[] = [
+      { ...queuedJobMessage(), id: "queued", backtestJob: job({ id: "queued", status: "queued" }) },
+      { ...queuedJobMessage(), id: "running", backtestJob: job({ id: "running", status: "running" }) },
+      { ...queuedJobMessage(), id: "succeeded", backtestJob: job({ id: "succeeded", status: "succeeded" }) },
+      { ...queuedJobMessage(), id: "failed", backtestJob: job({ id: "failed", status: "failed" }) },
+      { ...queuedJobMessage(), id: "canceled", backtestJob: job({ id: "canceled", status: "canceled" }) },
+      { ...queuedJobMessage(), id: "expired", backtestJob: job({ id: "expired", status: "expired" }) },
+    ];
+
+    expect(pendingBacktestJobIds(messages)).toEqual([
+      "queued",
+      "running",
+      "succeeded",
+    ]);
+  });
+
   test("failed durable job update replaces a local running state", () => {
     const running: Message = {
       ...queuedJobMessage(),
@@ -231,6 +248,7 @@ describe("chat backtest jobs", () => {
     );
 
     expect(completedMessages[0].confirmation?.statusLabel).toBe("Run complete");
+    expect(completedMessages[0].confirmation?.status).toBe("run_complete");
     expect(completedMessages[1].kind).toBe("strategy_result");
   });
 
@@ -263,6 +281,7 @@ describe("chat backtest jobs", () => {
     );
 
     expect(settledConfirmation.confirmation?.statusLabel).toBe("Request sent");
+    expect(settledConfirmation.confirmation?.status).toBe("request_sent");
     expect(activeJob.kind).toBe("backtest_job");
     expect(activeJob.backtestJob?.status).toBe("queued");
   });
@@ -308,6 +327,7 @@ describe("chat backtest jobs", () => {
     );
 
     expect(settledConfirmation.confirmation?.statusLabel).toBe("Could not run");
+    expect(settledConfirmation.confirmation?.status).toBe("could_not_run");
     expect(failedJob.kind).toBe("backtest_job");
     expect(failedJob.backtestJob?.status).toBe("failed");
   });
@@ -350,8 +370,53 @@ describe("chat backtest jobs", () => {
     );
 
     expect(settledConfirmation.confirmation?.statusLabel).toBe("Not completed");
+    expect(settledConfirmation.confirmation?.status).toBe("not_completed");
     expect(expiredJob.kind).toBe("backtest_job");
     expect(expiredJob.backtestJob?.status).toBe("expired");
+  });
+
+  test("canceled durable job settles request-sent confirmation status", () => {
+    const confirmationMessage: Message = supersedePriorConfirmations(
+      {
+        id: "confirmation-message-1",
+        role: "ai",
+        kind: "strategy_confirmation",
+        confirmation: {
+          confirmation_id: "confirmation-1",
+          confirmation_state: "active",
+          title: "AAPL buy and hold",
+          statusLabel: "Ready to run",
+          summary: "Ready to test AAPL.",
+          rows: [],
+          actions: [],
+        },
+        actions: [],
+      },
+      "Running",
+    );
+    const queuedMessages = applyBacktestJobUpdate(
+      [confirmationMessage, queuedJobMessage()],
+      {
+        job: job({ status: "running" }),
+        run: null,
+      },
+    );
+    const [settledConfirmation, canceledJob] = applyBacktestJobUpdate(
+      queuedMessages,
+      {
+        job: job({
+          status: "canceled",
+          finished_at: "2026-06-06T12:00:04Z",
+        }),
+        run: null,
+      },
+    );
+
+    expect(settledConfirmation.confirmation?.statusLabel).toBe("Not completed");
+    expect(settledConfirmation.confirmation?.status).toBe("not_completed");
+    expect(canceledJob.kind).toBe("backtest_job");
+    expect(canceledJob.backtestJob?.status).toBe("canceled");
+    expect(pendingBacktestJobIds([canceledJob])).toEqual([]);
   });
 
   test("job card locale copy does not expose implementation plumbing", () => {

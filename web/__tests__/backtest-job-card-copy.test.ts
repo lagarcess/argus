@@ -49,4 +49,24 @@ describe("backtest job card copy", () => {
 
     expect(copy.bodyKey).toBe("chat.backtest_job.failed_body");
   });
+
+  test("never uses retry copy for canceled or expired jobs", () => {
+    expect(
+      backtestJobCardCopy(job({ status: "canceled", retryable: true }), {
+        canRetry: true,
+      }).bodyKey,
+    ).toBe("chat.backtest_job.expired_body");
+
+    expect(
+      backtestJobCardCopy(job({ status: "expired", retryable: true }), {
+        canRetry: true,
+      }).bodyKey,
+    ).toBe("chat.backtest_job.expired_body");
+  });
+
+  test("uses neutral lifecycle tone for completed and not-completed handoff states", () => {
+    expect(backtestJobCardCopy(job({ status: "succeeded" })).tone).toBe("neutral");
+    expect(backtestJobCardCopy(job({ status: "canceled" })).tone).toBe("neutral");
+    expect(backtestJobCardCopy(job({ status: "expired" })).tone).toBe("neutral");
+  });
 });

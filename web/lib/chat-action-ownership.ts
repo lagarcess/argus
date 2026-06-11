@@ -40,5 +40,7 @@ export function visibleInputActions(actions: ChatActionOption[]) {
 }
 
 export function visibleComposerActions(actions: ChatActionOption[]) {
-  return visibleInputActions(actions).filter((action) => !isCardScopedAction(action));
+  return visibleInputActions(actions).filter(
+    (action) => !actionHasCardScopedOwnership(action),
+  );
 }

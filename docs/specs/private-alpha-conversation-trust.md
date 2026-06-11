@@ -1,7 +1,7 @@
 # Private Alpha Conversation Trust
 
-Status: Branch checkpoint; founder review pending
-Date: 2026-06-09
+Status: Merged and deployed checkpoint; follow-up debt triaged into next milestone
+Date: 2026-06-10
 Audience: Founder, engineering agents, product/architecture review
 
 ## Purpose
@@ -15,6 +15,24 @@ This is not a Perplexity Research Lab implementation milestone. Research Lab is
 captured below as the next product thesis so the direction is not lost, but the
 current milestone focuses on production-grade conversation trust for the
 existing chat/backtest loop.
+
+## Current Checkpoint
+
+The conversation trust milestone landed through:
+
+- PR #95: `feat(trust): harden private-alpha conversation flow`
+- PR #96: `feat(trust): harden private-alpha conversation followups`
+
+The deployed private-alpha app was smoke-tested on the merged `main` checkpoint
+`2fc4773`. The post-merge smoke verified that the app loads, the composer
+renders, empty send remains disabled with the expected tooltip, provider-backed
+`@` discovery returns AAPL/Apple results, selecting a result inserts the symbol,
+and clearing the composer disables send again.
+
+This document is therefore historical for the completed conversation-trust push
+and still useful as design context. New work should start from
+`docs/specs/private-alpha-next-integration.md` so agents do not reopen closed
+slices or mistake future product thesis work for current implementation scope.
 
 ## Product Thesis
 

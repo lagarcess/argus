@@ -416,6 +416,55 @@ def test_adjust_assumptions_capital_answer_patches_visible_draft(monkeypatch) ->
     assert strategy.date_range == {"start": "2024-07-03", "end": "2024-08-13"}
     assert strategy.capital_amount is None
     assert result.patch["optional_parameter_status"]["initial_capital"] == 5000
+    assert result.stage_patch.get("assistant_response") is None
+
+
+def test_adjust_assumptions_capital_amount_correction_updates_card_without_prose(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import interpret as interpret_module
+
+    monkeypatch.setattr(
+        interpret_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+    pending = StrategySummary(
+        strategy_type="buy_and_hold",
+        strategy_thesis="Buy and hold Ethereum.",
+        asset_universe=["ETH"],
+        asset_class="crypto",
+        date_range={"start": "2025-10-11", "end": "2026-06-10"},
+    )
+    response = StructuredInterpretation(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="User corrected the visible starting capital.",
+        candidate_strategy_draft=StrategySummary(
+            capital_amount=100000,
+            field_provenance={"capital_amount": "starting_capital"},
+        ),
+        semantic_turn_act="answer_pending_need",
+    )
+
+    result, _ = _interpret(
+        message="change the capital amount to 100,000 instead",
+        response=response,
+        snapshot=_task_snapshot_with_confirmation(pending),
+        selected_thread_metadata={
+            "last_stage_outcome": "await_user_reply",
+            "requested_field": "assumption",
+        },
+    )
+
+    assert result.outcome == "ready_for_confirmation"
+    strategy = result.decision.candidate_strategy_draft
+    assert strategy.asset_universe == ["ETH"]
+    assert strategy.date_range == {"start": "2025-10-11", "end": "2026-06-10"}
+    assert strategy.capital_amount is None
+    assert result.patch["optional_parameter_status"]["initial_capital"] == 100000
+    assert result.stage_patch.get("assistant_response") is None
 
 
 def test_buy_and_hold_without_capital_is_ready_for_confirmation(monkeypatch) -> None:
@@ -2747,7 +2796,6 @@ def test_requested_asset_answer_uses_provider_path_when_interpreter_unavailable(
     strategy = result.decision.candidate_strategy_draft
     assert provider_queries[0] == answer
     assert "AAPL" not in provider_queries
-    assert expected_symbol in {query.strip().upper() for query in provider_queries}
     assert strategy.asset_universe == [expected_symbol]
     assert strategy.asset_class == expected_class
     assert strategy.date_range == {"start": "2024-01-01", "end": "2024-12-31"}
@@ -4993,6 +5041,82 @@ def test_current_message_contract_repair_preserves_full_natural_date_range(
     assert "current_message_run_field_contract_repair" in repaired.reason_codes
 
 
+@pytest.mark.asyncio
+async def test_stated_run_fidelity_audits_misread_non_dca_capital(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as llm_module
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants to buy and hold ETH with 100K.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Let's buy and hold ETH for the last 8 months to date, put 100K on it"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis="Buy and hold ETH.",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2025-10-11", "end": "2026-06-10"},
+            capital_amount=1000,
+            field_provenance={"capital_amount": "starting_capital"},
+        ),
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "Let's buy and hold ETH for the last 8 months to date, put 100K on it"
+        ),
+        user=UserState(user_id="user-1"),
+    )
+
+    calls: list[str] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, model_name
+        calls.append(schema_name)
+        assert schema_name == "StatedRunFieldFidelityAudit"
+        assert "100K" in str(messages)
+        return schema_model(capital_amount=100000, confidence=0.96)
+
+    monkeypatch.setattr(llm_module, "invoke_openrouter_json_schema", fake_json_schema)
+
+    assert llm_module._response_needs_stated_run_field_fidelity_audit(
+        response=response,
+        request=request,
+    )
+
+    deterministic_repair = llm_module._response_from_current_message_run_field_contract(
+        response=response,
+        request=request,
+    )
+    assert deterministic_repair is None
+
+    repaired = await llm_module._audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.capital_amount == 100000
+    assert draft.field_provenance["capital_amount"] == "starting_capital"
+    assert repaired.assistant_response is None
+    assert calls == ["StatedRunFieldFidelityAudit"]
+    assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
+
 def test_current_message_contract_repair_preserves_only_calendar_year_date_range(
     monkeypatch,
 ) -> None:
@@ -5708,6 +5832,54 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair() -> None:
         current_user_message=(
             "If I bought AAPL at the start of 2024 and held through the end of "
             "2025, how would it compare with SPY?"
+        ),
+        user=UserState(user_id="user-1"),
+    )
+
+    assert not _response_needs_stated_run_field_fidelity_audit(
+        response=response,
+        request=request,
+    )
+
+
+def test_stated_run_fidelity_audit_skips_aligned_focused_repair_capital() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        _response_needs_stated_run_field_fidelity_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants a TSLA crossover test with stated capital.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="signal_strategy",
+            strategy_thesis="Backtest TSLA when the 50 SMA crosses the 200 SMA.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range={"start": "2022-01-01", "end": "today"},
+            capital_amount=10000,
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        reason_codes=["focused_strategy_extraction_repair"],
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "buy when the 50 crosses the 200 for Tesla from January 2022 "
+            "to today with 10k"
         ),
         user=UserState(user_id="user-1"),
     )

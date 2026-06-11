@@ -1,5 +1,8 @@
 # Private Alpha Reliability Hardening Implementation Plan
 
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make the existing Argus chat/backtest runtime reliable enough for scheduled private-alpha internet testing on Render Free/Hobby without a broad rearchitecture.

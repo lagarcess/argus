@@ -1,84 +1,91 @@
-# Jules – AI Agent Reference & Journal
+# Jules Agent Instructions
 
-This directory contains reference documentation and mandatory logic for the Jules autonomous scheduling framework.
+This folder is the small instruction surface Jules auto-loads for Argus work.
+It must stay current, narrow, and subordinate to `AGENTS.md`.
 
----
+## Branch Model
 
-## 📚 Structure
+Jules works only in the downstream intake lane:
 
-### `.agent/.jules/realignment.md`
+```text
+main
+  -> codex/private-alpha-next
+       -> codex/private-alpha-next-jules-intake
+            -> jules/<focused-low-risk-task>
+```
 
-**Mandatory Rule**: This file defines the "Branch Sync & Goal Realignment" logic. Every Jules session must execute these steps (rebase main, re-verify mission, validate regressions) before concluding.
+Rules:
 
----
-**Key principles:**
-- **Goal Realignment**: Jules must always stay aligned with the `main` branch and the original mission.
-- **Shared Skills**: Jules uses the global repository at `.agent/skills/`.
-- **Quarantine**: Scheduled task definitions and journals are maintained in the root `temp/` folder for manual review.
+- Start Jules task branches from `codex/private-alpha-next-jules-intake`.
+- Name Jules branches `jules/<short-focused-task>`.
+- Open Jules PRs back to `codex/private-alpha-next-jules-intake`.
+- Do not push to `main`, `codex/private-alpha-next`, or the intake branch.
+- Do not rebase Jules work directly on `main`.
+- Treat `codex/private-alpha-next` as the integration source of truth. Codex
+  will periodically merge or fast-forward it down into the intake branch.
 
----
+## Required Reading
 
-## 📅 Maintenance Protocol
+Before changing files, read:
 
-| Step              | Action                                  | Rationale                               |
-| ----------------- | --------------------------------------- | --------------------------------------- |
-| **Sync**          | `git fetch origin main && git rebase`  | Prevent architectural drift             |
-| **Realignment**   | Re-check mission vs API contract        | Ensure functional integrity             |
-| **Verify**        | Run `/verify` workflow                  | Maintain 63% coverage and <3s latency   |
+1. `AGENTS.md`
+2. `docs/specs/private-alpha-next-integration.md`
+3. `.agent/.jules/realignment.md`
+4. The canon docs listed in `AGENTS.md` when the task touches product behavior,
+   architecture, API contracts, data model, or design.
 
----
+## Scope
 
-## 🧠 What are Skills?
+Jules is for low-risk, focused debt work unless a task says otherwise.
 
-Jules draws from the **global Argus skills** located in `.agent/skills/`.
+Good Jules tasks:
 
-**Autonomous Selection**: Jules is authorized to proactively select and apply *any* relevant skill from the global library `.agent/skills/` based on the context of the task, ensuring best practices are maintained without explicit instruction.
+- docs hygiene and stale-reference cleanup
+- small test coverage additions
+- i18n string consistency
+- local-only script cleanup
+- narrow dead-code removal with tests
+- small UI polish that does not change runtime behavior
 
-**Core available skills:**
-- `coding-standards/`
-- `numba-patterns/`
-- `backend-patterns/`
-- `testing-patterns/`
-- `frontend-patterns/`
-- `security-review/`
-- `supabase/`
-- `stitch-loop/`
+Avoid unless explicitly authorized:
 
----
+- Argus runtime or LangGraph behavior changes
+- Supabase schema/RLS migrations
+- Render deploy or workflow configuration changes
+- live Supabase writes
+- production env or secret changes
+- broad large-file refactors
+- Perplexity Research Lab implementation
 
-## 🔄 Rules & Workflows
+## Setup
 
-Jules follows the project-wide rules in `.agent/rules/` and workflows in `.agent/workflows/`. Specifically, it must always check against `realignment.md` in this directory.
+Run the project bootstrap first:
 
----
+```bash
+.github/setup.sh
+```
 
-## 📖 Documentation References
+If `.env` or `web/.env.local` are missing, use safe development defaults. Do
+not require production secrets for low-risk debt work.
 
-- **API contract:** `docs/API_CONTRACT.md`
-- **Master Registry:** `AGENTS.md` (overall agent structure, skills, rules)
+## Verification
 
----
+Every Jules PR must report:
 
-## 📝 Realignment Checklist (Mandatory)
+- branch base and target branch
+- files changed
+- exact verification commands run
+- browser QA notes when UI changed
+- known caveats
 
-1. **Synchronize**: Force rebase of `main`, prioritize upstream.
-2. **Realignment**: Re-verify mission against current `docs/API_CONTRACT.md`.
-3. **Validation**: Enforce `/verify` and iterate failures with `/fix`.
-4. **Reporting**: Summarize shifts necessitated by drift.
+Use focused checks by default. Run broader checks when the task touches shared
+contracts, runtime behavior, frontend rendering primitives, or CI setup.
 
----
+## Safety
 
-## 🚫 Anti-Patterns
-
-- ❌ Ignore `main` branch updates during long-running tasks.
-- ❌ Proceed with stale mission goals after API contract shifts.
-- ❌ Skip `/verify` before declaring a task complete.
-- ❌ Create new localized skills (always use `.agent/skills/`).
-
----
-
-## Resources
-
-- **Antigravity Docs:** https://antigravity.google/docs/
-- **API reference:** `docs/API_CONTRACT.md`
-- **Project agents:** `AGENTS.md`
+- MCP access is read-only by default.
+- Render or Supabase write operations require explicit task authorization.
+- Never commit `.env`, `web/.env.local`, credentials, API keys, tokens, or local
+  admin scripts.
+- Keep generated scratch output under `temp/`.
+- If instructions conflict, stop and report the conflict instead of guessing.

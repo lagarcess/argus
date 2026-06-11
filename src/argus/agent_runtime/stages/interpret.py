@@ -4022,7 +4022,14 @@ def _trusted_user_mention_resolution(
 ) -> AssetResolution | None:
     field = f"asset_universe[{index}]"
     normalized_symbol = str(symbol or "").strip().upper()
-    for item in strategy.resolution_provenance:
+    for raw_item in strategy.resolution_provenance:
+        if isinstance(raw_item, ResolutionProvenance):
+            item = raw_item
+        else:
+            try:
+                item = ResolutionProvenance.model_validate(raw_item)
+            except (TypeError, ValueError):
+                continue
         if item.source != "user_mention":
             continue
         if item.candidate_kind != "asset" or item.resolution_status != "resolved":

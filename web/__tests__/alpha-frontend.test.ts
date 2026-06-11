@@ -260,12 +260,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain('presentation="heroDeltaEvidence"');
     expect(card).toContain("appearanceOverride={appearance}");
     expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
+    expect(card).toContain("const saveAction = strategiesEnabled");
     expect(card).toContain('action.type !== "save_strategy"');
     expect(labelHelper).toContain('"Explain result"');
     expect(labelHelper).toContain('"Refine idea"');
     expect(card).toContain('action.type === "save_strategy"');
     expect(card).toContain("<Save");
-    expect(chat).toContain('action.type !== "save_strategy"');
+    expect(chat).toContain("if (!strategiesEnabled)");
+    expect(chat).toContain("chat.private_alpha_result_kept");
     expect(chart).toContain("BaselineSeries");
     expect(chart).toContain("createSeriesMarkers");
     expect(chart).toContain("buildVisibleSeriesMarkers");
@@ -355,11 +357,13 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("from \"./artifact-history\"");
     expect(artifactHistory).toContain("supersedePriorConfirmations");
     expect(artifactHistory).toContain("function isTerminalConfirmation");
-    expect(card).toContain('confirmation.confirmation_state === "superseded"');
-    expect(card).toContain('confirmation.confirmation_state === "cancelled"');
+    expect(card).toContain("confirmationStatusFromPayload");
+    expect(card).toContain("confirmationStatusLabelKey");
+    expect(card).toContain("confirmationRowKey(row)");
     expect(card).toContain("function confirmationDisplayState");
-    expect(card).toContain('statusLabel: rawLabel || "Draft canceled"');
-    expect(card).toContain('confirmation.confirmation_state === "superseded" ? "Updated" : "Ready"');
+    expect(card).not.toContain("row.label.toLowerCase()");
+    expect(card).not.toContain('normalizedLabel === "running"');
+    expect(card).toContain('t("chat.confirmation.selected_asset", "Selected asset")');
   });
 
   test("chat supersedes active confirmations when a later turn asks for recovery", () => {
@@ -371,7 +375,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(chat).toContain("settleOpenConfirmationsAfterTextFinal");
     expect(artifactHistory).toContain("supersedeOpenConfirmations");
-    expect(artifactHistory).toContain("Could not run");
+    expect(artifactHistory).toContain("could_not_run");
+    expect(artifactHistory).toContain("confirmationStatusLabel");
     expect(artifactHistory).toContain('artifactType === "failed_action"');
     expect(chat).toContain("finalStageOutcome");
     expect(chat).toContain('finalStageOutcome === "await_user_reply"');
@@ -394,6 +399,8 @@ describe("Argus Alpha frontend contract", () => {
 
     expect(types).toContain('"action"');
     expect(chat).toContain('kind: action?.type ? "action" : "text"');
+    expect(chat).toContain("chatActionRequestFromAction");
+    expect(chat).toContain("labelKey: action.labelKey");
     expect(chat).toContain("selectedAction: action");
     expect(chat).toContain("metadata.chat_action");
     expect(message).toContain('message.kind === "action"');
@@ -641,11 +648,18 @@ describe("Argus Alpha frontend contract", () => {
 
   test("result cards render artifact scoped actions and saved state", () => {
     const card = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
+    const resultActions = readFileSync(join(root, "lib/chat-result-actions.ts"), "utf-8");
     const locale = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
 
     expect(card).toContain('action.type === "show_breakdown"');
     expect(card).toContain('action.type === "refine_strategy"');
     expect(card).toContain('action.type === "save_strategy"');
+    expect(card).toContain("isVisibleResultAction");
+    expect(resultActions).toContain("VISIBLE_RESULT_ACTION_TYPES");
+    expect(resultActions).toContain("isVisibleResultAction");
+    expect(card).not.toContain("...resultActions.filter(");
+    expect(resultActions).not.toContain("next_experiment");
+    expect(resultActions).not.toContain("try_next");
     expect(card).toContain("result.savedStrategyId");
     expect(card).toContain("chat.saved");
     expect(locale).toContain('"saved": "Saved"');
@@ -882,6 +896,7 @@ describe("Argus Alpha frontend contract", () => {
   test("chat message feedback controls fill only the selected thumb glyph", () => {
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const feedbackContext = readFileSync(join(root, "lib/chat-message-feedback-context.ts"), "utf-8");
 
     expect(message).toContain("text-[#191c1f] dark:text-white");
     expect(message).toContain("selectedFeedbackClass");
@@ -900,7 +915,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain('onFeedback?.("rating"');
     expect(message).toContain("postFeedback");
     expect(message).toContain("conversationId?: string | null");
-    expect(message).toContain("conversation_id: conversationId");
+    expect(message).toContain("feedbackContextForMessage(message, conversationId, extra)");
+    expect(feedbackContext).toContain("conversation_id: conversationId");
     expect(chat).toContain("conversationId={conversationId}");
   });
 
@@ -1112,5 +1128,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("err.status === 404");
     expect(chat).toContain("clearActiveConversationPointer()");
     expect(chat).toContain("await streamToConversation(conversation.id)");
+  });
+
+  test("apiFetch does not leak request options to the console", () => {
+    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    expect(api).not.toContain("[argus-api] Fetching");
   });
 });

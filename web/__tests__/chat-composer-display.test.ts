@@ -7,9 +7,11 @@ import {
   DISCOVERY_SEARCH_LIMIT,
   discoveryEnterAction,
   discoveryOptionDomId,
+  discoveryResultsAreFresh,
   discoverySectionsForDisplay,
   mergeDiscoveryItems,
   nextDiscoveryItemId,
+  selectableDiscoveryItemsForQuery,
   shouldHideMentionButton,
 } from "../components/chat/ChatInput";
 import type { DiscoveryItem } from "../lib/argus-api";
@@ -105,6 +107,46 @@ describe("chat composer display helpers", () => {
     expect(merged).toHaveLength(DISCOVERY_SEARCH_LIMIT);
   });
 
+  test("prioritizes a runnable indicator when the query matches its full name", () => {
+    const assetResults: DiscoveryItem[] = [
+      {
+        id: "asset:equity:RELX",
+        type: "asset",
+        label: "RELX · Relx PLC",
+        symbol: "RELX",
+        asset_class: "equity",
+        description: "Stock",
+        insert_text: "RELX",
+        provider: "alpaca",
+        support_status: "supported",
+      },
+    ];
+    const indicatorResults: DiscoveryItem[] = [
+      {
+        id: "indicator:rsi",
+        type: "indicator",
+        label: "RSI",
+        symbol: "rsi",
+        description: "Relative Strength Index",
+        insert_text: "RSI",
+        provider: "pandas-ta-classic",
+        support_status: "supported",
+      },
+    ];
+
+    const merged = mergeDiscoveryItems(
+      assetResults,
+      indicatorResults,
+      "relative strength",
+      DISCOVERY_SEARCH_LIMIT,
+    );
+
+    expect(merged.map((item) => item.id)).toEqual([
+      "indicator:rsi",
+      "asset:equity:RELX",
+    ]);
+  });
+
   test("chat input exposes the discovery picker as a keyboardable listbox", () => {
     const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
 
@@ -118,8 +160,9 @@ describe("chat composer display helpers", () => {
     expect(input).toContain("isMentionButtonHidden ? \"invisible pointer-events-none\"");
     expect(input).toContain('aria-controls={isDiscoveryOpen ? "chat-discovery-listbox" : undefined}');
     expect(input).toContain("aria-activedescendant={isDiscoveryOpen ? activeDiscoveryOptionId : undefined}");
-    expect(input).toContain("aria-selected={item.id === activeDiscoveryItemId}");
-    expect(input).toContain('data-active-discovery-option={item.id === activeDiscoveryItemId ? "true" : undefined}');
+    expect(input).toContain("aria-selected={isActive}");
+    expect(input).toContain("disabled={!itemSelectable}");
+    expect(input).toContain('data-active-discovery-option={isActive ? "true" : undefined}');
     expect(input).toContain("onMouseDown={(event) => event.preventDefault()}");
     expect(input).toContain('e.key === "ArrowDown"');
     expect(input).toContain('e.key === "ArrowUp"');
@@ -139,6 +182,31 @@ describe("chat composer display helpers", () => {
     expect(input).toContain("aria-busy={discoveryPanel.busy}");
     expect(input).toContain("Promise.allSettled");
     expect(input).not.toContain("searchDiscovery(\"assets\", query, DISCOVERY_SEARCH_LIMIT).catch(() => ({ items: [] }))");
+  });
+
+  test("chat input preserves visible discovery results while a follow-up query loads", () => {
+    const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
+
+    expect(input).toContain('setDiscoveryStatus("loading")');
+    expect(input).not.toContain('setDiscoveryItems([]);\n    setDiscoveryStatus("loading")');
+  });
+
+  test("stale discovery results stay visible but cannot be selected", () => {
+    const visibleItems = discoverySectionsForDisplay(defaults, "tesla")
+      .flatMap((section) => section.items);
+
+    expect(visibleItems.map((item) => item.id)).toEqual(["asset:AAPL", "indicator:rsi"]);
+    expect(discoveryResultsAreFresh(" apple ", "APPLE")).toBe(true);
+    expect(discoveryResultsAreFresh("apple", "tesla")).toBe(false);
+    expect(selectableDiscoveryItemsForQuery(visibleItems, false)).toEqual([]);
+    expect(
+      discoveryEnterAction({
+        hasActiveItem: selectableDiscoveryItemsForQuery(visibleItems, false).length > 0,
+        hasComposerContent: true,
+      }),
+    ).toBe("submit");
+    expect(selectableDiscoveryItemsForQuery(visibleItems, true).map((item) => item.id))
+      .toEqual(["asset:AAPL", "indicator:rsi"]);
   });
 
   test("discovery enter behavior does not trap send when no result is active", () => {

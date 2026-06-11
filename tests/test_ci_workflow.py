@@ -12,14 +12,28 @@ def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
-def test_ci_runs_on_main_and_codex_pushes_without_deploying() -> None:
+def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
     workflow = _workflow()
 
     assert not (ROOT / ".github" / "workflows" / "deploy.yml").exists()
     assert workflow["name"] == "CI"
-    assert workflow["on"]["push"]["branches"] == ["main", "codex/**"]
-    assert workflow["on"]["pull_request"]["branches"] == ["main"]
+    assert workflow["on"]["push"]["branches"] == ["main", "codex/**", "jules/**"]
+    assert workflow["on"]["pull_request"]["branches"] == [
+        "main",
+        "codex/private-alpha-next",
+        "codex/private-alpha-next-jules-intake",
+    ]
     assert "deploy" not in workflow["jobs"]
+
+
+def test_ci_queues_integration_branch_runs_without_canceling_evidence() -> None:
+    concurrency = _workflow()["concurrency"]
+
+    assert concurrency["group"] == "${{ github.workflow }}-${{ github.ref }}"
+    assert concurrency["cancel-in-progress"] == (
+        "${{ github.ref != 'refs/heads/codex/private-alpha-next' && "
+        "github.ref != 'refs/heads/codex/private-alpha-next-jules-intake' }}"
+    )
 
 
 def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:

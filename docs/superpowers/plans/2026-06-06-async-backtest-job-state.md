@@ -1,5 +1,8 @@
 # Async Backtest Job State Implementation Plan
 
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move chat-confirmed `Run backtest` actions onto durable real Render Workflow jobs and hydrate queued/running/succeeded/failed state in chat without holding the API SSE stream open for the backtest duration.

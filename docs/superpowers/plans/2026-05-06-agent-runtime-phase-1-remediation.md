@@ -1,5 +1,8 @@
 # Agent Runtime Phase 1 Remediation Implementation Plan
 
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Do not dispatch subagents unless the user explicitly requests parallel agent work. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stop all pre-LLM message interception and structural message rewriting in the Argus agent runtime while preserving approval, edit-action, social, and educational behavior through the structured interpreter contract.

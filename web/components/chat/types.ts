@@ -98,8 +98,32 @@ export type StrategyResultPayload = {
   chart?: ResultChartPayload | null;
 };
 
+export type StrategyConfirmationRowKey =
+  | "strategy"
+  | "assets"
+  | "period"
+  | "cadence"
+  | "buy_rule"
+  | "exit_rule"
+  | "starting_capital"
+  | "contribution";
+
+export type StrategyConfirmationStatus =
+  | "ready_to_run"
+  | "needs_change"
+  | "running"
+  | "request_sent"
+  | "run_complete"
+  | "could_not_run"
+  | "not_completed"
+  | "editing"
+  | "draft_canceled"
+  | "updated";
+
 export type StrategyConfirmationRow = {
+  key?: StrategyConfirmationRowKey;
   label: string;
+  labelKey?: string;
   value: string;
 };
 
@@ -112,6 +136,7 @@ export type StrategyConfirmationPayload = {
   savedStrategyId?: string | null;
   copyText?: string;
   title: string;
+  status?: StrategyConfirmationStatus;
   statusLabel: string;
   summary: string;
   rows: StrategyConfirmationRow[];

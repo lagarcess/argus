@@ -298,15 +298,29 @@ may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
 `failed_action`, and `result_fact_bank`. User messages created by action chips
 may store `chat_action` so the transcript can hydrate the selected chip as an
-action item after reload. Clients use these fields to hydrate cards and actions
-after reload. Runtime execution still validates against the LangGraph checkpoint
+action item after reload. Action chip requests and persisted `chat_action`
+metadata should preserve `label` plus `labelKey` so localized transcript chips
+survive reload. Clients use these fields to hydrate cards and actions after
+reload. Runtime execution still validates against the LangGraph checkpoint
 first. A confirmation card may include `confirmation_id` and
 `confirmation_state`; only the latest active confirmation can execute, and older
-cards are transcript history. Result actions that mutate state must reference a
-canonical run id. `result_fact_bank` is a backend-provided, run-derived context
-object for result follow-ups; it is not a second metrics source of truth.
-`saved_strategy_id` marks a result artifact as already saved and must be treated
-as idempotent display state after reload.
+cards are transcript history. Confirmation cards should include stable
+machine-readable fields alongside display labels:
+
+- `status`: stable confirmation status code such as `ready_to_run`, `running`,
+  `run_complete`, or `could_not_run`.
+- `statusLabel`: legacy/user-facing fallback label for old clients and old
+  persisted cards.
+- `rows[].key`: stable row identity such as `strategy`, `assets`, or `period`.
+- `rows[].label` / `rows[].labelKey`: display fallback plus frontend i18n key.
+- `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
+
+Clients must use `status` and `rows[].key` for behavior. They must not infer
+card state from translated display labels. Result actions that mutate state must
+reference a canonical run id. `result_fact_bank` is a backend-provided,
+run-derived context object for result follow-ups; it is not a second metrics
+source of truth. `saved_strategy_id` marks a result artifact as already saved and
+must be treated as idempotent display state after reload.
 
 ## Strategy
 

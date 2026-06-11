@@ -1,5 +1,8 @@
 # Artifact-Centered Runtime Rebuild Scope
 
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 **Date:** 2026-05-13  
 **Status:** Draft scope for user review  
 **Branch context:** `codex/backtesting-chat-service-modularization`  

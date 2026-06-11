@@ -5,6 +5,8 @@ import {
   displayResultActionLabel,
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
+import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
+import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
 import ResultEquityChart from "./ResultEquityChart";
 import type { ChatActionOption, StrategyResultPayload } from "./types";
@@ -30,7 +32,7 @@ export default function StrategyResultCard({
     locale: i18n.language,
   });
   const symbols = result.symbols ?? [];
-  const resultActions = result.actions ?? [];
+  const resultActions = (result.actions ?? []).filter(isVisibleResultAction);
   const showBreakdownAction = resultActions.find(
     (action) => action.type === "show_breakdown",
   );
@@ -40,17 +42,10 @@ export default function StrategyResultCard({
   const saveAction = strategiesEnabled
     ? resultActions.find((action) => action.type === "save_strategy")
     : undefined;
-  const orderedActions = [
-    showBreakdownAction,
-    refineStrategyAction,
-    saveAction,
-    ...resultActions.filter(
-      (action) =>
-        action.type !== "show_breakdown" &&
-        action.type !== "refine_strategy" &&
-        action.type !== "save_strategy",
-    ),
-  ].filter((action): action is ChatActionOption => Boolean(action));
+  const orderedActions: ChatActionOption[] = [];
+  if (showBreakdownAction) orderedActions.push(showBreakdownAction);
+  if (refineStrategyAction) orderedActions.push(refineStrategyAction);
+  if (saveAction) orderedActions.push(saveAction);
   const renderedActions = result.savedStrategyId || result.savingStrategy
     ? orderedActions.filter((action) => action.type !== "save_strategy")
     : orderedActions;
@@ -88,7 +83,7 @@ export default function StrategyResultCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="rounded-full border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[11px] font-medium tracking-tight text-black/70 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70">
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName("neutral")}`}>
             {result.statusLabel || t("chat.simulation_complete", "Simulation Complete")}
           </span>
         </div>
@@ -144,7 +139,7 @@ export default function StrategyResultCard({
             <button
               type="button"
               disabled
-              className="inline-flex min-h-9 cursor-default items-center gap-1.5 rounded-full border border-[#70a38d]/25 bg-[#70a38d]/10 px-3 py-1.5 text-[12px] font-medium tracking-tight text-[#4f806d] dark:border-[#70a38d]/30 dark:bg-[#70a38d]/12 dark:text-[#9bc6b4]"
+              className={`inline-flex min-h-9 cursor-default items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium tracking-tight ${artifactStatusToneClassName("success")}`}
             >
               <Save className="h-3.5 w-3.5" />
               {result.savedStrategyId ? t("chat.saved") : t("chat.saving")}

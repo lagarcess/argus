@@ -1,12 +1,16 @@
 # Argus Research Lab Thesis
 
-**Status:** Draft design spec for the next milestone.
+**Status:** Historical thesis draft, refined by
+`docs/specs/evidence-aware-idea-loop.md`.
 **Branch:** `codex/private-alpha-conversation-trust`
 **Last updated:** June 9, 2026
 
 This is not an implementation plan for the current conversation-trust milestone.
 It preserves the product direction that emerged during private-alpha hardening so
 future work does not accidentally reduce Argus to "chat plus a calculator."
+The active refined direction is the evidence-aware idea loop, which keeps
+research optional and supports direct testing, education, light evidence, and
+deep research as separate lanes into the same durable idea loop.
 
 ## Thesis
 

@@ -1,5 +1,8 @@
 # Render Workflow Proof Implementation Plan
 
+> [!NOTE]
+> Historical context. This document is retained as implementation evidence and is not the current execution source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Validate the Render Workflow execution boundary with a tiny durable proof job before moving real backtests out of the API.

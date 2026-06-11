@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { BacktestJob } from "@/lib/argus-api";
+import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
 import {
   backtestJobCardCopy,
   type BacktestJobCardIcon,
@@ -15,17 +16,6 @@ import {
 type BacktestJobCardProps = {
   job: BacktestJob;
   canRetry?: boolean;
-};
-
-const toneClasses = {
-  active:
-    "border-[#7da0ca]/25 bg-[#7da0ca]/8 text-[#4f6f95] dark:border-[#7da0ca]/30 dark:bg-[#7da0ca]/12 dark:text-[#a7bdd7]",
-  failed:
-    "border-[#d66d75]/25 bg-[#d66d75]/8 text-[#96505a] dark:border-[#d66d75]/30 dark:bg-[#d66d75]/12 dark:text-[#e0a1a7]",
-  neutral:
-    "border-[#c2a44d]/25 bg-[#c2a44d]/8 text-[#806d2f] dark:border-[#c2a44d]/30 dark:bg-[#c2a44d]/12 dark:text-[#d9c574]",
-  success:
-    "border-[#70a38d]/25 bg-[#70a38d]/8 text-[#4f806d] dark:border-[#70a38d]/30 dark:bg-[#70a38d]/12 dark:text-[#9bc6b4]",
 };
 
 const statusIcons = {
@@ -60,7 +50,7 @@ export default function BacktestJobCard({
           </p>
         </div>
         <span
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${toneClasses[copy.tone]}`}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName(copy.tone)}`}
         >
           <StatusIcon
             className={`h-3.5 w-3.5 ${job.status === "running" ? "animate-spin" : ""}`}

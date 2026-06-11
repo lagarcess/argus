@@ -140,8 +140,15 @@ def _add_aliases(
         canonical,
     }
     if record.asset_class == "crypto":
+        base_name = record.name.lower().strip() if record.name else None
         base_aliases.add(f"{canonical}/USD")
         base_aliases.add(f"{canonical}USD")
+        base_aliases.add(f"{canonical} USD")
+        base_aliases.add(f"{canonical} dollar")
+        if base_name:
+            base_aliases.add(f"{base_name} usd")
+            base_aliases.add(f"{base_name}/usd")
+            base_aliases.add(f"{base_name} dollar")
     if record.asset_class == "currency_pair" and len(canonical) == 6:
         base_aliases.add(f"{canonical[:3]}/{canonical[3:]}")
 

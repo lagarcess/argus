@@ -18,12 +18,16 @@ describe("chat turn artifact UX", () => {
       { type: "retry_failed_action", label: "Try again" },
       { type: "save_strategy", label: "Save", presentation: "result" },
       { id: "ask-follow-up", label: "Ask follow-up" },
+      { id: "presentation-confirmation", label: "Presentation confirmation", presentation: "confirmation" },
+      { id: "presentation-result", label: "Presentation result", presentation: "result" },
     ];
 
     expect(actions.filter(actionHasCardScopedOwnership).map((action) => action.label)).toEqual([
       "Run backtest",
       "Explain result",
       "Save",
+      "Presentation confirmation",
+      "Presentation result",
     ]);
     expect(visibleComposerActions(actions).map((action) => action.label)).toEqual([
       "Try again",
@@ -37,7 +41,8 @@ describe("chat turn artifact UX", () => {
       "utf-8",
     );
 
-    expect(card).toContain("confirmationToneClasses");
+    expect(card).toContain("artifactStatusToneClassName");
+    expect(card).not.toContain("const confirmationToneClasses");
     expect(card).toContain("confirmationDisplayState");
     expect(card).toContain("font-display text-[18px]");
     expect(card).toContain("text-[#505a63] dark:text-[#8d969e]");
@@ -55,9 +60,14 @@ describe("chat turn artifact UX", () => {
       join(root, "lib/chat-action-ownership.ts"),
       "utf-8",
     );
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
 
     expect(ownership).toContain("export function actionHasCardScopedOwnership");
     expect(ownership).toContain("export function visibleComposerActions");
+    expect(chat).toContain("visibleComposerActions(latestAi?.actions ?? [])");
     expect(message).toContain('import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";');
     expect(message).toContain("const footerMessageActions =");
     expect(message).toContain("!actionHasCardScopedOwnership(action)");
@@ -82,7 +92,32 @@ describe("chat turn artifact UX", () => {
 
     expect(card).toContain("canRetry?: boolean");
     expect(card).toContain("backtestJobCardCopy(job, { canRetry })");
+    expect(card).toContain("artifactStatusToneClassName(copy.tone)");
+    expect(card).not.toContain("const toneClasses");
     expect(message).toContain("canRetry={Boolean(retryAction)}");
+  });
+
+  test("result card keeps lifecycle completion neutral and saved state explicit", () => {
+    const card = readFileSync(
+      join(root, "components/chat/StrategyResultCard.tsx"),
+      "utf-8",
+    );
+
+    expect(card).toContain('artifactStatusToneClassName("neutral")');
+    expect(card).toContain('artifactStatusToneClassName("success")');
+    expect(card).toContain("view.hero.tone === \"positive\"");
+  });
+
+  test("assistant more menu hides internal message ids", () => {
+    const message = readFileSync(
+      join(root, "components/chat/ChatMessage.tsx"),
+      "utf-8",
+    );
+
+    expect(message).toContain("chat.copy_plaintext");
+    expect(message).toContain("chat.report_issue");
+    expect(message).not.toContain("chat.copy_id");
+    expect(message).not.toContain("handleCopy(message.id)");
   });
 
   test("stream error handling settles confirmation artifacts and clears stale composer actions", () => {
