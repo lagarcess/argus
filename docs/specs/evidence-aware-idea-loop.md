@@ -419,6 +419,29 @@ Outputs:
 - private-alpha interview/test script;
 - first-slice scope and non-goals.
 
+Locked defaults:
+
+- **Primary learning question:** Do users find Argus more valuable when it helps
+  them move from a broad investing curiosity into a concrete, testable idea?
+- **Success signal:** A tester completes one loop from broad question ->
+  candidate idea -> backtest/result -> follow-up/refinement, and says the flow
+  helped them think better than a normal chatbot.
+- **Failure signal:** Users skip evidence/research help and only use direct
+  backtests, or they find candidate suggestions obvious, noisy, untrustworthy,
+  or slower than asking a generic chatbot.
+- **First implementation slice:** Implement Milestone 1 only. Add internal
+  evidence-depth and candidate-experiment contracts with fixture-backed routing
+  examples. Do not call Perplexity yet, and do not change the direct backtest
+  path.
+- **Private-alpha test script style:** Use both messy realistic prompts from
+  normal users and finance-literate prompts from investor friends. Keep the
+  first script to five to eight prompts total so the learning signal stays
+  sharp.
+- **First-slice non-goals:** No Perplexity provider adapter, citations UI,
+  durable idea table, monitoring/inbox, public sharing, vector/semantic search,
+  or new UI mode selector. Those remain later milestones unless Milestone 1
+  proves they are required earlier.
+
 ### Milestone 1: Evidence-Aware Intent Contract
 
 Goal:
@@ -577,13 +600,17 @@ Before building the full lab, private alpha should test one core behavior:
 
 ### Test Method
 
-Use five to ten private-alpha sessions with intentionally broad prompts:
+Use five to eight private-alpha prompts that mix messy consumer language and
+finance-literate investor language:
 
-- "Is the semiconductor industry outperforming gold?"
-- "Do rate cuts usually help long-duration bonds?"
-- "Explain yield curve inversion and what I could test historically."
-- "Is Bitcoin behaving more like tech stocks lately?"
-- "What is a simple way to test whether monthly buying beats lump sum?"
+- "Is semis still better than gold or am I late?"
+- "Should I just buy NVDA or the chip ETF?"
+- "What happens if I bought Bitcoin every week last year?"
+- "I keep hearing rates are coming down. What could I test?"
+- "Compare SMH vs GLD over the last two years with SPY as context."
+- "Test a weekly DCA into NU over the last two years."
+- "Compare equal-weight NVDA, AMD, and AVGO versus SPY since 2023."
+- "Explain what sector rotation means, then suggest one testable proxy."
 
 For each prompt, observe:
 
@@ -1424,17 +1451,25 @@ These are intentionally not decided yet:
 
 ## Next Spec Step
 
-The next step is an implementation plan for Milestone 1 and Milestone 2 using
-the locked decisions above, while preserving the loop thesis:
+The next step is an implementation plan for **Milestone 1 only** using the
+locked decisions above. Milestone 2 remains design context, but agents should
+not wire Perplexity, citations UI, durable idea tables, or research jobs until
+Milestone 1 proves Argus can preserve direct backtests while recognizing
+evidence-seeking turns.
 
 1. evidence-depth contract with direct-test bypass preserved;
-2. candidate experiment contract for comparison/proxy-first tests;
-3. minimum citation contract for short cited context;
-4. message-metadata-first persistence plan;
-5. unsupported-boundary copy and capability filtering;
-6. private-alpha test script focused on broad question -> candidate -> run;
-7. feature flags, route receipts, and canary requirements;
-8. golden prompt harness for direct tests plus first evidence-aware examples.
+2. candidate-experiment contract for comparison/proxy-first tests, represented
+   in fixtures only;
+3. direct-test, education, light-evidence, and deep-research routing examples
+   without provider calls;
+4. unsupported-boundary copy and capability filtering;
+5. private-alpha test script focused on broad question -> candidate -> run;
+6. feature flags, route receipts, and canary requirements;
+7. golden prompt harness for direct tests plus first evidence-aware examples.
+
+Milestone 2 starts only after Milestone 1 shows that direct users are not slowed
+down and broad-question users can be routed toward supported candidate
+experiments without frontend shortcuts or unsupported runnable-looking cards.
 
 The next natural product-design discussion should focus on card copy and
 interaction details for the locked v1 comparison/proxy scope:
