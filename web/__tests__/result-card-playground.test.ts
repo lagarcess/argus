@@ -14,6 +14,7 @@ import {
   formatTimeframeForDisplay,
   heroDeltaEvidenceView,
 } from "../lib/result-card-playground-display";
+import type { ChatActionOption } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
 
@@ -360,7 +361,7 @@ describe("result card playground", () => {
   });
 
   test("hydrates missing run facts and normalizes action labels correctly via resultCardFromConversationCard", () => {
-    const card = {
+    const card: Parameters<typeof resultCardFromConversationCard>[0] = {
       title: "Test Strategy",
       symbols: ["AAPL", "MSFT"],
       strategy_label: "Test Label",
@@ -371,13 +372,18 @@ describe("result card playground", () => {
       assumptions: ["Assumption 1", "Assumption 2"],
       actions: [
         { id: "action-1", type: "show_breakdown", presentation: "result" },
-        { id: "action-2", type: "custom_type", label: "Custom Action", presentation: "result" }
+        {
+          id: "action-2",
+          type: "custom_type" as ChatActionOption["type"],
+          label: "Custom Action",
+          presentation: "result",
+        }
       ],
       // chart is omitted intentionally
     };
 
     // 1. Without run argument
-    const mappedWithoutRun = resultCardFromConversationCard(card as Parameters<typeof resultCardFromConversationCard>[0], undefined);
+    const mappedWithoutRun = resultCardFromConversationCard(card, undefined);
     expect(mappedWithoutRun.strategyName).toBe("Test Strategy");
     expect(mappedWithoutRun.symbols).toEqual(["AAPL", "MSFT"]);
     expect(mappedWithoutRun.statusLabel).toBe("Completed");
@@ -393,13 +399,13 @@ describe("result card playground", () => {
     expect(mappedWithoutRun.actions[1].label).toBe("Custom Action");
 
     // 3. With run argument
-    const run = {
+    const run: Parameters<typeof resultCardFromConversationCard>[1] = {
       id: "run-123",
       strategy_id: "strat-456",
       benchmark_symbol: "SPY",
       config_snapshot: { template: "buy_and_hold" }
     };
-    const mappedWithRun = resultCardFromConversationCard(card as Parameters<typeof resultCardFromConversationCard>[0], run as Parameters<typeof resultCardFromConversationCard>[1]);
+    const mappedWithRun = resultCardFromConversationCard(card, run);
     expect(mappedWithRun.runId).toBe("run-123");
     expect(mappedWithRun.strategyId).toBe("strat-456");
     expect(mappedWithRun.configSnapshot).toEqual({ template: "buy_and_hold" });
