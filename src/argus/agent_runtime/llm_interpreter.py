@@ -4634,7 +4634,7 @@ def _response_needs_stated_run_field_fidelity_audit(
                 draft,
                 current_message=current_message,
             ),
-            _draft_capital_needs_stated_run_field_audit(
+            _focused_repair_capital_needs_stated_run_field_audit(
                 draft,
                 current_message=current_message,
             ),
@@ -4684,6 +4684,19 @@ def _focused_repair_benchmark_needs_fidelity_audit(
         current_message=current_message,
         resolved_asset_mentions=_resolved_asset_mentions_from_message(current_message),
         resolve_candidate=_resolve_benchmark_candidate_from_message,
+    )
+
+
+def _focused_repair_capital_needs_stated_run_field_audit(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str,
+) -> bool:
+    if draft.capital_amount is not None:
+        return False
+    return _draft_capital_needs_stated_run_field_audit(
+        draft,
+        current_message=current_message,
     )
 
 

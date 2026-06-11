@@ -5842,6 +5842,54 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair() -> None:
     )
 
 
+def test_stated_run_fidelity_audit_skips_aligned_focused_repair_capital() -> None:
+    from argus.agent_runtime.llm_interpreter import (
+        _response_needs_stated_run_field_fidelity_audit,
+    )
+    from argus.agent_runtime.llm_interpreter_types import (
+        LLMInterpretationResponse,
+        LLMStrategyDraft,
+    )
+    from argus.agent_runtime.stages.interpret_types import InterpretationRequest
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="User wants a TSLA crossover test with stated capital.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="signal_strategy",
+            strategy_thesis="Backtest TSLA when the 50 SMA crosses the 200 SMA.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range={"start": "2022-01-01", "end": "today"},
+            capital_amount=10000,
+            entry_rule={
+                "type": "moving_average_crossover",
+                "fast_indicator": "sma",
+                "fast_period": 50,
+                "slow_indicator": "sma",
+                "slow_period": 200,
+                "direction": "bullish",
+            },
+        ),
+        semantic_turn_act="new_idea",
+        reason_codes=["focused_strategy_extraction_repair"],
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "buy when the 50 crosses the 200 for Tesla from January 2022 "
+            "to today with 10k"
+        ),
+        user=UserState(user_id="user-1"),
+    )
+
+    assert not _response_needs_stated_run_field_fidelity_audit(
+        response=response,
+        request=request,
+    )
+
+
 def test_pending_date_answer_uses_stated_run_fidelity_audit() -> None:
     from argus.agent_runtime.llm_interpreter import (
         _response_needs_stated_run_field_fidelity_audit,
