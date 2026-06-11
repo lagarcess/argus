@@ -90,14 +90,7 @@ export function rangeForDiscoveryItem(
   const leadingWhitespaceLength = rawQuery.length - rawQuery.trimStart().length;
   const query = rawQuery.trimStart();
   const normalizedQuery = normalizeSearchText(query);
-  const candidates = [
-    item.description,
-    item.label,
-    item.insert_text,
-    item.symbol ?? undefined,
-  ]
-    .filter((candidate): candidate is string => Boolean(candidate))
-    .sort((a, b) => b.length - a.length);
+  const candidates = discoveryReplacementCandidates(item);
 
   for (const candidate of candidates) {
     const normalizedCandidate = normalizeSearchText(candidate);
@@ -150,6 +143,52 @@ export function insertTextAtOffset(
 
 function normalizeSearchText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function discoveryReplacementCandidates(item: DiscoveryItem) {
+  const candidates = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    const trimmed = value?.trim();
+    if (trimmed) candidates.add(trimmed);
+  };
+
+  add(item.description);
+  add(item.label);
+  add(item.insert_text);
+  add(item.symbol ?? undefined);
+
+  const symbol = item.symbol || item.insert_text;
+  const labelParts = item.label
+    .split("·")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  labelParts.forEach(add);
+
+  const symbolText = normalizeSearchText(symbol);
+  const assetName = labelParts.find(
+    (part) => normalizeSearchText(part) !== symbolText,
+  );
+
+  if (item.type === "asset" && item.asset_class === "crypto") {
+    for (const base of [symbol, item.insert_text, assetName]) {
+      if (!base) continue;
+      add(`${base} USD`);
+      add(`${base}/USD`);
+      add(`${base} dollar`);
+    }
+  }
+
+  if (item.type === "asset" && item.asset_class === "currency_pair") {
+    const compact = symbol.replace(/[^A-Za-z]/g, "").toUpperCase();
+    if (compact.length === 6) {
+      const base = compact.slice(0, 3);
+      const quote = compact.slice(3);
+      add(`${base}/${quote}`);
+      add(`${base} ${quote}`);
+    }
+  }
+
+  return Array.from(candidates).sort((a, b) => b.length - a.length);
 }
 
 export function replaceRangeWithToken(

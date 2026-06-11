@@ -37,6 +37,30 @@ const rsi = {
   support_status: "supported" as const,
 };
 
+const btc = {
+  id: "asset:crypto:BTC",
+  type: "asset" as const,
+  label: "BTC · Bitcoin",
+  symbol: "BTC",
+  asset_class: "crypto" as const,
+  description: "Crypto",
+  insert_text: "BTC",
+  provider: "kraken",
+  support_status: "supported" as const,
+};
+
+const eurusd = {
+  id: "asset:currency_pair:EURUSD",
+  type: "asset" as const,
+  label: "EURUSD · EUR/USD",
+  symbol: "EURUSD",
+  asset_class: "currency_pair" as const,
+  description: "Currency Pair",
+  insert_text: "EURUSD",
+  provider: "kraken",
+  support_status: "supported" as const,
+};
+
 describe("chat composer model", () => {
   test("replaces an @ query with an inline token and serializes natural text", () => {
     const segments: ComposerSegment[] = [{ type: "text", text: "Buy @google when it dips" }];
@@ -146,6 +170,26 @@ describe("chat composer model", () => {
     const next = replaceRangeWithToken(segments, range!, rsi);
 
     expect(serializeComposerSegments(next)).toBe("Buy RSI drops below 30");
+  });
+
+  test("selecting a crypto pair alias replaces the full multi-word discovery phrase", () => {
+    const segments: ComposerSegment[] = [
+      { type: "text", text: "Buy @bitcoin usd over the last year" },
+    ];
+    const range = rangeForDiscoveryItem(segments, "Buy @bitcoin usd".length, btc);
+    const next = replaceRangeWithToken(segments, range!, btc);
+
+    expect(serializeComposerSegments(next)).toBe("Buy BTC over the last year");
+  });
+
+  test("selecting a currency pair slash alias replaces the full discovery phrase", () => {
+    const segments: ComposerSegment[] = [
+      { type: "text", text: "Compare @eur/usd against cash" },
+    ];
+    const range = rangeForDiscoveryItem(segments, "Compare @eur/usd".length, eurusd);
+    const next = replaceRangeWithToken(segments, range!, eurusd);
+
+    expect(serializeComposerSegments(next)).toBe("Compare EURUSD against cash");
   });
 
   test("clicking a result after a partial search offset still replaces the full typed asset word", () => {
