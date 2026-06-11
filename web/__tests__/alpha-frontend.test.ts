@@ -1122,5 +1122,6 @@ describe("Argus Alpha frontend contract", () => {
   test("apiFetch does not leak request options to the console", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     expect(api).not.toContain("[argus-api] Fetching");
+    expect(api).not.toContain("console.log(");
   });
 });
