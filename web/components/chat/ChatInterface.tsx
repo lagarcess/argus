@@ -230,10 +230,8 @@ function latestInputActions(messages: Message[]) {
   ) {
     return [];
   }
-  return (latestAi?.actions ?? []).filter(
-    (action) =>
-      action.type !== "save_strategy" &&
-      action.artifactType !== "failed_action",
+  return visibleComposerActions(latestAi?.actions ?? []).filter(
+    (action) => action.artifactType !== "failed_action",
   );
 }
 

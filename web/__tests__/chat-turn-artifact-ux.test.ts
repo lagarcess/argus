@@ -18,12 +18,16 @@ describe("chat turn artifact UX", () => {
       { type: "retry_failed_action", label: "Try again" },
       { type: "save_strategy", label: "Save", presentation: "result" },
       { id: "ask-follow-up", label: "Ask follow-up" },
+      { id: "presentation-confirmation", label: "Presentation confirmation", presentation: "confirmation" },
+      { id: "presentation-result", label: "Presentation result", presentation: "result" },
     ];
 
     expect(actions.filter(actionHasCardScopedOwnership).map((action) => action.label)).toEqual([
       "Run backtest",
       "Explain result",
       "Save",
+      "Presentation confirmation",
+      "Presentation result",
     ]);
     expect(visibleComposerActions(actions).map((action) => action.label)).toEqual([
       "Try again",
@@ -55,9 +59,14 @@ describe("chat turn artifact UX", () => {
       join(root, "lib/chat-action-ownership.ts"),
       "utf-8",
     );
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
 
     expect(ownership).toContain("export function actionHasCardScopedOwnership");
     expect(ownership).toContain("export function visibleComposerActions");
+    expect(chat).toContain("visibleComposerActions(latestAi?.actions ?? [])");
     expect(message).toContain('import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";');
     expect(message).toContain("const footerMessageActions =");
     expect(message).toContain("!actionHasCardScopedOwnership(action)");
