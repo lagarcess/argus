@@ -152,13 +152,13 @@ function discoveryReplacementCandidates(item: DiscoveryItem) {
     if (trimmed) candidates.add(trimmed);
   };
 
-  add(item.description);
-  add(item.label);
-  add(item.insert_text);
-  add(item.symbol ?? undefined);
+  add(item?.description);
+  add(item?.label);
+  add(item?.insert_text);
+  add(item?.symbol ?? undefined);
 
-  const symbol = item.symbol || item.insert_text;
-  const labelParts = item.label
+  const symbol = item?.symbol ?? item?.insert_text ?? "";
+  const labelParts = (item?.label ?? "")
     .split("·")
     .map((part) => part.trim())
     .filter(Boolean);
@@ -169,8 +169,8 @@ function discoveryReplacementCandidates(item: DiscoveryItem) {
     (part) => normalizeSearchText(part) !== symbolText,
   );
 
-  if (item.type === "asset" && item.asset_class === "crypto") {
-    for (const base of [symbol, item.insert_text, assetName]) {
+  if (item?.type === "asset" && item?.asset_class === "crypto") {
+    for (const base of [symbol, item?.insert_text, assetName]) {
       if (!base) continue;
       add(`${base} USD`);
       add(`${base}/USD`);
@@ -178,7 +178,7 @@ function discoveryReplacementCandidates(item: DiscoveryItem) {
     }
   }
 
-  if (item.type === "asset" && item.asset_class === "currency_pair") {
+  if (item?.type === "asset" && item?.asset_class === "currency_pair") {
     const compact = symbol.replace(/[^A-Za-z]/g, "").toUpperCase();
     if (compact.length === 6) {
       const base = compact.slice(0, 3);

@@ -13,6 +13,7 @@ import {
   serializeComposerSegments,
   type ComposerSegment,
 } from "../components/chat/composer-model";
+import type { DiscoveryItem } from "../lib/argus-api";
 
 const goog = {
   id: "asset:equity:GOOG",
@@ -190,6 +191,28 @@ describe("chat composer model", () => {
     const next = replaceRangeWithToken(segments, range!, eurusd);
 
     expect(serializeComposerSegments(next)).toBe("Compare EURUSD against cash");
+  });
+
+  test("malformed discovery payloads do not crash range matching", () => {
+    const malformed = {
+      id: "asset:crypto:ETH",
+      type: "asset",
+      label: null,
+      symbol: null,
+      asset_class: "crypto",
+      description: null,
+      insert_text: undefined,
+      provider: "kraken",
+      support_status: "supported",
+    } as unknown as DiscoveryItem;
+
+    const range = rangeForDiscoveryItem(
+      [{ type: "text", text: "Buy @ethereum now" }],
+      "Buy @ethereum".length,
+      malformed,
+    );
+
+    expect(range).toEqual({ start: 4, end: "Buy @ethereum".length, query: "ethereum" });
   });
 
   test("clicking a result after a partial search offset still replaces the full typed asset word", () => {

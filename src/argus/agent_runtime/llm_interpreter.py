@@ -4588,12 +4588,17 @@ def _response_needs_stated_run_field_fidelity_audit(
     if _draft_has_unprovenanced_benchmark(draft):
         return True
     if response.semantic_turn_act == "answer_pending_need":
-        if requested_field != "date_range":
-            return False
-        return _draft_contains_structured_date_context(
-            draft,
-            current_message=current_message,
-        )
+        if requested_field == "date_range":
+            return _draft_contains_structured_date_context(
+                draft,
+                current_message=current_message,
+            )
+        if requested_field == "assumption":
+            return _draft_capital_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            )
+        return False
     if not any(
         code in response.reason_codes
         for code in {
@@ -4611,8 +4616,10 @@ def _response_needs_stated_run_field_fidelity_audit(
     if "signal_rule_plan_repair" in response.reason_codes:
         return any(
             [
-                draft.capital_amount is None
-                and _draft_contains_structured_capital_context(draft),
+                _draft_capital_needs_stated_run_field_audit(
+                    draft,
+                    current_message=current_message,
+                ),
                 _llm_value_is_empty(draft.timeframe)
                 and _draft_contains_structured_timeframe_context(draft),
                 _draft_date_range_needs_stated_run_field_audit(
@@ -4627,8 +4634,10 @@ def _response_needs_stated_run_field_fidelity_audit(
                 draft,
                 current_message=current_message,
             ),
-            draft.capital_amount is None
-            and _draft_contains_structured_capital_context(draft),
+            _draft_capital_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            ),
             _llm_value_is_empty(draft.timeframe)
             and _draft_contains_structured_timeframe_context(draft),
             _draft_date_range_needs_stated_run_field_audit(
@@ -4689,8 +4698,10 @@ def _ready_response_has_unreconciled_stated_run_fields(
                 draft,
                 current_message=current_message,
             ),
-            draft.capital_amount is None
-            and _draft_contains_structured_capital_context(draft),
+            _draft_capital_needs_stated_run_field_audit(
+                draft,
+                current_message=current_message,
+            ),
             _llm_value_is_empty(draft.timeframe)
             and _draft_contains_structured_timeframe_context(draft),
             _draft_date_range_needs_stated_run_field_audit(
@@ -4699,6 +4710,18 @@ def _ready_response_has_unreconciled_stated_run_fields(
             ),
         ]
     )
+
+
+def _draft_capital_needs_stated_run_field_audit(
+    draft: LLMStrategyDraft,
+    *,
+    current_message: str,
+) -> bool:
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        return False
+    if _text_contains_structured_capital_context(current_message):
+        return True
+    return draft.capital_amount is None and _draft_contains_structured_capital_context(draft)
 
 
 def _draft_missing_comparison_baseline_needs_stated_run_field_audit(
@@ -4888,8 +4911,11 @@ def _date_endpoint_is_runtime_current(value: Any) -> bool:
 
 
 def _draft_contains_structured_capital_context(draft: LLMStrategyDraft) -> bool:
-    text = _structured_draft_context_text(draft)
-    folded = text.casefold()
+    return _text_contains_structured_capital_context(_structured_draft_context_text(draft))
+
+
+def _text_contains_structured_capital_context(text: str) -> bool:
+    folded = str(text or "").casefold()
     if "$" in text or "usd" in folded or "dollar" in folded:
         return True
     for token in _field_fidelity_tokens(folded):
@@ -5189,8 +5215,9 @@ def _stated_run_field_fidelity_messages(
                 "the user explicitly stated but the draft may have dropped or "
                 "reshaped. Do not infer defaults, fees, slippage, symbols, or rules. "
                 "If a field is absent from the current user message, return null "
-                "for that field. Normalize starting capital such as 10k or $10,000 "
-                "to 10000. For DCA or recurring buys, return the per-purchase "
+                "for that field. Normalize starting capital exactly from the "
+                "current message: 10k -> 10000, 100K -> 100000, and $10,000 "
+                "-> 10000. For DCA or recurring buys, return the per-purchase "
                 "recurring contribution as recurring_contribution_amount, not "
                 "capital_amount; return cadence only when the current message states "
                 "one. If a money amount is total budget, starting principal, or cap, "

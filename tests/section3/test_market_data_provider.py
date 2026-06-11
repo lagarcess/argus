@@ -288,6 +288,22 @@ def test_asset_search_supports_provider_backed_crypto_name_pair_aliases(
     assert btc_usd[0].canonical_symbol == "BTC"
 
 
+def test_crypto_aliases_tolerate_missing_provider_name() -> None:
+    mapping: dict[str, ResolvedAsset] = {}
+    record = ResolvedAsset(
+        canonical_symbol="ETH",
+        asset_class="crypto",
+        name=None,  # type: ignore[arg-type]
+        raw_symbol="ETH/USD",
+    )
+
+    assets._add_aliases(mapping, record, canonical="ETH")
+
+    assert mapping["ETH"].canonical_symbol == "ETH"
+    assert mapping["ETH/USD"].canonical_symbol == "ETH"
+    assert mapping["ETHUSD"].canonical_symbol == "ETH"
+
+
 def test_resolve_asset_accepts_unique_provider_name_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

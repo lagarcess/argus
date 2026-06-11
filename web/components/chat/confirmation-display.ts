@@ -99,7 +99,7 @@ export function confirmationStatusFromLabel(
   if (!normalized) {
     return null;
   }
-  return LABEL_TO_STATUS[normalized] ?? null;
+  return hasOwn(LABEL_TO_STATUS, normalized) ? LABEL_TO_STATUS[normalized] : null;
 }
 
 export function confirmationStatusFromValue(
@@ -164,7 +164,7 @@ export function confirmationRowKey(
     return row.key;
   }
   const normalized = row.label.trim().toLowerCase();
-  return LABEL_TO_ROW_KEY[normalized] ?? null;
+  return hasOwn(LABEL_TO_ROW_KEY, normalized) ? LABEL_TO_ROW_KEY[normalized] : null;
 }
 
 export function confirmationRowLabelKey(
