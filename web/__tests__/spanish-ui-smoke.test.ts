@@ -52,18 +52,36 @@ describe("Spanish UI Smoke Harness", () => {
   function flattenKeys(obj: Record<string, unknown>, prefix = ""): Record<string, string> {
     return Object.keys(obj).reduce((acc: Record<string, string>, k: string) => {
       const pre = prefix.length ? prefix + "." : "";
-      if (typeof obj[k] === "object" && obj[k] !== null && !Array.isArray(obj[k])) {
-        Object.assign(acc, flattenKeys(obj[k] as Record<string, unknown>, pre + k));
-      } else if (Array.isArray(obj[k])) {
-        obj[k].forEach((item: unknown, index: number) => {
-          if (typeof item === "object" && item !== null) {
-            Object.assign(acc, flattenKeys(item as Record<string, unknown>, pre + k + "[" + index + "]"));
-          } else {
-            acc[pre + k + "[" + index + "]"] = String(item);
-          }
-        });
+      const keyPath = pre + k;
+      const value = obj[k];
+
+      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        const nestedValue = value as Record<string, unknown>;
+        if (Object.keys(nestedValue).length === 0) {
+          acc[keyPath] = "{}";
+        } else {
+          Object.assign(acc, flattenKeys(nestedValue, keyPath));
+        }
+      } else if (Array.isArray(value)) {
+        if (value.length === 0) {
+          acc[keyPath] = "[]";
+        } else {
+          value.forEach((item: unknown, index: number) => {
+            const itemPath = keyPath + "[" + index + "]";
+            if (typeof item === "object" && item !== null && !Array.isArray(item)) {
+              const nestedItem = item as Record<string, unknown>;
+              if (Object.keys(nestedItem).length === 0) {
+                acc[itemPath] = "{}";
+              } else {
+                Object.assign(acc, flattenKeys(nestedItem, itemPath));
+              }
+            } else {
+              acc[itemPath] = String(item);
+            }
+          });
+        }
       } else {
-        acc[pre + k] = String(obj[k]);
+        acc[keyPath] = String(value);
       }
       return acc;
     }, {});
@@ -156,7 +174,7 @@ describe("Spanish UI Smoke Harness", () => {
       expect(Object.prototype.hasOwnProperty.call(es, key)).toBe(true);
       const enPlaceholders = extractPlaceholders(en[key]);
       const esPlaceholders = extractPlaceholders(es[key]);
-      expect(esPlaceholders).toEqual(enPlaceholders);
+      expect({ key, placeholders: esPlaceholders }).toEqual({ key, placeholders: enPlaceholders });
     }
   });
 
