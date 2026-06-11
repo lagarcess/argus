@@ -13,6 +13,7 @@ import { postFeedback } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
+import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 
@@ -46,6 +47,8 @@ export default function ChatMessage({
   const idleFeedbackClass =
     "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white";
   const selectedFeedbackIconClass = "fill-current";
+  const feedbackContext = (extra: Record<string, string | number | boolean> = {}) =>
+    feedbackContextForMessage(message, conversationId, extra);
 
   const toggleOptions = (e: React.MouseEvent) => {
     if (!showOptions) {
@@ -104,10 +107,10 @@ export default function ChatMessage({
       postFeedback({
         type: "general",
         message: newRating === "positive" ? "Thumbs Up" : "Thumbs Down",
-        context: { message_id: message.id, conversation_id: conversationId, rating: newRating }
+        context: feedbackContext({ rating: newRating })
       });
       // Then, open the detailed feedback dialog
-      onFeedback?.("rating", { message_id: message.id, conversation_id: conversationId }, newRating);
+      onFeedback?.("rating", feedbackContext(), newRating);
     }
   };
 
@@ -335,15 +338,7 @@ export default function ChatMessage({
                     <button
                       className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
                       role="menuitem"
-                      onClick={() => { void handleCopy(message.id); setShowOptions(false); }}
-                    >
-                      <Copy className="w-4 h-4 text-black/60 dark:text-white/60" />
-                      {t('chat.copy_id')}
-                    </button>
-                    <button
-                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left text-black dark:text-white text-[15px] font-medium"
-                      role="menuitem"
-                      onClick={() => { setShowOptions(false); onFeedback?.("bug", { message_id: message.id }); }}
+                      onClick={() => { setShowOptions(false); onFeedback?.("bug", feedbackContext()); }}
                     >
                       <MessageSquareWarning className="w-4 h-4 text-black/60 dark:text-white/60" />
                       {t('chat.report_issue')}
