@@ -1,6 +1,6 @@
 # Private Alpha Status/Action Parity Audit
 
-Status: Active implementation slice
+Status: Implemented; locally verified
 Date: 2026-06-11
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, reviewers
@@ -60,7 +60,9 @@ tests expose.
 - Add focused backend tests for job status responses and terminal workflow
   reconciliation where coverage is missing.
 - Patch frontend helpers/components narrowly when tests expose mismatches.
-- Run local focused verification, frontend build, and live QA/browser smoke.
+- Run local focused verification and frontend build.
+- Leave live/browser QA for the batch-level readiness pass before PR or founder
+  handoff.
 
 ## Out Of Scope
 
@@ -89,25 +91,77 @@ tests expose.
   enablement or new product surface.
 - Local focused tests pass.
 - `cd web && bun run build` passes.
-- Live QA verifies queued/running/succeeded and at least one failed or
-  not-completed path, with notes captured in the plan or final report.
+- Live/browser QA remains a batch-level readiness step: verify
+  queued/running/succeeded and at least one failed or not-completed path, with
+  notes captured before PR or founder handoff.
+
+## Implementation Closeout
+
+Implemented commits on `codex/private-alpha-next`:
+
+- `e545235 fix(chat): attach feedback to artifact context`
+- `220953b fix(chat): keep card actions on artifact surfaces`
+- `f60158d test(chat): cover async job lifecycle parity`
+- `aa9ca68 test(api): cover terminal workflow job parity`
+- `b0c2562 fix(chat): hide internal message id action`
+- `cf6662d fix(chat): normalize artifact status tones`
+- `b211eb6 test(chat): refresh alpha frontend guardrails`
+
+What changed:
+
+- Feedback/report actions now attach message, conversation, and artifact context
+  through a shared helper.
+- Card-scoped artifact actions remain on confirmation/result surfaces instead of
+  leaking to composer or assistant footer controls.
+- Async job lifecycle tests cover queued/running/terminal parity and terminal
+  workflow reconciliation.
+- The assistant more menu no longer exposes the internal `Copy ID` action.
+- Confirmation, job, result, and saved-state pills now use shared artifact
+  status tones so lifecycle color is consistent and calm.
+- Alpha frontend source guardrails now match the current feature-flag and
+  feedback-context ownership model.
+
+Known closeout boundary:
+
+- This slice did not enable Strategies, Collections, async-job retry, public
+  sharing, or Research Lab runtime work.
+- Browser/live QA is intentionally deferred to the batch readiness pass because
+  the final patch was test-only and the visual status-tone change is narrow.
 
 ## Verification
 
 Local focused checks:
 
 ```bash
-cd web && bun test __tests__/chat-backtest-jobs.test.ts __tests__/backtest-job-card-copy.test.ts __tests__/chat-turn-artifact-ux.test.ts __tests__/chat-retry-actions.test.ts __tests__/chat-artifact-history.test.ts __tests__/chat-message-feedback-context.test.ts
+cd web && bun test __tests__/chat-backtest-jobs.test.ts __tests__/backtest-job-card-copy.test.ts __tests__/chat-turn-artifact-ux.test.ts __tests__/chat-retry-actions.test.ts __tests__/chat-artifact-history.test.ts __tests__/chat-message-feedback-context.test.ts __tests__/artifact-status-tones.test.ts __tests__/alpha-frontend.test.ts
 poetry run pytest tests/test_backtest_jobs_async.py::test_backtest_job_status_endpoint_returns_job_and_result tests/test_backtest_jobs_async.py::test_backtest_job_status_endpoint_reconciles_terminal_workflow_run tests/test_chat_stream_contract.py::test_chat_stream_runtime_failure_persists_retry_last_turn_metadata -q
 cd web && bun run build
 ```
+
+Fresh closeout run, 2026-06-11:
+
+- `cd web && bun test __tests__/chat-backtest-jobs.test.ts
+  __tests__/backtest-job-card-copy.test.ts
+  __tests__/chat-turn-artifact-ux.test.ts __tests__/chat-retry-actions.test.ts
+  __tests__/chat-artifact-history.test.ts
+  __tests__/chat-message-feedback-context.test.ts
+  __tests__/artifact-status-tones.test.ts __tests__/alpha-frontend.test.ts`
+  passed: 125 tests, 815 expects.
+- `poetry run pytest
+  tests/test_backtest_jobs_async.py::test_backtest_job_status_endpoint_returns_job_and_result
+  tests/test_backtest_jobs_async.py::test_backtest_job_status_endpoint_reconciles_terminal_workflow_run
+  tests/test_chat_stream_contract.py::test_chat_stream_runtime_failure_persists_retry_last_turn_metadata
+  -q` passed: 3 tests. The run emitted existing dependency deprecation warnings
+  from Python 3.14 / asyncio compatibility.
+- `cd web && bun run build` passed. The run emitted the existing Node
+  `module.register()` deprecation warning.
 
 Live QA:
 
 - Run QA mode with real backend credentials via `.github/qa.sh`.
 - Run the frontend with `NEXT_PUBLIC_MOCK_AUTH=false` and
   `NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:8000/api/v1`.
-- Use browser QA to run a real private-alpha conversation through confirmation,
-  queued/running job state, result hydration, Explain result, feedback/report,
-  and a failure/not-completed path when available.
+- At batch readiness, use browser QA to run a real private-alpha conversation
+  through confirmation, queued/running job state, result hydration, Explain
+  result, feedback/report, and a failure/not-completed path when available.
 - Confirm the assistant more menu no longer exposes `Copy ID`.
