@@ -26,6 +26,16 @@ def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
     assert "deploy" not in workflow["jobs"]
 
 
+def test_ci_queues_integration_branch_runs_without_canceling_evidence() -> None:
+    concurrency = _workflow()["concurrency"]
+
+    assert concurrency["group"] == "${{ github.workflow }}-${{ github.ref }}"
+    assert concurrency["cancel-in-progress"] == (
+        "${{ github.ref != 'refs/heads/codex/private-alpha-next' && "
+        "github.ref != 'refs/heads/codex/private-alpha-next-jules-intake' }}"
+    )
+
+
 def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     jobs = _workflow()["jobs"]
 
