@@ -49,17 +49,17 @@ describe("Spanish UI Smoke Harness", () => {
     return JSON.parse(fs.readFileSync(localePath, "utf-8"));
   }
 
-  function flattenKeys(obj: any, prefix = ""): Record<string, string> {
+  function flattenKeys(obj: Record<string, unknown>, prefix = ""): Record<string, string> {
     return Object.keys(obj).reduce((acc: Record<string, string>, k: string) => {
       const pre = prefix.length ? prefix + "." : "";
       if (typeof obj[k] === "object" && obj[k] !== null && !Array.isArray(obj[k])) {
-        Object.assign(acc, flattenKeys(obj[k], pre + k));
+        Object.assign(acc, flattenKeys(obj[k] as Record<string, unknown>, pre + k));
       } else if (Array.isArray(obj[k])) {
-        obj[k].forEach((item: any, index: number) => {
+        obj[k].forEach((item: unknown, index: number) => {
           if (typeof item === "object" && item !== null) {
-             Object.assign(acc, flattenKeys(item, pre + k + "[" + index + "]"));
+            Object.assign(acc, flattenKeys(item as Record<string, unknown>, pre + k + "[" + index + "]"));
           } else {
-             acc[pre + k + "[" + index + "]"] = String(item);
+            acc[pre + k + "[" + index + "]"] = String(item);
           }
         });
       } else {
@@ -141,8 +141,8 @@ describe("Spanish UI Smoke Harness", () => {
     const enKeys = Object.keys(en);
     const esKeys = Object.keys(es);
 
-    const missingInEs = enKeys.filter(k => !esKeys.includes(k));
-    const missingInEn = esKeys.filter(k => !enKeys.includes(k));
+    const missingInEs = enKeys.filter((key) => !esKeys.includes(key));
+    const missingInEn = esKeys.filter((key) => !enKeys.includes(key));
 
     expect(missingInEs).toEqual([]);
     expect(missingInEn).toEqual([]);
@@ -152,14 +152,11 @@ describe("Spanish UI Smoke Harness", () => {
     const en = flattenKeys(readLocale(enLocalePath));
     const es = flattenKeys(readLocale(esLocalePath));
 
-    const enKeys = Object.keys(en);
-
-    for (const key of enKeys) {
-      if (es[key]) {
-        const enPlaceholders = extractPlaceholders(en[key]);
-        const esPlaceholders = extractPlaceholders(es[key]);
-        expect(esPlaceholders).toEqual(enPlaceholders);
-      }
+    for (const key of Object.keys(en)) {
+      expect(Object.prototype.hasOwnProperty.call(es, key)).toBe(true);
+      const enPlaceholders = extractPlaceholders(en[key]);
+      const esPlaceholders = extractPlaceholders(es[key]);
+      expect(esPlaceholders).toEqual(enPlaceholders);
     }
   });
 
