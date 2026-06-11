@@ -56,26 +56,30 @@ def runtime_confirmation_card(
     title = f"{assets} {strategy_type}".strip()
 
     rows = [
-        {"label": "Strategy", "value": strategy_label},
-        {"label": "Assets", "value": assets},
-        {"label": "Period", "value": date_range},
+        _confirmation_row("strategy", "Strategy", strategy_label),
+        _confirmation_row("assets", "Assets", assets),
+        _confirmation_row("period", "Period", date_range),
     ]
     canonical_strategy_type = executable_strategy_type(strategy)
     if strategy.get("cadence") and _strategy_type_uses_cadence(canonical_strategy_type):
-        rows.append({"label": "Cadence", "value": str(strategy["cadence"]).title()})
+        rows.append(
+            _confirmation_row("cadence", "Cadence", str(strategy["cadence"]).title())
+        )
     if strategy.get("entry_logic"):
         rows.append(
-            {
-                "label": "Buy rule",
-                "value": _format_confirmation_value(strategy["entry_logic"]),
-            }
+            _confirmation_row(
+                "buy_rule",
+                "Buy rule",
+                _format_confirmation_value(strategy["entry_logic"]),
+            )
         )
     if strategy.get("exit_logic"):
         rows.append(
-            {
-                "label": "Exit rule",
-                "value": _format_confirmation_value(strategy["exit_logic"]),
-            }
+            _confirmation_row(
+                "exit_rule",
+                "Exit rule",
+                _format_confirmation_value(strategy["exit_logic"]),
+            )
         )
     if strategy.get("capital_amount"):
         capital_label = (
@@ -84,10 +88,13 @@ def runtime_confirmation_card(
             else "Starting capital"
         )
         rows.append(
-            {
-                "label": capital_label,
-                "value": f"${float(strategy['capital_amount']):,.0f}",
-            }
+            _confirmation_row(
+                "contribution"
+                if _strategy_type_uses_cadence(canonical_strategy_type)
+                else "starting_capital",
+                capital_label,
+                f"${float(strategy['capital_amount']):,.0f}",
+            )
         )
 
     launch_payload = payload.get("launch_payload")
@@ -116,9 +123,7 @@ def runtime_confirmation_card(
     action_payload = {
         "confirmation_id": active_confirmation_id,
         "artifact_id": active_confirmation_id,
-        "launch_payload_hash": stable_payload_hash(
-            execution_validation.launch_payload
-        ),
+        "launch_payload_hash": stable_payload_hash(execution_validation.launch_payload),
     }
     if owner_conversation_id:
         action_payload["conversation_id"] = owner_conversation_id
@@ -127,6 +132,7 @@ def runtime_confirmation_card(
             "id": "change-dates",
             "type": "change_dates",
             "label": "Change dates",
+            "labelKey": "chat.confirmation.actions.change_dates",
             "presentation": "confirmation",
             "payload": action_payload,
         },
@@ -134,6 +140,7 @@ def runtime_confirmation_card(
             "id": "change-asset",
             "type": "change_asset",
             "label": "Change asset",
+            "labelKey": "chat.confirmation.actions.change_asset",
             "presentation": "confirmation",
             "payload": action_payload,
         },
@@ -141,6 +148,7 @@ def runtime_confirmation_card(
             "id": "adjust-assumptions",
             "type": "adjust_assumptions",
             "label": "Adjust assumptions",
+            "labelKey": "chat.confirmation.actions.adjust_assumptions",
             "presentation": "confirmation",
             "payload": action_payload,
         },
@@ -148,6 +156,7 @@ def runtime_confirmation_card(
             "id": "cancel-confirmation",
             "type": "cancel_confirmation",
             "label": "Cancel",
+            "labelKey": "chat.confirmation.actions.cancel",
             "presentation": "confirmation",
             "payload": action_payload,
         },
@@ -159,6 +168,7 @@ def runtime_confirmation_card(
                 "id": "run-backtest",
                 "type": "run_backtest",
                 "label": "Run backtest",
+                "labelKey": "chat.confirmation.actions.run_backtest",
                 "presentation": "confirmation",
                 "payload": action_payload,
             },
@@ -167,11 +177,21 @@ def runtime_confirmation_card(
         "confirmation_id": active_confirmation_id,
         "confirmation_state": "active",
         "title": title,
+        "status": "ready_to_run" if is_ready_to_run else "needs_change",
         "statusLabel": "Ready to run" if is_ready_to_run else "Needs change",
         "summary": summary,
         "rows": rows,
         "assumptions": assumptions,
         "actions": actions,
+    }
+
+
+def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:
+    return {
+        "key": key,
+        "label": label,
+        "labelKey": f"chat.confirmation.rows.{key}",
+        "value": value,
     }
 
 

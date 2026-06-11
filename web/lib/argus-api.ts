@@ -270,6 +270,7 @@ export type ChatFinalPayload = {
 export type ChatActionRequest = {
   type: NonNullable<ChatActionOption["type"]>;
   label?: string;
+  labelKey?: string;
   payload?: Record<string, unknown>;
   presentation?: "confirmation" | "result";
 };

@@ -86,6 +86,13 @@ describe("chat artifact history", () => {
       ]);
 
       expect(message.confirmation?.confirmation_state).toBe(confirmationState);
+      expect(message.confirmation?.status).toBe(
+        type === "run_backtest"
+          ? "running"
+          : type === "cancel_confirmation"
+            ? "draft_canceled"
+            : "editing",
+      );
       expect(message.confirmation?.statusLabel).toBe(statusLabel);
       expect(message.confirmation?.actions).toEqual([]);
       expect(message.actions).toEqual([]);
@@ -102,6 +109,7 @@ describe("chat artifact history", () => {
     ]);
 
     expect(message.confirmation?.confirmation_state).toBe("cancelled");
+    expect(message.confirmation?.status).toBe("draft_canceled");
     expect(message.confirmation?.statusLabel).toBe("Draft canceled");
     expect(message.confirmation?.actions).toEqual([]);
     expect(message.actions).toEqual([]);
@@ -125,6 +133,7 @@ describe("chat artifact history", () => {
     const [settled] = settleOpenConfirmationsAfterStreamError([running], action);
 
     expect(settled.confirmation?.confirmation_state).toBe("superseded");
+    expect(settled.confirmation?.status).toBe("could_not_run");
     expect(settled.confirmation?.statusLabel).toBe("Could not run");
     expect(settled.confirmation?.actions).toEqual([]);
     expect(settled.actions).toEqual([]);
@@ -174,11 +183,13 @@ describe("chat artifact history", () => {
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-aapl",
+        status: "draft_canceled",
         statusLabel: "Draft canceled",
       },
       {
         type: "cancel_confirmation",
         confirmationId: "confirm-aapl",
+        status: "draft_canceled",
         statusLabel: "Draft canceled",
       },
     ]);
@@ -251,6 +262,7 @@ describe("chat artifact history", () => {
     expect(messages[0].confirmation?.confirmation_state).toBe("superseded");
     expect(messages[0].confirmation?.statusLabel).toBe("Updated");
     expect(messages[1].confirmation?.confirmation_state).toBe("cancelled");
+    expect(messages[1].confirmation?.status).toBe("draft_canceled");
     expect(messages[1].confirmation?.statusLabel).toBe("Draft canceled");
   });
 
@@ -269,6 +281,7 @@ describe("chat artifact history", () => {
     ]);
 
     expect(message.confirmation?.confirmation_state).toBe("cancelled");
+    expect(message.confirmation?.status).toBe("draft_canceled");
     expect(message.confirmation?.statusLabel).toBe("Draft canceled");
     expect(message.confirmation?.actions).toEqual([]);
   });
@@ -285,6 +298,7 @@ describe("chat artifact history", () => {
     const [normalized] = normalizeConfirmationHistory([cancelled]);
 
     expect(normalized.confirmation?.confirmation_state).toBe("cancelled");
+    expect(normalized.confirmation?.status).toBe("draft_canceled");
     expect(normalized.confirmation?.statusLabel).toBe("Draft canceled");
     expect(normalized.confirmation?.actions).toEqual([]);
     expect(normalized.actions).toEqual([]);
@@ -312,6 +326,7 @@ describe("chat artifact history", () => {
     const [normalizedConfirmation] = normalizeConfirmationHistory([running, result]);
 
     expect(normalizedConfirmation.confirmation?.confirmation_state).toBe("superseded");
+    expect(normalizedConfirmation.confirmation?.status).toBe("run_complete");
     expect(normalizedConfirmation.confirmation?.statusLabel).toBe("Run complete");
     expect(normalizedConfirmation.confirmation?.actions).toEqual([]);
     expect(normalizedConfirmation.actions).toEqual([]);

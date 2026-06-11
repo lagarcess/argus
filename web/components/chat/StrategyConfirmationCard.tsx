@@ -8,8 +8,17 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { type ChatActionOption, type StrategyConfirmationPayload } from "./types";
 import { splitPeriodDisplay, splitSymbolList } from "./card-formatting";
+import {
+  confirmationActionLabelKey,
+  confirmationRowKey,
+  confirmationRowLabelKey,
+  confirmationStatusFromPayload,
+  confirmationStatusLabel,
+  confirmationStatusLabelKey,
+} from "./confirmation-display";
 
 type StrategyConfirmationCardProps = {
   confirmation: StrategyConfirmationPayload;
@@ -31,9 +40,10 @@ const confirmationToneClasses = {
 };
 
 export default function StrategyConfirmationCard({ confirmation, onAction }: StrategyConfirmationCardProps) {
+  const { t } = useTranslation();
   const primaryRows = confirmation.rows.slice(0, 3);
   const detailRows = confirmation.rows.slice(3);
-  const displayState = confirmationDisplayState(confirmation);
+  const displayState = confirmationDisplayState(confirmation, t);
   const activeActions =
     confirmation.confirmation_state === "active" || !confirmation.confirmation_state
       ? confirmation.actions ?? []
@@ -62,9 +72,9 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
           {primaryRows.map((row) => (
             <div key={row.label} className="min-w-0">
               <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8d969e]">
-                {row.label}
+                {displayConfirmationRowLabel(row, t)}
               </dt>
-              <ConfirmationValue row={row} />
+              <ConfirmationValue row={row} t={t} />
             </div>
           ))}
         </dl>
@@ -74,7 +84,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
             {detailRows.map((row) => (
               <div key={row.label} className="min-w-0">
                 <dt className="text-[12px] text-[#8d969e]">
-                  {row.label}
+                  {displayConfirmationRowLabel(row, t)}
                 </dt>
                 <dd className="mt-0.5 whitespace-normal break-words text-[14px] font-medium leading-[1.45] text-[#191c1f] dark:text-white/76">
                   {row.value}
@@ -106,7 +116,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
               className={actionClassName}
             >
               <ConfirmationActionIcon action={action} />
-              {action.label}
+              {displayConfirmationActionLabel(action, t)}
             </button>
           ))}
         </div>
@@ -117,13 +127,15 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
 
 function ConfirmationValue({
   row,
+  t,
 }: {
   row: StrategyConfirmationPayload["rows"][number];
+  t: any;
 }) {
-  if (row.label.toLowerCase() === "assets") {
-    return <AssetList symbols={splitSymbolList(row.value)} />;
+  if (confirmationRowKey(row) === "assets") {
+    return <AssetList symbols={splitSymbolList(row.value)} t={t} />;
   }
-  if (row.label.toLowerCase() === "period") {
+  if (confirmationRowKey(row) === "period") {
     const period = splitPeriodDisplay(row.value);
     return (
       <dd className="mt-1 text-[15px] font-semibold leading-snug tracking-tight text-[#191c1f] dark:text-white">
@@ -143,11 +155,11 @@ function ConfirmationValue({
   );
 }
 
-function AssetList({ symbols }: { symbols: string[] }) {
+function AssetList({ symbols, t }: { symbols: string[]; t: any }) {
   if (symbols.length === 0) {
     return (
       <dd className="mt-1 text-[15px] font-semibold leading-snug tracking-tight text-[#191c1f] dark:text-white">
-        Selected asset
+        {t("chat.confirmation.selected_asset", "Selected asset")}
       </dd>
     );
   }
@@ -165,49 +177,43 @@ function AssetList({ symbols }: { symbols: string[] }) {
   );
 }
 
-function confirmationDisplayState(confirmation: StrategyConfirmationPayload) {
-  const rawLabel = confirmation.statusLabel?.trim();
-  const normalizedLabel = rawLabel?.toLowerCase() ?? "";
-  if (confirmation.confirmation_state === "cancelled") {
-    return {
-      icon: CircleSlash2,
-      isSpinning: false,
-      statusLabel: rawLabel || "Draft canceled",
-      tone: "neutral" as const,
-    };
+function confirmationDisplayState(confirmation: StrategyConfirmationPayload, t: any) {
+  const status = confirmationStatusFromPayload(confirmation);
+  const statusLabel = t(
+    confirmationStatusLabelKey(status),
+    confirmation.statusLabel?.trim() || confirmationStatusLabel(status),
+  );
+  if (status === "running") {
+    return { icon: Loader2, isSpinning: true, statusLabel, tone: "active" as const };
   }
-  if (normalizedLabel === "running") {
-    return {
-      icon: Loader2,
-      isSpinning: true,
-      statusLabel: rawLabel,
-      tone: "active" as const,
-    };
+  if (status === "run_complete") {
+    return { icon: CheckCircle2, isSpinning: false, statusLabel, tone: "success" as const };
   }
-  if (normalizedLabel === "run complete") {
-    return {
-      icon: CheckCircle2,
-      isSpinning: false,
-      statusLabel: rawLabel,
-      tone: "success" as const,
-    };
+  if (status === "could_not_run") {
+    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: "failed" as const };
   }
-  if (normalizedLabel === "could not run") {
-    return {
-      icon: CircleSlash2,
-      isSpinning: false,
-      statusLabel: rawLabel,
-      tone: "failed" as const,
-    };
+  if (status === "draft_canceled") {
+    return { icon: CircleSlash2, isSpinning: false, statusLabel, tone: "neutral" as const };
   }
   return {
     icon: CheckCircle2,
     isSpinning: false,
-    statusLabel:
-      rawLabel ||
-      (confirmation.confirmation_state === "superseded" ? "Updated" : "Ready"),
+    statusLabel,
     tone: confirmation.confirmation_state === "active" ? "active" as const : "neutral" as const,
   };
+}
+
+function displayConfirmationRowLabel(
+  row: StrategyConfirmationPayload["rows"][number],
+  t: any,
+) {
+  const key = confirmationRowLabelKey(row);
+  return key ? t(key, row.label) : row.label;
+}
+
+function displayConfirmationActionLabel(action: ChatActionOption, t: any) {
+  const key = confirmationActionLabelKey(action);
+  return key ? t(key, action.label) : action.label;
 }
 
 function ConfirmationActionIcon({ action }: { action: ChatActionOption }) {

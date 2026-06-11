@@ -231,6 +231,7 @@ describe("chat backtest jobs", () => {
     );
 
     expect(completedMessages[0].confirmation?.statusLabel).toBe("Run complete");
+    expect(completedMessages[0].confirmation?.status).toBe("run_complete");
     expect(completedMessages[1].kind).toBe("strategy_result");
   });
 
@@ -263,6 +264,7 @@ describe("chat backtest jobs", () => {
     );
 
     expect(settledConfirmation.confirmation?.statusLabel).toBe("Request sent");
+    expect(settledConfirmation.confirmation?.status).toBe("request_sent");
     expect(activeJob.kind).toBe("backtest_job");
     expect(activeJob.backtestJob?.status).toBe("queued");
   });
@@ -308,6 +310,7 @@ describe("chat backtest jobs", () => {
     );
 
     expect(settledConfirmation.confirmation?.statusLabel).toBe("Could not run");
+    expect(settledConfirmation.confirmation?.status).toBe("could_not_run");
     expect(failedJob.kind).toBe("backtest_job");
     expect(failedJob.backtestJob?.status).toBe("failed");
   });
@@ -350,6 +353,7 @@ describe("chat backtest jobs", () => {
     );
 
     expect(settledConfirmation.confirmation?.statusLabel).toBe("Not completed");
+    expect(settledConfirmation.confirmation?.status).toBe("not_completed");
     expect(expiredJob.kind).toBe("backtest_job");
     expect(expiredJob.backtestJob?.status).toBe("expired");
   });
