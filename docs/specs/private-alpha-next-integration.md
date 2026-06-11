@@ -87,21 +87,22 @@ Do not reopen these as debt unless a new bug is reproduced:
   confirmation card, completed result card, Quick take, and Explain result;
   no visible Try next, Quick Breakdown, Copy ID, or console/API regression was
   observed.
+- Pre-merge internet readiness passed on 2026-06-11 for commit `dd65bf6`:
+  Render `argus-api` deploy `dep-d8lj6ureo5us73fanrcg` and `argus-app` deploy
+  `dep-d8lj8cjtqb8s738jf28g` both reached `live`; warmup passed in
+  `real-workflow` mode; the authenticated canary conversation
+  `d2fba747-bb93-45be-a48d-0fc944982423` completed durable job
+  `93c89ccf-fb88-4ae2-ba93-4e0ab7b821c6` with run
+  `e654ed96-efc0-44d6-86fe-033383c2d625`; and a deployed browser shell smoke
+  rendered the unauthenticated front door without new console errors after
+  reload.
 - `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is marked historical.
 
 ## Remaining High-Leverage Work
 
-Codex should own or closely supervise these:
+Codex should own or closely supervise this:
 
-1. **Pre-merge internet readiness**
-   - Preview the integration branch over the Render staging target before the
-     PR to `main`.
-   - Warm the frontend/API pair, run the remote canary flow, and capture enough
-     proof to compare behavior against local QA.
-   - Do not change Render service topology, environment variable names, or
-     production deploy behavior as part of this pass.
-
-2. **Research Lab product spec**
+1. **Research Lab product spec**
    - Perplexity, citations, research-to-testable-hypothesis loops, inbox briefs,
      saved research, and monitoring belong in a dedicated spec before code.
    - The active refined draft is
