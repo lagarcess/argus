@@ -260,12 +260,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(card).toContain('presentation="heroDeltaEvidence"');
     expect(card).toContain("appearanceOverride={appearance}");
     expect(flags).toContain("NEXT_PUBLIC_STRATEGIES_ENABLED");
+    expect(card).toContain("const saveAction = strategiesEnabled");
     expect(card).toContain('action.type !== "save_strategy"');
     expect(labelHelper).toContain('"Explain result"');
     expect(labelHelper).toContain('"Refine idea"');
     expect(card).toContain('action.type === "save_strategy"');
     expect(card).toContain("<Save");
-    expect(chat).toContain('action.type !== "save_strategy"');
+    expect(chat).toContain("if (!strategiesEnabled)");
+    expect(chat).toContain("chat.private_alpha_result_kept");
     expect(chart).toContain("BaselineSeries");
     expect(chart).toContain("createSeriesMarkers");
     expect(chart).toContain("buildVisibleSeriesMarkers");
@@ -887,6 +889,7 @@ describe("Argus Alpha frontend contract", () => {
   test("chat message feedback controls fill only the selected thumb glyph", () => {
     const message = readFileSync(join(root, "components/chat/ChatMessage.tsx"), "utf-8");
     const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    const feedbackContext = readFileSync(join(root, "lib/chat-message-feedback-context.ts"), "utf-8");
 
     expect(message).toContain("text-[#191c1f] dark:text-white");
     expect(message).toContain("selectedFeedbackClass");
@@ -905,7 +908,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain('onFeedback?.("rating"');
     expect(message).toContain("postFeedback");
     expect(message).toContain("conversationId?: string | null");
-    expect(message).toContain("conversation_id: conversationId");
+    expect(message).toContain("feedbackContextForMessage(message, conversationId, extra)");
+    expect(feedbackContext).toContain("conversation_id: conversationId");
     expect(chat).toContain("conversationId={conversationId}");
   });
 
