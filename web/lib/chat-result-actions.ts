@@ -11,11 +11,28 @@ type ResultActionContext = {
   assetClass?: AssetClass;
 };
 
+export const VISIBLE_RESULT_ACTION_TYPES = [
+  "show_breakdown",
+  "refine_strategy",
+  "save_strategy",
+] as const;
+
+type VisibleResultActionType = (typeof VISIBLE_RESULT_ACTION_TYPES)[number];
+
+const visibleResultActionTypeSet = new Set<string>(VISIBLE_RESULT_ACTION_TYPES);
+
+export function isVisibleResultAction(
+  action: ChatActionOption,
+): action is ChatActionOption & { type: VisibleResultActionType } {
+  return Boolean(action.type && visibleResultActionTypeSet.has(action.type));
+}
+
 export function hydrateResultActions(
   actions: ChatActionOption[],
   context: ResultActionContext,
 ): ChatActionOption[] {
   return actions
+    .filter(isVisibleResultAction)
     .filter(
       (action) =>
         !resultActionRequiresRunContext(action) ||

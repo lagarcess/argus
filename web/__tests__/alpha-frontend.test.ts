@@ -648,11 +648,18 @@ describe("Argus Alpha frontend contract", () => {
 
   test("result cards render artifact scoped actions and saved state", () => {
     const card = readFileSync(join(root, "components/chat/StrategyResultCard.tsx"), "utf-8");
+    const resultActions = readFileSync(join(root, "lib/chat-result-actions.ts"), "utf-8");
     const locale = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
 
     expect(card).toContain('action.type === "show_breakdown"');
     expect(card).toContain('action.type === "refine_strategy"');
     expect(card).toContain('action.type === "save_strategy"');
+    expect(card).toContain("isVisibleResultAction");
+    expect(resultActions).toContain("VISIBLE_RESULT_ACTION_TYPES");
+    expect(resultActions).toContain("isVisibleResultAction");
+    expect(card).not.toContain("...resultActions.filter(");
+    expect(resultActions).not.toContain("next_experiment");
+    expect(resultActions).not.toContain("try_next");
     expect(card).toContain("result.savedStrategyId");
     expect(card).toContain("chat.saved");
     expect(locale).toContain('"saved": "Saved"');

@@ -6,6 +6,7 @@ import {
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
 import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
+import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
 import ResultEquityChart from "./ResultEquityChart";
 import type { ChatActionOption, StrategyResultPayload } from "./types";
@@ -31,7 +32,7 @@ export default function StrategyResultCard({
     locale: i18n.language,
   });
   const symbols = result.symbols ?? [];
-  const resultActions = result.actions ?? [];
+  const resultActions = (result.actions ?? []).filter(isVisibleResultAction);
   const showBreakdownAction = resultActions.find(
     (action) => action.type === "show_breakdown",
   );
@@ -41,17 +42,10 @@ export default function StrategyResultCard({
   const saveAction = strategiesEnabled
     ? resultActions.find((action) => action.type === "save_strategy")
     : undefined;
-  const orderedActions = [
-    showBreakdownAction,
-    refineStrategyAction,
-    saveAction,
-    ...resultActions.filter(
-      (action) =>
-        action.type !== "show_breakdown" &&
-        action.type !== "refine_strategy" &&
-        action.type !== "save_strategy",
-    ),
-  ].filter((action): action is ChatActionOption => Boolean(action));
+  const orderedActions: ChatActionOption[] = [];
+  if (showBreakdownAction) orderedActions.push(showBreakdownAction);
+  if (refineStrategyAction) orderedActions.push(refineStrategyAction);
+  if (saveAction) orderedActions.push(saveAction);
   const renderedActions = result.savedStrategyId || result.savingStrategy
     ? orderedActions.filter((action) => action.type !== "save_strategy")
     : orderedActions;
