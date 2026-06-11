@@ -358,4 +358,51 @@ describe("result card playground", () => {
     expect(trade.details).toContainEqual({ label: "Entry rule", value: "RSI below 30" });
     expect(trade.details).toContainEqual({ label: "Exit rule", value: "RSI above 55" });
   });
+
+  test("hydrates missing run facts and normalizes action labels correctly via resultCardFromConversationCard", () => {
+    const card = {
+      title: "Test Strategy",
+      symbols: ["AAPL", "MSFT"],
+      strategy_label: "Test Label",
+      date_range: { start: "2023-01-01", end: "2024-01-01", display: "2023-01-01 to 2024-01-01" },
+      status_label: "Completed",
+      rows: [{ key: "metric1", label: "Metric 1", value: "100" }],
+      benchmark_note: "Test Benchmark Note",
+      assumptions: ["Assumption 1", "Assumption 2"],
+      actions: [
+        { id: "action-1", type: "show_breakdown", presentation: "result" },
+        { id: "action-2", type: "custom_type", label: "Custom Action", presentation: "result" }
+      ],
+      // chart is omitted intentionally
+    };
+
+    // 1. Without run argument
+    const mappedWithoutRun = resultCardFromConversationCard(card as Parameters<typeof resultCardFromConversationCard>[0], undefined);
+    expect(mappedWithoutRun.strategyName).toBe("Test Strategy");
+    expect(mappedWithoutRun.symbols).toEqual(["AAPL", "MSFT"]);
+    expect(mappedWithoutRun.statusLabel).toBe("Completed");
+    expect(mappedWithoutRun.assumptions).toEqual(["Assumption 1", "Assumption 2"]);
+    expect(mappedWithoutRun.chart).toBeNull();
+    expect(mappedWithoutRun.runId).toBeUndefined();
+    expect(mappedWithoutRun.strategyId).toBeNull();
+    expect(mappedWithoutRun.configSnapshot).toBeUndefined();
+
+    // 2. Actions label normalization
+    expect(mappedWithoutRun.actions).toHaveLength(2);
+    expect(mappedWithoutRun.actions[0].label).toBe("Explain result");
+    expect(mappedWithoutRun.actions[1].label).toBe("Custom Action");
+
+    // 3. With run argument
+    const run = {
+      id: "run-123",
+      strategy_id: "strat-456",
+      benchmark_symbol: "SPY",
+      config_snapshot: { template: "buy_and_hold" }
+    };
+    const mappedWithRun = resultCardFromConversationCard(card as Parameters<typeof resultCardFromConversationCard>[0], run as Parameters<typeof resultCardFromConversationCard>[1]);
+    expect(mappedWithRun.runId).toBe("run-123");
+    expect(mappedWithRun.strategyId).toBe("strat-456");
+    expect(mappedWithRun.configSnapshot).toEqual({ template: "buy_and_hold" });
+  });
+
 });
