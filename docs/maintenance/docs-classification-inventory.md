@@ -4,9 +4,10 @@
 
 *   **Canon:** 6
 *   **Active Spec:** 3
+*   **Maintenance:** 6
 *   **Historical Evidence:** 21
-*   **Archive Candidate:** 1
-*   **Unclear/Needs Owner Decision:** 13
+*   **Stale/Superseded:** 1
+*   **Unclear/Needs Owner Decision:** 16
 
 ## Inventory
 
@@ -24,8 +25,8 @@
 | `docs/specs/research-lab-thesis.md` | historical evidence | Earlier Research Lab thesis draft. It is retained for context and explicitly refined by `docs/specs/evidence-aware-idea-loop.md`. | Keep as historical context. | Superseded by active evidence-aware loop spec. |
 | `docs/specs/private-alpha-backtest-execution-capacity.md` | unclear/needs owner decision | Draft from 2026-06-05, frames architecture questions before scaling. Not clearly an active spec for the current milestone, nor pure historical evidence. | Determine if this is an active spec or historical. |  |
 | `docs/specs/agent-architecture.md` | historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Add historical banner. | Stale date. |
-| `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or archive candidate. |  |
-| `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | archive candidate | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Add superseded banner pointing to `docs/specs/private-alpha-conversation-trust.md`. | Explicitly stale. |
+| `docs/CONVERSATIONAL_RUNTIME.md` | unclear/needs owner decision | Status is "Active Alpha implementation", but unclear if it's canon, active spec, or superseded by `docs/ARCHITECTURE.md`. | Decide if canon or stale/superseded. |  |
+| `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` | stale/superseded | Explicitly marked "> Historical plan. This document records an earlier launch-closure checklist and should not be treated as the current milestone source of truth." | Add superseded banner pointing to `docs/specs/private-alpha-conversation-trust.md`. | Explicitly stale. |
 | `docs/ARGUS_SYSTEM_STEERING.md` | historical evidence | "Pre-private-launch steering reference... planning reference, not an implementation ticket" from 2026-05-19. | Add historical banner. |  |
 | `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` | unclear/needs owner decision | QA script. Could be canon process, or an active spec, or archive if out of date. | Clarify if this QA process is still active. | Uses legacy orchestrator path? |
 | `docs/PRIVATE_LAUNCH_RUNBOOK.md` | historical evidence | Runbook for "first trusted-user internet tests". Private launch has passed (we are in "private alpha next"). | Keep for historical reference, or update. | URLs might still be valid, but process is historical. |
@@ -56,6 +57,15 @@
 | `.agent/.jules/realignment.md` | unclear/needs owner decision | Active instructions. | Clarify if .jules instructions are "canon". |  |
 | `.agent/.jules/README.md` | unclear/needs owner decision | Active instructions. | Clarify if .jules instructions are "canon". |  |
 | `.agent/ownership/README.md` | unclear/needs owner decision | Active ownership rules. | Clarify if ownership docs are "canon". |  |
+| `.agent/handoffs/HANDOFF_PACKET_TEMPLATE.md` | unclear/needs owner decision | Template for handoffs. Needs verification if this is canon. | Verify if handoff template is 'canon'. | |
+| `.agent/handoffs/SECTION3_OWNERSHIP_CHECKLIST.md` | unclear/needs owner decision | Handoff checklist. Needs verification if this is canon. | Verify if handoff checklist is 'canon'. | |
+| `.agent/handoffs/SECTION4_OWNERSHIP_CHECKLIST.md` | unclear/needs owner decision | Handoff checklist. Needs verification if this is canon. | Verify if handoff checklist is 'canon'. | |
+| `docs/maintenance/dead-code-candidates.md` | maintenance | Inventory of dead code candidates. | Keep updated as codebase evolves. | |
+| `docs/maintenance/docs-classification-inventory.md` | maintenance | This file. | Keep updated as docs evolve. | |
+| `docs/maintenance/i18n-key-audit.md` | maintenance | Inventory of i18n keys. | Keep updated as keys are added/removed. | |
+| `docs/maintenance/language-enablement-checklist.md` | maintenance | Checklist for language enablement. | Track progress of language support. | |
+| `docs/maintenance/large-file-modularity-inventory.md` | maintenance | Inventory of large files for modularity. | Keep updated as refactoring occurs. | |
+| `docs/maintenance/spanish-readiness-inventory.md` | maintenance | Inventory of Spanish readiness. | Keep updated as translations progress. | |
 
 
 ## Banner Applied Summary
