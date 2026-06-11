@@ -4,6 +4,20 @@
 
 This inventory assesses the Argus application for Spanish localization readiness. It identifies hardcoded English strings and language/locale handling gaps across the frontend UI, backend deterministic copy, and LLM language contracts.
 
+**Decision:** Spanish is not release-ready for private alpha yet. This branch is
+allowed to land Spanish scaffolding behind `NEXT_PUBLIC_ENABLE_SPANISH`, but
+Spanish must remain disabled in production-like Render environments until a
+Codex-owned runtime readiness gate passes. The current work stabilizes
+translation keys, static UI coverage, and confirmation-card state handling; it
+does not prove the LangGraph chat/backtest spine is language agnostic.
+
+**Current known blocker:** a Spanish multi-turn clarification/approval flow can
+crash when serialized `resolution_provenance` entries rehydrate as dictionaries
+while interpreter helpers expect `ResolutionProvenance` model objects. This is
+not a locale-file issue. It is runtime-state normalization debt and must be
+handled by Codex-owned runtime work with a regression test before Spanish can be
+enabled for testers.
+
 The findings are grouped by category:
 *   **Static frontend UI copy**: ~100+ strings wrapped in `t()` with hardcoded English fallbacks.
 *   **Backend deterministic user-facing copy**: ~20+ strings in API exceptions and artifact labels.
@@ -22,6 +36,8 @@ The findings are grouped by category:
 | **Backend API Errors** | `src/argus/api/routers/conversations.py` | Hardcoded HTTP exception details: `"Conversation not found."`, `"Strategy not found."` | Medium | Product decision | Implement error code system (e.g., `error_code="CONVERSATION_NOT_FOUND"`) that frontend maps to `t()`. |
 | **Backend Results** | `src/argus/domain/benchmark_comparison.py` | User phrases generated in backend: `"Beat by {magnitude}"`, `"In line with benchmark"` | High | Product decision | Return structured data (e.g., `{ type: "beat_benchmark", value: magnitude }`) and localize in frontend. |
 | **LLM Prompts** | `src/argus/agent_runtime/stages/interpret.py` | System prompts: `"Supported-strategy facts:"`, `"Available short-lived context packet:"` | High | Codex-owned | Do not change. Treat as Codex-owned runtime contracts.|
+| **Runtime State Hydration** | `src/argus/agent_runtime/stages/interpret.py` | Continuation turns can encounter serialized `resolution_provenance` dictionaries in paths that expect model objects. | High | Codex-owned | Add a Spanish continuation regression test, normalize provenance at the runtime boundary, and verify the flow reaches confirmation/result without generic recovery. |
+| **Recovery Copy** | `src/argus/api/routers/agent.py` | Generic runtime failure recovery currently persists English copy. | High | Codex-owned | Define structured error/recovery codes and language-aware presentation so Spanish users do not see English fallback copy on runtime failure. |
 
 ## Detailed Inventory
 
@@ -51,6 +67,14 @@ The findings are grouped by category:
 | `src/argus/agent_runtime/artifact_edit_planner.py` | `{"role": "system", "content": ...}` | Prompt | High | Codex-owned | No action needed. Treat as Codex-owned. |
 | `src/argus/agent_runtime/result_followups.py` | `{"role": "system", "content": ...}` | Prompt | High | Codex-owned | No action needed. Treat as Codex-owned. |
 | `src/argus/agent_runtime/stages/explain.py` | `{"role": "system", "content": ...}` | Prompt | High | Codex-owned | No action needed. Treat as Codex-owned. |
+
+### Runtime language-agnostic spine
+
+| File / Area | Representative examples | Classification | Risk | Owner | Recommendation |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `src/argus/agent_runtime/stages/interpret.py` | Continuation helpers reading `resolution_provenance` as model attributes after persistence or metadata serialization. | State normalization | High | Codex-owned | Normalize provenance consistently before helpers inspect it; add tests for Spanish approval/continuation after clarification. |
+| `src/argus/api/routers/agent.py` | Runtime failure recovery writes English text directly into the assistant transcript. | Recovery copy | High | Codex-owned | Keep recovery behavior structured and language-aware; do not make English prose the durable failure contract. |
+| `tests/agent_runtime/*` | Existing tests cover many English runtime paths but do not yet cover Spanish multi-turn continuation into confirmation/result. | Coverage gap | High | Codex-owned | Add a compact Spanish runtime transcript set before enabling Spanish in Render. |
 
 ### Artifact/result/status labels
 

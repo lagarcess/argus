@@ -23,6 +23,31 @@ file.
 - Spanish is registered behind `NEXT_PUBLIC_ENABLE_SPANISH`; do not claim it is
   production-ready just because a locale file exists.
 
+## Current Spanish Readiness Decision
+
+Spanish work on `codex/private-alpha-next-jules-intake` is **scaffolding only**
+until a separate Codex-owned runtime readiness gate passes. The branch may add
+locale files, stable translation keys, documentation, and static UI tests, but
+it must not be treated as a release signal for Spanish private-alpha users.
+
+Keep `NEXT_PUBLIC_ENABLE_SPANISH` disabled in production-like Render
+environments until all of these pass:
+
+- Spanish static UI smoke for the private-alpha surfaces.
+- Spanish production-parity chat QA covering at least one multi-turn
+  clarification and confirmation flow.
+- Spanish result/job/retry/recovery surfaces render without English happy-path
+  or failure copy leaking into the user-facing transcript.
+- A live or local QA canary verifies that structured runtime state survives
+  continuation turns without depending on translated labels as executable truth.
+
+The current known blocker is runtime-state normalization in Spanish
+continuation flows. A Spanish user can reach paths where serialized
+`resolution_provenance` entries rehydrate as dictionaries while runtime helpers
+expect model objects. That is a language-readiness blocker because it exposes
+that the chat/backtest spine is not yet fully presentation-language agnostic.
+Fixing this belongs to Codex-owned runtime work, not mechanical locale intake.
+
 ## Frontend Responsibilities
 
 - Add the locale directory and keep JSON key/placeholder parity with `en`.
@@ -95,6 +120,8 @@ Before enabling a language flag in Render:
 - Docs that describe current implementation without changing runtime behavior.
 - Narrow tests that fail on missing locale files, keys, placeholders, or feature
   flag drift.
+- Static UI i18n migrations that do not alter LangGraph state, backend runtime
+  semantics, provider resolution, or user-facing assistant prose generation.
 
 **Codex-owned / product-runtime**
 
@@ -102,6 +129,10 @@ Before enabling a language flag in Render:
   changes.
 - Backend language resolution semantics.
 - Structured artifact contract changes.
+- Runtime state normalization and hydration across continuation turns.
+- Recovery/failure copy policy for non-English conversations.
+- Per-language live/local canaries that exercise real chat interpretation,
+  confirmation, queued/running/result jobs, retry actions, and reload hydration.
 - Anything that touches Supabase migrations, auth/RLS, Render env/config, model
   provider plumbing, backtest engine semantics, or private-alpha release gates.
 
