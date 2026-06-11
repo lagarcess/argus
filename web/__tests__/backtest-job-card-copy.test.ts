@@ -49,4 +49,18 @@ describe("backtest job card copy", () => {
 
     expect(copy.bodyKey).toBe("chat.backtest_job.failed_body");
   });
+
+  test("never uses retry copy for canceled or expired jobs", () => {
+    expect(
+      backtestJobCardCopy(job({ status: "canceled", retryable: true }), {
+        canRetry: true,
+      }).bodyKey,
+    ).toBe("chat.backtest_job.expired_body");
+
+    expect(
+      backtestJobCardCopy(job({ status: "expired", retryable: true }), {
+        canRetry: true,
+      }).bodyKey,
+    ).toBe("chat.backtest_job.expired_body");
+  });
 });

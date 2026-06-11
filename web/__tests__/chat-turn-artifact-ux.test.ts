@@ -94,6 +94,18 @@ describe("chat turn artifact UX", () => {
     expect(message).toContain("canRetry={Boolean(retryAction)}");
   });
 
+  test("assistant more menu hides internal message ids", () => {
+    const message = readFileSync(
+      join(root, "components/chat/ChatMessage.tsx"),
+      "utf-8",
+    );
+
+    expect(message).toContain("chat.copy_plaintext");
+    expect(message).toContain("chat.report_issue");
+    expect(message).not.toContain("chat.copy_id");
+    expect(message).not.toContain("handleCopy(message.id)");
+  });
+
   test("stream error handling settles confirmation artifacts and clears stale composer actions", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
