@@ -1361,7 +1361,7 @@ def _strategy_date_range_needs_current_message_repair(
     if has_partial_explicit_date_range(strategy.date_range):
         return True
     if isinstance(strategy.date_range, str):
-        return True
+        return False
     if _date_range_endpoints(strategy.date_range) != _date_range_endpoints(
         current_date_range
     ):
