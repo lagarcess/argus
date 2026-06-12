@@ -122,15 +122,15 @@
     "trigger_create_strategy": "Quiero crear una nueva estrategia.",
     "trigger_create_collection": "Quiero crear una nueva colección.",
     "placeholder_prompts": [
-      "¿Cómo le fue a Apple contra SPY en 2024?",
-      "¿Y si comprara Bitcoin al inicio de 2024?",
+      "¿Cómo le ha ido a Apple contra SPY este año?",
+      "¿Qué habría pasado si compraba Bitcoin al inicio de este año?",
       "Explícame un término del mercado en palabras simples.",
-      "¿Qué pasa si mantengo Nvidia durante un año?",
-      "Compara mantener ETH frente a BTC el último año.",
-      "Prueba comprar SPY al inicio de 2024.",
-      "¿Cómo funciona el trading de momentum para tecnológicas?",
-      "¿Y si comprara $250 de Nvidia cada semana en 2024?",
-      "Prueba una idea simple de comprar y mantener Solana.",
+      "¿Qué pasa si mantengo Nvidia durante los últimos 12 meses hasta hoy?",
+      "Compara Ethereum y Bitcoin durante los últimos 12 meses hasta hoy.",
+      "Prueba comprar SPY en lo que va del año.",
+      "¿Cómo funciona comprar acciones fuertes?",
+      "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante los últimos 12 meses hasta hoy?",
+      "Prueba una idea simple de comprar y mantener Solana en los últimos 6 meses.",
       "¿Por qué la gente compara una acción con SPY?"
     ],
     "view_history": "Ver historial",
@@ -140,15 +140,15 @@
     "starter_actions": {
       "tsla": {
         "label": "Prueba Apple vs SPY",
-        "value": "Prueba Apple contra SPY del 1 de enero de 2024 al 31 de diciembre de 2024 y muéstrame el resultado."
+        "value": "Compara Apple con SPY durante los últimos 12 meses hasta hoy."
       },
       "btc": {
         "label": "Prueba mantener Bitcoin (BTC)",
-        "value": "Prueba comprar BTC (Bitcoin) el 1 de enero de 2024 y mantenerlo hasta el 31 de diciembre de 2024."
+        "value": "¿Qué habría pasado si compraba Bitcoin este año hasta hoy?"
       },
       "dca": {
         "label": "Prueba compras semanales de Nvidia",
-        "value": "Prueba esta idea de inversión. Estrategia: compras recurrentes. Activo: NVDA (Nvidia). Aporte recurrente: $250 por semana. Periodo: del 1 de enero de 2024 al 31 de diciembre de 2024."
+        "value": "¿Qué habría pasado si compraba $250 de Nvidia cada semana durante los últimos 12 meses hasta hoy?"
       }
     },
     "example_queries": {

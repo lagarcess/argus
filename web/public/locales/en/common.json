@@ -122,15 +122,15 @@
     "trigger_create_strategy": "I want to create a new strategy.",
     "trigger_create_collection": "I want to create a new collection.",
     "placeholder_prompts": [
-      "How did Apple perform against SPY in 2024?",
-      "What if I bought Bitcoin at the start of 2024?",
+      "How has Apple performed against SPY this year?",
+      "What if I bought Bitcoin at the start of this year?",
       "Explain a market term in simple words.",
-      "What happens if I hold Nvidia for a year?",
-      "Compare Ethereum and Bitcoin over the last year.",
-      "Test buying SPY at the start of 2024.",
+      "What happens if I hold Nvidia over the last 12 months?",
+      "Compare Ethereum and Bitcoin over the last 12 months.",
+      "Test buying SPY this year so far.",
       "How does buying strong stocks work?",
-      "What if I bought $250 of Nvidia every week in 2024?",
-      "Try a simple Solana buy-and-hold idea.",
+      "What if I bought $250 of Nvidia every week over the last 12 months?",
+      "Try a simple Solana buy-and-hold idea over the last 6 months.",
       "Why do people compare a stock to SPY?"
     ],
     "view_history": "View history",
@@ -140,15 +140,15 @@
     "starter_actions": {
       "tsla": {
         "label": "Test Apple vs SPY",
-        "value": "Test Apple against SPY from January 1, 2024 through December 31, 2024 and show me the result."
+        "value": "Compare Apple with SPY over the last 12 months."
       },
       "btc": {
         "label": "Test Bitcoin (BTC) hold",
-        "value": "Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024."
+        "value": "What if I bought Bitcoin this year so far?"
       },
       "dca": {
         "label": "Test weekly Nvidia buys",
-        "value": "Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024."
+        "value": "What if I bought $250 of Nvidia every week over the last 12 months?"
       }
     },
     "example_queries": {

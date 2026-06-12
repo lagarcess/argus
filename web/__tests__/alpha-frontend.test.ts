@@ -127,8 +127,10 @@ describe("Argus Alpha frontend contract", () => {
     const input = readFileSync(join(root, "components/chat/ChatInput.tsx"), "utf-8");
     const flags = readFileSync(join(root, "lib/private-alpha-flags.ts"), "utf-8");
     const envExample = readFileSync(join(root, ".env.local.example"), "utf-8");
-    const en = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
-    const es = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+    const enSource = readFileSync(join(root, "public/locales/en/common.json"), "utf-8");
+    const esSource = readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8");
+    const en = JSON.parse(enSource);
+    const es = JSON.parse(esSource);
 
     expect(flags).toContain("NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED");
     expect(flags).toContain("chatExploratorySuggestionsEnabled");
@@ -143,12 +145,35 @@ describe("Argus Alpha frontend contract", () => {
     expect(input).toContain("const prompts = chatExploratorySuggestionsEnabled");
     expect(input).toContain("placeholder");
     expect(chat).toContain("chat.followup_placeholder");
-    expect(en).toContain("from January 1, 2024 through December 31, 2024");
-    expect(en).toContain("Strategy: recurring buys");
-    expect(en).toContain("Asset: NVDA");
-    expect(en).toContain("Recurring contribution: $250 per week");
-    expect(en).toContain("Period: January 1, 2024 through December 31, 2024");
-    expect(es).toContain("del 1 de enero de 2024 al 31 de diciembre de 2024");
+
+    const starterAndPlaceholderText = [
+      ...en.chat.placeholder_prompts,
+      ...es.chat.placeholder_prompts,
+      en.chat.starter_actions.tsla.value,
+      en.chat.starter_actions.btc.value,
+      en.chat.starter_actions.dca.value,
+      es.chat.starter_actions.tsla.value,
+      es.chat.starter_actions.btc.value,
+      es.chat.starter_actions.dca.value,
+    ].join("\n");
+
+    expect(starterAndPlaceholderText).not.toContain("2024");
+    expect(starterAndPlaceholderText).not.toContain("January 1");
+    expect(starterAndPlaceholderText).not.toContain("December 31");
+    expect(starterAndPlaceholderText).not.toContain("1 de enero");
+    expect(starterAndPlaceholderText).not.toContain("31 de diciembre");
+    expect(starterAndPlaceholderText).not.toContain("Strategy:");
+    expect(starterAndPlaceholderText).not.toContain("Asset:");
+    expect(starterAndPlaceholderText).not.toContain("Period:");
+    expect(starterAndPlaceholderText).not.toContain("Estrategia:");
+    expect(starterAndPlaceholderText).not.toContain("Activo:");
+    expect(starterAndPlaceholderText).not.toContain("Periodo:");
+    expect(en.chat.starter_actions.tsla.value).toBe("Compare Apple with SPY over the last 12 months.");
+    expect(en.chat.starter_actions.btc.value).toBe("What if I bought Bitcoin this year so far?");
+    expect(en.chat.starter_actions.dca.value).toBe("What if I bought $250 of Nvidia every week over the last 12 months?");
+    expect(es.chat.starter_actions.tsla.value).toBe("Compara Apple con SPY durante los últimos 12 meses hasta hoy.");
+    expect(es.chat.starter_actions.btc.value).toBe("¿Qué habría pasado si compraba Bitcoin este año hasta hoy?");
+    expect(es.chat.starter_actions.dca.value).toBe("¿Qué habría pasado si compraba $250 de Nvidia cada semana durante los últimos 12 meses hasta hoy?");
   });
 
   test("assistant turn controls use shared tooltips and robust clipboard copy", () => {

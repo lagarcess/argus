@@ -183,6 +183,38 @@ def test_current_message_date_range_accepts_spanish_month_year_spans() -> None:
     assert resolved == {"start": "2021-01-01", "end": "2024-12-31"}
 
 
+def test_current_message_date_range_accepts_cold_start_starter_phrases() -> None:
+    today = date(2026, 6, 12)
+
+    assert current_message_date_range(
+        "Compare Apple with SPY over the last 12 months.",
+        today=today,
+    ) == {"start": "2025-06-12", "end": "2026-06-12"}
+    assert current_message_date_range(
+        "What if I bought Bitcoin this year so far?",
+        today=today,
+    ) == {"start": "2026-01-01", "end": "2026-06-12"}
+    assert current_message_date_range(
+        "What if I bought $250 of Nvidia every week over the last 12 months?",
+        today=today,
+    ) == {"start": "2025-06-12", "end": "2026-06-12"}
+    assert current_message_date_range(
+        "Compara Apple con SPY durante los últimos 12 meses hasta hoy.",
+        today=today,
+    ) == {"start": "2025-06-01", "end": "2026-06-12"}
+    assert current_message_date_range(
+        "¿Qué habría pasado si compraba Bitcoin este año hasta hoy?",
+        today=today,
+    ) == {"start": "2026-01-01", "end": "2026-06-12"}
+    assert current_message_date_range(
+        (
+            "¿Qué habría pasado si compraba $250 de Nvidia cada semana "
+            "durante los últimos 12 meses hasta hoy?"
+        ),
+        today=today,
+    ) == {"start": "2025-06-01", "end": "2026-06-12"}
+
+
 def test_resolve_date_range_accepts_spanish_month_year_spans() -> None:
     resolved = resolve_date_range(
         "desde enero de 2021 hasta diciembre de 2024",

@@ -2156,21 +2156,21 @@ export default function ChatInterface() {
                 {/* Starter Actions / Chips */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Test Apple against SPY for 2024 and show me the result.'))}
+                    onClick={() => handleSend(t('chat.starter_actions.tsla.value', 'Compare Apple with SPY over the last 12 months.'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <TrendingUp className="h-4 w-4 text-black/60 dark:text-white/60" />
                     {t('chat.starter_actions.tsla.label', 'Test Apple vs SPY')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'Test buying BTC (Bitcoin) on January 1, 2024 and holding it through December 31, 2024.'))}
+                    onClick={() => handleSend(t('chat.starter_actions.btc.value', 'What if I bought Bitcoin this year so far?'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <Bitcoin className="h-4 w-4 text-black/60 dark:text-white/60" />
                     {t('chat.starter_actions.btc.label', 'Test Bitcoin (BTC) hold')}
                   </button>
                   <button
-                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'Test this investing idea. Strategy: recurring buys. Asset: NVDA (Nvidia). Recurring contribution: $250 per week. Period: January 1, 2024 through December 31, 2024.'))}
+                    onClick={() => handleSend(t('chat.starter_actions.dca.value', 'What if I bought $250 of Nvidia every week over the last 12 months?'))}
                     className="flex items-center gap-2 rounded-full border border-black/10 bg-white/50 px-4 py-2 text-[14px] font-medium text-black transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-[#1f2225]/50 dark:text-white dark:hover:bg-white/5"
                   >
                     <LineChart className="h-4 w-4 text-black/60 dark:text-white/60" />

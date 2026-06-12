@@ -962,7 +962,7 @@ Prove or disprove:
 
 ### Cold-Start Prompt Slate
 
-Current implementation facts:
+Original implementation facts:
 
 - `web/components/chat/ChatInterface.tsx` renders three cold-start action chips
   with hardcoded fallback prompts.
@@ -973,6 +973,19 @@ Current implementation facts:
   January 1, 2024 through December 31, 2024.
 
 This should be treated as UX trust debt for the readiness pass.
+
+Readiness implementation status:
+
+- English and Spanish starter action values now use natural rolling-window
+  prompts instead of exact 2024 calendar ranges.
+- English and Spanish placeholder prompt slates now mix current rolling windows
+  with plain educational questions.
+- The Nvidia DCA starter no longer submits a rigid field-template prompt.
+- Backend regression coverage asserts the submitted starter prompts resolve
+  through the shared natural-time parser, keeping frontend copy out of date
+  math.
+- Browser QA remains part of the final readiness batch because the copy change
+  is only locally verified in this slice.
 
 The desired model:
 
@@ -1205,8 +1218,12 @@ Before implementing the readiness slice, lock these:
 ### Slice 7: Cold Start And UX Research Readiness
 
 - Replace exact-date 2024 starter actions with natural rolling-window examples.
-- Update English and Spanish placeholder prompts together.
-- Verify clicked starter chips still enter the normal interpreter path.
+  Closed locally in the readiness branch.
+- Update English and Spanish placeholder prompts together. Closed locally in
+  the readiness branch.
+- Verify clicked starter chips still enter the normal interpreter path. Covered
+  by backend natural-time regression tests; live browser QA remains in the final
+  readiness batch.
 - Add cold-start prompt slate to the browser QA checklist.
 - Update founder observation sheet to track whether starters feel current and
   approachable.
