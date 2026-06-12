@@ -264,7 +264,51 @@ def test_provider_metadata_distinguishes_market_data_sources() -> None:
     assert crypto_metadata["source_policy"] == "alpaca_crypto_with_kraken_fallback"
 
 
-def test_launch_request_explicit_asset_class_preserves_selected_equity_symbol(
+def test_launch_request_explicit_asset_class_still_uses_provider_canonical_symbol(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = LaunchBacktestRequest(
+        strategy_type="buy_and_hold",
+        symbol="BTC/USD",
+        symbols=["btc/usd"],
+        asset_class="crypto",
+        timeframe="1D",
+        date_range={"start": "2026-01-01", "end": "2026-06-03"},
+        entry_rule=None,
+        exit_rule=None,
+        sizing_mode="capital_amount",
+        capital_amount=1000.0,
+        position_size=None,
+        cadence=None,
+        parameters={},
+        risk_rules=[],
+        benchmark_symbol="SPY",
+    )
+
+    def classify_symbol_stub(symbol: str):
+        assert symbol == "BTC/USD"
+        return type(
+            "ResolvedAsset",
+            (),
+            {
+                "canonical_symbol": "BTC",
+                "asset_class": "crypto",
+                "symbol": "BTC",
+            },
+        )()
+
+    monkeypatch.setattr(
+        "argus.domain.engine_launch.adapter.classify_symbol",
+        classify_symbol_stub,
+    )
+
+    symbols, asset_class = _resolve_request_symbols(request)
+
+    assert symbols == ["BTC"]
+    assert asset_class == "crypto"
+
+
+def test_launch_request_explicit_asset_class_rejects_provider_class_conflict(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request = LaunchBacktestRequest(
@@ -286,13 +330,12 @@ def test_launch_request_explicit_asset_class_preserves_selected_equity_symbol(
     )
 
     def classify_symbol_stub(symbol: str):
-        asset_class = "crypto" if symbol == "CVX" else "equity"
         return type(
             "ResolvedAsset",
             (),
             {
                 "canonical_symbol": symbol,
-                "asset_class": asset_class,
+                "asset_class": "crypto",
                 "symbol": symbol,
             },
         )()
@@ -302,10 +345,8 @@ def test_launch_request_explicit_asset_class_preserves_selected_equity_symbol(
         classify_symbol_stub,
     )
 
-    symbols, asset_class = _resolve_request_symbols(request)
-
-    assert symbols == ["CVX"]
-    assert asset_class == "equity"
+    with pytest.raises(ValueError, match="asset_class_conflict"):
+        _resolve_request_symbols(request)
 
 
 def test_buy_and_hold_adapter_returns_envelope_card_and_context(
@@ -337,7 +378,7 @@ def test_buy_and_hold_adapter_returns_envelope_card_and_context(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "total_return_pct": 12.5,
@@ -403,7 +444,7 @@ def test_buy_and_hold_adapter_propagates_explicit_benchmark_to_card_and_context(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "profit": 350.0,
@@ -497,7 +538,7 @@ def test_buy_and_hold_adapter_uses_canonical_benchmark_for_all_result_facts(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "profit": 100.0,
@@ -568,7 +609,7 @@ def test_buy_and_hold_adapter_preserves_multi_symbol_universe(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "total_return_pct": 25.0,
@@ -646,7 +687,7 @@ def test_buy_and_hold_adapter_converts_position_size_to_capital(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "total_return_pct": 5.0,
@@ -708,7 +749,7 @@ def test_indicator_threshold_adapter_returns_envelope_card_and_context(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "total_return_pct": 11.0,
@@ -800,7 +841,7 @@ def test_adapter_accepts_registry_bounded_indicator_threshold_shape(
     )
     captured: dict[str, object] = {}
 
-    def compute_metrics_stub(config: dict[str, object]) -> dict[str, object]:
+    def compute_metrics_stub(config: dict[str, object], **_: Any) -> dict[str, object]:
         captured["config"] = config
         return {
             "aggregate": {
@@ -882,7 +923,7 @@ def test_adapter_uses_indicator_period_from_threshold_rules(
     )
     captured: dict[str, object] = {}
 
-    def compute_metrics_stub(config: dict[str, object]) -> dict[str, object]:
+    def compute_metrics_stub(config: dict[str, object], **_: Any) -> dict[str, object]:
         captured["config"] = config
         return {
             "aggregate": {
@@ -946,7 +987,7 @@ def test_adapter_adds_no_trade_note_to_signal_result_card(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "total_return_pct": 0.0,
@@ -1019,7 +1060,7 @@ def test_adapter_maps_common_crossover_payload_to_rule_spec(
     )
     captured: dict[str, object] = {}
 
-    def compute_metrics_stub(config: dict[str, object]) -> dict[str, object]:
+    def compute_metrics_stub(config: dict[str, object], **_: Any) -> dict[str, object]:
         captured["config"] = config
         return {
             "aggregate": {
@@ -1103,7 +1144,7 @@ def test_adapter_classifies_rule_warmup_failure_as_invalid_input(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: (_ for _ in ()).throw(
+        lambda config, **_: (_ for _ in ()).throw(
             ValueError("indicator_data_insufficient")
         ),
     )
@@ -1182,7 +1223,7 @@ def test_dca_adapter_returns_envelope_card_and_context(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "total_return_pct": 8.5,
@@ -1248,7 +1289,7 @@ def test_dca_adapter_separates_recurring_contribution_from_starting_principal(
         )(),
     )
 
-    def fake_metrics(config: dict[str, Any]) -> dict[str, Any]:
+    def fake_metrics(config: dict[str, Any], **_: Any) -> dict[str, Any]:
         observed_config.update(config)
         return {
             "aggregate": {
@@ -1321,7 +1362,7 @@ def test_dca_adapter_supports_quarterly_cadence(
     )
     monkeypatch.setattr(
         "argus.domain.engine_launch.adapter.compute_alpha_metrics",
-        lambda config: {
+        lambda config, **_: {
             "aggregate": {
                 "performance": {
                     "total_return_pct": 7.0,

@@ -316,10 +316,12 @@ canonical provider-backed resolution.
 
 Action:
 
-- Add tests proving explicit `asset_class` still canonicalizes symbols and
-  rejects conflicts.
-- Patch launch resolution so selected/explicit asset class constrains the
-  resolver rather than skipping it.
+- Closed locally in the readiness branch: tests now prove explicit
+  `asset_class` still canonicalizes symbols and rejects provider class
+  conflicts.
+- Closed locally in the readiness branch: launch resolution now classifies
+  symbols through the provider-backed resolver first, then treats selected or
+  explicit `asset_class` as a constraint rather than a bypass.
 
 #### Multiple Execution Truths
 
@@ -1193,7 +1195,8 @@ Before implementing the readiness slice, lock these:
 
 ### Slice 4: Backtest Trust Hardening
 
-- Fix explicit asset class resolution bypass.
+- Fix explicit asset class resolution bypass. Closed locally in the readiness
+  branch.
 - Add execution/chart/metric parity tests.
 - Add benchmark sparse coverage tests.
 - Add config snapshot reproducibility tests.

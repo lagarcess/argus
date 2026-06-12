@@ -716,13 +716,13 @@ def _initial_price(
 
 
 def _resolve_request_symbols(request: LaunchBacktestRequest) -> tuple[list[str], str]:
-    if request.asset_class is not None:
-        if not request.symbols:
-            raise ValueError("invalid_symbol_count")
-        return [symbol.strip().upper() for symbol in request.symbols], request.asset_class
     assets = [classify_symbol(symbol) for symbol in request.symbols]
     if not assets:
         raise ValueError("invalid_symbol_count")
+    if request.asset_class is not None:
+        if any(asset.asset_class != request.asset_class for asset in assets):
+            raise ValueError("asset_class_conflict")
+        return [asset.symbol for asset in assets], request.asset_class
     asset_class = assets[0].asset_class
     if any(asset.asset_class != asset_class for asset in assets):
         raise ValueError("asset_class_conflict")
