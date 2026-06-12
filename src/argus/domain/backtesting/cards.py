@@ -74,6 +74,8 @@ def build_result_card(
         ]
         if bool(realism["enabled"]):
             assumptions[2] = "Execution realism enabled"
+    if is_dca:
+        assumptions = _dca_assumptions(config, is_es=is_es) + assumptions
 
     rows = [
         {
@@ -159,3 +161,39 @@ def _should_show_win_rate(config: dict[str, Any], efficiency: dict[str, Any]) ->
     if config["template"] in {"buy_and_hold", "dca_accumulation"}:
         return False
     return int(efficiency.get("total_trades", 0) or 0) > 1
+
+
+def _dca_assumptions(config: dict[str, Any], *, is_es: bool) -> list[str]:
+    contribution = float(
+        config.get("recurring_contribution") or config["starting_capital"]
+    )
+    principal = float(config.get("starting_principal") or 0.0)
+    cadence = _dca_cadence_label(config, is_es=is_es)
+    cadence_suffix = f" {cadence}" if cadence else ""
+    if is_es:
+        return [
+            f"Aporte recurrente: {_format_money(contribution)}{cadence_suffix}",
+            f"Capital inicial: {_format_money(principal)}",
+        ]
+    return [
+        f"Recurring contribution: {_format_money(contribution)}{cadence_suffix}",
+        f"Starting principal: {_format_money(principal)}",
+    ]
+
+
+def _dca_cadence_label(config: dict[str, Any], *, is_es: bool) -> str:
+    parameters = (
+        config.get("parameters") if isinstance(config.get("parameters"), dict) else {}
+    )
+    cadence = str(parameters.get("dca_cadence") or "").strip().lower()
+    if not cadence:
+        return ""
+    if is_es:
+        return {
+            "daily": "diario",
+            "weekly": "semanal",
+            "biweekly": "quincenal",
+            "monthly": "mensual",
+            "quarterly": "trimestral",
+        }.get(cadence, cadence.replace("_", " "))
+    return cadence.replace("_", " ")

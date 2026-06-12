@@ -418,10 +418,7 @@ def _run_dca_accumulation(
         },
         metrics=metrics,
         benchmark_metrics=benchmark_metrics,
-        assumptions=[
-            f"Recurring allocation: ${recurring_allocation:,.0f}.",
-            f"Cadence: {cadence}.",
-        ],
+        assumptions=list(result_card.get("assumptions", [])),
         caveats=[
             format_timeframe_data_caveat(config["timeframe"], language=language),
             format_recurring_entry_caveat(config["timeframe"], language=language),

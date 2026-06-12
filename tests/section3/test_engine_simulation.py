@@ -616,6 +616,56 @@ def test_build_result_card_actions_by_symbol_count() -> None:
     assert card["actions"][1]["label"] == "Guardar"
 
 
+def test_build_result_card_dca_assumptions_name_recurring_contribution() -> None:
+    config = {
+        "template": "dca_accumulation",
+        "asset_class": "equity",
+        "symbols": ["NVDA"],
+        "timeframe": "1D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-12-31",
+        "side": "long",
+        "starting_capital": 500,
+        "allocation_method": "equal_weight",
+        "benchmark_symbol": "SPY",
+        "parameters": {"dca_cadence": "monthly"},
+        "recurring_contribution": 500,
+        "starting_principal": 0.0,
+    }
+    metrics = {
+        "aggregate": {
+            "performance": {
+                "total_return_pct": 5.0,
+                "delta_vs_benchmark_pct": 1.0,
+                "profit": 300.0,
+            },
+            "risk": {"max_drawdown_pct": -4.0},
+            "efficiency": {"win_rate": 0.0, "total_trades": 12},
+        }
+    }
+
+    card = engine.build_result_card(config, metrics)
+    assert card["assumptions"] == [
+        "Recurring contribution: $500 monthly",
+        "Starting principal: $0",
+        "Long-only",
+        "Equal weight",
+        "No fees/slippage",
+        "Benchmark: SPY",
+    ]
+    assert not any("Starting capital" in item for item in card["assumptions"])
+
+    spanish_card = engine.build_result_card(config, metrics, language="es-419")
+    assert spanish_card["assumptions"] == [
+        "Aporte recurrente: $500 mensual",
+        "Capital inicial: $0",
+        "Solo largo",
+        "Peso igual",
+        "Sin comisiones/deslizamiento",
+        "Referencia: SPY",
+    ]
+
+
 def test_build_result_card_hides_win_rate_when_no_meaningful_closed_trades() -> None:
     config = {
         "template": "buy_and_hold",

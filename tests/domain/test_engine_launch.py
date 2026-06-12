@@ -1256,6 +1256,7 @@ def test_dca_adapter_returns_envelope_card_and_context(
     assert result.envelope.resolved_parameters["cadence"] == "monthly"
     assert result.result_card is not None
     assert result.result_card["title"] == "TSLA DCA Accumulation"
+    assert result.envelope.assumptions == result.result_card["assumptions"]
     assert result.explanation_context is not None
     assert result.explanation_context["strategy_type"] == "dca_accumulation"
 

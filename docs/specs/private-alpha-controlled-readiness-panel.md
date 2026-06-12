@@ -345,7 +345,9 @@ until first-class DCA semantics land.
 
 Action:
 
-- Make DCA assumptions explicit in English and Spanish.
+- Closed locally in the readiness branch: DCA result cards now make recurring
+  contribution, cadence, and zero starting principal explicit in English and
+  Spanish assumptions, and the launch envelope reuses those card assumptions.
 - Gate or clarify user requests that mix starting principal, recurring
   contribution, and total budget.
 
@@ -1200,7 +1202,9 @@ Before implementing the readiness slice, lock these:
 - Add execution/chart/metric parity tests.
 - Add benchmark sparse coverage tests.
 - Add config snapshot reproducibility tests.
-- Clarify or gate DCA.
+- Clarify DCA result assumptions. Closed locally in the readiness branch.
+- Gate unsupported DCA total-budget/starting-principal requests where the
+  interpreter has not already done so.
 
 ### Slice 5: Workflow And Observability Gate
 
