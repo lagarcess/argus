@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -94,6 +94,32 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain("handleCopyConversationLink");
     expect(chat).not.toContain("chat.add_to_collection");
     expect(chat).not.toContain('aria-label="Archived chats"');
+  });
+
+  test("sidebar logo swap preserves toggle behavior and archives the legacy mark", () => {
+    const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
+    const logo = readFileSync(join(root, "components/ArgusLogo.tsx"), "utf-8");
+    const legacyPath = join(root, "components/ArgusLogoLegacy.tsx");
+    const faviconPath = join(root, "app/favicon.ico");
+
+    expect(sidebar).toContain("onClick={onToggle}");
+    expect(sidebar).toContain('<PanelLeft className="h-5 w-5 text-black/60 dark:text-white/60" />');
+    expect(sidebar).toContain('<ArgusLogo className="h-8 w-8 text-black dark:text-white" />');
+    expect(existsSync(legacyPath)).toBe(true);
+    expect(existsSync(faviconPath)).toBe(true);
+
+    const legacy = existsSync(legacyPath) ? readFileSync(legacyPath, "utf-8") : "";
+    const favicon = existsSync(faviconPath) ? readFileSync(faviconPath) : Buffer.from([]);
+    expect(legacy).toContain("Outer Portal - The Sandbox / Gateway");
+    expect(legacy).toContain('<circle cx="12" cy="15" r="1.5" fill="currentColor" />');
+    expect(favicon.length).toBeGreaterThan(1024);
+    expect([...favicon.subarray(0, 4)]).toEqual([0, 0, 1, 0]);
+    expect(logo).toContain("argus-angular-a-mark");
+    expect(logo).toContain("vtracer-t120-polygon");
+    expect(logo).toContain('viewBox="0 0 473 447"');
+    expect(logo).toContain('fill="currentColor"');
+    expect(logo).not.toContain("Outer Portal - The Sandbox / Gateway");
+    expect(logo).not.toContain('stroke="currentColor"');
   });
 
   test("private-alpha defaults hide exploratory chat suggestions while keeping starter chips", () => {
