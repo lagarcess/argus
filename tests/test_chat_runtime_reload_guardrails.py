@@ -285,6 +285,104 @@ def test_confirmation_action_prefers_visible_card_metadata_over_checkpoint(
     assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
 
 
+def test_valid_confirmation_action_reuses_recent_messages_for_metadata_fallback(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.state.models import StrategySummary, TaskSnapshot
+    from argus.api import state as api_state
+    from argus.api.chat import actions as chat_actions
+    from argus.api.chat import recovery as chat_recovery
+    from argus.api.routers import agent as agent_router
+
+    captured: dict[str, Any] = {}
+    recent_message_reads = 0
+
+    async def _checkpoint(**_: Any):
+        return {
+            "stage_outcome": "await_approval",
+            "latest_task_snapshot": TaskSnapshot(
+                pending_strategy_summary=StrategySummary(
+                    strategy_type="buy_and_hold",
+                    strategy_thesis="Stale checkpoint draft.",
+                    asset_universe=["MSFT"],
+                    asset_class="equity",
+                    date_range="past year",
+                )
+            ),
+        }
+
+    async def _runtime(**kwargs: Any):
+        captured.update(kwargs)
+        yield {"type": "stage_start", "stage": "interpret"}
+        yield {
+            "type": "final",
+            "payload": {
+                "stage_outcome": "ready_to_respond",
+                "assistant_response": "Used visible card context.",
+            },
+        }
+
+    def _recent_messages_for_conversation(
+        *,
+        user_id: str,
+        conversation_id: str,
+        limit: int,
+    ):
+        nonlocal recent_message_reads
+        recent_message_reads += 1
+        return list(api_state.store.messages.get(conversation_id, []))[-limit:]
+
+    monkeypatch.setattr(agent_router, "runtime_checkpoint_values", _checkpoint)
+    monkeypatch.setattr(agent_router, "stream_agent_turn_events", _runtime)
+    monkeypatch.setattr(
+        agent_router,
+        "_recent_messages_for_conversation",
+        _recent_messages_for_conversation,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        chat_actions,
+        "_recent_messages_for_conversation",
+        _recent_messages_for_conversation,
+    )
+    monkeypatch.setattr(
+        chat_recovery,
+        "_recent_messages_for_conversation",
+        _recent_messages_for_conversation,
+    )
+    client = _client()
+    conversation = _conversation(client)
+    user_id = _user_id(client)
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content="I read this as AAPL using a buy and hold approach.",
+        metadata=_confirmation_metadata(),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": conversation["id"],
+            "action": {
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "presentation": "confirmation",
+                "payload": {"confirmation_id": "confirm-aapl"},
+            },
+            "language": "en",
+        },
+    )
+
+    assert response.status_code == 200
+    assert recent_message_reads == 1
+    fallback_payload = captured["fallback_confirmation_payload"]
+    assert fallback_payload["launch_payload"]["symbol"] == "AAPL"
+    snapshot = captured["fallback_latest_task_snapshot"]
+    assert snapshot.pending_strategy_summary.asset_universe == ["AAPL"]
+
+
 def test_confirmation_final_payload_keeps_artifact_identity_consistent(
     monkeypatch,
 ) -> None:

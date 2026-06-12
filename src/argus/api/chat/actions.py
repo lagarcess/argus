@@ -8,7 +8,7 @@ from argus.api.chat.recovery import (
     _run_by_id_for_user,
     latest_completed_run_for_conversation,
 )
-from argus.api.schemas import BacktestRun, ChatStreamRequest, User
+from argus.api.schemas import BacktestRun, ChatStreamRequest, Message, User
 
 CONFIRMATION_ACTION_TYPES = {
     "run_backtest",
@@ -112,6 +112,7 @@ def stale_confirmation_action_message(
     payload: ChatStreamRequest,
     user_id: str,
     conversation_id: str,
+    recent_messages: list[Message] | None = None,
 ) -> str | None:
     if payload.action is None or payload.action.presentation != "confirmation":
         return None
@@ -123,6 +124,7 @@ def stale_confirmation_action_message(
     latest_confirmation_id = latest_active_confirmation_id(
         user_id=user_id,
         conversation_id=conversation_id,
+        recent_messages=recent_messages,
     )
     if latest_confirmation_id is None or latest_confirmation_id == action_confirmation_id:
         return None
@@ -133,11 +135,16 @@ def latest_active_confirmation_id(
     *,
     user_id: str,
     conversation_id: str,
+    recent_messages: list[Message] | None = None,
 ) -> str | None:
-    messages = _recent_messages_for_conversation(
-        user_id=user_id,
-        conversation_id=conversation_id,
-        limit=20,
+    messages = (
+        recent_messages
+        if recent_messages is not None
+        else _recent_messages_for_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            limit=20,
+        )
     )
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):

@@ -128,6 +128,7 @@ def confirmation_metadata_fallback_context(
     *,
     user_id: str,
     conversation_id: str,
+    recent_messages: list[Message] | None = None,
 ) -> RuntimeFallbackContext | None:
     from argus.agent_runtime.confirmation_artifacts import (
         confirmation_artifact_reference,
@@ -135,10 +136,14 @@ def confirmation_metadata_fallback_context(
     )
     from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 
-    messages = _recent_messages_for_conversation(
-        user_id=user_id,
-        conversation_id=conversation_id,
-        limit=20,
+    messages = (
+        recent_messages
+        if recent_messages is not None
+        else _recent_messages_for_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            limit=20,
+        )
     )
     for message in reversed(messages):
         if message.role != "assistant" or not isinstance(message.metadata, dict):

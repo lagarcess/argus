@@ -42,6 +42,7 @@ from argus.api.chat.onboarding import (
 )
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
+    _recent_messages_for_conversation,
     checkpoint_has_pending_confirmation,
     confirmation_metadata_fallback_context,
     failed_action_metadata_fallback_context,
@@ -339,10 +340,20 @@ async def chat_stream(
         conversation_id=conversation.id,
     )
     runtime_fallback = RuntimeFallbackContext()
+    confirmation_action_messages = (
+        _recent_messages_for_conversation(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            limit=20,
+        )
+        if is_confirmation_action(payload)
+        else None
+    )
     stale_confirmation_message = stale_confirmation_action_message(
         payload=payload,
         user_id=user.id,
         conversation_id=conversation.id,
+        recent_messages=confirmation_action_messages,
     )
     if stale_confirmation_message is not None:
         runtime_fallback = RuntimeFallbackContext(
@@ -352,6 +363,7 @@ async def chat_stream(
         metadata_fallback = confirmation_metadata_fallback_context(
             user_id=user.id,
             conversation_id=conversation.id,
+            recent_messages=confirmation_action_messages,
         )
         if metadata_fallback is None and not checkpoint_has_pending_confirmation(
             checkpoint_values
