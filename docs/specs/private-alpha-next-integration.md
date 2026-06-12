@@ -96,6 +96,15 @@ Do not reopen these as debt unless a new bug is reproduced:
   `e654ed96-efc0-44d6-86fe-033383c2d625`; and a deployed browser shell smoke
   rendered the unauthenticated front door without new console errors after
   reload.
+- Post-merge main deploy passed on 2026-06-12 UTC for commit `f335d78`:
+  Render `argus-api` deploy `dep-d8lkvl48aovs73dmc1dg` and `argus-app` deploy
+  `dep-d8lkvnm7r5hc73d968k0` both reached `live`; warmup passed in
+  `real-workflow` mode; the authenticated developer canary conversation
+  `4ac80db0-5eb2-40cc-9a5b-a232c73ace01` completed durable job
+  `2d65a145-94b8-404e-a949-2f0e0907d51a` with run
+  `f17c8578-78b0-4bd6-82a2-24aaf17feff9`; and the canary confirmed the
+  confirmation card, `run_backtest` action, async job/run result, LLM readout
+  voice, and persisted messages.
 - `docs/LAUNCH_GATE_FINAL_CLOSURE_PLAN.md` is marked historical.
 
 ## Remaining High-Leverage Work
