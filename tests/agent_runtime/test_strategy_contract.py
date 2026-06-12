@@ -1,5 +1,9 @@
+import ast
+import inspect
+import textwrap
 from datetime import date
 
+import argus.agent_runtime.strategy_contract as strategy_contract_module
 from argus.agent_runtime.run_field_contract import (
     current_message_date_range,
     current_message_dca_cadence,
@@ -39,6 +43,27 @@ def test_lump_sum_strategy_alias_executes_as_buy_and_hold() -> None:
 def test_spanish_strategy_alias_canonicalizes_through_runtime_contract() -> None:
     assert canonical_strategy_type("compra y mantén") == "buy_and_hold"
     assert canonical_strategy_type("comprar_y_mantener") == "buy_and_hold"
+
+
+def test_strategy_aliases_live_in_capability_registry_not_runtime_contract() -> None:
+    tree = ast.parse(
+        textwrap.dedent(
+            inspect.getsource(strategy_contract_module.canonical_strategy_type)
+        )
+    )
+
+    local_alias_dicts = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "aliases"
+            for target in node.targets
+        )
+        and isinstance(node.value, ast.Dict)
+    ]
+
+    assert local_alias_dicts == []
 
 
 def test_broad_investment_label_is_not_a_strategy_alias() -> None:

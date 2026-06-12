@@ -13,6 +13,7 @@ from argus.domain.backtesting.rules import (
 )
 from argus.domain.indicators import executable_indicator_spec
 from argus.domain.slot_normalizer import normalize_template_name
+from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.nlp.natural_time import (
     NaturalDateRange,
     parse_date_text,
@@ -61,45 +62,14 @@ def canonical_strategy_type(
 ) -> str:
     del entry_logic, exit_logic
     normalized = _normalize_token(raw_type)
+    if normalized in SUPPORTED_STRATEGY_TYPES:
+        return normalized
     template = normalize_template_name(normalized)
-    template_strategy_types = {
-        "buy_and_hold": "buy_and_hold",
-        "dca_accumulation": "dca_accumulation",
-        "buy_the_dip": "indicator_threshold",
-        "rsi_mean_reversion": "indicator_threshold",
-        "moving_average_crossover": "signal_strategy",
-    }
-    if template in template_strategy_types:
-        return template_strategy_types[template]
-    aliases = {
-        "buy_hold": "buy_and_hold",
-        "buy_and_hold": "buy_and_hold",
-        "buyandhold": "buy_and_hold",
-        "hold": "buy_and_hold",
-        "dca": "dca_accumulation",
-        "dollar_cost_averaging": "dca_accumulation",
-        "recurring_accumulation": "dca_accumulation",
-        "recurring_buys": "dca_accumulation",
-        "dca_accumulation": "dca_accumulation",
-        "rsi": "indicator_threshold",
-        "rsi_threshold": "indicator_threshold",
-        "rsi_mean_reversion": "indicator_threshold",
-        "dip_buying": "indicator_threshold",
-        "buy_the_dip": "indicator_threshold",
-        "buying_dips": "indicator_threshold",
-        "threshold": "indicator_threshold",
-        "indicator": "indicator_threshold",
-        "indicator_threshold": "indicator_threshold",
-        "rule_based": "indicator_threshold",
-        "signal": "signal_strategy",
-        "signal_strategy": "signal_strategy",
-        "moving_average_crossover": "signal_strategy",
-        "ma_crossover": "signal_strategy",
-        "golden_cross": "signal_strategy",
-        "death_cross": "signal_strategy",
-    }
-    if normalized in aliases:
-        return aliases[normalized]
+    if template is not None:
+        capability = STRATEGY_CAPABILITIES.get(template)
+        if capability is not None and capability.execution_strategy_type:
+            return capability.execution_strategy_type
+        return template
     if _has_value(cadence):
         return "dca_accumulation"
     return normalized
@@ -210,6 +180,7 @@ def display_strategy_type(strategy: StrategySummary | dict[str, Any]) -> str:
         "signal_strategy": "Signal Strategy",
     }
     return labels.get(canonical, str(raw_type or "Strategy").replace("_", " ").title())
+
 
 def display_strategy_slug(strategy: StrategySummary | dict[str, Any]) -> str:
     return display_strategy_type(strategy).lower()

@@ -6,6 +6,12 @@ from argus.domain.cadences import SUPPORTED_DCA_CADENCE_VALUES
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 SlotPolicy = Literal["required", "defaultable", "clarify_if_missing"]
+ExecutionStrategyType = Literal[
+    "buy_and_hold",
+    "dca_accumulation",
+    "indicator_threshold",
+    "signal_strategy",
+]
 
 
 class ParameterSpec(BaseModel):
@@ -21,6 +27,7 @@ class StrategyCapability(BaseModel):
     template: str
     display_name: str
     aliases: list[str]
+    execution_strategy_type: ExecutionStrategyType | None = None
     supported_asset_classes: list[AssetClass]
     parameters: dict[str, ParameterSpec] = Field(default_factory=dict)
 
@@ -31,6 +38,8 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         display_name="Buy and Hold",
         aliases=[
             "buy and hold",
+            "buy hold",
+            "buyhold",
             "comprar y mantener",
             "mantener",
             "compra y manten",
@@ -43,6 +52,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "one time investment",
             "one_time_investment",
         ],
+        execution_strategy_type="buy_and_hold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "buy_the_dip": StrategyCapability(
@@ -52,9 +62,11 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "buy the dip",
             "buy dips",
             "dip buying",
+            "buying dips",
             "compra en caidas",
             "compra en bajadas",
         ],
+        execution_strategy_type="indicator_threshold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "rsi_mean_reversion": StrategyCapability(
@@ -62,11 +74,17 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         display_name="RSI Threshold",
         aliases=[
             "rsi",
+            "rsi threshold",
             "oversold",
             "mean reversion",
             "reversion a la media",
             "sobreventa",
+            "indicator",
+            "indicator threshold",
+            "threshold",
+            "rule based",
         ],
+        execution_strategy_type="indicator_threshold",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
         parameters={
             "indicator": ParameterSpec(
@@ -103,11 +121,14 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
         aliases=[
             "moving average",
             "ma crossover",
+            "signal",
+            "signal strategy",
             "golden cross",
             "death cross",
             "cruce de medias",
             "cruce de medias moviles",
         ],
+        execution_strategy_type="signal_strategy",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
     ),
     "dca_accumulation": StrategyCapability(
@@ -117,9 +138,12 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "dca",
             "dollar cost averaging",
             "accumulation",
+            "recurring accumulation",
+            "recurring buys",
             "promedio de costo",
             "acumulacion",
         ],
+        execution_strategy_type="dca_accumulation",
         supported_asset_classes=["equity", "crypto", "currency_pair"],
         parameters={
             "dca_cadence": ParameterSpec(
