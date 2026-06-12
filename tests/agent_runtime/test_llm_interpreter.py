@@ -16,9 +16,11 @@ from argus.agent_runtime.llm_interpreter import (
     _llm_strategy_draft_has_executable_shape,
     _pending_signal_rule_planning_response,
     _recover_supported_signal_rule_from_draft_if_needed,
+    _response_from_current_message_run_field_contract,
     _response_from_signal_grounding_audit,
     _response_from_signal_rule_plan,
     _signal_rule_checked_response,
+    _strategy_from_llm,
 )
 from argus.agent_runtime.resolution import AssetResolution
 from argus.agent_runtime.signal_rule_repair import (
@@ -669,6 +671,82 @@ def test_llm_interpreter_prompt_uses_provider_date_allowances() -> None:
     assert "preserve those requested fields" in prompt
     assert "do not silently widen the timeframe" in prompt
     assert "provider names, candle counts, and provider plumbing" in prompt
+
+
+def test_llm_interpreter_prompt_contracts_language_agnostic_metadata() -> None:
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
+    prompt = interpreter._system_prompt().lower()
+
+    assert "canonical internal values" in prompt
+    assert "date_range_raw_text" in prompt
+    assert "evidence_spans" in prompt
+    assert "assistant_response in the user's language" in prompt
+
+
+def test_llm_strategy_draft_carries_language_and_evidence_metadata() -> None:
+    draft = LLMStrategyDraft(
+        raw_user_phrasing="Compra y manten ETH de enero 2024 a marzo 2024.",
+        strategy_type="buy_and_hold",
+        asset_universe=["ETH"],
+        date_range_raw_text="enero 2024 a marzo 2024",
+        language="es-419",
+        evidence_spans={
+            "strategy_type": "Compra y manten",
+            "asset_universe": "ETH",
+            "date_range": "enero 2024 a marzo 2024",
+        },
+    )
+
+    strategy = _strategy_from_llm(draft)
+
+    assert draft.language == "es-419"
+    assert draft.date_range_raw_text == "enero 2024 a marzo 2024"
+    assert strategy.extra_parameters["language"] == "es-419"
+    assert (
+        strategy.extra_parameters["date_range_raw_text"]
+        == "enero 2024 a marzo 2024"
+    )
+    assert strategy.extra_parameters["evidence_spans"] == {
+        "strategy_type": "Compra y manten",
+        "asset_universe": "ETH",
+        "date_range": "enero 2024 a marzo 2024",
+    }
+
+
+def test_current_message_run_field_contract_prefers_bounded_date_evidence_span() -> None:
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="El usuario quiere probar ETH.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing="Compra y manten ETH de enero 2024 a marzo 2024.",
+            strategy_type="buy_and_hold",
+            asset_universe=["ETH"],
+            date_range={"start": "2023-01-01", "end": "2023-12-31"},
+            date_range_raw_text="enero 2024 a marzo 2024",
+            language="es-419",
+            evidence_spans={"date_range": "enero 2024 a marzo 2024"},
+        ),
+    )
+
+    repaired = _response_from_current_message_run_field_contract(
+        response=response,
+        request=InterpretationRequest(
+            current_user_message="hazlo",
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1"),
+        ),
+    )
+
+    assert repaired is not None
+    assert repaired.candidate_strategy_draft.date_range == {
+        "start": "2024-01-01",
+        "end": "2024-03-31",
+    }
 
 
 @pytest.mark.asyncio

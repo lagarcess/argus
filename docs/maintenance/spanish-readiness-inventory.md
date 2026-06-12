@@ -18,6 +18,14 @@ addresses the known dict-shaped provenance crash class, but Spanish must remain
 disabled in production-like environments until the broader Spanish runtime QA
 matrix and live canary pass.
 
+**Interpreter schema update:** `codex/private-alpha-readiness` now asks the LLM
+to accept any user language while returning canonical Argus machine values, plus
+`language`, `date_range_raw_text`, and `evidence_spans` metadata. Runtime date
+repair can resolve bounded date spans through `argus.nlp.natural_time` before
+falling back to whole-message parsing. This reduces hardcoded multilingual token
+growth in core runtime contracts, but it still requires Spanish transcript QA
+and live canary evidence before enabling Spanish in production-like environments.
+
 The findings are grouped by category:
 *   **Static frontend UI copy**: ~100+ strings wrapped in `t()` with hardcoded English fallbacks.
 *   **Backend deterministic user-facing copy**: ~20+ strings in API exceptions and artifact labels.
@@ -37,6 +45,7 @@ The findings are grouped by category:
 | **Backend Results** | `src/argus/domain/benchmark_comparison.py` | User phrases generated in backend: `"Beat by {magnitude}"`, `"In line with benchmark"` | High | Product decision | Return structured data (e.g., `{ type: "beat_benchmark", value: magnitude }`) and localize in frontend. |
 | **LLM Prompts** | `src/argus/agent_runtime/stages/interpret.py` | System prompts: `"Supported-strategy facts:"`, `"Available short-lived context packet:"` | High | Codex-owned | Do not change. Treat as Codex-owned runtime contracts.|
 | **Runtime State Hydration** | `src/argus/agent_runtime/state/models.py`, `src/argus/agent_runtime/runtime.py`, `src/argus/agent_runtime/graph/workflow.py`, `src/argus/agent_runtime/stages/interpret.py`, `src/argus/agent_runtime/stages/interpret_types.py`, `src/argus/agent_runtime/llm_interpreter.py` | Dict-shaped `resolution_provenance` entries are normalized/deduped before durable snapshot carry-forward, public payload serialization, interpreter patches, and LLM interpreter capability validation. | Partially resolved | Codex-owned | Keep the regression tests; still run the full Spanish continuation QA matrix before enabling Spanish in Render. |
+| **LLM Interpreter Metadata** | `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/agent_runtime/llm_interpreter_types.py`, `src/argus/nlp/natural_time.py` | Structured interpretation now carries `language`, `date_range_raw_text`, and `evidence_spans`; bounded date evidence is resolved through natural-time parsing before whole-message fallback. | Partially resolved | Codex-owned | Keep the bounded-span tests; add Spanish transcript/live QA before enabling Spanish. |
 | **Recovery Copy** | `src/argus/api/routers/agent.py` | Generic runtime failure recovery currently persists English copy. | High | Codex-owned | Define structured error/recovery codes and language-aware presentation so Spanish users do not see English fallback copy on runtime failure. |
 
 ## Detailed Inventory
@@ -73,6 +82,8 @@ The findings are grouped by category:
 | File / Area | Representative examples | Classification | Risk | Owner | Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `src/argus/agent_runtime/state/models.py`, `src/argus/agent_runtime/runtime.py`, `src/argus/agent_runtime/graph/workflow.py`, `src/argus/agent_runtime/stages/interpret.py`, `src/argus/agent_runtime/stages/interpret_types.py`, `src/argus/agent_runtime/llm_interpreter.py` | Shared provenance normalization protects persisted snapshot carry-forward, public runtime payloads, interpreter patches, and LLM capability validation from dict/model drift. | State normalization | Partially resolved | Codex-owned | Broaden Spanish continuation/live QA before enabling the Spanish feature flag. |
+| `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/agent_runtime/llm_interpreter_types.py` | LLM interpreter schema and prompt now require canonical internal values, detected language, bounded date raw text, and evidence spans; conversion stores that metadata in `StrategySummary.extra_parameters`. | Interpreter contract | Partially resolved | Codex-owned | Do not make metadata executable by itself; keep deterministic validation and add Spanish runtime transcript coverage. |
+| `src/argus/nlp/natural_time.py` | Bounded date evidence can be resolved with `dateparser` through the Argus natural-time wrapper instead of expanding month/date token tables inside runtime contracts. | Natural time parsing | Partially resolved | Codex-owned | Feed only bounded spans or strong candidates; avoid whole-chat false positives. |
 | `src/argus/api/routers/agent.py` | Runtime failure recovery writes English text directly into the assistant transcript. | Recovery copy | High | Codex-owned | Keep recovery behavior structured and language-aware; do not make English prose the durable failure contract. |
 | `tests/agent_runtime/*` | Existing tests cover many English runtime paths but do not yet cover Spanish multi-turn continuation into confirmation/result. | Coverage gap | High | Codex-owned | Add a compact Spanish runtime transcript set before enabling Spanish in Render. |
 

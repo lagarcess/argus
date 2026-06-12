@@ -21,6 +21,14 @@ class LLMRiskRule(BaseModel):
 
 class LLMStrategyDraft(BaseModel):
     raw_user_phrasing: str | None = None
+    language: str | None = Field(
+        default=None,
+        description=(
+            "Detected user-message language as a BCP-47-style code such as en, "
+            "es, or es-419. This guides user-facing prose and bounded parsers; "
+            "executable fields still use canonical Argus values."
+        ),
+    )
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
@@ -37,6 +45,13 @@ class LLMStrategyDraft(BaseModel):
     entry_threshold: float | None = None
     exit_threshold: float | None = None
     date_range: str | dict[str, str] | None = None
+    date_range_raw_text: str | None = Field(
+        default=None,
+        description=(
+            "Exact short user text span that expresses the requested date or time "
+            "window, for example 'last 8 months' or 'enero 2024 a marzo 2024'."
+        ),
+    )
     sizing_mode: str | None = None
     capital_amount: float | None = None
     recurring_contribution: float | None = None
@@ -48,6 +63,14 @@ class LLMStrategyDraft(BaseModel):
     comparison_baseline: str | None = None
     refinement_of: str | None = None
     field_provenance: dict[str, str] = Field(default_factory=dict)
+    evidence_spans: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Short user-message spans that justify extracted canonical fields, keyed "
+            "by field name such as strategy_type, asset_universe, date_range, "
+            "capital_amount, cadence, or comparison_baseline."
+        ),
+    )
     extra_parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -112,6 +135,7 @@ class FocusedStrategyExtraction(BaseModel):
     is_testable_strategy: bool
     requires_clarification: bool = False
     user_goal_summary: str
+    language: str | None = None
     strategy_type: str | None = None
     strategy_thesis: str | None = None
     asset_universe: list[str] = Field(default_factory=list)
@@ -133,6 +157,7 @@ class FocusedStrategyExtraction(BaseModel):
             "missing_required_fields."
         ),
     )
+    date_range_raw_text: str | None = None
     comparison_baseline: str | None = Field(
         default=None,
         description=(
@@ -159,3 +184,4 @@ class FocusedStrategyExtraction(BaseModel):
     missing_required_fields: list[str] = Field(default_factory=list)
     assistant_response: str | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    evidence_spans: dict[str, str] = Field(default_factory=dict)
