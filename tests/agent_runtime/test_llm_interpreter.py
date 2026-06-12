@@ -2362,6 +2362,59 @@ async def test_stated_run_field_contract_repairs_compact_month_year_range(
 
 
 @pytest.mark.asyncio
+async def test_stated_run_field_contract_repairs_spanish_month_year_range(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fail_if_audit_model_is_needed(**kwargs):
+        raise AssertionError(f"unexpected audit call: {kwargs.get('schema_name')}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fail_if_audit_model_is_needed,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        requires_clarification=False,
+        user_goal_summary="El usuario quiere probar comprar y mantener Tesla.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            strategy_thesis="Comprar y mantener Tesla.",
+            asset_universe=["TSLA"],
+            asset_class="equity",
+            date_range={"start": "2021-01-01", "end": "2024-01-01"},
+            capital_amount=100000,
+        ),
+        semantic_turn_act="new_idea",
+    )
+    request = InterpretationRequest(
+        current_user_message=(
+            "Compra y manten Tesla desde enero de 2021 hasta diciembre de 2024"
+        ),
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1"),
+    )
+
+    repaired = await interpreter_module._audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert repaired is not None
+    assert repaired.candidate_strategy_draft.date_range == {
+        "start": "2021-01-01",
+        "end": "2024-12-31",
+    }
+    assert "current_message_run_field_contract_repair" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "current_message",
     [

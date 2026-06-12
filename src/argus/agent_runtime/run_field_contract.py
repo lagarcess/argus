@@ -9,6 +9,7 @@ from argus.agent_runtime.strategy_contract import (
 )
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
+from argus.nlp.natural_time import resolve_date_range_text
 
 MONTH_TOKENS = frozenset(MONTH_ALIASES)
 
@@ -147,6 +148,9 @@ def current_message_date_range(
     calendar_year = _calendar_year_date_range_from_tokens(tokens, today=current_date)
     if calendar_year is not None:
         return calendar_year
+    parsed_natural = resolve_date_range_text(message, today=current_date)
+    if parsed_natural is not None:
+        return parsed_natural.payload
     return None
 
 

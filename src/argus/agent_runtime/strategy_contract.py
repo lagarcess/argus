@@ -13,6 +13,11 @@ from argus.domain.backtesting.rules import (
 )
 from argus.domain.indicators import executable_indicator_spec
 from argus.domain.slot_normalizer import normalize_template_name
+from argus.nlp.natural_time import (
+    parse_date_text,
+    relative_range_label_from_text,
+    resolve_date_range_text,
+)
 
 SUPPORTED_STRATEGY_TYPES = {
     "buy_and_hold",
@@ -288,6 +293,13 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         relative = _relative_period(normalized, today=current_date)
         if relative is not None:
             return relative
+        parsed_natural = resolve_date_range_text(value, today=current_date)
+        if parsed_natural is not None:
+            return DateRangeResolution(
+                label=parsed_natural.label,
+                start=parsed_natural.start,
+                end=parsed_natural.end,
+            )
     start = _add_months(current_date, -12)
     return DateRangeResolution(
         label="past year",
@@ -367,6 +379,12 @@ def _relative_date_label_from_user_phrasing(
     relative = _relative_period(normalized, today=current_date)
     if relative is not None:
         return relative.label
+    parsed_natural = relative_range_label_from_text(
+        raw_user_phrasing,
+        today=current_date,
+    )
+    if parsed_natural is not None:
+        return parsed_natural
     return None
 
 
@@ -585,6 +603,8 @@ def _parse_date_token(
     natural = _parse_natural_date(normalized)
     if natural is not None:
         return natural
+    if endpoint in {"start", "end"}:
+        return parse_date_text(value, today=today, endpoint=endpoint)
     return None
 
 

@@ -50,6 +50,10 @@ def test_normalizes_locale_cadence_values():
         normalize_parameter_value("dca_accumulation", "dca_cadence", "mensual")
         == "monthly"
     )
+    assert (
+        normalize_parameter_value("dca_accumulation", "dca_cadence", "cada día")
+        == "daily"
+    )
 
     # Test case insensitivity and whitespace
     assert (
@@ -71,3 +75,5 @@ def test_normalizes_template_names():
     assert normalize_template_name("dca") == "dca_accumulation"
     assert normalize_template_name("DCA Accumulation") == "dca_accumulation"
     assert normalize_template_name("promedio de costo") == "dca_accumulation"
+    assert normalize_template_name("acumulación") == "dca_accumulation"
+    assert normalize_template_name("compra y mantén") == "buy_and_hold"

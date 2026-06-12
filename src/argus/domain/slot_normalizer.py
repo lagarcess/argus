@@ -1,3 +1,4 @@
+import unicodedata
 from typing import Any
 
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
@@ -11,7 +12,7 @@ def normalize_template_name(raw_name: Any) -> str | None:
     if not raw_name:
         return None
 
-    clean = str(raw_name).strip().lower()
+    clean = _normalize_alias(raw_name)
 
     # Direct match
     if clean in STRATEGY_CAPABILITIES:
@@ -20,11 +21,11 @@ def normalize_template_name(raw_name: Any) -> str | None:
     # Alias match
     for template_key, capability in STRATEGY_CAPABILITIES.items():
         # Check primary template key, aliases, and display_name
-        aliases = [a.lower() for a in capability.aliases]
+        aliases = [_normalize_alias(a) for a in capability.aliases]
         if (
-            clean == template_key
+            clean == _normalize_alias(template_key)
             or clean in aliases
-            or clean == capability.display_name.lower()
+            or clean == _normalize_alias(capability.display_name)
         ):
             return template_key
 
@@ -47,27 +48,47 @@ def normalize_parameter_value(template_key: str, param_key: str, raw_value: Any)
     if not spec:
         return raw_value
 
-    clean_value = str(raw_value).strip().lower()
+    clean_value = _normalize_alias(raw_value)
     res = raw_value
 
     # 1. Check if it's already a canonical allowed value
-    allowed = [str(v).lower() for v in spec.allowed_values]
+    allowed = [_normalize_alias(v) for v in spec.allowed_values]
     if clean_value in allowed:
         # Return the actual allowed value (preserving type if it's in the list)
         for v in spec.allowed_values:
-            if str(v).lower() == clean_value:
+            if _normalize_alias(v) == clean_value:
                 res = v
                 break
     else:
         # 2. Check value_aliases
         if hasattr(spec, "value_aliases") and spec.value_aliases:
             for canonical_val, aliases in spec.value_aliases.items():
-                clean_aliases = [str(a).strip().lower() for a in aliases]
+                clean_aliases = [_normalize_alias(a) for a in aliases]
                 if (
-                    clean_value == str(canonical_val).lower()
+                    clean_value == _normalize_alias(canonical_val)
                     or clean_value in clean_aliases
                 ):
                     res = canonical_val
                     break
 
     return res
+
+
+def _normalize_alias(value: Any) -> str:
+    folded = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", str(value).strip().casefold())
+        if not unicodedata.combining(char)
+    )
+    parts: list[str] = []
+    current: list[str] = []
+    for char in folded:
+        if char.isalnum():
+            current.append(char)
+            continue
+        if current:
+            parts.append("".join(current))
+            current = []
+    if current:
+        parts.append("".join(current))
+    return " ".join(parts)

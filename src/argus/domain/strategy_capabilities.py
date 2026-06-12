@@ -33,6 +33,7 @@ STRATEGY_CAPABILITIES: dict[str, StrategyCapability] = {
             "buy and hold",
             "comprar y mantener",
             "mantener",
+            "compra y manten",
             "hold",
             "compra y mantener",
             "lump sum",
