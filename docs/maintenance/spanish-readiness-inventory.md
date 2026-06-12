@@ -26,6 +26,13 @@ falling back to whole-message parsing. This reduces hardcoded multilingual token
 growth in core runtime contracts, but it still requires Spanish transcript QA
 and live canary evidence before enabling Spanish in production-like environments.
 
+**Domain slot normalization update:** LLM-returned DCA cadence values now pass
+through the existing strategy capability registry after interpretation. Known
+localized aliases such as `semanal` become canonical engine values such as
+`weekly`; unknown cadence text is preserved as `raw_cadence` metadata and
+cleared from the executable cadence field so deterministic guardrails can ask a
+follow-up instead of leaking localized prose into the engine contract.
+
 The findings are grouped by category:
 *   **Static frontend UI copy**: ~100+ strings wrapped in `t()` with hardcoded English fallbacks.
 *   **Backend deterministic user-facing copy**: ~20+ strings in API exceptions and artifact labels.
@@ -83,9 +90,10 @@ The findings are grouped by category:
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `src/argus/agent_runtime/state/models.py`, `src/argus/agent_runtime/runtime.py`, `src/argus/agent_runtime/graph/workflow.py`, `src/argus/agent_runtime/stages/interpret.py`, `src/argus/agent_runtime/stages/interpret_types.py`, `src/argus/agent_runtime/llm_interpreter.py` | Shared provenance normalization protects persisted snapshot carry-forward, public runtime payloads, interpreter patches, and LLM capability validation from dict/model drift. | State normalization | Partially resolved | Codex-owned | Broaden Spanish continuation/live QA before enabling the Spanish feature flag. |
 | `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/agent_runtime/llm_interpreter_types.py` | LLM interpreter schema and prompt now require canonical internal values, detected language, bounded date raw text, and evidence spans; conversion stores that metadata in `StrategySummary.extra_parameters`. | Interpreter contract | Partially resolved | Codex-owned | Do not make metadata executable by itself; keep deterministic validation and add Spanish runtime transcript coverage. |
+| `src/argus/agent_runtime/llm_interpreter.py`, `src/argus/domain/slot_normalizer.py`, `src/argus/domain/strategy_capabilities.py` | Post-LLM DCA cadence values are normalized through registry aliases, so Spanish cadence text can reach the runtime without expanding core parser token tables. | Domain slot normalization | Partially resolved | Codex-owned | Extend this registry-backed pattern to other Argus-domain slots before adding more languages. |
 | `src/argus/nlp/natural_time.py` | Bounded date evidence can be resolved with `dateparser` through the Argus natural-time wrapper instead of expanding month/date token tables inside runtime contracts. | Natural time parsing | Partially resolved | Codex-owned | Feed only bounded spans or strong candidates; avoid whole-chat false positives. |
 | `src/argus/api/routers/agent.py` | Runtime failure recovery writes English text directly into the assistant transcript. | Recovery copy | High | Codex-owned | Keep recovery behavior structured and language-aware; do not make English prose the durable failure contract. |
-| `tests/agent_runtime/*` | Existing tests cover many English runtime paths but do not yet cover Spanish multi-turn continuation into confirmation/result. | Coverage gap | High | Codex-owned | Add a compact Spanish runtime transcript set before enabling Spanish in Render. |
+| `tests/agent_runtime/*` | Existing tests now include a first Spanish DCA transcript that exercises the real structured interpreter conversion and runtime guardrails, but do not yet cover Spanish multi-turn continuation into approval/result. | Coverage gap | High | Codex-owned | Add the remaining compact Spanish runtime transcript set before enabling Spanish in Render. |
 
 ### Artifact/result/status labels
 

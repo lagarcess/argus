@@ -105,6 +105,7 @@ from argus.domain.indicators import (
     normalize_indicator_parameters,
 )
 from argus.domain.market_data import resolve_asset
+from argus.domain.slot_normalizer import normalize_parameter_value
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.llm.openrouter import (
     build_openrouter_model,
@@ -2275,7 +2276,12 @@ def _dca_contract_missing_fields(
 
 
 def _supported_dca_cadence_value(value: Any) -> str | None:
-    normalized = str(value or "").strip().casefold()
+    normalized_value = normalize_parameter_value(
+        "dca_accumulation",
+        "dca_cadence",
+        value,
+    )
+    normalized = str(normalized_value or "").strip().casefold()
     if not normalized:
         return None
     capability = STRATEGY_CAPABILITIES.get("dca_accumulation")
@@ -6389,6 +6395,7 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         )
     if evidence_spans:
         payload.setdefault("extra_parameters", {})["evidence_spans"] = evidence_spans
+    _normalize_llm_domain_slots(payload)
     payload["date_range"] = normalize_date_range_candidate(
         payload.get("date_range"),
         raw_user_phrasing=payload.get("raw_user_phrasing"),
@@ -6402,6 +6409,27 @@ def _strategy_from_llm(draft: LLMStrategyDraft) -> StrategySummary:
         for rule in draft.risk_rules
     ]
     return StrategySummary.model_validate(payload)
+
+
+def _normalize_llm_domain_slots(payload: dict[str, Any]) -> None:
+    strategy_type = canonical_strategy_type(
+        payload.get("strategy_type"),
+        cadence=payload.get("cadence"),
+    )
+    if strategy_type != "dca_accumulation":
+        return
+    raw_cadence = payload.get("cadence")
+    if raw_cadence in (None, "", [], {}):
+        return
+    cadence = _supported_dca_cadence_value(raw_cadence)
+    if cadence is None:
+        payload.setdefault("extra_parameters", {})["raw_cadence"] = raw_cadence
+        payload["cadence"] = None
+        return
+    payload["cadence"] = cadence
+    extra_parameters = payload.setdefault("extra_parameters", {})
+    if extra_parameters.get("recurring_cadence") not in (None, "", [], {}):
+        extra_parameters["recurring_cadence"] = cadence
 
 
 def _clean_optional_text(value: Any) -> str | None:
