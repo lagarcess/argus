@@ -85,3 +85,31 @@ def test_runtime_does_not_restore_raw_message_semantic_routers() -> None:
                 violations.append(f"{relative_path}: {token}")
 
     assert violations == []
+
+
+def test_runtime_contracts_do_not_own_human_language_date_tables() -> None:
+    """Date language belongs behind argus.nlp.natural_time, not runtime contracts."""
+
+    forbidden_by_file = {
+        "src/argus/agent_runtime/strategy_contract.py": [
+            "MONTH_ALIASES",
+            "_month_year_span",
+            "_month_span_with_shared_year",
+            "_build_month_year_date",
+        ],
+        "src/argus/agent_runtime/run_field_contract.py": [
+            "MONTH_ALIASES",
+            "MONTH_TOKENS",
+            "_month_year_date_range_from_tokens",
+            "_month_year_endpoint",
+        ],
+    }
+    violations: list[str] = []
+
+    for relative_path, tokens in forbidden_by_file.items():
+        source = Path(relative_path).read_text()
+        for token in tokens:
+            if token in source:
+                violations.append(f"{relative_path}: {token}")
+
+    assert violations == []

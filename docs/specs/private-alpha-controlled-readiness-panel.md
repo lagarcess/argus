@@ -236,7 +236,9 @@ Relevant code:
 - Strengthen field descriptions or schema so raw localized values cannot become
   executable values unless normalized after interpretation.
 - Extend deterministic normalization after interpretation for Spanish dates,
-  timeframe phrases, cadence phrases, and common indicator names.
+  timeframe phrases, cadence phrases, and common indicator names. Date/time
+  language belongs behind `argus.nlp.natural_time`; Argus-domain aliases belong
+  in registries such as `strategy_capabilities.py`, not in runtime contracts.
 - Keep hard constraints in schema, code, or runtime parameters instead of vague
   prose, following the same discipline described in Perplexity's prompt guide:
   focused instructions, clear formatting, grounding, JSON schema where
@@ -1152,7 +1154,8 @@ Before implementing the readiness slice, lock these:
 
 - Add multilingual interpreter contract.
 - Tighten canonical field descriptions.
-- Add Spanish post-LLM normalization.
+- Add Spanish post-LLM normalization through the natural-time wrapper and
+  registry-backed domain aliases, not hardcoded runtime language tables.
 - Add Spanish prompt matrix tests.
 - Local QA with Spanish prompts.
 - Live QA with at least one Spanish prompt in Render staging.

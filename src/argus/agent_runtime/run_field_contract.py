@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import calendar
 from datetime import date
 
-from argus.agent_runtime.strategy_contract import (
-    MONTH_ALIASES,
-    parse_relative_date_token,
-)
 from argus.domain.indicators import EXECUTABLE_INDICATORS
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
-from argus.nlp.natural_time import resolve_date_range_text
-
-MONTH_TOKENS = frozenset(MONTH_ALIASES)
+from argus.nlp.natural_time import (
+    contains_named_date_evidence,
+    parse_relative_endpoint_text,
+    resolve_date_range_text,
+)
 
 
 def current_message_dca_cadence(message: str) -> str | None:
@@ -109,14 +106,7 @@ def current_message_date_range(
     folded_message = str(message or "").casefold()
     tokens = field_fidelity_tokens(folded_message)
     current_date = today or date.today()
-    month_year = _month_year_date_range_from_tokens(
-        _date_range_fidelity_tokens(folded_message)
-    )
-    if month_year is not None:
-        return month_year
-    multi_year = _multi_year_date_range_from_tokens(tokens, today=current_date)
-    if multi_year is not None:
-        return multi_year
+
     year_so_far = _year_so_far_date_range_from_tokens(tokens, today=current_date)
     if year_so_far is not None:
         return year_so_far
@@ -145,12 +135,26 @@ def current_message_date_range(
     )
     if relative_endpoint is not None:
         return relative_endpoint
-    calendar_year = _calendar_year_date_range_from_tokens(tokens, today=current_date)
-    if calendar_year is not None:
-        return calendar_year
+
     parsed_natural = resolve_date_range_text(message, today=current_date)
     if parsed_natural is not None:
         return parsed_natural.payload
+
+    has_named_date = contains_named_date_evidence(message, today=current_date)
+    multi_year = (
+        None
+        if has_named_date
+        else _multi_year_date_range_from_tokens(tokens, today=current_date)
+    )
+    if multi_year is not None:
+        return multi_year
+    calendar_year = (
+        None
+        if has_named_date
+        else _calendar_year_date_range_from_tokens(tokens, today=current_date)
+    )
+    if calendar_year is not None:
+        return calendar_year
     return None
 
 
@@ -160,21 +164,6 @@ def field_fidelity_tokens(text: str) -> list[str]:
     for separator in separators:
         cleaned = cleaned.replace(separator, " ")
     return [token for token in cleaned.split() if token]
-
-
-def _date_range_fidelity_tokens(text: str) -> list[str]:
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in text:
-        if char.isalnum():
-            current.append(char)
-            continue
-        if current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
 
 
 def message_states_bar_timeframe(message: str) -> bool:
@@ -217,48 +206,11 @@ def _year_so_far_date_range_from_tokens(
     return None
 
 
-def _month_year_date_range_from_tokens(tokens: list[str]) -> dict[str, str] | None:
-    connectors = {"to", "through", "thru", "until", "till"}
-    for index in range(0, len(tokens)):
-        start = _month_year_endpoint(tokens, index=index, endpoint="start")
-        if start is None:
-            continue
-        end_index = index + 2
-        if end_index < len(tokens) and tokens[end_index] in connectors:
-            end_index += 1
-        end = _month_year_endpoint(tokens, index=end_index, endpoint="end")
-        if end is None or end < start:
-            continue
-        return {"start": start.isoformat(), "end": end.isoformat()}
-    return None
-
-
-def _month_year_endpoint(
-    tokens: list[str],
-    *,
-    index: int,
-    endpoint: str,
-) -> date | None:
-    if index < 0 or index + 1 >= len(tokens):
-        return None
-    month = MONTH_ALIASES.get(tokens[index])
-    year_text = tokens[index + 1]
-    if month is None or not (len(year_text) == 4 and year_text.isdigit()):
-        return None
-    year = int(year_text)
-    if not 1900 <= year <= 2100:
-        return None
-    day = 1 if endpoint == "start" else calendar.monthrange(year, month)[1]
-    return date(year, month, day)
-
-
 def _multi_year_date_range_from_tokens(
     tokens: list[str],
     *,
     today: date,
 ) -> dict[str, str] | None:
-    if set(tokens) & MONTH_TOKENS:
-        return None
     years: list[int] = []
     for token in tokens:
         if not (len(token) == 4 and token.isdigit()):
@@ -302,8 +254,6 @@ def _calendar_year_date_range_from_tokens(
     *,
     today: date,
 ) -> dict[str, str] | None:
-    if set(tokens) & MONTH_TOKENS:
-        return None
     year_tokens = [
         token
         for token in tokens
@@ -381,7 +331,7 @@ def _relative_date_token_after_marker(
 ) -> date | None:
     for index in range(max(start, 0), min(limit, len(tokens))):
         token = tokens[index]
-        parsed = parse_relative_date_token(token, today=today)
+        parsed = parse_relative_endpoint_text(token, today=today)
         if parsed is not None:
             return parsed
     return None

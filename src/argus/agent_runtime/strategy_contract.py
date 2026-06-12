@@ -14,6 +14,7 @@ from argus.domain.backtesting.rules import (
 from argus.domain.indicators import executable_indicator_spec
 from argus.domain.slot_normalizer import normalize_template_name
 from argus.nlp.natural_time import (
+    NaturalDateRange,
     parse_date_text,
     relative_range_label_from_text,
     resolve_date_range_text,
@@ -24,33 +25,6 @@ SUPPORTED_STRATEGY_TYPES = {
     "dca_accumulation",
     "indicator_threshold",
     "signal_strategy",
-}
-
-MONTH_ALIASES = {
-    "jan": 1,
-    "january": 1,
-    "feb": 2,
-    "february": 2,
-    "mar": 3,
-    "march": 3,
-    "apr": 4,
-    "april": 4,
-    "may": 5,
-    "jun": 6,
-    "june": 6,
-    "jul": 7,
-    "july": 7,
-    "aug": 8,
-    "august": 8,
-    "sep": 9,
-    "sept": 9,
-    "september": 9,
-    "oct": 10,
-    "october": 10,
-    "nov": 11,
-    "november": 11,
-    "dec": 12,
-    "december": 12,
 }
 
 
@@ -272,9 +246,14 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
                 start=date(1900, 1, 1),
                 end=current_date,
             )
-        natural_explicit = _explicit_natural_range(normalized, today=current_date)
-        if natural_explicit is not None:
-            return natural_explicit
+        relative = _relative_period(normalized, today=current_date)
+        if relative is not None:
+            return relative
+        parsed_natural = _date_range_resolution_from_natural(
+            resolve_date_range_text(value, today=current_date)
+        )
+        if parsed_natural is not None:
+            return parsed_natural
         multi_year = _multi_year_period(normalized, today=current_date)
         if multi_year is not None:
             return multi_year
@@ -290,16 +269,6 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         beginning_last_year = _beginning_last_year(normalized, today=current_date)
         if beginning_last_year is not None:
             return beginning_last_year
-        relative = _relative_period(normalized, today=current_date)
-        if relative is not None:
-            return relative
-        parsed_natural = resolve_date_range_text(value, today=current_date)
-        if parsed_natural is not None:
-            return DateRangeResolution(
-                label=parsed_natural.label,
-                start=parsed_natural.start,
-                end=parsed_natural.end,
-            )
     start = _add_months(current_date, -12)
     return DateRangeResolution(
         label="past year",
@@ -307,6 +276,17 @@ def resolve_date_range(value: Any, *, today: date | None = None) -> DateRangeRes
         end=current_date,
         used_default=True,
     )
+
+
+def _date_range_resolution_from_natural(
+    value: NaturalDateRange | None,
+) -> DateRangeResolution | None:
+    if value is None:
+        return None
+    label = value.label
+    if label == f"{value.start} to {value.end}":
+        label = f"{format_display_date(value.start)} to {format_display_date(value.end)}"
+    return DateRangeResolution(label=label, start=value.start, end=value.end)
 
 
 def normalize_date_range_candidate(
@@ -596,26 +576,9 @@ def _parse_date_token(
             return parsed_month
     if not isinstance(value, str):
         return None
-    normalized = _normalize_token(value)
-    relative = parse_relative_date_token(normalized, today=today)
-    if relative is not None:
-        return relative
-    natural = _parse_natural_date(normalized)
-    if natural is not None:
-        return natural
     if endpoint in {"start", "end"}:
         return parse_date_text(value, today=today, endpoint=endpoint)
-    return None
-
-
-def parse_relative_date_token(value: Any, *, today: date | None = None) -> date | None:
-    current_date = today or date.today()
-    normalized = _normalize_token(value)
-    if normalized == "yesterday":
-        return current_date - timedelta(days=1)
-    if normalized in {"today", "now", "present", "current", "to_date", "current_date"}:
-        return current_date
-    return None
+    return parse_date_text(value, today=today)
 
 
 def _explicit_iso_range(value: str) -> DateRangeResolution | None:
@@ -645,192 +608,12 @@ def _explicit_iso_range(value: str) -> DateRangeResolution | None:
     )
 
 
-def _explicit_natural_range(
-    value: str,
-    *,
-    today: date,
-) -> DateRangeResolution | None:
-    tokens = _tokens(value)
-    shared_year_span = _month_span_with_shared_year(tokens)
-    if shared_year_span is not None:
-        return shared_year_span
-    month_year_span = _month_year_span(tokens)
-    if month_year_span is not None:
-        return month_year_span
-    start: date | None = None
-    end: date | None = None
-    connectors = {"to", "through", "until", "till"}
-    for index in range(0, len(tokens)):
-        start_candidate = _natural_endpoint_candidate(
-            tokens,
-            index,
-            today=today,
-            endpoint="start",
-        )
-        if start_candidate is None:
-            continue
-        candidate_start, next_index = start_candidate
-        if next_index >= len(tokens) or tokens[next_index] not in connectors:
-            continue
-        end_candidate = _natural_endpoint_candidate(
-            tokens,
-            next_index + 1,
-            today=today,
-            endpoint="end",
-        )
-        if end_candidate is None:
-            continue
-        candidate_end, _ = end_candidate
-        start = candidate_start
-        end = candidate_end
-        break
-    if start is None or end is None:
-        return None
-    return DateRangeResolution(
-        label=f"{format_display_date(start)} to {format_display_date(end)}",
-        start=start,
-        end=end,
-    )
-
-
-def _month_year_span(tokens: list[str]) -> DateRangeResolution | None:
-    connectors = {"to", "through", "until", "till"}
-    for index in range(0, len(tokens)):
-        start_candidate = _build_month_year_date(
-            tokens[index],
-            tokens[index + 1] if index + 1 < len(tokens) else None,
-            endpoint="start",
-        )
-        if start_candidate is None:
-            continue
-        end_index = index + 2
-        if end_index < len(tokens) and tokens[end_index] in connectors:
-            end_index += 1
-        end_candidate = _build_month_year_date(
-            tokens[end_index] if end_index < len(tokens) else None,
-            tokens[end_index + 1] if end_index + 1 < len(tokens) else None,
-            endpoint="end",
-        )
-        if end_candidate is None or end_candidate < start_candidate:
-            continue
-        return DateRangeResolution(
-            label=(
-                f"{format_display_date(start_candidate)} to "
-                f"{format_display_date(end_candidate)}"
-            ),
-            start=start_candidate,
-            end=end_candidate,
-        )
-    return None
-
-
-def _month_span_with_shared_year(tokens: list[str]) -> DateRangeResolution | None:
-    connectors = {"to", "through", "until", "till"}
-    for index, token in enumerate(tokens):
-        start_month = MONTH_ALIASES.get(token)
-        if start_month is None:
-            continue
-        connector_index = index + 1
-        end_month_index = index + 2
-        year_index = index + 3
-        if year_index >= len(tokens):
-            continue
-        if tokens[connector_index] not in connectors:
-            continue
-        end_month = MONTH_ALIASES.get(tokens[end_month_index])
-        if end_month is None:
-            continue
-        year = _int_or_none(tokens[year_index])
-        if year is None:
-            continue
-        if end_month < start_month:
-            continue
-        start = date(year, start_month, 1)
-        end = date(year, end_month, _last_day_of_month(year, end_month))
-        return DateRangeResolution(
-            label=f"{format_display_date(start)} to {format_display_date(end)}",
-            start=start,
-            end=end,
-        )
-    return None
-
-
-def _natural_endpoint_candidate(
-    tokens: list[str],
-    index: int,
-    *,
-    today: date,
-    endpoint: str,
-) -> tuple[date, int] | None:
-    if index >= len(tokens):
-        return None
-    token = tokens[index]
-    if token in {"today", "now", "present"}:
-        return today, index + 1
-    if index + 2 < len(tokens):
-        natural = _build_natural_date(tokens[index], tokens[index + 1], tokens[index + 2])
-        if natural is not None:
-            return natural, index + 3
-    if index + 1 < len(tokens):
-        month_year = _build_month_year_date(
-            tokens[index],
-            tokens[index + 1],
-            endpoint=endpoint,
-        )
-        if month_year is not None:
-            return month_year, index + 2
-    return None
-
-
-def _build_month_year_date(
-    month_value: Any,
-    year_value: Any,
-    *,
-    endpoint: str,
-) -> date | None:
-    month = MONTH_ALIASES.get(str(month_value or "").lower())
-    year = _int_or_none(year_value)
-    if month is None or year is None:
-        return None
-    day = 1 if endpoint == "start" else _last_day_of_month(year, month)
-    try:
-        return date(year, month, day)
-    except ValueError:
-        return None
-
-
 def _last_day_of_month(year: int, month: int) -> int:
     if month == 12:
         next_month = date(year + 1, 1, 1)
     else:
         next_month = date(year, month + 1, 1)
     return (next_month - timedelta(days=1)).day
-
-
-def _parse_natural_date(value: str) -> date | None:
-    tokens = _tokens(value)
-    if len(tokens) != 3:
-        return None
-    return _build_natural_date(tokens[0], tokens[1], tokens[2])
-
-
-def _build_natural_date(
-    month_value: Any,
-    day_value: Any,
-    year_value: Any,
-) -> date | None:
-    month = MONTH_ALIASES.get(str(month_value or "").lower())
-    if month is None:
-        return None
-    day_text = str(day_value or "").lower()
-    day = 1 if day_text == "first" else _int_or_none(day_text)
-    year = _int_or_none(year_value)
-    if day is None or year is None:
-        return None
-    try:
-        return date(year, month, day)
-    except ValueError:
-        return None
 
 
 def _int_or_none(value: Any) -> int | None:
