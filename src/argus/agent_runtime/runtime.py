@@ -17,6 +17,7 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     TaskSnapshot,
     UserState,
+    dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.workflow_contract import (
     TOKEN_STREAM_NODES,
@@ -290,7 +291,10 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
             run_state, "resolution_provenance", None
         ):
             serialized["resolution_provenance"] = [
-                item.model_dump(mode="python") for item in run_state.resolution_provenance
+                item.model_dump(mode="python")
+                for item in dedupe_resolution_provenance_items(
+                    run_state.resolution_provenance
+                )
             ]
         if "pending_strategy" not in serialized:
             pending_strategy = _pending_strategy_payload(result, run_state=run_state)

@@ -11,12 +11,12 @@ Codex-owned runtime readiness gate passes. The current work stabilizes
 translation keys, static UI coverage, and confirmation-card state handling; it
 does not prove the LangGraph chat/backtest spine is language agnostic.
 
-**Current known blocker:** a Spanish multi-turn clarification/approval flow can
-crash when serialized `resolution_provenance` entries rehydrate as dictionaries
-while interpreter helpers expect `ResolutionProvenance` model objects. This is
-not a locale-file issue. It is runtime-state normalization debt and must be
-handled by Codex-owned runtime work with a regression test before Spanish can be
-enabled for testers.
+**Runtime-state normalization update:** `codex/private-alpha-readiness` adds a
+shared `resolution_provenance` normalizer for workflow snapshots, public runtime
+payloads, interpreter patches, and LLM interpreter capability validation. This
+addresses the known dict-shaped provenance crash class, but Spanish must remain
+disabled in production-like environments until the broader Spanish runtime QA
+matrix and live canary pass.
 
 The findings are grouped by category:
 *   **Static frontend UI copy**: ~100+ strings wrapped in `t()` with hardcoded English fallbacks.
@@ -36,7 +36,7 @@ The findings are grouped by category:
 | **Backend API Errors** | `src/argus/api/routers/conversations.py` | Hardcoded HTTP exception details: `"Conversation not found."`, `"Strategy not found."` | Medium | Product decision | Implement error code system (e.g., `error_code="CONVERSATION_NOT_FOUND"`) that frontend maps to `t()`. |
 | **Backend Results** | `src/argus/domain/benchmark_comparison.py` | User phrases generated in backend: `"Beat by {magnitude}"`, `"In line with benchmark"` | High | Product decision | Return structured data (e.g., `{ type: "beat_benchmark", value: magnitude }`) and localize in frontend. |
 | **LLM Prompts** | `src/argus/agent_runtime/stages/interpret.py` | System prompts: `"Supported-strategy facts:"`, `"Available short-lived context packet:"` | High | Codex-owned | Do not change. Treat as Codex-owned runtime contracts.|
-| **Runtime State Hydration** | `src/argus/agent_runtime/stages/interpret.py` | Continuation turns can encounter serialized `resolution_provenance` dictionaries in paths that expect model objects. | High | Codex-owned | Add a Spanish continuation regression test, normalize provenance at the runtime boundary, and verify the flow reaches confirmation/result without generic recovery. |
+| **Runtime State Hydration** | `src/argus/agent_runtime/state/models.py`, `src/argus/agent_runtime/runtime.py`, `src/argus/agent_runtime/graph/workflow.py`, `src/argus/agent_runtime/stages/interpret.py`, `src/argus/agent_runtime/stages/interpret_types.py`, `src/argus/agent_runtime/llm_interpreter.py` | Dict-shaped `resolution_provenance` entries are normalized/deduped before durable snapshot carry-forward, public payload serialization, interpreter patches, and LLM interpreter capability validation. | Partially resolved | Codex-owned | Keep the regression tests; still run the full Spanish continuation QA matrix before enabling Spanish in Render. |
 | **Recovery Copy** | `src/argus/api/routers/agent.py` | Generic runtime failure recovery currently persists English copy. | High | Codex-owned | Define structured error/recovery codes and language-aware presentation so Spanish users do not see English fallback copy on runtime failure. |
 
 ## Detailed Inventory
@@ -72,7 +72,7 @@ The findings are grouped by category:
 
 | File / Area | Representative examples | Classification | Risk | Owner | Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `src/argus/agent_runtime/stages/interpret.py` | Continuation helpers reading `resolution_provenance` as model attributes after persistence or metadata serialization. | State normalization | High | Codex-owned | Normalize provenance consistently before helpers inspect it; add tests for Spanish approval/continuation after clarification. |
+| `src/argus/agent_runtime/state/models.py`, `src/argus/agent_runtime/runtime.py`, `src/argus/agent_runtime/graph/workflow.py`, `src/argus/agent_runtime/stages/interpret.py`, `src/argus/agent_runtime/stages/interpret_types.py`, `src/argus/agent_runtime/llm_interpreter.py` | Shared provenance normalization protects persisted snapshot carry-forward, public runtime payloads, interpreter patches, and LLM capability validation from dict/model drift. | State normalization | Partially resolved | Codex-owned | Broaden Spanish continuation/live QA before enabling the Spanish feature flag. |
 | `src/argus/api/routers/agent.py` | Runtime failure recovery writes English text directly into the assistant transcript. | Recovery copy | High | Codex-owned | Keep recovery behavior structured and language-aware; do not make English prose the durable failure contract. |
 | `tests/agent_runtime/*` | Existing tests cover many English runtime paths but do not yet cover Spanish multi-turn continuation into confirmation/result. | Coverage gap | High | Codex-owned | Add a compact Spanish runtime transcript set before enabling Spanish in Render. |
 

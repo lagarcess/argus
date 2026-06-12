@@ -13,6 +13,7 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UnsupportedConstraint,
     UserState,
+    dedupe_resolution_provenance_items,
 )
 from pydantic import BaseModel, Field
 
@@ -96,7 +97,8 @@ class InterpretDecision(BaseModel):
             item.model_dump(mode="python") for item in self.unsupported_constraints
         ]
         resolution_provenance = [
-            item.model_dump(mode="python") for item in self.resolution_provenance
+            item.model_dump(mode="python")
+            for item in dedupe_resolution_provenance_items(self.resolution_provenance)
         ]
         return {
             "normalized_signals": self.normalized_signals,

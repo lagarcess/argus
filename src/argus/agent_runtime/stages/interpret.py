@@ -108,6 +108,7 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UnsupportedConstraint,
     UserState,
+    dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.strategy_contract import (
     SUPPORTED_STRATEGY_TYPES,
@@ -5177,27 +5178,7 @@ def _dedupe_ambiguous_fields(fields: list[AmbiguousField]) -> list[AmbiguousFiel
 def _dedupe_resolution_provenance(
     provenance: list[ResolutionProvenance | dict[str, Any]],
 ) -> list[ResolutionProvenance]:
-    seen: set[tuple[str, str, str, str]] = set()
-    deduped: list[ResolutionProvenance] = []
-    for raw_item in provenance:
-        if isinstance(raw_item, ResolutionProvenance):
-            item = raw_item
-        else:
-            try:
-                item = ResolutionProvenance.model_validate(raw_item)
-            except (TypeError, ValueError):
-                continue
-        key = (
-            item.field,
-            item.raw_text,
-            item.source,
-            item.candidate_kind,
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(item)
-    return deduped
+    return dedupe_resolution_provenance_items(provenance)
 
 
 def normalize_task_snapshot(

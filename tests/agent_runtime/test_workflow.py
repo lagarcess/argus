@@ -17,6 +17,7 @@ from argus.agent_runtime.runtime import (
 )
 from argus.agent_runtime.stages.interpret import (
     InterpretationRequest,
+    InterpretDecision,
     StageResult,
     StructuredInterpretation,
 )
@@ -24,7 +25,9 @@ from argus.agent_runtime.stages.next_step import next_step_stage
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     FinalResponsePayload,
+    ResolutionProvenance,
     ResponseIntent,
+    ResponseProfile,
     RunState,
     SimplificationOption,
     StrategySummary,
@@ -63,6 +66,144 @@ def test_task_snapshot_clears_failed_action_after_new_confirmation() -> None:
     )
 
     assert snapshot.latest_failed_action_reference is None
+
+
+def test_task_snapshot_normalizes_prior_dict_resolution_provenance() -> None:
+    prior = TaskSnapshot(
+        resolution_provenance=[
+            {
+                "field": "asset_universe[0]",
+                "raw_text": "Tesla",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "resolved",
+                "canonical_symbol": "TSLA",
+                "asset_class": "equity",
+                "validated_by": "provider_catalog",
+                "confidence": "high",
+            },
+            ResolutionProvenance(
+                field="asset_universe[0]",
+                raw_text="Tesla",
+                source="llm_extraction",
+                candidate_kind="asset",
+                resolution_status="resolved",
+                canonical_symbol="TSLA",
+                asset_class="equity",
+                validated_by="provider_catalog",
+                confidence="high",
+            ),
+        ]
+    )
+
+    snapshot = _build_task_snapshot(
+        run_state=RunState(current_user_message="si, ejecutalo"),
+        stage_outcome=WorkflowStageOutcome.AWAIT_USER_REPLY,
+        prior_task_snapshot=prior,
+        artifact_references=[],
+    )
+
+    assert snapshot.resolution_provenance == [
+        ResolutionProvenance(
+            field="asset_universe[0]",
+            raw_text="Tesla",
+            source="llm_extraction",
+            candidate_kind="asset",
+            resolution_status="resolved",
+            canonical_symbol="TSLA",
+            asset_class="equity",
+            validated_by="provider_catalog",
+            confidence="high",
+        )
+    ]
+
+
+def test_public_result_normalizes_dict_resolution_provenance() -> None:
+    run_state = RunState(current_user_message="si, ejecutalo")
+    run_state.resolution_provenance = [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        },
+        ResolutionProvenance(
+            field="asset_universe[0]",
+            raw_text="Tesla",
+            source="llm_extraction",
+            candidate_kind="asset",
+            resolution_status="resolved",
+            canonical_symbol="TSLA",
+            asset_class="equity",
+            validated_by="provider_catalog",
+            confidence="high",
+        ),
+    ]
+
+    public = _public_result({"run_state": run_state})
+
+    assert public["resolution_provenance"] == [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        }
+    ]
+
+
+def test_interpret_decision_patch_normalizes_dict_resolution_provenance() -> None:
+    decision = InterpretDecision(
+        intent="backtest_execution",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="El usuario aprobo la confirmacion visible.",
+        confidence=0.9,
+        effective_response_profile=ResponseProfile(
+            effective_tone="friendly",
+            effective_verbosity="medium",
+            effective_expertise_mode="beginner",
+        ),
+    )
+    decision.resolution_provenance = [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        }
+    ]
+
+    patch = decision.to_patch()
+
+    assert patch["resolution_provenance"] == [
+        {
+            "field": "asset_universe[0]",
+            "raw_text": "Tesla",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "TSLA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "high",
+        }
+    ]
 
 
 class RsiConfirmationInterpreter:

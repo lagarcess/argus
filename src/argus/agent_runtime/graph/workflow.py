@@ -36,6 +36,7 @@ from argus.agent_runtime.state.models import (
     StrategySummary,
     TaskSnapshot,
     UserState,
+    dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.workflow_contract import WorkflowNode
 from langgraph.graph import END, StateGraph
@@ -490,7 +491,7 @@ def _build_task_snapshot(
             if stage_outcome_value in {"await_user_reply", "await_approval"}
             else None
         ),
-        resolution_provenance=(
+        resolution_provenance=dedupe_resolution_provenance_items(
             run_state.resolution_provenance
             or (
                 prior_task_snapshot.resolution_provenance

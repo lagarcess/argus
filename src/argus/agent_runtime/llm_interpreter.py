@@ -82,6 +82,7 @@ from argus.agent_runtime.state.models import (
     SimplificationOption,
     StrategySummary,
     UnsupportedConstraint,
+    dedupe_resolution_provenance_items,
 )
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
@@ -6903,14 +6904,6 @@ def _humanize_simplification_label(label: str) -> str:
 
 
 def _dedupe_resolution_provenance(
-    items: list[ResolutionProvenance],
+    items: list[ResolutionProvenance | dict[str, Any]],
 ) -> list[ResolutionProvenance]:
-    seen: set[tuple[str, str, str, str]] = set()
-    deduped: list[ResolutionProvenance] = []
-    for item in items:
-        key = (item.field, item.raw_text, item.source, item.candidate_kind)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(item)
-    return deduped
+    return dedupe_resolution_provenance_items(items)
