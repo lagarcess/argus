@@ -147,7 +147,7 @@ The readiness slice should be sequenced like this:
 | Tenant ownership | Add app-level ownership checks before service-role writes that accept parent IDs. | Service-role backend paths must preserve tenant boundaries. |
 | Feedback privacy | Cap feedback payloads, schema context, and redact URL query strings. | Feedback should help us learn without collecting accidental secrets. |
 | Workflow mode | Require real workflow dispatch/execution config and green warmup/canary before sessions. | Prevents in-process heavy execution or hidden workflow drift. |
-| Confirmation action I/O | Resolve or explicitly gate [GitHub issue 112](https://github.com/lagarcess/argus/issues/112): valid confirmation actions should not read the same recent messages twice before entering the runtime. | This is a latency-sensitive action path that also owns stale-confirmation guardrails; the fix must preserve behavior exactly. |
+| Confirmation action I/O | Resolved locally on `codex/private-alpha-readiness`; [GitHub issue 112](https://github.com/lagarcess/argus/issues/112) should close after merge. Valid confirmation actions now reuse one recent-message read before entering runtime. | This remains a latency-sensitive action path that owns stale-confirmation guardrails, so the focused regression coverage must stay green. |
 | Cold-start prompts | Replace stale exact-date starter chips/placeholders with natural rolling-window examples in English and Spanish. | Exact 2024 examples make Argus feel brittle and outdated, and they teach users that imprecise natural prompts may break the product. |
 
 ## Acceptable With Disclosure For Controlled Alpha
@@ -700,12 +700,10 @@ Backpressure exists:
 - 5 running global;
 - 10 queued global.
 
-Open issue 112 adds one concrete readiness item to this lane. A valid
-confirmation action can read the same recent conversation messages twice before
-continuing through `chat_stream`: once for stale-confirmation validation and
-again for confirmation metadata fallback. This should be fixed with focused
-regression coverage because the path is both latency-sensitive and correctness
-sensitive.
+Issue 112 is resolved locally on `codex/private-alpha-readiness` and remains
+open on GitHub until the branch is merged. Valid confirmation actions share one
+recent-message read between stale-confirmation validation and confirmation
+metadata fallback, while stale confirmation actions still stop before runtime.
 
 ### Must Fix Or Verify Before Testers
 
@@ -714,8 +712,7 @@ sensitive.
 - Run warmup and canary before every tester window.
 - Fail canary if result readout falls back instead of using the LLM explain
   stage.
-- Resolve issue 112 or keep it explicitly blocked in the readiness checklist
-  with an owner and acceptance criteria.
+- Keep issue 112 focused tests green until merge, then close the GitHub issue.
 - Run focused import-boundary, workflow, async job, canary, readiness, and
   runtime compatibility tests.
 - Set tester expectations: backtests may take around a minute.
@@ -1190,8 +1187,7 @@ Before implementing the readiness slice, lock these:
 
 - Verify Render env status command.
 - Run warmup/canary.
-- Resolve issue 112 duplicate recent-message reads on valid confirmation
-  actions, preserving stale-action behavior.
+- Keep issue 112 duplicate-read regression tests green until merge.
 - Add or document daily canary automation.
 - Add stale job scan.
 - Add minimal alpha metrics extraction.
@@ -1223,8 +1219,8 @@ Argus is ready for the first controlled alpha tester when:
 - Terms/Privacy/consent are live and linked.
 - Feedback submission persists to Supabase with redacted context.
 - Render env check, warmup, and canary pass.
-- Issue 112 is closed or explicitly accepted with measured latency impact and
-  preserved confirmation guardrail coverage.
+- Issue 112 has merged or remains explicitly tracked with passing duplicate-read
+  and stale-confirmation guardrail coverage.
 - Cold-start starter actions and placeholder prompts are natural, current,
   bilingual, and free of stale default 2024 examples.
 - A manual smoke test verifies login, chat, Spanish prompt, confirmation, run,

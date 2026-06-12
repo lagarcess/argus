@@ -86,10 +86,13 @@ No runtime source changes were made as part of this audit.
 - `chat_stream` does meaningful work before returning the stream: quota,
   profile, conversation, history, checkpoint, metadata fallback, and
   user-message persistence.
-- Metadata fallback can repeat recent-message scans in the same turn.
-- [GitHub issue 112](https://github.com/lagarcess/argus/issues/112) confirms a
-  narrow case: valid confirmation actions can read the same recent messages once
-  for stale-action validation and again for confirmation metadata fallback.
+- Metadata fallback can repeat recent-message scans in the same turn, but the
+  issue 112 confirmation-action case is resolved locally on
+  `codex/private-alpha-readiness`.
+- [GitHub issue 112](https://github.com/lagarcess/argus/issues/112) remains open
+  until merge; focused tests now prove valid confirmation actions reuse one
+  recent-message read while stale confirmation actions still stop before
+  runtime.
 - Context packet collection can block final result persistence/stream completion
   up to its budget after a result card.
 
@@ -134,8 +137,8 @@ that should happen before making performance claims.
    user-message write.
 3. Add result persistence timing for context packet collection and final
    assistant-message persistence.
-4. Track issue 112 as a readiness item: prove the valid confirmation action path
-   uses one recent-message read while stale confirmation behavior remains
+4. Keep issue 112 regression tests green until merge: valid confirmation actions
+   must use one recent-message read while stale confirmation behavior remains
    unchanged.
 5. Confirm the live Render workflow plan/tier before each tester window and
    record cold/warm workflow timings.
@@ -165,9 +168,9 @@ These are good candidates once the measurement gate is in place.
 ### Backend Runtime
 
 - Collapse repeated metadata fallback scans into one recent-message read per
-  turn, then derive the failed, confirmation, pending, and latest contexts from
-  that list.
-- For issue 112 specifically, preserve stale confirmation behavior: old
+  turn where measurement proves it matters; the confirmation-action issue 112
+  case is already covered locally.
+- For issue 112 specifically, keep preserving stale confirmation behavior: old
   `confirmation_id` values must still return the stale-card recovery message and
   must not execute runtime.
 - Log row count and duration for history/search/conversations/messages before
