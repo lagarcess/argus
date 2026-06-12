@@ -319,10 +319,12 @@ class StatedRunFieldFidelityAudit(BaseModel):
         default=None,
         description=(
             "Starting capital explicitly stated by the current user message, "
-            "normalized as a number. Examples: 10k -> 10000, $500 -> 500. "
-            "Leave null when the user did not state starting capital. For DCA "
-            "or recurring buys, do not put the per-purchase contribution here; "
-            "use recurring_contribution_amount."
+            "normalized as a number. Examples: 10k -> 10000, $500 -> 500, "
+            "100000 -> 100000 when the message uses that plain number as the "
+            "amount to test or invest. Leave null when the user did not state "
+            "starting capital. Do not treat dates, indicator windows, percentages, "
+            "or asset names as capital. For DCA or recurring buys, do not put the "
+            "per-purchase contribution here; use recurring_contribution_amount."
         ),
     )
     recurring_contribution_amount: float | None = Field(
@@ -363,6 +365,25 @@ class StatedRunFieldFidelityAudit(BaseModel):
         description=(
             "Benchmark or comparison asset explicitly stated by the current user "
             "message. Leave null when the user did not state one."
+        ),
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class SupportedStrategyCapabilityConflictAudit(BaseModel):
+    drop_unsupported_strategy_logic: bool = Field(
+        description=(
+            "True only when the unsupported_strategy_logic constraint is a model "
+            "contradiction because the current user message asks for a supported "
+            "buy_and_hold or dca_accumulation run without any extra unsupported "
+            "entry, exit, fundamental, sentiment, event, custom scripting, or "
+            "brokerage/trading rule."
+        ),
+    )
+    keep_unsupported_strategy_logic: bool = Field(
+        description=(
+            "True when the current user message includes an extra unsupported "
+            "strategy rule or condition beyond the supported canonical strategy."
         ),
     )
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
@@ -813,7 +834,15 @@ class OpenRouterStructuredInterpreter:
             "draft context. Never infer monthly from a multi-year date range.\n\n"
             "If the user explicitly says buy and hold, hold, or buy-and-hold, classify it as "
             "buy_and_hold even when the sentence also contains a start date like Jan 1. "
-            "A start date is the backtest period, not entry logic.\n\n"
+            "A start date is the backtest period, not entry logic. If you set "
+            "strategy_type to buy_and_hold or dca_accumulation, do not also add "
+            "unsupported_strategy_logic unless the user asked for an additional "
+            "entry rule, exit rule, fundamental rule, sentiment/news/event rule, "
+            "custom script, brokerage action, shorting, or another unsupported "
+            "condition beyond that supported strategy. Preserve those extra rules "
+            "in entry_logic, exit_logic, or strategy_thesis when they exist so a "
+            "later audit can distinguish supported strategy intent from unsupported "
+            "custom logic.\n\n"
             "Clarify only when required meaning is missing, genuinely ambiguous, "
             "or unsupported in a way that requires the user to choose a simplification. "
             "Starting capital, timeframe, benchmark, fees, and slippage have safe defaults; "
@@ -3138,6 +3167,13 @@ async def _response_ready_for_runtime(
     )
     if audited_response is not None:
         response = audited_response
+    conflict_response = await _audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if conflict_response is not None:
+        response = conflict_response
     grounded_response = await _audit_executable_strategy_grounding(
         response=response,
         preferred_model=preferred_model,
@@ -3211,7 +3247,14 @@ async def _stated_run_field_audited_response(
         preferred_model=preferred_model,
         request=request,
     )
-    return audited_response or response
+    if audited_response is not None:
+        response = audited_response
+    conflict_response = await _audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    return conflict_response or response
 
 
 def _clear_auto_simplified_strategy_when_rule_is_ambiguous(
@@ -4427,6 +4470,7 @@ async def _audit_stated_run_field_fidelity(
     preferred_model: str,
     request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
+    del preferred_model
     if not _response_needs_stated_run_field_fidelity_audit(
         response=response,
         request=request,
@@ -4447,35 +4491,161 @@ async def _audit_stated_run_field_fidelity(
         response=response,
         request=request,
     )
-    best_repaired: LLMInterpretationResponse | None = None
-    for model_name in _unique_repair_models(preferred_model):
-        try:
-            audit = await invoke_openrouter_json_schema(
-                task="interpretation",
-                messages=messages,
-                schema_model=StatedRunFieldFidelityAudit,
-                schema_name="StatedRunFieldFidelityAudit",
-                model_name=model_name,
-            )
-        except Exception:
-            continue
-        if not isinstance(audit, StatedRunFieldFidelityAudit):
-            continue
-        repaired = _response_from_stated_run_field_fidelity_audit(
-            response=response,
-            audit=audit,
-            current_message=request.current_user_message,
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="field_fidelity",
+            messages=messages,
+            schema_model=StatedRunFieldFidelityAudit,
+            schema_name="StatedRunFieldFidelityAudit",
         )
-        if repaired is not None:
-            if not _stated_run_field_audit_omitted_expected_fields(
-                response=response,
-                audit=audit,
-                request=request,
-            ):
-                return repaired
-            if best_repaired is None:
-                best_repaired = repaired
-    return best_repaired or deterministic_repair
+    except Exception:
+        return deterministic_repair
+    if not isinstance(audit, StatedRunFieldFidelityAudit):
+        return deterministic_repair
+    repaired = _response_from_stated_run_field_fidelity_audit(
+        response=response,
+        audit=audit,
+        current_message=request.current_user_message,
+    )
+    if repaired is None:
+        return deterministic_repair
+    return repaired
+
+
+async def _audit_supported_strategy_capability_conflict(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    del preferred_model
+    if not _response_needs_supported_strategy_capability_conflict_audit(response):
+        return None
+    messages = _supported_strategy_capability_conflict_messages(
+        response=response,
+        request=request,
+    )
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="capability_conflict",
+            messages=messages,
+            schema_model=SupportedStrategyCapabilityConflictAudit,
+            schema_name="SupportedStrategyCapabilityConflictAudit",
+        )
+    except Exception:
+        return None
+    if not isinstance(audit, SupportedStrategyCapabilityConflictAudit):
+        return None
+    if (
+        audit.drop_unsupported_strategy_logic
+        and not audit.keep_unsupported_strategy_logic
+        and audit.confidence >= 0.7
+    ):
+        return _response_with_supported_strategy_capability_conflict_removed(
+            response=response
+        )
+    return None
+
+
+def _response_needs_supported_strategy_capability_conflict_audit(
+    response: LLMInterpretationResponse,
+) -> bool:
+    if response.intent not in {
+        "strategy_drafting",
+        "backtest_execution",
+        "unsupported_or_out_of_scope",
+    }:
+        return False
+    if not any(
+        item.category == "unsupported_strategy_logic"
+        for item in response.unsupported_constraints
+    ):
+        return False
+    return canonical_strategy_type(response.candidate_strategy_draft.strategy_type) in {
+        "buy_and_hold",
+        "dca_accumulation",
+    }
+
+
+def _supported_strategy_capability_conflict_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    constraints = [
+        item.model_dump(mode="json")
+        for item in response.unsupported_constraints
+        if item.category == "unsupported_strategy_logic"
+    ]
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's capability-conflict audit. The primary interpreter "
+                "returned both a supported canonical strategy and an "
+                "unsupported_strategy_logic constraint. Decide whether that constraint "
+                "is a real user-requested unsupported rule or a model contradiction. "
+                "Supported Alpha strategy families include buy_and_hold and "
+                "dca_accumulation when the user is only asking to test holding or "
+                "recurring fixed-dollar buys over a period. Keep the unsupported "
+                "constraint when the current message adds an extra unsupported entry "
+                "condition, exit condition, fundamental rule, sentiment/news/event "
+                "rule, custom script, brokerage action, shorting, or other logic "
+                "beyond the supported strategy family. Drop it only when the message "
+                "semantically asks for the supported strategy itself and no extra "
+                "unsupported rule. Reason from the current message and structured "
+                "draft meaning, not from keyword matching. Return only JSON matching "
+                "the schema."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Structured draft JSON: "
+                f"{response.candidate_strategy_draft.model_dump(mode='json')}"
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Unsupported strategy constraints JSON: "
+                f"{json.dumps(constraints, ensure_ascii=False)}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _response_with_supported_strategy_capability_conflict_removed(
+    *,
+    response: LLMInterpretationResponse,
+) -> LLMInterpretationResponse:
+    repaired = response.model_copy(deep=True)
+    repaired.unsupported_constraints = [
+        item
+        for item in repaired.unsupported_constraints
+        if item.category != "unsupported_strategy_logic"
+    ]
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "supported_strategy_capability_conflict_audit",
+            ]
+        )
+    )
+    if (
+        not repaired.unsupported_constraints
+        and not repaired.ambiguous_fields
+        and not repaired.missing_required_fields
+        and _llm_strategy_draft_has_concrete_execution_target(
+            repaired.candidate_strategy_draft
+        )
+    ):
+        repaired.intent = "backtest_execution"
+        repaired.requires_clarification = False
+        repaired.assistant_response = None
+    return repaired
 
 
 def _response_from_current_message_run_field_contract(
@@ -4755,6 +4925,10 @@ def _draft_capital_needs_stated_run_field_audit(
 ) -> bool:
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
         return False
+    if draft.capital_amount is None and _llm_strategy_draft_has_concrete_execution_target(
+        draft
+    ):
+        return True
     if _text_contains_structured_capital_context(current_message):
         return True
     return draft.capital_amount is None and _draft_contains_structured_capital_context(draft)
@@ -5257,8 +5431,11 @@ def _stated_run_field_fidelity_messages(
                 "reshaped. Do not infer defaults, fees, slippage, symbols, or rules. "
                 "If a field is absent from the current user message, return null "
                 "for that field. Normalize starting capital exactly from the "
-                "current message: 10k -> 10000, 100K -> 100000, and $10,000 "
-                "-> 10000. For DCA or recurring buys, return the per-purchase "
+                "current message: 10k -> 10000, 100K -> 100000, $10,000 "
+                "-> 10000, and a plain number such as 100000 -> 100000 when "
+                "the message uses it as the amount to test or invest. Do not "
+                "require currency symbols. Do not treat dates, indicator windows, "
+                "percentages, or asset names as capital. For DCA or recurring buys, return the per-purchase "
                 "recurring contribution as recurring_contribution_amount, not "
                 "capital_amount; return cadence only when the current message states "
                 "one. If a money amount is total budget, starting principal, or cap, "

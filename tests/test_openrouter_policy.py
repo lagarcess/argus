@@ -17,6 +17,7 @@ from argus.agent_runtime.llm_interpreter import (
     LLMStrategyDraft,
     OpenRouterStructuredInterpreter,
     StatedRunFieldFidelityAudit,
+    SupportedStrategyCapabilityConflictAudit,
 )
 from argus.agent_runtime.runtime import run_agent_turn
 from argus.agent_runtime.stages.interpret import InterpretationRequest
@@ -2837,6 +2838,130 @@ def test_direct_json_schema_payload_disables_reasoning_for_artifact_tasks(
     assert receipt.schema_name == "LLMInterpretationResponse"
     assert receipt.outcome == "succeeded"
     assert receipt.failure_mode is None
+
+
+def test_field_fidelity_json_schema_uses_context_route_with_reasoning(
+    monkeypatch,
+) -> None:
+    observed_payloads: list[dict[str, Any]] = []
+    openrouter.clear_openrouter_route_receipts()
+
+    class FakeAsyncClient:
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def post(self, _url: str, **kwargs: Any) -> object:
+            observed_payloads.append(kwargs["json"])
+
+            class FakeResponse:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict[str, Any]:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": '{"capital_amount":100000,"recurring_contribution_amount":null,"cadence":null,"timeframe":null,"date_range":null,"comparison_baseline":null,"confidence":0.95}'
+                                }
+                            }
+                        ]
+                    }
+
+            return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setattr(
+        openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient()
+    )
+
+    result = asyncio.run(
+        openrouter.invoke_openrouter_json_schema(
+            task="field_fidelity",
+            messages=[{"role": "user", "content": "con 100000"}],
+            schema_model=StatedRunFieldFidelityAudit,
+            schema_name="StatedRunFieldFidelityAudit",
+        )
+    )
+
+    assert result is not None
+    assert result.capital_amount == 100000
+    assert observed_payloads[0]["model"] == "openai/gpt-oss-120b"
+    assert observed_payloads[0]["reasoning"] == {"effort": "medium"}
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert receipt.task == "field_fidelity"
+    assert receipt.tier == "context"
+    assert receipt.model == "openai/gpt-oss-120b"
+    assert receipt.schema_name == "StatedRunFieldFidelityAudit"
+    assert receipt.outcome == "succeeded"
+
+
+def test_capability_conflict_json_schema_uses_context_route_with_reasoning(
+    monkeypatch,
+) -> None:
+    observed_payloads: list[dict[str, Any]] = []
+    openrouter.clear_openrouter_route_receipts()
+
+    class FakeAsyncClient:
+        async def __aenter__(self) -> "FakeAsyncClient":
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def post(self, _url: str, **kwargs: Any) -> object:
+            observed_payloads.append(kwargs["json"])
+
+            class FakeResponse:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict[str, Any]:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": '{"drop_unsupported_strategy_logic":true,"keep_unsupported_strategy_logic":false,"confidence":0.94}'
+                                }
+                            }
+                        ]
+                    }
+
+            return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setattr(
+        openrouter.httpx, "AsyncClient", lambda **_kwargs: FakeAsyncClient()
+    )
+
+    result = asyncio.run(
+        openrouter.invoke_openrouter_json_schema(
+            task="capability_conflict",
+            messages=[{"role": "user", "content": "Compra y mantén ETH"}],
+            schema_model=SupportedStrategyCapabilityConflictAudit,
+            schema_name="SupportedStrategyCapabilityConflictAudit",
+        )
+    )
+
+    assert result is not None
+    assert result.drop_unsupported_strategy_logic is True
+    assert observed_payloads[0]["model"] == "openai/gpt-oss-120b"
+    assert observed_payloads[0]["reasoning"] == {"effort": "medium"}
+    receipts = openrouter.get_openrouter_route_receipts()
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert receipt.task == "capability_conflict"
+    assert receipt.tier == "context"
+    assert receipt.model == "openai/gpt-oss-120b"
+    assert receipt.schema_name == "SupportedStrategyCapabilityConflictAudit"
+    assert receipt.outcome == "succeeded"
 
 
 def test_direct_json_schema_records_missing_key_route_receipt(monkeypatch) -> None:

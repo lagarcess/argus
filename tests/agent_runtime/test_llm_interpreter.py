@@ -750,6 +750,72 @@ def test_current_message_run_field_contract_prefers_bounded_date_evidence_span()
 
 
 @pytest.mark.asyncio
+async def test_stated_run_field_fidelity_audit_preserves_bare_numeric_capital(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del messages, model_name
+        calls.append((task, schema_name))
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return schema_model(capital_amount=100000, confidence=0.95)
+        raise AssertionError(f"unexpected schema: {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="El usuario quiere probar ETH.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Compra y manten ETH de enero de 2024 hasta marzo de 2024 con 100000"
+            ),
+            strategy_type="buy_and_hold",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-03-31"},
+            date_range_raw_text="enero de 2024 hasta marzo de 2024",
+            language="es-419",
+            evidence_spans={
+                "strategy_type": "Compra y manten",
+                "asset_universe": "ETH",
+                "date_range": "enero de 2024 hasta marzo de 2024",
+            },
+        ),
+    )
+
+    repaired = await interpreter_module._audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert calls == [("field_fidelity", "StatedRunFieldFidelityAudit")]
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.capital_amount == 100000
+    assert draft.field_provenance["capital_amount"] == "starting_capital"
+    assert "stated_run_field_fidelity_audit" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model_failure(
     monkeypatch,
 ) -> None:
@@ -5159,6 +5225,165 @@ def test_llm_interpreter_drops_stale_unsupported_copy_for_executable_rsi_thresho
     assert result.unsupported_constraints == []
     assert strategy.entry_logic == "Buy when RSI(14) drops to 40 or below"
     assert strategy.exit_logic == "Sell when RSI(14) rises to 55 or above"
+
+
+@pytest.mark.asyncio
+async def test_supported_strategy_capability_conflict_audit_clears_simple_buy_and_hold(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del messages, model_name
+        calls.append((task, schema_name))
+        return schema_model(
+            drop_unsupported_strategy_logic=True,
+            keep_unsupported_strategy_logic=False,
+            confidence=0.94,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "resolve_asset",
+        lambda symbol: ResolvedAssetStub(symbol.upper(), "crypto"),
+    )
+
+    interpreter = OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="El usuario quiere comprar y mantener ETH.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis=(
+                "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+            ),
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range="enero de 2024 hasta marzo de 2024",
+            capital_amount=100000,
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value=(
+                    "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+                ),
+                explanation="This idea depends on strategy logic that is not executable yet.",
+                simplification_labels=[
+                    "Use a supported RSI threshold rule",
+                    "Compare with buy and hold",
+                    "Use a supported moving-average crossover",
+                ],
+            )
+        ],
+    )
+
+    request = InterpretationRequest(
+        current_user_message=(
+            "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+        ),
+        recent_thread_history=[],
+        latest_task_snapshot=None,
+        user=UserState(user_id="u1", language_preference="es-419"),
+    )
+    audited = await interpreter_module._audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model="test-model",
+        request=request,
+    )
+
+    assert calls == [("capability_conflict", "SupportedStrategyCapabilityConflictAudit")]
+    assert audited is not None
+    result = interpreter._to_runtime_interpretation(audited, request=request)
+    strategy = result.candidate_strategy_draft
+    assert strategy.strategy_type == "buy_and_hold"
+    assert strategy.asset_universe == ["ETH"]
+    assert strategy.capital_amount == 100000
+    assert result.unsupported_constraints == []
+    assert "supported_strategy_capability_conflict_audit" in result.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_supported_strategy_capability_conflict_audit_keeps_extra_rule_block(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del task, messages, schema_name, model_name
+        return schema_model(
+            drop_unsupported_strategy_logic=False,
+            keep_unsupported_strategy_logic=True,
+            confidence=0.92,
+        )
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="El usuario quiere condicionar una compra de ETH a noticias.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Compra y mantén ETH cuando las noticias sean positivas durante 2024"
+            ),
+            strategy_type="buy_and_hold",
+            strategy_thesis=(
+                "Compra y mantén ETH cuando las noticias sean positivas durante 2024"
+            ),
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range="2024",
+            capital_amount=100000,
+            entry_logic="Comprar cuando las noticias sean positivas",
+        ),
+        unsupported_constraints=[
+            interpreter_module.LLMUnsupportedConstraint(
+                category="unsupported_strategy_logic",
+                raw_value="cuando las noticias sean positivas",
+                explanation=(
+                    "The request depends on news sentiment, which is not executable."
+                ),
+                simplification_labels=["Compare with buy and hold"],
+            )
+        ],
+    )
+
+    audited = await interpreter_module._audit_supported_strategy_capability_conflict(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "Compra y mantén ETH cuando las noticias sean positivas durante 2024"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert audited is None
 
 
 def test_llm_interpreter_does_not_merge_prior_dca_into_fresh_strategy(
