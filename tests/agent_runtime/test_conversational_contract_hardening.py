@@ -5100,7 +5100,14 @@ async def test_stated_run_fidelity_audits_misread_non_dca_capital(
         response=response,
         request=request,
     )
-    assert deterministic_repair is None
+    assert deterministic_repair is not None
+    assert "current_message_run_field_contract_repair" in (
+        deterministic_repair.reason_codes
+    )
+    assert llm_module._response_needs_stated_run_field_fidelity_audit(
+        response=deterministic_repair,
+        request=request,
+    )
 
     repaired = await llm_module._audit_stated_run_field_fidelity(
         response=response,

@@ -352,8 +352,10 @@ Action:
 - Closed locally in the readiness branch: DCA result cards now make recurring
   contribution, cadence, and zero starting principal explicit in English and
   Spanish assumptions, and the launch envelope reuses those card assumptions.
-- Gate or clarify user requests that mix starting principal, recurring
-  contribution, and total budget.
+- Closed locally in the readiness branch: DCA total-budget, starting-principal,
+  cap, and recurring-contribution roles are separated by semantic audits and
+  regression coverage; unsupported total-principal context clarifies instead of
+  becoming the executable recurring amount.
 
 #### Config Snapshot Reproducibility
 
@@ -1209,7 +1211,8 @@ Before implementing the readiness slice, lock these:
 - Add config snapshot reproducibility tests.
 - Clarify DCA result assumptions. Closed locally in the readiness branch.
 - Gate unsupported DCA total-budget/starting-principal requests where the
-  interpreter has not already done so.
+  interpreter has not already done so. Covered locally by the existing DCA
+  semantic-role audit and clarification matrix.
 
 ### Slice 5: Workflow And Observability Gate
 
