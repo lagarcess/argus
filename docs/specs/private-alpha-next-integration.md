@@ -112,6 +112,31 @@ Codex should own or closely supervise this:
    - This branch may refine that spec, but it must not implement the
      evidence-aware idea loop without explicit approval.
 
+## Known Non-Blocking Debt
+
+Track these as future validation slices, not blockers for the current main
+deploy:
+
+1. **Composer paste and long copied-result handling**
+   - Live observation on 2026-06-11: `Copy Plain Text` can copy a non-empty
+     result breakdown into the Codex browser tab clipboard and show `Copied`,
+     but pasting back into `ChatInput` can fail when the browser does not
+     support or allow the current `document.execCommand("insertText")` paste
+     path after the paste handler calls `preventDefault`.
+   - Product concern: long copied result text can overwhelm the persistent
+     composer if pasted inline. Frontier chat products often promote long
+     copied content into file-like attachments, but Argus should not fake
+     `.txt` attachments while the current OpenRouter-backed chat path does not
+     support text-file inputs.
+   - Future validation should confirm normal-browser versus Codex-browser
+     behavior, define an Argus-scale long-text paste treatment such as capped
+     inline paste, paste preview, or explicit large-text handling, then replace
+     the `execCommand` paste path with a modern contenteditable or state
+     insertion path and add Bun plus browser QA.
+   - This is not Jules-ready implementation until the product behavior is
+     scoped. Jules may later run a read-only validation inventory or help draft
+     a GitHub task prompt.
+
 ## Low-Risk Work Suitable For External Async Agents
 
 External async agent `Jules` may work on these only within focused
