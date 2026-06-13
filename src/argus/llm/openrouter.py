@@ -94,8 +94,8 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
         "field_fidelity",
         temperature=0,
         max_tokens=900,
-        timeout_seconds=15,
-        reasoning_effort="medium",
+        timeout_seconds=20,
+        reasoning_effort="high",
     ),
     "capability_conflict": OpenRouterProfile(
         "capability_conflict",

@@ -370,6 +370,20 @@ class StatedRunFieldFidelityAudit(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
+class StatedStartingCapitalAudit(BaseModel):
+    starting_capital: float | None = Field(
+        default=None,
+        description=(
+            "Starting capital explicitly stated by the current user message, "
+            "normalized as a number. Return null when the current message does "
+            "not state starting capital. Preserve plain numeric allocation "
+            "amounts in any language when they are used as the amount to test, "
+            "invest, allocate, put on, or use as capital."
+        ),
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
 class SupportedStrategyCapabilityConflictAudit(BaseModel):
     drop_unsupported_strategy_logic: bool = Field(
         description=(
@@ -4507,6 +4521,13 @@ async def _audit_stated_run_field_fidelity(
         audit=audit,
         current_message=request.current_user_message,
     )
+    candidate_response = repaired or deterministic_repair or response
+    capital_recheck = await _audit_stated_starting_capital_fidelity(
+        response=candidate_response,
+        request=request,
+    )
+    if capital_recheck is not None:
+        return capital_recheck
     if repaired is None:
         return deterministic_repair
     return repaired
@@ -5569,6 +5590,124 @@ def _stated_run_field_audit_omitted_expected_fields(
     ):
         return True
     return False
+
+
+async def _audit_stated_starting_capital_fidelity(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    if not _response_needs_stated_starting_capital_recheck(
+        response=response,
+        request=request,
+    ):
+        return None
+    try:
+        audit = await invoke_openrouter_json_schema(
+            task="field_fidelity",
+            messages=_stated_starting_capital_messages(
+                response=response,
+                request=request,
+            ),
+            schema_model=StatedStartingCapitalAudit,
+            schema_name="StatedStartingCapitalAudit",
+        )
+    except Exception:
+        return None
+    if not isinstance(audit, StatedStartingCapitalAudit):
+        return None
+    return _response_from_stated_starting_capital_audit(
+        response=response,
+        audit=audit,
+    )
+
+
+def _response_needs_stated_starting_capital_recheck(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> bool:
+    if response.intent not in {"strategy_drafting", "backtest_execution"}:
+        return False
+    if response.semantic_turn_act in {
+        "approval",
+        "result_followup",
+        "unsupported_request",
+    }:
+        return False
+    draft = response.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        return False
+    if draft.capital_amount is not None:
+        return False
+    return _llm_strategy_draft_has_concrete_execution_target(draft)
+
+
+def _stated_starting_capital_messages(
+    *,
+    response: LLMInterpretationResponse,
+    request: InterpretationRequest,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are Argus's focused starting-capital verifier. The broad "
+                "run-field audit may have omitted a money amount. Decide only "
+                "whether the current user message explicitly states starting "
+                "capital for the runnable idea. Return starting_capital as a "
+                "normalized number only when the message uses the amount as the "
+                "cash to test, invest, allocate, put on, or use as capital. This "
+                "is language-agnostic: examples include 'with 100000', "
+                "'con 100000', 'put 100K on it', '$10,000', and equivalent "
+                "allocation wording in the user's language. Do not require a "
+                "currency symbol. Return null for dates, calendar years, "
+                "indicator periods, lookback windows, percentages, share counts, "
+                "asset names, ticker symbols, or benchmark names. For DCA or "
+                "recurring buys, do not return per-purchase contribution here. "
+                "Do not copy default assumptions from the draft. If unsure, "
+                "return null with low confidence. Return only JSON matching the "
+                "schema."
+            ),
+        },
+        {
+            "role": "system",
+            "content": (
+                "Structured draft JSON: "
+                f"{response.candidate_strategy_draft.model_dump(mode='json')}"
+            ),
+        },
+        {"role": "user", "content": request.current_user_message},
+    ]
+
+
+def _response_from_stated_starting_capital_audit(
+    *,
+    response: LLMInterpretationResponse,
+    audit: StatedStartingCapitalAudit,
+) -> LLMInterpretationResponse | None:
+    if audit.starting_capital is None or audit.confidence < 0.8:
+        return None
+    repaired = response.model_copy(deep=True)
+    draft = repaired.candidate_strategy_draft
+    if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
+        return None
+    if draft.capital_amount == audit.starting_capital and draft.field_provenance.get(
+        "capital_amount"
+    ) == "starting_capital":
+        return None
+    draft.capital_amount = float(audit.starting_capital)
+    draft.field_provenance["capital_amount"] = "starting_capital"
+    repaired.reason_codes = list(
+        dict.fromkeys(
+            [
+                *repaired.reason_codes,
+                "stated_run_field_fidelity_audit",
+                "stated_starting_capital_recheck",
+            ]
+        )
+    )
+    return repaired
 
 
 def _normalized_stated_field(value: Any) -> str:
