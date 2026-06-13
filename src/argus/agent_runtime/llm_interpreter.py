@@ -4513,8 +4513,20 @@ async def _audit_stated_run_field_fidelity(
             schema_name="StatedRunFieldFidelityAudit",
         )
     except Exception:
+        capital_recheck = await _audit_stated_starting_capital_fidelity(
+            response=deterministic_repair or response,
+            request=request,
+        )
+        if capital_recheck is not None:
+            return capital_recheck
         return deterministic_repair
     if not isinstance(audit, StatedRunFieldFidelityAudit):
+        capital_recheck = await _audit_stated_starting_capital_fidelity(
+            response=deterministic_repair or response,
+            request=request,
+        )
+        if capital_recheck is not None:
+            return capital_recheck
         return deterministic_repair
     repaired = _response_from_stated_run_field_fidelity_audit(
         response=response,
