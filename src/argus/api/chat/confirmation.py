@@ -200,9 +200,19 @@ def runtime_confirmation_card(
         "assumptions": assumptions,
         "actions": actions,
     }
+    asset_class = _confirmation_asset_class(strategy)
+    if asset_class is not None:
+        card["asset_class"] = asset_class
     if canonical_date_range is not None:
         card["date_range"] = canonical_date_range
     return card
+
+
+def _confirmation_asset_class(strategy: dict[str, Any]) -> str | None:
+    asset_class = strategy.get("asset_class")
+    if asset_class in {"equity", "crypto", "currency_pair"}:
+        return str(asset_class)
+    return None
 
 
 def _confirmation_row(key: str, label: str, value: str) -> dict[str, str]:

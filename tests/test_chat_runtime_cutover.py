@@ -408,5 +408,6 @@ def test_runtime_confirmation_card_formats_structured_date_range(
     )
 
     assert card is not None
+    assert card["asset_class"] == "crypto"
     rows_by_label = {row["label"]: row["value"] for row in card["rows"]}
     assert rows_by_label["Period"] == "January 1, 2025 - May 3, 2026"

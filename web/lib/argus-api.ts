@@ -64,6 +64,7 @@ export type ConversationResultCard = {
   title: string;
   symbols?: string[];
   strategy_label?: string;
+  asset_class?: AssetClass | null;
   date_range: {
     start: string;
     end: string;
@@ -367,7 +368,9 @@ function rememberDiscoverySearch(
 export function resultCardFromConversationCard(
   card: ConversationResultCard,
   run?: Pick<BacktestRun, "id" | "strategy_id"> &
-    Partial<Pick<BacktestRun, "benchmark_symbol" | "config_snapshot">>,
+    Partial<
+      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot">
+    >,
 ) {
   const rows = [...card.rows].sort(
     (a, b) => resultMetricDisplayOrder(a) - resultMetricDisplayOrder(b),
@@ -386,6 +389,7 @@ export function resultCardFromConversationCard(
     })),
     benchmarkNote: displayResultBenchmarkNote(card.benchmark_note),
     assumptions: card.assumptions,
+    assetClass: run?.asset_class ?? card.asset_class ?? undefined,
     configSnapshot: run?.config_snapshot,
     runId: run?.id,
     strategyId: run?.strategy_id ?? null,

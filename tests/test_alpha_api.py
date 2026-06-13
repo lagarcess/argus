@@ -422,6 +422,7 @@ def test_backtest_run_normalizes_defaults_persists_metrics_and_history() -> None
     run = response.json()["run"]
     assert run["status"] == "completed"
     assert run["asset_class"] == "equity"
+    assert run["conversation_result_card"]["asset_class"] == "equity"
     assert run["benchmark_symbol"] == "SPY"
     assert run["config_snapshot"]["side"] == "long"
     assert run["config_snapshot"]["starting_capital"] == 1000

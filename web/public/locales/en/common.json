@@ -163,6 +163,11 @@
     "error_generic": "Something went wrong. Try again.",
     "result_trust_strip": "Historical simulation · No fees/slippage · Not advice",
     "result_trust_strip_label": "Result trust context",
+    "asset_class": {
+      "equity": "Stocks",
+      "crypto": "Crypto",
+      "currency_pair": "Currency Pair"
+    },
     "view_details": "View details",
     "new_chat_ready": "New chat ready. What idea should we test?",
     "resume_prompt": "Resuming \"{{title}}\". What would you like to explore next?",

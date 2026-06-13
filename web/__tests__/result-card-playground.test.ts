@@ -305,6 +305,7 @@ describe("result card playground", () => {
     const spanish = heroDeltaEvidenceView(
       {
         ...resultCardPlaygroundFixtures[0].result,
+        assetClass: "crypto",
         dateRange: {
           start: "2024-01-01",
           end: "2024-03-31",
@@ -321,11 +322,15 @@ describe("result card playground", () => {
           totalReturnSuffix: "rendimiento total",
           percentagePoints: (value) => `${value} puntos porcentuales`,
           beatBy: (value) => `Superó por ${value}`,
+          assetClassLabel: (assetClass) =>
+            assetClass === "crypto" ? "Cripto" : assetClass,
           startingCapitalLabel: "Capital inicial",
           dateRangeLabel: "Rango de fechas",
           timeframeLabel: "Temporalidad",
           benchmarkLabel: "Referencia",
           dailyData: "Datos diarios",
+          trustStrip:
+            "Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
         },
         locale: "es-419",
       },
@@ -338,6 +343,9 @@ describe("result card playground", () => {
     expect(spanish.benchmark.value).toBe("Superó por 27.9 puntos porcentuales");
     expect(spanish.worstDrop.label).toBe("Peor caída");
     expect(spanish.timeframeDisplay).toBe("Datos diarios");
+    expect(spanish.trustGroups).toEqual([
+      "Cripto · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría",
+    ]);
     expect(spanish.details).toContainEqual({
       label: "Capital inicial",
       value: "$1,000",
@@ -403,6 +411,7 @@ describe("result card playground", () => {
     expect(mappedWithoutRun.symbols).toEqual(["AAPL", "MSFT"]);
     expect(mappedWithoutRun.statusLabel).toBe("Completed");
     expect(mappedWithoutRun.assumptions).toEqual(["Assumption 1", "Assumption 2"]);
+    expect(mappedWithoutRun.assetClass).toBeUndefined();
     expect(mappedWithoutRun.chart).toBeNull();
     expect(mappedWithoutRun.runId).toBeUndefined();
     expect(mappedWithoutRun.strategyId).toBeNull();
@@ -424,6 +433,31 @@ describe("result card playground", () => {
     expect(mappedWithRun.runId).toBe("run-123");
     expect(mappedWithRun.strategyId).toBe("strat-456");
     expect(mappedWithRun.configSnapshot).toEqual({ template: "buy_and_hold" });
+  });
+
+  test("hydrates asset class from persisted result cards when run context is absent", () => {
+    const mapped = resultCardFromConversationCard({
+      title: "ETH Buy and Hold",
+      symbols: ["ETH"],
+      strategy_label: "Buy and Hold",
+      asset_class: "crypto",
+      date_range: {
+        start: "2024-01-01",
+        end: "2024-03-31",
+        display: "January 1, 2024 to March 31, 2024",
+      },
+      status_label: "Simulation Complete",
+      rows: [
+        { key: "cash_value", label: "Cash Value ($)", value: "$100,000 -> $120,000" },
+        { key: "total_return_pct", label: "Total Return (%)", value: "+20.0%" },
+        { key: "benchmark_delta", label: "Vs benchmark", value: "+1.0% vs BTC" },
+        { key: "max_drawdown_pct", label: "Max Drawdown", value: "-10.0%" },
+      ],
+      assumptions: ["Long-only", "Equal weight", "Benchmark: BTC"],
+      actions: [],
+    });
+
+    expect(mapped.assetClass).toBe("crypto");
   });
 
 });

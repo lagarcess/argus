@@ -6,6 +6,7 @@ import {
   actionHasCardScopedOwnership,
   visibleComposerActions,
 } from "../lib/chat-action-ownership";
+import { confirmationRowKey } from "../components/chat/confirmation-display";
 import type { ChatActionOption } from "../components/chat/types";
 
 const root = join(import.meta.dir, "..");
@@ -51,10 +52,21 @@ describe("chat turn artifact UX", () => {
     expect(card).toContain("confirmation.confirmation_state === \"active\"");
     expect(card).toContain("confirmationCardViewModel");
     expect(card).toContain("confirmationAssetTitle");
+    expect(card).toContain("assetClassDisplayLabel(confirmation.asset_class");
     expect(card).toContain("displayAssumptions");
     expect(card).not.toContain("confirmation.rows.slice(0, 3)");
     expect(card).not.toContain("sm:grid-cols-3");
     expect(card).not.toContain("opacity-70");
+  });
+
+  test("confirmation row identity uses structured keys instead of translated labels", () => {
+    expect(
+      confirmationRowKey({
+        label: "Capital inicial",
+        labelKey: "chat.confirmation.rows.starting_capital",
+      }),
+    ).toBe("starting_capital");
+    expect(confirmationRowKey({ label: "Capital inicial" })).toBeNull();
   });
 
   test("assistant turn controls render for artifact turns without duplicating card-scoped actions", () => {

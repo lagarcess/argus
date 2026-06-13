@@ -141,6 +141,7 @@ export type StrategyConfirmationDateRange = {
 export type StrategyConfirmationPayload = {
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
+  asset_class?: AssetClass | null;
   artifactId?: string;
   artifactType?: ArtifactType;
   artifactStatus?: string;

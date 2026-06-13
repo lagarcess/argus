@@ -1,4 +1,6 @@
 import type { StrategyResultPayload } from "@/components/chat/types";
+import type { AssetClass } from "@/lib/argus-types";
+import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 
 type MetricLike = {
@@ -32,6 +34,7 @@ export type ResultCardDisplayCopy = {
   inLineWith: (symbol: string) => string;
   beatBy: (value: string) => string;
   laggedBy: (value: string) => string;
+  assetClassLabel: (assetClass: AssetClass) => string;
   trustStrip: string;
   startingCapitalLabel: string;
   totalContributedLabel: string;
@@ -75,6 +78,7 @@ export const defaultResultCardDisplayCopy: ResultCardDisplayCopy = {
   inLineWith: (symbol) => `In line with ${symbol}`,
   beatBy: (value) => `Beat by ${value}`,
   laggedBy: (value) => `Lagged by ${value}`,
+  assetClassLabel: (assetClass) => assetClassDisplayLabel(assetClass) ?? assetClass,
   trustStrip: "Historical simulation · No fees/slippage · Not advice",
   startingCapitalLabel: "Starting capital",
   totalContributedLabel: "Total contributed",
@@ -291,13 +295,19 @@ export function heroDeltaEvidenceView(
       value: worstDrop?.value ?? copy.unavailable,
     },
     timeframeDisplay: facts.timeframeDisplay,
-    trustGroups: compactTrustGroups(copy),
+    trustGroups: compactTrustGroups(copy, result.assetClass),
     details: facts.details,
   };
 }
 
-export function compactTrustGroups(copy = defaultResultCardDisplayCopy) {
-  return [copy.trustStrip];
+export function compactTrustGroups(
+  copy = defaultResultCardDisplayCopy,
+  assetClass?: AssetClass,
+) {
+  const assetClassLabel = assetClass ? copy.assetClassLabel(assetClass) : undefined;
+  return [
+    assetClassLabel ? `${assetClassLabel} · ${copy.trustStrip}` : copy.trustStrip,
+  ];
 }
 
 export function compactTrustStrip(copy = defaultResultCardDisplayCopy) {

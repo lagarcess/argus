@@ -569,6 +569,7 @@ def test_build_result_card_actions_by_symbol_count() -> None:
 
     # Case 1: Single symbol
     card = engine.build_result_card(config, metrics)
+    assert card["asset_class"] == "equity"
     row_keys = [row["key"] for row in card["rows"]]
     assert row_keys[:4] == [
         "cash_value",

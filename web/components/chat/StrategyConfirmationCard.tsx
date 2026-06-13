@@ -15,6 +15,7 @@ import {
   artifactStatusToneClassName,
   type ArtifactStatusTone,
 } from "@/lib/artifact-status-tones";
+import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import {
   type ChatActionOption,
@@ -75,7 +76,7 @@ export default function StrategyConfirmationCard({ confirmation, onAction }: Str
       {(viewModel.summaryRows.length > 0 || viewModel.detailRows.length > 0) && (
         <div className="border-t border-[#c9c9cd]/30 px-4 py-4 dark:border-white/[0.06] sm:px-5">
           {viewModel.summaryRows.length > 0 && (
-            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {viewModel.summaryRows.map((row) => (
                 <div key={row.label} className="min-w-0">
                   <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8d969e]">
@@ -237,6 +238,7 @@ function confirmationCardViewModel(
     )
     .map(({ row }) => row);
   const promotedValues = summaryRows.map((row) => row.value);
+  const assetClassLabel = assetClassDisplayLabel(confirmation.asset_class, t);
 
   return {
     assetSymbols,
@@ -244,7 +246,11 @@ function confirmationCardViewModel(
       strategyRow?.value ?? confirmationAssetTitle(assetRow, confirmation.title, t),
     summaryRows,
     detailRows,
-    assumptions: displayAssumptions(confirmation.assumptions ?? [], promotedValues),
+    assumptions: displayAssumptions(
+      confirmation.assumptions ?? [],
+      promotedValues,
+      assetClassLabel,
+    ),
   };
 }
 
@@ -290,11 +296,19 @@ function confirmationAssetTitle(
   return fallbackTitle.trim() || t("chat.confirmation.selected_asset", "Selected asset");
 }
 
-function displayAssumptions(assumptions: string[], promotedValues: string[]) {
-  return assumptions.filter(
+function displayAssumptions(
+  assumptions: string[],
+  promotedValues: string[],
+  assetClassLabel?: string,
+) {
+  const filtered = assumptions.filter(
     (assumption) =>
       !promotedValues.some((value) => value.trim() && assumption.includes(value.trim())),
   );
+  if (!assetClassLabel || filtered.includes(assetClassLabel)) {
+    return filtered;
+  }
+  return [assetClassLabel, ...filtered];
 }
 
 function AssetSymbols({ symbols }: { symbols: string[] }) {

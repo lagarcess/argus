@@ -6,6 +6,7 @@ import {
   heroDeltaEvidenceView,
 } from "@/lib/result-card-display";
 import { artifactStatusToneClassName } from "@/lib/artifact-status-tones";
+import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { isVisibleResultAction } from "@/lib/chat-result-actions";
 import { strategiesEnabled } from "@/lib/private-alpha-flags";
@@ -117,7 +118,10 @@ export default function StrategyResultCard({
 
         <StatRail metrics={[view.benchmark, view.worstDrop]} />
 
-        <TrustRail groups={trustGroups} />
+        <TrustRail
+          groups={trustGroups}
+          label={t("chat.result_trust_strip_label", "Result trust context")}
+        />
 
         <ExecutionDetails
           details={view.details}
@@ -191,10 +195,10 @@ function StatItem({
   );
 }
 
-function TrustRail({ groups }: { groups: string[] }) {
+function TrustRail({ groups, label }: { groups: string[]; label: string }) {
   return (
     <div
-      aria-label="Result trust context"
+      aria-label={label}
       className="mt-3 flex flex-col gap-1 text-[12px] leading-snug tracking-[0.16px] text-[#8d969e] sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1"
     >
       {groups.map((group) => (
@@ -317,6 +321,8 @@ function resultDisplayCopy(t: ReturnType<typeof useTranslation>["t"]): ResultCar
         defaultValue: "Lagged by {{value}}",
         value,
       }),
+    assetClassLabel: (assetClass) =>
+      assetClassDisplayLabel(assetClass, t) ?? assetClass,
     trustStrip: t(
       "chat.result_trust_strip",
       "Historical simulation · No fees/slippage · Not advice",

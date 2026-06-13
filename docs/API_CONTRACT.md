@@ -316,6 +316,8 @@ machine-readable fields alongside display labels:
   persisted cards.
 - `rows[].key`: stable row identity such as `strategy`, `assets`, or `period`.
 - `rows[].label` / `rows[].labelKey`: display fallback plus frontend i18n key.
+- `asset_class`: optional stable run universe class such as `equity`,
+  `crypto`, or `currency_pair`; clients may render this as muted trust metadata.
 - `date_range`: optional canonical `{ start, end, display }` range for cards
   whose period row is visually compacted from ISO fields.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
@@ -465,6 +467,7 @@ Immutable simulation result.
   },
   "conversation_result_card": {
     "title": "Moon Mission (Momentum Breakout)",
+    "asset_class": "equity",
     "date_range": {
       "start": "2022-01-01",
       "end": "2024-12-31",
