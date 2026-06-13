@@ -3157,7 +3157,7 @@ async def _response_ready_for_runtime(
             response=response,
             request=request,
         ):
-            audited_response = await _audit_stated_run_field_fidelity(
+            audited_response = await _audit_stated_run_fields(
                 response=response,
                 preferred_model=preferred_model,
                 request=request,
@@ -3174,7 +3174,7 @@ async def _response_ready_for_runtime(
             "OpenRouter interpretation replayed the active artifact without a "
             "material current-turn update"
         )
-    audited_response = await _audit_stated_run_field_fidelity(
+    audited_response = await _audit_stated_run_fields(
         response=response,
         preferred_model=preferred_model,
         request=request,
@@ -3256,7 +3256,7 @@ async def _stated_run_field_audited_response(
         response = grounded_response
         if response.requires_clarification:
             return response
-    audited_response = await _audit_stated_run_field_fidelity(
+    audited_response = await _audit_stated_run_fields(
         response=response,
         preferred_model=preferred_model,
         request=request,
@@ -3269,6 +3269,25 @@ async def _stated_run_field_audited_response(
         request=request,
     )
     return conflict_response or response
+
+
+async def _audit_stated_run_fields(
+    *,
+    response: LLMInterpretationResponse,
+    preferred_model: str,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse | None:
+    audited_response = await _audit_stated_run_field_fidelity(
+        response=response,
+        preferred_model=preferred_model,
+        request=request,
+    )
+    if audited_response is not None:
+        return audited_response
+    return await _audit_stated_starting_capital_fidelity(
+        response=response,
+        request=request,
+    )
 
 
 def _clear_auto_simplified_strategy_when_rule_is_ambiguous(
@@ -3370,7 +3389,7 @@ async def _repair_incomplete_strategy_extraction(
             preferred_model=model_name,
             request=request,
         )
-        audited_response = await _audit_stated_run_field_fidelity(
+        audited_response = await _audit_stated_run_fields(
             response=response,
             preferred_model=model_name,
             request=request,

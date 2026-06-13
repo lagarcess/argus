@@ -971,6 +971,81 @@ async def test_stated_starting_capital_recheck_runs_when_broad_audit_fails(
 
 
 @pytest.mark.asyncio
+async def test_stated_starting_capital_recheck_runs_when_broad_audit_skips(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime import llm_interpreter as interpreter_module
+
+    calls: list[tuple[str, str]] = []
+
+    async def no_broad_change(**kwargs) -> None:
+        del kwargs
+        return None
+
+    async def fake_json_schema(
+        *, task, messages, schema_model, schema_name, model_name=None
+    ):
+        del messages, model_name
+        calls.append((task, schema_name))
+        if schema_name == "StatedStartingCapitalAudit":
+            return schema_model(starting_capital=100000, confidence=0.94)
+        raise AssertionError(f"unexpected schema: {schema_name}")
+
+    monkeypatch.setattr(
+        interpreter_module,
+        "_audit_stated_run_field_fidelity",
+        no_broad_change,
+    )
+    monkeypatch.setattr(
+        interpreter_module,
+        "invoke_openrouter_json_schema",
+        fake_json_schema,
+    )
+
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        user_goal_summary="El usuario quiere probar ETH.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            raw_user_phrasing=(
+                "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+            ),
+            strategy_type="buy_and_hold",
+            asset_universe=["ETH"],
+            asset_class="crypto",
+            date_range={"start": "2024-01-01", "end": "2024-03-31"},
+            date_range_raw_text="enero de 2024 hasta marzo de 2024",
+            language="es-419",
+            evidence_spans={
+                "strategy_type": "Compra y mantén",
+                "asset_universe": "ETH",
+                "date_range": "enero de 2024 hasta marzo de 2024",
+            },
+        ),
+    )
+
+    repaired = await interpreter_module._audit_stated_run_fields(
+        response=response,
+        preferred_model="test-model",
+        request=InterpretationRequest(
+            current_user_message=(
+                "Compra y mantén ETH de enero de 2024 hasta marzo de 2024 con 100000"
+            ),
+            recent_thread_history=[],
+            latest_task_snapshot=None,
+            user=UserState(user_id="u1", language_preference="es-419"),
+        ),
+    )
+
+    assert calls == [("field_fidelity", "StatedStartingCapitalAudit")]
+    assert repaired is not None
+    draft = repaired.candidate_strategy_draft
+    assert draft.capital_amount == 100000
+    assert draft.field_provenance["capital_amount"] == "starting_capital"
+    assert "stated_starting_capital_recheck" in repaired.reason_codes
+
+
+@pytest.mark.asyncio
 async def test_llm_interpreter_plans_active_artifact_assumption_edit_after_model_failure(
     monkeypatch,
 ) -> None:
