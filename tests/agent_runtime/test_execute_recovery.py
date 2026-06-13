@@ -1465,6 +1465,30 @@ def test_explain_stage_varies_with_profile_and_includes_caveats() -> None:
     )
 
 
+def test_explain_stage_localizes_spanish_quick_take_heading() -> None:
+    state = RunState.new(current_user_message="por que", recent_thread_history=[])
+    state.effective_response_profile = ResponseProfile(
+        effective_tone="friendly",
+        effective_verbosity="medium",
+        effective_expertise_mode="beginner",
+    )
+    state.confirmation_payload = {
+        "strategy": {"strategy_thesis": "Probar compra y mantener ETH"},
+    }
+    state.final_response_payload = {
+        "result": {
+            "total_return": 0.551,
+            "benchmark_return": 0.614,
+            "benchmark_symbol": "BTC",
+        }
+    }
+
+    result = explain_stage(state=state, language="es-419")
+
+    assert result.patch["assistant_response"].startswith("**Resumen rápido**")
+    assert not result.patch["assistant_response"].startswith("**Quick take**")
+
+
 @pytest.mark.asyncio
 async def test_explain_stage_async_validates_next_checks_without_rendering_them(
     monkeypatch,
@@ -1536,6 +1560,62 @@ async def test_explain_stage_async_validates_next_checks_without_rendering_them(
     assert "trend_filter" not in allowed_kinds
     assert "volatility_stop" not in allowed_kinds
     assert captured["schema_model"] is explain_module.QuickTakeDraft
+
+
+@pytest.mark.asyncio
+async def test_explain_stage_async_localizes_spanish_quick_take_heading(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.stages import explain as explain_module
+
+    async def fake_quick_take_plan(**_: object) -> dict[str, object]:
+        return {
+            "relative_performance_claim": "lagged_benchmark",
+            "takeaway": "ETH rindió +55.1%, pero quedó 6.3 puntos porcentuales detrás de BTC.",
+            "tested_bullet": "Se probó comprar y mantener ETH en la ventana solicitada.",
+            "meaning_bullet": "La comparación sirve como evidencia histórica, no como predicción.",
+            "next_check_bullet": None,
+            "assumption_bullet": None,
+            "caveat_bullet": "Simulación histórica solamente.",
+            "next_experiment_option_kinds": [],
+            "fact_ids": [
+                "tested_summary",
+                "total_return",
+                "benchmark_return",
+                "benchmark_symbol",
+                "benchmark_comparison",
+                "caveat",
+            ],
+        }
+
+    monkeypatch.setattr(
+        explain_module,
+        "invoke_openrouter_json_schema",
+        fake_quick_take_plan,
+    )
+    state = RunState.new(current_user_message="por que", recent_thread_history=[])
+    state.confirmation_payload = {
+        "strategy": {
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Comprar y mantener ETH",
+            "asset_universe": ["ETH"],
+        },
+        "optional_parameters": {},
+    }
+    state.final_response_payload = {
+        "result": {
+            "total_return": 0.551,
+            "benchmark_return": 0.614,
+            "benchmark_symbol": "BTC",
+        }
+    }
+
+    result = await explain_stage_async(state=state, language="es-419")
+
+    assert result.stage_patch["assistant_response"].startswith("**Resumen rápido**")
+    assert not result.stage_patch["assistant_response"].startswith("**Quick take**")
+    assert "ETH rindió +55.1%" in result.stage_patch["assistant_response"]
+    assert result.stage_patch["assistant_response_source"] == "llm_explain_stage"
 
 
 @pytest.mark.asyncio

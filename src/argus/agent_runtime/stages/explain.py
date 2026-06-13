@@ -50,6 +50,11 @@ RESULT_READOUT_FAILURE_LLM_UNAVAILABLE = "llm_unavailable_or_rejected"
 RESULT_READOUT_FAILURE_QUICK_TAKE_DRAFT_REJECTED = "quick_take_draft_rejected"
 
 
+def _quick_take_heading(language: str | None) -> str:
+    normalized = str(language or "").strip().lower()
+    return "Resumen rápido" if normalized.startswith("es") else "Quick take"
+
+
 @dataclass(frozen=True)
 class _LLMExplanationResult:
     text: str | None
@@ -153,7 +158,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
             outcome="ready_to_respond",
             stage_patch={
                 "assistant_response": with_response_heading(
-                    heading="Quick take",
+                    heading=_quick_take_heading(language),
                     body=response,
                 )
             },
@@ -180,7 +185,7 @@ def explain_stage(*, state: RunState, language: str = "en") -> StageResult:
         outcome="ready_to_respond",
         stage_patch={
             "assistant_response": with_response_heading(
-                heading="Quick take",
+                heading=_quick_take_heading(language),
                 body=response,
             )
         },
@@ -216,7 +221,7 @@ async def explain_stage_async(*, state: RunState, language: str = "en") -> Stage
         stage_patch={
             **fallback.stage_patch,
             "assistant_response": with_response_heading(
-                heading="Quick take",
+                heading=_quick_take_heading(language),
                 body=llm_result.text,
             ),
             "assistant_response_source": RESULT_READOUT_SOURCE_LLM,
